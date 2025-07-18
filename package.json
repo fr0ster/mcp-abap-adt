@@ -27,17 +27,20 @@
     "url": "git+https://github.com/mario-andreschak/mcp-abap-adt.git"
   },
   "devDependencies": {
+    "@abaplint/cli": "^2.113.146",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.10",
     "commander": "^14.0.0",
     "dotenv": "^17.0.1",
     "express": "^5.1.0",
     "jest": "^30.0.4",
+    "minimist": "^1.2.8",
     "open": "^10.1.2",
     "ts-jest": "^29.4.0",
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "@abaplint/core": "^2.113.146",
     "@modelcontextprotocol/sdk": "^1.13.3",
     "axios": "^1.10.0",
     "fast-xml-parser": "^5.2.5",

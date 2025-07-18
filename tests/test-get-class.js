@@ -1,20 +1,16 @@
-// Test for handleGetClass
+// Тестовий скрипт для handleGetClass
+const { handleGetClass } = require("../dist/handlers/handleGetClass");
 
-const { handleGetClass } = require('../dist/handlers/handleGetClass');
+const argv = require("minimist")(process.argv.slice(2));
+const class_name = argv.name || "CL_SALV_TABLE";
 
-async function main() {
+(async () => {
   try {
-    const args = {
-      class_name: process.argv[2] || 'ZCL_MY_CLASS',
-      filePath: process.argv[3] || undefined
-    };
-    const result = await handleGetClass(args);
-    console.log('handleGetClass result:', JSON.stringify(result, null, 2));
+    const result = await handleGetClass({ class_name });
+    console.dir(result, { depth: null, colors: true });
     process.exit(0);
   } catch (e) {
-    console.error('Error:', e);
+    console.error("Error:", e);
     process.exit(1);
   }
-}
-
-main();
+})();

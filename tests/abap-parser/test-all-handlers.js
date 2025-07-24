@@ -5,9 +5,9 @@
  * Usage: node test-abap-parser.js
  */
 
-const { handleGetAbapAST } = require('./dist/handlers/handleGetAbapAST');
-const { handleGetAbapSemanticAnalysis } = require('./dist/handlers/handleGetAbapSemanticAnalysis');
-const { handleGetAbapSystemSymbols } = require('./dist/handlers/handleGetAbapSystemSymbols');
+const { handleGetAbapAST } = require('../../dist/handlers/handleGetAbapAST');
+const { handleGetAbapSemanticAnalysis } = require('../../dist/handlers/handleGetAbapSemanticAnalysis');
+const { handleGetAbapSystemSymbols } = require('../../dist/handlers/handleGetAbapSystemSymbols');
 
 // Sample ABAP code for testing
 const sampleAbapCode = `
@@ -188,6 +188,9 @@ async function testAbapParser() {
         console.error('Stack trace:', error.stack);
         process.exit(1);
     }
+    
+    // Завершити процес успішно
+    process.exit(0);
 }
 
 // Run tests if script is executed directly

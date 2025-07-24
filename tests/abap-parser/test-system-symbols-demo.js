@@ -5,7 +5,7 @@
  * Цей скрипт показує повну JSON структуру відповіді
  */
 
-const { handleGetAbapSystemSymbols } = require('./dist/handlers/handleGetAbapSystemSymbols');
+const { handleGetAbapSystemSymbols } = require('../../dist/handlers/handleGetAbapSystemSymbols');
 
 // Простий ABAP код для демонстрації
 const demoAbapCode = `
@@ -200,7 +200,11 @@ async function demonstrateSystemSymbols() {
     } catch (error) {
         console.error('💥 Помилка демонстрації:', error.message);
         console.error('Stack trace:', error.stack);
+        process.exit(1);
     }
+    
+    // Завершити процес успішно
+    process.exit(0);
 }
 
 // Запуск демонстрації

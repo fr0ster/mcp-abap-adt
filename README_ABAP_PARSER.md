@@ -396,6 +396,40 @@ The ABAP parser integrates with existing MCP ABAP ADT tools:
 5. **Refactoring assistance**
 6. **Performance optimization** for large codebases
 
+## 🧪 Testing
+
+### Available Test Scripts
+
+The project includes comprehensive test scripts located in `tests/abap-parser/`:
+
+1. **test-all-handlers.js** - Tests all three ABAP handlers
+2. **test-system-symbols-demo.js** - Demonstrates JSON response structure  
+3. **test-salv-table-resolution.js** - Tests CL_SALV_TABLE resolution
+
+### Running Tests
+
+```bash
+# 1. Build project
+make build
+
+# 2. Run all handlers test
+cd tests/abap-parser
+node test-all-handlers.js
+
+# 3. Run specific tests
+node test-system-symbols-demo.js
+node test-salv-table-resolution.js
+```
+
+### Expected Results
+
+- **AST Generation**: 13+ code structures identified
+- **Semantic Analysis**: 15+ symbols with complexity metrics
+- **System Symbols**: Integration with SAP ADT handlers
+- **CL_SALV_TABLE**: Real SAP class resolution demo
+
+See `tests/abap-parser/README.md` for detailed testing documentation.
+
 ## Contributing
 
 When contributing to the ABAP parser:

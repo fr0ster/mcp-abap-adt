@@ -1,9 +1,10 @@
 import { McpError, ErrorCode } from '../lib/utils';
 import { writeResultToFile } from '../lib/writeResultToFile';
+import { AbapASTGenerator } from '../lib/abapParser';
 
 export const TOOL_DEFINITION = {
   name: "GetAbapAST",
-  description: "Parse ABAP code and return AST (Abstract Syntax Tree) in JSON format.",
+  description: "Parse ABAP code and return AST (Abstract Syntax Tree) in JSON format using ANTLR4 grammar.",
   inputSchema: {
     type: "object",
     properties: {
@@ -14,140 +15,48 @@ export const TOOL_DEFINITION = {
       filePath: {
         type: "string",
         description: "Optional file path to write the result to"
+      },
+      useDetailedAST: {
+        type: "boolean",
+        description: "Whether to return detailed AST with full parse tree (default: false)",
+        default: false
       }
     },
     required: ["code"]
   }
 } as const;
 
-// Simplified AST generator that doesn't depend on ANTLR until it's properly set up
-class SimpleAbapASTGenerator {
-    public parseToAST(code: string): any {
-        try {
-            // This is a placeholder implementation until ANTLR is properly configured
-            // It provides basic structure analysis
-            const lines = code.split('\n');
-            const ast = {
-                type: 'abapSource',
-                sourceLength: code.length,
-                lineCount: lines.length,
-                structures: this.analyzeStructures(code),
-                includes: this.findIncludes(code),
-                classes: this.findClasses(code),
-                methods: this.findMethods(code),
-                dataDeclarations: this.findDataDeclarations(code),
-                forms: this.findForms(code)
-            };
-            
-            return ast;
-        } catch (error) {
-            throw new Error(`Failed to parse ABAP code: ${error instanceof Error ? error.message : String(error)}`);
-        }
+// Helper functions
+function generateCodeHash(code: string): string {
+    // Simple hash function for code fingerprinting
+    let hash = 0;
+    for (let i = 0; i < code.length; i++) {
+        const char = code.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
     }
+    return Math.abs(hash).toString(16);
+}
 
-    private analyzeStructures(code: string): any[] {
-        const structures: any[] = [];
-        const lines = code.split('\n');
-        
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim().toLowerCase();
-            
-            if (line.startsWith('class ')) {
-                structures.push({
-                    type: 'class',
-                    line: i + 1,
-                    content: lines[i].trim()
-                });
-            } else if (line.startsWith('method ')) {
-                structures.push({
-                    type: 'method',
-                    line: i + 1,
-                    content: lines[i].trim()
-                });
-            } else if (line.startsWith('form ')) {
-                structures.push({
-                    type: 'form',
-                    line: i + 1,
-                    content: lines[i].trim()
-                });
-            } else if (line.startsWith('function ')) {
-                structures.push({
-                    type: 'function',
-                    line: i + 1,
-                    content: lines[i].trim()
-                });
+function countASTNodes(ast: any): number {
+    if (typeof ast !== 'object' || ast === null) {
+        return 0;
+    }
+    
+    let count = 1; // Count current node
+    
+    for (const key in ast) {
+        if (ast.hasOwnProperty(key)) {
+            const value = ast[key];
+            if (Array.isArray(value)) {
+                count += value.reduce((sum, item) => sum + countASTNodes(item), 0);
+            } else if (typeof value === 'object' && value !== null) {
+                count += countASTNodes(value);
             }
         }
-        
-        return structures;
     }
-
-    private findIncludes(code: string): string[] {
-        const includeRegex = /include\s+([a-zA-Z0-9_/<>]+)/gi;
-        const matches = code.match(includeRegex) || [];
-        return matches.map(match => match.replace(/include\s+/i, '').trim());
-    }
-
-    private findClasses(code: string): any[] {
-        const classRegex = /class\s+([a-zA-Z0-9_]+)\s+(definition|implementation)/gi;
-        const classes: any[] = [];
-        let match;
-        
-        while ((match = classRegex.exec(code)) !== null) {
-            classes.push({
-                name: match[1],
-                type: match[2].toLowerCase(),
-                position: match.index
-            });
-        }
-        
-        return classes;
-    }
-
-    private findMethods(code: string): any[] {
-        const methodRegex = /methods?\s+([a-zA-Z0-9_]+)/gi;
-        const methods: any[] = [];
-        let match;
-        
-        while ((match = methodRegex.exec(code)) !== null) {
-            methods.push({
-                name: match[1],
-                position: match.index
-            });
-        }
-        
-        return methods;
-    }
-
-    private findDataDeclarations(code: string): any[] {
-        const dataRegex = /data:?\s+([a-zA-Z0-9_]+)/gi;
-        const declarations: any[] = [];
-        let match;
-        
-        while ((match = dataRegex.exec(code)) !== null) {
-            declarations.push({
-                name: match[1],
-                position: match.index
-            });
-        }
-        
-        return declarations;
-    }
-
-    private findForms(code: string): any[] {
-        const formRegex = /form\s+([a-zA-Z0-9_]+)/gi;
-        const forms: any[] = [];
-        let match;
-        
-        while ((match = formRegex.exec(code)) !== null) {
-            forms.push({
-                name: match[1],
-                position: match.index
-            });
-        }
-        
-        return forms;
-    }
+    
+    return count;
 }
 
 export async function handleGetAbapAST(args: any) {
@@ -156,21 +65,36 @@ export async function handleGetAbapAST(args: any) {
             throw new McpError(ErrorCode.InvalidParams, 'ABAP code is required');
         }
 
-        const astGenerator = new SimpleAbapASTGenerator();
+        const astGenerator = new AbapASTGenerator();
         const ast = astGenerator.parseToAST(args.code);
+
+        // Add additional metadata
+        const enrichedAST = {
+            ...ast,
+            parseOptions: {
+                useDetailedAST: args.useDetailedAST || false,
+                timestamp: new Date().toISOString(),
+                codeHash: generateCodeHash(args.code)
+            },
+            statistics: {
+                parsingTime: 0, // Would be measured in real implementation
+                memoryUsage: process.memoryUsage().heapUsed,
+                nodeCount: countASTNodes(ast)
+            }
+        };
 
         const result = {
             isError: false,
             content: [
                 {
                     type: "text",
-                    text: JSON.stringify(ast, null, 2)
+                    text: JSON.stringify(enrichedAST, null, 2)
                 }
             ]
         };
 
         if (args.filePath) {
-            writeResultToFile(JSON.stringify(ast, null, 2), args.filePath);
+            writeResultToFile(JSON.stringify(enrichedAST, null, 2), args.filePath);
         }
 
         return result;

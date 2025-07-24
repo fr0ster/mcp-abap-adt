@@ -1,0 +1,2 @@
+# This file ensures the tools/antlr directory is tracked by git
+# while allowing the Makefile to download ANTLR JAR files into this directory

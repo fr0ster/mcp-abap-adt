@@ -16,10 +16,12 @@ export const TOOL_DEFINITION = {
       "object_type": {
         "type": "string",
         "enum": [
-          "program",
-          "include"
+          "PROG/P",
+          "PROG/I",
+          "FUGR",
+          "CLAS/OC"
         ],
-        "description": "Type of the ABAP object"
+        "description": "ADT object type (e.g. PROG/P, PROG/I, FUGR, CLAS/OC)"
       },
       "detailed": {
         "type": "boolean",
@@ -131,25 +133,18 @@ export async function handleGetIncludesList(args: any) {
         if (!object_name || typeof object_name !== 'string' || object_name.trim() === '') {
             throw new McpError(ErrorCode.InvalidParams, 'Parameter "object_name" (string) is required and cannot be empty.');
         }
-        if (!object_type || (object_type !== 'program' && object_type !== 'include')) {
-            throw new McpError(ErrorCode.InvalidParams, 'Parameter "object_type" must be either "program" or "include".');
+        if (!object_type || typeof object_type !== 'string') {
+            throw new McpError(ErrorCode.InvalidParams, 'Parameter "object_type" (string) is required.');
         }
 
         // Default timeout: 30 seconds
         const requestTimeout = timeout && typeof timeout === 'number' ? timeout : 30000;
         const isDetailed = detailed === true;
 
-        // For includes, we need to determine the parent program
+        // Передаємо object_type напряму як parentType
         let parentName = object_name;
         let parentTechName = object_name;
-        let parentType = 'PROG/P';
-
-        if (object_type === 'include') {
-            // For includes, we assume they belong to a program with similar name
-            // This is a simplification - in real scenarios, you might need additional logic
-            // to determine the actual parent program
-            // console.warn(`Include processing: assuming parent program for include ${object_name}`);
-        }
+        let parentType = object_type;
 
         // Step 1: Get root node structure to find includes node (with timeout)
         const rootResponse = await Promise.race([

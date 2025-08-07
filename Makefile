@@ -17,15 +17,15 @@ setup: $(ANTLR_DIR)/$(ANTLR_JAR)
 
 $(ANTLR_DIR)/$(ANTLR_JAR):
 	@echo "Downloading ANTLR4 JAR..."
-	@mkdir -p $(ANTLR_DIR)
-	@curl -L $(ANTLR_URL) -o $(ANTLR_DIR)/$(ANTLR_JAR)
+@if not exist $(ANTLR_DIR) mkdir $(ANTLR_DIR)
+@curl -L $(ANTLR_URL) -o $(ANTLR_DIR)/$(ANTLR_JAR)
 	@echo "ANTLR4 JAR downloaded successfully"
 
 # Generate parser from grammar
 .PHONY: generate
 generate: $(ANTLR_DIR)/$(ANTLR_JAR)
 	@echo "Generating ANTLR4 parser..."
-	@mkdir -p $(GENERATED_DIR)
+	@if not exist $(GENERATED_DIR) mkdir $(GENERATED_DIR)
 	@java -jar $(ANTLR_DIR)/$(ANTLR_JAR) -Dlanguage=TypeScript -o $(GENERATED_DIR) -package $(PARSER_PACKAGE) $(GRAMMAR_FILE)
 	@echo "Parser generated successfully"
 
@@ -40,15 +40,15 @@ build:
 .PHONY: clean
 clean:
 	@echo "Cleaning generated files..."
-	@rm -rf $(GENERATED_DIR)
-	@rm -rf dist/
+@if exist $(GENERATED_DIR) rmdir /s /q $(GENERATED_DIR)
+@if exist dist rmdir /s /q dist
 	@echo "Clean completed"
 
 # Clean everything including ANTLR JAR
 .PHONY: clean-all
 clean-all: clean
 	@echo "Cleaning ANTLR JAR..."
-	@rm -rf $(ANTLR_DIR)
+	@if exist $(ANTLR_DIR) rmdir /s /q $(ANTLR_DIR)
 	@echo "Clean all completed"
 
 # Development workflow

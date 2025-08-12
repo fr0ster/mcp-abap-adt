@@ -29,21 +29,19 @@
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@types/node": "^24.0.15",
+    "@types/node": "^24.2.1",
     "commander": "^14.0.0",
-    "dotenv": "^17.2.0",
+    "dotenv": "^17.2.1",
     "express": "^5.1.0",
-    "jest": "^30.0.4",
+    "jest": "^30.0.5",
     "open": "^10.2.0",
-    "ts-jest": "^29.4.0",
-    "typescript": "^5.8.3"
+    "ts-jest": "^29.4.1",
+    "typescript": "^5.9.2"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.16.0",
-    "axios": "^1.10.0",
+    "@modelcontextprotocol/sdk": "^1.17.2",
+    "axios": "^1.11.0",
     "fast-xml-parser": "^5.2.5",
-    "xml-js": "^1.6.11",
-    "antlr4ts": "^0.5.0-alpha.4",
-    "antlr4ts-cli": "^0.5.0-alpha.4"
+    "xml-js": "^1.6.11"
   }
 }

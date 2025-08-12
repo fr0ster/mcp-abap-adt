@@ -1,64 +1,46 @@
-# ANTLR4 Configuration
-ANTLR_VERSION = 4.13.1
-ANTLR_JAR = antlr-$(ANTLR_VERSION)-complete.jar
-ANTLR_URL = https://www.antlr.org/download/$(ANTLR_JAR)
-ANTLR_DIR = tools/antlr
-GRAMMAR_FILE = Abap.g4
-GENERATED_DIR = src/generated
-PARSER_PACKAGE = abap
+# Detect OS
+ifeq ($(OS),Windows_NT)
+	# Windows
+	MKDIR = if not exist $(1) mkdir $(1)
+	RMDIR = if exist $(1) rmdir /s /q $(1)
+	RM = if exist $(1) del /q $(1)
+	SEP = \\
+	PATH_SEP = ;
+else
+	# Unix-like (Linux, macOS)
+	MKDIR = mkdir -p $(1)
+	RMDIR = rm -rf $(1)
+	RM = rm -f $(1)
+	SEP = /
+	PATH_SEP = :
+endif
 
-# Default target
+# Default target - just build TypeScript
 .PHONY: all
-all: setup generate build
+all: build
 
-# Setup ANTLR4
-.PHONY: setup
-setup: $(ANTLR_DIR)/$(ANTLR_JAR)
-
-$(ANTLR_DIR)/$(ANTLR_JAR):
-	@echo "Downloading ANTLR4 JAR..."
-@if not exist $(ANTLR_DIR) mkdir $(ANTLR_DIR)
-@curl -L $(ANTLR_URL) -o $(ANTLR_DIR)/$(ANTLR_JAR)
-	@echo "ANTLR4 JAR downloaded successfully"
-
-# Generate parser from grammar
-.PHONY: generate
-generate: $(ANTLR_DIR)/$(ANTLR_JAR)
-	@echo "Generating ANTLR4 parser..."
-	@if not exist $(GENERATED_DIR) mkdir $(GENERATED_DIR)
-	@java -jar $(ANTLR_DIR)/$(ANTLR_JAR) -Dlanguage=TypeScript -o $(GENERATED_DIR) -package $(PARSER_PACKAGE) $(GRAMMAR_FILE)
-	@echo "Parser generated successfully"
-
-# Build TypeScript
+# Build TypeScript (main build target)
 .PHONY: build
 build:
 	@echo "Building TypeScript..."
-	@npm run build
+	@tsc -p tsconfig.json
 	@echo "Build completed"
 
 # Clean generated files
 .PHONY: clean
 clean:
 	@echo "Cleaning generated files..."
-@if exist $(GENERATED_DIR) rmdir /s /q $(GENERATED_DIR)
-@if exist dist rmdir /s /q dist
+	@$(call RMDIR,dist)
 	@echo "Clean completed"
-
-# Clean everything including ANTLR JAR
-.PHONY: clean-all
-clean-all: clean
-	@echo "Cleaning ANTLR JAR..."
-	@if exist $(ANTLR_DIR) rmdir /s /q $(ANTLR_DIR)
-	@echo "Clean all completed"
 
 # Development workflow
 .PHONY: dev
-dev: generate build
+dev: build
 	@npm run dev
 
 # Test
 .PHONY: test
-test: generate build
+test: build
 	@npm test
 
 # Install dependencies
@@ -70,13 +52,12 @@ install:
 .PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  all        - Setup ANTLR, generate parser, and build"
-	@echo "  setup      - Download ANTLR4 JAR"
-	@echo "  generate   - Generate parser from grammar"
-	@echo "  build      - Build TypeScript"
-	@echo "  clean      - Clean generated files"
-	@echo "  clean-all  - Clean everything including ANTLR JAR"
-	@echo "  dev        - Generate, build and run in development mode"
-	@echo "  test       - Generate, build and run tests"
+	@echo "  all        - Build TypeScript (default)"
+	@echo "  build      - Build TypeScript (main target)"
+	@echo "  clean      - Clean build files"
+	@echo "  dev        - Build and run in development mode"
+	@echo "  test       - Build and run tests"
 	@echo "  install    - Install npm dependencies"
 	@echo "  help       - Show this help"
+	@echo ""
+	@echo "Detected OS: $(if $(filter Windows_NT,$(OS)),Windows,Unix-like)"

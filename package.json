@@ -4,13 +4,11 @@
   "main": "index.js",
   "scripts": {
     "test": "jest",
-    "build": "make generate && tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
     "start": "node ./dist/index.js",
     "dev": "npx @modelcontextprotocol/inspector node ./dist/index.js",
     "auth": "node ./tools/sap-abap-auth.js auth",
-    "generate": "make generate",
-    "clean": "make clean",
-    "setup": "make setup"
+    "clean": "make clean"
   },
   "keywords": [
     "abap",

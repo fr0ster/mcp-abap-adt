@@ -1,6 +1,25 @@
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
-import { makeAdtRequest, return_error, return_response, getBaseUrl } from '../lib/utils';
+import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl } from '../lib/utils';
 import convert from 'xml-js';
+import { writeResultToFile } from '../lib/writeResultToFile';
+
+
+export const TOOL_DEFINITION = {
+  "name": "GetPackage",
+  "description": "Retrieve ABAP package details.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "package_name": {
+        "type": "string",
+        "description": "Name of the ABAP package"
+      }
+    },
+    "required": [
+      "package_name"
+    ]
+  }
+} as const;
 
 export async function handleGetPackage(args: any) {
     try {
@@ -15,7 +34,7 @@ export async function handleGetPackage(args: any) {
             withShortDescriptions: true
         };
 
-        const package_structure_response = await makeAdtRequest(nodeContentsUrl, 'POST', 30000, undefined, nodeContentsParams);
+        const package_structure_response = await makeAdtRequestWithTimeout(nodeContentsUrl, 'POST', 'default', undefined, nodeContentsParams);
         const result = convert.xml2js(package_structure_response.data, {compact: true});
         
         const nodes = result["asx:abap"]?.["asx:values"]?.DATA?.TREE_CONTENT?.SEU_ADT_REPOSITORY_OBJ_NODE || [];
@@ -28,15 +47,25 @@ export async function handleGetPackage(args: any) {
             OBJECT_URI: node.OBJECT_URI._text
         }));
 
-        return {
+        const finalResult = {
             isError: false,
             content: [{
                 type: 'text',
-                text: JSON.stringify(extractedData)
+                text: JSON.stringify(extractedData, null, 2)
             }]
         };
+        if (args.filePath) {
+            writeResultToFile(JSON.stringify(finalResult, null, 2), args.filePath);
+        }
+        return finalResult;
 
     } catch (error) {
-        return return_error(error);
+        return {
+            isError: true,
+            content: [{
+                type: 'text',
+                text: error instanceof Error ? error.message : String(error)
+            }]
+        };
     }
 }

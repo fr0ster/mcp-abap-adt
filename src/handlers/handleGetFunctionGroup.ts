@@ -1,15 +1,102 @@
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
-import { makeAdtRequest, return_error, return_response, getBaseUrl } from '../lib/utils';
+import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../lib/utils';
+import { XMLParser } from 'fast-xml-parser';
+import { writeResultToFile } from '../lib/writeResultToFile';
+
+
+export const TOOL_DEFINITION = {
+  "name": "GetFunctionGroup",
+  "description": "Retrieve ABAP Function Group source code.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "function_group": {
+        "type": "string",
+        "description": "Name of the function group"
+      }
+    },
+    "required": [
+      "function_group"
+    ]
+  }
+} as const;
+
+function parseFunctionGroupXml(xml: string) {
+    const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '',
+        parseAttributeValue: true,
+        trimValues: true
+    });
+    const result = parser.parse(xml);
+
+    // ADT Function Group XML (FUGR)
+    if (result['fu:functionGroup']) {
+        const fg = result['fu:functionGroup'];
+        const modules = fg['fu:functionModules']?.['fu:functionModule'];
+        const moduleArr = !modules ? [] : Array.isArray(modules)
+            ? modules.map(m => m['adtcore:name'])
+            : [modules['adtcore:name']];
+        return {
+            name: fg['adtcore:name'],
+            objectType: 'function_group',
+            description: fg['adtcore:description'],
+            package: fg['adtcore:packageRef']?.['adtcore:name'] || null,
+            functionModules: moduleArr
+        };
+    }
+
+    // fallback: return raw
+    return { raw: result };
+}
 
 export async function handleGetFunctionGroup(args: any) {
     try {
         if (!args?.function_group) {
             throw new McpError(ErrorCode.InvalidParams, 'Function Group is required');
         }
-        const url = `${await getBaseUrl()}/sap/bc/adt/functions/groups/${args.function_group}/source/main`;
-        const response = await makeAdtRequest(url, 'GET', 30000);
-        return return_response(response);
+        const url = `${await getBaseUrl()}/sap/bc/adt/functions/groups/${encodeSapObjectName(args.function_group)}/source/main`;
+        const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+        // Якщо XML — парсимо, якщо ні — повертаємо як є
+        if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
+            const resultObj = parseFunctionGroupXml(response.data);
+            const result = {
+                isError: false,
+                content: [
+                    {
+                        type: "text",
+                        text: JSON.stringify(resultObj, null, 2)
+                    }
+                ]
+            };
+            if (args.filePath) {
+                writeResultToFile(JSON.stringify(result, null, 2), args.filePath);
+            }
+            return result;
+        } else {
+            const plainResult = {
+                isError: false,
+                content: [
+                    {
+                        type: "text",
+                        text: response.data
+                    }
+                ]
+            };
+            if (args.filePath) {
+                writeResultToFile(response.data, args.filePath);
+            }
+            return plainResult;
+        }
     } catch (error) {
-        return return_error(error);
+        return {
+            isError: true,
+            content: [
+                {
+                        type: "text",
+                        text: error instanceof Error ? error.message : String(error)
+                }
+            ]
+        };
     }
 }

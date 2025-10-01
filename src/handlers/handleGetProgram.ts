@@ -1,17 +1,51 @@
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
-import { makeAdtRequest, return_error, return_response, getBaseUrl } from '../lib/utils';
+import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../lib/utils';
+import { writeResultToFile } from '../lib/writeResultToFile';
+
+export const TOOL_DEFINITION = {
+  name: "GetProgram",
+  description: "Retrieve ABAP program source code. Returns only the main program source code without includes or enhancements.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      program_name: { type: "string", description: "Name of the ABAP program" }
+    },
+    required: ["program_name"]
+  }
+} as const;
 
 export async function handleGetProgram(args: any) {
     try {
         if (!args?.program_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Program name is required');
         }
-        const url = `${await getBaseUrl()}/sap/bc/adt/programs/programs/${args.program_name}/source/main`;
+        const url = `${await getBaseUrl()}/sap/bc/adt/programs/programs/${encodeSapObjectName(args.program_name)}/source/main`;
 
-        const response = await makeAdtRequest(url, 'GET', 30000);
-        return return_response(response);
+        const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+        const plainText = response.data;
+        if (args.filePath) {
+            writeResultToFile(plainText, args.filePath);
+        }
+        return {
+            isError: false,
+            content: [
+                {
+                    type: "text",
+                    text: plainText
+                }
+            ]
+        };
     }
     catch (error) {
-        return return_error(error);
+        // MCP-compliant error response: always return content[] with type "text"
+        return {
+            isError: true,
+            content: [
+                {
+                    type: "text",
+                    text: `ADT error: ${String(error)}`
+                }
+            ]
+        };
     }
 }

@@ -4,10 +4,19 @@
   "main": "index.js",
   "scripts": {
     "test": "jest",
-    "build": "tsc -p tsconfig.json",
+    "build": "make build",
+    "build-full": "make build-full",
     "start": "node ./dist/index.js",
     "dev": "npx @modelcontextprotocol/inspector node ./dist/index.js",
-    "auth": "node ./tools/sap-abap-auth.js auth"
+    "auth": "node ./tools/sap-abap-auth.js auth",
+    "generate": "make generate",
+    "generate-if-needed": "make generate-if-needed",
+    "clean": "make clean",
+    "clean-all": "make clean-all",
+    "setup": "make setup",
+    "reset": "make reset",
+    "validate-grammar": "make validate-grammar",
+    "parser-stats": "make parser-stats"
   },
   "keywords": [
     "abap",
@@ -34,14 +43,14 @@
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
     "jest": "^30.0.4",
-    "minimist": "^1.2.8",
     "open": "^10.2.0",
     "ts-jest": "^29.4.0",
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@abaplint/core": "^2.113.146",
     "@modelcontextprotocol/sdk": "^1.16.0",
+    "antlr4ts": "^0.5.0-alpha.4",
+    "antlr4ts-cli": "^0.5.0-alpha.4",
     "axios": "^1.10.0",
     "fast-xml-parser": "^5.2.5",
     "xml-js": "^1.6.11"

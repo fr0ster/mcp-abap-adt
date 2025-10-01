@@ -44,4 +44,14 @@ Thumbs.db
 # Backup files
 *.bak
 
+# ANTLR4 generated files (excluded from git)
+src/generated/
+
+# ANTLR4 tools (JAR files, excluded from git)
+tools/antlr/*.jar
+
+# Keep tools/antlr directory structure but ignore JAR files
+!tools/antlr/
+!tools/antlr/.gitkeep
+
 sk.json

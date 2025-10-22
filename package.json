@@ -6,7 +6,11 @@
     "test": "jest",
     "build": "tsc -p tsconfig.json",
     "start": "node ./dist/index.js",
+    "start:http": "node ./dist/index.js --transport streamable-http",
+    "start:sse": "node ./dist/index.js --transport sse",
     "dev": "npx @modelcontextprotocol/inspector node ./dist/index.js",
+    "dev:http": "npx @modelcontextprotocol/inspector node ./dist/index.js --transport streamable-http",
+    "dev:sse": "npx @modelcontextprotocol/inspector node ./dist/index.js --transport sse",
     "auth": "node ./tools/sap-abap-auth.js auth",
     "clean": "make clean"
   },

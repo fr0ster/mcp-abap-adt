@@ -43,4 +43,18 @@ This guide is designed for beginners, so we'll walk through everything step-by-s
 5.  **Troubleshooting:** Common problems and solutions.
 6.  **Available Tools:** A list of the commands you can use.
 
+### HTTP Server Mode
+
+- Build once with `npm run build`, then launch via `npm run start:http` to expose the MCP server over Streamable HTTP (`0.0.0.0:3000` by default).
+- Override host/port and transport options directly: `node dist/index.js --transport streamable-http --http-port 4000 --http-host 127.0.0.1`.
+- The helper script `node tools/run-http.js --http-port 4000 --http-json-response` forwards all `--http-*` flags and loads the expected `.env` file automatically.
+- Set `MCP_TRANSPORT=streamable-http` (and optional `MCP_HTTP_*` variables) if you prefer configuring the mode via environment variables.
+
+### SSE Mode
+
+- Запускай за потреби `npm run start:sse` або `node tools/run-sse.js --sse-port 4100`, щоб відкрити Stream-SSE підключення (GET `/mcp/events` + POST `/mcp/messages`).
+- Усі ключі `--sse-*` можна передавати через CLI або задати через змінні оточення `MCP_SSE_*` (`MCP_TRANSPORT=sse`).
+- Для клієнтів, що потребують захисту, активуй `--sse-enable-dns-protection` чи відповідний ENV, щоб перевіряти заголовки `Host` та `Origin`.
+- Рівно одна активна SSE-сесія підтримується одночасно; нові підключення отримають HTTP 409, доки попереднє не закрито.
+
 [...Оригінальний зміст README.md без змін...]

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import {
   CallToolRequestSchema,
   ErrorCode,
@@ -9,6 +11,8 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import path from "path";
 import dotenv from "dotenv";
+import { createServer, Server as HttpServer } from "http";
+import { randomUUID } from "crypto";
 
 // Import handler functions
 import { handleGetProgram } from "./handlers/handleGetProgram";
@@ -138,6 +142,169 @@ logger.info("SAP configuration loaded", {
   DIRNAME: __dirname,
 });
 
+type TransportConfig =
+  | { type: "stdio" }
+  | {
+      type: "streamable-http";
+      host: string;
+      port: number;
+      enableJsonResponse: boolean;
+      allowedOrigins?: string[];
+      allowedHosts?: string[];
+      enableDnsRebindingProtection: boolean;
+    }
+  | {
+      type: "sse";
+      host: string;
+      port: number;
+      allowedOrigins?: string[];
+      allowedHosts?: string[];
+      enableDnsRebindingProtection: boolean;
+    };
+
+function getArgValue(name: string): string | undefined {
+  const args = process.argv;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith(`${name}=`)) {
+      return arg.slice(name.length + 1);
+    }
+    if (arg === name && i + 1 < args.length) {
+      return args[i + 1];
+    }
+  }
+  return undefined;
+}
+
+function hasFlag(name: string): boolean {
+  return process.argv.includes(name);
+}
+
+function parseBoolean(value?: string): boolean {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+
+function resolvePortOption(argName: string, envName: string, defaultValue: number): number {
+  const rawValue = getArgValue(argName) ?? process.env[envName];
+  if (!rawValue) {
+    return defaultValue;
+  }
+
+  const port = Number.parseInt(rawValue, 10);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    throw new Error(`Invalid port value for ${argName}: ${rawValue}`);
+  }
+
+  return port;
+}
+
+function resolveBooleanOption(argName: string, envName: string, defaultValue: boolean): boolean {
+  const argValue = getArgValue(argName);
+  if (argValue !== undefined) {
+    return parseBoolean(argValue);
+  }
+  if (hasFlag(argName)) {
+    return true;
+  }
+  const envValue = process.env[envName];
+  if (envValue !== undefined) {
+    return parseBoolean(envValue);
+  }
+  return defaultValue;
+}
+
+function resolveListOption(argName: string, envName: string): string[] | undefined {
+  const rawValue = getArgValue(argName) ?? process.env[envName];
+  if (!rawValue) {
+    return undefined;
+  }
+  const items = rawValue
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  return items.length > 0 ? items : undefined;
+}
+
+function parseTransportConfig(): TransportConfig {
+  const transportInput = getArgValue("--transport") ?? process.env.MCP_TRANSPORT;
+  const normalized = transportInput ? transportInput.trim().toLowerCase() : undefined;
+
+  if (
+    normalized &&
+    normalized !== "stdio" &&
+    normalized !== "http" &&
+    normalized !== "streamable-http" &&
+    normalized !== "server" &&
+    normalized !== "sse"
+  ) {
+    throw new Error(`Unsupported transport: ${transportInput}`);
+  }
+
+  const sseRequested =
+    normalized === "sse" ||
+    hasFlag("--sse");
+
+  if (sseRequested) {
+    const port = resolvePortOption("--sse-port", "MCP_SSE_PORT", 3001);
+    const host = getArgValue("--sse-host") ?? process.env.MCP_SSE_HOST ?? "0.0.0.0";
+    const allowedOrigins = resolveListOption("--sse-allowed-origins", "MCP_SSE_ALLOWED_ORIGINS");
+    const allowedHosts = resolveListOption("--sse-allowed-hosts", "MCP_SSE_ALLOWED_HOSTS");
+    const enableDnsRebindingProtection = resolveBooleanOption(
+      "--sse-enable-dns-protection",
+      "MCP_SSE_ENABLE_DNS_PROTECTION",
+      false
+    );
+
+    return {
+      type: "sse",
+      host,
+      port,
+      allowedOrigins,
+      allowedHosts,
+      enableDnsRebindingProtection,
+    };
+  }
+
+  const httpRequested =
+    normalized === "http" ||
+    normalized === "streamable-http" ||
+    normalized === "server" ||
+    hasFlag("--http");
+
+  if (httpRequested) {
+    const port = resolvePortOption("--http-port", "MCP_HTTP_PORT", 3000);
+    const host = getArgValue("--http-host") ?? process.env.MCP_HTTP_HOST ?? "0.0.0.0";
+    const enableJsonResponse = resolveBooleanOption(
+      "--http-json-response",
+      "MCP_HTTP_ENABLE_JSON_RESPONSE",
+      false
+    );
+    const allowedOrigins = resolveListOption("--http-allowed-origins", "MCP_HTTP_ALLOWED_ORIGINS");
+    const allowedHosts = resolveListOption("--http-allowed-hosts", "MCP_HTTP_ALLOWED_HOSTS");
+    const enableDnsRebindingProtection = resolveBooleanOption(
+      "--http-enable-dns-protection",
+      "MCP_HTTP_ENABLE_DNS_PROTECTION",
+      false
+    );
+
+    return {
+      type: "streamable-http",
+      host,
+      port,
+      enableJsonResponse,
+      allowedOrigins,
+      allowedHosts,
+      enableDnsRebindingProtection,
+    };
+  }
+
+  return { type: "stdio" };
+}
+
 // Interface for SAP configuration
 export interface SapConfig {
   url: string;
@@ -227,12 +394,27 @@ export function getConfig(): SapConfig {
 export class mcp_abap_adt_server {
   private server: Server; // Instance of the MCP server
   private sapConfig: SapConfig; // SAP configuration
+  private transportConfig: TransportConfig;
+  private httpServer?: HttpServer;
+  private currentSseTransport?: SSEServerTransport;
+  private shuttingDown = false;
 
   /**
    * Constructor for the mcp_abap_adt_server class.
    */
   constructor() {
     this.sapConfig = getConfig(); // Load SAP configuration
+    try {
+      this.transportConfig = parseTransportConfig();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error("Failed to parse transport configuration", {
+        type: "TRANSPORT_CONFIG_ERROR",
+        error: message,
+      });
+      process.stderr.write(`ERROR: ${message}\n`);
+      process.exit(1);
+    }
     this.server = new Server(
       {
         name: "mcp-abap-adt",
@@ -246,6 +428,35 @@ export class mcp_abap_adt_server {
     );
 
     this.setupHandlers(); // Setup request handlers
+    this.setupSignalHandlers();
+
+    if (this.transportConfig.type === "streamable-http") {
+      logger.info("Transport configured", {
+        type: "TRANSPORT_CONFIG",
+        transport: this.transportConfig.type,
+        host: this.transportConfig.host,
+        port: this.transportConfig.port,
+        enableJsonResponse: this.transportConfig.enableJsonResponse,
+        allowedOrigins: this.transportConfig.allowedOrigins ?? [],
+        allowedHosts: this.transportConfig.allowedHosts ?? [],
+        enableDnsRebindingProtection: this.transportConfig.enableDnsRebindingProtection,
+      });
+    } else if (this.transportConfig.type === "sse") {
+      logger.info("Transport configured", {
+        type: "TRANSPORT_CONFIG",
+        transport: this.transportConfig.type,
+        host: this.transportConfig.host,
+        port: this.transportConfig.port,
+        allowedOrigins: this.transportConfig.allowedOrigins ?? [],
+        allowedHosts: this.transportConfig.allowedHosts ?? [],
+        enableDnsRebindingProtection: this.transportConfig.enableDnsRebindingProtection,
+      });
+    } else {
+      logger.info("Transport configured", {
+        type: "TRANSPORT_CONFIG",
+        transport: this.transportConfig.type,
+      });
+    }
   }
 
   /**
@@ -338,19 +549,273 @@ export class mcp_abap_adt_server {
       }
     });
 
-    // Handle server shutdown on SIGINT (Ctrl+C)
-    process.on("SIGINT", async () => {
+  }
+
+  private setupSignalHandlers() {
+    const signals: NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
+    for (const signal of signals) {
+      process.on(signal, () => {
+        if (this.shuttingDown) {
+          return;
+        }
+        this.shuttingDown = true;
+        logger.info("Received shutdown signal", {
+          type: "SERVER_SHUTDOWN_SIGNAL",
+          signal,
+          transport: this.transportConfig.type,
+        });
+        void this.shutdown().finally(() => {
+          process.exit(0);
+        });
+      });
+    }
+  }
+
+  private async shutdown() {
+    try {
       await this.server.close();
-      process.exit(0);
-    });
+    } catch (error) {
+      logger.error("Failed to close MCP server", {
+        type: "SERVER_SHUTDOWN_ERROR",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    if (this.currentSseTransport) {
+      try {
+        await this.currentSseTransport.close();
+      } catch (error) {
+        logger.error("Failed to close SSE transport", {
+          type: "SSE_SHUTDOWN_ERROR",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      this.currentSseTransport = undefined;
+    }
+
+    if (this.httpServer) {
+      await new Promise<void>((resolve) => {
+        this.httpServer?.close((closeError) => {
+          if (closeError) {
+            logger.error("Failed to close HTTP server", {
+              type: "HTTP_SERVER_SHUTDOWN_ERROR",
+              error: closeError instanceof Error ? closeError.message : String(closeError),
+            });
+          }
+          resolve();
+        });
+      });
+      this.httpServer = undefined;
+    }
   }
 
   /**
    * Starts the MCP server and connects it to the transport.
    */
   async run() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
+    if (this.transportConfig.type === "stdio") {
+      const transport = new StdioServerTransport();
+      await this.server.connect(transport);
+      logger.info("Server connected", {
+        type: "SERVER_READY",
+        transport: "stdio",
+      });
+      return;
+    }
+
+    if (this.transportConfig.type === "streamable-http") {
+      const httpConfig = this.transportConfig;
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        enableJsonResponse: httpConfig.enableJsonResponse,
+        allowedOrigins: httpConfig.allowedOrigins,
+        allowedHosts: httpConfig.allowedHosts,
+        enableDnsRebindingProtection: httpConfig.enableDnsRebindingProtection,
+      });
+
+      await this.server.connect(transport);
+
+      const httpServer = createServer(async (req, res) => {
+        try {
+          await transport.handleRequest(req, res);
+        } catch (error) {
+          logger.error("Failed to handle HTTP request", {
+            type: "HTTP_REQUEST_ERROR",
+            error: error instanceof Error ? error.message : String(error),
+          });
+          if (!res.headersSent) {
+            res.writeHead(500).end("Internal Server Error");
+          } else {
+            res.end();
+          }
+        }
+      });
+
+      httpServer.on("clientError", (err, socket) => {
+        logger.error("HTTP client error", {
+          type: "HTTP_CLIENT_ERROR",
+          error: err instanceof Error ? err.message : String(err),
+        });
+        socket.end("HTTP/1.1 400 Bad Request\r\n\r\n");
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        const onError = (error: Error) => {
+          logger.error("HTTP server failed to start", {
+            type: "HTTP_SERVER_ERROR",
+            error: error.message,
+          });
+          httpServer.off("error", onError);
+          reject(error);
+        };
+
+        httpServer.once("error", onError);
+        httpServer.listen(httpConfig.port, httpConfig.host, () => {
+          httpServer.off("error", onError);
+          logger.info("HTTP server listening", {
+            type: "HTTP_SERVER_LISTENING",
+            host: httpConfig.host,
+            port: httpConfig.port,
+            enableJsonResponse: httpConfig.enableJsonResponse,
+          });
+          resolve();
+        });
+      });
+
+      this.httpServer = httpServer;
+      return;
+    }
+
+    const sseConfig = this.transportConfig;
+    const streamPath = "/mcp/events";
+    const postPath = "/mcp/messages";
+
+    const httpServer = createServer(async (req, res) => {
+      const requestUrl = req.url ? new URL(req.url, `http://${req.headers.host ?? `${sseConfig.host}:${sseConfig.port}`}`) : undefined;
+      const pathname = requestUrl?.pathname ?? "/";
+
+      if (req.method === "GET" && pathname === streamPath) {
+        if (this.currentSseTransport) {
+          res.writeHead(409, { "Content-Type": "application/json" }).end(
+            JSON.stringify({ error: "SSE session already established" })
+          );
+          return;
+        }
+
+        const transport = new SSEServerTransport(postPath, res, {
+          allowedHosts: sseConfig.allowedHosts,
+          allowedOrigins: sseConfig.allowedOrigins,
+          enableDnsRebindingProtection: sseConfig.enableDnsRebindingProtection,
+        });
+
+        this.currentSseTransport = transport;
+
+        transport.onclose = () => {
+          logger.info("SSE connection closed", {
+            type: "SSE_CONNECTION_CLOSED",
+          });
+          this.currentSseTransport = undefined;
+        };
+
+        transport.onerror = (error) => {
+          logger.error("SSE transport error", {
+            type: "SSE_TRANSPORT_ERROR",
+            error: error instanceof Error ? error.message : String(error),
+          });
+        };
+
+        try {
+          await this.server.connect(transport);
+          logger.info("SSE transport connected", {
+            type: "SSE_CONNECTION_READY",
+            postEndpoint: postPath,
+          });
+        } catch (error) {
+          logger.error("Failed to connect SSE transport", {
+            type: "SSE_CONNECT_ERROR",
+            error: error instanceof Error ? error.message : String(error),
+          });
+          this.currentSseTransport = undefined;
+          if (!res.headersSent) {
+            res.writeHead(500).end("Internal Server Error");
+          } else {
+            res.end();
+          }
+        }
+        return;
+      }
+
+      if (req.method === "POST" && pathname === postPath) {
+        const transport = this.currentSseTransport;
+        if (!transport) {
+          res.writeHead(503, { "Content-Type": "application/json" }).end(
+            JSON.stringify({ error: "SSE session not initialized" })
+          );
+          return;
+        }
+
+        try {
+          await transport.handlePostMessage(req, res);
+        } catch (error) {
+          logger.error("Failed to handle SSE POST message", {
+            type: "SSE_POST_ERROR",
+            error: error instanceof Error ? error.message : String(error),
+          });
+          if (!res.headersSent) {
+            res.writeHead(500).end("Internal Server Error");
+          } else {
+            res.end();
+          }
+        }
+        return;
+      }
+
+      if (req.method === "OPTIONS" && (pathname === streamPath || pathname === postPath)) {
+        res.writeHead(204, {
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+        }).end();
+        return;
+      }
+
+      res.writeHead(404, { "Content-Type": "application/json" }).end(
+        JSON.stringify({ error: "Not Found" })
+      );
+    });
+
+    httpServer.on("clientError", (err, socket) => {
+      logger.error("SSE HTTP client error", {
+        type: "SSE_HTTP_CLIENT_ERROR",
+        error: err instanceof Error ? err.message : String(err),
+      });
+      socket.end("HTTP/1.1 400 Bad Request\r\n\r\n");
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const onError = (error: Error) => {
+        logger.error("SSE HTTP server failed to start", {
+          type: "SSE_HTTP_SERVER_ERROR",
+          error: error.message,
+        });
+        httpServer.off("error", onError);
+        reject(error);
+      };
+
+      httpServer.once("error", onError);
+      httpServer.listen(sseConfig.port, sseConfig.host, () => {
+        httpServer.off("error", onError);
+        logger.info("SSE HTTP server listening", {
+          type: "SSE_HTTP_SERVER_LISTENING",
+          host: sseConfig.host,
+          port: sseConfig.port,
+          streamPath,
+          postPath,
+        });
+        resolve();
+      });
+    });
+
+    this.httpServer = httpServer;
   }
 }
 

@@ -198,7 +198,7 @@ async function getFieldsFromDatapreviewMetadata(tableName: string): Promise<stri
                     return '';
                 }
 
-                if (!/^[A-Z0-9_]+$/.test(fieldName)) {
+                if (!/^[A-Z0-9_\/]+$/.test(fieldName)) {
                     return '';
                 }
 
@@ -299,7 +299,7 @@ export async function handleGetTableContents(args: any) {
                             if (STRUCTURE_KEYWORDS.has(upper)) {
                                 return false;
                             }
-                            return /^[A-Z0-9_]+$/.test(upper);
+                            return /^[A-Z0-9_\/]+$/.test(upper);
                         })
                         .map((fieldName) => `${tableName}~${fieldName}`);
                 }

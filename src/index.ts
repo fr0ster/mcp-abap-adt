@@ -687,14 +687,34 @@ export class mcp_abap_adt_server {
     }
 
     const sseConfig = this.transportConfig;
-    const streamPath = "/mcp/events";
-    const postPath = "/mcp/messages";
+    const streamPathMap = new Map<string, string>([
+      ["/", "/messages"],
+      ["/mcp/events", "/mcp/messages"],
+      ["/sse", "/sse"],
+    ]);
+    const streamPaths = Array.from(streamPathMap.keys());
+    const postPathSet = new Set(streamPathMap.values());
+    postPathSet.add("/messages");
 
     const httpServer = createServer(async (req, res) => {
       const requestUrl = req.url ? new URL(req.url, `http://${req.headers.host ?? `${sseConfig.host}:${sseConfig.port}`}`) : undefined;
-      const pathname = requestUrl?.pathname ?? "/";
+      let pathname = requestUrl?.pathname ?? "/";
+      if (pathname.length > 1 && pathname.endsWith("/")) {
+        pathname = pathname.slice(0, -1);
+      }
 
-      if (req.method === "GET" && pathname === streamPath) {
+      logger.debug("SSE request received", {
+        type: "SSE_HTTP_REQUEST",
+        method: req.method,
+        pathname,
+        originalUrl: req.url,
+        headers: {
+          accept: req.headers.accept,
+          "content-type": req.headers["content-type"],
+        },
+      });
+
+      if (req.method === "GET" && streamPathMap.has(pathname)) {
         if (this.currentSseTransport) {
           res.writeHead(409, { "Content-Type": "application/json" }).end(
             JSON.stringify({ error: "SSE session already established" })
@@ -702,7 +722,9 @@ export class mcp_abap_adt_server {
           return;
         }
 
-        const transport = new SSEServerTransport(postPath, res, {
+        const postEndpoint = streamPathMap.get(pathname) ?? "/mcp/messages";
+
+        const transport = new SSEServerTransport(postEndpoint, res, {
           allowedHosts: sseConfig.allowedHosts,
           allowedOrigins: sseConfig.allowedOrigins,
           enableDnsRebindingProtection: sseConfig.enableDnsRebindingProtection,
@@ -713,6 +735,7 @@ export class mcp_abap_adt_server {
         transport.onclose = () => {
           logger.info("SSE connection closed", {
             type: "SSE_CONNECTION_CLOSED",
+            streamPath: pathname,
           });
           this.currentSseTransport = undefined;
         };
@@ -728,7 +751,8 @@ export class mcp_abap_adt_server {
           await this.server.connect(transport);
           logger.info("SSE transport connected", {
             type: "SSE_CONNECTION_READY",
-            postEndpoint: postPath,
+            streamPath: pathname,
+            postEndpoint,
           });
         } catch (error) {
           logger.error("Failed to connect SSE transport", {
@@ -745,7 +769,7 @@ export class mcp_abap_adt_server {
         return;
       }
 
-      if (req.method === "POST" && pathname === postPath) {
+      if (req.method === "POST" && postPathSet.has(pathname)) {
         const transport = this.currentSseTransport;
         if (!transport) {
           res.writeHead(503, { "Content-Type": "application/json" }).end(
@@ -770,7 +794,7 @@ export class mcp_abap_adt_server {
         return;
       }
 
-      if (req.method === "OPTIONS" && (pathname === streamPath || pathname === postPath)) {
+  if (req.method === "OPTIONS" && (streamPathMap.has(pathname) || postPathSet.has(pathname))) {
         res.writeHead(204, {
           "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type",
@@ -808,8 +832,8 @@ export class mcp_abap_adt_server {
           type: "SSE_HTTP_SERVER_LISTENING",
           host: sseConfig.host,
           port: sseConfig.port,
-          streamPath,
-          postPath,
+          streamPaths,
+          postPaths: Array.from(postPathSet.values()),
         });
         resolve();
       });

@@ -159,6 +159,64 @@ function parseTableDataXml(xmlData: string, tableName: string) {
     }
 }
 
+// ABAP table source may contain statements such as "INCLUDE STRUCTURE" that
+// are not real fields, so we maintain an explicit deny-list to avoid injecting
+// pseudo identifiers into the SQL statement sent to SAP.
+const STRUCTURE_KEYWORDS = new Set([
+    'INCLUDE',
+    'APPEND',
+    'BEGIN',
+    'END',
+    'FOREIGN',
+    'PRIMARY',
+    'INDEX',
+    'UNIQUE',
+    'CHECK',
+    'CONSTRAINT',
+    'KEY'
+]);
+
+async function getFieldsFromDatapreviewMetadata(tableName: string): Promise<string[]> {
+    try {
+        const metadataUrl = `${await getBaseUrl()}/sap/bc/adt/datapreview/ddic/${encodeSapObjectName(tableName)}/metadata`;
+        logger.info('Fetching datapreview metadata', { metadataUrl });
+
+        const metadataResponse = await makeAdtRequestWithTimeout(metadataUrl, 'GET', 'default');
+        const xmlText = metadataResponse.data;
+        const fieldMatches = xmlText.match(/<dataPreview:metadata[^>]*dataPreview:name="([^"]+)"[^>]*>/gi);
+
+        if (!fieldMatches) {
+            return [];
+        }
+
+        const fields = fieldMatches
+            .map((match: string) => {
+                const fieldNameMatch = match.match(/dataPreview:name="([^"]+)"/i);
+                const fieldName = fieldNameMatch?.[1]?.toUpperCase();
+
+                if (!fieldName || STRUCTURE_KEYWORDS.has(fieldName)) {
+                    return '';
+                }
+
+                if (!/^[A-Z0-9_]+$/.test(fieldName)) {
+                    return '';
+                }
+
+                return `${tableName}~${fieldName}`;
+            })
+            .filter((field) => field !== '');
+
+        return Array.from(new Set(fields));
+    } catch (error) {
+        logger.warn('Failed to fetch datapreview metadata', {
+            error: error instanceof Error ? error.message : String(error),
+            tableName
+        });
+
+        return [];
+    }
+}
+
 export async function handleGetTableContents(args: any) {
     try {
         logger.info('handleGetTableContents called', { args });
@@ -176,64 +234,78 @@ export async function handleGetTableContents(args: any) {
         
         logger.info('Getting table structure first', { tableStructureUrl });
         
-        let tableFields: string[] = [];
+        let tableFields: string[] = await getFieldsFromDatapreviewMetadata(tableName);
         
         try {
-            const structureResponse = await makeAdtRequestWithTimeout(tableStructureUrl, 'GET', 'default');
-            
-            // Parse table structure to extract field names
-            const structureText = structureResponse.data;
-            
-            // Extract field names from ABAP table definition
-            // Support both old and new CDS view syntax
-            const fieldNames = new Set<string>();
-            
-            // Check if this is a CDS view (contains "define table")
-            if (structureText.includes('define table')) {
-                // New CDS syntax: parse line by line to properly handle field definitions
-                const lines = structureText.split('\n');
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    // Match field definitions inside the CDS table definition
-                    const fieldMatch = trimmedLine.match(/^(key\s+)?([a-z0-9_]+)\s*:\s*[a-z0-9_]+/i);
-                    if (fieldMatch) {
-                        const fieldName = fieldMatch[2].trim().toUpperCase();
-                        if (fieldName && fieldName.length > 0) {
-                            fieldNames.add(fieldName);
-                        }
-                    }
-                }
-                
-                logger.info('Parsed CDS view fields', { count: fieldNames.size, fields: Array.from(fieldNames).slice(0, 10) });
-            } else {
-                // Old ABAP syntax patterns
-                const patterns = [
-                    /^\s+([A-Z0-9_]+)\s*:\s*(TYPE|LIKE)/gmi,  // FIELD : TYPE pattern
-                    /^\s+([A-Z0-9_]+)\s+(TYPE|LIKE)/gmi,     // FIELD TYPE pattern
-                    /^\s+([A-Z0-9_]+)\s*:\s*[A-Z0-9_]+/gmi,  // FIELD : DOMAIN pattern
-                    /^\s+([A-Z0-9_]+)\s+[A-Z0-9_]+(?:\([0-9]+\))?/gmi  // FIELD DOMAIN(LENGTH) pattern
-                ];
-                
-                for (const pattern of patterns) {
-                    const matches = structureText.match(pattern);
-                    if (matches) {
-                        matches.forEach((match: string) => {
-                            const fieldName = match.trim().split(/[\s:]+/)[0].trim();
-                            if (fieldName && fieldName.length > 0 && !fieldName.includes('.')) {
+            if (tableFields.length > 0) {
+                logger.info('Using fields from datapreview metadata', { count: tableFields.length, fields: tableFields.slice(0, 5) });
+            }
+
+            if (tableFields.length === 0) {
+                const structureResponse = await makeAdtRequestWithTimeout(tableStructureUrl, 'GET', 'default');
+
+                // Parse table structure to extract field names
+                const structureText = structureResponse.data;
+
+                // Extract field names from ABAP table definition
+                // Support both old and new CDS view syntax
+                const fieldNames = new Set<string>();
+
+                // Check if this is a CDS view (contains "define table")
+                if (structureText.includes('define table')) {
+                    // New CDS syntax: parse line by line to properly handle field definitions
+                    const lines = structureText.split('\n');
+                    for (const line of lines) {
+                        const trimmedLine = line.trim();
+                        // Match field definitions inside the CDS table definition
+                        const fieldMatch = trimmedLine.match(/^(key\s+)?([a-z0-9_]+)\s*:\s*[a-z0-9_]+/i);
+                        if (fieldMatch) {
+                            const fieldName = fieldMatch[2].trim().toUpperCase();
+                            if (fieldName && fieldName.length > 0) {
                                 fieldNames.add(fieldName);
                             }
-                        });
+                        }
                     }
+
+                    logger.info('Parsed CDS view fields', { count: fieldNames.size, fields: Array.from(fieldNames).slice(0, 10) });
+                } else {
+                    // Old ABAP syntax patterns
+                    const patterns = [
+                        /^\s+([A-Z0-9_]+)\s*:\s*(TYPE|LIKE)/gmi,  // FIELD : TYPE pattern
+                        /^\s+([A-Z0-9_]+)\s+(TYPE|LIKE)/gmi,     // FIELD TYPE pattern
+                        /^\s+([A-Z0-9_]+)\s*:\s*[A-Z0-9_]+/gmi,  // FIELD : DOMAIN pattern
+                        /^\s+([A-Z0-9_]+)\s+[A-Z0-9_]+(?:\([0-9]+\))?/gmi  // FIELD DOMAIN(LENGTH) pattern
+                    ];
+
+                    for (const pattern of patterns) {
+                        const matches = structureText.match(pattern);
+                        if (matches) {
+                            matches.forEach((match: string) => {
+                                const fieldName = match.trim().split(/[\s:]+/)[0].trim();
+                                if (fieldName && fieldName.length > 0 && !fieldName.includes('.')) {
+                                    fieldNames.add(fieldName);
+                                }
+                            });
+                        }
+                    }
+
+                    logger.info('Parsed traditional ABAP fields', { count: fieldNames.size, fields: Array.from(fieldNames).slice(0, 10) });
                 }
-                
-                logger.info('Parsed traditional ABAP fields', { count: fieldNames.size, fields: Array.from(fieldNames).slice(0, 10) });
+
+                if (fieldNames.size > 0) {
+                    tableFields = Array.from(fieldNames)
+                        .filter((fieldName) => {
+                            const upper = fieldName.toUpperCase();
+                            if (STRUCTURE_KEYWORDS.has(upper)) {
+                                return false;
+                            }
+                            return /^[A-Z0-9_]+$/.test(upper);
+                        })
+                        .map((fieldName) => `${tableName}~${fieldName}`);
+                }
+
+                logger.info('Extracted table fields', { count: tableFields.length, fields: tableFields.slice(0, 5) });
             }
-            
-            if (fieldNames.size > 0) {
-                tableFields = Array.from(fieldNames).map(fieldName => `${tableName}~${fieldName}`);
-            }
-            
-            logger.info('Extracted table fields', { count: tableFields.length, fields: tableFields.slice(0, 5) });
             
         } catch (structureError) {
             logger.warn('Could not get table structure, falling back to alternative method', { 
@@ -251,10 +323,19 @@ export async function handleGetTableContents(args: any) {
                 const fieldMatches = xmlText.match(/<ddic:field[^>]*name="([^"]+)"/gi);
                 
                 if (fieldMatches) {
-                    tableFields = fieldMatches.map((match: string) => {
-                        const fieldName = match.match(/name="([^"]+)"/)?.[1];
-                        return fieldName ? `${tableName}~${fieldName}` : '';
-                    }).filter(field => field !== '');
+                    tableFields = fieldMatches
+                        .map((match: string) => {
+                            const fieldName = match.match(/name="([^"]+)"/);
+                            const nameValue = fieldName?.[1];
+                            if (!nameValue) {
+                                return '';
+                            }
+                            if (STRUCTURE_KEYWORDS.has(nameValue.toUpperCase())) {
+                                return '';
+                            }
+                            return `${tableName}~${nameValue}`;
+                        })
+                        .filter(field => field !== '');
                     
                     logger.info('Extracted fields from metadata', { count: tableFields.length, fields: tableFields.slice(0, 5) });
                 }

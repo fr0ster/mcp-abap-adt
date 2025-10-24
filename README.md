@@ -50,11 +50,18 @@ This guide is designed for beginners, so we'll walk through everything step-by-s
 - The helper script `node tools/run-http.js --http-port 4000 --http-json-response` forwards all `--http-*` flags and loads the expected `.env` file automatically.
 - Set `MCP_TRANSPORT=streamable-http` (and optional `MCP_HTTP_*` variables) if you prefer configuring the mode via environment variables.
 
+#### Debugging with MCP Inspector
+
+- Run `npm run build`, then start `npm run dev:http -- --env=./e23.env --http-port 3000` (your flags pass straight through).
+- The helper script `tools/dev-http.js` boots the MCP server with `DEBUG=true` and, after ~1.2 s, launches `@modelcontextprotocol/inspector` pointing at `http://localhost:<port>` with auth disabled.
+- Closing the Inspector tab does not stop the server. Press `Ctrl+C` in the terminal to terminate both processes.
+- Need a longer warm-up? Set `MCP_DEV_HTTP_INSPECTOR_DELAY=2000` (milliseconds) before running the command.
+
 ### SSE Mode
 
-- Запускай за потреби `npm run start:sse` або `node tools/run-sse.js --sse-port 4100`, щоб відкрити Stream-SSE підключення (GET `/mcp/events` + POST `/mcp/messages`).
-- Усі ключі `--sse-*` можна передавати через CLI або задати через змінні оточення `MCP_SSE_*` (`MCP_TRANSPORT=sse`).
-- Для клієнтів, що потребують захисту, активуй `--sse-enable-dns-protection` чи відповідний ENV, щоб перевіряти заголовки `Host` та `Origin`.
-- Рівно одна активна SSE-сесія підтримується одночасно; нові підключення отримають HTTP 409, доки попереднє не закрито.
+- Launch `npm run start:sse` or `node tools/run-sse.js --sse-port 4100` to expose the stream endpoints (GET `/mcp/events`, POST `/mcp/messages`).
+- Pass any `--sse-*` switches on the CLI or through `MCP_SSE_*` environment variables (`MCP_TRANSPORT=sse`).
+- Enable `--sse-enable-dns-protection` (or the matching ENV) when you need host/origin checks for untrusted clients.
+- Only one SSE session is active at a time; additional connections receive HTTP 409 until the previous session ends.
+- MCP Inspector does not expose an SSE test UI, so use Cline or a custom EventSource client when debugging this transport.
 
-[...Оригінальний зміст README.md без змін...]

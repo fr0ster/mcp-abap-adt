@@ -126,6 +126,12 @@ let config: SapConfig | undefined;
 let csrfToken: string | null = null;
 let cookies: string | null = null; // Variable to store cookies
 
+export function setConfigOverride(override?: SapConfig) {
+  config = override;
+  csrfToken = null;
+  cookies = null;
+}
+
 export async function getBaseUrl() {
   if (!config) {
     config = getConfig();

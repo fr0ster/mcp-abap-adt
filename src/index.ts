@@ -50,8 +50,10 @@ import {
   return_error,
   return_response,
   setConfigOverride,
+  setConnectionOverride,
 } from "./lib/utils";
 import { SapConfig } from "./lib/sapConfig";
+import { AbapConnection } from "./lib/connection/AbapConnection";
 
 // Import logger
 import { logger } from "./lib/logger";
@@ -314,6 +316,7 @@ let sapConfigOverride: SapConfig | undefined;
 
 export interface ServerOptions {
   sapConfig?: SapConfig;
+  connection?: AbapConnection;
   transportConfig?: TransportConfig;
   allowProcessExit?: boolean;
   registerSignalHandlers?: boolean;
@@ -322,6 +325,10 @@ export interface ServerOptions {
 export function setSapConfigOverride(config?: SapConfig) {
   sapConfigOverride = config;
   setConfigOverride(config);
+}
+
+export function setAbapConnectionOverride(connection?: AbapConnection) {
+  setConnectionOverride(connection);
 }
 
 /**
@@ -419,14 +426,28 @@ export class mcp_abap_adt_server {
     this.allowProcessExit = options?.allowProcessExit ?? true;
     this.registerSignalHandlers = options?.registerSignalHandlers ?? true;
 
-    setSapConfigOverride(options?.sapConfig);
-    
+    if (options?.connection) {
+      setAbapConnectionOverride(options.connection);
+    } else {
+      setAbapConnectionOverride(undefined);
+    }
+
+    if (!options?.connection) {
+      setSapConfigOverride(options?.sapConfig);
+    }
+
     // CHANGED: Don't validate config in constructor - will validate on actual ABAP requests
     // This allows creating server instance without .env file when using runtime config (e.g., from HTTP headers)
     try {
-      this.sapConfig = options?.sapConfig ?? getConfig();
+      if (options?.sapConfig) {
+        this.sapConfig = options.sapConfig;
+      } else if (!options?.connection) {
+        this.sapConfig = getConfig();
+      } else {
+        this.sapConfig = { url: "http://injected-connection", authType: "jwt", jwtToken: "injected" };
+      }
     } catch (error) {
-      // If config is not available yet, that's OK - it will be provided later via setSapConfigOverride
+      // If config is not available yet, that's OK - it will be provided later via setSapConfigOverride or DI
       logger.warn("SAP config not available at initialization, will use runtime config", {
         type: "CONFIG_DEFERRED",
         error: error instanceof Error ? error.message : String(error),

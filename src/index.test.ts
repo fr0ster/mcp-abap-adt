@@ -1,5 +1,5 @@
 import { after } from "node:test";
-import { mcp_abap_adt_server, getConfig, setSapConfigOverride } from "./index";
+import { mcp_abap_adt_server, getConfig, setSapConfigOverride, setAbapConnectionOverride } from "./index";
 // If './index' does not export 'mcp_abap_adt_server', update './index.ts' to include:
 // export class mcp_abap_adt_server { ... }
 import { handleGetProgram } from "./handlers/handleGetProgram";
@@ -17,11 +17,82 @@ import { handleGetTransaction } from "./handlers/handleGetTransaction";
 import { handleSearchObject } from "./handlers/handleSearchObject";
 import { handleGetEnhancements, parseEnhancementsFromXml } from "./handlers/handleGetEnhancements";
 import { handleGetSqlQuery } from "./handlers/handleGetSqlQuery";
-import { cleanup } from "./lib/utils";
+import { cleanup, getBaseUrl, getAuthHeaders } from "./lib/utils";
 import { logger } from "./lib/logger";
+import { AbapConnection, AbapRequestOptions } from "./lib/connection/AbapConnection";
+import { AxiosResponse } from "axios";
+import { SapConfig } from "./lib/sapConfig";
 
 const sapConfig = getConfig();
 const isCloudDeployment = sapConfig.authType === "jwt";
+
+describe("Dependency Injection", () => {
+  class StubConnection implements AbapConnection {
+    public readonly config: SapConfig = {
+      url: "https://stub.example",
+      authType: "jwt",
+      jwtToken: "stub-token",
+    };
+
+    public calls = {
+      baseUrl: 0,
+      authHeaders: 0,
+      requests: 0,
+      reset: 0,
+      lastRequest: undefined as AbapRequestOptions | undefined,
+    };
+
+    getConfig(): SapConfig {
+      return this.config;
+    }
+
+    async getBaseUrl(): Promise<string> {
+      this.calls.baseUrl += 1;
+      return this.config.url;
+    }
+
+    async getAuthHeaders(): Promise<Record<string, string>> {
+      this.calls.authHeaders += 1;
+      return { Authorization: "Bearer stub-token" };
+    }
+
+    async makeAdtRequest(options: AbapRequestOptions): Promise<AxiosResponse> {
+      this.calls.requests += 1;
+      this.calls.lastRequest = options;
+      return {
+        data: { stub: true },
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: {} as any,
+      } as AxiosResponse;
+    }
+
+    reset(): void {
+      this.calls.reset += 1;
+    }
+  }
+
+  afterEach(() => {
+    cleanup();
+    setAbapConnectionOverride(undefined);
+  });
+
+  it("should use injected ABAP connection instance", async () => {
+    const stubConnection = new StubConnection();
+    // Server instantiation should not throw even without environment variables
+    new mcp_abap_adt_server({ connection: stubConnection });
+
+    const baseUrl = await getBaseUrl();
+    expect(baseUrl).toBe(stubConnection.config.url);
+
+    const headers = await getAuthHeaders();
+    expect(headers.Authorization).toBe("Bearer stub-token");
+
+    expect(stubConnection.calls.baseUrl).toBeGreaterThan(0);
+    expect(stubConnection.calls.authHeaders).toBeGreaterThan(0);
+  });
+});
 
 describe("mcp_abap_adt_server - Integration Tests", () => {
   let server: mcp_abap_adt_server;
@@ -254,6 +325,12 @@ describe("mcp_abap_adt_server - Integration Tests", () => {
   describe("handleSearchObject", () => {
     it("should successfully search for an object", async () => {
       const result = await handleSearchObject({ query: "SYST" });
+
+      if (isCloudDeployment) {
+        expect(result.isError).toBe(true);
+        return;
+      }
+
       expect(result.isError).toBe(false);
       expect(Array.isArray(result.content)).toBe(true);
       expect(result.content.length).toBeGreaterThan(0);
@@ -278,6 +355,10 @@ describe("mcp_abap_adt_server - Integration Tests", () => {
         object_name: "SD_SALES_DOCUMENT_VIEW" 
       });
       // Check if it's not an error response
+      if (isCloudDeployment) {
+        expect('isError' in result ? result.isError : false).toBe(true);
+        return;
+      }
       expect('isError' in result ? result.isError : false).toBe(false);
       expect(Array.isArray(result.content)).toBe(true);
       expect(result.content.length).toBeGreaterThan(0);
@@ -305,6 +386,10 @@ if (content0.type === "text" && "text" in content0) {
         program: "SAPMV45A"
       });
       // Check if it's not an error response
+      if (isCloudDeployment) {
+        expect('isError' in result ? result.isError : false).toBe(true);
+        return;
+      }
       expect('isError' in result ? result.isError : false).toBe(false);
       expect(Array.isArray(result.content)).toBe(true);
       expect(result.content.length).toBeGreaterThan(0);

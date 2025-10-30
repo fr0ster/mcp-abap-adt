@@ -49,6 +49,7 @@ export function return_error(error: any) {
   };
 }
 
+let overrideConfig: SapConfig | undefined;
 let overrideConnection: AbapConnection | undefined;
 let cachedConnection: AbapConnection | undefined;
 let cachedConfigSignature: string | undefined;
@@ -64,7 +65,7 @@ function getManagedConnection(): AbapConnection {
     return overrideConnection;
   }
 
-  const config = getConfig();
+  const config = overrideConfig ?? getConfig();
   const signature = sapConfigSignature(config);
 
   if (!cachedConnection || cachedConfigSignature !== signature) {
@@ -77,6 +78,7 @@ function getManagedConnection(): AbapConnection {
 }
 
 export function setConfigOverride(override?: SapConfig) {
+  overrideConfig = override;
   disposeConnection(overrideConnection);
   overrideConnection = override ? createAbapConnection(override) : undefined;
 
@@ -86,10 +88,21 @@ export function setConfigOverride(override?: SapConfig) {
   cachedConfigSignature = undefined;
 }
 
+export function setConnectionOverride(connection?: AbapConnection) {
+  disposeConnection(overrideConnection);
+  overrideConnection = connection;
+  overrideConfig = undefined;
+
+  disposeConnection(cachedConnection);
+  cachedConnection = undefined;
+  cachedConfigSignature = undefined;
+}
+
 export function cleanup() {
   disposeConnection(overrideConnection);
   disposeConnection(cachedConnection);
   overrideConnection = undefined;
+  overrideConfig = undefined;
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
 }

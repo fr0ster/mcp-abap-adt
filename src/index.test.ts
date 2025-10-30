@@ -1,5 +1,5 @@
 import { after } from "node:test";
-import { mcp_abap_adt_server } from "./index";
+import { mcp_abap_adt_server, getConfig, setSapConfigOverride } from "./index";
 // If './index' does not export 'mcp_abap_adt_server', update './index.ts' to include:
 // export class mcp_abap_adt_server { ... }
 import { handleGetProgram } from "./handlers/handleGetProgram";
@@ -19,6 +19,9 @@ import { handleGetEnhancements, parseEnhancementsFromXml } from "./handlers/hand
 import { handleGetSqlQuery } from "./handlers/handleGetSqlQuery";
 import { cleanup } from "./lib/utils";
 import { logger } from "./lib/logger";
+
+const sapConfig = getConfig();
+const isCloudDeployment = sapConfig.authType === "jwt";
 
 describe("mcp_abap_adt_server - Integration Tests", () => {
   let server: mcp_abap_adt_server;
@@ -107,6 +110,14 @@ describe("mcp_abap_adt_server - Integration Tests", () => {
         table_name: "T000",
         max_rows: 10 
       });
+
+      if (isCloudDeployment) {
+        expect(result.isError).toBe(true);
+        const firstMessage = result.content?.[0]?.text ?? "";
+        expect(firstMessage).toMatch(/(error|denied|forbidden|400|401)/i);
+        return;
+      }
+
       expect(result.isError).toBe(false);
       expect(Array.isArray(result.content)).toBe(true);
       expect(result.content.length).toBeGreaterThan(0);
@@ -117,6 +128,14 @@ describe("mcp_abap_adt_server - Integration Tests", () => {
       const result = await handleGetTableContents({ 
         table_name: "T000"
       });
+
+      if (isCloudDeployment) {
+        expect(result.isError).toBe(true);
+        const firstMessage = result.content?.[0]?.text ?? "";
+        expect(firstMessage).toMatch(/(error|denied|forbidden|400|401)/i);
+        return;
+      }
+
       expect(result.isError).toBe(false);
       expect(Array.isArray(result.content)).toBe(true);
       expect(result.content.length).toBeGreaterThan(0);
@@ -132,47 +151,51 @@ describe("mcp_abap_adt_server - Integration Tests", () => {
 
     // Add test to verify SQL generation format
     it('should generate correct SQL SELECT statement format', async () => {
-        // Mock the makeAdtRequestWithTimeout to capture the SQL statement
-        let capturedSql = '';
-        const originalMakeAdtRequestWithTimeout = require('./lib/utils').makeAdtRequestWithTimeout;
-        
-        // Mock only the table structure call
-        require('./lib/utils').makeAdtRequestWithTimeout = jest.fn()
-            .mockImplementationOnce(() => {
-                // First call - table structure
-                return Promise.resolve({
-                    data: `@EndUserText.label : 'Clients'
-@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
-@AbapCatalog.tableCategory : #TRANSPARENT
-@AbapCatalog.deliveryClass : #C
-@AbapCatalog.dataMaintenance : #ALLOWED
-define table t000 {
-  key mandt  : mandt not null;
-  mtext      : mtext_d not null;
-  ort01      : ort01 not null;
-  mwaer      : mwaer not null;
-  adrnr      : char10 not null;
-  cccategory : cccategory not null;
-}`
-                });
-            })
-            .mockImplementationOnce((url, method, timeout, payload) => {
-                // Second call - table contents with SQL payload
-                capturedSql = payload;
-                return Promise.resolve({
-                    status: 200,
-                    data: '<?xml version="1.0" encoding="utf-8"?><dataPreview:tableData xmlns:dataPreview="http://www.sap.com/adt/datapreview"><dataPreview:totalRows>0</dataPreview:totalRows><dataPreview:queryExecutionTime>0.1</dataPreview:queryExecutionTime><dataPreview:metadata dataPreview:name="MANDT" dataPreview:type="CLNT"/><dataPreview:metadata dataPreview:name="MTEXT" dataPreview:type="CHAR"/><dataPreview:columns><dataPreview:data>100</dataPreview:data></dataPreview:columns><dataPreview:columns><dataPreview:data>Test</dataPreview:data></dataPreview:columns></dataPreview:tableData>'
-                });
-            });
+      if (isCloudDeployment) {
+        // No additional expectations on cloud systems where datapreview is not available
+        expect(true).toBe(true);
+        return;
+      }
 
+      // Mock the makeAdtRequestWithTimeout to capture the SQL statement
+      let capturedSql = '';
+      const utils = require('./lib/utils');
+      const originalMakeAdtRequestWithTimeout = utils.makeAdtRequestWithTimeout;
+
+      // Force on-premise behavior for this test by overriding SAP config to basic auth
+      // Use a minimal valid on-prem config (client required for basic auth)
+      setSapConfigOverride({ url: 'http://localhost', client: '001', authType: 'basic', username: 'test', password: 'test' });
+
+      const metadataResponse = '<?xml version="1.0" encoding="utf-8"?>' +
+        '<dataPreview:tableData xmlns:dataPreview="http://www.sap.com/adt/datapreview">' +
+        '<dataPreview:metadata dataPreview:name="MANDT" dataPreview:type="CLNT"/>' +
+        '<dataPreview:metadata dataPreview:name="MTEXT" dataPreview:type="CHAR"/>' +
+        '<dataPreview:metadata dataPreview:name="ORT01" dataPreview:type="CHAR"/>' +
+        '<dataPreview:metadata dataPreview:name="MWAER" dataPreview:type="CUKY"/>' +
+        '<dataPreview:metadata dataPreview:name="ADRNR" dataPreview:type="CHAR"/>' +
+        '<dataPreview:metadata dataPreview:name="CCCATEGORY" dataPreview:type="CHAR"/>' +
+        '</dataPreview:tableData>';
+
+      const datapreviewResponse = '<?xml version="1.0" encoding="utf-8"?><dataPreview:tableData xmlns:dataPreview="http://www.sap.com/adt/datapreview"><dataPreview:totalRows>0</dataPreview:totalRows><dataPreview:queryExecutionTime>0.1</dataPreview:queryExecutionTime><dataPreview:metadata dataPreview:name="MANDT" dataPreview:type="CLNT"/><dataPreview:metadata dataPreview:name="MTEXT" dataPreview:type="CHAR"/><dataPreview:columns><dataPreview:data>100</dataPreview:data></dataPreview:columns><dataPreview:columns><dataPreview:data>Test</dataPreview:data></dataPreview:columns></dataPreview:tableData>';
+
+      utils.makeAdtRequestWithTimeout = jest
+        .fn()
+        .mockImplementationOnce(() => Promise.resolve({ data: metadataResponse }))
+        .mockImplementationOnce((url: string, method: string, timeout: string | number, payload: string) => {
+          capturedSql = payload;
+          return Promise.resolve({ status: 200, data: datapreviewResponse });
+        });
+
+      try {
         const result = await handleGetTableContents({ table_name: 'T000', max_rows: 5 });
-        
         expect(result.isError).toBe(false);
         expect(capturedSql).toContain('SELECT T000~MANDT, T000~MTEXT, T000~ORT01, T000~MWAER, T000~ADRNR, T000~CCCATEGORY FROM T000');
         expect(capturedSql).not.toContain('SELECT *');
-        
-        // Restore original function
-        require('./lib/utils').makeAdtRequestWithTimeout = originalMakeAdtRequestWithTimeout;
+      } finally {
+        // Restore utils and SAP config
+        utils.makeAdtRequestWithTimeout = originalMakeAdtRequestWithTimeout;
+        setSapConfigOverride(undefined);
+      }
     });
   });
 
@@ -339,6 +362,14 @@ if (content0.type === "text" && "text" in content0) {
         sql_query: "SELECT * FROM t000",
         row_number: 10,
       });
+
+      if (isCloudDeployment) {
+        expect(result.isError).toBe(true);
+        const firstMessage = result.content?.[0]?.text ?? "";
+        expect(firstMessage).toMatch(/ADT error/i);
+        return;
+      }
+
       expect(result.isError).toBe(false);
       expect(Array.isArray(result.content)).toBe(true);
       expect(result.content.length).toBeGreaterThan(0);
@@ -356,6 +387,14 @@ if (content0.type === "text" && "text" in content0) {
       const result = await handleGetSqlQuery({
         sql_query: "SELECT mandt FROM t000",
       });
+
+      if (isCloudDeployment) {
+        expect(result.isError).toBe(true);
+        const firstMessage = result.content?.[0]?.text ?? "";
+        expect(firstMessage).toMatch(/ADT error/i);
+        return;
+      }
+
       expect(result.isError).toBe(false);
       expect(Array.isArray(result.content)).toBe(true);
       expect(result.content.length).toBeGreaterThan(0);

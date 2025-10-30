@@ -30,6 +30,7 @@
 
 import { McpError, ErrorCode, AxiosResponse, logger } from '../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../lib/utils';
+import { getConfig } from '../index';
 import { writeResultToFile } from '../lib/writeResultToFile';
 
 
@@ -226,6 +227,28 @@ export async function handleGetTableContents(args: any) {
         }
         const maxRows = args.max_rows || 100;
         const tableName = args.table_name;
+        
+        // Detect deployment type by authentication method. JWT ~= cloud (BTP) where
+        // direct table datapreview access is restricted. Basic auth typically
+        // indicates on-premise systems where ADT datapreview may work.
+        try {
+            const cfg = getConfig();
+            if (cfg.authType === 'jwt') {
+                logger.warn('handleGetTableContents blocked on cloud deployment (JWT auth)', { tableName });
+                return {
+                    isError: true,
+                    content: [
+                        {
+                            type: 'text',
+                            text: 'Forbidden: Direct table contents preview via ADT is not permitted on cloud ABAP (BTP) when using JWT authentication. Use an on-premise system or another API that exposes data, or run this tool against a system with basic auth.'
+                        }
+                    ]
+                };
+            }
+        } catch (cfgErr) {
+            // If config cannot be determined, proceed with normal flow but log it.
+            logger.warn('Could not determine SAP config for deployment detection', { error: cfgErr instanceof Error ? cfgErr.message : String(cfgErr) });
+        }
         
         logger.info('Making table contents request', { tableName, maxRows });
         

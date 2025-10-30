@@ -46,12 +46,12 @@ import { handleGetAbapSystemSymbols } from "./handlers/handleGetAbapSystemSymbol
 import {
   getBaseUrl,
   getAuthHeaders,
-  createAxiosInstance,
   makeAdtRequest,
   return_error,
   return_response,
   setConfigOverride,
 } from "./lib/utils";
+import { SapConfig } from "./lib/sapConfig";
 
 // Import logger
 import { logger } from "./lib/logger";
@@ -308,17 +308,6 @@ function parseTransportConfig(): TransportConfig {
   }
 
   return { type: "stdio" };
-}
-
-// Interface for SAP configuration
-export interface SapConfig {
-  url: string;
-  client?: string; // Made optional since it's not needed for JWT
-  // Authentication options
-  authType: "basic" | "jwt";
-  username?: string;
-  password?: string;
-  jwtToken?: string;
 }
 
 let sapConfigOverride: SapConfig | undefined;

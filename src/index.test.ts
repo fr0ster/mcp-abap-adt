@@ -1,4 +1,4 @@
-import { after } from "node:test";
+// import { after } from "node:test";
 import { mcp_abap_adt_server, getConfig, setSapConfigOverride, setAbapConnectionOverride } from "./index";
 // If './index' does not export 'mcp_abap_adt_server', update './index.ts' to include:
 // export class mcp_abap_adt_server { ... }

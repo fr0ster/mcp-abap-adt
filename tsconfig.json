@@ -2,16 +2,19 @@
   "compilerOptions": {
     "target": "es2022",
     "lib": ["es2022"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "CommonJS",
+    "moduleResolution": "node",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "typeRoots": [
       "./node_modules/@types",
-      "./node_modules/@modelcontextprotocol/sdk/types"
+      "./node_modules/@modelcontextprotocol/sdk/types",
+      "../../node_modules/@types",
+      "../../node_modules/@modelcontextprotocol/sdk/types"
     ],
+    "types": ["node", "jest"],
     "outDir": "./dist",
     "noImplicitAny": false
   },

@@ -4,7 +4,7 @@ const { handleGetObjectsByType } = require('../dist/handlers/handleGetObjectsByT
 const assert = require('assert');
 
 async function run() {
-    // Дозволяємо передавати параметри через командний рядок
+    // Allow passing parameters through the command line
     const parent_name = process.argv[2] || '/CBY/PURBOOK_EN';
     const parent_tech_name = process.argv[3] || '/CBY/PURBOOK_EN';
     const parent_type = process.argv[4] || 'PROG/P';
@@ -21,9 +21,9 @@ async function run() {
 
     const result = await handleGetObjectsByType(args);
 
-    // Перевіряємо, що повертається об'єкт з content
+    // Ensure the handler returns an object with content
     assert(result && result.content && Array.isArray(result.content), 'Result must have content array');
-    // Виводимо результат для перевірки
+    // Log the result for verification
     console.dir(result, { depth: null, maxArrayLength: 100 });
 
     console.log('handleGetObjectsByType test passed');

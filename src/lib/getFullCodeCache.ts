@@ -1,4 +1,4 @@
-// Простий файловий кеш для GetFullCode
+// Simple file-based cache for GetFullCode
 
 import * as fs from 'fs';
 import * as path from 'path';

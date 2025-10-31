@@ -12,14 +12,14 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-// handleGetObjectNodeFromCache: повертає вузол з кешу за OBJECT_TYPE, OBJECT_NAME, TECH_NAME, розгортає OBJECT_URI
+// handleGetObjectNodeFromCache returns a cached node by OBJECT_TYPE, OBJECT_NAME, and TECH_NAME, expanding OBJECT_URI when available
 
 import { objectsListCache } from '../lib/getObjectsListCache';
 import { makeAdtRequest, getBaseUrl } from '../lib/utils';
 
 /**
  * @param args { object_type, object_name, tech_name }
- * @returns вузол з кешу з полем object_uri_response (якщо OBJECT_URI є)
+ * @returns cached node including object_uri_response when OBJECT_URI exists
  */
 export async function handleGetObjectNodeFromCache(args: any) {
     const { object_type, object_name, tech_name } = args;
@@ -54,7 +54,7 @@ export async function handleGetObjectNodeFromCache(args: any) {
             const resp = await makeAdtRequest(url, 'GET', 15000);
             node.object_uri_response = typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data);
 
-            // Оновлюємо вузол у кеші
+            // Persist the fetched OBJECT_URI payload back into the cache entry
             const idx = cache.objects.findIndex(
                 (obj: any) =>
                     obj.OBJECT_TYPE === object_type &&

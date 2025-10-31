@@ -28,7 +28,7 @@ function parseClassXml(xml: string) {
     if (result['oo:class']) {
         const c = result['oo:class'];
 
-        // Реалізації методів
+    // Method implementations extracted from the XML payload
         let methodImpls: any[] = [];
         const implSection = c['oo:methodImplementations']?.['oo:methodImplementation'];
         if (Array.isArray(implSection)) {
@@ -78,8 +78,8 @@ export async function handleGetClass(args: any) {
             throw new McpError(ErrorCode.InvalidParams, 'Class name is required');
         }
         const url = `${await getBaseUrl()}/sap/bc/adt/oo/classes/${encodeSapObjectName(args.class_name)}/source/main`;
-        const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
-        // Якщо XML — парсимо, якщо ні — повертаємо як є
+    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+    // Parse XML responses; otherwise return the payload unchanged
         if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
             const resultObj = parseClassXml(response.data);
             const result = {
@@ -96,7 +96,7 @@ export async function handleGetClass(args: any) {
             }
             return result;
         } else {
-            // Plain text: повертаємо у MCP-форматі
+            // Plain text responses still follow the MCP wrapper format
             if (args.filePath) {
                 writeResultToFile(response.data, args.filePath);
             }

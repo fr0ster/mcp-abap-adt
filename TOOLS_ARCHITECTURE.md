@@ -1,21 +1,21 @@
-# Архітектура інструментів MCP ABAP ADT
+# MCP ABAP ADT Tools Architecture
 
-## Проблема
+## Problem
 
-Раніше всі описи інструментів знаходилися в `index.ts`, що призводило до проблем:
-- Коли LLM вносив правки по одному модулю, вона могла зламати всі описи
-- Важко було підтримувати синхронізацію між хендлерами та їх описами
-- Дублювання коду та ризик неузгодженості
+Previously all tool descriptions lived in `index.ts`, which caused issues:
+- When the LLM edited a single module it could break every description
+- Keeping handlers and their descriptions in sync was hard
+- Description duplication increased the risk of inconsistencies
 
-## Рішення
+## Solution
 
-Кожен модуль тепер відповідає за свій власний опис через константну структуру `TOOL_DEFINITION`, яка експортується з кожного хендлера.
+Each module now owns its description via a constant `TOOL_DEFINITION` structure exported from every handler.
 
-## Структура
+## Structure
 
-### 1. Хендлери з описами
+### 1. Handlers with definitions
 
-Кожен хендлер (наприклад, `src/handlers/handleGetProgram.ts`) містить:
+Each handler (for example, `src/handlers/handleGetProgram.ts`) contains:
 
 ```typescript
 export const TOOL_DEFINITION = {
@@ -31,26 +31,26 @@ export const TOOL_DEFINITION = {
 } as const;
 
 export async function handleGetProgram(args: any) {
-  // Логіка хендлера
+  // Handler logic
 }
 ```
 
-### 2. Центральний реєстр
+### 2. Central registry
 
-Файл `src/lib/toolsRegistry.ts`:
-- Імпортує всі `TOOL_DEFINITION` з хендлерів
-- Збирає їх в єдиний масив `ALL_TOOLS`
-- Експортує функції для роботи з інструментами
+The `src/lib/toolsRegistry.ts` file:
+- Imports every handler `TOOL_DEFINITION`
+- Aggregates them into a single `ALL_TOOLS` array
+- Exports helper functions to work with the tools
 
 ```typescript
 import { TOOL_DEFINITION as GetProgram_Tool } from '../handlers/handleGetProgram';
 import { TOOL_DEFINITION as GetClass_Tool } from '../handlers/handleGetClass';
-// ... інші імпорти
+// ... other imports
 
 export const ALL_TOOLS: ToolDefinition[] = [
   GetProgram_Tool,
   GetClass_Tool,
-  // ... інші інструменти
+  // ... other tools
 ];
 
 export function getAllTools(): ToolDefinition[] {
@@ -58,9 +58,9 @@ export function getAllTools(): ToolDefinition[] {
 }
 ```
 
-### 3. Використання в index.ts
+### 3. Usage in index.ts
 
-`index.ts` тепер використовує динамічний реєстр замість жорстко закодованого списку:
+`index.ts` now relies on the dynamic registry instead of a hard-coded list:
 
 ```typescript
 import { getAllTools } from "./lib/toolsRegistry";
@@ -71,18 +71,18 @@ this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
 }));
 ```
 
-## Переваги
+## Benefits
 
-1. **Локальність**: Кожен хендлер відповідає за свій опис
-2. **Безпечність**: Зміни в одному хендлері не впливають на інші
-3. **Підтримуваність**: Легко додавати нові інструменти
-4. **Типобезпека**: TypeScript перевіряє узгодженість типів
-5. **DRY принцип**: Немає дублювання описів
+1. **Local ownership**: Each handler maintains its own description
+2. **Safer edits**: Changes in one handler do not affect others
+3. **Maintainable**: New tools are easy to add
+4. **Type-safety**: TypeScript validates the structure
+5. **DRY principle**: No duplicated descriptions
 
-## Як додати новий інструмент
+## How to add a new tool
 
-1. Створіть новий хендлер у `src/handlers/`
-2. Додайте `TOOL_DEFINITION` в хендлер:
+1. Create a new handler under `src/handlers/`
+2. Add a `TOOL_DEFINITION` constant to the handler:
    ```typescript
    export const TOOL_DEFINITION = {
      name: "YourToolName",
@@ -90,26 +90,26 @@ this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
      inputSchema: {
        type: "object",
        properties: {
-         // ваші параметри
+         // your parameters
        },
        required: ["required_param"]
      }
    } as const;
    ```
-3. Додайте імпорт та інструмент в `src/lib/toolsRegistry.ts`
-4. Додайте case в `CallToolRequestSchema` handler в `index.ts`
+3. Import and register the tool in `src/lib/toolsRegistry.ts`
+4. Add a case to the `CallToolRequestSchema` handler in `index.ts`
 
-## Автоматизація
+## Automation
 
-Створено скрипт `tools/update-handlers-with-tool-definitions.js` для автоматичного додавання `TOOL_DEFINITION` до існуючих хендлерів.
+The `tools/update-handlers-with-tool-definitions.js` script automatically adds `TOOL_DEFINITION` blocks to existing handlers.
 
-Запуск:
+Run it with:
 ```bash
 node tools/update-handlers-with-tool-definitions.js
 ```
 
-## Майбутні покращення
+## Future improvements
 
-- Можна додати автоматичну валідацію узгодженості між хендлерами та їх описами
-- Можна створити CLI інструмент для генерації нових хендлерів з шаблонами
-- Можна додати автоматичну генерацію документації з описів інструментів
+- Add automated validation to ensure handlers and descriptions stay aligned
+- Provide a CLI tool for generating new handlers from templates
+- Generate documentation automatically from tool descriptions

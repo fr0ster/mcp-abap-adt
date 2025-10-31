@@ -13,14 +13,14 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-// handleGetObjectsListStrict: рекурсивний обхід ADT node structure, стартує з node_id = '000000' як у прикладі користувача
+// handleGetObjectsListStrict performs a recursive ADT node traversal starting from node_id '000000' like in the user example
 
 import { McpError, ErrorCode } from '../lib/utils';
 import { fetchNodeStructure, return_error } from '../lib/utils';
 import { objectsListCache } from '../lib/getObjectsListCache';
 
 /**
- * Парсить всі SEU_ADT_REPOSITORY_OBJ_NODE з XML, повертає масив об'єктів з потрібними полями
+ * Parses every SEU_ADT_REPOSITORY_OBJ_NODE element from the XML and returns objects with the required fields
  */
 function parseValidObjects(xmlData: string): Array<Record<string, string>> {
     const nodes: Array<Record<string, string>> = [];
@@ -30,7 +30,7 @@ function parseValidObjects(xmlData: string): Array<Record<string, string>> {
         while ((match = nodeRegex.exec(xmlData)) !== null) {
             const nodeXml = match[1];
             const obj: Record<string, string> = {};
-            // Витягуємо потрібні поля
+            // Pull out the fields we need
             const typeMatch = nodeXml.match(/<OBJECT_TYPE>([^<]+)<\/OBJECT_TYPE>/);
             const nameMatch = nodeXml.match(/<OBJECT_NAME>([^<]+)<\/OBJECT_NAME>/);
             const techNameMatch = nodeXml.match(/<TECH_NAME>([^<]+)<\/TECH_NAME>/);
@@ -50,7 +50,7 @@ function parseValidObjects(xmlData: string): Array<Record<string, string>> {
 }
 
 /**
- * Парсить всі NODE_ID з OBJECT_TYPES з XML
+ * Extracts every NODE_ID from the OBJECT_TYPES XML block
  */
 function parseNodeIds(xmlData: string): string[] {
     const nodeIds: string[] = [];
@@ -71,7 +71,7 @@ function parseNodeIds(xmlData: string): string[] {
 }
 
 /**
- * Рекурсивно обходить вузли ADT node structure, повертає лише валідні об'єкти
+ * Recursively walks the ADT node structure and returns only valid objects
  */
 async function collectValidObjectsStrict(
     parent_name: string,
@@ -93,10 +93,10 @@ async function collectValidObjectsStrict(
     );
     const xml = response.data;
 
-    // Додаємо лише валідні об'єкти
+    // Keep only the nodes that represent valid objects
     const objects = parseValidObjects(xml);
 
-    // Рекурсивно обходимо дочірні вузли по NODE_ID
+    // Traverse child nodes recursively via NODE_ID
     const nodeIds = parseNodeIds(xml);
     for (const childNodeId of nodeIds) {
         const childObjects = await collectValidObjectsStrict(
@@ -114,7 +114,7 @@ async function collectValidObjectsStrict(
 }
 
 /**
- * Головний handler для GetObjectsListStrict
+ * Main handler for GetObjectsListStrict
  * @param args { parent_name, parent_tech_name, parent_type, with_short_descriptions }
  */
 export async function handleGetObjectsList(args: any) {
@@ -133,7 +133,7 @@ export async function handleGetObjectsList(args: any) {
 
         const withDescriptions = with_short_descriptions !== undefined ? Boolean(with_short_descriptions) : true;
 
-        // Стартуємо з node_id = '000000' (кореневий вузол)
+    // Begin traversal from node_id '000000' (the root node)
         const objects = await collectValidObjectsStrict(
             parent_name.toUpperCase(),
             parent_tech_name.toUpperCase(),
@@ -143,7 +143,7 @@ export async function handleGetObjectsList(args: any) {
             new Set()
         );
 
-        // Повертаємо результат у вигляді JSON
+    // Format the aggregated data as JSON
         const result = {
             parent_name,
             parent_tech_name,
@@ -152,7 +152,7 @@ export async function handleGetObjectsList(args: any) {
             objects
         };
 
-        // Зберігаємо у кеш (тільки в памʼяті)
+    // Persist the result inside the in-memory cache
         objectsListCache.setCache(result);
 
         return {
@@ -162,7 +162,7 @@ export async function handleGetObjectsList(args: any) {
                     text: JSON.stringify(result, null, 2)
                 }
             ],
-            // Додаємо кеш для можливого використання в інших модулях
+            // Expose the cache snapshot for potential reuse by other modules
             cache: objectsListCache.getCache()
         };
     } catch (error) {

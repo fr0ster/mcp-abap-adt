@@ -1,6 +1,6 @@
 /**
- * Тестовий скрипт для перевірки handleGetProgFullCode зі стандартним SAP об'єктом SAPMV45A
- * Використовуються лише стандартні об'єкти, які існують у всіх системах.
+ * Test script for validating handleGetProgFullCode with the standard SAP object SAPMV45A.
+ * Uses only standard objects that exist in every system.
  */
 
 const { handleGetProgFullCode } = require('../dist/handlers/handleGetProgFullCode');

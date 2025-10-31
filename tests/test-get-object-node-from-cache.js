@@ -6,8 +6,8 @@ const { loadObjectsListCache } = require('../dist/lib/getObjectsListCache');
 const assert = require('assert');
 
 async function run() {
-    // Генеруємо кеш, якщо його ще немає
-    // Дозволяємо передавати параметри через командний рядок
+    // Generate the cache if it is not there yet
+    // Allow passing parameters through the command line
     const parent_name = process.argv[2] || '/CBY/PURBOOK_EN';
     const parent_type = process.argv[3] || 'PROG/P';
     const object_type = process.argv[4];
@@ -27,7 +27,7 @@ async function run() {
 
     assert(cache && Array.isArray(cache.objects) && cache.objects.length > 0, 'Cache must contain objects');
 
-    // Якщо не передано вузол для пошуку — беремо перший з кешу
+    // Take the first cached node when search criteria are not provided
     let node;
     if (object_type && object_name && tech_name) {
         node = cache.objects.find(
@@ -39,7 +39,7 @@ async function run() {
     }
     assert(node.OBJECT_TYPE && node.OBJECT_NAME && node.TECH_NAME, 'Node must have OBJECT_TYPE, OBJECT_NAME, TECH_NAME');
 
-    // Викликаємо хендлер для пошуку вузла і розгортання OBJECT_URI
+    // Call the handler to find the node and expand OBJECT_URI
     const result = await handleGetObjectNodeFromCache({
         object_type: node.OBJECT_TYPE,
         object_name: node.OBJECT_NAME,
@@ -52,7 +52,7 @@ async function run() {
     assert(jsonBlock.json && jsonBlock.json.OBJECT_TYPE === node.OBJECT_TYPE, 'Returned node OBJECT_TYPE must match');
     assert(jsonBlock.json.object_uri_response && typeof jsonBlock.json.object_uri_response === 'string', 'Returned node must have object_uri_response');
 
-    // Виводимо лише перші 200 символів object_uri_response для перевірки
+    // Print only the first 200 characters of object_uri_response for inspection
     const preview = typeof jsonBlock.json.object_uri_response === 'string'
         ? jsonBlock.json.object_uri_response.slice(0, 200)
         : '';

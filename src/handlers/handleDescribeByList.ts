@@ -50,9 +50,9 @@ export async function handleDescribeByList(args: any) {
       let res = await handleSearchObject({ object_name: obj.name, object_type: type });
       let parsed;
       try {
-        parsed = typeof res === "string" ? JSON.parse(res) : res;
+  parsed = typeof res === "string" ? JSON.parse(res) : res;
 
-        // Якщо відповідь пуста або isError === true, пробуємо ще раз без типу
+  // If the response is empty or flagged as an error, retry without explicit type
         let tryWithoutType = false;
         if (
           (parsed == null) ||
@@ -65,7 +65,7 @@ export async function handleDescribeByList(args: any) {
         if (tryWithoutType) {
           res = await handleSearchObject({ object_name: obj.name });
           parsed = typeof res === "string" ? JSON.parse(res) : res;
-          // Якщо знову помилка або порожньо — пропускаємо цей об'єкт
+          // If it still fails or comes back empty, skip this object
           if (
             (parsed == null) ||
             (parsed.isError === true) ||
@@ -75,13 +75,13 @@ export async function handleDescribeByList(args: any) {
           }
         }
 
-        // Якщо є content і це масив
+        // When content is a non-empty array
         if (parsed.content && Array.isArray(parsed.content)) {
           const contentArr = parsed.content;
           if (contentArr.length === 0) {
             continue;
           }
-          // Якщо це SearchObject-style результат з масивом results
+          // Handle SearchObject-style payloads containing a results array
           let allResults: any[] = [];
           for (const item of contentArr) {
             try {
@@ -105,7 +105,7 @@ export async function handleDescribeByList(args: any) {
           continue;
         }
 
-        // Якщо це просто валідний об'єкт (наприклад, DTEL)
+        // Otherwise handle direct object payloads (e.g., DTEL)
         if (typeof parsed === "object" && parsed !== null) {
           results.push({ type: "text", text: JSON.stringify(parsed) });
         }
@@ -113,7 +113,7 @@ export async function handleDescribeByList(args: any) {
         continue;
       }
     }
-    // Якщо жоден об'єкт не знайдено, повертаємо isError: false
+    // Return isError: false even when nothing matched
     return {
       isError: false,
       content: results

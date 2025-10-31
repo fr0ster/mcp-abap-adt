@@ -12,14 +12,14 @@ export const TOOL_DEFINITION = {
     properties: {
       parent_type: { type: "string", description: "Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P)" },
       parent_name: { type: "string", description: "Parent object name" },
-      maxDepth: { type: "integer", description: "Максимальна глибина дерева (default depends on type)", default: 1 },
-      enrich: { type: "boolean", description: "Чи додавати опис та пакет через SearchObject (default true)", default: true }
+  maxDepth: { type: "integer", description: "Maximum tree depth (default depends on type)", default: 1 },
+  enrich: { type: "boolean", description: "Whether to add description and package via SearchObject (default true)", default: true }
     },
     required: ["parent_type", "parent_name"]
   }
 } as const;
 
-// Визначаємо дефолтну глибину для різних типів
+// Determine default depth for various object types
 function getDefaultDepth(parent_type: string): number {
   const type = parent_type?.toUpperCase() || '';
   if (type.startsWith('PROG/') || type.startsWith('FUGR/')) return 2;
@@ -123,10 +123,10 @@ async function buildTree(
   // 2. Get children if depth < maxDepth
   let children: any[] = [];
   if (depth < maxDepth) {
-    // Для root node_id = "0000", для інших - реальний NODE_ID
+  // Use node_id "0000" for the root; for others keep the actual NODE_ID
     const nodes = await fetchNodeStructureRaw(objectType, objectName, depth === 0 ? "0000" : node_id);
     for (const node of nodes) {
-      // Якщо наступний рівень буде максимальним — додаємо тільки термінальні листи
+      // When the next level hits the maximum depth, only include terminal leaves
       if (depth + 1 === maxDepth) {
         if (isTerminalLeaf(node)) {
 const terminalNode: any = {
@@ -136,7 +136,7 @@ const terminalNode: any = {
 };
 children.push(terminalNode);
         }
-        // вузли-групи не додаємо на максимальному рівні
+        // Skip group nodes at the maximum level
       } else {
         if (isGroupNode(node)) {
           // Group node: recurse, attach its children
@@ -187,7 +187,7 @@ export async function handleGetObjectInfo(args: { parent_type: string; parent_na
     if (!args?.parent_type || !args?.parent_name) {
       throw new McpError(ErrorCode.InvalidParams, 'parent_type and parent_name are required');
     }
-    // Визначаємо дефолтну глибину
+  // Determine the default depth if none is provided
     const maxDepth = Number.isInteger(args.maxDepth)
       ? args.maxDepth as number
       : getDefaultDepth(args.parent_type);

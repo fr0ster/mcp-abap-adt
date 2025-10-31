@@ -30,7 +30,7 @@ import { TOOL_DEFINITION as GetAbapAST_Tool } from '../handlers/handleGetAbapAST
 import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from '../handlers/handleGetAbapSemanticAnalysis';
 import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from '../handlers/handleGetAbapSystemSymbols';
 
-// Тип для опису інструмента
+// Type that describes a tool entry
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -41,7 +41,7 @@ export interface ToolDefinition {
   };
 }
 
-// Статичні описи для інструментів з динамічним імпортом
+// Static descriptors for tools that rely on dynamic import
 const DYNAMIC_IMPORT_TOOLS: ToolDefinition[] = [
   GetObjectsByType_Tool,
   GetObjectsList_Tool,
@@ -50,34 +50,34 @@ const DYNAMIC_IMPORT_TOOLS: ToolDefinition[] = [
   DescribeByList_Tool
 ];
 
-// Збираємо всі описи інструментів в одному масиві
+// Aggregate every tool definition into a single list
 export const ALL_TOOLS: ToolDefinition[] = [
-  // Програми, класи, функції
+  // Programs, classes, functions
   GetClass_Tool,
   GetFunction_Tool,
   GetFunctionGroup_Tool,
   GetProgram_Tool,
 
-  // Таблиці, структури
+  // Tables, structures
   GetStructure_Tool,
   GetTable_Tool,
   GetTableContents_Tool,
 
-  // Пакети, інтерфейси
+  // Packages, interfaces
   GetInterface_Tool,
   GetPackage_Tool,
 
-  // Інклуди, ієрархії
+  // Includes, hierarchies
   GetInclude_Tool,
   GetIncludesList_Tool,
   GetObjectStructure_Tool,
 
-  // Типи, опис, інформація
+  // Types, descriptions, metadata
   GetAdtTypes_Tool,
   GetTypeInfo_Tool,
   GetObjectInfo_Tool,
 
-  // Пошук, SQL, транзакції
+  // Search, SQL, transactions
   GetSqlQuery_Tool,
   GetTransaction_Tool,
   SearchObject_Tool,
@@ -94,16 +94,16 @@ export const ALL_TOOLS: ToolDefinition[] = [
   GetAbapSemanticAnalysis_Tool,
   GetAbapSystemSymbols_Tool,
 
-  // Динамічні інструменти
+  // Dynamically imported tools
   ...DYNAMIC_IMPORT_TOOLS
 ];
 
-// Функція для отримання всіх інструментів
+// Returns the entire tool list
 export function getAllTools(): ToolDefinition[] {
   return ALL_TOOLS;
 }
 
-// Функція для пошуку інструмента за іменем
+// Finds a tool definition by name
 export function getToolByName(name: string): ToolDefinition | undefined {
   return ALL_TOOLS.find(tool => tool.name === name);
 }

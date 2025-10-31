@@ -66,8 +66,8 @@ export async function handleGetInterface(args: any) {
             throw new McpError(ErrorCode.InvalidParams, 'Interface name is required');
         }
         const url = `${await getBaseUrl()}/sap/bc/adt/oo/interfaces/${encodeSapObjectName(args.interface_name)}/source/main`;
-        const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
-        // Якщо XML — парсимо, якщо ні — повертаємо як є
+    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+    // Parse XML responses; otherwise return the payload unchanged
         if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
             const result = {
                 isError: false,

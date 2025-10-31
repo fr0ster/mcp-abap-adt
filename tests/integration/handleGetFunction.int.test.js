@@ -13,9 +13,20 @@ describe('handleGetFunction (integration)', () => {
       function_group: 'SDTX'
     };
     const result = await handleGetFunction(args);
-    expect(typeof result).toBe('string');
-    expect(result).toMatch(/function rfc_read_table/i);
-    expect(result).toMatch(/endfunction/i);
+    expect(result?.isError).toBe(false);
+    const payload = result?.content?.[0]?.text ?? '';
+    expect(typeof payload).toBe('string');
+    const normalized = payload.trim();
+    let sourceText = payload;
+    if (normalized.startsWith('{')) {
+      const parsed = JSON.parse(normalized);
+      expect(parsed.name).toBe('RFC_READ_TABLE');
+      expect(parsed.group).toBe('SDTX');
+      sourceText = parsed.source;
+    }
+    expect(typeof sourceText).toBe('string');
+    expect(sourceText).toMatch(/FUNCTION\s+RFC_READ_TABLE/i);
+    expect(sourceText).toMatch(/ENDFUNCTION/i);
   });
 
   it('should write result to file if filePath is provided', async () => {
@@ -34,12 +45,24 @@ describe('handleGetFunction (integration)', () => {
     expect(fs.existsSync(filePath)).toBe(true);
     // Content should match result
     const fileContent = fs.readFileSync(filePath, 'utf8');
-    expect(fileContent).toContain('function rfc_read_table');
-    expect(fileContent).toContain('endfunction');
+    const payload = result.content?.[0]?.text ?? '';
+    const normalized = payload.trim();
+    if (normalized.startsWith('{')) {
+      const persistedObj = JSON.parse(fileContent);
+      const persistedPayload = persistedObj?.content?.[0]?.text ?? '';
+      expect(persistedPayload).toEqual(payload);
+      const parsedPersisted = JSON.parse(persistedPayload);
+      expect(parsedPersisted.source).toMatch(/FUNCTION\s+RFC_READ_TABLE/i);
+      expect(parsedPersisted.source).toMatch(/ENDFUNCTION/i);
+    } else {
+      const normalizedFile = fileContent.toLowerCase();
+      expect(normalizedFile).toContain('function rfc_read_table');
+      expect(normalizedFile).toContain('endfunction');
+    }
 
     // Cleanup after
     fs.unlinkSync(filePath);
   });
 
-  // Додаткові тести можна додати тут для інших функцій/груп
+  // Additional scenarios for other functions/groups can be added here
 });

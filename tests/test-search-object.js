@@ -1,7 +1,7 @@
 const { handleSearchObject } = require('../dist/handlers/handleSearchObject');
 
 async function runTest() {
-  // Тест: коректний тип
+  // Test: ensure valid object type handling
   try {
     let result = await handleSearchObject({ object_name: 'MARA', object_type: 'TABL' });
     console.log('SearchObject MARA TABL:', result);

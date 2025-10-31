@@ -521,7 +521,7 @@ export class mcp_abap_adt_server {
    * @private
    */
   private setupHandlers() {
-    // Handler for ListToolsRequest - використовуємо динамічний реєстр інструментів
+  // Handler for ListToolsRequest - relies on the dynamic tool registry
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: getAllTools()
     }));

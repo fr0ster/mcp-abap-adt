@@ -2,61 +2,61 @@
 
 ## Test Results Summary
 
-✅ **УСПІШНО ВИРІШЕНО**: Проблема з некоректною обробкою класів у неймспейсах
+✅ **RESOLVED**: Incorrect handling of classes in namespaces has been fixed
 
-## Проведені тести
+## Executed Tests
 
-### 1. Тест кодування функції
-- **Програма**: `/SAPAPO/RMSNPSRC`
-- **Очікуване кодування**: `%2FSAPAPO%2FRMSNPSRC`
-- **Результат**: ✅ ПРОЙШОВ
+### 1. Encoding Function Test
+- **Program**: `/SAPAPO/RMSNPSRC`
+- **Expected Encoding**: `%2FSAPAPO%2FRMSNPSRC`
+- **Result**: ✅ PASSED
 
-### 2. Тест з реальним MCP сервером
-- **Програма**: `/SAPAPO/RMSNPSRC`
-- **Інструмент**: `GetProgram`
-- **Результат**: ✅ ПРОЙШОВ - ПРОГРАМА УСПІШНО ОТРИМАНА!
+### 2. Live MCP Server Test
+- **Program**: `/SAPAPO/RMSNPSRC`
+- **Tool**: `GetProgram`
+- **Result**: ✅ PASSED – PROGRAM RETRIEVED SUCCESSFULLY!
 
-## Аналіз результатів
+## Result Analysis
 
-### До виправлення:
+### Before the fix:
 ```
 URL: /sap/bc/adt/programs/programs//SAPAPO/RMSNPSRC/source/main
 ```
-- Незакодовані символи `/` в неймспейсі
-- HTTP 404 або інші помилки через некоректний URL
+- Namespace contained unencoded `/` characters
+- SAP returned HTTP 404 or similar errors because of the malformed URL
 
-### Після виправлення:
+### After the fix:
 ```
 URL: /sap/bc/adt/programs/programs/%2FSAPAPO%2FRMSNPSRC/source/main
 ```
-- Правильно закодовані символи `/` як `%2F`
-- SAP система коректно розпізнає неймспейс
+- `/` characters are encoded as `%2F`
+- SAP correctly recognizes the namespace and returns data
 
-## Підтвердження роботи
+## Validation
 
-Тест з реальним MCP сервером показав:
+The live MCP server test returned:
 
 ```json
 {"result":{"isError":false,"content":[{"type":"text","text":"*&-----...\r\n*& Report  /SAPAPO/RMSNPSRC..."}]}}
 ```
 
-**Це підтверджує, що:**
-1. ✅ URL був правильно сформований
-2. ✅ Запит дійшов до SAP системи  
-3. ✅ SAP система правильно розпізнала неймспейс `/SAPAPO/`
-4. ✅ Програма успішно отримана з повним вихідним кодом!
+**This confirms that:**
+1. ✅ The URL was formed correctly
+2. ✅ The request reached the SAP system  
+3. ✅ SAP recognized the namespace `/SAPAPO/`
+4. ✅ The full source code was retrieved successfully
 
-## Технічні деталі
+## Technical Details
 
-### Функція кодування
+### Encoding Function
 ```typescript
 export function encodeSapObjectName(objectName: string): string {
   return encodeURIComponent(objectName);
 }
 ```
 
-### Використання в обробниках
-Всі 17 обробників MCP інструментів використовують функцію `encodeSapObjectName`:
+### Usage in Handlers
+All 17 MCP tool handlers rely on `encodeSapObjectName`:
 - `GetClass` - ✅
 - `GetInterface` - ✅  
 - `GetProgram` - ✅
@@ -66,25 +66,25 @@ export function encodeSapObjectName(objectName: string): string {
 - `GetStructure` - ✅
 - `GetTypeInfo` - ✅
 - `GetTransaction` - ✅
-- та інші...
+- and the remaining handlers...
 
-## Висновок
+## Conclusion
 
-🎉 **Проблема повністю вирішена!**
+🎉 **The issue is fully resolved!**
 
-- Неймспейси тепер обробляються коректно
-- Програма `/SAPAPO/RMSNPSRC` та інші об'єкти в неймспейсах читаються правильно
-- Звіти можуть коректно читати неймспейси
-- Всі SAP об'єкти з символами `/` в іменах тепер працюють
-- **ПІДТВЕРДЖЕНО РЕАЛЬНИМ ТЕСТОМ**: програма успішно отримана!
+- Namespaces now resolve correctly
+- Program `/SAPAPO/RMSNPSRC` and other namespaced objects load as expected
+- Reports can read namespace-prefixed objects
+- All SAP objects containing `/` in their names are handled correctly
+- **LIVE TEST CONFIRMED**: program retrieval succeeds
 
-## Рекомендації
+## Recommendations
 
-1. ✅ Кодування неймспейсів працює автоматично
-2. ✅ Додаткових налаштувань не потрібно
-3. ✅ Всі існуючі та нові об'єкти в неймспейсах будуть працювати
+1. ✅ Namespace encoding is automated
+2. ✅ No extra configuration is required
+3. ✅ All current and future namespaced objects will work seamlessly
 
 ---
 
-**Дата тестування**: 2 червня 2025  
-**Статус**: ВИРІШЕНО ✅
+**Test Date**: 2 June 2025  
+**Status**: RESOLVED ✅

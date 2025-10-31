@@ -1,66 +1,66 @@
 # ABAP Parser and Semantic Analysis Tools
 
-Цей документ описує нові інструменти для парсингу та семантичного аналізу ABAP коду, які були додані до MCP ABAP ADT сервера.
+This document describes the new tools for parsing and semantic analysis of ABAP code that were added to the MCP ABAP ADT server.
 
-## Огляд
+## Overview
 
-Було додано три нових інструменти:
+Three new tools were added:
 
-1. **GetAbapAST** - Парсинг ABAP коду та генерація AST (Abstract Syntax Tree)
-2. **GetAbapSemanticAnalysis** - Семантичний аналіз з визначенням символів, типів та скоупів
-3. **GetAbapSystemSymbols** - Резолюція символів з SAP системи з додатковою інформацією
+1. **GetAbapAST** – Parses ABAP code and generates an AST (Abstract Syntax Tree)
+2. **GetAbapSemanticAnalysis** – Performs semantic analysis with symbol, type, and scope resolution
+3. **GetAbapSystemSymbols** – Resolves symbols against the SAP system and enriches them with additional metadata
 
-## Налаштування
+## Setup
 
 ### Makefile
 
-Створений Makefile для автоматизації роботи з ANTLR4:
+A Makefile automates the workflow with ANTLR4:
 
 ```bash
-# Завантаження ANTLR4 та генерація парсера
+# Download ANTLR4 and generate the parser
 make setup generate
 
-# Збірка проекту
+# Build the project
 make build
 
-# Розробка (генерація + збірка + запуск)
+# Development loop (generate + build + run)
 make dev
 
-# Тестування
+# Run tests
 make test
 
-# Очистка згенерованих файлів
+# Clean generated files
 make clean
 
-# Повна очистка (включаючи ANTLR JAR)
+# Full cleanup (including the ANTLR JAR)
 make clean-all
 ```
 
-### Автоматична генерація парсера
+### Automatic parser generation
 
-Парсер автоматично генерується при збірці проекту:
+The parser is generated automatically during the project build:
 
 ```bash
-npm run build  # Спочатку запускає make generate, потім tsc
+npm run build  # Runs make generate first, followed by tsc
 ```
 
-### Ігнорування згенерованих файлів
+### Ignoring generated files
 
-Згенеровані файли автоматично ігноруються Git:
-- `src/generated/` - згенеровані файли парсера
-- `tools/antlr/` - JAR файл ANTLR4
+Generated assets are already ignored by Git:
+- `src/generated/` – Parser output
+- `tools/antlr/` – ANTLR4 JAR file
 
-## Інструменти
+## Tools
 
 ### 1. GetAbapAST
 
-Парсить ABAP код та повертає AST дерево в JSON форматі.
+Parses ABAP code and returns the AST tree in JSON format.
 
-**Параметри:**
-- `code` (обов'язковий) - ABAP код для парсингу
-- `filePath` (опціональний) - шлях до файлу для збереження результату
+**Parameters:**
+- `code` (required) – ABAP code to parse
+- `filePath` (optional) – File path to persist the result
 
-**Приклад використання:**
+**Example usage:**
 ```json
 {
   "code": "CLASS zcl_test DEFINITION.\n  PUBLIC SECTION.\n    METHODS: test.\nENDCLASS.",
@@ -68,7 +68,7 @@ npm run build  # Спочатку запускає make generate, потім tsc
 }
 ```
 
-**Результат:**
+**Result:**
 ```json
 {
   "type": "abapSource",
@@ -99,13 +99,13 @@ npm run build  # Спочатку запускає make generate, потім tsc
 
 ### 2. GetAbapSemanticAnalysis
 
-Виконує семантичний аналіз ABAP коду та повертає символи, типи, скоупи та залежності.
+Performs semantic analysis of ABAP code and returns symbols, types, scopes, and dependencies.
 
-**Параметри:**
-- `code` (обов'язковий) - ABAP код для аналізу
-- `filePath` (опціональний) - шлях до файлу для збереження результату
+**Parameters:**
+- `code` (required) – ABAP code to analyse
+- `filePath` (optional) – File path to persist the result
 
-**Приклад використання:**
+**Example usage:**
 ```json
 {
   "code": "CLASS zcl_test DEFINITION.\n  PUBLIC SECTION.\n    DATA: lv_text TYPE string.\n    METHODS: process IMPORTING iv_input TYPE string.\nENDCLASS.",
@@ -113,7 +113,7 @@ npm run build  # Спочатку запускає make generate, потім tsc
 }
 ```
 
-**Результат:**
+**Result:**
 ```json
 {
   "symbols": [
@@ -165,13 +165,13 @@ npm run build  # Спочатку запускає make generate, потім tsc
 
 ### 3. GetAbapSystemSymbols
 
-Виконує семантичний аналіз та резолює символи з SAP системи, додаючи додаткову інформацію про пакети, описи та системні властивості.
+Runs semantic analysis and resolves symbols against the SAP system, enriching them with package details, descriptions, and system attributes.
 
-**Параметри:**
-- `code` (обов'язковий) - ABAP код для аналізу та резолюції
-- `filePath` (опціональний) - шлях до файлу для збереження результату
+**Parameters:**
+- `code` (required) – ABAP code for analysis and resolution
+- `filePath` (optional) – File path to persist the result
 
-**Приклад використання:**
+**Example usage:**
 ```json
 {
   "code": "CLASS cl_salv_table DEFINITION.\n  METHODS: factory.\nENDCLASS.",
@@ -179,7 +179,7 @@ npm run build  # Спочатку запускає make generate, потім tsc
 }
 ```
 
-**Результат:**
+**Result:**
 ```json
 {
   "symbols": [
@@ -220,55 +220,55 @@ npm run build  # Спочатку запускає make generate, потім tsc
 }
 ```
 
-## Архітектура
+## Architecture
 
-### Компоненти
+### Components
 
-1. **Makefile** - Автоматизація ANTLR4 та збірки
-2. **Abap.g4** - Граматика ABAP для ANTLR4
-3. **src/lib/abapParser.ts** - Основні класи для парсингу та аналізу
-4. **src/handlers/handleGetAbapAST.ts** - Хендлер для AST
-5. **src/handlers/handleGetAbapSemanticAnalysis.ts** - Хендлер для семантичного аналізу
-6. **src/handlers/handleGetAbapSystemSymbols.ts** - Хендлер для системної резолюції
+1. **Makefile** – Automates ANTLR4 tasks and builds
+2. **Abap.g4** – ABAP grammar for ANTLR4
+3. **src/lib/abapParser.ts** – Core classes for parsing and analysis
+4. **src/handlers/handleGetAbapAST.ts** – Handler for AST responses
+5. **src/handlers/handleGetAbapSemanticAnalysis.ts** – Handler for semantic analysis
+6. **src/handlers/handleGetAbapSystemSymbols.ts** – Handler for system resolution
 
 ### Workflow
 
-1. **Парсинг** - ABAP код парситься за допомогою спрощеного парсера (до повного впровадження ANTLR4)
-2. **Семантичний аналіз** - Визначаються символи, типи, скоупи та залежності
-3. **Системна резолюція** - Символи резолюються з SAP системи через існуючі ADT хендлери
+1. **Parsing** – ABAP code is parsed using the simplified parser (until full ANTLR4 adoption)
+2. **Semantic analysis** – Symbols, types, scopes, and dependencies are computed
+3. **System resolution** – Symbols are resolved through existing SAP ADT handlers
 
-### Плани на майбутнє
+### Future plans
 
-- Повне впровадження ANTLR4 для більш точного парсингу
-- Розширення граматики для підтримки більше ABAP конструкцій
-- Додавання контекстуального аналізу та валідації
-- Інтеграція з більшою кількістю SAP системних API
+- Fully adopt ANTLR4 for precise parsing
+- Extend the grammar to cover more ABAP constructs
+- Add contextual analysis and validation
+- Integrate with additional SAP system APIs
 
-## Використання в розробці
+## Development usage
 
-### Приклади команд
+### Example commands
 
 ```bash
-# Налаштування середовища
+# Set up the environment
 make setup
 
-# Розробка з автоматичною генерацією
+# Development cycle with automatic generation
 make dev
 
-# Тестування нових інструментів
+# Test the new tools
 npm test
 
-# Очистка та повна пересборка
+# Clean and rebuild everything
 make clean-all && make all
 ```
 
-### Інтеграція з існуючими інструментами
+### Integration with existing tools
 
-Нові інструменти інтегровані з існуючою інфраструктурою:
-- Використовують той самий реєстр інструментів
-- Підтримують той самий формат відповідей
-- Інтегровані з існуючими SAP ADT хендлерами для резолюції символів
+The new tools integrate seamlessly with the existing infrastructure:
+- They reuse the shared tool registry
+- They follow the same response format
+- They leverage the existing SAP ADT handlers for symbol resolution
 
-### Налагодження
+### Debugging
 
-Всі інструменти підтримують опціональний параметр `filePath` для збереження результатів у файл, що полегшує налагодження та аналіз результатів.
+Every tool accepts an optional `filePath` parameter to capture results on disk, which simplifies debugging and later analysis.

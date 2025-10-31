@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 
-// Мапа імен хендлерів до їх описів (взято з оригінального index.ts)
+// Map handler names to their definitions (taken from the original index.ts)
 const TOOL_DEFINITIONS = {
   'handleGetFunctionGroup': {
     name: "GetFunctionGroup",
@@ -229,23 +229,23 @@ const TOOL_DEFINITIONS = {
 function updateHandlerFile(filePath, handlerName) {
   const content = fs.readFileSync(filePath, 'utf8');
   
-  // Перевіряємо, чи вже є TOOL_DEFINITION
+  // Check whether TOOL_DEFINITION is already present
   if (content.includes('export const TOOL_DEFINITION')) {
-    console.log(`Пропускаємо ${filePath} - TOOL_DEFINITION вже існує`);
+    console.log(`Skipping ${filePath} - TOOL_DEFINITION already exists`);
     return false;
   }
   
   const definition = TOOL_DEFINITIONS[handlerName];
   if (!definition) {
-    console.log(`Немає визначення для ${handlerName}`);
+    console.log(`No definition for ${handlerName}`);
     return false;
   }
   
-  // Знаходимо перший import
+  // Locate the first import statement
   const lines = content.split('\n');
   let insertIndex = 0;
   
-  // Знаходимо останній import
+  // Identify the last import statement to keep the block together
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].startsWith('import ')) {
       insertIndex = i + 1;
@@ -255,17 +255,17 @@ function updateHandlerFile(filePath, handlerName) {
     }
   }
   
-  // Створюємо TOOL_DEFINITION
+  // Create TOOL_DEFINITION
   const toolDefinition = `
 export const TOOL_DEFINITION = ${JSON.stringify(definition, null, 2)} as const;
 `;
   
-  // Вставляємо після imports
+  // Insert the definition right after the import section
   lines.splice(insertIndex, 0, toolDefinition);
   
-  // Записуємо файл
+  // Write the file back to disk
   fs.writeFileSync(filePath, lines.join('\n'));
-  console.log(`Оновлено ${filePath}`);
+  console.log(`Updated ${filePath}`);
   return true;
 }
 
@@ -286,7 +286,7 @@ function main() {
     }
   });
   
-  console.log(`Оновлено ${updatedCount} файлів`);
+  console.log(`Updated ${updatedCount} files`);
 }
 
 if (require.main === module) {

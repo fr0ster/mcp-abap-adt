@@ -46,6 +46,12 @@ This guide is designed for beginners, so we'll walk through everything step-by-s
 5.  **Troubleshooting:** Common problems and solutions.
 6.  **Available Tools:** A list of the commands you can use.
 
+## Testing
+
+- Run `npm test` to execute the Jest suite. The configuration relies on `jest.setup.js` to disable automatic MCP server startup via `MCP_SKIP_AUTO_START`, preventing transport initialization during unit tests.
+- Only files following the `*.test.[tj]s` naming pattern are collected, ensuring CLI helpers do not run as part of the Jest suite.
+- Use `npm test -- --detectOpenHandles` when you need to track pending asynchronous resources after the tests finish.
+
 ### HTTP Server Mode
 
 - Build once with `npm run build`, then launch via `npm run start:http` to expose the MCP server over Streamable HTTP (`0.0.0.0:3000` by default).

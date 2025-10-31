@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Changed
+- Added dedicated `jest.setup.js` to skip automatic MCP server bootstrap during Jest runs, eliminating TDZ errors in the test environment.
+- Narrowed Jest `testMatch` patterns to `*.test.[tj]s` and removed legacy CLI scripts from the suite to prevent false negatives.
+- Updated `tests/integration/handleGetFunction.int.test.js` to accept either JSON or plain-text payloads and perform case-insensitive source assertions.
+- Translated legacy inline comments and documentation references to English for consistency with project guidelines.
 - MCP protocol compliance: All handler responses now strictly follow the MCP protocol.
 - Removed all `mimeType` and `data` fields from handler responses.
 - For type `"text"` in `content`, only the `text` field is used.

@@ -128,3 +128,7 @@ setAbapConnectionOverride(undefined); // fallback to env-configured factory
 - Use `setAbapConnectionOverride(connection)` to swap implementations dynamically (e.g. for multi-tenant gateways).
 - Call `cleanup()` when tests finish to release interceptors/caches that the connection might hold.
 
+## Contributors
+
+Thank you to all contributors who have helped make mcp-abap-adt better! See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the complete list.
+

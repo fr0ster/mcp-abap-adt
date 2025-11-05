@@ -56,8 +56,8 @@ export async function handleGetFunctionGroup(args: any) {
             throw new McpError(ErrorCode.InvalidParams, 'Function Group is required');
         }
         const url = `${await getBaseUrl()}/sap/bc/adt/functions/groups/${encodeSapObjectName(args.function_group)}/source/main`;
-        const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
-        // Якщо XML — парсимо, якщо ні — повертаємо як є
+    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+    // Parse XML responses; otherwise return the payload unchanged
         if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
             const resultObj = parseFunctionGroupXml(response.data);
             const result = {

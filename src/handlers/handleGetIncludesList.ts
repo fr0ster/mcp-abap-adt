@@ -141,7 +141,7 @@ export async function handleGetIncludesList(args: any) {
         const requestTimeout = timeout && typeof timeout === 'number' ? timeout : 30000;
         const isDetailed = detailed === true;
 
-        // Передаємо object_type напряму як parentType
+    // Pass object_type straight through as parentType
         let parentName = object_name;
         let parentTechName = object_name;
         let parentType = object_type;

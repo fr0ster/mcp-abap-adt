@@ -4,7 +4,7 @@ const { handleGetTypeInfo } = require('../dist/handlers/handleGetTypeInfo');
 const assert = require('assert');
 
 async function run() {
-    // Дозволяємо передавати type_name через командний рядок
+    // Allow overriding type_name via command line arguments
     const type_name = process.argv[2] || '/CBY/MMSKLCARD';
 
     const result = await handleGetTypeInfo({ type_name });

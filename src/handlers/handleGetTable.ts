@@ -64,8 +64,8 @@ export async function handleGetTable(args: any) {
             throw new McpError(ErrorCode.InvalidParams, 'Table name is required');
         }
         const url = `${await getBaseUrl()}/sap/bc/adt/ddic/tables/${encodeSapObjectName(args.table_name)}/source/main`;
-        const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
-        // Якщо XML — парсимо, якщо ні — повертаємо як є
+    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+    // Parse XML responses; fall back to returning the payload as-is
         if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
             const resultObj = parseTableXml(response.data);
             const result = {

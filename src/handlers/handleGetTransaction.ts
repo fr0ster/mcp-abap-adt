@@ -53,8 +53,8 @@ export async function handleGetTransaction(args: any) {
         }
         const encodedTransactionName = encodeSapObjectName(args.transaction_name);
         const url = `${await getBaseUrl()}/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=%2Fsap%2Fbc%2Fadt%2Fvit%2Fwb%2Fobject_type%2Ftrant%2Fobject_name%2F${encodedTransactionName}&facet=package&facet=appl`;
-        const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
-        // Якщо XML — парсимо, якщо ні — повертаємо як є
+    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+    // Parse XML responses; otherwise return the payload unchanged
         if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
             const result = {
                 isError: false,

@@ -1,170 +1,170 @@
-# Інструкцыя па ўстаноўцы MCP ABAP ADT Server
+# MCP ABAP ADT Server Installation Guide
 
-Гэты дапаможнік дапаможа вам усталяваць і наладзіць MCP ABAP ADT Server для працы з SAP ABAP сістэмамі праз Model Context Protocol (MCP). Сервер дазваляе інтэграваць ABAP распрацоўку з AI-інструментамі як Cline, Cursor і GitHub Copilot.
+This guide helps you install and configure the MCP ABAP ADT Server so you can work with SAP ABAP systems through the Model Context Protocol (MCP). The server integrates ABAP development with AI tools such as Cline, Cursor, and GitHub Copilot.
 
-## 📋 Змест
+## 📋 Table of Contents
 
-1. [Перадумовы](#перадумовы)
-2. [Устаноўка](#устаноўка)
-3. [Наладка для On-Premise SAP](#наладка-для-on-premise-sap)
-4. [Наладка для SAP BTP Cloud](#наладка-для-sap-btp-cloud)
-5. [Падключэнне да Cline](#падключэнне-да-cline)
-6. [Падключэнне да Cursor](#падключэнне-да-cursor)
-7. [Падключэнне да GitHub Copilot](#падключэнне-да-github-copilot)
-8. [Тэсціраванне](#тэсціраванне)
-9. [Вырашэнне праблем](#вырашэнне-праблем)
-10. [Даступныя інструменты](#даступныя-інструменты)
+1. [Prerequisites](#-prerequisites)
+2. [Installation](#-installation)
+3. [On-Premise SAP Configuration](#-on-premise-sap-configuration)
+4. [SAP BTP Cloud Configuration](#-sap-btp-cloud-configuration)
+5. [Connecting to Cline](#-connecting-to-cline)
+6. [Connecting to Cursor](#-connecting-to-cursor)
+7. [Connecting to GitHub Copilot](#-connecting-to-github-copilot)
+8. [Testing](#-testing)
+9. [Troubleshooting](#-troubleshooting)
+10. [Available Tools](#-available-tools)
 
-## 🔧 Перадумовы
+## 🔧 Prerequisites
 
-### Сістэмныя патрабаванні
-- **Node.js** версіі 18 або навейшай
-- **npm** (усталёўваецца разам з Node.js)
-- **Git** для кланавання рэпазіторыя
-- Доступ да SAP ABAP сістэмы (on-premise або BTP)
+### System Requirements
+- **Node.js** version 18 or later
+- **npm** (bundled with Node.js)
+- **Git** for cloning the repository
+- Access to a SAP ABAP system (on-premise or BTP)
 
-### SAP сістэмныя патрабаванні
-- Актываваныя ADT сэрвісы ў транзакцыі `SICF`:
+### SAP System Requirements
+- Activate ADT services in transaction `SICF`:
   - `/sap/bc/adt`
-- Для інструмента `GetTableContents` патрэбна рэалізацыя кастомнага сэрвісу `/z_mcp_abap_adt/z_tablecontent`
-- Адпаведныя аўтарызацыі для карыстальніка SAP
+- The `GetTableContents` tool requires the custom service `/z_mcp_abap_adt/z_tablecontent`
+- Provide appropriate authorizations to the SAP user
 
-### Устаноўка Node.js
-1. Спампуйце Node.js LTS версію з [nodejs.org](https://nodejs.org/)
-2. Усталюйце, следуючы інструкцыям для вашай АС
-3. Праверце ўстаноўку:
+### Installing Node.js
+1. Download the Node.js LTS release from [nodejs.org](https://nodejs.org/)
+2. Follow the OS-specific installer instructions
+3. Verify the installation:
    ```bash
    node -v
    npm -v
    ```
 
-## 📦 Устаноўка
+## 📦 Installation
 
-### Аўтаматычная ўстаноўка праз Smithery
+### Automatic Installation via Smithery
 
 ```bash
 npx -y @smithery/cli install @mario-andreschak/mcp-abap-adt --client cline
 ```
 
-### Ручная ўстаноўка
+### Manual Installation
 
-1. **Кланаванне рэпазіторыя:**
+1. **Clone the repository:**
    ```bash
    git clone https://github.com/mario-andreschak/mcp-abap-adt.git
    cd mcp-abap-adt
    ```
 
-2. **Устаноўка залежнасцей:**
+2. **Install dependencies:**
    ```bash
    npm install
    ```
 
-3. **Зборка праекта:**
+3. **Build the project:**
    ```bash
    npm run build
    ```
 
-## 🏢 Наладка для On-Premise SAP
+## 🏢 On-Premise SAP Configuration
 
-### 1. Стварэнне файла канфігурацыі
+### 1. Create the configuration file
 
-Стварыце файл `.env` у каранёвай дырэкторыі праекта:
+Add a `.env` file to the project root:
 
 ```env
-# URL вашай SAP сістэмы
+# SAP system URL
 SAP_URL=https://your-sap-system.com:8000
 
-# SAP кліент
+# SAP client
 SAP_CLIENT=100
 
-# Мова (апцыянальна, па змаўчанні 'en')
+# Language (optional, defaults to 'en')
 SAP_LANGUAGE=en
 
-# Тып аўтарызацыі
+# Authentication type
 SAP_AUTH_TYPE=basic
 
-# Уліковыя дадзеныя
+# Credentials
 SAP_USERNAME=your_username
 SAP_PASSWORD=your_password
 
-# TLS налады (усталюйце 0 для самападпісаных сертыфікатаў)
+# TLS options (set to 0 for self-signed certificates)
 TLS_REJECT_UNAUTHORIZED=0
 
-# Налады таймаўтаў (у мілісекундах)
+# Timeouts in milliseconds
 SAP_TIMEOUT_DEFAULT=45000
 SAP_TIMEOUT_CSRF=15000
 SAP_TIMEOUT_LONG=60000
 ```
 
-### 2. Праверка падключэння
+### 2. Verify the connection
 
-Запусціце тэставае падключэнне:
+Start the server to test connectivity:
 ```bash
 npm run start
 ```
 
-## ☁️ Наладка для SAP BTP Cloud
+## ☁️ SAP BTP Cloud Configuration
 
-### 1. Атрыманне Service Key
+### 1. Obtain a service key
 
-1. Увайдзіце ў SAP BTP Cockpit
-2. Перайдзіце да вашага ABAP Environment
-3. Стварыце Service Key для Communication Arrangement
-4. Спампуйце JSON файл з ключом
+1. Sign in to the SAP BTP Cockpit
+2. Open your ABAP Environment instance
+3. Create a Service Key for the communication arrangement
+4. Download the JSON file with the credential details
 
-### 2. Аўтаматычная аўтарызацыя (рэкамендавана)
+### 2. Automatic authorization (recommended)
 
-Выкарыстоўвайце ўбудаваны інструмент для аўтаматычнага атрымання JWT токена:
+Use the bundled tool to fetch a JWT token automatically:
 
 ```bash
 node tools/sap-abap-auth-browser.js auth --key path/to/your/service-key.json --browser chrome
 ```
 
-**Параметры:**
-- `--key <path>`: Шлях да JSON файла з service key
-- `--browser <browser>`: Браўзер для адкрыцця (chrome, edge, firefox, system, none)
+**Parameters:**
+- `--key <path>`: Path to the JSON service key
+- `--browser <browser>`: Browser to launch (chrome, edge, firefox, system, none)
 
-**Што робіць інструмент:**
-1. Чытае ваш SAP BTP service key
-2. Адкрывае браўзер для OAuth2 аўтарызацыі
-3. Аўтаматычна абменьвае код аўтарызацыі на JWT токен
-4. Стварае/абнаўляе файл `.env` з правільнай канфігурацыяй
+**What the tool does:**
+1. Reads the SAP BTP service key
+2. Opens a browser window for the OAuth2 authorization
+3. Exchanges the authorization code for a JWT token
+4. Generates or updates the `.env` file with the correct configuration
 
-### 3. Ручная наладка
+### 3. Manual configuration
 
-Калі аўтаматычная аўтарызацыя не працуе, стварыце файл `.env` уручную:
+If the automatic flow fails, create `.env` manually:
 
 ```env
-# URL з service key
+# URL from the service key
 SAP_URL=https://your-account-abap-trial.eu10.abap.cloud.sap
 
-# SAP кліент з service key
+# SAP client from the service key
 SAP_CLIENT=100
 
-# Тып аўтарызацыі
+# Authentication type
 SAP_AUTH_TYPE=xsuaa
 
-# JWT токен (атрымайце праз OAuth2 flow)
+# JWT token obtained via OAuth2
 SAP_JWT_TOKEN=your_jwt_token_here
 
-# Налады таймаўтаў
+# Timeout settings
 SAP_TIMEOUT_DEFAULT=45000
 SAP_TIMEOUT_CSRF=15000
 SAP_TIMEOUT_LONG=60000
 ```
 
-## 🔌 Падключэнне да Cline
+## 🔌 Connecting to Cline
 
-### 1. Устаноўка Cline
+### 1. Install Cline
 
-Усталюйце пашырэнне "Cline" у VS Code з Marketplace.
+Install the "Cline" extension for VS Code from the Marketplace.
 
-### 2. Наладка MCP сервера
+### 2. Configure the MCP server
 
-1. Адкрыйце налады VS Code (Ctrl+,)
-2. Знайдзіце "Cline MCP Settings"
-3. Націсніце "Edit in settings.json"
-4. Дадайце канфігурацыю сервера:
+1. Open VS Code settings (Ctrl+,)
+2. Search for "Cline MCP Settings"
+3. Click "Edit in settings.json"
+4. Add the server configuration:
 
 ```json
 {
@@ -179,23 +179,23 @@ SAP_TIMEOUT_LONG=60000
 }
 ```
 
-**Важна:** Замяніце `C:/PATH_TO/mcp-abap-adt/` на поўны шлях да вашай дырэкторыі праекта.
+**Important:** Replace `C:/PATH_TO/mcp-abap-adt/` with the absolute path to your project directory.
 
-### 3. Перазапуск VS Code
+### 3. Restart VS Code
 
-Перазапусціце VS Code для прымянення налад.
+Restart VS Code to apply the configuration.
 
-## 🎯 Падключэнне да Cursor
+## 🎯 Connecting to Cursor
 
-### 1. Устаноўка Cursor
+### 1. Install Cursor
 
-Спампуйце і ўсталюйце Cursor з [cursor.sh](https://cursor.sh/).
+Download and install Cursor from [cursor.sh](https://cursor.sh/).
 
-### 2. Наладка MCP
+### 2. Configure MCP
 
-1. Адкрыйце Cursor
-2. Перайдзіце да Settings → Features → Model Context Protocol
-3. Дадайце новы сервер:
+1. Launch Cursor
+2. Open Settings → Features → Model Context Protocol
+3. Add a new server:
 
 ```json
 {
@@ -207,19 +207,19 @@ SAP_TIMEOUT_LONG=60000
 }
 ```
 
-### 3. Актывацыя сервера
+### 3. Enable the server
 
-Уключыце сервер у наладах MCP і перазапусціце Cursor.
+Enable the server in the MCP settings and restart Cursor.
 
-## 🐙 Падключэнне да GitHub Copilot
+## 🐙 Connecting to GitHub Copilot
 
-### 1. GitHub Copilot Extensions
+### 1. GitHub Copilot extensions
 
-GitHub Copilot падтрымлівае MCP праз пашырэнні. Для інтэграцыі:
+GitHub Copilot supports MCP through its extensions. To integrate:
 
-1. Усталюйце GitHub Copilot Extension для VS Code
-2. Наладзьце MCP сервер праз канфігурацыю пашырэння
-3. Дадайце ў `settings.json`:
+1. Install the GitHub Copilot extension for VS Code
+2. Configure the MCP server inside the extension
+3. Update `settings.json`:
 
 ```json
 {
@@ -236,12 +236,12 @@ GitHub Copilot падтрымлівае MCP праз пашырэнні. Для 
 }
 ```
 
-### 2. Выкарыстанне праз Claude Desktop
+### 2. Using Claude Desktop
 
-Альтэрнатыўна, выкарыстоўвайце Claude Desktop як прамежкавы інструмент:
+You can also connect via Claude Desktop:
 
-1. Усталюйце Claude Desktop
-2. Наладзьце MCP сервер у `claude_desktop_config.json`:
+1. Install Claude Desktop
+2. Add the MCP server to `claude_desktop_config.json`:
 
 ```json
 {
@@ -254,106 +254,106 @@ GitHub Copilot падтрымлівае MCP праз пашырэнні. Для 
 }
 ```
 
-## 🧪 Тэсціраванне
+## 🧪 Testing
 
-### 1. Тэсціраванне падключэння
+### 1. Connectivity test
 
-Запусціце сервер у рэжыме адладкі:
+Run the server in development mode:
 ```bash
 npm run dev
 ```
 
-Адкрыйце браўзер па адрасе, якую пакажа каманда (звычайна `http://localhost:5173`).
+Open the browser at the URL shown in the output (typically `http://localhost:5173`).
 
-### 2. Тэсціраванне інструментаў
+### 2. Tool testing
 
-У MCP Inspector:
-1. Націсніце "Connect"
-2. Перайдзіце да "Tools"
-3. Націсніце "List Tools"
-4. Паспрабуйце інструмент `GetProgram` з параметрам `SAPMV45A`
+In MCP Inspector:
+1. Click "Connect"
+2. Navigate to "Tools"
+3. Click "List Tools"
+4. Invoke the `GetProgram` tool with parameter `SAPMV45A`
 
-### 3. Тэсціраванне ў Cline
+### 3. Testing in Cline
 
-Спытайце Cline:
+Ask Cline:
 ```
-Атрымай зыходны код праграмы SAPMV45A
+Retrieve the source code of program SAPMV45A
 ```
 
-Cline павінен выкарыстаць MCP сервер для атрымання кода.
+Cline should call the MCP server and return the code.
 
-## 🔧 Вырашэнне праблем
+## 🔧 Troubleshooting
 
-### Праблемы з Node.js
-- **Памылка "node не распазнаны"**: Пераканайцеся, што Node.js дададзены ў PATH
-- **Памылка npm install**: Паспрабуйце выдаліць `node_modules` і запусціць `npm install` зноў
+### Node.js issues
+- **"node" is not recognized:** Ensure Node.js is added to the PATH environment variable
+- **`npm install` fails:** Remove `node_modules` and rerun `npm install`
 
-### Праблемы з SAP падключэннем
-- **Памылка аўтарызацыі**: Праверце ўліковыя дадзеныя ў файле `.env`
-- **Таймаўт**: Павялічце значэнні таймаўтаў у `.env`
-- **SSL памылкі**: Усталюйце `TLS_REJECT_UNAUTHORIZED=0` для самападпісаных сертыфікатаў
+### SAP connectivity issues
+- **Authorization error:** Verify credentials in `.env`
+- **Timeouts:** Increase the timeout values in `.env`
+- **SSL errors:** Set `TLS_REJECT_UNAUTHORIZED=0` when using self-signed certificates
 
-### Праблемы з MCP кліентамі
-- **Cline не бачыць сервер**: Праверце шлях у `cline_mcp_settings.json`
-- **Сервер не запускаецца**: Пераканайцеся, што праект сабраны (`npm run build`)
+### MCP client issues
+- **Cline cannot find the server:** Confirm the path in `cline_mcp_settings.json`
+- **Server fails to start:** Ensure the project is built (`npm run build`)
 
-### Логі і адладка
+### Logging and debugging
 
-Для дэтальнага логавання ўсталюйце зменную асяроддзя:
+Use verbose logging when needed:
 ```bash
 set DEBUG=mcp-abap-adt:*
 npm run start
 ```
 
-## 📚 Даступныя інструменты
+## 📚 Available Tools
 
-| Інструмент | Апісанне | Параметры | Прыклад выкарыстання |
-|------------|----------|-----------|---------------------|
-| `GetProgram` | Атрыманне зыходнага кода ABAP праграмы | `program_name` (string) | Атрымай код праграмы SAPMV45A |
-| `GetClass` | Атрыманне зыходнага кода ABAP класа | `class_name` (string) | Пакажы клас ZCL_MY_CLASS |
-| `GetFunction` | Атрыманне кода функцыянальнага модуля | `function_name`, `function_group` | Атрымай функцыю Z_MY_FUNCTION |
-| `GetTable` | Структура табліцы БД | `table_name` (string) | Пакажы структуру табліцы MARA |
-| `GetTableContents` | Змест табліцы БД | `table_name`, `max_rows` (апцыянальна) | Атрымай дадзеныя з табліцы MARA |
-| `GetEnhancements` | Аналіз enhancement'аў | `object_name`, `include_nested` (апцыянальна) | Знайдзі ўсе enhancement'ы ў SAPMV45A |
-| `GetSqlQuery` | Выкананне SQL запытаў | `sql_query`, `row_number` (апцыянальна) | Выканай SELECT * FROM mara WHERE matnr LIKE 'TEST%' |
-| `SearchObject` | Пошук ABAP аб'ектаў | `query`, `maxResults` (апцыянальна) | Знайдзі ўсе аб'екты што пачынаюцца з Z* |
+| Tool | Description | Parameters | Example Usage |
+|------|-------------|------------|----------------|
+| `GetProgram` | Fetch ABAP program source code | `program_name` (string) | Retrieve program SAPMV45A |
+| `GetClass` | Fetch ABAP class source code | `class_name` (string) | Show class ZCL_MY_CLASS |
+| `GetFunction` | Fetch function module source | `function_name`, `function_group` | Get function Z_MY_FUNCTION |
+| `GetTable` | Inspect database table structure | `table_name` (string) | Show table MARA |
+| `GetTableContents` | Read database table data | `table_name`, `max_rows` (optional) | Fetch data from MARA |
+| `GetEnhancements` | Analyze enhancements | `object_name`, `include_nested` (optional) | List enhancements for SAPMV45A |
+| `GetSqlQuery` | Execute SQL queries | `sql_query`, `row_number` (optional) | Run SELECT * FROM mara WHERE matnr LIKE 'TEST%' |
+| `SearchObject` | Search ABAP objects | `query`, `maxResults` (optional) | Find objects starting with Z* |
 
-### Прыклады выкарыстання ў Cline
+### Examples in Cline
 
 ```
-# Атрыманне праграмы
-Атрымай зыходны код праграмы SAPMV45A
+# Retrieve a program
+Retrieve the source code of program SAPMV45A
 
-# Аналіз enhancement'аў
-Знайдзі ўсе enhancement'ы ў праграме SAPMV45A уключаючы ўкладзеныя include'ы
+# Analyze enhancements
+List all enhancements in SAPMV45A including nested includes
 
-# Пошук аб'ектаў
-Знайдзі ўсе класы што пачынаюцца з ZCL_SALES
+# Search objects
+Find classes starting with ZCL_SALES
 
-# SQL запыт
-Выканай SQL запыт: SELECT matnr, maktx FROM mara INNER JOIN makt ON mara~matnr = makt~matnr WHERE mara~matnr LIKE 'TEST%'
+# SQL query
+Run SQL query: SELECT matnr, maktx FROM mara INNER JOIN makt ON mara~matnr = makt~matnr WHERE mara~matnr LIKE 'TEST%'
 ```
 
-## 🔐 Бяспека
+## 🔐 Security
 
-### Абарона ўліковых дадзеных
-- Ніколі не дадавайце файл `.env` у Git рэпазіторый
-- Выкарыстоўвайце JWT токены замест пароляў для BTP
-- Рэгулярна абнаўляйце токены доступу
+### Protecting credentials
+- Never commit the `.env` file to source control
+- Prefer JWT tokens over passwords for BTP
+- Rotate access tokens regularly
 
-### Сеткавая бяспека
-- Выкарыстоўвайце HTTPS для ўсіх падключэнняў
-- Наладзьце правілы firewall для абмежавання доступу
-- Маніторце логі доступу
+### Network security
+- Use HTTPS for every connection
+- Configure firewall rules to limit access
+- Monitor access logs and alerts
 
-## 📞 Падтрымка
+## 📞 Support
 
-Пры ўзнікненні праблем:
-1. Праверце логі сервера
-2. Прагледзьце дакументацыю SAP ADT
-3. Стварыце issue ў GitHub рэпазіторыі
-4. Звярніцеся да SAP Basis адміністратара па пытаннях аўтарызацыі
+If issues occur:
+1. Inspect server logs
+2. Review SAP ADT documentation
+3. Open an issue in the GitHub repository
+4. Contact your SAP Basis administrator for authorization questions
 
-## 📄 Ліцэнзія
+## 📄 License
 
-Гэты праект распаўсюджваецца пад ліцэнзіяй MIT. Дэтальную інфармацыю глядзіце ў файле LICENSE.
+This project is distributed under the MIT License. See the LICENSE file for details.

@@ -39,8 +39,8 @@ export async function handleSearchObject(args: any) {
       throw new McpError(ErrorCode.InvalidParams, 'object_name is required');
     }
     const query = object_name;
-    let url = `${await getBaseUrl()}/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${encodeSapObjectName(query)}&maxResults=${maxResults || 100}`;
-    // Додаємо object_type як маску, якщо задано
+  let url = `${await getBaseUrl()}/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${encodeSapObjectName(query)}&maxResults=${maxResults || 100}`;
+  // Append object_type as a filter when provided
     if (object_type) {
       url += `&objectType=${encodeSapObjectName(object_type)}`;
     }
@@ -53,20 +53,20 @@ export async function handleSearchObject(args: any) {
 let result = return_response(response);
 const { isError, ...rest } = result;
 
-  // Перевірка на порожню XML (<adtcore:objectReferences/>)
+  // Detect empty XML (<adtcore:objectReferences/>) results
   const xmlText = rest.content?.[0]?.text || "";
   if (!xmlText.includes("<adtcore:objectReference ")) {
-    // Якщо ADT не знайшов об'єкт, повертаємо порожній результат (це не помилка)
+    // Return an empty result (not an error) when ADT finds nothing
     return {
       isError: false,
       content: []
     };
   }
 
-  // Парсинг усіх <adtcore:objectReference .../> з xmlText
+  // Parse every <adtcore:objectReference .../> entry from the XML
   const matches = Array.from(xmlText.matchAll(/<adtcore:objectReference\s+([^>]*)\/>/g));
   if (!matches || matches.length === 0) {
-    // Якщо ADT не знайшов об'єкт, повертаємо порожній результат (це не помилка)
+    // Return an empty result (not an error) when ADT finds nothing
     return {
       isError: false,
       content: []
@@ -83,8 +83,8 @@ const { isError, ...rest } = result;
     const name = extract("adtcore:name");
     const type = extract("adtcore:type");
     const description = extract("adtcore:description");
-    let pkgName = extract("adtcore:packageName");
-    // Якщо packageName порожній, пробуємо витягти з rawXML тег <adtcore:packageName>
+  let pkgName = extract("adtcore:packageName");
+  // If packageName is missing, attempt to pull it from the raw XML via <adtcore:packageName>
     if (!pkgName) {
       const pkgMatch = xmlText.match(/<adtcore:packageName>([^<]*)<\/adtcore:packageName>/);
       if (pkgMatch) {

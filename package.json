@@ -1,7 +1,8 @@
 {
-  "name": "@orchestraight.co/mcp-abap-adt",
+  "name": "@fr0ster/mcp-abap-adt",
   "version": "1.1.0",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "test": "jest",
     "build": "tsc -p tsconfig.json",
@@ -12,7 +13,8 @@
     "dev:http": "node ./tools/dev-http.js",
     "dev:sse": "npx @modelcontextprotocol/inspector node ./dist/index.js --transport sse",
     "auth": "node ./tools/sap-abap-auth.js auth",
-    "clean": "make clean"
+    "clean": "make clean",
+    "docs:tools": "node ./tools/generate-tools-docs.js"
   },
   "keywords": [
     "abap",
@@ -21,15 +23,12 @@
     "mcp",
     "model-context-protocol"
   ],
-  "author": "orchestraight.co",
-  "description": "ABAP ADT (ABAP Development Tools) MCP Server for interacting with SAP systems",
+  "author": "Oleksii Kyslytsia <oleksja.kyslytsja@gmail.com>",
+  "description": "Embedded ABAP ADT MCP server tailored for the Cloud LLM Hub stack",
   "license": "MIT",
-  "publishConfig": {
-    "access": "public"
-  },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mario-andreschak/mcp-abap-adt.git"
+    "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

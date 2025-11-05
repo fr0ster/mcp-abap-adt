@@ -46,11 +46,14 @@ import { handleGetAbapSystemSymbols } from "./handlers/handleGetAbapSystemSymbol
 import {
   getBaseUrl,
   getAuthHeaders,
-  createAxiosInstance,
   makeAdtRequest,
   return_error,
   return_response,
+  setConfigOverride,
+  setConnectionOverride,
 } from "./lib/utils";
+import { SapConfig } from "./lib/sapConfig";
+import { AbapConnection } from "./lib/connection/AbapConnection";
 
 // Import logger
 import { logger } from "./lib/logger";
@@ -83,61 +86,65 @@ function parseEnvArg(): string | undefined {
 }
 
 // Find .env file path from arguments
-let envFilePath = parseEnvArg();
+const skipEnvAutoload = process.env.MCP_SKIP_ENV_LOAD === "true";
 
-// If no --env provided, try default locations
-if (!envFilePath) {
-  // List of possible default locations, in order of preference
-  const possiblePaths = [
-    // 1. .env in current working directory
-    path.resolve(process.cwd(), '.env'),
-    // 2. .env in project root (relative to dist/index.js)
-    path.resolve(__dirname, "../.env")
-  ];
-  
-  // Find the first existing .env file
-  for (const possiblePath of possiblePaths) {
-    if (fs.existsSync(possiblePath)) {
-      envFilePath = possiblePath;
-      process.stderr.write(`[MCP-ENV] No --env specified, using found .env: ${envFilePath}\n`);
-      break;
+let envFilePath = parseEnvArg() ?? process.env.MCP_ENV_PATH;
+
+if (!skipEnvAutoload) {
+  if (!envFilePath) {
+    const possiblePaths = [
+      path.resolve(process.cwd(), ".env"),
+      path.resolve(__dirname, "../.env")
+    ];
+
+    for (const possiblePath of possiblePaths) {
+      if (fs.existsSync(possiblePath)) {
+        envFilePath = possiblePath;
+        process.stderr.write(`[MCP-ENV] No --env specified, using found .env: ${envFilePath}\n`);
+        break;
+      }
+    }
+
+    if (!envFilePath) {
+      envFilePath = path.resolve(__dirname, "../.env");
+      process.stderr.write(`[MCP-ENV] WARNING: No .env file found, will use path: ${envFilePath}\n`);
     }
   }
-  
-  // If still not found, default to project root
-  if (!envFilePath) {
-    envFilePath = path.resolve(__dirname, "../.env");
-    process.stderr.write(`[MCP-ENV] WARNING: No .env file found, will use path: ${envFilePath}\n`);
+
+  if (!path.isAbsolute(envFilePath)) {
+    envFilePath = path.resolve(process.cwd(), envFilePath);
   }
-}
 
-// Always convert to absolute path
-if (!path.isAbsolute(envFilePath)) {
-  envFilePath = path.resolve(process.cwd(), envFilePath);
-}
+  process.stderr.write(`[MCP-ENV] Using .env path: ${envFilePath}\n`);
 
-// Log the path being used
-process.stderr.write(`[MCP-ENV] Using .env path: ${envFilePath}\n`);
-
-// Load environment variables from the .env file
-if (fs.existsSync(envFilePath)) {
-  dotenv.config({ path: envFilePath });
-  process.stderr.write(`[MCP-ENV] Successfully loaded environment from: ${envFilePath}\n`);
+  if (fs.existsSync(envFilePath)) {
+    dotenv.config({ path: envFilePath });
+    process.stderr.write(`[MCP-ENV] Successfully loaded environment from: ${envFilePath}\n`);
+  } else {
+    logger.error(".env file not found at provided path", { path: envFilePath });
+    process.stderr.write(`ERROR: .env file not found at: ${envFilePath}\n`);
+    process.exit(1);
+  }
+} else if (envFilePath) {
+  if (!path.isAbsolute(envFilePath)) {
+    envFilePath = path.resolve(process.cwd(), envFilePath);
+  }
+  process.stderr.write(`[MCP-ENV] Environment autoload skipped; using provided path reference: ${envFilePath}\n`);
 } else {
-  logger.error(".env file not found at provided path", { path: envFilePath });
-  process.stderr.write(`ERROR: .env file not found at: ${envFilePath}\n`);
-  process.exit(1);
+  process.stderr.write(`[MCP-ENV] Environment autoload skipped (MCP_SKIP_ENV_LOAD=true).\n`);
 }
 // --- END ENV FILE LOADING LOGIC ---
 
 // Debug: Log loaded SAP_URL and SAP_CLIENT using the MCP-compatible logger
+const envLogPath = envFilePath ?? "(skipped)";
+
 logger.info("SAP configuration loaded", {
   type: "CONFIG_INFO",
   SAP_URL: process.env.SAP_URL,
   SAP_CLIENT: process.env.SAP_CLIENT || "(not set)",
   SAP_AUTH_TYPE: process.env.SAP_AUTH_TYPE || "(not set)",
   SAP_JWT_TOKEN: process.env.SAP_JWT_TOKEN ? "[set]" : "(not set)",
-  ENV_PATH: envFilePath,
+  ENV_PATH: envLogPath,
   CWD: process.cwd(),
   DIRNAME: __dirname,
 });
@@ -305,15 +312,23 @@ function parseTransportConfig(): TransportConfig {
   return { type: "stdio" };
 }
 
-// Interface for SAP configuration
-export interface SapConfig {
-  url: string;
-  client?: string; // Made optional since it's not needed for JWT
-  // Authentication options
-  authType: "basic" | "jwt";
-  username?: string;
-  password?: string;
-  jwtToken?: string;
+let sapConfigOverride: SapConfig | undefined;
+
+export interface ServerOptions {
+  sapConfig?: SapConfig;
+  connection?: AbapConnection;
+  transportConfig?: TransportConfig;
+  allowProcessExit?: boolean;
+  registerSignalHandlers?: boolean;
+}
+
+export function setSapConfigOverride(config?: SapConfig) {
+  sapConfigOverride = config;
+  setConfigOverride(config);
+}
+
+export function setAbapConnectionOverride(connection?: AbapConnection) {
+  setConnectionOverride(connection);
 }
 
 /**
@@ -323,6 +338,9 @@ export interface SapConfig {
  * @throws {Error} If any required environment variable is missing.
  */
 export function getConfig(): SapConfig {
+  if (sapConfigOverride) {
+    return sapConfigOverride;
+  }
   // Clean all environment variables from comments (everything after # symbol)
   const rawUrl = process.env.SAP_URL;
   const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
@@ -392,6 +410,8 @@ export function getConfig(): SapConfig {
  * Server class for interacting with ABAP systems via ADT.
  */
 export class mcp_abap_adt_server {
+  private readonly allowProcessExit: boolean;
+  private readonly registerSignalHandlers: boolean;
   private server: Server; // Instance of the MCP server
   private sapConfig: SapConfig; // SAP configuration
   private transportConfig: TransportConfig;
@@ -402,10 +422,42 @@ export class mcp_abap_adt_server {
   /**
    * Constructor for the mcp_abap_adt_server class.
    */
-  constructor() {
-    this.sapConfig = getConfig(); // Load SAP configuration
+  constructor(options?: ServerOptions) {
+    this.allowProcessExit = options?.allowProcessExit ?? true;
+    this.registerSignalHandlers = options?.registerSignalHandlers ?? true;
+
+    if (options?.connection) {
+      setAbapConnectionOverride(options.connection);
+    } else {
+      setAbapConnectionOverride(undefined);
+    }
+
+    if (!options?.connection) {
+      setSapConfigOverride(options?.sapConfig);
+    }
+
+    // CHANGED: Don't validate config in constructor - will validate on actual ABAP requests
+    // This allows creating server instance without .env file when using runtime config (e.g., from HTTP headers)
     try {
-      this.transportConfig = parseTransportConfig();
+      if (options?.sapConfig) {
+        this.sapConfig = options.sapConfig;
+      } else if (!options?.connection) {
+        this.sapConfig = getConfig();
+      } else {
+        this.sapConfig = { url: "http://injected-connection", authType: "jwt", jwtToken: "injected" };
+      }
+    } catch (error) {
+      // If config is not available yet, that's OK - it will be provided later via setSapConfigOverride or DI
+      logger.warn("SAP config not available at initialization, will use runtime config", {
+        type: "CONFIG_DEFERRED",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Set a placeholder that will be replaced
+      this.sapConfig = { url: "http://placeholder", authType: "jwt", jwtToken: "placeholder" };
+    }
+
+    try {
+      this.transportConfig = options?.transportConfig ?? parseTransportConfig();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error("Failed to parse transport configuration", {
@@ -413,7 +465,10 @@ export class mcp_abap_adt_server {
         error: message,
       });
       process.stderr.write(`ERROR: ${message}\n`);
-      process.exit(1);
+      if (this.allowProcessExit) {
+        process.exit(1);
+      }
+      throw error instanceof Error ? error : new Error(message);
     }
     this.server = new Server(
       {
@@ -428,7 +483,9 @@ export class mcp_abap_adt_server {
     );
 
     this.setupHandlers(); // Setup request handlers
-    this.setupSignalHandlers();
+    if (this.registerSignalHandlers) {
+      this.setupSignalHandlers();
+    }
 
     if (this.transportConfig.type === "streamable-http") {
       logger.info("Transport configured", {
@@ -464,7 +521,7 @@ export class mcp_abap_adt_server {
    * @private
    */
   private setupHandlers() {
-    // Handler for ListToolsRequest - використовуємо динамічний реєстр інструментів
+  // Handler for ListToolsRequest - relies on the dynamic tool registry
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: getAllTools()
     }));
@@ -565,7 +622,9 @@ export class mcp_abap_adt_server {
           transport: this.transportConfig.type,
         });
         void this.shutdown().finally(() => {
-          process.exit(0);
+          if (this.allowProcessExit) {
+            process.exit(0);
+          }
         });
       });
     }
@@ -843,8 +902,13 @@ export class mcp_abap_adt_server {
   }
 }
 
-// Create and run the server
-const server = new mcp_abap_adt_server();
-server.run().catch((error) => {
-  process.exit(1);
-});
+if (process.env.MCP_SKIP_AUTO_START !== "true") {
+  const server = new mcp_abap_adt_server();
+  server.run().catch((error) => {
+    logger.error("Fatal error while running MCP server", {
+      type: "SERVER_FATAL_ERROR",
+      error: error instanceof Error ? error.message : String(error),
+    });
+    process.exit(1);
+  });
+}

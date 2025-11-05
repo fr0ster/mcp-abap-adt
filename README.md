@@ -33,6 +33,9 @@ This branch includes several powerful new features:
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
 - **⚙️ Advanced Configuration**: Configurable timeouts, flexible .env loading, enhanced logging
 - **🛠️ Developer Tools**: New testing utilities and improved error handling
+- **🧩 Dependency Injection Ready**: Inject a preconfigured `AbapConnection` instance when constructing the MCP server to bypass global configuration/state during tests or advanced integrations.
+
+> ℹ️ **ABAP Cloud limitation**: Direct ADT data preview of database tables (e.g. via `GetTableContents` or freestyle SQL) is blocked by SAP BTP backend policies. When you authenticate with JWT/XSUAA the server will now return a descriptive error rather than attempting the forbidden request. The same tools continue to work against on-premise systems that still allow datapreview.
 
 This guide is designed for beginners, so we'll walk through everything step-by-step. We'll cover:
 
@@ -42,6 +45,40 @@ This guide is designed for beginners, so we'll walk through everything step-by-s
 4.  **Integrating with Cline:** Connecting this server to the Cline VS Code extension.
 5.  **Troubleshooting:** Common problems and solutions.
 6.  **Available Tools:** A list of the commands you can use.
+
+## Testing
+
+- Run `npm test` to execute the Jest suite. The configuration relies on `jest.setup.js` to disable automatic MCP server startup via `MCP_SKIP_AUTO_START`, preventing transport initialization during unit tests.
+- Only files following the `*.test.[tj]s` naming pattern are collected, ensuring CLI helpers do not run as part of the Jest suite.
+- Use `npm test -- --detectOpenHandles` when you need to track pending asynchronous resources after the tests finish.
+
+## Developer Tools
+
+The project includes utility scripts for maintaining tool definitions and documentation:
+
+### Generate Tool Documentation
+
+Automatically generate `doc/AVAILABLE_TOOLS.md` from all handler `TOOL_DEFINITION` exports:
+
+```bash
+npm run docs:tools
+# or
+node tools/generate-tools-docs.js [--help]
+```
+
+This scans all handlers, extracts tool definitions, and generates comprehensive documentation with descriptions, parameters, and examples.
+
+### Update Handler Definitions
+
+Check and help add `TOOL_DEFINITION` to handler files:
+
+```bash
+node tools/update-handlers-with-tool-definitions.js [--help]
+```
+
+**Note:** This is primarily for new handlers. All existing handlers already have `TOOL_DEFINITION`.
+
+See [tools/README.md](tools/README.md) for complete documentation of all developer tools.
 
 ### HTTP Server Mode
 
@@ -64,4 +101,30 @@ This guide is designed for beginners, so we'll walk through everything step-by-s
 - Enable `--sse-enable-dns-protection` (or the matching ENV) when you need host/origin checks for untrusted clients.
 - Only one SSE session is active at a time; additional connections receive HTTP 409 until the previous session ends.
 - MCP Inspector does not expose an SSE test UI, so use Cline or a custom EventSource client when debugging this transport.
+
+## Dependency Injection for ABAP Connections
+
+Advanced runtimes or test harnesses can now inject a ready-made connection instead of relying on global environment variables.
+
+```ts
+import { mcp_abap_adt_server, setAbapConnectionOverride } from "@orchestraight.co/mcp-abap-adt";
+import { createAbapConnection } from "./lib/connection/connectionFactory";
+
+const connection = createAbapConnection({
+  url: "https://my-system.example",
+  authType: "basic",
+  client: "100",
+  username: process.env.SAP_USERNAME!,
+  password: process.env.SAP_PASSWORD!,
+});
+
+const server = new mcp_abap_adt_server({ connection });
+
+// Optional: swap connections at runtime
+setAbapConnectionOverride(undefined); // fallback to env-configured factory
+```
+
+- `ServerOptions.connection` takes precedence over any `.env` or CLI configuration.
+- Use `setAbapConnectionOverride(connection)` to swap implementations dynamically (e.g. for multi-tenant gateways).
+- Call `cleanup()` when tests finish to release interceptors/caches that the connection might hold.
 

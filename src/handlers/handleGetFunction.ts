@@ -27,8 +27,8 @@ function parseFunctionXml(xml: string) {
 
     // ADT Function Module XML (FUGR/FM)
     if (result['fu:functionModule']) {
-        const f = result['fu:functionModule'];
-        // Параметри
+    const f = result['fu:functionModule'];
+    // Parameter extraction helper
         const params = (section) => {
             const arr = f[section]?.['fu:parameter'];
             if (!arr) return [];
@@ -52,13 +52,13 @@ function parseFunctionXml(xml: string) {
                     description: arr['fu:description']
                 }];
         };
-        // Таблиці
+    // Table parameters
         const tables = params('fu:tables');
-        // Імпорт/експорт/змінні
+    // Import/export/changing parameter sets
         const importing = params('fu:importing');
         const exporting = params('fu:exporting');
         const changing = params('fu:changing');
-        // Винятки
+    // Exceptions
         const exceptions = f['fu:exceptions']?.['fu:exception'];
         const excArr = !exceptions ? [] : Array.isArray(exceptions)
             ? exceptions.map(e => e['fu:name'])
@@ -89,9 +89,9 @@ export async function handleGetFunction(args: any) {
         if (!args?.function_name || !args?.function_group) {
             throw new McpError(ErrorCode.InvalidParams, 'Function name and group are required');
         }
-        const url = `${await getBaseUrl()}/sap/bc/adt/functions/groups/${encodeSapObjectName(args.function_group)}/fmodules/${encodeSapObjectName(args.function_name)}/source/main`;
-        const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
-        // Якщо XML — парсимо і повертаємо JSON, якщо ні — повертаємо plain text напряму
+    const url = `${await getBaseUrl()}/sap/bc/adt/functions/groups/${encodeSapObjectName(args.function_group)}/fmodules/${encodeSapObjectName(args.function_name)}/source/main`;
+    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+    // Parse XML responses and return JSON; otherwise stream back the plain text
         if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
             const resultObj = parseFunctionXml(response.data);
             const result = {
@@ -108,7 +108,7 @@ export async function handleGetFunction(args: any) {
             }
             return result;
         } else {
-            // Plain text: MCP-формат
+            // Wrap plain text responses in the MCP format
             if (args.filePath) {
                 writeResultToFile(response.data, args.filePath);
             }

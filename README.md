@@ -52,6 +52,34 @@ This guide is designed for beginners, so we'll walk through everything step-by-s
 - Only files following the `*.test.[tj]s` naming pattern are collected, ensuring CLI helpers do not run as part of the Jest suite.
 - Use `npm test -- --detectOpenHandles` when you need to track pending asynchronous resources after the tests finish.
 
+## Developer Tools
+
+The project includes utility scripts for maintaining tool definitions and documentation:
+
+### Generate Tool Documentation
+
+Automatically generate `doc/AVAILABLE_TOOLS.md` from all handler `TOOL_DEFINITION` exports:
+
+```bash
+npm run docs:tools
+# or
+node tools/generate-tools-docs.js [--help]
+```
+
+This scans all handlers, extracts tool definitions, and generates comprehensive documentation with descriptions, parameters, and examples.
+
+### Update Handler Definitions
+
+Check and help add `TOOL_DEFINITION` to handler files:
+
+```bash
+node tools/update-handlers-with-tool-definitions.js [--help]
+```
+
+**Note:** This is primarily for new handlers. All existing handlers already have `TOOL_DEFINITION`.
+
+See [tools/README.md](tools/README.md) for complete documentation of all developer tools.
+
 ### HTTP Server Mode
 
 - Build once with `npm run build`, then launch via `npm run start:http` to expose the MCP server over Streamable HTTP (`0.0.0.0:3000` by default).

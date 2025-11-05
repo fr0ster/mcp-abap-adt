@@ -4,17 +4,65 @@
  * Generate AVAILABLE_TOOLS.md documentation from TOOL_DEFINITION exports
  * 
  * This script automatically generates documentation for all MCP ABAP ADT tools
- * by reading TOOL_DEFINITION from the toolsRegistry.
+ * by reading TOOL_DEFINITION from handler files.
  * 
  * Usage:
- *   node tools/generate-tools-docs.js
- * 
- * Or via npm script:
+ *   node tools/generate-tools-docs.js [--help]
  *   npm run docs:tools
+ * 
+ * Options:
+ *   --help, -h    Show this help message
+ * 
+ * What it does:
+ *   1. Scans all handler files in src/handlers/
+ *   2. Extracts TOOL_DEFINITION from each handler
+ *   3. Groups tools by category
+ *   4. Generates markdown documentation with descriptions, parameters, and examples
+ *   5. Writes to doc/AVAILABLE_TOOLS.md
+ * 
+ * Example:
+ *   $ npm run docs:tools
+ *   🔍 Loading tools from handlers...
+ *   ✅ Found 31 tools
+ *   📝 Generating documentation...
+ *   ✅ Documentation generated: doc/AVAILABLE_TOOLS.md
  */
 
 const fs = require('fs');
 const path = require('path');
+
+// Show help if requested
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log(`
+Usage: node tools/generate-tools-docs.js [options]
+
+Generate AVAILABLE_TOOLS.md documentation from TOOL_DEFINITION exports
+
+Options:
+  --help, -h    Show this help message
+
+What it does:
+  • Scans all handler files in src/handlers/
+  • Extracts TOOL_DEFINITION from each handler
+  • Groups tools by category (Programs, Tables, Enhancements, etc.)
+  • Generates markdown documentation with:
+    - Tool descriptions
+    - Parameter lists with types and descriptions
+    - Example JSON for each tool
+    - Special notes (e.g., ABAP Cloud limitations)
+  • Writes to doc/AVAILABLE_TOOLS.md
+
+Examples:
+  $ npm run docs:tools
+  $ node tools/generate-tools-docs.js
+
+See also:
+  • tools/update-handlers-with-tool-definitions.js - Add TOOL_DEFINITION to new handlers
+  • doc/AVAILABLE_TOOLS.md - Generated documentation
+  • TOOLS_ARCHITECTURE.md - Architecture documentation
+`);
+  process.exit(0);
+}
 
 // Tool category mappings
 const CATEGORY_MAP = {

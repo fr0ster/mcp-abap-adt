@@ -1,251 +1,156 @@
 #!/usr/bin/env node
+
+/**
+ * Update handler files with TOOL_DEFINITION if missing
+ * 
+ * This script checks handler files and helps add TOOL_DEFINITION exports if they're missing.
+ * It's useful when creating new handlers or migrating existing ones.
+ * 
+ * Usage:
+ *   node tools/update-handlers-with-tool-definitions.js [--help]
+ * 
+ * Options:
+ *   --help, -h    Show this help message
+ * 
+ * What it does:
+ *   1. Scans all handler files in src/handlers/
+ *   2. Checks if each handler has TOOL_DEFINITION
+ *   3. If missing, suggests a basic TOOL_DEFINITION based on handler function name
+ *   4. Adds the definition to the file (you must review and update parameters!)
+ * 
+ * Note:
+ *   Auto-generated TOOL_DEFINITION may be incomplete. Always review and update:
+ *   - Description should be accurate and descriptive
+ *   - inputSchema.properties should match the handler function parameters
+ *   - required array should list all mandatory parameters
+ * 
+ * Example:
+ *   $ node tools/update-handlers-with-tool-definitions.js
+ *   🔍 Checking handler files for TOOL_DEFINITION...
+ *   ✓ handleGetProgram.ts - TOOL_DEFINITION already exists
+ *   ✎ handleNewHandler.ts - Added TOOL_DEFINITION (please review and update parameters!)
+ * 
+ * See also:
+ *   • tools/generate-tools-docs.js - Generate documentation from TOOL_DEFINITION
+ *   • TOOLS_ARCHITECTURE.md - Architecture documentation
+ */
+
 const fs = require('fs');
 const path = require('path');
 
-// Map handler names to their definitions (taken from the original index.ts)
-const TOOL_DEFINITIONS = {
-  'handleGetFunctionGroup': {
-    name: "GetFunctionGroup",
-    description: "Retrieve ABAP Function Group source code.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        function_group: { type: "string", description: "Name of the function group" }
-      },
-      required: ["function_group"]
+// Show help if requested
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log(`
+Usage: node tools/update-handlers-with-tool-definitions.js [options]
+
+Update handler files with TOOL_DEFINITION if missing
+
+Options:
+  --help, -h    Show this help message
+
+What it does:
+  • Scans all handler files in src/handlers/
+  • Checks if each handler has TOOL_DEFINITION export
+  • If missing, attempts to generate a basic TOOL_DEFINITION:
+    - Extracts tool name from handler function (handleXxx -> Xxx)
+    - Tries to find description in JSDoc comments
+    - Creates basic inputSchema structure
+  • Adds TOOL_DEFINITION to the file after imports
+  • ⚠️  WARNING: Auto-generated definitions are incomplete!
+     You MUST review and update:
+     - Description accuracy
+     - inputSchema.properties (match handler parameters)
+     - required array (list mandatory parameters)
+     - Default values if any
+
+Examples:
+  $ node tools/update-handlers-with-tool-definitions.js
+  $ # Check if all handlers have TOOL_DEFINITION
+
+When to use:
+  • When creating a new handler file
+  • When migrating old handlers to new architecture
+  • To verify all handlers have TOOL_DEFINITION
+
+Best practice:
+  • Manually add TOOL_DEFINITION following existing patterns
+  • Use this script only as a starting point
+  • Always review and complete the generated definition
+
+See also:
+  • tools/generate-tools-docs.js - Generate documentation
+  • TOOLS_ARCHITECTURE.md - Architecture documentation
+  • doc/AVAILABLE_TOOLS.md - Generated tool documentation
+`);
+  process.exit(0);
+}
+
+// Reuse the extraction logic from generate-tools-docs.js
+function extractToolDefinition(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    
+    // Check if TOOL_DEFINITION already exists
+    if (content.includes('export const TOOL_DEFINITION')) {
+      return { exists: true };
     }
-  },
-  'handleGetTable': {
-    name: "GetTable",
-    description: "Retrieve ABAP table structure.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        table_name: { type: "string", description: "Name of the ABAP table" }
-      },
-      required: ["table_name"]
+    
+    // Try to extract from handler function signature and comments
+    // This is a fallback - ideally TOOL_DEFINITION should be added manually
+    const handlerMatch = content.match(/export\s+(async\s+)?function\s+handle(\w+)/);
+    if (!handlerMatch) {
+      return { exists: false, error: 'No handler function found' };
     }
-  },
-  'handleGetStructure': {
-    name: "GetStructure",
-    description: "Retrieve ABAP Structure.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        structure_name: { type: "string", description: "Name of the ABAP Structure" }
-      },
-      required: ["structure_name"]
-    }
-  },
-  'handleGetTableContents': {
-    name: "GetTableContents",
-    description: "Retrieve contents of an ABAP table.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        table_name: { type: "string", description: "Name of the ABAP table" },
-        max_rows: { type: "number", description: "Maximum number of rows to retrieve", default: 100 }
-      },
-      required: ["table_name"]
-    }
-  },
-  'handleGetPackage': {
-    name: "GetPackage",
-    description: "Retrieve ABAP package details.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        package_name: { type: "string", description: "Name of the ABAP package" }
-      },
-      required: ["package_name"]
-    }
-  },
-  'handleGetInclude': {
-    name: "GetInclude",
-    description: "Retrieve source code of a specific ABAP include file.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        include_name: { type: "string", description: "Name of the ABAP Include" }
-      },
-      required: ["include_name"]
-    }
-  },
-  'handleGetIncludesList': {
-    name: "GetIncludesList",
-    description: "Recursively discover and list ALL include files within an ABAP program or include.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        object_name: { type: "string", description: "Name of the ABAP program or include" },
-        object_type: { type: "string", enum: ["program", "include"], description: "Type of the ABAP object" },
-        detailed: { type: "boolean", description: "If true, returns structured JSON with metadata and raw XML.", default: false },
-        timeout: { type: "number", description: "Timeout in ms for each ADT request." }
-      },
-      required: ["object_name", "object_type"]
-    }
-  },
-  'handleGetTypeInfo': {
-    name: "GetTypeInfo",
-    description: "Retrieve ABAP type information.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        type_name: { type: "string", description: "Name of the ABAP type" }
-      },
-      required: ["type_name"]
-    }
-  },
-  'handleGetInterface': {
-    name: "GetInterface",
-    description: "Retrieve ABAP interface source code.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        interface_name: { type: "string", description: "Name of the ABAP interface" }
-      },
-      required: ["interface_name"]
-    }
-  },
-  'handleGetTransaction': {
-    name: "GetTransaction",
-    description: "Retrieve ABAP transaction details.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        transaction_name: { type: "string", description: "Name of the ABAP transaction" }
-      },
-      required: ["transaction_name"]
-    }
-  },
-  'handleSearchObject': {
-    name: "SearchObject",
-    description: "Search for ABAP objects by name pattern.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        search_pattern: { type: "string", description: "Search pattern for ABAP objects" },
-        object_type: { type: "string", description: "Type of ABAP object to search for" }
-      },
-      required: ["search_pattern"]
-    }
-  },
-  'handleGetEnhancements': {
-    name: "GetEnhancements",
-    description: "Retrieve a list of enhancements for a given ABAP object.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        object_name: { type: "string", description: "Name of the ABAP object" },
-        object_type: { type: "string", description: "Type of the ABAP object" }
-      },
-      required: ["object_name", "object_type"]
-    }
-  },
-  'handleGetEnhancementImpl': {
-    name: "GetEnhancementImpl",
-    description: "Retrieve source code of a specific enhancement implementation by its name and enhancement spot.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        enhancement_spot: { type: "string", description: "Name of the enhancement spot" },
-        enhancement_name: { type: "string", description: "Name of the enhancement implementation" }
-      },
-      required: ["enhancement_spot", "enhancement_name"]
-    }
-  },
-  'handleGetEnhancementSpot': {
-    name: "GetEnhancementSpot",
-    description: "Retrieve metadata and list of implementations for a specific enhancement spot.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        enhancement_spot: { type: "string", description: "Name of the enhancement spot" }
-      },
-      required: ["enhancement_spot"]
-    }
-  },
-  'handleGetBdef': {
-    name: "GetBdef",
-    description: "Retrieve the source code of a BDEF (Behavior Definition) for a CDS entity.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        bdef_name: { type: "string", description: "Name of the BDEF (Behavior Definition)" }
-      },
-      required: ["bdef_name"]
-    }
-  },
-  'handleGetSqlQuery': {
-    name: "GetSqlQuery",
-    description: "Execute freestyle SQL queries via SAP ADT Data Preview API.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        sql_query: { type: "string", description: "SQL query to execute" },
-        row_number: { type: "number", description: "Maximum number of rows to return", default: 100 }
-      },
-      required: ["sql_query"]
-    }
-  },
-  'handleGetRelatedObjectTypes': {
-    name: "GetRelatedObjectTypes",
-    description: "Retrieves related ABAP object types for a given object.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        object_name: { type: "string", description: "Name of the ABAP object" }
-      },
-      required: ["object_name"]
-    }
-  },
-  'handleGetWhereUsed': {
-    name: "GetWhereUsed",
-    description: "Retrieve where-used references for ABAP objects via ADT usageReferences.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        object_name: { type: "string", description: "Name of the ABAP object" },
-        object_type: { type: "string", description: "Type of the ABAP object" },
-        detailed: { type: "boolean", description: "If true, returns all references including packages and internal components.", default: false }
-      },
-      required: ["object_name", "object_type"]
-    }
-  },
-  'handleGetObjectInfo': {
-    name: "GetObjectInfo",
-    description: "Return all objects related to a given ABAP object using nodestructure, traversing at least two levels.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        parent_type: { type: "string", description: "Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P)" },
-        parent_name: { type: "string", description: "Parent object name" }
-      },
-      required: ["parent_type", "parent_name"]
-    }
+    
+    const toolName = handlerMatch[2];
+    
+    // Try to find description in comments
+    const commentMatch = content.match(/\/\*\*[\s\S]*?\*\//);
+    const description = commentMatch 
+      ? commentMatch[0].replace(/\/\*\*|\*\//g, '').trim().split('\n')[0].replace(/^\*\s*/, '').trim()
+      : `Handler for ${toolName}`;
+    
+    return {
+      exists: false,
+      suggested: {
+        name: toolName,
+        description: description,
+        inputSchema: {
+          type: "object",
+          properties: {},
+          required: []
+        }
+      }
+    };
+  } catch (error) {
+    return { exists: false, error: error.message };
   }
-};
+}
 
 function updateHandlerFile(filePath, handlerName) {
+  const result = extractToolDefinition(filePath);
+  
+  if (result.exists) {
+    console.log(`✓ ${path.basename(filePath)} - TOOL_DEFINITION already exists`);
+    return false;
+  }
+  
+  if (result.error) {
+    console.log(`⚠ ${path.basename(filePath)} - ${result.error}`);
+    return false;
+  }
+  
+  if (!result.suggested) {
+    console.log(`⚠ ${path.basename(filePath)} - Cannot generate TOOL_DEFINITION automatically`);
+    console.log(`  Please add TOOL_DEFINITION manually following the pattern in other handlers.`);
+    return false;
+  }
+  
   const content = fs.readFileSync(filePath, 'utf8');
-  
-  // Check whether TOOL_DEFINITION is already present
-  if (content.includes('export const TOOL_DEFINITION')) {
-    console.log(`Skipping ${filePath} - TOOL_DEFINITION already exists`);
-    return false;
-  }
-  
-  const definition = TOOL_DEFINITIONS[handlerName];
-  if (!definition) {
-    console.log(`No definition for ${handlerName}`);
-    return false;
-  }
-  
-  // Locate the first import statement
   const lines = content.split('\n');
-  let insertIndex = 0;
   
-  // Identify the last import statement to keep the block together
+  // Find insertion point (after imports)
+  let insertIndex = 0;
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].startsWith('import ')) {
       insertIndex = i + 1;
@@ -255,29 +160,35 @@ function updateHandlerFile(filePath, handlerName) {
     }
   }
   
-  // Create TOOL_DEFINITION
-  const toolDefinition = `
-export const TOOL_DEFINITION = ${JSON.stringify(definition, null, 2)} as const;
+  // Generate TOOL_DEFINITION
+  const toolDefinition = `export const TOOL_DEFINITION = ${JSON.stringify(result.suggested, null, 2)} as const;
+
 `;
   
-  // Insert the definition right after the import section
+  // Insert the definition
   lines.splice(insertIndex, 0, toolDefinition);
   
-  // Write the file back to disk
+  // Write the file back
   fs.writeFileSync(filePath, lines.join('\n'));
-  console.log(`Updated ${filePath}`);
+  console.log(`✎ ${path.basename(filePath)} - Added TOOL_DEFINITION (please review and update parameters!)`);
   return true;
 }
 
 function main() {
+  console.log('🔍 Checking handler files for TOOL_DEFINITION...\n');
+  
   const handlersDir = path.join(__dirname, '..', 'src', 'handlers');
-  const files = fs.readdirSync(handlersDir);
+  if (!fs.existsSync(handlersDir)) {
+    console.error(`❌ Handlers directory not found: ${handlersDir}`);
+    process.exit(1);
+  }
+  
+  const files = fs.readdirSync(handlersDir)
+    .filter(file => file.endsWith('.ts') && file.startsWith('handle'));
   
   let updatedCount = 0;
   
   files.forEach(file => {
-    if (!file.endsWith('.ts')) return;
-    
     const handlerName = path.basename(file, '.ts');
     const filePath = path.join(handlersDir, file);
     
@@ -286,11 +197,16 @@ function main() {
     }
   });
   
-  console.log(`Updated ${updatedCount} files`);
+  console.log(`\n${updatedCount === 0 ? '✅ All handlers already have TOOL_DEFINITION' : `📝 Updated ${updatedCount} file(s) - please review and update parameters!`}`);
+  
+  if (updatedCount > 0) {
+    console.log('\n⚠️  WARNING: Auto-generated TOOL_DEFINITION may be incomplete!');
+    console.log('   Please review and update the inputSchema properties based on the handler function.');
+  }
 }
 
 if (require.main === module) {
   main();
 }
 
-module.exports = { updateHandlerFile, TOOL_DEFINITIONS };
+module.exports = { updateHandlerFile, extractToolDefinition };

@@ -101,15 +101,51 @@ this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
 
 ## Automation
 
-The `tools/update-handlers-with-tool-definitions.js` script automatically adds `TOOL_DEFINITION` blocks to existing handlers.
+### Updating Handlers
 
-Run it with:
+The `tools/update-handlers-with-tool-definitions.js` script helps add `TOOL_DEFINITION` blocks to handlers that don't have them yet.
+
 ```bash
-node tools/update-handlers-with-tool-definitions.js
+node tools/update-handlers-with-tool-definitions.js [--help]
 ```
+
+**What it does:**
+- Checks all handler files for `TOOL_DEFINITION`
+- Suggests basic definitions for missing ones
+- ⚠️ **Important:** Auto-generated definitions are incomplete! Always review and update.
+
+**When to use:**
+- Creating new handlers
+- Migrating existing handlers
+- Verifying all handlers have `TOOL_DEFINITION`
+
+### Generating Documentation
+
+The `tools/generate-tools-docs.js` script automatically generates `doc/AVAILABLE_TOOLS.md` from all `TOOL_DEFINITION` exports.
+
+```bash
+npm run docs:tools
+# or
+node tools/generate-tools-docs.js [--help]
+```
+
+**What it does:**
+- Scans all handler files in `src/handlers/`
+- Extracts `TOOL_DEFINITION` from each
+- Groups tools by category
+- Generates comprehensive markdown documentation
+
+**When to use:**
+- After adding or updating tools
+- Before releasing a new version
+- To keep documentation in sync with code
+
+**Output:** `doc/AVAILABLE_TOOLS.md` - Complete reference of all available tools.
+
+See [tools/README.md](tools/README.md) for more details on available developer tools.
 
 ## Future improvements
 
 - Add automated validation to ensure handlers and descriptions stay aligned
 - Provide a CLI tool for generating new handlers from templates
-- Generate documentation automatically from tool descriptions
+- Add unit tests for tool definition structure

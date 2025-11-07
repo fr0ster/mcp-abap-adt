@@ -33,6 +33,8 @@ import { TOOL_DEFINITION as GetDomain_Tool } from '../handlers/handleGetDomain';
 import { TOOL_DEFINITION as CreateDomain_Tool } from '../handlers/handleCreateDomain';
 import { TOOL_DEFINITION as CreateDataElement_Tool } from '../handlers/handleCreateDataElement';
 import { TOOL_DEFINITION as GetDataElement_Tool } from '../handlers/handleGetDataElement';
+import { TOOL_DEFINITION as CreateTransport_Tool } from '../handlers/handleCreateTransport';
+import { TOOL_DEFINITION as GetTransport_Tool } from '../handlers/handleGetTransport';
 
 // Type that describes a tool entry
 export interface ToolDefinition {
@@ -105,6 +107,10 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // Data Element management
   GetDataElement_Tool,
   CreateDataElement_Tool,
+
+  // Transport management
+  GetTransport_Tool,
+  CreateTransport_Tool,
 
   // Dynamically imported tools
   ...DYNAMIC_IMPORT_TOOLS

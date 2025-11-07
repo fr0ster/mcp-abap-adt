@@ -45,6 +45,8 @@ import { handleGetDomain } from "./handlers/handleGetDomain";
 import { handleCreateDomain } from "./handlers/handleCreateDomain";
 import { handleCreateDataElement } from "./handlers/handleCreateDataElement";
 import { handleGetDataElement } from "./handlers/handleGetDataElement";
+import { handleCreateTransport } from "./handlers/handleCreateTransport";
+import { handleGetTransport } from "./handlers/handleGetTransport";
 
 // Import shared utility functions and types
 import {
@@ -610,6 +612,10 @@ export class mcp_abap_adt_server {
           return await handleCreateDataElement(request.params.arguments);
         case "GetDataElement":
           return await handleGetDataElement(request.params.arguments);
+        case "CreateTransport":
+          return await handleCreateTransport(request.params.arguments);
+        case "GetTransport":
+          return await handleGetTransport(request.params.arguments);
         default:
           throw new McpError(
             ErrorCode.MethodNotFound,

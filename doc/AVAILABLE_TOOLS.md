@@ -9,12 +9,13 @@ This document contains a complete list of all tools (functions) provided by the 
 
 ## 📋 Table of Contents
 
-- [Programs, Classes, Functions](#programs,-classes,-functions)
+- [Programs, Classes, Functions](#programs-classes-functions)
 - [Tables and Structures](#tables-and-structures)
+- [Dictionary Objects (Domains, Data Elements)](#dictionary-objects-domains-data-elements)
 - [Packages and Interfaces](#packages-and-interfaces)
 - [Includes and Hierarchies](#includes-and-hierarchies)
-- [Types, Descriptions, Metadata](#types,-descriptions,-metadata)
-- [Search, SQL, Transactions](#search,-sql,-transactions)
+- [Types, Descriptions, Metadata](#types-descriptions-metadata)
+- [Search, SQL, Transactions](#search-sql-transactions)
 - [Enhancements](#enhancements)
 - [ABAP Parser and Semantic Analysis](#abap-parser-and-semantic-analysis)
 - [Batch Operations](#batch-operations)
@@ -117,7 +118,7 @@ This document contains a complete list of all tools (functions) provided by the 
 
 ---
 
-## Domain Management
+## Dictionary Objects (Domains, Data Elements)
 
 ### GetDomain
 **Description:** Retrieve ABAP domain structure and properties from SAP system.
@@ -184,6 +185,95 @@ This document contains a complete list of all tools (functions) provided by the 
 - Domain details (datatype, length, decimals)
 
 **Note:** SAP handles locking automatically on the transport. Domain is created and activated in one operation.
+
+---
+
+### CreateDataElement
+**Description:** Create a new ABAP data element in SAP system. Creates data element with all properties including domain reference and field labels, then activates it automatically.
+
+**Parameters:**
+- `data_element_name` (string, required): Data element name (e.g., ZZ_E_TEST_001). Must follow SAP naming conventions.
+- `description` (string, optional): Data element description. If not provided, data_element_name will be used.
+- `package_name` (string, required): Package name (e.g., ZOK_LOCAL, $TMP for local objects)
+- `transport_request` (string, required): Transport request number (e.g., E19K905635). Required for transportable packages.
+- `domain_name` (string, required): Domain name to use as type reference (e.g., ZZ_TEST_0001)
+- `data_type` (string, optional, default: "CHAR"): Data type (e.g., CHAR, NUMC). Usually inherited from domain.
+- `length` (number, optional, default: 100): Data type length. Usually inherited from domain.
+- `decimals` (number, optional, default: 0): Decimal places. Usually inherited from domain.
+- `short_label` (string, optional): Short field label (max 10 chars)
+- `medium_label` (string, optional): Medium field label (max 20 chars)
+- `long_label` (string, optional): Long field label (max 40 chars)
+- `heading_label` (string, optional): Heading field label (max 55 chars)
+
+**Example:**
+```json
+{
+  "data_element_name": "ZZ_E_TEST_MCP_01",
+  "description": "Test data element created via MCP",
+  "package_name": "ZOK_LOCAL",
+  "transport_request": "E19K905635",
+  "domain_name": "ZZ_TEST_MCP_03",
+  "data_type": "CHAR",
+  "length": 50,
+  "decimals": 0,
+  "short_label": "ShortLbl",
+  "medium_label": "Medium Label",
+  "long_label": "Long Field Label",
+  "heading_label": "Heading"
+}
+```
+
+**Workflow:**
+1. POST creates data element with all properties (domain reference + field labels)
+2. Activate data element
+3. Verify activation
+
+**Response includes:**
+- Success status
+- Data element name and version
+- Package and transport request
+- Domain linkage confirmation
+- Data element details (type_kind, type_name, data_type, length, decimals)
+
+**Note:** SAP handles locking automatically on the transport. Data element is created and activated in one operation (similar to CreateDomain).
+
+---
+
+### GetDataElement
+**Description:** Retrieve ABAP data element information including type definition, field labels, and metadata from SAP system via ADT API.
+
+**Parameters:**
+- `data_element_name` (string, required): Data element name (e.g., MAKTX, MATNR, ZZ_E_TEST_001)
+
+**Example:**
+```json
+{
+  "data_element_name": "MAKTX"
+}
+```
+
+**Response includes:**
+- **Metadata:**
+  - Name, type, description
+  - Language, master language, master system
+  - Created/changed by and timestamp
+  - Version and ABAP language version
+- **Package information:**
+  - Package name, type, description, URI
+- **Data element details:**
+  - Type kind (domain/built-in type)
+  - Type name (domain reference)
+  - Data type, length, decimals
+  - Field labels (short/10, medium/20, long/40, heading/55)
+  - Search help and parameters
+  - Change document settings
+  - Input history and BIDI settings
+
+**Use cases:**
+- Verify data element properties after creation
+- Check domain references and type definitions
+- Retrieve field labels for UI generation
+- Analyze data element configurations
 
 ---
 

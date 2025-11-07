@@ -9,8 +9,17 @@
   - Simplified workflow: POST with all properties + Activate + Verify
   - SAP handles locking automatically on transport
   - Full test coverage with `test-create-domain.js` and `test-get-domain.js`
+- **Data Element Management Tools**:
+  - `GetDataElement`: Retrieve ABAP data element information including type definition, field labels, and metadata
+  - `CreateDataElement`: Create new ABAP data elements with domain references and field labels
+  - Simplified workflow: POST with full body + Activate + Verify (similar to CreateDomain)
+  - Support for all field labels: short (10), medium (20), long (40), heading (55)
+  - Support for search help, change document, and other data element properties
+  - Full test coverage with `test-create-data-element.js` and `test-get-data-element.js`
 - Domain creation creates and activates domain in one operation (3 steps vs Eclipse's 7 steps)
+- Data element creation follows same simplified approach (3 steps vs Eclipse's multiple LOCK/UNLOCK operations)
 - All domain properties (datatype, length, decimals, lowercase, sign, conversion exit, value table) supported
+- All data element properties (domain reference, field labels, type info, search help) supported
 
 ### Changed
 - Added dedicated `jest.setup.js` to skip automatic MCP server bootstrap during Jest runs, eliminating TDZ errors in the test environment.

@@ -28,7 +28,8 @@ See [doc/DetectObjectTypeListTools.md](doc/DetectObjectTypeListTools.md) for det
 This branch includes several powerful new features:
 
 - **🏗️ Domain Management**: `GetDomain`, `CreateDomain` - Create and manage ABAP domains with automatic activation
-- **🔍 Enhancement Analysis Tools**: `GetEnhancements`, `GetEnhancementByName` - Comprehensive enhancement discovery and analysis
+- **� Data Element Management**: `GetDataElement`, `CreateDataElement` - Create and retrieve ABAP data elements with domain references and field labels
+- **�🔍 Enhancement Analysis Tools**: `GetEnhancements`, `GetEnhancementByName` - Comprehensive enhancement discovery and analysis
 - **📋 Include Management**: `GetIncludesList` - Recursive include discovery and hierarchy mapping  
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API

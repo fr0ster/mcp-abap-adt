@@ -18,6 +18,26 @@ create_domain:
         lowercase: false
         sign_exists: false
 
+# Data Element Creation Tests
+create_data_element:
+  test_cases:
+    - name: "basic_data_element"
+      enabled: false
+      description: "Create a simple data element based on domain"
+      params:
+        data_element_name: "ZZ_E_TEST_MCP_01"
+        description: "Test data element created via MCP"
+        package_name: "ZOK_LOCAL"
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
+        domain_name: "ZZ_TEST_MCP_01"  # Use domain created by create_domain test
+        data_type: "CHAR"
+        length: 50
+        decimals: 0
+        short_label: "ShortLbl"
+        medium_label: "Medium Label"
+        long_label: "Long Field Label"
+        heading_label: "Heading"
+
 # Program Tests
 get_program:
   test_cases:

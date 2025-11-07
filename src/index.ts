@@ -43,6 +43,8 @@ import { handleGetAbapSemanticAnalysis } from "./handlers/handleGetAbapSemanticA
 import { handleGetAbapSystemSymbols } from "./handlers/handleGetAbapSystemSymbols";
 import { handleGetDomain } from "./handlers/handleGetDomain";
 import { handleCreateDomain } from "./handlers/handleCreateDomain";
+import { handleCreateDataElement } from "./handlers/handleCreateDataElement";
+import { handleGetDataElement } from "./handlers/handleGetDataElement";
 
 // Import shared utility functions and types
 import {
@@ -604,6 +606,10 @@ export class mcp_abap_adt_server {
           return await handleGetAbapSystemSymbols(request.params.arguments);
         case "CreateDomain":
           return await handleCreateDomain(request.params.arguments);
+        case "CreateDataElement":
+          return await handleCreateDataElement(request.params.arguments);
+        case "GetDataElement":
+          return await handleGetDataElement(request.params.arguments);
         default:
           throw new McpError(
             ErrorCode.MethodNotFound,

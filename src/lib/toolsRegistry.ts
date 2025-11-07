@@ -31,6 +31,8 @@ import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from '../handlers/han
 import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from '../handlers/handleGetAbapSystemSymbols';
 import { TOOL_DEFINITION as GetDomain_Tool } from '../handlers/handleGetDomain';
 import { TOOL_DEFINITION as CreateDomain_Tool } from '../handlers/handleCreateDomain';
+import { TOOL_DEFINITION as CreateDataElement_Tool } from '../handlers/handleCreateDataElement';
+import { TOOL_DEFINITION as GetDataElement_Tool } from '../handlers/handleGetDataElement';
 
 // Type that describes a tool entry
 export interface ToolDefinition {
@@ -99,6 +101,10 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // Domain management
   GetDomain_Tool,
   CreateDomain_Tool,
+
+  // Data Element management
+  GetDataElement_Tool,
+  CreateDataElement_Tool,
 
   // Dynamically imported tools
   ...DYNAMIC_IMPORT_TOOLS

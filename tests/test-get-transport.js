@@ -3,7 +3,7 @@
  * Tests transport request information retrieval
  */
 
-const { initializeTestEnvironment } = require('./test-helper');
+const { initializeTestEnvironment, loadTestConfig } = require('./test-helper');
 
 // Initialize test environment
 initializeTestEnvironment();
@@ -16,8 +16,16 @@ async function testGetTransport() {
   console.log('='.repeat(80));
 
   try {
-    // Test with existing transport (you can change this to a real transport number)
-    const transportNumber = 'E19K905635'; // Update with actual transport number
+    // Load test configuration
+    const testConfig = loadTestConfig();
+    const testCase = testConfig.get_transport?.test_cases?.find(tc => tc.name === 'existing_transport');
+    
+    if (!testCase) {
+      console.error('❌ Test case "existing_transport" not found in test-config.yaml');
+      return;
+    }
+
+    const transportNumber = testCase.params.transport_number;
     
     console.log(`\n📝 Testing with transport: ${transportNumber}`);
 
@@ -27,8 +35,8 @@ async function testGetTransport() {
     const startTime = Date.now();
     const result = await handleGetTransport({
       transport_number: transportNumber,
-      include_objects: true,
-      include_tasks: true
+      include_objects: testCase.params.include_objects,
+      include_tasks: testCase.params.include_tasks
     });
     const duration = Date.now() - startTime;
 

@@ -57,24 +57,20 @@ function generateRequestId(): string {
  * Create transport request XML payload
  */
 function buildCreateTransportXml(args: CreateTransportArgs, username: string): string {
-  const transportType = args.transport_type || 'workbench';
-  const owner = args.owner || username;
-  
-  // Transport type mapping for SAP
-  const typeMapping = {
-    'workbench': 'K', // Workbench request
-    'customizing': 'W' // Customizing request
-  };
-  
-  const sapType = typeMapping[transportType] || 'K';
-  
+  const transportType = args.transport_type === 'customizing' ? 'T' : 'K';
+  const description = args.description || 'Transport request created via MCP';
+  const owner = username;
+  const target = args.target_system || 'PRD';
+
   return `<?xml version="1.0" encoding="UTF-8"?>
-<tm:request xmlns:tm="http://www.sap.com/cts/adt/tm" xmlns:adtcore="http://www.sap.com/adt/core">
-  <tm:type>${sapType}</tm:type>
-  <tm:description>${args.description}</tm:description>
-  <tm:owner>${owner}</tm:owner>
-  ${args.target_system ? `<tm:target>${args.target_system}</tm:target>` : ''}
-</tm:request>`;
+<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" xmlns:adtcore="http://www.sap.com/adt/core">
+  <tm:request>
+    <tm:type>${transportType}</tm:type>
+    <tm:description>${description}</tm:description>
+    <tm:owner>${owner}</tm:owner>
+    <tm:target>${target}</tm:target>
+  </tm:request>
+</tm:root>`;
 }
 
 /**
@@ -128,8 +124,8 @@ export async function handleCreateTransport(args: any) {
 
     const xmlBody = buildCreateTransportXml(typedArgs, username);
     const headers = {
-      'Accept': 'application/vnd.sap.cts.adt.tm.request.v1+xml',
-      'Content-Type': 'application/vnd.sap.cts.adt.tm.request.v1+xml'
+      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml',
+      'Content-Type': 'application/vnd.sap.adt.transportorganizer.v1+xml'
     };
 
     console.log(`[DEBUG] POST to: ${url}`);

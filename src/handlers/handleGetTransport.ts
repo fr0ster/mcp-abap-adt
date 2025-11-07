@@ -59,54 +59,75 @@ function parseTransportXml(xmlData: string, includeObjects: boolean = true, incl
   });
 
   const result = parser.parse(xmlData);
-  const request = result['tm:request'] || result['request'];
-
-  if (!request) {
-    throw new McpError(ErrorCode.InternalError, 'Invalid transport XML structure');
+  const root = result['tm:root'] || result['root'];
+  
+  if (!root) {
+    throw new McpError(ErrorCode.InternalError, 'Invalid transport XML structure - no tm:root found');
   }
 
-  // Extract basic transport information
+  // Get detailed transport info from tm:request inside tm:root
+  const request = root['tm:request'] || {};
+  
+  // Extract basic transport information from both root attributes and request details
   const transportInfo = {
-    number: request['tm:number'] || request['number'],
-    description: request['tm:description'] || request['description'],
-    type: request['tm:type'] || request['type'],
-    status: request['tm:status'] || request['status'],
-    owner: request['tm:owner'] || request['owner'],
-    target_system: request['tm:target'] || request['target'],
-    created_at: request['tm:createdAt'] || request['createdAt'],
-    created_by: request['tm:createdBy'] || request['createdBy'],
-    changed_at: request['tm:changedAt'] || request['changedAt'],
-    changed_by: request['tm:changedBy'] || request['changedBy'],
-    release_date: request['tm:releaseDate'] || request['releaseDate'],
-    client: request['tm:client'] || request['client']
+    number: root['adtcore:name'] || request['tm:number'] || root['name'],
+    description: request['tm:desc'] || request['description'] || root['tm:description'],
+    type: request['tm:type'] || root['tm:object_type'] || root['type'],
+    status: request['tm:status'] || root['tm:status'],
+    status_text: request['tm:status_text'],
+    owner: request['tm:owner'] || root['tm:owner'],
+    target_system: request['tm:target'] || root['tm:target'],
+    target_desc: request['tm:target_desc'],
+    created_at: root['adtcore:createdAt'] || request['tm:createdAt'] || root['createdAt'],
+    created_by: root['adtcore:createdBy'] || request['tm:createdBy'] || root['createdBy'],
+    changed_at: root['adtcore:changedAt'] || request['tm:changedAt'] || root['changedAt'],
+    changed_by: root['adtcore:changedBy'] || request['tm:changedBy'] || root['changedBy'],
+    release_date: request['tm:releaseDate'] || root['releaseDate'],
+    client: request['tm:source_client'] || root['tm:client'],
+    cts_project: request['tm:cts_project'],
+    cts_project_desc: request['tm:cts_project_desc']
   };
 
   // Extract objects if requested
   let objects: any[] = [];
-  if (includeObjects && request['tm:objects']) {
-    const objectList = request['tm:objects']['tm:object'] || request['tm:objects']['object'] || [];
+  if (includeObjects && request['tm:all_objects']) {
+    const objectList = request['tm:all_objects']['tm:abap_object'] || [];
     objects = Array.isArray(objectList) ? objectList : [objectList];
     objects = objects.map(obj => ({
-      name: obj['tm:name'] || obj['name'],
-      type: obj['tm:type'] || obj['type'],
-      package: obj['tm:package'] || obj['package'],
-      status: obj['tm:status'] || obj['status'],
-      lock_status: obj['tm:lockStatus'] || obj['lockStatus']
+      name: obj['tm:name'],
+      type: obj['tm:type'],
+      wbtype: obj['tm:wbtype'],
+      pgmid: obj['tm:pgmid'],
+      description: obj['tm:obj_desc'],
+      position: obj['tm:position'],
+      lock_status: obj['tm:lock_status'],
+      info: obj['tm:obj_info']
     }));
   }
 
   // Extract tasks if requested
   let tasks: any[] = [];
-  if (includeTasks && request['tm:tasks']) {
-    const taskList = request['tm:tasks']['tm:task'] || request['tm:tasks']['task'] || [];
-    tasks = Array.isArray(taskList) ? taskList : [taskList];
-    tasks = tasks.map(task => ({
-      number: task['tm:number'] || task['number'],
-      description: task['tm:description'] || task['description'],
-      type: task['tm:type'] || task['type'],
-      status: task['tm:status'] || task['status'],
-      owner: task['tm:owner'] || task['owner'],
-      created_at: task['tm:createdAt'] || task['createdAt']
+  if (includeTasks && request['tm:task']) {
+    const taskList = Array.isArray(request['tm:task']) ? request['tm:task'] : [request['tm:task']];
+    tasks = taskList.map(task => ({
+      number: task['tm:number'],
+      parent: task['tm:parent'],
+      description: task['tm:desc'],
+      type: task['tm:type'],
+      status: task['tm:status'],
+      status_text: task['tm:status_text'],
+      owner: task['tm:owner'],
+      target: task['tm:target'],
+      target_desc: task['tm:target_desc'],
+      client: task['tm:source_client'],
+      created_at: task['tm:lastchanged_timestamp'],
+      objects: task['tm:abap_object'] ? (Array.isArray(task['tm:abap_object']) ? task['tm:abap_object'] : [task['tm:abap_object']]).map(obj => ({
+        name: obj['tm:name'],
+        type: obj['tm:type'],
+        wbtype: obj['tm:wbtype'],
+        description: obj['tm:obj_desc'],
+        position: obj['tm:position']
+      })) : []
     }));
   }
 
@@ -148,7 +169,7 @@ export async function handleGetTransport(args: any) {
     }
 
     const headers = {
-      'Accept': 'application/vnd.sap.cts.adt.tm.request.v1+xml'
+      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
     };
 
     console.log(`[DEBUG] GET from: ${url}`);

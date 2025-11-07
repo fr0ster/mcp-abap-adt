@@ -38,6 +38,27 @@ create_data_element:
         long_label: "Long Field Label"
         heading_label: "Heading"
 
+# Transport Management Tests
+create_transport:
+  test_cases:
+    - name: "workbench_transport"
+      enabled: false
+      description: "Create a workbench transport request"
+      params:
+        transport_type: "workbench"
+        description: "Test transport created via MCP"
+        target_system: "PRD"
+
+get_transport:
+  test_cases:
+    - name: "existing_transport"
+      enabled: false
+      description: "Retrieve existing transport information"
+      params:
+        transport_number: "<YOUR_TRANSPORT_NUMBER>"  # ⚠️ UPDATE WITH REAL TRANSPORT
+        include_objects: true
+        include_tasks: true
+
 # Program Tests
 get_program:
   test_cases:

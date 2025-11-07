@@ -9,6 +9,7 @@ export abstract class BaseAbapConnection implements AbapConnection {
   private axiosInstance: AxiosInstance | null = null;
   private csrfToken: string | null = null;
   private cookies: string | null = null;
+  private cookieStore: Map<string, string> = new Map();
   private cachedBaseUrl: string | null = null;
 
   protected constructor(private readonly config: SapConfig) {}
@@ -25,6 +26,7 @@ export abstract class BaseAbapConnection implements AbapConnection {
     }
     this.csrfToken = null;
     this.cookies = null;
+    this.cookieStore.clear();
     this.cachedBaseUrl = null;
   }
 
@@ -127,6 +129,7 @@ export abstract class BaseAbapConnection implements AbapConnection {
 
     try {
       const response = await this.getAxiosInstance()(requestConfig);
+      this.updateCookiesFromResponse(response.headers);
 
       logger.info(`Request succeeded with status ${response.status}`, {
         type: "REQUEST_SUCCESS",
@@ -158,6 +161,8 @@ export abstract class BaseAbapConnection implements AbapConnection {
           typeof error.response.data === "string"
             ? error.response.data.slice(0, 200)
             : JSON.stringify(error.response.data).slice(0, 200);
+
+        this.updateCookiesFromResponse(error.response.headers);
       }
 
       logger.error(errorDetails.message, errorDetails);
@@ -180,7 +185,9 @@ export abstract class BaseAbapConnection implements AbapConnection {
           requestHeaders["Cookie"] = this.cookies;
         }
 
-        return await this.getAxiosInstance()(requestConfig);
+        const retryResponse = await this.getAxiosInstance()(requestConfig);
+        this.updateCookiesFromResponse(retryResponse.headers);
+        return retryResponse;
       }
 
       throw error;
@@ -188,6 +195,61 @@ export abstract class BaseAbapConnection implements AbapConnection {
   }
 
   protected abstract buildAuthorizationHeader(): string;
+
+  private updateCookiesFromResponse(headers?: Record<string, any>): void {
+    if (!headers) {
+      return;
+    }
+
+    const setCookie = headers["set-cookie"] as string[] | string | undefined;
+    if (!setCookie) {
+      return;
+    }
+
+    const cookiesArray = Array.isArray(setCookie) ? setCookie : [setCookie];
+
+    for (const entry of cookiesArray) {
+      if (typeof entry !== "string") {
+        continue;
+      }
+
+      const [nameValue] = entry.split(";");
+      if (!nameValue) {
+        continue;
+      }
+
+      const [name, ...rest] = nameValue.split("=");
+      if (!name) {
+        continue;
+      }
+
+      const trimmedName = name.trim();
+      const trimmedValue = rest.join("=").trim();
+
+      if (!trimmedName) {
+        continue;
+      }
+
+      this.cookieStore.set(trimmedName, trimmedValue);
+    }
+
+    if (this.cookieStore.size === 0) {
+      return;
+    }
+
+    const combined = Array.from(this.cookieStore.entries())
+      .map(([name, value]) => (value ? `${name}=${value}` : name))
+      .join("; ");
+
+    if (!combined) {
+      return;
+    }
+
+    this.cookies = combined;
+    console.log(
+      `[DEBUG] BaseAbapConnection - Updated cookies from response (first 100 chars): ${this.cookies.substring(0, 100)}...`
+    );
+  }
 
   private getAxiosInstance(): AxiosInstance {
     if (!this.axiosInstance) {
@@ -267,6 +329,8 @@ export abstract class BaseAbapConnection implements AbapConnection {
           timeout: getTimeout("csrf")
         });
 
+        this.updateCookiesFromResponse(response.headers);
+
         const token = response.headers["x-csrf-token"] as string | undefined;
         if (!token) {
           logger.csrfToken("error", "No CSRF token in response headers", {
@@ -282,11 +346,13 @@ export abstract class BaseAbapConnection implements AbapConnection {
         }
 
         if (response.headers["set-cookie"]) {
-          this.cookies = (response.headers["set-cookie"] as string[]).join("; ");
-          console.log(`[DEBUG] BaseAbapConnection - Cookies received from CSRF response (first 100 chars): ${this.cookies.substring(0, 100)}...`);
-          logger.csrfToken("success", "Cookies extracted from response", {
-            cookieLength: this.cookies.length
-          });
+          this.updateCookiesFromResponse(response.headers);
+          if (this.cookies) {
+            console.log(`[DEBUG] BaseAbapConnection - Cookies received from CSRF response (first 100 chars): ${this.cookies.substring(0, 100)}...`);
+            logger.csrfToken("success", "Cookies extracted from response", {
+              cookieLength: this.cookies.length
+            });
+          }
         }
 
         logger.csrfToken("success", "CSRF token successfully obtained");
@@ -308,9 +374,7 @@ export abstract class BaseAbapConnection implements AbapConnection {
 
             const token = error.response.headers["x-csrf-token"] as string;
             if (token) {
-              if (error.response.headers["set-cookie"]) {
-                this.cookies = (error.response.headers["set-cookie"] as string[]).join("; ");
-              }
+              this.updateCookiesFromResponse(error.response.headers);
               return token;
             }
           }
@@ -322,9 +386,7 @@ export abstract class BaseAbapConnection implements AbapConnection {
             );
 
             const token = error.response.headers["x-csrf-token"] as string;
-            if (error.response.headers["set-cookie"]) {
-              this.cookies = (error.response.headers["set-cookie"] as string[]).join("; ");
-            }
+            this.updateCookiesFromResponse(error.response.headers);
             return token;
           }
 

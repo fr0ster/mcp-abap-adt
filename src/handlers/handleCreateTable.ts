@@ -55,9 +55,38 @@ async function makeAdtRequestWithSession(
   return makeAdtRequestWithTimeout(fullUrl, method, 'default', data, undefined, headers);
 }
 
+function buildCheckRunPayload(tableName: string): string {
+  const uriName = encodeSapObjectName(tableName).toLowerCase();
+  return `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
+    <chkrun:checkObject adtcore:uri="/sap/bc/adt/ddic/tables/${uriName}" chkrun:version="new"/>
+  </chkrun:checkObjectList>`;
+}
+
+async function runCheckRun(
+  reporter: 'tableStatusCheck' | 'abapCheckRun',
+  tableName: string,
+  sessionId: string
+): Promise<AxiosResponse> {
+  const payload = buildCheckRunPayload(tableName);
+  const headers = {
+    'Accept': 'application/vnd.sap.adt.checkmessages+xml',
+    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml'
+  };
+  const url = `/sap/bc/adt/checkruns?reporters=${reporter}`;
+  console.log(`[DEBUG] Running check-run ${reporter} for ${tableName}`);
+  return makeAdtRequestWithSession(url, 'POST', sessionId, payload, headers);
+}
+
+async function deleteTableLock(tableName: string): Promise<AxiosResponse> {
+  const baseUrl = await getBaseUrl();
+  const url = `${baseUrl}/sap/bc/adt/ddic/ddlock/locks?lockAction=DELETE&name=${encodeSapObjectName(tableName)}`;
+  console.log('[DEBUG] Attempting lock cleanup for table:', tableName);
+  return makeAdtRequestWithTimeout(url, 'POST', 'default', '');
+}
+
 export const TOOL_DEFINITION = {
   name: "CreateTable",
-  description: "Create a new ABAP table in SAP system using DDL code. The user provides ready DDL code.",
+  description: "Create a new ABAP table via the ADT API using provided DDL. Mirrors Eclipse ADT behaviour with status/check runs, lock handling, activation and verification.",
   inputSchema: {
     type: "object",
     properties: {
@@ -372,6 +401,28 @@ export async function handleCreateTable(args: any): Promise<any> {
           objectType: 'table'
         }
       });
+
+      // Step 1.1: Mirror Eclipse ADT by running table status check before locking
+      try {
+        results.push({
+          step: 'check_table_status',
+          action: 'POST /sap/bc/adt/checkruns?reporters=tableStatusCheck'
+        });
+        const statusCheckResponse = await runCheckRun('tableStatusCheck', createTableArgs.table_name, sessionId);
+        results.push({
+          step: 'check_table_status',
+          status: 'success',
+          http_status: statusCheckResponse.status
+        });
+      } catch (statusError) {
+        console.log('[DEBUG] tableStatusCheck failed:', statusError);
+        results.push({
+          step: 'check_table_status',
+          status: 'warning',
+          error: statusError instanceof Error ? statusError.message : String(statusError),
+          note: 'Table status check failed; proceeding but unlock/activation may fail'
+        });
+      }
       
       // Step 1.2: Get lockHandle for the created table
       console.log('[DEBUG] Step 1.2: Getting lockHandle for table...');
@@ -422,6 +473,28 @@ export async function handleCreateTable(args: any): Promise<any> {
         }
       });
 
+      // Step 1.3.1: Run ABAP check before unlock (same as Eclipse ADT)
+      try {
+        results.push({
+          step: 'abap_check_run',
+          action: 'POST /sap/bc/adt/checkruns?reporters=abapCheckRun'
+        });
+        const abapCheckResponse = await runCheckRun('abapCheckRun', createTableArgs.table_name, sessionId);
+        results.push({
+          step: 'abap_check_run',
+          status: 'success',
+          http_status: abapCheckResponse.status
+        });
+      } catch (checkError) {
+        console.log('[DEBUG] abapCheckRun failed:', checkError);
+        results.push({
+          step: 'abap_check_run',
+          status: 'warning',
+          error: checkError instanceof Error ? checkError.message : String(checkError),
+          note: 'ABAP check run failed; unlock/activation may fail'
+        });
+      }
+
       // Step 1.4: Unlock the table after DDL content is added
       console.log('[DEBUG] Step 1.4: Unlocking table after DDL content addition...');
       results.push({
@@ -444,6 +517,25 @@ export async function handleCreateTable(args: any): Promise<any> {
           status: 'error',
           error: unlockError instanceof Error ? unlockError.message : String(unlockError)
         });
+
+        // Attempt to cleanup locks to avoid leaving object stuck
+        try {
+          const cleanupResponse = await deleteTableLock(createTableArgs.table_name);
+          results.push({
+            step: 'cleanup_lock',
+            status: 'success',
+            http_status: cleanupResponse.status,
+            note: 'Lock cleanup executed after unlock failure'
+          });
+        } catch (cleanupError) {
+          console.log('[DEBUG] Lock cleanup failed:', cleanupError);
+          results.push({
+            step: 'cleanup_lock',
+            status: 'error',
+            error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+            note: 'Manual cleanup (SE11 → Utilities → Locks) may be required'
+          });
+        }
         // Continue to activation even if unlock fails
       }
 
@@ -463,9 +555,9 @@ export async function handleCreateTable(args: any): Promise<any> {
         action: 'Activating table ' + createTableArgs.table_name
       });
 
-      let activateResponse;
-      let activationAttempt = 0;
-      const maxActivationAttempts = 1; // Reduced attempts since table may already be active
+    let activateResponse;
+    let activationAttempt = 0;
+    const maxActivationAttempts = 2;
 
       while (activationAttempt < maxActivationAttempts) {
         activationAttempt++;
@@ -495,8 +587,13 @@ export async function handleCreateTable(args: any): Promise<any> {
           
           // If it's a "No active nametab" error, it's expected - table may be auto-active
           if (attemptError.response?.data?.includes('No active nametab')) {
-            console.log(`[DEBUG] Nametab issue detected - table likely auto-activated after unlock`);
-            break;
+            console.log('[DEBUG] Nametab issue detected - re-running ABAP check before retrying activation');
+            try {
+              await runCheckRun('abapCheckRun', createTableArgs.table_name, sessionId);
+            } catch (retryCheckError) {
+              console.log('[DEBUG] Retry abapCheckRun failed:', retryCheckError);
+            }
+            continue;
           } else {
             throw attemptError;
           }
@@ -571,10 +668,11 @@ export async function handleCreateTable(args: any): Promise<any> {
     console.log('[DEBUG] Results length:', results.length);
     console.log('[DEBUG] Results structure:', results.map(r => ({ step: r.step, status: r.status, hasResponse: !!r.response })));
     
+    const uniqueSteps = Array.from(new Set(results.map(r => r.step)));
     const summary = {
       table_name: createTableArgs.table_name,
       package: createTableArgs.package_name, // Fixed: was package_name
-      total_steps: 4,
+      total_steps: uniqueSteps.length,
       successful_steps: successSteps,
       overall_status: successSteps >= 3 ? 'success' : 'partial_success',
       steps: results.map(step => ({

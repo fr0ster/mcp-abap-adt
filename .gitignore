@@ -55,3 +55,4 @@ tools/antlr/*.jar
 !tools/antlr/.gitkeep
 
 sk.json
+tests/test-config.yaml

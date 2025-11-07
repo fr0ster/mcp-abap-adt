@@ -92,60 +92,6 @@ function generateRequestId(): string {
   return crypto.randomUUID().replace(/-/g, '');
 }
 
-/**
- * Build domain XML payload for PUT request
- */
-function buildDomainXml(args: DomainArgs, username: string): string {
-  const now = new Date().toISOString();
-  const description = args.description || args.domain_name;
-  const datatype = args.datatype || 'CHAR';
-  const length = args.length || 100;
-  const decimals = args.decimals || 0;
-  const lowercase = args.lowercase || false;
-  const signExists = args.sign_exists || false;
-  const conversionExit = args.conversion_exit || '';
-  const valueTable = args.value_table || '';
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" 
-             xmlns:adtcore="http://www.sap.com/adt/core" 
-             xmlns:atom="http://www.w3.org/2005/Atom"
-             adtcore:name="${args.domain_name.toUpperCase()}"
-             adtcore:type="DOMA/DD"
-             adtcore:description="${description}"
-             adtcore:language="EN"
-             adtcore:version="new"
-             adtcore:abapLanguageVersion="standard"
-             adtcore:masterLanguage="EN"
-             adtcore:responsible="${username}"
-             adtcore:createdAt="${now}"
-             adtcore:createdBy="${username}"
-             adtcore:changedAt="${now}"
-             adtcore:changedBy="${username}">
-  <atom:link href="versions" rel="http://www.sap.com/adt/relations/versions" title="Historic versions"/>
-  <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}" adtcore:type="DEVC/K"/>
-  <doma:content>
-    <doma:typeInformation>
-      <doma:datatype>${datatype}</doma:datatype>
-      <doma:length>${length}</doma:length>
-      <doma:decimals>${decimals}</doma:decimals>
-    </doma:typeInformation>
-    <doma:outputInformation>
-      <doma:length>${length}</doma:length>
-      <doma:style/>
-      <doma:conversionExit>${conversionExit}</doma:conversionExit>
-      <doma:signExists>${signExists}</doma:signExists>
-      <doma:lowercase>${lowercase}</doma:lowercase>
-      <doma:ampmFormat>false</doma:ampmFormat>
-    </doma:outputInformation>
-    <doma:valueInformation>
-      <doma:valueTableRef>${valueTable}</doma:valueTableRef>
-      <doma:appendExists>false</doma:appendExists>
-      <doma:fixValues/>
-    </doma:valueInformation>
-  </doma:content>
-</doma:domain>`;
-}
 
 /**
  * Build check run XML payload
@@ -167,25 +113,6 @@ function buildActivationXml(domainName: string): string {
 </adtcore:objectReferences>`;
 }
 
-/**
- * Extract lock handle from PUT response
- */
-function extractLockHandle(response: AxiosResponse): string | null {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  
-  try {
-    const result = parser.parse(response.data);
-    // Lock handle typically comes from response headers or needs to be extracted from initial GET
-    // For now, return from headers if available
-    const lockHandle = response.headers['sap-adt-lockhandle'] || response.headers['lockhandle'];
-    return lockHandle || null;
-  } catch (error) {
-    return null;
-  }
-}
 
 /**
  * Parse check run response to verify success
@@ -453,48 +380,6 @@ async function getDomainInactive(
   }
 }
 
-/**
- * Step 0.5 (old): Get ETag for the domain (required for PUT)
- */
-async function getDomainETag(
-  domainName: string,
-  sessionId: string
-): Promise<string> {
-  const baseUrl = await getBaseUrl();
-  const domainNameEncoded = encodeSapObjectName(domainName.toLowerCase());
-  
-  // GET domain to get ETag (without version parameter for new domains)
-  const url = `${baseUrl}/sap/bc/adt/ddic/domains/${domainNameEncoded}`;
-  
-  const headers = {
-    'Accept': 'application/vnd.sap.adt.domains.v1+xml, application/vnd.sap.adt.domains.v2+xml',
-    'Cache-Control': 'no-cache',
-    'X-sap-adt-profiling': 'server-time',
-    'sap-adt-connection-id': sessionId,
-    'sap-adt-request-id': generateRequestId()
-  };
-  
-  try {
-    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default', null, undefined, headers);
-    
-    // Extract ETag from response headers
-    const etag = response.headers['etag'] || response.headers['ETag'];
-    
-    console.log(`[DEBUG] ETag received: "${etag}"`);
-    console.log(`[DEBUG] All headers:`, response.headers);
-    
-    if (!etag) {
-      // For new domains, ETag might not exist, return empty string
-      return '';
-    }
-    
-    return etag;
-  } catch (error: any) {
-    // For new domains that don't exist yet, this is expected
-    // Return empty ETag
-    return '';
-  }
-}
 
 /**
  * Step 1: Create domain with lock handle and ETag

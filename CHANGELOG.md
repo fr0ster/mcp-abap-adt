@@ -23,6 +23,16 @@
   - Support for workbench (K) and customizing (T) transport types
   - Complete transport metadata parsing and validation
   - Full test coverage with `test-create-transport.js` and `test-get-transport.js`
+- **Dictionary Objects Management Tools**:
+  - `CreateTable`: Create new ABAP tables with fields, keys, and technical settings
+  - `CreateStructure`: Create new ABAP structures with fields and type references
+  - `GetView`: Retrieve ABAP database view definition including tables, fields, joins, and selection conditions
+  - Comprehensive field definitions with data types, lengths, decimals, key flags, NOT NULL constraints
+  - Support for domain and data element references in field definitions
+  - Table delivery classes (A/C/L/G) and data categories (APPL0/APPL1/APPL2) configuration
+  - Structure includes and field type references (domains, data elements, structures, tables)
+  - View analysis with tables, joins, selection conditions, and optional data retrieval
+  - Full test coverage with `test-create-table.js`, `test-create-structure.js`, and `test-get-view.js`
 - Domain creation creates and activates domain in one operation (3 steps vs Eclipse's 7 steps)
 - Data element creation follows same simplified approach (3 steps vs Eclipse's multiple LOCK/UNLOCK operations)
 - All domain properties (datatype, length, decimals, lowercase, sign, conversion exit, value table) supported

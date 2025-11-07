@@ -47,6 +47,10 @@ import { handleCreateDataElement } from "./handlers/handleCreateDataElement";
 import { handleGetDataElement } from "./handlers/handleGetDataElement";
 import { handleCreateTransport } from "./handlers/handleCreateTransport";
 import { handleGetTransport } from "./handlers/handleGetTransport";
+import { handleCreateTable } from "./handlers/handleCreateTable";
+import { handleCreateStructure } from "./handlers/handleCreateStructure";
+import { handleCreateView } from "./handlers/handleCreateView";
+import { handleGetView } from "./handlers/handleGetView";
 
 // Import shared utility functions and types
 import {
@@ -616,6 +620,14 @@ export class mcp_abap_adt_server {
           return await handleCreateTransport(request.params.arguments);
         case "GetTransport":
           return await handleGetTransport(request.params.arguments);
+        case "CreateTable":
+          return await handleCreateTable(request.params.arguments);
+        case "CreateStructure":
+          return await handleCreateStructure(request.params.arguments);
+        case "CreateView":
+          return await handleCreateView(request.params.arguments);
+        case "GetView":
+          return await handleGetView(request.params.arguments);
         default:
           throw new McpError(
             ErrorCode.MethodNotFound,

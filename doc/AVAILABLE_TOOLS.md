@@ -12,6 +12,8 @@ This document contains a complete list of all tools (functions) provided by the 
 - [Programs, Classes, Functions](#programs-classes-functions)
 - [Tables and Structures](#tables-and-structures)
 - [Dictionary Objects (Domains, Data Elements)](#dictionary-objects-domains-data-elements)
+- [Dictionary Objects (Tables, Structures, Views)](#dictionary-objects-tables-structures-views)
+- [Transport Management](#transport-management)
 - [Packages and Interfaces](#packages-and-interfaces)
 - [Includes and Hierarchies](#includes-and-hierarchies)
 - [Types, Descriptions, Metadata](#types-descriptions-metadata)
@@ -354,6 +356,209 @@ This document contains a complete list of all tools (functions) provided by the 
 - Track development object assignments
 - Monitor task and object relationships
 - Generate transport documentation
+
+---
+
+## Dictionary Objects
+
+### CreateTable
+**Description:** Create a new ABAP table in SAP system with fields, keys, and technical settings. Includes create, activate, and verify steps.
+
+**Parameters:**
+- `table_name` (string, required): Table name (e.g., ZZ_TEST_TABLE_001). Must follow SAP naming conventions.
+- `description` (string, optional): Table description. If not provided, table_name will be used.
+- `package_name` (string, required): Package name (e.g., ZOK_LOCAL, $TMP for local objects)
+- `transport_request` (string, optional): Transport request number (e.g., E19K905635). Required for transportable packages.
+- `fields` (array, required): Array of table fields
+  - Each field object contains:
+    - `name` (string, required): Field name (e.g., CLIENT, MATERIAL_ID)
+    - `data_type` (string, required): Data type (CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.)
+    - `length` (number, required): Field length
+    - `decimals` (number, optional): Decimal places (for DEC, CURR, QUAN types), default: 0
+    - `key` (boolean, optional): Is this a key field?, default: false
+    - `not_null` (boolean, optional): NOT NULL constraint, default: false
+    - `domain` (string, optional): Domain name for type reference
+    - `data_element` (string, optional): Data element name for type reference
+    - `description` (string, optional): Field description
+- `delivery_class` (string, optional): Delivery class (A=Application table, C=Customer table, L=Local table, G=Global table), default: L
+- `data_category` (string, optional): Data category (APPL0=User data, APPL1=Configuration data, APPL2=System data), default: APPL0
+- `maintenance_allowed` (boolean, optional): Table maintenance allowed via SM30, default: false
+
+**Example:**
+```json
+{
+  "table_name": "ZZ_TEST_MATERIALS_001",
+  "description": "Test Materials Table",
+  "package_name": "ZOK_LOCAL",
+  "transport_request": "E19K905635",
+  "fields": [
+    {
+      "name": "CLIENT",
+      "data_type": "CHAR",
+      "length": 3,
+      "key": true,
+      "not_null": true,
+      "description": "Client ID"
+    },
+    {
+      "name": "MATERIAL_ID",
+      "data_type": "CHAR", 
+      "length": 18,
+      "key": true,
+      "not_null": true,
+      "description": "Material Number"
+    },
+    {
+      "name": "DESCRIPTION",
+      "data_type": "CHAR",
+      "length": 40,
+      "description": "Material Description"
+    },
+    {
+      "name": "PRICE",
+      "data_type": "CURR",
+      "length": 15,
+      "decimals": 2,
+      "description": "Material Price"
+    }
+  ],
+  "delivery_class": "L",
+  "maintenance_allowed": true
+}
+```
+
+**Workflow:**
+1. **Create table** with field definitions and technical settings
+2. **Activate table** for use in the system
+3. **Verify creation** by retrieving table structure
+
+**Response includes:**
+- **Step-by-step results** for create, activate, verify operations
+- **Table metadata** including name, package, field count
+- **Field verification** with complete field structure and properties
+- **Success/failure status** for each operation step
+
+---
+
+### CreateStructure  
+**Description:** Create a new ABAP structure in SAP system with fields and type references. Includes create, activate, and verify steps.
+
+**Parameters:**
+- `structure_name` (string, required): Structure name (e.g., ZZ_S_ADDRESS_001). Must follow SAP naming conventions.
+- `description` (string, optional): Structure description. If not provided, structure_name will be used.
+- `package_name` (string, required): Package name (e.g., ZOK_LOCAL, $TMP for local objects)
+- `transport_request` (string, optional): Transport request number (e.g., E19K905635). Required for transportable packages.
+- `fields` (array, required): Array of structure fields
+  - Each field object contains:
+    - `name` (string, required): Field name (e.g., CLIENT, MATERIAL_ID)
+    - `data_type` (string, optional): Data type (CHAR, NUMC, DATS, TIMS, DEC, etc.)
+    - `length` (number, optional): Field length
+    - `decimals` (number, optional): Decimal places (for DEC, CURR, QUAN types), default: 0
+    - `domain` (string, optional): Domain name for type reference
+    - `data_element` (string, optional): Data element name for type reference
+    - `structure_ref` (string, optional): Include another structure
+    - `table_ref` (string, optional): Reference to table type
+    - `description` (string, optional): Field description
+- `includes` (array, optional): Include other structures in this structure
+  - Each include object contains:
+    - `name` (string, required): Include structure name
+    - `suffix` (string, optional): Optional suffix for include fields
+
+**Example:**
+```json
+{
+  "structure_name": "ZZ_S_ADDRESS_001",
+  "description": "Test Address Structure",
+  "package_name": "ZOK_LOCAL", 
+  "transport_request": "E19K905635",
+  "fields": [
+    {
+      "name": "CLIENT",
+      "data_type": "CHAR",
+      "length": 3,
+      "description": "Client ID"
+    },
+    {
+      "name": "ADDRESS_ID", 
+      "data_type": "CHAR",
+      "length": 10,
+      "description": "Address ID"
+    },
+    {
+      "name": "STREET",
+      "data_type": "CHAR",
+      "length": 35,
+      "description": "Street Name"
+    },
+    {
+      "name": "LATITUDE",
+      "data_type": "DEC",
+      "length": 15,
+      "decimals": 6,
+      "description": "Latitude Coordinate"
+    }
+  ]
+}
+```
+
+**Workflow:**
+1. **Create structure** with field definitions and includes
+2. **Activate structure** for use in the system  
+3. **Verify creation** by retrieving structure details
+
+**Response includes:**
+- **Step-by-step results** for create, activate, verify operations
+- **Structure metadata** including name, package, field count
+- **Field verification** with complete field structure and type references
+- **Success/failure status** for each operation step
+
+---
+
+### GetView
+**Description:** Retrieve ABAP database view definition including tables, fields, joins, and selection conditions.
+
+**Parameters:**
+- `view_name` (string, required): Name of the ABAP database view
+- `filePath` (string, optional): Optional file path to write the result to
+
+**Example:**
+```json
+{
+  "view_name": "DD02V",
+  "max_rows": 50
+}
+```
+
+**Response includes:**
+- **View definition:**
+  - Name, type, description, package
+  - View type (database_view, maintenance_view, etc.)
+  - Maintenance allowed flag
+- **Tables information:**
+  - Participating tables with names, aliases, positions
+  - Table relationships and dependencies
+- **Fields structure:**
+  - Field names, data types, lengths, decimals
+  - Key field indicators and aggregation functions
+  - Field descriptions and table associations
+- **Joins information:**
+  - Join types (INNER, LEFT, RIGHT, etc.)
+  - Join conditions between tables
+  - Left/right table specifications
+- **Selection conditions:**
+  - Where clause conditions
+  - Field operators and values
+  - Conditional logic for view filtering
+- **View contents** (optional):
+  - Actual data from the view (if accessible)
+  - SQL query used for data retrieval
+  - Row count and data preview
+
+**Supported view types:**
+- **Database Views**: Standard join views with selection criteria
+- **Maintenance Views**: Views with table maintenance capabilities  
+- **Help Views**: Views designed for F4 help functionality
+- **Projection Views**: Simple single-table projections
 
 ---
 

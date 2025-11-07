@@ -277,6 +277,86 @@ This document contains a complete list of all tools (functions) provided by the 
 
 ---
 
+## Transport Management
+
+### CreateTransport
+**Description:** Create new ABAP transport requests for development and customizing objects with automatic task creation.
+
+**Parameters:**
+- `description` (string, required): Transport request description
+- `transport_type` (string, optional): Transport type - 'workbench' (default) or 'customizing'
+- `target_system` (string, optional): Target system for transport (e.g., 'E19TOQAS', 'PRD')
+- `owner` (string, optional): Transport owner (defaults to current user)
+
+**Example:**
+```json
+{
+  "description": "New features for inventory management",
+  "transport_type": "workbench",
+  "target_system": "E19TOQAS"
+}
+```
+
+**Workflow:**
+1. POST creates transport request with Eclipse-compatible XML structure
+2. System generates unique transport number
+3. Automatic task creation with current user as owner
+
+**Response includes:**
+- **Success status** and transport number (E.g., E19K905642)
+- **Transport metadata:** description, type (K/T), target system
+- **URI references** for ADT and GUI access
+- **Creation confirmation** with all provided parameters
+
+**Supported transport types:**
+- **Workbench (K)**: Cross-client development objects (programs, classes, tables)
+- **Customizing (T)**: Client-specific configuration objects
+
+---
+
+### GetTransport
+**Description:** Retrieve comprehensive transport request information including objects, tasks, metadata, and relationships.
+
+**Parameters:**
+- `transport_number` (string, required): Transport request number (e.g., E19K905635, E19K905642)
+- `include_objects` (boolean, optional): Include transport objects list (default: true)
+- `include_tasks` (boolean, optional): Include task information (default: true)
+
+**Example:**
+```json
+{
+  "transport_number": "E19K905635",
+  "include_objects": true,
+  "include_tasks": true
+}
+```
+
+**Response includes:**
+- **Transport metadata:**
+  - Number, description, type, status, owner
+  - Target system, client, CTS project
+  - Created/changed timestamps and users
+- **Objects list** (when include_objects=true):
+  - Object name, type, workbench type, PGMID
+  - Description, position, lock status
+  - Package and object information
+- **Tasks information** (when include_tasks=true):
+  - Task number, parent, description, type
+  - Task status, owner, target system
+  - Task-specific objects with details
+- **Validation results:**
+  - Object count, task count
+  - Completeness checks and status validation
+
+**Use cases:**
+- Verify transport creation results
+- Analyze transport contents before release
+- Track development object assignments
+- Monitor task and object relationships
+- Generate transport documentation
+
+---
+
 ## Packages and Interfaces
 
 ### GetInterface

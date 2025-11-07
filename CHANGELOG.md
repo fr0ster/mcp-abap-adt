@@ -16,6 +16,13 @@
   - Support for all field labels: short (10), medium (20), long (40), heading (55)
   - Support for search help, change document, and other data element properties
   - Full test coverage with `test-create-data-element.js` and `test-get-data-element.js`
+- **Transport Management Tools**:
+  - `CreateTransport`: Create new ABAP transport requests with automatic task creation
+  - `GetTransport`: Retrieve comprehensive transport information with objects and tasks
+  - Eclipse-compatible XML structure with proper Content-Type headers
+  - Support for workbench (K) and customizing (T) transport types
+  - Complete transport metadata parsing and validation
+  - Full test coverage with `test-create-transport.js` and `test-get-transport.js`
 - Domain creation creates and activates domain in one operation (3 steps vs Eclipse's 7 steps)
 - Data element creation follows same simplified approach (3 steps vs Eclipse's multiple LOCK/UNLOCK operations)
 - All domain properties (datatype, length, decimals, lowercase, sign, conversion exit, value table) supported

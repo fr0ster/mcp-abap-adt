@@ -60,7 +60,7 @@ function disposeConnection(connection?: AbapConnection) {
   }
 }
 
-function getManagedConnection(): AbapConnection {
+export function getManagedConnection(): AbapConnection {
   if (overrideConnection) {
     return overrideConnection;
   }
@@ -116,12 +116,13 @@ export async function getAuthHeaders() {
 }
 
 /**
- * Simplified ADT request function that uses configurable timeouts
+ * Makes an ADT request with specified timeout
  * @param url Request URL
  * @param method HTTP method
  * @param timeoutType Timeout type ('default', 'csrf', 'long') or custom number in ms
  * @param data Optional request data
  * @param params Optional request parameters
+ * @param headers Optional custom headers
  * @returns Promise with the response
  */
 export async function makeAdtRequestWithTimeout(
@@ -129,10 +130,11 @@ export async function makeAdtRequestWithTimeout(
   method: string,
   timeoutType: 'default' | 'csrf' | 'long' | number = 'default',
   data?: any,
-  params?: any
+  params?: any,
+  headers?: Record<string, string>
 ) {
   const timeout = getTimeout(timeoutType);
-  return makeAdtRequest(url, method, timeout, data, params);
+  return makeAdtRequest(url, method, timeout, data, params, headers);
 }
 
 /**
@@ -188,7 +190,8 @@ export async function makeAdtRequest(
   method: string,
   timeout: number,
   data?: any,
-  params?: any
+  params?: any,
+  headers?: Record<string, string>
 ) {
-  return getManagedConnection().makeAdtRequest({ url, method, timeout, data, params });
+  return getManagedConnection().makeAdtRequest({ url, method, timeout, data, params, headers });
 }

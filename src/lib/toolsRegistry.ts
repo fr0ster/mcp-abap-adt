@@ -29,6 +29,8 @@ import { TOOL_DEFINITION as GetObjectStructure_Tool } from '../handlers/handleGe
 import { TOOL_DEFINITION as GetAbapAST_Tool } from '../handlers/handleGetAbapAST';
 import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from '../handlers/handleGetAbapSemanticAnalysis';
 import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from '../handlers/handleGetAbapSystemSymbols';
+import { TOOL_DEFINITION as GetDomain_Tool } from '../handlers/handleGetDomain';
+import { TOOL_DEFINITION as CreateDomain_Tool } from '../handlers/handleCreateDomain';
 
 // Type that describes a tool entry
 export interface ToolDefinition {
@@ -93,6 +95,10 @@ export const ALL_TOOLS: ToolDefinition[] = [
   GetAbapAST_Tool,
   GetAbapSemanticAnalysis_Tool,
   GetAbapSystemSymbols_Tool,
+
+  // Domain management
+  GetDomain_Tool,
+  CreateDomain_Tool,
 
   // Dynamically imported tools
   ...DYNAMIC_IMPORT_TOOLS

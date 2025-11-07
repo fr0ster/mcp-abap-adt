@@ -62,7 +62,7 @@ export abstract class BaseAbapConnection implements AbapConnection {
   }
 
   async makeAdtRequest(options: AbapRequestOptions): Promise<AxiosResponse> {
-    const { url, method, timeout, data, params } = options;
+    const { url, method, timeout, data, params, headers: customHeaders } = options;
     const normalizedMethod = method.toUpperCase();
     const requestUrl = this.normalizeRequestUrl(url);
 
@@ -70,20 +70,30 @@ export abstract class BaseAbapConnection implements AbapConnection {
       await this.ensureFreshCsrfToken(requestUrl);
     }
 
-    const requestHeaders: Record<string, string> = {
-      ...(await this.getAuthHeaders())
-    };
+    // Start with default Accept header
+    const requestHeaders: Record<string, string> = {};
+    if (!customHeaders || !customHeaders["Accept"]) {
+      requestHeaders["Accept"] = "application/xml, application/json, text/plain, */*";
+    }
+    
+    // Add custom headers (but they won't override auth/cookies)
+    if (customHeaders) {
+      Object.assign(requestHeaders, customHeaders);
+    }
+    
+    // Add auth headers (these MUST NOT be overridden)
+    Object.assign(requestHeaders, await this.getAuthHeaders());
 
     if ((normalizedMethod === "POST" || normalizedMethod === "PUT") && this.csrfToken) {
       requestHeaders["x-csrf-token"] = this.csrfToken;
     }
 
+    // Add cookies LAST (MUST NOT be overridden by custom headers)
     if (this.cookies) {
       requestHeaders["Cookie"] = this.cookies;
-    }
-
-    if (!requestHeaders["Accept"]) {
-      requestHeaders["Accept"] = "application/xml, application/json, text/plain, */*";
+      console.log(`[DEBUG] BaseAbapConnection - Adding cookies to request (first 100 chars): ${this.cookies.substring(0, 100)}...`);
+    } else {
+      console.log(`[DEBUG] BaseAbapConnection - NO COOKIES available for this request to ${requestUrl}`);
     }
 
     if ((normalizedMethod === "POST" || normalizedMethod === "PUT") && data) {
@@ -206,7 +216,15 @@ export abstract class BaseAbapConnection implements AbapConnection {
   }
 
   private async ensureFreshCsrfToken(requestUrl: string): Promise<void> {
+    // If we already have a CSRF token, reuse it to keep the same SAP session
+    // SAP ties the lock handle to the HTTP session (SAP_SESSIONID cookie)
+    if (this.csrfToken) {
+      console.log(`[DEBUG] BaseAbapConnection - Reusing existing CSRF token to maintain session`);
+      return;
+    }
+    
     try {
+      console.log(`[DEBUG] BaseAbapConnection - Fetching NEW CSRF token (will create new SAP session)`);
       this.csrfToken = await this.fetchCsrfToken(requestUrl);
     } catch (error) {
       const errorMsg =
@@ -265,6 +283,7 @@ export abstract class BaseAbapConnection implements AbapConnection {
 
         if (response.headers["set-cookie"]) {
           this.cookies = (response.headers["set-cookie"] as string[]).join("; ");
+          console.log(`[DEBUG] BaseAbapConnection - Cookies received from CSRF response (first 100 chars): ${this.cookies.substring(0, 100)}...`);
           logger.csrfToken("success", "Cookies extracted from response", {
             cookieLength: this.cookies.length
           });

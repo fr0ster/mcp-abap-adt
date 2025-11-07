@@ -1,0 +1,158 @@
+# Template for MCP ABAP ADT test configuration
+# Copy this file to test-config.yaml and fill in real values before running tests
+
+# Domain Creation Tests
+create_domain:
+  test_cases:
+    - name: "basic_char_domain"
+      enabled: false
+      description: "Create a simple CHAR domain"
+      params:
+        domain_name: "ZZ_TEST_MCP_01"
+        description: "Test domain created via MCP"
+        package_name: "ZOK_LOCAL"
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
+        datatype: "CHAR"
+        length: 50
+        decimals: 0
+        lowercase: false
+        sign_exists: false
+
+# Program Tests
+get_program:
+  test_cases:
+    - name: "standard_program"
+      enabled: false
+      params:
+        program_name: "SAPMV45A"
+
+# Class Tests
+get_class:
+  test_cases:
+    - name: "standard_class"
+      enabled: false
+      params:
+        class_name: "CL_ABAP_TYPEDESCR"
+
+# Function Tests
+get_function:
+  test_cases:
+    - name: "standard_function"
+      enabled: false
+      params:
+        function_name: "RFC_READ_TABLE"
+        function_group: "SRFC"
+
+# Table Tests
+get_table:
+  test_cases:
+    - name: "standard_table"
+      enabled: false
+      params:
+        table_name: "MARA"
+
+get_table_contents:
+  test_cases:
+    - name: "limited_rows"
+      enabled: false
+      params:
+        table_name: "T000"
+        max_rows: 10
+
+# Package Tests
+get_package:
+  test_cases:
+    - name: "standard_package"
+      enabled: false
+      params:
+        package_name: "$TMP"
+
+# Search Tests
+search_object:
+  test_cases:
+    - name: "search_tables"
+      enabled: false
+      params:
+        object_name: "MARA*"
+        object_type: "TABL"
+        maxResults: 10
+
+# SQL Query Tests
+get_sql_query:
+  test_cases:
+    - name: "simple_select"
+      enabled: false
+      params:
+        sql_query: "SELECT MANDT, MTEXT FROM T000 WHERE MANDT < '100'"
+        row_number: 10
+
+# Where Used Tests
+get_where_used:
+  test_cases:
+    - name: "table_usage"
+      enabled: false
+      params:
+        object_name: "MARA"
+        object_type: "TABL/DT"
+        detailed: false
+
+# Enhancement Tests
+get_enhancements:
+  test_cases:
+    - name: "program_enhancements"
+      enabled: false
+      params:
+        object_name: "SAPMV45A"
+        object_type: "PROG/P"
+
+# Object Info Tests
+get_object_info:
+  test_cases:
+    - name: "class_structure"
+      enabled: false
+      params:
+        parent_type: "CLAS/OC"
+        parent_name: "CL_ABAP_TYPEDESCR"
+        maxDepth: 2
+        enrich: true
+
+# ABAP Parser Tests
+get_abap_ast:
+  test_cases:
+    - name: "simple_code"
+      enabled: false
+      params:
+        code: |
+          REPORT test.
+          DATA: lv_text TYPE string.
+          lv_text = 'Hello World'.
+          WRITE: / lv_text.
+
+get_abap_semantic_analysis:
+  test_cases:
+    - name: "with_symbols"
+      enabled: false
+      params:
+        code: |
+          REPORT test.
+          DATA: lv_count TYPE i,
+                lv_name TYPE string.
+          lv_count = 42.
+          lv_name = 'Test'.
+
+# Environment Configuration
+# These values can be overridden by environment variables
+environment:
+  default_package: "ZOK_LOCAL"
+  default_transport: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
+  default_system: "E19"
+  default_client: "100"
+
+# Test Execution Settings
+test_settings:
+  fail_fast: false
+  verbose: true
+  timeout: 30000
+  retry_on_failure: false
+  max_retries: 1
+  cleanup_after_test: false

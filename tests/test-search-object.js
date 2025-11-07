@@ -1,48 +1,54 @@
+/**
+ * Test script for SearchObject handler
+ * Configuration loaded from tests/test-config.yaml
+ */
+
+const {
+  initializeTestEnvironment,
+  getEnabledTestCase,
+  printTestHeader,
+  printTestParams,
+  printTestResult
+} = require('./test-helper');
+
+// Initialize test environment before importing handlers
+initializeTestEnvironment();
+
 const { handleSearchObject } = require('../dist/handlers/handleSearchObject');
 
 async function runTest() {
-  // Test: ensure valid object type handling
   try {
-    let result = await handleSearchObject({ object_name: 'MARA', object_type: 'TABL' });
-    console.log('SearchObject MARA TABL:', result);
-  } catch (err) {
-    console.error('SearchObject MARA TABL ERROR:', err.status, err.body?.error?.message || err.message);
-  }
+    // Load test case from YAML (or use command line arg)
+    let testArgs;
+    
+    if (process.argv[2]) {
+      // Command line argument takes precedence
+      testArgs = {
+        object_name: process.argv[2],
+        object_type: process.argv[3] || undefined,
+        maxResults: process.argv[4] ? parseInt(process.argv[4], 10) : 10
+      };
+      console.log('Using command line arguments');
+      printTestParams(testArgs);
+    } else {
+      // Load from YAML config
+      const testCase = getEnabledTestCase('search_object');
+      printTestHeader('SearchObject', testCase);
+      testArgs = testCase.params;
+      printTestParams(testArgs);
+    }
 
-  try {
-    let result = await handleSearchObject({ object_name: 'MARA', object_type: 'TABLE' });
-    console.log('SearchObject MARA TABLE:', result);
+    const result = await handleSearchObject(testArgs);
+    
+    if (!printTestResult(result, 'SearchObject')) {
+      process.exit(1);
+    }
+    
+    process.exit(0);
   } catch (err) {
-    console.error('SearchObject MARA TABLE ERROR:', err.status, err.body?.error?.message || err.message);
-  }
-
-  try {
-    let result = await handleSearchObject({ object_name: 'SFLIGHT', object_type: 'TABLE' });
-    console.log('SearchObject SFLIGHT TABLE:', result);
-  } catch (err) {
-    console.error('SearchObject SFLIGHT TABLE ERROR:', err.status, err.body?.error?.message || err.message);
-  }
-
-  try {
-    let result = await handleSearchObject({ object_name: 'SFLIGHT', object_type: 'TABL' });
-    console.log('SearchObject SFLIGHT TABL:', result);
-  } catch (err) {
-    console.error('SearchObject SFLIGHT TABL ERROR:', err.status, err.body?.error?.message || err.message);
-  }
-
-  try {
-    let result = await handleSearchObject({ object_name: 'MARA' });
-    console.log('SearchObject MARA:', result);
-  } catch (err) {
-    console.error('SearchObject MARA ERROR:', err.status, err.body?.error?.message || err.message);
-  }
-
-  try {
-    let result = await handleSearchObject({ object_name: 'ZZZZZZZZ', object_type: 'TABL' });
-    console.log('SearchObject ZZZZZZZZ TABL:', result);
-  } catch (err) {
-    console.error('SearchObject ZZZZZZZZ TABL ERROR:', err.status, err.body?.error?.message || err.message);
+    console.error('❌ SearchObject ERROR:', err.status, err.body?.error?.message || err.message);
+    process.exit(1);
   }
 }
 
-runTest().then(() => process.exit(0));
+runTest();

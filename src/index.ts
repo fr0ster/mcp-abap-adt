@@ -41,6 +41,8 @@ import { handleDescribeByList } from "./handlers/handleDescribeByList";
 import { handleGetAbapAST } from "./handlers/handleGetAbapAST";
 import { handleGetAbapSemanticAnalysis } from "./handlers/handleGetAbapSemanticAnalysis";
 import { handleGetAbapSystemSymbols } from "./handlers/handleGetAbapSystemSymbols";
+import { handleGetDomain } from "./handlers/handleGetDomain";
+import { handleCreateDomain } from "./handlers/handleCreateDomain";
 
 // Import shared utility functions and types
 import {
@@ -541,6 +543,8 @@ export class mcp_abap_adt_server {
           return await handleGetStructure(request.params.arguments);
         case "GetTable":
           return await handleGetTable(request.params.arguments);
+        case "GetDomain":
+          return await handleGetDomain(request.params.arguments);
         case "GetTableContents":
           return await handleGetTableContents(request.params.arguments);
         case "GetPackage":
@@ -598,6 +602,8 @@ export class mcp_abap_adt_server {
           return await handleGetAbapSemanticAnalysis(request.params.arguments);
         case "GetAbapSystemSymbols":
           return await handleGetAbapSystemSymbols(request.params.arguments);
+        case "CreateDomain":
+          return await handleCreateDomain(request.params.arguments);
         default:
           throw new McpError(
             ErrorCode.MethodNotFound,

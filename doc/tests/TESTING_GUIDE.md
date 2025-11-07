@@ -2,16 +2,6 @@
 
 This directory contains test scripts for the MCP ABAP ADT server functionality.
 
-## 📖 Full Documentation
-
-**Complete testing documentation is available in**: [`doc/tests/`](../doc/tests/README.md)
-
-Including:
-- [Testing Guide](../doc/tests/TESTING_GUIDE.md) - Complete instructions
-- [Test Infrastructure](../doc/tests/TEST_INFRASTRUCTURE.md) - Technical overview
-- [CreateDomain Tool](../doc/tests/CREATE_DOMAIN_TOOL.md) - Handler documentation
-- [Config Template](../doc/tests/test-config.yaml.template) - YAML template
-
 ## 🎯 YAML-Based Testing (Recommended)
 
 All tests now support centralized configuration via `test-config.yaml`. This provides:
@@ -22,12 +12,7 @@ All tests now support centralized configuration via `test-config.yaml`. This pro
 
 ### Quick Start
 
-1. **Create test configuration from template**:
-   ```bash
-   cp test-config.yaml.template test-config.yaml
-   ```
-
-2. **Update test parameters** in `test-config.yaml`:
+1. **Update test parameters** in `test-config.yaml`:
    ```yaml
    create_domain:
      test_cases:
@@ -35,20 +20,20 @@ All tests now support centralized configuration via `test-config.yaml`. This pro
          enabled: true
          params:
            domain_name: "ZZ_TEST_MCP_01"
-           transport_request: "<YOUR_TRANSPORT>"  # ⚠️ UPDATE THIS!
+           transport_request: "E19K905635"  # ⚠️ UPDATE THIS!
    ```
 
-3. **Run a single test**:
+2. **Run a single test**:
    ```bash
    node tests/test-create-domain.js
    ```
 
-4. **Run all enabled tests**:
+3. **Run all enabled tests**:
    ```bash
    node tests/run-all-tests.js
    ```
 
-5. **List available tests**:
+4. **List available tests**:
    ```bash
    node tests/run-all-tests.js --list
    ```
@@ -79,13 +64,6 @@ async function main() {
 }
 main();
 ```
-
-## ⚠️ Important
-
-- `test-config.yaml` is **not tracked in git** (contains transport requests)
-- Always use `test-config.yaml.template` as starting point
-- Update transport requests before running write operations
-- Run `npm run build` before testing
 
 ## Test Categories
 

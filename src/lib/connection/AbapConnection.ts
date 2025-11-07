@@ -7,6 +7,7 @@ export interface AbapRequestOptions {
   timeout: number;
   data?: any;
   params?: any;
+  headers?: Record<string, string>;
 }
 
 export interface AbapConnection {

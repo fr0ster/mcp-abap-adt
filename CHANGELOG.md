@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+- **Domain Management Tools**:
+  - `GetDomain`: Retrieve ABAP domain structure and properties
+  - `CreateDomain`: Create new ABAP domains with automatic activation
+  - Simplified workflow: POST with all properties + Activate + Verify
+  - SAP handles locking automatically on transport
+  - Full test coverage with `test-create-domain.js` and `test-get-domain.js`
+- Domain creation creates and activates domain in one operation (3 steps vs Eclipse's 7 steps)
+- All domain properties (datatype, length, decimals, lowercase, sign, conversion exit, value table) supported
+
 ### Changed
 - Added dedicated `jest.setup.js` to skip automatic MCP server bootstrap during Jest runs, eliminating TDZ errors in the test environment.
 - Narrowed Jest `testMatch` patterns to `*.test.[tj]s` and removed legacy CLI scripts from the suite to prevent false negatives.

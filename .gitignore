@@ -12,6 +12,9 @@ package-lock.json
 .env.*.local
 *.env
 
+# Test configuration (contains real transport requests and sensitive data)
+tests/test-config.yaml
+
 # Logs
 logs
 *.log

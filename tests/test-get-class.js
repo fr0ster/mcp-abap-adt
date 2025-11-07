@@ -1,18 +1,51 @@
-// Test for handleGetClass
+/**
+ * Test script for GetClass handler
+ * Configuration loaded from tests/test-config.yaml
+ */
+
+const {
+  initializeTestEnvironment,
+  getEnabledTestCase,
+  printTestHeader,
+  printTestParams,
+  printTestResult
+} = require('./test-helper');
+
+// Initialize test environment before importing handlers
+initializeTestEnvironment();
 
 const { handleGetClass } = require('../dist/handlers/handleGetClass');
 
 async function main() {
   try {
-    const args = {
-      class_name: process.argv[2] || 'ZCL_MY_CLASS',
-      filePath: process.argv[3] || undefined
-    };
-    const result = await handleGetClass(args);
-    console.log('handleGetClass result:', JSON.stringify(result, null, 2));
+    // Load test case from YAML (or use command line arg)
+    let testArgs;
+    
+    if (process.argv[2]) {
+      // Command line argument takes precedence
+      testArgs = {
+        class_name: process.argv[2],
+        filePath: process.argv[3] || undefined
+      };
+      console.log('Using command line arguments');
+      printTestParams(testArgs);
+    } else {
+      // Load from YAML config
+      const testCase = getEnabledTestCase('get_class');
+      printTestHeader('GetClass', testCase);
+      testArgs = testCase.params;
+      printTestParams(testArgs);
+    }
+
+    const result = await handleGetClass(testArgs);
+    
+    if (!printTestResult(result, 'GetClass')) {
+      process.exit(1);
+    }
+    
     process.exit(0);
   } catch (e) {
-    console.error('Error:', e);
+    console.error('❌ Error:', e);
     process.exit(1);
   }
 }

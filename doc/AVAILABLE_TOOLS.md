@@ -117,6 +117,76 @@ This document contains a complete list of all tools (functions) provided by the 
 
 ---
 
+## Domain Management
+
+### GetDomain
+**Description:** Retrieve ABAP domain structure and properties from SAP system.
+
+**Parameters:**
+- `domain_name` (string, required): Domain name (e.g., MATNR, CHAR20, ZZ_TEST_DOMAIN)
+
+**Example:**
+```json
+{
+  "domain_name": "ZZ_TEST_MCP_25"
+}
+```
+
+**Response includes:**
+- Domain metadata (name, type, description, version)
+- Type information (datatype, length, decimals)
+- Output information (conversion exit, lowercase, sign)
+- Value information (value table, fixed values)
+- Package and responsible user
+
+---
+
+### CreateDomain
+**Description:** Create a new ABAP domain in SAP system. Creates domain with all properties in one call and activates it automatically.
+
+**Parameters:**
+- `domain_name` (string, required): Domain name (e.g., ZZ_TEST_0001). Must follow SAP naming conventions.
+- `description` (string, optional): Domain description. If not provided, domain_name will be used.
+- `package_name` (string, required): Package name (e.g., ZOK_LOCAL, $TMP for local objects)
+- `transport_request` (string, required): Transport request number (e.g., E19K905635). Required for transportable packages.
+- `datatype` (string, optional, default: "CHAR"): Data type - CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.
+- `length` (number, optional, default: 100): Field length (max depends on datatype)
+- `decimals` (number, optional, default: 0): Decimal places (for DEC, CURR, QUAN types)
+- `conversion_exit` (string, optional): Conversion exit routine name (without CONVERSION_EXIT_ prefix)
+- `lowercase` (boolean, optional, default: false): Allow lowercase input
+- `sign_exists` (boolean, optional, default: false): Field has sign (+/-)
+- `value_table` (string, optional): Value table name for foreign key relationship
+
+**Example:**
+```json
+{
+  "domain_name": "ZZ_TEST_MCP_25",
+  "description": "Test domain created via MCP",
+  "package_name": "ZOK_LOCAL",
+  "transport_request": "E19K905635",
+  "datatype": "CHAR",
+  "length": 50,
+  "decimals": 0,
+  "lowercase": false,
+  "sign_exists": false
+}
+```
+
+**Workflow:**
+1. POST creates domain with all properties
+2. Activate domain
+3. Verify activation
+
+**Response includes:**
+- Success status
+- Domain name and version
+- Package and transport request
+- Domain details (datatype, length, decimals)
+
+**Note:** SAP handles locking automatically on the transport. Domain is created and activated in one operation.
+
+---
+
 ## Packages and Interfaces
 
 ### GetInterface

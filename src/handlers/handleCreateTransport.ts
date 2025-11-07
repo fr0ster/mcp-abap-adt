@@ -59,16 +59,13 @@ function generateRequestId(): string {
 function buildCreateTransportXml(args: CreateTransportArgs, username: string): string {
   const transportType = args.transport_type === 'customizing' ? 'T' : 'K';
   const description = args.description || 'Transport request created via MCP';
-  const owner = username;
-  const target = args.target_system || 'PRD';
+  const owner = args.owner || username;
+  const target = args.target_system ? `/${args.target_system}/` : '/E19TOQAS/'; // Default target format
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" xmlns:adtcore="http://www.sap.com/adt/core">
-  <tm:request>
-    <tm:type>${transportType}</tm:type>
-    <tm:description>${description}</tm:description>
-    <tm:owner>${owner}</tm:owner>
-    <tm:target>${target}</tm:target>
+  return `<?xml version="1.0" encoding="ASCII"?>
+<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="newrequest">
+  <tm:request tm:desc="${description}" tm:type="${transportType}" tm:target="${target}" tm:cts_project="">
+    <tm:task tm:owner="${owner}"/>
   </tm:request>
 </tm:root>`;
 }
@@ -84,21 +81,29 @@ function parseTransportResponse(xmlData: string): any {
   });
 
   const result = parser.parse(xmlData);
-  const request = result['tm:request'] || result['request'];
-
-  if (!request) {
-    throw new McpError(ErrorCode.InternalError, 'Invalid transport response XML structure');
+  const root = result['tm:root'] || result['root'];
+  
+  if (!root) {
+    throw new McpError(ErrorCode.InternalError, 'Invalid transport response XML structure - no tm:root found');
   }
 
+  const request = root['tm:request'] || {};
+  const task = request['tm:task'] || {};
+
+  console.log('[DEBUG] CreateTransport parsed request:', JSON.stringify(request, null, 2));
+  console.log('[DEBUG] CreateTransport parsed task:', JSON.stringify(task, null, 2));
+
   return {
-    transport_number: request['tm:number'] || request['number'],
-    description: request['tm:description'] || request['description'],
-    type: request['tm:type'] || request['type'],
-    status: request['tm:status'] || request['status'],
-    owner: request['tm:owner'] || request['owner'],
-    target_system: request['tm:target'] || request['target'],
-    created_at: request['tm:createdAt'] || request['createdAt'],
-    created_by: request['tm:createdBy'] || request['createdBy']
+    transport_number: request['tm:number'],
+    description: request['tm:desc'] || request['tm:description'],
+    type: request['tm:type'],
+    target_system: request['tm:target'],
+    target_desc: request['tm:target_desc'],
+    cts_project: request['tm:cts_project'],
+    cts_project_desc: request['tm:cts_project_desc'],
+    uri: request['tm:uri'],
+    parent: request['tm:parent'],
+    owner: task['tm:owner'] || request['tm:owner'] // Owner is in tm:task
   };
 }
 
@@ -113,7 +118,7 @@ export async function handleCreateTransport(args: any) {
     }
 
     const typedArgs = args as CreateTransportArgs;
-    const username = process.env.SAP_USER || 'MPCUSER';
+    const username = process.env.SAP_USERNAME || process.env.SAP_USER || 'DEVELOPER';
 
     console.log(`[DEBUG] Creating transport: ${typedArgs.description}`);
     console.log(`[DEBUG] Type: ${typedArgs.transport_type || 'workbench'}`);
@@ -125,7 +130,7 @@ export async function handleCreateTransport(args: any) {
     const xmlBody = buildCreateTransportXml(typedArgs, username);
     const headers = {
       'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml',
-      'Content-Type': 'application/vnd.sap.adt.transportorganizer.v1+xml'
+      'Content-Type': 'text/plain'
     };
 
     console.log(`[DEBUG] POST to: ${url}`);
@@ -137,8 +142,9 @@ export async function handleCreateTransport(args: any) {
     console.log('[DEBUG] CreateTransport response status:', response.status);
     console.log('[DEBUG] CreateTransport response data:', response.data);
 
-    // Parse response
+    // Parse response and add known information from request
     const transportInfo = parseTransportResponse(response.data);
+    const requestOwner = typedArgs.owner || username;
 
     return return_response({
       data: JSON.stringify({
@@ -146,11 +152,11 @@ export async function handleCreateTransport(args: any) {
         transport_request: transportInfo.transport_number,
         description: transportInfo.description,
         type: transportInfo.type,
-        status: transportInfo.status,
-        owner: transportInfo.owner,
         target_system: transportInfo.target_system,
-        created_at: transportInfo.created_at,
-        created_by: transportInfo.created_by,
+        target_desc: transportInfo.target_desc,
+        cts_project: transportInfo.cts_project,
+        owner: requestOwner, // Use owner from request since response doesn't include it
+        uri: transportInfo.uri,
         message: `Transport request ${transportInfo.transport_number} created successfully`
       }, null, 2),
       status: response.status,

@@ -47,7 +47,7 @@ create_transport:
       params:
         transport_type: "workbench"
         description: "Test transport created via MCP"
-        target_system: "PRD"
+        target_system: "QAS"  # Update with your target system
 
 get_transport:
   test_cases:

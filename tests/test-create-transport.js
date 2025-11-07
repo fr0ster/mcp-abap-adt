@@ -1,9 +1,9 @@
 /**
  * Test script for CreateTransport handler
- * Tests transport request creation workflow
+ * Tests transport request creation
  */
 
-const { loadTestConfig, initializeTestEnvironment } = require('./test-helper');
+const { initializeTestEnvironment, loadTestConfig } = require('./test-helper');
 
 // Initialize test environment
 initializeTestEnvironment();
@@ -16,11 +16,20 @@ async function testCreateTransport() {
   console.log('='.repeat(80));
 
   try {
-    // Test with workbench transport
+    // Load test configuration
+    const testConfig = loadTestConfig();
+    const testCase = testConfig.create_transport?.test_cases?.find(tc => tc.name === 'workbench_transport');
+    
+    if (!testCase) {
+      console.error('❌ Test case "workbench_transport" not found in test-config.yaml');
+      return;
+    }
+
+    // Use parameters from YAML config
     const transportData = {
-      transport_type: "workbench",
-      description: "Test transport created via MCP - " + new Date().toISOString(),
-      target_system: "PRD"
+      transport_type: testCase.params.transport_type,
+      description: testCase.params.description + " - " + new Date().toISOString(),
+      target_system: testCase.params.target_system
     };
     
     console.log(`\n📝 Creating transport with parameters:`);

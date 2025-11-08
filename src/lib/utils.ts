@@ -89,7 +89,9 @@ export function setConfigOverride(override?: SapConfig) {
 }
 
 export function setConnectionOverride(connection?: AbapConnection) {
-  disposeConnection(overrideConnection);
+  if (overrideConnection) {
+    disposeConnection(overrideConnection);
+  }
   overrideConnection = connection;
   overrideConfig = undefined;
 

@@ -63,34 +63,76 @@ function generateRequestId(): string {
 }
 
 /**
+ * Helper function to make ADT requests with session management
+ */
+async function makeAdtRequestWithSession(
+  url: string,
+  method: string,
+  sessionId: string,
+  data?: any,
+  additionalHeaders?: Record<string, string>
+): Promise<AxiosResponse> {
+  const baseUrl = await getBaseUrl();
+  const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
+  
+  const requestId = generateRequestId();
+  const headers: Record<string, string> = {
+    'sap-adt-connection-id': sessionId,
+    'sap-adt-request-id': requestId,
+    'x-sap-adt-sessiontype': 'stateful',
+    'X-sap-adt-profiling': 'server-time',
+    ...additionalHeaders
+  };
+  
+  return makeAdtRequestWithTimeout(fullUrl, method, 'default', data, undefined, headers);
+}
+
+/**
  * Step 1: Lock class for editing
  */
-async function lockClass(className: string, sessionId: string): Promise<{ response: AxiosResponse; lockHandle: string }> {
-  const url = `${getBaseUrl()}/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}?_action=LOCK`;
+async function lockClass(className: string, sessionId: string): Promise<{ response: AxiosResponse; lockHandle: string; corrNr?: string }> {
+  const url = `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
   
-  const response = await makeAdtRequestWithTimeout(
-    url,
-    'POST',
-    30000,
-    '_action=LOCK',
-    undefined,
-    {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'sap-adt-sessiontype': 'stateful',
-      'sap-adt-connection-id': sessionId,
-      'X-sap-adt-sessiontype': 'stateful',
-      'sap-adt-xcsrf-token': 'fetch',
-      'X-csrf-token': 'fetch',
-      'x-sap-request-id': generateRequestId()
-    }
-  );
+  const headers = {
+    'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
+  };
 
-  const lockHandle = response.headers['sap-adt-lockhandle'] || response.headers['SAP-ADT-LOCKHANDLE'];
+  logger.info(`Locking class: ${className}`);
+  const response = await makeAdtRequestWithSession(url, 'POST', sessionId, null, headers);
+  
+  // Debug: log full response data
+  logger.info(`Lock response status: ${response.status}`);
+  logger.info(`Lock response headers: ${JSON.stringify(response.headers)}`);
+  logger.info(`Lock response data (full): ${typeof response.data === 'string' ? response.data : JSON.stringify(response.data)}`);
+  
+  // Parse lock handle from XML response
+  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+  const result = parser.parse(response.data);
+  
+  // Debug: log full parsed result
+  logger.info(`Parsed lock result (full): ${JSON.stringify(result, null, 2)}`);
+  
+  // Try different possible paths for lock handle
+  let lockHandle = result?.['asx:abap']?.['asx:values']?.['DATA']?.['LOCK_HANDLE'];
   if (!lockHandle) {
-    throw new Error('Failed to obtain lock handle from response');
+    lockHandle = result?.['asx:abap']?.['asx:values']?.['DATA']?.['@_LOCK_HANDLE'];
   }
-
-  return { response, lockHandle };
+  if (!lockHandle) {
+    lockHandle = result?.['lock:result']?.['@_LOCK_HANDLE'];
+  }
+  if (!lockHandle) {
+    lockHandle = result?.['lock:result']?.['LOCK_HANDLE'];
+  }
+  
+  // Extract transport number (corrNr)
+  const corrNr = result?.['asx:abap']?.['asx:values']?.['DATA']?.['CORRNR'];
+  
+  if (!lockHandle) {
+    throw new Error(`Failed to obtain lock handle from SAP. Response: ${JSON.stringify(result, null, 2)}`);
+  }
+  
+  logger.info(`Lock acquired: ${lockHandle}${corrNr ? `, transport: ${corrNr}` : ''}`);
+  return { response, lockHandle, corrNr };
 }
 
 /**
@@ -100,72 +142,51 @@ async function uploadClassSource(
   className: string, 
   sourceCode: string, 
   lockHandle: string, 
-  sessionId: string
+  sessionId: string,
+  corrNr?: string
 ): Promise<AxiosResponse> {
-  const url = `${getBaseUrl()}/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}/source/main`;
+  // Lock handle and transport number are passed as URL parameters
+  let url = `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}/source/main?lockHandle=${lockHandle}`;
+  if (corrNr) {
+    url += `&corrNr=${corrNr}`;
+  }
   
-  return await makeAdtRequestWithTimeout(
-    url,
-    'PUT',
-    30000,
-    sourceCode,
-    undefined,
-    {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'sap-adt-sessiontype': 'stateful',
-      'sap-adt-connection-id': sessionId,
-      'X-sap-adt-sessiontype': 'stateful',
-      'sap-adt-lockhandle': lockHandle,
-      'x-sap-request-id': generateRequestId()
-    }
-  );
+  const headers = {
+    'Content-Type': 'text/plain; charset=utf-8',
+    'Accept': 'text/plain'
+  };
+
+  logger.info(`Uploading class source (${sourceCode.length} bytes)`);
+  return await makeAdtRequestWithSession(url, 'PUT', sessionId, sourceCode, headers);
 }
 
 /**
  * Step 3: Unlock class after editing
  */
 async function unlockClass(className: string, lockHandle: string, sessionId: string): Promise<AxiosResponse> {
-  const url = `${getBaseUrl()}/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}?_action=UNLOCK&lockHandle=${lockHandle}`;
+  const url = `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}?_action=UNLOCK&lockHandle=${lockHandle}`;
   
-  return await makeAdtRequestWithTimeout(
-    url,
-    'POST',
-    30000,
-    '_action=UNLOCK',
-    undefined,
-    {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'sap-adt-sessiontype': 'stateful',
-      'sap-adt-connection-id': sessionId,
-      'X-sap-adt-sessiontype': 'stateful',
-      'x-sap-request-id': generateRequestId()
-    }
-  );
+  logger.info(`Unlocking class with handle: ${lockHandle}`);
+  return await makeAdtRequestWithSession(url, 'POST', sessionId, null, {});
 }
 
 /**
  * Step 4: Activate class (optional)
  */
 async function activateClass(className: string, sessionId: string): Promise<AxiosResponse> {
-  const url = `${getBaseUrl()}/sap/bc/adt/activation?method=activate&preauditRequested=true`;
+  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
   
   const activationXml = `<?xml version="1.0" encoding="UTF-8"?>
 <adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
   <adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}" adtcore:name="${className}"/>
 </adtcore:objectReferences>`;
 
-  return await makeAdtRequestWithTimeout(
-    url,
-    'POST',
-    30000,
-    activationXml,
-    undefined,
-    {
-      'Content-Type': 'application/vnd.sap.adt.activation+xml',
-      'sap-adt-connection-id': sessionId,
-      'x-sap-request-id': generateRequestId()
-    }
-  );
+  const headers = {
+    'Content-Type': 'application/vnd.sap.adt.activation+xml'
+  };
+
+  logger.info(`Activating class: ${className}`);
+  return await makeAdtRequestWithSession(url, 'POST', sessionId, activationXml, headers);
 }
 
 /**
@@ -188,12 +209,16 @@ export async function handleUpdateClassSource(params: any) {
     logger.info(`Session ID: ${sessionId}`);
 
     // Step 1: Lock the class
+    logger.info(`About to call lockClass for ${className}`);
     const lockResult = await lockClass(className, sessionId);
+    logger.info(`lockClass returned, lockHandle: ${lockResult.lockHandle || '(empty)'}`);
     lockHandle = lockResult.lockHandle;
-    logger.info(`✓ Step 1: Class locked (handle: ${lockHandle})`);
+    const corrNr = lockResult.corrNr;
+    logger.info(`✓ Step 1: Class locked (handle: ${lockHandle}${corrNr ? `, transport: ${corrNr}` : ''})`);
 
     // Step 2: Upload new source code
-    await uploadClassSource(className, args.source_code, lockHandle, sessionId);
+    logger.info(`About to upload source, lockHandle: ${lockHandle}`);
+    await uploadClassSource(className, args.source_code, lockHandle, sessionId, corrNr);
     logger.info(`✓ Step 2: Source code uploaded (${args.source_code.length} bytes)`);
 
     // Step 3: Unlock the class

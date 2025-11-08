@@ -576,6 +576,88 @@ This document contains a complete list of all tools (functions) provided by the 
 
 ---
 
+### CreateClass
+**Description:** Create a new ABAP class in SAP system with full object-oriented features. Supports inheritance, final classes, abstract classes, and visibility modifiers. Follows Eclipse ADT approach with stateful session and lock management.
+
+**Parameters:**
+- `class_name` (string, required): Class name (e.g., ZCL_TEST_MCP_01). Must follow SAP naming conventions (usually starts with Z or Y).
+- `package_name` (string, required): Package name (e.g., ZOK_LAB, $TMP for local objects)
+- `transport_request` (string, optional): Transport request number (e.g., E19K905635). Required for transportable packages.
+- `description` (string, optional): Class description. If not provided, class_name will be used.
+- `superclass` (string, optional): Superclass name for inheritance (e.g., CL_ABAP_BEHAVIOR_HANDLER). Leave empty for no inheritance.
+- `final` (boolean, optional): Mark class as final (cannot be inherited). Default: false
+- `abstract` (boolean, optional): Mark class as abstract (cannot be instantiated). Default: false
+- `create_protected` (boolean, optional): Set CREATE PROTECTED visibility. Default: false (CREATE PUBLIC)
+- `source_code` (string, optional): Complete ABAP class source code including DEFINITION and IMPLEMENTATION sections. If not provided, a minimal template will be generated.
+
+**Example (Minimal class):**
+```json
+{
+  "class_name": "ZCL_TEST_MCP_01",
+  "description": "Test ABAP Class",
+  "package_name": "ZOK_LAB",
+  "transport_request": "E19K905635"
+}
+```
+
+**Example (With source code):**
+```json
+{
+  "class_name": "ZCL_MY_HANDLER",
+  "description": "Custom Event Handler",
+  "package_name": "ZOK_LAB",
+  "transport_request": "E19K905635",
+  "superclass": "CL_ABAP_BEHAVIOR_HANDLER",
+  "final": true,
+  "source_code": "CLASS ZCL_MY_HANDLER DEFINITION\n  PUBLIC\n  FINAL\n  CREATE PUBLIC .\n\n  PUBLIC SECTION.\n    METHODS: handle_event.\n  PROTECTED SECTION.\n  PRIVATE SECTION.\nENDCLASS.\n\nCLASS ZCL_MY_HANDLER IMPLEMENTATION.\n  METHOD handle_event.\n    \" Implementation here\n  ENDMETHOD.\nENDCLASS."
+}
+```
+
+**Workflow (Eclipse ADT compliant):**
+1. **Create class object** with metadata (POST /sap/bc/adt/oo/classes)
+   - XML attributes: `class:final`, `class:visibility` as XML attributes (not elements!)
+   - Includes package reference, superclass reference, test class include
+2. **Extract lock handle** from POST response headers (`sap-adt-lockhandle`)
+   - Class is automatically locked after creation
+   - No separate LOCK request needed (unlike Views/Tables)
+3. **Upload source code** (PUT /sap/bc/adt/oo/classes/{name}/source/main)
+   - Content-Type: `text/plain; charset=utf-8`
+   - Must include both DEFINITION and IMPLEMENTATION sections
+4. **Unlock class** (POST with _action=UNLOCK&lockHandle={handle})
+5. **Activate** the class (POST /sap/bc/adt/activation?method=activate)
+
+**Technical Implementation:**
+- Uses **stateful session** (`sap-adt-connection-id`) for all requests
+- Unique **request IDs** (`sap-adt-request-id`) for each request
+- **Cookies automatically managed** via BaseAbapConnection
+- **Lock handle** extracted from POST response headers, not separate LOCK call
+- XML format: `application/vnd.sap.adt.oo.classes.v4+xml`
+- Source upload: `text/plain; charset=utf-8`
+
+**Response includes:**
+- Success status and class name
+- Package and transport request
+- Class type (CLAS/OC)
+- URI to the created class
+- Steps completed: `[create_object, lock, upload_source, unlock, activate]`
+- Superclass, final, abstract flags
+
+**Important Notes:**
+- **Source code must be complete**: Include both CLASS...DEFINITION and CLASS...IMPLEMENTATION sections
+- **XML attributes vs elements**: `class:final` and `class:visibility` must be XML attributes, not child elements
+- **Lock handle**: Automatically obtained from POST response, no explicit LOCK needed
+- **Session management**: All operations must use same `sap-adt-connection-id`
+- **Error handling**: If any step fails, unlock is attempted automatically
+
+**Common Patterns:**
+- Simple class: Leave `source_code` empty, template generated automatically
+- Inheritance: Set `superclass` parameter (e.g., "CL_ABAP_BEHAVIOR_HANDLER")
+- Final class: Set `final: true` to prevent inheritance
+- Abstract class: Set `abstract: true` for abstract classes
+- Protected creation: Set `create_protected: true` for CREATE PROTECTED
+
+---
+
 ### GetView
 **Description:** Retrieve ABAP database view definition including tables, fields, joins, and selection conditions.
 

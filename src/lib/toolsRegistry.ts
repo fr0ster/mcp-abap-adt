@@ -42,6 +42,7 @@ import { TOOL_DEFINITION as GetView_Tool } from '../handlers/handleGetView';
 import { TOOL_DEFINITION as CreateClass_Tool } from '../handlers/handleCreateClass';
 import { TOOL_DEFINITION as CreateProgram_Tool } from '../handlers/handleCreateProgram';
 import { TOOL_DEFINITION as CreateInterface_Tool } from '../handlers/handleCreateInterface';
+import { TOOL_DEFINITION as CreateFunctionGroup_Tool } from '../handlers/handleCreateFunctionGroup';
 import { TOOL_DEFINITION as ActivateObject_Tool } from '../handlers/handleActivateObject';
 import { TOOL_DEFINITION as DeleteObject_Tool } from '../handlers/handleDeleteObject';
 import { TOOL_DEFINITION as CheckObject_Tool } from '../handlers/handleCheckObject';
@@ -141,6 +142,9 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // Interface management
   CreateInterface_Tool,
   UpdateInterfaceSource_Tool,
+
+  // Function Group management
+  CreateFunctionGroup_Tool,
 
   // View management
   CreateView_Tool,

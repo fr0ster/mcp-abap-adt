@@ -39,6 +39,7 @@ import { TOOL_DEFINITION as CreateTable_Tool } from '../handlers/handleCreateTab
 import { TOOL_DEFINITION as CreateStructure_Tool } from '../handlers/handleCreateStructure';
 import { TOOL_DEFINITION as CreateView_Tool } from '../handlers/handleCreateView';
 import { TOOL_DEFINITION as GetView_Tool } from '../handlers/handleGetView';
+import { TOOL_DEFINITION as CreateClass_Tool } from '../handlers/handleCreateClass';
 
 // Type that describes a tool entry
 export interface ToolDefinition {
@@ -123,6 +124,9 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // View management
   CreateView_Tool,
   GetView_Tool,
+
+  // Class management
+  CreateClass_Tool,
 
   // Dynamically imported tools
   ...DYNAMIC_IMPORT_TOOLS

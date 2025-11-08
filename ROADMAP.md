@@ -215,6 +215,66 @@ Each Create handler must:
 - ✅ Documentation in AVAILABLE_TOOLS.md
 - ✅ Example usage in test-config.yaml
 
+---
+
+## 🔄 Architecture Improvement: Separate Create and Update Operations
+
+### Current State
+Current Create* handlers perform **both operations** in one call:
+1. POST - Create object metadata
+2. LOCK - Acquire lock handle  
+3. PUT - Upload source code
+4. UNLOCK - Release lock
+5. ACTIVATE - Activate object (optional)
+
+This works but combines two distinct operations:
+- **Create** (metadata) - stateless POST
+- **Update** (source) - stateful LOCK/PUT/UNLOCK
+
+### Proposed Refactoring
+
+#### Option A: Separate Functions (Recommended)
+Keep current all-in-one Create* functions AND add separate Update* functions:
+
+**Create Functions** (current, keep as-is):
+- `CreateClass` - Full workflow (metadata + source + activate)
+- `CreateProgram` - Full workflow
+- `CreateView` - Full workflow
+- Benefits: Backward compatible, convenient for new objects
+
+**New Update Functions** (to be added - P1 priority):
+- `UpdateClassSource` - LOCK → PUT source → UNLOCK
+- `UpdateProgramSource` - LOCK → PUT source → UNLOCK  
+- `UpdateViewSource` - LOCK → PUT DDL → UNLOCK
+- Benefits: Modify existing objects without re-creation
+
+#### Option B: Split Completely (Breaking Change - Not Recommended)
+Replace current Create* with two separate operations - breaks existing usage.
+
+### Activation Parameter
+Make activation **optional** in both Create and Update:
+- `activate: boolean` parameter (default: true for Create, false for Update)
+- Allows batch creation without individual activations
+- Use `ActivateObject` for batch activation later
+- More flexible workflow control
+
+### Implementation Priority
+**P1 - Add Update* functions** (Option A):
+1. `UpdateClassSource` - Modify existing class source
+2. `UpdateProgramSource` - Modify existing program source
+3. `UpdateViewSource` - Modify existing view DDL
+
+Keep current Create* functions unchanged for backward compatibility.
+
+### Benefits
+- **Flexibility**: Users choose workflow (all-in-one vs. step-by-step)
+- **Efficiency**: Update existing objects without metadata re-creation
+- **Batch Operations**: Create multiple objects, then batch activate
+- **Testability**: Easier to test individual operations
+- **Clarity**: Clear separation of concerns (Create vs. Modify)
+
+---
+
 ## Notes
 
 - **Stateful Session:** Required for all Create operations to maintain lock handle

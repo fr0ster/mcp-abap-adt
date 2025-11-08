@@ -7,6 +7,12 @@ import { SapConfig, sapConfigSignature } from "./sapConfig";
 import { getTimeout, getTimeoutConfig } from "./timeouts";
 import { logger } from "./logger"; // Import the MCP-compatible logger
 
+// Initialize connection variables before exports to avoid circular dependency issues
+let overrideConfig: SapConfig | undefined;
+let overrideConnection: AbapConnection | undefined;
+let cachedConnection: AbapConnection | undefined;
+let cachedConfigSignature: string | undefined;
+
 export { McpError, ErrorCode, AxiosResponse, logger, getTimeout, getTimeoutConfig };
 
 /**
@@ -48,11 +54,6 @@ export function return_error(error: any) {
     ],
   };
 }
-
-let overrideConfig: SapConfig | undefined;
-let overrideConnection: AbapConnection | undefined;
-let cachedConnection: AbapConnection | undefined;
-let cachedConfigSignature: string | undefined;
 
 function disposeConnection(connection?: AbapConnection) {
   if (connection) {

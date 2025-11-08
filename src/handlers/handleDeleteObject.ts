@@ -2,13 +2,24 @@
  * DeleteObject Handler - Delete ABAP objects via ADT API
  * 
  * Eclipse ADT workflow:
- * DELETE /sap/bc/adt/{object_path}?deleteOption=deleteFromDatabase&corrNr={transport}
+ * POST /sap/bc/adt/deletion/delete
+ * Content-Type: application/vnd.sap.adt.deletion.request.v1+xml
+ * Accept: application/vnd.sap.adt.deletion.response.v1+xml
+ * 
+ * Body:
+ * <?xml version="1.0" encoding="UTF-8"?>
+ * <del:deletionRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
+ *   <del:object adtcore:uri="/sap/bc/adt/{object_path}">
+ *     <del:transportNumber>{transport}</del:transportNumber>
+ *   </del:object>
+ * </del:deletionRequest>
  * 
  * Supported object types:
  * - Classes: /sap/bc/adt/oo/classes/{name}
  * - Programs: /sap/bc/adt/programs/programs/{name}
  * - Interfaces: /sap/bc/adt/oo/interfaces/{name}
  * - Function Groups: /sap/bc/adt/functions/groups/{name}
+ * - Function Modules: /sap/bc/adt/functions/groups/{group}/fmodules/{name}
  * - Tables: /sap/bc/adt/ddic/tables/{name}
  * - Structures: /sap/bc/adt/ddic/structures/{name}
  * - Views: /sap/bc/adt/ddic/ddlsources/{name}
@@ -27,27 +38,29 @@ import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
   name: "DeleteObject",
-  description: "Delete an ABAP object from the SAP system. Requires transport request for transportable objects. Object must not be locked by another user.",
+  description: "Delete an ABAP object from the SAP system via ADT deletion API. Requires transport request for transportable objects. Object must not be locked by another user.",
   inputSchema: {
     type: "object",
     properties: {
+      object_uri: {
+        type: "string",
+        description: "Full ADT object URI (e.g., /sap/bc/adt/oo/classes/zcl_my_class, /sap/bc/adt/functions/groups/zok_fg_mcp01/fmodules/z_test_fm_mcp01)"
+      },
       object_name: { 
         type: "string", 
-        description: "Object name (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE)" 
+        description: "Object name (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, Z_TEST_FM_MCP01)" 
       },
       object_type: {
         type: "string",
-        description: "Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element'",
-        enum: ["class", "program", "interface", "function_group", "table", "structure", "view", "domain", "data_element"]
+        description: "Object type: 'CLAS/OC' (class), 'PROG/P' (program), 'INTF/OI' (interface), 'FUGR/F' (function group), 'FUGR/FF' (function module), 'TABL/DT' (table), 'TTYP/ST' (structure), 'DDLS/DF' (view), 'DTEL/DE' (data element), 'DOMA/DM' (domain). Or simplified: 'class', 'program', 'interface', 'function_group', 'function_module', 'table', 'structure', 'view', 'domain', 'data_element'"
+      },
+      function_group_name: {
+        type: "string",
+        description: "Required only for function_module type - name of the function group containing the module"
       },
       transport_request: { 
         type: "string", 
         description: "Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP)." 
-      },
-      delete_option: {
-        type: "string",
-        description: "Deletion option: 'deleteFromDatabase' (permanent) or 'moveToTransport' (for later deletion). Default: deleteFromDatabase",
-        enum: ["deleteFromDatabase", "moveToTransport"]
       }
     },
     required: ["object_name", "object_type"]
@@ -55,19 +68,37 @@ export const TOOL_DEFINITION = {
 } as const;
 
 interface DeleteObjectArgs {
+  object_uri?: string;
   object_name: string;
   object_type: string;
+  function_group_name?: string;
   transport_request?: string;
-  delete_option?: string;
 }
 
 /**
- * Get ADT path for object type
+ * Get ADT URI for object
  */
-function getObjectPath(objectType: string, objectName: string): string {
+function getObjectUri(
+  objectType: string, 
+  objectName: string,
+  functionGroupName?: string
+): string {
   const encodedName = encodeSapObjectName(objectName);
   
-  switch (objectType.toLowerCase()) {
+  // Normalize object type
+  const type = objectType.toLowerCase()
+    .replace('clas/oc', 'class')
+    .replace('prog/p', 'program')
+    .replace('intf/oi', 'interface')
+    .replace('fugr/f', 'function_group')
+    .replace('fugr/ff', 'function_module')
+    .replace('tabl/dt', 'table')
+    .replace('ttyp/st', 'structure')
+    .replace('ddls/df', 'view')
+    .replace('dtel/de', 'data_element')
+    .replace('doma/dm', 'domain');
+  
+  switch (type) {
     case 'class':
       return `/sap/bc/adt/oo/classes/${encodedName}`;
     case 'program':
@@ -76,6 +107,12 @@ function getObjectPath(objectType: string, objectName: string): string {
       return `/sap/bc/adt/oo/interfaces/${encodedName}`;
     case 'function_group':
       return `/sap/bc/adt/functions/groups/${encodedName}`;
+    case 'function_module':
+      if (!functionGroupName) {
+        throw new Error('function_group_name is required for function_module type');
+      }
+      const encodedGroup = encodeSapObjectName(functionGroupName);
+      return `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}`;
     case 'table':
       return `/sap/bc/adt/ddic/tables/${encodedName}`;
     case 'structure':
@@ -92,39 +129,39 @@ function getObjectPath(objectType: string, objectName: string): string {
 }
 
 /**
- * Delete ABAP object
+ * Delete ABAP object using ADT deletion API
  */
 async function deleteObject(
-  objectName: string,
-  objectType: string,
-  transportRequest: string | undefined,
-  deleteOption: string
+  objectUri: string,
+  transportRequest: string | undefined
 ): Promise<AxiosResponse> {
   const baseUrl = await getBaseUrl();
-  const objectPath = getObjectPath(objectType, objectName);
+  const deletionUrl = `${baseUrl}/sap/bc/adt/deletion/delete`;
   
-  // Build URL with delete option and optional transport
-  let url = `${baseUrl}${objectPath}?deleteOption=${deleteOption}`;
-  if (transportRequest) {
-    url += `&corrNr=${transportRequest}`;
-  }
+  // Build XML deletion request
+  const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
+<del:deletionRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
+  <del:object adtcore:uri="${objectUri}">
+    ${transportRequest ? `<del:transportNumber>${transportRequest}</del:transportNumber>` : ''}
+  </del:object>
+</del:deletionRequest>`;
   
-  logger.info(`🗑️  Deleting ${objectType}: ${objectName}`);
-  logger.info(`   URL: ${url}`);
+  logger.info(`🗑️  Deleting object: ${objectUri}`);
+  logger.info(`   Transport: ${transportRequest || 'local ($TMP)'}`);
   
   const response = await makeAdtRequestWithTimeout(
-    url,
-    'DELETE',
+    deletionUrl,
+    'POST',
     'default',
-    undefined,
+    xmlPayload,
     undefined,
     {
-      'Accept': 'application/xml',
-      'Content-Type': 'application/xml'
+      'Accept': 'application/vnd.sap.adt.deletion.response.v1+xml',
+      'Content-Type': 'application/vnd.sap.adt.deletion.request.v1+xml'
     }
   );
   
-  logger.info(`✅ Object deleted successfully: ${objectName}`);
+  logger.info(`✅ Object deleted successfully`);
   
   return response;
 }
@@ -134,10 +171,11 @@ async function deleteObject(
  */
 export async function handleDeleteObject(args: any) {
   const {
+    object_uri,
     object_name,
     object_type,
-    transport_request,
-    delete_option = 'deleteFromDatabase'
+    function_group_name,
+    transport_request
   } = args as DeleteObjectArgs;
 
   // Validation
@@ -145,21 +183,14 @@ export async function handleDeleteObject(args: any) {
     return return_error('object_name and object_type are required');
   }
   
-  const validTypes = ['class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element'];
-  if (!validTypes.includes(object_type.toLowerCase())) {
-    return return_error(`Invalid object_type. Must be one of: ${validTypes.join(', ')}`);
-  }
-  
   logger.info(`🚀 Starting DeleteObject: ${object_name} (type: ${object_type})`);
   
   try {
+    // Get or build object URI
+    const uri = object_uri || getObjectUri(object_type, object_name, function_group_name);
+    
     // Delete object
-    const response = await deleteObject(
-      object_name,
-      object_type,
-      transport_request,
-      delete_option
-    );
+    const response = await deleteObject(uri, transport_request);
     
     logger.info(`✅ DeleteObject completed successfully: ${object_name}`);
     
@@ -168,8 +199,8 @@ export async function handleDeleteObject(args: any) {
         success: true,
         object_name,
         object_type,
+        object_uri: uri,
         transport_request: transport_request || 'local',
-        delete_option,
         message: `Object ${object_name} deleted successfully`
       }
     } as AxiosResponse);

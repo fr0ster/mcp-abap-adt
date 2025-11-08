@@ -54,6 +54,8 @@ import { handleGetView } from "./handlers/handleGetView";
 import { handleCreateClass } from "./handlers/handleCreateClass";
 import { handleCreateProgram } from "./handlers/handleCreateProgram";
 import { handleCreateInterface } from "./handlers/handleCreateInterface";
+import { handleCreateFunctionGroup } from "./handlers/handleCreateFunctionGroup";
+import { handleCreateFunctionModule } from "./handlers/handleCreateFunctionModule";
 import { handleActivateObject } from "./handlers/handleActivateObject";
 import { handleDeleteObject } from "./handlers/handleDeleteObject";
 import { handleCheckObject } from "./handlers/handleCheckObject";
@@ -61,6 +63,7 @@ import { handleUpdateClassSource } from "./handlers/handleUpdateClassSource";
 import { handleUpdateProgramSource } from "./handlers/handleUpdateProgramSource";
 import { handleUpdateViewSource } from "./handlers/handleUpdateViewSource";
 import { handleUpdateInterfaceSource } from "./handlers/handleUpdateInterfaceSource";
+import { handleUpdateFunctionModuleSource } from "./handlers/handleUpdateFunctionModuleSource";
 
 // Import shared utility functions and types
 import {
@@ -648,10 +651,16 @@ export class mcp_abap_adt_server {
           return await handleUpdateProgramSource(request.params.arguments);
         case "CreateInterface":
           return await handleCreateInterface(request.params.arguments);
+        case "CreateFunctionGroup":
+          return await handleCreateFunctionGroup(request.params.arguments);
+        case "CreateFunctionModule":
+          return await handleCreateFunctionModule(request.params.arguments);
         case "UpdateViewSource":
           return await handleUpdateViewSource(request.params.arguments);
         case "UpdateInterfaceSource":
           return await handleUpdateInterfaceSource(request.params.arguments);
+        case "UpdateFunctionModuleSource":
+          return await handleUpdateFunctionModuleSource(request.params.arguments as any);
         case "ActivateObject":
           return await handleActivateObject(request.params.arguments);
         case "DeleteObject":

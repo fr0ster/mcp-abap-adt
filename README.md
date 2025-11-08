@@ -33,7 +33,8 @@ This branch includes several powerful new features:
 - **🏛️ Structure Management**: `GetStructure`, `CreateStructure` - Create and retrieve ABAP structures with type references and includes
 - **👁️ View Management**: `GetView`, `CreateView` - Create CDS Views and Classic Views using DDL syntax with stateful session support
 - **🎓 Class Management**: `GetClass`, `CreateClass` - Create and retrieve ABAP classes with full OO features (inheritance, final, abstract, visibility)
-- **� Transport Management**: `CreateTransport`, `GetTransport` - Create new transport requests and retrieve complete transport information with objects and tasks
+- **📝 Program Management**: `GetProgram`, `CreateProgram` - Create and retrieve ABAP programs (reports, includes, module pools) with automatic template generation
+- **🚚 Transport Management**: `CreateTransport`, `GetTransport` - Create new transport requests and retrieve complete transport information with objects and tasks
 - **🔍 Enhancement Analysis Tools**: `GetEnhancements`, `GetEnhancementByName` - Comprehensive enhancement discovery and analysis
 - **📋 Include Management**: `GetIncludesList` - Recursive include discovery and hierarchy mapping  
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper

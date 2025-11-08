@@ -250,6 +250,25 @@ create_class:
       ENDMETHOD.
     ENDCLASS.
 
+# Program Creation Tests
+create_program:
+  program_name: "Z_TEST_PROGRAM_01"
+  description: "Test ABAP Program created via MCP ABAP ADT"
+  package_name: "ZOK_LOCAL"
+  transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
+  program_type: "1"  # 1=Executable, I=Include, M=Module Pool, F=Function Group
+  application: "*"   # Application area (e.g., 'S' for System, 'M' for MM)
+  source_code: |
+    *&---------------------------------------------------------------------*
+    *& Report Z_TEST_PROGRAM_01
+    *& Test ABAP Program created via MCP ABAP ADT
+    *&---------------------------------------------------------------------*
+    REPORT Z_TEST_PROGRAM_01.
+
+    START-OF-SELECTION.
+      WRITE: / 'Program Z_TEST_PROGRAM_01 executed successfully.'.
+      WRITE: / 'Created via MCP ABAP ADT API.'.
+
 # Environment Configuration
 # These values can be overridden by environment variables
 environment:

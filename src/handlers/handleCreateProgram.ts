@@ -53,6 +53,10 @@ export const TOOL_DEFINITION = {
       source_code: {
         type: "string",
         description: "Complete ABAP program source code. If not provided, generates minimal template based on program_type."
+      },
+      activate: {
+        type: "boolean",
+        description: "Activate program after creation. Default: true. Set to false for batch operations (activate multiple objects later)."
       }
     },
     required: ["program_name", "package_name"]
@@ -67,6 +71,7 @@ interface CreateProgramArgs {
   program_type?: string;
   application?: string;
   source_code?: string;
+  activate?: boolean;
 }
 
 /**
@@ -323,25 +328,36 @@ export async function handleCreateProgram(params: any) {
     lockHandle = null; // Clear lock handle after successful unlock
     logger.info(`✓ Step 4: Program unlocked`);
 
-    // Step 5: Activate the program
-    const activateResponse = await activateProgram(programName, sessionId);
-    logger.info(`✓ Step 5: Activation completed`);
-    
-    // Parse activation warnings/errors
+    // Step 5: Activate the program (optional)
     let activationWarnings: string[] = [];
-    if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
-      const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
-      const result = parser.parse(activateResponse.data);
-      const messages = result?.['chkl:messages']?.['msg'];
-      if (messages) {
-        const msgArray = Array.isArray(messages) ? messages : [messages];
-        activationWarnings = msgArray.map((msg: any) => 
-          `${msg['@_type']}: ${msg['shortText']?.['txt'] || 'Unknown'}`
-        );
+    const shouldActivate = args.activate !== false; // Default to true if not specified
+    
+    if (shouldActivate) {
+      const activateResponse = await activateProgram(programName, sessionId);
+      logger.info(`✓ Step 5: Activation completed`);
+      
+      // Parse activation warnings/errors
+      if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
+        const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+        const result = parser.parse(activateResponse.data);
+        const messages = result?.['chkl:messages']?.['msg'];
+        if (messages) {
+          const msgArray = Array.isArray(messages) ? messages : [messages];
+          activationWarnings = msgArray.map((msg: any) => 
+            `${msg['@_type']}: ${msg['shortText']?.['txt'] || 'Unknown'}`
+          );
+        }
       }
+    } else {
+      logger.info(`✓ Step 5: Activation skipped (activate=false)`);
     }
 
     // Return success result
+    const stepsCompleted = ['create_object', 'lock', 'upload_source', 'unlock'];
+    if (shouldActivate) {
+      stepsCompleted.push('activate');
+    }
+    
     const result = {
       success: true,
       program_name: programName,
@@ -349,9 +365,11 @@ export async function handleCreateProgram(params: any) {
       transport_request: args.transport_request || null,
       program_type: args.program_type || '1',
       type: 'PROG/P',
-      message: `Program ${programName} created and activated successfully`,
+      message: shouldActivate 
+        ? `Program ${programName} created and activated successfully`
+        : `Program ${programName} created successfully (not activated)`,
       uri: `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`,
-      steps_completed: ['create_object', 'lock', 'upload_source', 'unlock', 'activate'],
+      steps_completed: stepsCompleted,
       activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined
     };
 

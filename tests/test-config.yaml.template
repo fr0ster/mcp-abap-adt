@@ -280,6 +280,71 @@ activate_object:
       type: "PROG/P"
   preaudit: true
 
+# Update Class Source Tests
+update_class_source:
+  class_name: "ZCL_TEST_MCP_01"
+  activate: true  # Set to false to skip activation (use ActivateObject later)
+  source_code: |
+    CLASS ZCL_TEST_MCP_01 DEFINITION
+      PUBLIC
+      FINAL
+      CREATE PUBLIC .
+
+      PUBLIC SECTION.
+        METHODS: 
+          constructor,
+          get_message RETURNING VALUE(rv_message) TYPE string.
+      PROTECTED SECTION.
+      PRIVATE SECTION.
+    ENDCLASS.
+
+    CLASS ZCL_TEST_MCP_01 IMPLEMENTATION.
+      METHOD constructor.
+        " Updated initialization logic
+        WRITE: / 'Class instance created - UPDATED'.
+      ENDMETHOD.
+
+      METHOD get_message.
+        rv_message = 'Updated message from MCP test'.
+      ENDMETHOD.
+    ENDCLASS.
+
+# Update Program Source Tests
+update_program_source:
+  program_name: "Z_TEST_PROGRAM_01"
+  activate: true  # Set to false to skip activation (use ActivateObject later)
+  source_code: |
+    *&---------------------------------------------------------------------*
+    *& Report Z_TEST_PROGRAM_01
+    *& UPDATED Test ABAP Program via MCP ABAP ADT
+    *&---------------------------------------------------------------------*
+    REPORT Z_TEST_PROGRAM_01.
+
+    START-OF-SELECTION.
+      WRITE: / 'Program Z_TEST_PROGRAM_01 executed successfully - UPDATED'.
+      WRITE: / 'Updated via MCP ABAP ADT API.'.
+      WRITE: / 'Modification date:', sy-datum.
+
+# Update View Source Tests
+update_view_source:
+  view_name: "ZOK_R_TEST_0002"
+  activate: true  # Set to false to skip activation (use ActivateObject later)
+  ddl_source: |
+    @AbapCatalog.sqlViewName: 'ZV_TEST_SQL'
+    @AbapCatalog.compiler.compareFilter: true
+    @AccessControl.authorizationCheck: #NOT_REQUIRED
+    @EndUserText.label: 'Updated Test View via MCP'
+    define view ZOK_R_TEST_0002
+      as select from mara
+    {
+      key matnr as Material,
+          mtart as MaterialType,
+          matkl as MaterialGroup,
+          meins as BaseUnit,
+          ersda as CreatedOn,
+          laeda as LastChanged
+    }
+
 # Environment Configuration
 # These values can be overridden by environment variables
 environment:

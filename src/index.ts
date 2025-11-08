@@ -54,6 +54,9 @@ import { handleGetView } from "./handlers/handleGetView";
 import { handleCreateClass } from "./handlers/handleCreateClass";
 import { handleCreateProgram } from "./handlers/handleCreateProgram";
 import { handleActivateObject } from "./handlers/handleActivateObject";
+import { handleUpdateClassSource } from "./handlers/handleUpdateClassSource";
+import { handleUpdateProgramSource } from "./handlers/handleUpdateProgramSource";
+import { handleUpdateViewSource } from "./handlers/handleUpdateViewSource";
 
 // Import shared utility functions and types
 import {
@@ -633,8 +636,14 @@ export class mcp_abap_adt_server {
           return await handleGetView(request.params.arguments);
         case "CreateClass":
           return await handleCreateClass(request.params.arguments);
+        case "UpdateClassSource":
+          return await handleUpdateClassSource(request.params.arguments);
         case "CreateProgram":
           return await handleCreateProgram(request.params.arguments);
+        case "UpdateProgramSource":
+          return await handleUpdateProgramSource(request.params.arguments);
+        case "UpdateViewSource":
+          return await handleUpdateViewSource(request.params.arguments);
         case "ActivateObject":
           return await handleActivateObject(request.params.arguments);
         default:

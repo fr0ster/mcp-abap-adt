@@ -60,6 +60,10 @@ export const TOOL_DEFINITION = {
       source_code: {
         type: "string",
         description: "Complete ABAP class source code including CLASS DEFINITION and IMPLEMENTATION sections. If not provided, generates minimal template."
+      },
+      activate: {
+        type: "boolean",
+        description: "Activate class after creation. Default: true. Set to false for batch operations (activate multiple objects later)."
       }
     },
     required: ["class_name", "package_name"]
@@ -76,6 +80,7 @@ interface CreateClassArgs {
   abstract?: boolean;
   create_protected?: boolean;
   source_code?: string;
+  activate?: boolean;
 }
 
 /**
@@ -311,34 +316,47 @@ export async function handleCreateClass(params: any) {
     lockHandle = null; // Clear lock handle after successful unlock
     logger.info(`✓ Step 4: Class unlocked`);
 
-    // Step 5: Activate the class
-    const activateResponse = await activateClass(className, sessionId);
-    logger.info(`✓ Step 5: Activation completed`);
-    
-    // Parse activation warnings/errors
+    // Step 5: Activate the class (optional)
     let activationWarnings: string[] = [];
-    if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
-      const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
-      const result = parser.parse(activateResponse.data);
-      const messages = result?.['chkl:messages']?.['msg'];
-      if (messages) {
-        const msgArray = Array.isArray(messages) ? messages : [messages];
-        activationWarnings = msgArray.map((msg: any) => 
-          `${msg['@_type']}: ${msg['shortText']?.['txt'] || 'Unknown'}`
-        );
+    const shouldActivate = args.activate !== false; // Default to true if not specified
+    
+    if (shouldActivate) {
+      const activateResponse = await activateClass(className, sessionId);
+      logger.info(`✓ Step 5: Activation completed`);
+      
+      // Parse activation warnings/errors
+      if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
+        const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+        const result = parser.parse(activateResponse.data);
+        const messages = result?.['chkl:messages']?.['msg'];
+        if (messages) {
+          const msgArray = Array.isArray(messages) ? messages : [messages];
+          activationWarnings = msgArray.map((msg: any) => 
+            `${msg['@_type']}: ${msg['shortText']?.['txt'] || 'Unknown'}`
+          );
+        }
       }
+    } else {
+      logger.info(`✓ Step 5: Activation skipped (activate=false)`);
     }
 
     // Return success result
+    const stepsCompleted = ['create_object', 'lock', 'upload_source', 'unlock'];
+    if (shouldActivate) {
+      stepsCompleted.push('activate');
+    }
+    
     const result = {
       success: true,
       class_name: className,
       package_name: args.package_name,
       transport_request: args.transport_request || null,
       type: 'CLAS/OC',
-      message: `Class ${className} created and activated successfully`,
+      message: shouldActivate 
+        ? `Class ${className} created and activated successfully`
+        : `Class ${className} created successfully (not activated)`,
       uri: `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}`,
-      steps_completed: ['create_object', 'lock', 'upload_source', 'unlock', 'activate'],
+      steps_completed: stepsCompleted,
       activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined,
       superclass: args.superclass || null,
       final: args.final || false,

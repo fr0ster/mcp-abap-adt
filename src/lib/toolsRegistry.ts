@@ -42,6 +42,9 @@ import { TOOL_DEFINITION as GetView_Tool } from '../handlers/handleGetView';
 import { TOOL_DEFINITION as CreateClass_Tool } from '../handlers/handleCreateClass';
 import { TOOL_DEFINITION as CreateProgram_Tool } from '../handlers/handleCreateProgram';
 import { TOOL_DEFINITION as ActivateObject_Tool } from '../handlers/handleActivateObject';
+import { TOOL_DEFINITION as UpdateClassSource_Tool } from '../handlers/handleUpdateClassSource';
+import { TOOL_DEFINITION as UpdateProgramSource_Tool } from '../handlers/handleUpdateProgramSource';
+import { TOOL_DEFINITION as UpdateViewSource_Tool } from '../handlers/handleUpdateViewSource';
 
 // Type that describes a tool entry
 export interface ToolDefinition {
@@ -123,15 +126,18 @@ export const ALL_TOOLS: ToolDefinition[] = [
   CreateTable_Tool,
   CreateStructure_Tool,
 
-  // View management
-  CreateView_Tool,
-  GetView_Tool,
-
   // Class management
   CreateClass_Tool,
+  UpdateClassSource_Tool,
 
   // Program management
   CreateProgram_Tool,
+  UpdateProgramSource_Tool,
+
+  // View management
+  CreateView_Tool,
+  GetView_Tool,
+  UpdateViewSource_Tool,
 
   // Activation
   ActivateObject_Tool,

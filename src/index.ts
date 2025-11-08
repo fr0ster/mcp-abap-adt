@@ -53,6 +53,7 @@ import { handleCreateView } from "./handlers/handleCreateView";
 import { handleGetView } from "./handlers/handleGetView";
 import { handleCreateClass } from "./handlers/handleCreateClass";
 import { handleCreateProgram } from "./handlers/handleCreateProgram";
+import { handleActivateObject } from "./handlers/handleActivateObject";
 
 // Import shared utility functions and types
 import {
@@ -634,6 +635,8 @@ export class mcp_abap_adt_server {
           return await handleCreateClass(request.params.arguments);
         case "CreateProgram":
           return await handleCreateProgram(request.params.arguments);
+        case "ActivateObject":
+          return await handleActivateObject(request.params.arguments);
         default:
           throw new McpError(
             ErrorCode.MethodNotFound,

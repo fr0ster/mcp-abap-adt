@@ -41,6 +41,7 @@ import { TOOL_DEFINITION as CreateView_Tool } from '../handlers/handleCreateView
 import { TOOL_DEFINITION as GetView_Tool } from '../handlers/handleGetView';
 import { TOOL_DEFINITION as CreateClass_Tool } from '../handlers/handleCreateClass';
 import { TOOL_DEFINITION as CreateProgram_Tool } from '../handlers/handleCreateProgram';
+import { TOOL_DEFINITION as ActivateObject_Tool } from '../handlers/handleActivateObject';
 
 // Type that describes a tool entry
 export interface ToolDefinition {
@@ -131,6 +132,9 @@ export const ALL_TOOLS: ToolDefinition[] = [
 
   // Program management
   CreateProgram_Tool,
+
+  // Activation
+  ActivateObject_Tool,
 
   // Dynamically imported tools
   ...DYNAMIC_IMPORT_TOOLS

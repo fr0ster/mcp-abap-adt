@@ -53,10 +53,12 @@ import { handleCreateView } from "./handlers/handleCreateView";
 import { handleGetView } from "./handlers/handleGetView";
 import { handleCreateClass } from "./handlers/handleCreateClass";
 import { handleCreateProgram } from "./handlers/handleCreateProgram";
+import { handleCreateInterface } from "./handlers/handleCreateInterface";
 import { handleActivateObject } from "./handlers/handleActivateObject";
 import { handleUpdateClassSource } from "./handlers/handleUpdateClassSource";
 import { handleUpdateProgramSource } from "./handlers/handleUpdateProgramSource";
 import { handleUpdateViewSource } from "./handlers/handleUpdateViewSource";
+import { handleUpdateInterfaceSource } from "./handlers/handleUpdateInterfaceSource";
 
 // Import shared utility functions and types
 import {
@@ -642,8 +644,12 @@ export class mcp_abap_adt_server {
           return await handleCreateProgram(request.params.arguments);
         case "UpdateProgramSource":
           return await handleUpdateProgramSource(request.params.arguments);
+        case "CreateInterface":
+          return await handleCreateInterface(request.params.arguments);
         case "UpdateViewSource":
           return await handleUpdateViewSource(request.params.arguments);
+        case "UpdateInterfaceSource":
+          return await handleUpdateInterfaceSource(request.params.arguments);
         case "ActivateObject":
           return await handleActivateObject(request.params.arguments);
         default:

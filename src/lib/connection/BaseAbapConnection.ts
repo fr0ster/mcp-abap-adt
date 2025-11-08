@@ -68,7 +68,7 @@ export abstract class BaseAbapConnection implements AbapConnection {
     const normalizedMethod = method.toUpperCase();
     const requestUrl = this.normalizeRequestUrl(url);
 
-    if (normalizedMethod === "POST" || normalizedMethod === "PUT") {
+    if (normalizedMethod === "POST" || normalizedMethod === "PUT" || normalizedMethod === "DELETE") {
       await this.ensureFreshCsrfToken(requestUrl);
     }
 
@@ -86,7 +86,7 @@ export abstract class BaseAbapConnection implements AbapConnection {
     // Add auth headers (these MUST NOT be overridden)
     Object.assign(requestHeaders, await this.getAuthHeaders());
 
-    if ((normalizedMethod === "POST" || normalizedMethod === "PUT") && this.csrfToken) {
+    if ((normalizedMethod === "POST" || normalizedMethod === "PUT" || normalizedMethod === "DELETE") && this.csrfToken) {
       requestHeaders["x-csrf-token"] = this.csrfToken;
     }
 

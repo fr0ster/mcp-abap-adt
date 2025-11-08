@@ -353,6 +353,39 @@ environment:
   default_system: "E19"
   default_client: "100"
 
+# Interface Creation Tests
+create_interface:
+  test_cases:
+    - name: "basic_interface"
+      enabled: false
+      description: "Create a simple ABAP interface"
+      params:
+        interface_name: "ZIF_TEST_MCP_01"
+        description: "Test interface created via MCP"
+        package_name: "$TMP"
+        source_code: |
+          INTERFACE zif_test_mcp_01
+            PUBLIC.
+            
+            METHODS test_method
+              IMPORTING
+                iv_param TYPE string
+              RETURNING
+                VALUE(rv_result) TYPE string.
+                
+          ENDINTERFACE.
+
+# Object Deletion Tests
+delete_object:
+  test_cases:
+    - name: "delete_test_interface"
+      enabled: false
+      description: "Test object deletion with transport"
+      params:
+        test_interface_name: "ZIF_TEST_DELETE_01"
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
+        package_name: "$TMP"
+
 # Test Execution Settings
 test_settings:
   fail_fast: false

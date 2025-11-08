@@ -55,6 +55,8 @@ import { handleCreateClass } from "./handlers/handleCreateClass";
 import { handleCreateProgram } from "./handlers/handleCreateProgram";
 import { handleCreateInterface } from "./handlers/handleCreateInterface";
 import { handleActivateObject } from "./handlers/handleActivateObject";
+import { handleDeleteObject } from "./handlers/handleDeleteObject";
+import { handleCheckObject } from "./handlers/handleCheckObject";
 import { handleUpdateClassSource } from "./handlers/handleUpdateClassSource";
 import { handleUpdateProgramSource } from "./handlers/handleUpdateProgramSource";
 import { handleUpdateViewSource } from "./handlers/handleUpdateViewSource";
@@ -652,6 +654,10 @@ export class mcp_abap_adt_server {
           return await handleUpdateInterfaceSource(request.params.arguments);
         case "ActivateObject":
           return await handleActivateObject(request.params.arguments);
+        case "DeleteObject":
+          return await handleDeleteObject(request.params.arguments);
+        case "CheckObject":
+          return await handleCheckObject(request.params.arguments);
         default:
           throw new McpError(
             ErrorCode.MethodNotFound,

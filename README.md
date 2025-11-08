@@ -34,6 +34,7 @@ This branch includes several powerful new features:
 - **👁️ View Management**: `GetView`, `CreateView` - Create CDS Views and Classic Views using DDL syntax with stateful session support
 - **🎓 Class Management**: `GetClass`, `CreateClass` - Create and retrieve ABAP classes with full OO features (inheritance, final, abstract, visibility)
 - **📝 Program Management**: `GetProgram`, `CreateProgram` - Create and retrieve ABAP programs (reports, includes, module pools) with automatic template generation
+- **⚡ Activation**: `ActivateObject` - Universal activation for any ABAP object (classes, programs, tables, views, domains, etc.) with batch support
 - **🚚 Transport Management**: `CreateTransport`, `GetTransport` - Create new transport requests and retrieve complete transport information with objects and tasks
 - **🔍 Enhancement Analysis Tools**: `GetEnhancements`, `GetEnhancementByName` - Comprehensive enhancement discovery and analysis
 - **📋 Include Management**: `GetIncludesList` - Recursive include discovery and hierarchy mapping  

@@ -1,0 +1,26 @@
+{
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.profiles.linux": {
+    "zsh": {
+      "path": "/usr/bin/zsh",
+      "args": ["-l", "-i"],
+      "env": {
+        "SHELL": "/usr/bin/zsh",
+        "TERM": "xterm-256color"
+      }
+    },
+    "bash": {
+      "path": "/bin/bash",
+      "args": ["-l"]
+    }
+  },
+  "terminal.integrated.env.linux": {
+    "SHELL": "/bin/bash",
+    "TERM": "xterm-256color"
+  },
+  "terminal.integrated.shellIntegration.enabled": true,
+  "terminal.integrated.shellIntegration.decorationsEnabled": "both",
+  "terminal.integrated.allowChords": false,
+  "terminal.integrated.commandsToSkipShell": [],
+  "terminal.integrated.cwd": "${workspaceFolder}"
+}

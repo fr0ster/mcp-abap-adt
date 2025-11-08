@@ -1,0 +1,73 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "MCP Server - SSE",
+      "program": "${workspaceFolder}/dist/index.js",
+      "args": ["--transport", "sse", "--env", "${workspaceFolder}/.env"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "internalConsole",
+      "env": {
+        "NODE_ENV": "development",
+        "MCP_SSE_PORT": "4004"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "MCP Server - StreamableHTTP",
+      "program": "${workspaceFolder}/dist/index.js",
+      "args": ["--transport", "streamable-http", "--env", "${workspaceFolder}/.env"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "internalConsole",
+      "env": {
+        "NODE_ENV": "development",
+        "MCP_HTTP_PORT": "4004"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "MCP Inspector - STDIO",
+      "program": "${workspaceFolder}/node_modules/@modelcontextprotocol/inspector/dist/index.js",
+      "args": ["node", "${workspaceFolder}/dist/index.js", "--env", "${workspaceFolder}/.env"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "internalConsole",
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "MCP Inspector - SSE",
+      "program": "${workspaceFolder}/node_modules/@modelcontextprotocol/inspector/dist/index.js",
+      "args": ["node", "${workspaceFolder}/dist/index.js", "--transport", "sse", "--env", "${workspaceFolder}/.env"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "internalConsole",
+      "env": {
+        "NODE_ENV": "development",
+        "MCP_SSE_PORT": "4004"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Run Tests",
+      "program": "${workspaceFolder}/node_modules/.bin/jest",
+      "args": ["--runInBand"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "internalConsole",
+      "env": {
+        "NODE_ENV": "test"
+      }
+    }
+  ]
+}

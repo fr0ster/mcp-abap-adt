@@ -63,6 +63,7 @@ import { handleUpdateClassSource } from "./handlers/handleUpdateClassSource";
 import { handleUpdateProgramSource } from "./handlers/handleUpdateProgramSource";
 import { handleUpdateViewSource } from "./handlers/handleUpdateViewSource";
 import { handleUpdateInterfaceSource } from "./handlers/handleUpdateInterfaceSource";
+import { handleUpdateFunctionModuleSource } from "./handlers/handleUpdateFunctionModuleSource";
 
 // Import shared utility functions and types
 import {
@@ -658,6 +659,8 @@ export class mcp_abap_adt_server {
           return await handleUpdateViewSource(request.params.arguments);
         case "UpdateInterfaceSource":
           return await handleUpdateInterfaceSource(request.params.arguments);
+        case "UpdateFunctionModuleSource":
+          return await handleUpdateFunctionModuleSource(request.params.arguments as any);
         case "ActivateObject":
           return await handleActivateObject(request.params.arguments);
         case "DeleteObject":

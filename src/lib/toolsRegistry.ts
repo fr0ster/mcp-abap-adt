@@ -43,6 +43,7 @@ import { TOOL_DEFINITION as CreateClass_Tool } from '../handlers/handleCreateCla
 import { TOOL_DEFINITION as CreateProgram_Tool } from '../handlers/handleCreateProgram';
 import { TOOL_DEFINITION as CreateInterface_Tool } from '../handlers/handleCreateInterface';
 import { TOOL_DEFINITION as CreateFunctionGroup_Tool } from '../handlers/handleCreateFunctionGroup';
+import { TOOL_DEFINITION as CreateFunctionModule_Tool } from '../handlers/handleCreateFunctionModule';
 import { TOOL_DEFINITION as ActivateObject_Tool } from '../handlers/handleActivateObject';
 import { TOOL_DEFINITION as DeleteObject_Tool } from '../handlers/handleDeleteObject';
 import { TOOL_DEFINITION as CheckObject_Tool } from '../handlers/handleCheckObject';
@@ -50,6 +51,7 @@ import { TOOL_DEFINITION as UpdateClassSource_Tool } from '../handlers/handleUpd
 import { TOOL_DEFINITION as UpdateProgramSource_Tool } from '../handlers/handleUpdateProgramSource';
 import { TOOL_DEFINITION as UpdateViewSource_Tool } from '../handlers/handleUpdateViewSource';
 import { TOOL_DEFINITION as UpdateInterfaceSource_Tool } from '../handlers/handleUpdateInterfaceSource';
+import { TOOL_DEFINITION as UpdateFunctionModuleSource_Tool } from '../handlers/handleUpdateFunctionModuleSource';
 
 // Type that describes a tool entry
 export interface ToolDefinition {
@@ -145,6 +147,10 @@ export const ALL_TOOLS: ToolDefinition[] = [
 
   // Function Group management
   CreateFunctionGroup_Tool,
+
+  // Function Module management
+  CreateFunctionModule_Tool,
+  UpdateFunctionModuleSource_Tool,
 
   // View management
   CreateView_Tool,

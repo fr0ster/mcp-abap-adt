@@ -67,6 +67,15 @@ High-priority features for interface management and object operations:
 
 ---
 
+## 🎉 P2 Priorities: ALL COMPLETED (3/3)
+
+Function module and group management with full CRUD support:
+- ✅ CreateFunctionGroup - Function group creation with metadata
+- ✅ CreateFunctionModule - FM creation with full signature (IMPORTING/EXPORTING/CHANGING/TABLES)
+- ✅ UpdateFunctionModuleSource - Update FM source with LOCK→PUT→UNLOCK workflow (3/3 tests passed)
+
+---
+
 ## Priority: High (P1)
 
 ### 4. CreateInterface ⭐⭐
@@ -121,25 +130,44 @@ High-priority features for interface management and object operations:
 ## Priority: Medium (P2)
 
 ### 8. CreateFunctionModule ⭐
-**Status:** Not Started  
+**Status:** ✅ COMPLETED  
 **Priority:** Medium  
 **Complexity:** High - Complex structure  
 **Dependencies:** CreateFunctionGroup  
 **Implementation Notes:**
-- Must exist in function group
-- Stateful session for source + parameters
-- Import/Export/Changing/Tables parameters
-- Exceptions definition
+- ✅ Must exist in function group
+- ✅ Stateful session for source + parameters
+- ✅ Import/Export/Changing/Tables parameters
+- ✅ Exceptions definition
+- ✅ Full signature generation and validation
+- ✅ Test coverage with multiple scenarios
 
 ### 9. CreateFunctionGroup ⭐
-**Status:** Not Started  
+**Status:** ✅ COMPLETED  
 **Priority:** Medium  
 **Complexity:** Medium  
 **Dependencies:** None  
 **Implementation Notes:**
-- Container for function modules
-- Includes: TOP include, UXX includes
-- Stateful session pattern
+- ✅ Container for function modules
+- ✅ Includes: TOP include, UXX includes
+- ✅ Stateful session pattern
+- ✅ Full metadata support
+
+### 9.1 UpdateFunctionModuleSource ⭐
+**Status:** ✅ COMPLETED  
+**Priority:** Medium  
+**Complexity:** Medium - Update existing FM  
+**Dependencies:** CreateFunctionModule  
+**Implementation Notes:**
+- ✅ LOCK → PUT source → UNLOCK → ACTIVATE workflow
+- ✅ Stateful session management with proper cookie handling
+- ✅ Lock handle management across operations
+- ✅ Optional activation after update
+- ✅ Full test coverage: 3/3 tests passed
+  - Test 1: Update with to_upper() logic
+  - Test 2: Add validation with IF checks
+  - Test 3: Add parameters with DEFAULT values
+- ✅ All LOCK-based Update handlers complete (Class, Program, Interface, View, FM)
 
 ### 10. CreatePackage
 **Status:** Not Started  

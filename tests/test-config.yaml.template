@@ -221,6 +221,35 @@ create_cds:
           laeda as LastChanged
     }
 
+# Class Creation Tests
+create_class:
+  class_name: "ZCL_TEST_MCP_01"
+  description: "Test ABAP Class created via MCP ABAP ADT"
+  package_name: "ZOK_LOCAL"
+  transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
+  superclass: ""  # Optional: e.g., "CL_ABAP_BEHAVIOR_HANDLER"
+  final: false
+  abstract: false
+  create_protected: false
+  source_code: |
+    CLASS ZCL_TEST_MCP_01 DEFINITION
+      PUBLIC
+      FINAL
+      CREATE PUBLIC .
+
+      PUBLIC SECTION.
+        METHODS: constructor.
+      PROTECTED SECTION.
+      PRIVATE SECTION.
+    ENDCLASS.
+
+    CLASS ZCL_TEST_MCP_01 IMPLEMENTATION.
+      METHOD constructor.
+        " Initialization logic here
+        WRITE: / 'Class instance created'.
+      ENDMETHOD.
+    ENDCLASS.
+
 # Environment Configuration
 # These values can be overridden by environment variables
 environment:

@@ -29,7 +29,10 @@ This branch includes several powerful new features:
 
 - **🏗️ Domain Management**: `GetDomain`, `CreateDomain` - Create and manage ABAP domains with automatic activation
 - **📊 Data Element Management**: `GetDataElement`, `CreateDataElement` - Create and retrieve ABAP data elements with domain references and field labels
-- **🚚 Transport Management**: `CreateTransport`, `GetTransport` - Create new transport requests and retrieve complete transport information with objects and tasks
+- **� Table Management**: `GetTable`, `CreateTable` - Create and retrieve ABAP database tables with fields, keys, and technical settings
+- **🏛️ Structure Management**: `GetStructure`, `CreateStructure` - Create and retrieve ABAP structures with type references and includes
+- **👁️ View Management**: `GetView`, `CreateView` - Create CDS Views and Classic Views using DDL syntax with stateful session support
+- **�🚚 Transport Management**: `CreateTransport`, `GetTransport` - Create new transport requests and retrieve complete transport information with objects and tasks
 - **🔍 Enhancement Analysis Tools**: `GetEnhancements`, `GetEnhancementByName` - Comprehensive enhancement discovery and analysis
 - **📋 Include Management**: `GetIncludesList` - Recursive include discovery and hierarchy mapping  
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper

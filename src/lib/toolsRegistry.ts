@@ -35,6 +35,10 @@ import { TOOL_DEFINITION as CreateDataElement_Tool } from '../handlers/handleCre
 import { TOOL_DEFINITION as GetDataElement_Tool } from '../handlers/handleGetDataElement';
 import { TOOL_DEFINITION as CreateTransport_Tool } from '../handlers/handleCreateTransport';
 import { TOOL_DEFINITION as GetTransport_Tool } from '../handlers/handleGetTransport';
+import { TOOL_DEFINITION as CreateTable_Tool } from '../handlers/handleCreateTable';
+import { TOOL_DEFINITION as CreateStructure_Tool } from '../handlers/handleCreateStructure';
+import { TOOL_DEFINITION as CreateView_Tool } from '../handlers/handleCreateView';
+import { TOOL_DEFINITION as GetView_Tool } from '../handlers/handleGetView';
 
 // Type that describes a tool entry
 export interface ToolDefinition {
@@ -111,6 +115,14 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // Transport management
   GetTransport_Tool,
   CreateTransport_Tool,
+
+  // Table and Structure management
+  CreateTable_Tool,
+  CreateStructure_Tool,
+
+  // View management
+  CreateView_Tool,
+  GetView_Tool,
 
   // Dynamically imported tools
   ...DYNAMIC_IMPORT_TOOLS

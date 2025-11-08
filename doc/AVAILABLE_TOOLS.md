@@ -514,6 +514,68 @@ This document contains a complete list of all tools (functions) provided by the 
 
 ---
 
+### CreateView
+**Description:** Create CDS View or Classic View in SAP using DDL syntax. Supports both modern CDS Views with annotations and classic views with plain DDL. Both types use the same API workflow, differing only in DDL content.
+
+**Parameters:**
+- `view_name` (string, required): View name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW). Must follow SAP naming conventions.
+- `ddl_source` (string, required): Complete DDL source code. 
+  - **For CDS View**: Include @AbapCatalog.sqlViewName and other annotations
+  - **For Classic View**: Plain 'define view' statement without annotations
+- `package_name` (string, required): Package name (e.g., ZOK_LAB, $TMP for local objects)
+- `transport_request` (string, optional): Transport request number (e.g., E19K905635). Required for transportable packages.
+- `description` (string, optional): Optional description. If not provided, view_name will be used.
+
+**Example (CDS View):**
+```json
+{
+  "view_name": "ZOK_R_TEST_MCP_02",
+  "description": "Test CDS View via MCP",
+  "package_name": "ZOK_LAB",
+  "transport_request": "E19K905635",
+  "ddl_source": "@AbapCatalog.sqlViewName: 'ZOK_V_MCP_02'\n@AbapCatalog.compiler.compareFilter: true\n@AccessControl.authorizationCheck: #NOT_REQUIRED\n@EndUserText.label: 'Test CDS View'\n@Metadata.ignorePropagatedAnnotations: true\ndefine view ZOK_R_TEST_MCP_02 as select from mara\n{\n    matnr as MaterialNumber,\n    mtart as MaterialType,\n    meins as BaseUnitOfMeasure,\n    ersda as CreatedOn\n}"
+}
+```
+
+**Example (Classic View):**
+```json
+{
+  "view_name": "Z_CLASSIC_VIEW_01",
+  "description": "Classic View via MCP",
+  "package_name": "ZOK_LAB",
+  "transport_request": "E19K905635",
+  "ddl_source": "define view Z_CLASSIC_VIEW_01 as select from mara\n{\n    matnr,\n    mtart,\n    meins\n}"
+}
+```
+
+**Workflow (Eclipse ADT compliant):**
+1. **Create DDLS object** with metadata (POST /sap/bc/adt/ddic/ddl/sources)
+2. **Lock object** for modification (POST with _action=LOCK)
+3. **Upload DDL source** code (PUT /source/main)
+4. **Unlock object** (POST with _action=UNLOCK)
+5. **Activate** the view (POST /sap/bc/adt/activation)
+
+**Technical Implementation:**
+- Uses **stateful session** (`sap-adt-connection-id`) for all 5 steps
+- Unique **request IDs** for each individual request
+- **Cookies automatically managed** via BaseAbapConnection
+- **Lock handle** obtained and passed through session
+
+**Response includes:**
+- Success status and view name
+- Package and transport request
+- Complete URI to the created view
+- Steps completed confirmation
+- Activation warnings (e.g., key field differences)
+
+**Notes:**
+- CDS Views and Classic Views use identical API workflow
+- Only difference is DDL source content (annotations vs. plain DDL)
+- Lock handle is session-dependent and must be maintained throughout workflow
+- Activation may return warnings about key definitions - this is normal
+
+---
+
 ### GetView
 **Description:** Retrieve ABAP database view definition including tables, fields, joins, and selection conditions.
 

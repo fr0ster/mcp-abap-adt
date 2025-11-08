@@ -181,6 +181,46 @@ get_abap_semantic_analysis:
           lv_count = 42.
           lv_name = 'Test'.
 
+# View Creation Tests (Classic SE11 Database View)
+create_view:
+  view_name: "ZV_TEST_MCP_VIEW_01"
+  description: "Test Database View created via MCP ABAP ADT"
+  package_name: "ZOK_LOCAL"
+  transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
+  sql_view_name: "ZV_MCP_V01"  # SQL view name (16 chars max)
+  base_table: "MARA"
+  select_fields:
+    - "MATNR"
+    - "MTART"
+    - "MEINS"
+    - "ERSDA"
+
+# CDS View Creation Tests (Modern DDLS with DDL Source)
+create_cds:
+  cds_name: "Z_I_TEST_MCP_CDS_01"
+  description: "Test CDS View created via MCP ABAP ADT"
+  package_name: "ZOK_LOCAL"
+  transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
+  ddl_source: |
+    @AbapCatalog.viewEnhancementCategory: [#NONE]
+    @AccessControl.authorizationCheck: #NOT_REQUIRED
+    @EndUserText.label: 'Test CDS View for Materials'
+    @Metadata.ignorePropagatedAnnotations: true
+    @ObjectModel.usageType:{
+      serviceQuality: #X,
+      sizeCategory: #S,
+      dataClass: #MIXED
+    }
+    define view Z_I_TEST_MCP_CDS_01
+      as select from mara
+    {
+      key matnr as Material,
+          mtart as MaterialType,
+          meins as BaseUnitOfMeasure,
+          ersda as CreatedOn,
+          laeda as LastChanged
+    }
+
 # Environment Configuration
 # These values can be overridden by environment variables
 environment:

@@ -108,6 +108,21 @@ get_package:
       params:
         package_name: "$TMP"
 
+create_package:
+  test_cases:
+    - name: "basic_package"
+      enabled: false
+      description: "Create a basic development package"
+      params:
+        package_name: "ZOK_TEST_PKG_01"
+        description: "Test package created via MCP"
+        super_package: "ZOK_PACKAGE"  # Parent package
+        package_type: "development"  # or "structure"
+        software_component: "HOME"
+        transport_layer: "ZE19"  # Update with your transport layer
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
+        application_component: ""  # Optional, e.g., "BC-ABA"
+
 # Search Tests
 search_object:
   test_cases:

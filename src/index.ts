@@ -23,6 +23,7 @@ import { handleGetTable } from "./handlers/handleGetTable";
 import { handleGetStructure } from "./handlers/handleGetStructure";
 import { handleGetTableContents } from "./handlers/handleGetTableContents";
 import { handleGetPackage } from "./handlers/handleGetPackage";
+import { handleCreatePackage } from "./handlers/handleCreatePackage";
 import { handleGetInclude } from "./handlers/handleGetInclude";
 import { handleGetIncludesList } from "./handlers/handleGetIncludesList";
 import { handleGetTypeInfo } from "./handlers/handleGetTypeInfo";
@@ -570,6 +571,8 @@ export class mcp_abap_adt_server {
           return await handleGetTableContents(request.params.arguments);
         case "GetPackage":
           return await handleGetPackage(request.params.arguments);
+        case "CreatePackage":
+          return await handleCreatePackage(request.params.arguments);
         case "GetTypeInfo":
           return await handleGetTypeInfo(request.params.arguments);
         case "GetInclude":

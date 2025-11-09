@@ -6,6 +6,7 @@ import { TOOL_DEFINITION as GetTable_Tool } from '../handlers/handleGetTable';
 import { TOOL_DEFINITION as GetStructure_Tool } from '../handlers/handleGetStructure';
 import { TOOL_DEFINITION as GetTableContents_Tool } from '../handlers/handleGetTableContents';
 import { TOOL_DEFINITION as GetPackage_Tool } from '../handlers/handleGetPackage';
+import { TOOL_DEFINITION as CreatePackage_Tool } from '../handlers/handleCreatePackage';
 import { TOOL_DEFINITION as GetInclude_Tool } from '../handlers/handleGetInclude';
 import { TOOL_DEFINITION as GetIncludesList_Tool } from '../handlers/handleGetIncludesList';
 import { TOOL_DEFINITION as GetTypeInfo_Tool } from '../handlers/handleGetTypeInfo';
@@ -89,6 +90,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // Packages, interfaces
   GetInterface_Tool,
   GetPackage_Tool,
+  CreatePackage_Tool,
 
   // Includes, hierarchies
   GetInclude_Tool,

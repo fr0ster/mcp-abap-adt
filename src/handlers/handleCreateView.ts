@@ -14,9 +14,9 @@
  */
 
 import { AxiosResponse } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName, logger } from '../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger } from '../lib/utils';
+import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
 import { XMLParser } from 'fast-xml-parser';
-import * as crypto from 'crypto';
 
 export const TOOL_DEFINITION = {
   name: "CreateView",
@@ -55,36 +55,6 @@ interface CreateViewArgs {
   package_name: string;
   transport_request?: string;
   description?: string;
-}
-
-function generateSessionId(): string {
-  return crypto.randomUUID().replace(/-/g, '');
-}
-
-function generateRequestId(): string {
-  return crypto.randomUUID().replace(/-/g, '');
-}
-
-async function makeAdtRequestWithSession(
-  url: string,
-  method: string,
-  sessionId: string,
-  data?: any,
-  additionalHeaders?: Record<string, string>
-): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl();
-  const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
-  
-  const requestId = generateRequestId();
-  const headers: Record<string, string> = {
-    'sap-adt-connection-id': sessionId,
-    'sap-adt-request-id': requestId,
-    'x-sap-adt-sessiontype': 'stateful',
-    'X-sap-adt-profiling': 'server-time',
-    ...additionalHeaders
-  };
-  
-  return makeAdtRequestWithTimeout(fullUrl, method, 'default', data, undefined, headers);
 }
 
 async function createDDLSObject(args: CreateViewArgs, sessionId: string): Promise<AxiosResponse> {

@@ -9,51 +9,9 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../lib/utils';
+import { return_error, return_response, encodeSapObjectName, getBaseUrl, makeAdtRequestWithTimeout } from '../lib/utils';
+import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
 import { XMLParser, XMLBuilder } from 'fast-xml-parser';
-import * as crypto from 'crypto';
-
-/**
- * Generate unique session ID for ADT connection
- * All requests within this MCP call will use the same session ID
- */
-function generateSessionId(): string {
-  return crypto.randomUUID().replace(/-/g, '');
-}
-
-/**
- * Generate unique request ID for each ADT request
- */
-function generateRequestId(): string {
-  return crypto.randomUUID().replace(/-/g, '');
-}
-
-/**
- * Make ADT request with session and request IDs for stateful operations
- */
-async function makeAdtRequestWithSession(
-  url: string,
-  method: string,
-  sessionId: string,
-  data?: any,
-  additionalHeaders?: Record<string, string>
-): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl();
-  const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
-  
-  // Create custom headers with session and request IDs
-  const requestId = generateRequestId();
-  const headers: Record<string, string> = {
-    'sap-adt-connection-id': sessionId,
-    'sap-adt-request-id': requestId,
-    'x-sap-adt-sessiontype': 'stateful',
-    'X-sap-adt-profiling': 'server-time',
-    ...additionalHeaders
-  };
-  
-  // Use makeAdtRequestWithTimeout with custom headers
-  return makeAdtRequestWithTimeout(fullUrl, method, 'default', data, undefined, headers);
-}
 
 function buildCheckRunPayload(tableName: string): string {
   const uriName = encodeSapObjectName(tableName).toLowerCase();

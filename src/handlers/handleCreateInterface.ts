@@ -16,9 +16,9 @@
  */
 
 import { AxiosResponse } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName, logger } from '../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger } from '../lib/utils';
+import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
 import { XMLParser } from 'fast-xml-parser';
-import * as crypto from 'crypto';
 
 export const TOOL_DEFINITION = {
   name: "CreateInterface",
@@ -62,47 +62,6 @@ interface CreateInterfaceArgs {
   transport_request?: string;
   source_code?: string;
   activate?: boolean;
-}
-
-/**
- * Generate unique session ID - same for all requests in this operation
- */
-function generateSessionId(): string {
-  return crypto.randomUUID().replace(/-/g, '');
-}
-
-/**
- * Generate unique request ID - different for each request
- */
-function generateRequestId(): string {
-  return crypto.randomUUID().replace(/-/g, '');
-}
-
-/**
- * Make ADT request with stateful session headers
- * Critical: sap-adt-connection-id maintains session across requests
- * Critical: cookies are automatically managed by BaseAbapConnection
- */
-async function makeAdtRequestWithSession(
-  url: string,
-  method: string,
-  sessionId: string,
-  data?: any,
-  additionalHeaders?: Record<string, string>
-): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl();
-  const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
-  
-  const requestId = generateRequestId();
-  const headers: Record<string, string> = {
-    'sap-adt-connection-id': sessionId,
-    'sap-adt-request-id': requestId,
-    'x-sap-adt-sessiontype': 'stateful',
-    'X-sap-adt-profiling': 'server-time',
-    ...additionalHeaders
-  };
-  
-  return makeAdtRequestWithTimeout(fullUrl, method, 'default', data, undefined, headers);
 }
 
 /**

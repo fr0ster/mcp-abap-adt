@@ -22,5 +22,6 @@
   "terminal.integrated.shellIntegration.decorationsEnabled": "both",
   "terminal.integrated.allowChords": false,
   "terminal.integrated.commandsToSkipShell": [],
-  "terminal.integrated.cwd": "${workspaceFolder}"
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "cSpell.language": "en"
 }

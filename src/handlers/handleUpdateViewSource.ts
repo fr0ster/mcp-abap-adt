@@ -22,6 +22,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger } from '../lib/utils';
 import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
+import { activateObjectInSession } from '../lib/activationUtils';
 import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
@@ -119,19 +120,9 @@ async function unlockView(viewName: string, lockHandle: string, sessionId: strin
  * Step 4: Activate view (optional)
  */
 async function activateView(viewName: string, sessionId: string): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
-  
-  const activationXml = `<?xml version="1.0" encoding="UTF-8"?>
-<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName)}" adtcore:name="${viewName}"/>
-</adtcore:objectReferences>`;
-
-  const headers = {
-    'Content-Type': 'application/vnd.sap.adt.activation+xml'
-  };
-
+  const objectUri = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName)}`;
   logger.info(`Activating view: ${viewName}`);
-  return await makeAdtRequestWithSession(url, 'POST', sessionId, activationXml, headers);
+  return await activateObjectInSession(objectUri, viewName, sessionId, true);
 }
 
 /**

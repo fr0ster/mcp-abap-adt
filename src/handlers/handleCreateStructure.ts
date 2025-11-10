@@ -9,7 +9,10 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger, getBaseUrl } from '../lib/utils';
+import { makeAdtRequestWithTimeout } from '../lib/utils';
+import { generateSessionId } from '../lib/sessionUtils';
+import { activateObjectInSession } from '../lib/activationUtils';
 import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 import * as crypto from 'crypto';
 
@@ -260,19 +263,9 @@ function parseStructureCreationResponse(xml: string) {
 /**
  * Activate the structure after creation
  */
-async function activateStructure(structureName: string) {
-  const url = `${await getBaseUrl()}/sap/bc/adt/activation`;
-  
-  const activationXml = `<?xml version="1.0" encoding="UTF-8"?>
-<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/structures/${encodeSapObjectName(structureName)}" adtcore:name="${structureName}"/>
-</adtcore:objectReferences>`;
-
-  const response = await makeAdtRequestWithTimeout(url, 'POST', 'default', {
-    'Content-Type': 'application/vnd.sap.adt.activation+xml'
-  }, activationXml);
-
-  return response;
+async function activateStructure(structureName: string, sessionId: string): Promise<AxiosResponse> {
+  const objectUri = `/sap/bc/adt/ddic/structures/${encodeSapObjectName(structureName)}`;
+  return await activateObjectInSession(objectUri, structureName, sessionId, true);
 }
 
 /**
@@ -300,6 +293,7 @@ export async function handleCreateStructure(args: any): Promise<any> {
     }
 
     const results: any[] = [];
+    const sessionId = generateSessionId();
     
     // Step 1: Create structure
     try {
@@ -339,7 +333,7 @@ export async function handleCreateStructure(args: any): Promise<any> {
         action: 'Activating structure ' + createStructureArgs.structure_name
       });
 
-      const activateResponse = await activateStructure(createStructureArgs.structure_name);
+      const activateResponse = await activateStructure(createStructureArgs.structure_name, sessionId);
       results.push({
         step: 'activate_structure',
         status: 'success',

@@ -16,8 +16,9 @@
  */
 
 import { AxiosResponse } from '../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getBaseUrl, makeAdtRequestWithTimeout } from '../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger, getBaseUrl } from '../lib/utils';
 import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
+import { activateObjectInSession } from '../lib/activationUtils';
 import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
@@ -158,35 +159,17 @@ async function unlockFunctionModule(
  * Step 4: Activate function module (optional)
  */
 async function activateFunctionModule(
+  functionModuleName: string,
   functionGroupName: string,
-  functionModuleName: string
+  sessionId: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl();
   const groupLower = encodeSapObjectName(functionGroupName).toLowerCase();
   const moduleLower = encodeSapObjectName(functionModuleName).toLowerCase();
   const objectUri = `/sap/bc/adt/functions/groups/${groupLower}/fmodules/${moduleLower}`;
   
   logger.info(`⚡ Activating function module: ${functionModuleName}`);
-  
-  const activationXml = `<?xml version="1.0" encoding="UTF-8"?>
-<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:objectReference adtcore:uri="${objectUri}" adtcore:name="${functionModuleName}"/>
-</adtcore:objectReferences>`;
-
-  const response = await makeAdtRequestWithTimeout(
-    `${baseUrl}/sap/bc/adt/activation`,
-    'POST',
-    'default',
-    activationXml,
-    { method: 'activate', preauditRequested: 'true' },
-    {
-      'Content-Type': 'application/xml',
-      'Accept': 'application/xml'
-    }
-  );
-  
-  logger.info(`✅ Function module activated successfully`);
-  
+  const response = await activateObjectInSession(objectUri, functionModuleName, sessionId, true);
+  logger.info(`✅ Function module activated`);
   return response;
 }
 
@@ -262,8 +245,9 @@ export async function handler(args: UpdateFunctionModuleSourceArgs): Promise<any
       // Step 4: Activate if requested
       if (args.activate) {
         const activateResponse = await activateFunctionModule(
+          args.function_module_name,
           args.function_group_name,
-          args.function_module_name
+          sessionId
         );
 
         if (activateResponse.status !== 200) {

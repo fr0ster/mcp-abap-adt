@@ -284,16 +284,36 @@ create_program:
       WRITE: / 'Program Z_TEST_PROGRAM_01 executed successfully.'.
       WRITE: / 'Created via MCP ABAP ADT API.'.
 
-# Activation Tests
+# Group Activation Tests
+# Activate 2-3 objects together using /sap/bc/adt/activation/runs endpoint
+# URI is auto-generated from name and type - no need to specify it!
 activate_object:
   objects:
     - name: "ZCL_TEST_MCP_01"
-      uri: "/sap/bc/adt/oo/classes/zcl_test_mcp_01"
       type: "CLAS/OC"
     - name: "Z_TEST_PROGRAM_01"
-      uri: "/sap/bc/adt/programs/programs/z_test_program_01"
       type: "PROG/P"
-  preaudit: true
+  preaudit: false  # Set to true for pre-activation check
+
+# Check Object Tests
+# Syntax check for ABAP objects without activation
+# Use friendly type names: 'class', 'program', 'view', 'interface', etc.
+check_object:
+  test_cases:
+    - name: "check_cds_views"
+      enabled: true
+      description: "Check syntax of CDS views"
+      params:
+        objects:
+          - object_name: "ZOK_I_MARKET_0001"
+            object_type: "view"
+            version: "active"
+          - object_name: "ZOK_I_ORDER_0001"
+            object_type: "view"
+            version: "active"
+          - object_name: "ZOK_I_PRODUCT_0001"
+            object_type: "view"
+            version: "active"
 
 # Update Class Source Tests
 update_class_source:

@@ -17,6 +17,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger } from '../lib/utils';
 import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
+import { activateObjectInSession } from '../lib/activationUtils';
 import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
@@ -135,19 +136,9 @@ async function unlockClass(className: string, lockHandle: string, sessionId: str
  * Step 4: Activate class (optional)
  */
 async function activateClass(className: string, sessionId: string): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
-  
-  const activationXml = `<?xml version="1.0" encoding="UTF-8"?>
-<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}" adtcore:name="${className}"/>
-</adtcore:objectReferences>`;
-
-  const headers = {
-    'Content-Type': 'application/vnd.sap.adt.activation+xml'
-  };
-
+  const objectUri = `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}`;
   logger.info(`Activating class: ${className}`);
-  return await makeAdtRequestWithSession(url, 'POST', sessionId, activationXml, headers);
+  return await activateObjectInSession(objectUri, className, sessionId, true);
 }
 
 /**

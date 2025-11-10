@@ -16,39 +16,39 @@
  * - Interfaces (INTF/OI)
  * - And many more...
  * 
- * ADT API endpoint: POST /sap/bc/adt/activation?method=activate&preauditRequested=true
+ * ADT API endpoint: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true
  */
 
 import { AxiosResponse } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName, logger } from '../lib/utils';
-import { XMLParser } from 'fast-xml-parser';
+import { return_error, return_response, logger } from '../lib/utils';
+import { activateObjectsGroup, parseActivationResponse, buildObjectUri } from '../lib/activationUtils';
 
 export const TOOL_DEFINITION = {
   name: "ActivateObject",
-  description: "Activate one or multiple ABAP repository objects. Works with any object type: classes, programs, tables, views, domains, data elements, etc. Returns activation status and any warnings/errors.",
+  description: "Activate one or multiple ABAP repository objects. Works with any object type: classes, programs, tables, views, domains, data elements, etc. URI is auto-generated from name and type. Returns activation status and any warnings/errors.",
   inputSchema: {
     type: "object",
     properties: {
       objects: {
         type: "array",
-        description: "Array of objects to activate. Each object must have 'uri' and 'name' properties.",
+        description: "Array of objects to activate. Each object must have 'name' and 'type'. URI is auto-generated.",
         items: {
           type: "object",
           properties: {
-            uri: {
-              type: "string",
-              description: "Object URI in ADT format (e.g., '/sap/bc/adt/oo/classes/zcl_my_class', '/sap/bc/adt/programs/programs/z_my_program')"
-            },
             name: {
               type: "string",
-              description: "Object name in uppercase (e.g., 'ZCL_MY_CLASS', 'Z_MY_PROGRAM')"
+              description: "Object name in uppercase (e.g., 'ZCL_MY_CLASS', 'Z_MY_PROGRAM', 'ZOK_I_MARKET_0001')"
             },
             type: {
               type: "string",
-              description: "Optional object type for reference (e.g., 'CLAS/OC', 'PROG/P', 'TABL/DT')"
+              description: "Object type code (e.g., 'CLAS/OC', 'PROG/P', 'DDLS/DF', 'TABL/DT'). URI will be auto-generated from this."
+            },
+            uri: {
+              type: "string",
+              description: "Optional: Object URI in ADT format. If not provided, will be auto-generated from name and type."
             }
           },
-          required: ["uri", "name"]
+          required: ["name", "type"]
         }
       },
       preaudit: {
@@ -71,146 +71,7 @@ interface ActivateObjectArgs {
   preaudit?: boolean;
 }
 
-/**
- * Helper: Build object URI from name and type if URI is not provided
- */
-function buildObjectUri(name: string, type?: string): string {
-  const lowerName = encodeSapObjectName(name).toLowerCase();
-  
-  if (!type) {
-    // Try to guess type from name prefix
-    if (name.startsWith('ZCL_') || name.startsWith('CL_')) {
-      return `/sap/bc/adt/oo/classes/${lowerName}`;
-    } else if (name.startsWith('Z') && name.includes('_PROGRAM')) {
-      return `/sap/bc/adt/programs/programs/${lowerName}`;
-    }
-    // Default: assume program
-    return `/sap/bc/adt/programs/programs/${lowerName}`;
-  }
-  
-  // Map type to URI path
-  switch (type.toUpperCase()) {
-    case 'CLAS/OC':
-    case 'CLAS':
-      return `/sap/bc/adt/oo/classes/${lowerName}`;
-    
-    case 'PROG/P':
-    case 'PROG':
-      return `/sap/bc/adt/programs/programs/${lowerName}`;
-    
-    case 'FUGR':
-    case 'FUNC':
-      return `/sap/bc/adt/functions/groups/${lowerName}`;
-    
-    case 'TABL/DT':
-    case 'TABL':
-      return `/sap/bc/adt/ddic/tables/${lowerName}`;
-    
-    case 'TABL/DS':
-    case 'STRU/DS':
-    case 'STRU':
-      return `/sap/bc/adt/ddic/structures/${lowerName}`;
-    
-    case 'DDLS/DF':
-    case 'DDLS':
-      return `/sap/bc/adt/ddic/ddl/sources/${lowerName}`;
-    
-    case 'VIEW/DV':
-    case 'VIEW':
-      return `/sap/bc/adt/ddic/views/${lowerName}`;
-    
-    case 'DTEL/DE':
-    case 'DTEL':
-      return `/sap/bc/adt/ddic/dataelements/${lowerName}`;
-    
-    case 'DOMA/DD':
-    case 'DOMA':
-      return `/sap/bc/adt/ddic/domains/${lowerName}`;
-    
-    case 'INTF/OI':
-    case 'INTF':
-      return `/sap/bc/adt/oo/interfaces/${lowerName}`;
-    
-    default:
-      // Fallback: try to construct URI from type
-      return `/sap/bc/adt/${type.toLowerCase()}/${lowerName}`;
-  }
-}
 
-/**
- * Build activation XML payload
- */
-function buildActivationXml(objects: ActivationObject[]): string {
-  const objectReferences = objects.map(obj => {
-    const uri = obj.uri || buildObjectUri(obj.name, obj.type);
-    return `  <adtcore:objectReference adtcore:uri="${uri}" adtcore:name="${obj.name.toUpperCase()}"/>`;
-  }).join('\n');
-  
-  return `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-${objectReferences}
-</adtcore:objectReferences>`;
-}
-
-/**
- * Parse activation response to extract status, warnings, and errors
- */
-function parseActivationResponse(response: AxiosResponse): {
-  success: boolean;
-  activated: boolean;
-  checked: boolean;
-  generated: boolean;
-  messages: Array<{type: string; text: string; line?: number; column?: number}>;
-} {
-  const parser = new XMLParser({ 
-    ignoreAttributes: false, 
-    attributeNamePrefix: '@_',
-    parseAttributeValue: true
-  });
-  
-  try {
-    const result = parser.parse(response.data);
-    
-    // Check for properties element
-    const properties = result['chkl:messages']?.['chkl:properties'];
-    
-    const activated = properties?.['@_activationExecuted'] === 'true' || properties?.['@_activationExecuted'] === true;
-    const checked = properties?.['@_checkExecuted'] === 'true' || properties?.['@_checkExecuted'] === true;
-    const generated = properties?.['@_generationExecuted'] === 'true' || properties?.['@_generationExecuted'] === true;
-    
-    // Parse messages (warnings/errors)
-    const messages: Array<{type: string; text: string; line?: number; column?: number}> = [];
-    const msgData = result['chkl:messages']?.['msg'];
-    
-    if (msgData) {
-      const msgArray = Array.isArray(msgData) ? msgData : [msgData];
-      msgArray.forEach((msg: any) => {
-        messages.push({
-          type: msg['@_type'] || 'info',
-          text: msg['shortText']?.['txt'] || msg['shortText'] || 'Unknown message',
-          line: msg['@_line'],
-          column: msg['@_column']
-        });
-      });
-    }
-    
-    return {
-      success: activated && checked,
-      activated,
-      checked,
-      generated,
-      messages
-    };
-  } catch (error) {
-    logger.error('Failed to parse activation response:', error);
-    return {
-      success: false,
-      activated: false,
-      checked: false,
-      generated: false,
-      messages: [{type: 'error', text: 'Failed to parse activation response'}]
-    };
-  }
-}
 
 /**
  * Main handler for ActivateObject tool
@@ -241,36 +102,33 @@ export async function handleActivateObject(params: any) {
   logger.info(`Starting activation of ${args.objects.length} object(s)`);
   
   try {
-    // Build activation XML
-    const activationXml = buildActivationXml(args.objects);
-    logger.debug('Activation XML:', activationXml);
+    // Prepare objects for group activation
+    const activationObjects = args.objects.map(obj => ({
+      uri: obj.uri || buildObjectUri(obj.name, obj.type),
+      name: obj.name.toUpperCase()
+    }));
     
-    // Make activation request
-    const baseUrl = await getBaseUrl();
-    const url = `${baseUrl}/sap/bc/adt/activation?method=activate&preauditRequested=${preaudit}`;
+    logger.debug('Activating objects:', activationObjects);
     
-    const headers = {
-      'Accept': 'application/xml',
-      'Content-Type': 'application/xml'
-    };
-    
-    const response = await makeAdtRequestWithTimeout(url, 'POST', 'default', activationXml, undefined, headers);
+    // Make group activation request
+    const response = await activateObjectsGroup(activationObjects, preaudit);
     
     // Debug: log raw response
     logger.debug('Activation response status:', response.status);
     logger.debug('Activation response data:', typeof response.data === 'string' ? response.data.substring(0, 500) : response.data);
     
     // Parse response
-    const activationResult = parseActivationResponse(response);
+    const activationResult = parseActivationResponse(response.data);
+    const success = activationResult.activated && activationResult.checked;
     
     // Build result object
     const result = {
-      success: activationResult.success,
+      success,
       objects_count: args.objects.length,
-      objects: args.objects.map(obj => ({
-        name: obj.name.toUpperCase(),
-        uri: obj.uri || buildObjectUri(obj.name, obj.type),
-        type: obj.type
+      objects: activationObjects.map((obj, idx) => ({
+        name: obj.name,
+        uri: obj.uri,
+        type: args.objects[idx].type
       })),
       activation: {
         activated: activationResult.activated,
@@ -280,12 +138,12 @@ export async function handleActivateObject(params: any) {
       messages: activationResult.messages,
       warnings: activationResult.messages.filter(m => m.type === 'warning' || m.type === 'W'),
       errors: activationResult.messages.filter(m => m.type === 'error' || m.type === 'E'),
-      message: activationResult.success 
+      message: success 
         ? `Successfully activated ${args.objects.length} object(s)`
         : `Activation completed with issues: ${activationResult.messages.length} message(s)`
     };
     
-    logger.info(`Activation completed: ${activationResult.success ? 'SUCCESS' : 'WITH ISSUES'}`);
+    logger.info(`Activation completed: ${success ? 'SUCCESS' : 'WITH ISSUES'}`);
     
     return return_response({
       data: JSON.stringify(result, null, 2),

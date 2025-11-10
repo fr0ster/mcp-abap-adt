@@ -17,6 +17,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger } from '../lib/utils';
 import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
+import { activateObjectInSession } from '../lib/activationUtils';
 import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
@@ -114,19 +115,9 @@ async function unlockProgram(programName: string, lockHandle: string, sessionId:
  * Step 4: Activate program (optional)
  */
 async function activateProgram(programName: string, sessionId: string): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
-  
-  const activationXml = `<?xml version="1.0" encoding="UTF-8"?>
-<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:objectReference adtcore:uri="/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}" adtcore:name="${programName}"/>
-</adtcore:objectReferences>`;
-
-  const headers = {
-    'Content-Type': 'application/vnd.sap.adt.activation+xml'
-  };
-
+  const objectUri = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`;
   logger.info(`Activating program: ${programName}`);
-  return await makeAdtRequestWithSession(url, 'POST', sessionId, activationXml, headers);
+  return await activateObjectInSession(objectUri, programName, sessionId, true);
 }
 
 /**

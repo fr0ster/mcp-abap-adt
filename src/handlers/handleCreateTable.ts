@@ -9,8 +9,10 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
-import { return_error, return_response, encodeSapObjectName, getBaseUrl, makeAdtRequestWithTimeout } from '../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger, getBaseUrl } from '../lib/utils';
+import { makeAdtRequestWithTimeout } from '../lib/utils';
 import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
+import { activateObjectInSession } from '../lib/activationUtils';
 import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 
 function buildCheckRunPayload(tableName: string): string {
@@ -251,25 +253,13 @@ function parseTableCreationResponse(xml: string) {
 /**
  * Activate the table after creation
  */
-async function activateTable(tableName: string, sessionId?: string) {
-  const url = `${await getBaseUrl()}/sap/bc/adt/activation?method=activate`;
+async function activateTable(tableName: string, sessionId: string): Promise<AxiosResponse> {
+  const objectUri = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}`;
   
-  const activationXml = `<?xml version="1.0" encoding="UTF-8"?>
-<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}" adtcore:name="${tableName}"/>
-</adtcore:objectReferences>`;
-
-  console.log('[DEBUG] Activating table with XML:', activationXml);
-  console.log('[DEBUG] Activation URL:', url);
+  console.log('[DEBUG] Activating table:', tableName);
   console.log('[DEBUG] Session ID for activation:', sessionId);
 
-  const response = sessionId 
-    ? await makeAdtRequestWithSession('/sap/bc/adt/activation?method=activate', 'POST', sessionId, activationXml, {
-        'Content-Type': 'application/vnd.sap.adt.activation+xml'
-      })
-    : await makeAdtRequestWithTimeout(url, 'POST', 'default', {
-        'Content-Type': 'application/vnd.sap.adt.activation+xml'
-      }, activationXml);
+  const response = await activateObjectInSession(objectUri, tableName, sessionId, true);
 
   console.log('[DEBUG] Activation response status:', response.status);
   console.log('[DEBUG] Activation response data:', response.data);

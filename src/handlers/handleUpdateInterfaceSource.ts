@@ -16,6 +16,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger } from '../lib/utils';
 import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
+import { activateObjectInSession } from '../lib/activationUtils';
 import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
@@ -141,32 +142,10 @@ async function activateInterface(
   sessionId: string
 ): Promise<any> {
   const objectUri = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName).toLowerCase()}`;
-  
-  const payload = `<?xml version="1.0" encoding="UTF-8"?>
-<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:objectReference adtcore:uri="${objectUri}" adtcore:name="${interfaceName}"/>
-</adtcore:objectReferences>`;
-
   logger.info(`🔄 Activating interface...`);
-  const response = await makeAdtRequestWithSession(
-    '/sap/bc/adt/activation?method=activate&preauditRequested=true',
-    'POST',
-    sessionId,
-    payload,
-    { 
-      'Content-Type': 'application/xml',
-      'Accept': 'application/xml'
-    }
-  );
-  
+  const response = await activateObjectInSession(objectUri, interfaceName, sessionId, true);
   logger.info(`✅ Interface activated`);
-  
-  // Parse activation response
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '@_'
-  });
-  return parser.parse(response.data);
+  return response;
 }
 
 /**

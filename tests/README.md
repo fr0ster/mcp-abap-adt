@@ -89,6 +89,31 @@ main();
 
 ## Test Categories
 
+### Activation Tests
+- `test-activate-object.js` - **Group activation** of 2-3 related ABAP objects
+  - Uses `/sap/bc/adt/activation/runs` endpoint
+  - Designed for activating 2-3 related objects together (not mass activation)
+  - Configure in `test-config.yaml` under `activate_object` section
+  
+  **Example usage**:
+  ```bash
+  # Configure 2-3 objects in test-config.yaml:
+  # activate_object:
+  #   objects:
+  #     - name: "ZCL_TEST_MCP_01"
+  #       uri: "/sap/bc/adt/oo/classes/zcl_test_mcp_01"
+  #       type: "CLAS/OC"
+  #     - name: "Z_TEST_PROGRAM_01"
+  #       uri: "/sap/bc/adt/programs/programs/z_test_program_01"
+  #       type: "PROG/P"
+  #   preaudit: false
+  
+  # Run the test
+  node tests/test-activate-object.js
+  ```
+  
+  See [README_GROUP_ACTIVATION.md](README_GROUP_ACTIVATION.md) for detailed guide.
+
 ### Enhancement Tests
 - `test-enhancement-by-name.js` - Test getting enhancements by specific name
 - `test-enhancement-timeout.js` - Test enhancement timeout handling

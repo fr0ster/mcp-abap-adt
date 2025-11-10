@@ -16,6 +16,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger } from '../lib/utils';
 import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
+import { activateObjectInSession } from '../lib/activationUtils';
 import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
@@ -116,19 +117,9 @@ async function unlockDDLS(viewName: string, lockHandle: string, sessionId: strin
 }
 
 async function activateDDLS(viewName: string, sessionId: string): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
-  
-  const activationXml = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}" adtcore:name="${viewName}"/>
-</adtcore:objectReferences>`;
-
-  const headers = {
-    'Accept': 'application/xml',
-    'Content-Type': 'application/xml'
-  };
-
+  const objectUri = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}`;
   logger.info(`Activating DDLS: ${viewName}`);
-  return makeAdtRequestWithSession(url, 'POST', sessionId, activationXml, headers);
+  return await activateObjectInSession(objectUri, viewName, sessionId, true);
 }
 
 export async function handleCreateView(params: any) {

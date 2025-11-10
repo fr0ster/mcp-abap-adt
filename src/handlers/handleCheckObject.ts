@@ -76,7 +76,7 @@ function getObjectUri(objectType: string, objectName: string): string {
     case 'structure':
       return `/sap/bc/adt/ddic/structures/${encodedName}`;
     case 'view':
-      return `/sap/bc/adt/ddic/ddlsources/${encodedName}`;
+      return `/sap/bc/adt/ddic/ddl/sources/${encodedName}`;
     case 'domain':
       return `/sap/bc/adt/ddic/domains/${encodedName}`;
     case 'data_element':

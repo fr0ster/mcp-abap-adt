@@ -3,6 +3,14 @@
 ## [Unreleased]
 
 ### Added
+- **Documentation Restructure**:
+  - New platform-specific installation guides: `INSTALL_WINDOWS.md`, `INSTALL_MACOS.md`, `INSTALL_LINUX.md`
+  - Main entry point: `INSTALLATION.md` with quick links to platform guides
+  - SSE/HTTP transport mode documentation for web-based clients
+  - nvm (Node Version Manager) as recommended installation method for all platforms
+  - Server transport modes documentation: stdio (default for Cline/Cursor) and SSE/HTTP (for web interfaces)
+  - SSE server options: `--sse-port`, `--sse-host`, `--sse-allowed-origins`, `--sse-enable-dns-protection`
+  - Examples for running server in SSE mode: `npm run start:sse`, `npm run start:http`
 - **Domain Management Tools**:
   - `GetDomain`: Retrieve ABAP domain structure and properties
   - `CreateDomain`: Create new ABAP domains with automatic activation
@@ -56,6 +64,16 @@
   - DetectObjectTypeListArray: accepts array of objects via 'objects' parameter.
   - DetectObjectTypeListJson: accepts JSON payload with 'objects' array via 'payload' parameter.
 - Added documentation for both tools: see [doc/DetectObjectTypeListTools.md](doc/DetectObjectTypeListTools.md).
+- Repository URL changed from `mario-andreschak/mcp-abap-adt` to `fr0ster/mcp-abap-adt`
+- Added acknowledgment to original project in README.md
+
+### Removed
+- **Deprecated Documentation Files**:
+  - Removed `INSTALLATION_GUIDE_EN.md`, `INSTALLATION_GUIDE_UA.md`, `INSTALLATION_GUIDE_BY.md` (replaced by platform-specific guides)
+  - Removed Smithery automatic installation instructions (not supported)
+  - Removed Smithery badge from README.md
+  - Removed all references to `@mario-andreschak/mcp-abap-adt` package
+
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]

@@ -1,0 +1,21 @@
+# Normalize line endings
+* text=auto eol=lf
+
+# Ensure package-lock.json has LF line endings and is treated as text
+package-lock.json text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+
+# Scripts should have LF line endings
+*.sh text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.json text eol=lf

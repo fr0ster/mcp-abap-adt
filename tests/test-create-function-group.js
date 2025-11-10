@@ -33,24 +33,8 @@ function getTestConfig() {
   try {
     const testCase = getEnabledTestCase('create_function_group');
     
-    if (!validateTransportRequest(testCase.params)) {
-      console.error('❌ Transport request not configured properly');
-      console.log('\n📝 Add this to test-config.yaml:');
-      console.log(`
-create_function_group:
-  test_cases:
-    - name: "create_test_function_group"
-      enabled: true
-      description: "Test function group creation"
-      params:
-        function_group_name: "ZTEST_FG_MCP01"
-        description: "Test Function Group for MCP"
-        transport_request: "E19K905635"  # ⚠️ UPDATE THIS
-        package_name: "$TMP"
-`);
-      process.exit(1);
-    }
-    
+    // validateTransportRequest handles $TMP correctly - no need for extra check
+    // Just return the params
     return testCase.params;
   } catch (error) {
     console.error('❌ Failed to load test configuration');

@@ -19,6 +19,7 @@ import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger } from '../lib/utils';
 import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
 import { activateObjectInSession } from '../lib/activationUtils';
+import { validateTransportRequest } from '../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
@@ -45,7 +46,8 @@ export const TOOL_DEFINITION = {
       },
       program_type: {
         type: "string",
-        description: "Program type: '1' (Executable/Report), 'I' (Include), 'M' (Module Pool), 'F' (Function Group), 'K' (Class Pool), 'J' (Interface Pool). Default: '1'"
+        description: "Program type: 'executable' (Report), 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'",
+        enum: ["executable", "include", "module_pool", "function_group", "class_pool", "interface_pool"]
       },
       application: {
         type: "string",
@@ -73,6 +75,22 @@ interface CreateProgramArgs {
   application?: string;
   source_code?: string;
   activate?: boolean;
+}
+
+/**
+ * Convert readable program type to SAP internal code
+ */
+function convertProgramType(programType?: string): string {
+  const typeMap: Record<string, string> = {
+    'executable': '1',
+    'include': 'I',
+    'module_pool': 'M',
+    'function_group': 'F',
+    'class_pool': 'K',
+    'interface_pool': 'J'
+  };
+  
+  return typeMap[programType || 'executable'] || '1';
 }
 
 /**
@@ -120,13 +138,13 @@ START-OF-SELECTION.
  */
 async function createProgramObject(args: CreateProgramArgs, sessionId: string): Promise<AxiosResponse> {
   const description = args.description || args.program_name;
-  const programType = args.program_type || '1'; // Default: Executable
+  const programType = convertProgramType(args.program_type); // Convert to SAP code
   const application = args.application || '*'; // Default: cross-application
   const url = `/sap/bc/adt/programs/programs${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
   
-  // Get username (if available) or leave empty
+  // Get username and master system
   const username = process.env.SAP_USERNAME || '';
-  const masterSystem = process.env.SAP_SYSTEM || 'E19';
+  const masterSystem = process.env.SAP_SYSTEM_ID || 'SAP';
   
   // Build program metadata XML following Eclipse ADT format
   const metadataXml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -235,6 +253,13 @@ export async function handleCreateProgram(params: any) {
   if (!args.program_name || !args.package_name) {
     return return_error(new Error("Missing required parameters: program_name and package_name"));
   }
+  
+  // Validate transport_request: required for non-$TMP packages
+  try {
+    validateTransportRequest(args.package_name, args.transport_request);
+  } catch (error) {
+    return return_error(error as Error);
+  }
 
   const programName = args.program_name.toUpperCase();
   const sessionId = generateSessionId();
@@ -265,7 +290,7 @@ export async function handleCreateProgram(params: any) {
     logger.info(`✓ Step 2: Lock handle obtained: ${lockHandle.substring(0, 10)}...`);
 
     // Step 3: Upload source code (uses lock handle from step 1/2)
-    const programType = args.program_type || '1';
+    const programType = convertProgramType(args.program_type);
     const sourceCode = args.source_code || generateProgramTemplate(programName, programType, args.description || programName);
     const uploadResponse = await uploadProgramSource(programName, sourceCode, lockHandle, sessionId, args.transport_request);
     if (uploadResponse.status < 200 || uploadResponse.status >= 300) {

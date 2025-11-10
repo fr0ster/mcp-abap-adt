@@ -17,6 +17,7 @@ import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger } from '../lib/utils';
 import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
 import { activateObjectInSession } from '../lib/activationUtils';
+import { validateTransportRequest } from '../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
@@ -127,6 +128,13 @@ export async function handleCreateView(params: any) {
   
   if (!args.view_name || !args.ddl_source || !args.package_name) {
     return return_error(new Error("Missing required parameters: view_name, ddl_source, and package_name"));
+  }
+  
+  // Validate transport_request: required for non-$TMP packages
+  try {
+    validateTransportRequest(args.package_name, args.transport_request);
+  } catch (error) {
+    return return_error(error as Error);
   }
 
   const viewName = args.view_name.toUpperCase();

@@ -13,6 +13,7 @@ import { return_error, return_response, encodeSapObjectName, logger, getBaseUrl 
 import { makeAdtRequestWithTimeout } from '../lib/utils';
 import { generateSessionId } from '../lib/sessionUtils';
 import { activateObjectInSession } from '../lib/activationUtils';
+import { validateTransportRequest } from '../utils/transportValidation.js';
 import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 import * as crypto from 'crypto';
 
@@ -288,6 +289,9 @@ export async function handleCreateStructure(args: any): Promise<any> {
     if (!createStructureArgs?.package_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
     }
+    
+    // Validate transport_request: required for non-$TMP packages
+    validateTransportRequest(createStructureArgs.package_name, createStructureArgs.transport_request);
     if (!createStructureArgs?.fields || !Array.isArray(createStructureArgs.fields) || createStructureArgs.fields.length === 0) {
       throw new McpError(ErrorCode.InvalidParams, 'At least one field is required');
     }

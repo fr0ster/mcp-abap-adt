@@ -11,6 +11,13 @@
   - Server transport modes documentation: stdio (default for Cline/Cursor) and SSE/HTTP (for web interfaces)
   - SSE server options: `--sse-port`, `--sse-host`, `--sse-allowed-origins`, `--sse-enable-dns-protection`
   - Examples for running server in SSE mode: `npm run start:sse`, `npm run start:http`
+- **Transport Request Validation**:
+  - New utility function `validateTransportRequest()` for consistent validation across all Create handlers
+  - Transport request is now optional for `$TMP` (local) package only
+  - Transport request is required for all transportable (non-`$TMP`) packages
+  - Clear error messages guide users to use `package_name: "$TMP"` for local development
+  - Test configuration updated with `$TMP` example in `test-config.yaml.template`
+  - Note: `$TMP` is the only local package in SAP - each user has their own `$TMP`
 - **Domain Management Tools**:
   - `GetDomain`: Retrieve ABAP domain structure and properties
   - `CreateDomain`: Create new ABAP domains with automatic activation
@@ -66,6 +73,11 @@
 - Added documentation for both tools: see [doc/DetectObjectTypeListTools.md](doc/DetectObjectTypeListTools.md).
 - Repository URL changed from `mario-andreschak/mcp-abap-adt` to `fr0ster/mcp-abap-adt`
 - Added acknowledgment to original project in README.md
+- **All Create handlers updated**:
+  - `CreateDomain`, `CreateDataElement`, `CreateClass`, `CreateProgram`, `CreateInterface`
+  - `CreateFunctionGroup`, `CreateTable`, `CreateStructure`, `CreateView`
+  - All now validate transport_request based on package type ($TMP vs transportable)
+  - `transport_request` parameter removed from `required` fields in tool schemas where applicable
 
 ### Removed
 - **Deprecated Documentation Files**:

@@ -34,23 +34,8 @@ function getTestConfig() {
   try {
     const testCase = getEnabledTestCase('delete_object');
     
-    if (!validateTransportRequest(testCase.params)) {
-      console.error('❌ Transport request not configured properly');
-      console.log('\n📝 Add this to test-config.yaml:');
-      console.log(`
-delete_object:
-  test_cases:
-    - name: "delete_test_interface"
-      enabled: true
-      description: "Test object deletion"
-      params:
-        test_interface_name: "ZIF_TEST_DELETE_01"
-        transport_request: "E19K905635"  # ⚠️ UPDATE THIS
-        package_name: "$TMP"
-`);
-      process.exit(1);
-    }
-    
+    // validateTransportRequest handles $TMP correctly - no need for extra check
+    // Just return the params
     return testCase.params;
   } catch (error) {
     console.error('❌ Failed to load test configuration');

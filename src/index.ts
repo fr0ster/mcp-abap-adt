@@ -44,7 +44,9 @@ import { handleGetAbapSemanticAnalysis } from "./handlers/handleGetAbapSemanticA
 import { handleGetAbapSystemSymbols } from "./handlers/handleGetAbapSystemSymbols";
 import { handleGetDomain } from "./handlers/handleGetDomain";
 import { handleCreateDomain } from "./handlers/handleCreateDomain";
+import { handleUpdateDomain } from "./handlers/handleUpdateDomain";
 import { handleCreateDataElement } from "./handlers/handleCreateDataElement";
+import { handleUpdateDataElement } from "./handlers/handleUpdateDataElement";
 import { handleGetDataElement } from "./handlers/handleGetDataElement";
 import { handleCreateTransport } from "./handlers/handleCreateTransport";
 import { handleGetTransport } from "./handlers/handleGetTransport";
@@ -628,8 +630,12 @@ export class mcp_abap_adt_server {
           return await handleGetAbapSystemSymbols(request.params.arguments);
         case "CreateDomain":
           return await handleCreateDomain(request.params.arguments);
+        case "UpdateDomain":
+          return await handleUpdateDomain(request.params.arguments);
         case "CreateDataElement":
           return await handleCreateDataElement(request.params.arguments);
+        case "UpdateDataElement":
+          return await handleUpdateDataElement(request.params.arguments);
         case "GetDataElement":
           return await handleGetDataElement(request.params.arguments);
         case "CreateTransport":

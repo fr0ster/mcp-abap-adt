@@ -53,7 +53,7 @@ function loadTestConfig() {
 }
 
 /**
- * Get enabled test case for a specific handler
+ * Get enabled test case from config (returns first enabled)
  * @param {string} handlerName - Name of the handler (e.g., 'create_domain', 'get_program')
  * @returns {object} Test case with params
  */
@@ -70,6 +70,26 @@ function getEnabledTestCase(handlerName) {
   }
 
   return enabledTest;
+}
+
+/**
+ * Get all enabled test cases from config
+ * @param {string} handlerName - Name of the handler (e.g., 'create_domain', 'get_program')
+ * @returns {Array} Array of enabled test cases
+ */
+function getAllEnabledTestCases(handlerName) {
+  const config = loadTestConfig();
+  const handlerTests = config[handlerName]?.test_cases || [];
+  
+  const enabledTests = handlerTests.filter(tc => tc.enabled === true);
+  
+  if (enabledTests.length === 0) {
+    console.error(`❌ No enabled test cases found for "${handlerName}" in test-config.yaml`);
+    console.error(`Please set enabled: true for at least one test case under ${handlerName}`);
+    process.exit(1);
+  }
+
+  return enabledTests;
 }
 
 /**
@@ -167,6 +187,7 @@ module.exports = {
   initializeTestEnvironment,
   loadTestConfig,
   getEnabledTestCase,
+  getAllEnabledTestCases,
   getTestSettings,
   getEnvironmentConfig,
   validateTransportRequest,

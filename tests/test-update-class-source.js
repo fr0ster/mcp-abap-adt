@@ -3,7 +3,13 @@
  * Tests updating source code of existing ABAP classes
  */
 
-const { initializeTestEnvironment, loadTestConfig } = require('./test-helper');
+const {
+  initializeTestEnvironment,
+  getAllEnabledTestCases,
+  printTestHeader,
+  printTestParams,
+  printTestResult
+} = require('./test-helper');
 
 // Initialize test environment
 initializeTestEnvironment();
@@ -11,76 +17,55 @@ initializeTestEnvironment();
 const { handleUpdateClassSource } = require('../dist/handlers/handleUpdateClassSource');
 
 async function testUpdateClassSource() {
-  console.log('='.repeat(80));
-  console.log('UpdateClassSource Handler Test (ABAP Class Source Update)');
-  console.log('='.repeat(80));
-
-  try {
-    // Load test configuration
-    const testConfig = loadTestConfig();
+  const testCases = getAllEnabledTestCases('update_class_source');
+  
+  console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
+  
+  let passedTests = 0;
+  let failedTests = 0;
+  
+  for (const testCase of testCases) {
+    printTestHeader('UpdateClassSource', testCase);
+    const params = testCase.params;
     
-    if (!testConfig.update_class_source) {
-      console.error('❌ Missing update_class_source configuration in test-config.yaml');
-      console.log('\n📝 Add this section to your test-config.yaml:');
-      console.log(`
-update_class_source:
-  class_name: "ZCL_TEST_MCP_01"
-  activate: true
-  source_code: |
-    CLASS zcl_test_mcp_01 DEFINITION
-      PUBLIC
-      FINAL
-      CREATE PUBLIC.
+    printTestParams(params);
+    console.log('--- Starting class source update flow ---\n');
 
-      PUBLIC SECTION.
-        METHODS: get_message RETURNING VALUE(rv_message) TYPE string.
-    ENDCLASS.
+    try {
+      const result = await handleUpdateClassSource(params);
+      
+      if (printTestResult(result, 'UpdateClassSource')) {
+        passedTests++;
+      } else {
+        failedTests++;
+      }
 
-    CLASS zcl_test_mcp_01 IMPLEMENTATION.
-      METHOD get_message.
-        rv_message = 'Updated message from MCP test'.
-      ENDMETHOD.
-    ENDCLASS.
-      `);
-      process.exit(1);
+    } catch (error) {
+      console.error('❌ Unexpected error during class source update:');
+      console.error(error);
+      failedTests++;
     }
-
-    const params = testConfig.update_class_source;
     
-    console.log('📋 Test Parameters:');
-    console.log(`   Class Name: ${params.class_name}`);
-    console.log(`   Activate: ${params.activate !== false ? 'X' : ''}`);
-    if (params.source_code) {
-      console.log(`   Source Code: ${params.source_code.split('\n')[0] + '...'}`);
-      console.log(`   Source Size: ${params.source_code.length} bytes`);
-    }
-
-    console.log('\n🚀 Updating ABAP class source...');
-    
-    const result = await handleUpdateClassSource(params);
-
-    if (result.isError) {
-      console.error('\n❌ Class source update failed:');
-      console.error(result.content[0].text);
-      process.exit(1);
-    } else {
-      console.log('\n✅ Class source updated successfully!');
-      console.log(result.content[0].text);
-    }
-
-  } catch (error) {
-    console.error('\n❌ Test failed:', error.message);
-    if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
-    }
-    console.error('Stack:', error.stack);
+    console.log('\n' + '='.repeat(60) + '\n');
+  }
+  
+  console.log(`\n📊 Test Summary:`);
+  console.log(`   ✅ Passed: ${passedTests}`);
+  console.log(`   ❌ Failed: ${failedTests}`);
+  console.log(`   📝 Total:  ${testCases.length}`);
+  
+  if (failedTests > 0) {
     process.exit(1);
   }
 }
 
-// Run test
-testUpdateClassSource().catch(error => {
-  console.error('Unexpected error:', error);
-  process.exit(1);
-});
+testUpdateClassSource()
+  .then(() => {
+    console.log('\n=== All tests completed successfully ===');
+    process.exit(0);
+  })
+  .catch(error => {
+    console.error('\n=== Tests failed ===');
+    console.error(error);
+    process.exit(1);
+  });

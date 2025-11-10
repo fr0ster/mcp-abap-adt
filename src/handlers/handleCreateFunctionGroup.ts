@@ -11,6 +11,7 @@
 
 import { AxiosResponse } from '../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName, logger } from '../lib/utils';
+import { validateTransportRequest } from '../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import * as crypto from 'crypto';
 
@@ -157,6 +158,13 @@ export async function handleCreateFunctionGroup(args: any) {
   // Validation
   if (!function_group_name || !package_name) {
     return return_error('function_group_name and package_name are required');
+  }
+  
+  // Validate transport_request: required for non-$TMP packages
+  try {
+    validateTransportRequest(package_name, transport_request);
+  } catch (error) {
+    return return_error(error as Error);
   }
   
   // Validate function group name (max 26 chars, SAP naming)

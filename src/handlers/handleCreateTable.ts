@@ -13,6 +13,7 @@ import { return_error, return_response, encodeSapObjectName, logger, getBaseUrl 
 import { makeAdtRequestWithTimeout } from '../lib/utils';
 import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
 import { activateObjectInSession } from '../lib/activationUtils';
+import { validateTransportRequest } from '../utils/transportValidation.js';
 import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 
 function buildCheckRunPayload(tableName: string): string {
@@ -301,6 +302,9 @@ export async function handleCreateTable(args: any): Promise<any> {
     if (!createTableArgs?.package_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
     }
+    
+    // Validate transport_request: required for non-$TMP packages
+    validateTransportRequest(createTableArgs.package_name, createTableArgs.transport_request);
 
     const results: any[] = [];
     

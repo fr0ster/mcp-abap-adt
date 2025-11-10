@@ -1,12 +1,9 @@
 /**
- * Test CreateInterface - ABAP Interface Creation
+ * Test script for UpdateDomain MCP tool
+ * Tests the complete flow: get, lock, update, check, unlock, activate, verify
  * 
- * Tests interface creation via ADT API with stateful session:
- * 1. Create interface object with metadata
- * 2. Lock interface
- * 3. Upload interface source code
- * 4. Unlock interface
- * 5. Activate interface (optional)
+ * Configuration is loaded from tests/test-config.yaml
+ * Update transport_request in the YAML before running tests!
  */
 
 const {
@@ -19,13 +16,14 @@ const {
   waitForConfirmation
 } = require('./test-helper');
 
-// Initialize test environment
+// Initialize test environment before importing handlers
 initializeTestEnvironment();
 
-const { handleCreateInterface } = require('../dist/handlers/handleCreateInterface');
+const { handleUpdateDomain } = require('../dist/handlers/handleUpdateDomain');
 
-async function testCreateInterface() {
-  const testCases = getAllEnabledTestCases('create_interface');
+async function testUpdateDomain() {
+  // Load all enabled test cases from YAML
+  const testCases = getAllEnabledTestCases('update_domain');
   
   console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
   
@@ -33,30 +31,33 @@ async function testCreateInterface() {
   let failedTests = 0;
   
   for (const testCase of testCases) {
-    printTestHeader('CreateInterface', testCase);
-    const params = testCase.params;
+    printTestHeader('UpdateDomain', testCase);
 
-    if (!validateTransportRequest(params)) {
+    // Test parameters from YAML
+    const testArgs = testCase.params;
+
+    // Validate transport request
+    if (!validateTransportRequest(testArgs)) {
       await waitForConfirmation(
         '⚠️  Using default transport request! Update test-config.yaml with a valid request.',
         5
       );
     }
-    
-    printTestParams(params);
-    console.log('--- Starting interface creation flow ---\n');
+
+    printTestParams(testArgs);
+    console.log('--- Starting domain update flow ---\n');
 
     try {
-      const result = await handleCreateInterface(params);
+      const result = await handleUpdateDomain(testArgs);
       
-      if (printTestResult(result, 'CreateInterface')) {
+      if (printTestResult(result, 'UpdateDomain')) {
         passedTests++;
       } else {
         failedTests++;
       }
 
     } catch (error) {
-      console.error('❌ Unexpected error during interface creation:');
+      console.error('❌ Unexpected error during domain update:');
       console.error(error);
       failedTests++;
     }
@@ -64,6 +65,7 @@ async function testCreateInterface() {
     console.log('\n' + '='.repeat(60) + '\n');
   }
   
+  // Print summary
   console.log(`\n📊 Test Summary:`);
   console.log(`   ✅ Passed: ${passedTests}`);
   console.log(`   ❌ Failed: ${failedTests}`);
@@ -74,7 +76,8 @@ async function testCreateInterface() {
   }
 }
 
-testCreateInterface()
+// Run the test
+testUpdateDomain()
   .then(() => {
     console.log('\n=== All tests completed successfully ===');
     process.exit(0);

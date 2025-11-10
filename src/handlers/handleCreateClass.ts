@@ -17,6 +17,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger } from '../lib/utils';
 import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
+import { validateTransportRequest } from '../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
@@ -232,6 +233,13 @@ export async function handleCreateClass(params: any) {
   // Validate required parameters
   if (!args.class_name || !args.package_name) {
     return return_error(new Error("Missing required parameters: class_name and package_name"));
+  }
+  
+  // Validate transport_request: required for non-$TMP packages
+  try {
+    validateTransportRequest(args.package_name, args.transport_request);
+  } catch (error) {
+    return return_error(error as Error);
   }
 
   const className = args.class_name.toUpperCase();

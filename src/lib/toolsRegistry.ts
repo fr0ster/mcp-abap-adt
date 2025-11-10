@@ -32,7 +32,9 @@ import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from '../handlers/han
 import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from '../handlers/handleGetAbapSystemSymbols';
 import { TOOL_DEFINITION as GetDomain_Tool } from '../handlers/handleGetDomain';
 import { TOOL_DEFINITION as CreateDomain_Tool } from '../handlers/handleCreateDomain';
+import { TOOL_DEFINITION as UpdateDomain_Tool } from '../handlers/handleUpdateDomain';
 import { TOOL_DEFINITION as CreateDataElement_Tool } from '../handlers/handleCreateDataElement';
+import { TOOL_DEFINITION as UpdateDataElement_Tool } from '../handlers/handleUpdateDataElement';
 import { TOOL_DEFINITION as GetDataElement_Tool } from '../handlers/handleGetDataElement';
 import { TOOL_DEFINITION as CreateTransport_Tool } from '../handlers/handleCreateTransport';
 import { TOOL_DEFINITION as GetTransport_Tool } from '../handlers/handleGetTransport';
@@ -122,10 +124,12 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // Domain management
   GetDomain_Tool,
   CreateDomain_Tool,
+  UpdateDomain_Tool,
 
   // Data Element management
   GetDataElement_Tool,
   CreateDataElement_Tool,
+  UpdateDataElement_Tool,
 
   // Transport management
   GetTransport_Tool,

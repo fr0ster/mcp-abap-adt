@@ -3,7 +3,15 @@
  * Tests creation of ABAP classes with full OO features
  */
 
-const { initializeTestEnvironment, loadTestConfig } = require('./test-helper');
+const {
+  initializeTestEnvironment,
+  getAllEnabledTestCases,
+  validateTransportRequest,
+  printTestHeader,
+  printTestParams,
+  printTestResult,
+  waitForConfirmation
+} = require('./test-helper');
 
 // Initialize test environment
 initializeTestEnvironment();
@@ -11,73 +19,67 @@ initializeTestEnvironment();
 const { handleCreateClass } = require('../dist/handlers/handleCreateClass');
 
 async function testCreateClass() {
-  console.log('='.repeat(80));
-  console.log('CreateClass Handler Test (ABAP Class Creation)');
-  console.log('='.repeat(80));
+  // Load all enabled test cases from YAML
+  const testCases = getAllEnabledTestCases('create_class');
+  
+  console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
+  
+  let passedTests = 0;
+  let failedTests = 0;
+  
+  for (const testCase of testCases) {
+    printTestHeader('CreateClass', testCase);
 
-  try {
-    // Load test configuration
-    const testConfig = loadTestConfig();
+    // Test parameters from YAML
+    const params = testCase.params;
+
+    // Validate transport request
+    if (!validateTransportRequest(params)) {
+      await waitForConfirmation(
+        '⚠️  Using default transport request! Update test-config.yaml with a valid request.',
+        5
+      );
+    }
     
-    if (!testConfig.create_class) {
-      console.error('❌ Missing create_class configuration in test-config.yaml');
-      console.log('\n📝 Add this section to your test-config.yaml:');
-      console.log(`
-create_class:
-  class_name: "ZCL_TEST_MCP_01"
-  description: "Test ABAP Class"
-  package_name: "ZOK_LAB"
-  transport_request: "E19K905635"
-  superclass: ""
-  final: false
-  abstract: false
-  create_protected: false
-  source_code: |
-    METHOD constructor.
-      " Initialization logic
-    ENDMETHOD.
-      `);
-      process.exit(1);
-    }
+    printTestParams(params);
+    console.log('--- Starting class creation flow ---\n');
 
-    const params = testConfig.create_class;
+    try {
+      const result = await handleCreateClass(params);
+      
+      if (printTestResult(result, 'CreateClass')) {
+        passedTests++;
+      } else {
+        failedTests++;
+      }
+
+    } catch (error) {
+      console.error('❌ Unexpected error during class creation:');
+      console.error(error);
+      failedTests++;
+    }
     
-    console.log('📋 Test Parameters:');
-    console.log(`   Class Name: ${params.class_name}`);
-    console.log(`   Description: ${params.description || params.class_name}`);
-    console.log(`   Package: ${params.package_name}`);
-    console.log(`   Transport: ${params.transport_request || '(local)'}`);
-    console.log(`   Superclass: ${params.superclass || '(none)'}`);
-    console.log(`   Final: ${params.final ? 'X' : ''}`);
-    console.log(`   Abstract: ${params.abstract ? 'X' : ''}`);
-    console.log(`   Create Protected: ${params.create_protected ? 'X' : ''}`);
-    if (params.source_code) {
-      console.log(`   Source Code: ${params.source_code.split('\n')[0] + '...'}`);
-    }
-
-    console.log('\n🚀 Creating ABAP class...');
-    
-    const result = await handleCreateClass(params);
-
-    if (result.isError) {
-      console.error('\n❌ Class creation failed:');
-      console.error(result.content[0].text);
-      process.exit(1);
-    } else {
-      console.log('\n✅ Class created successfully!');
-      console.log(result.content[0].text);
-    }
-
-  } catch (error) {
-    console.error('\n❌ Test failed:', error.message);
-    if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
-    }
-    console.error('Stack:', error.stack);
+    console.log('\n' + '='.repeat(60) + '\n');
+  }
+  
+  // Print summary
+  console.log(`\n📊 Test Summary:`);
+  console.log(`   ✅ Passed: ${passedTests}`);
+  console.log(`   ❌ Failed: ${failedTests}`);
+  console.log(`   📝 Total:  ${testCases.length}`);
+  
+  if (failedTests > 0) {
     process.exit(1);
   }
 }
 
-// Run the test
-testCreateClass();
+testCreateClass()
+  .then(() => {
+    console.log('\n=== All tests completed successfully ===');
+    process.exit(0);
+  })
+  .catch(error => {
+    console.error('\n=== Tests failed ===');
+    console.error(error);
+    process.exit(1);
+  });

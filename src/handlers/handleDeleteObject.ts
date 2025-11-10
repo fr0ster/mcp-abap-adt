@@ -38,14 +38,10 @@ import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
   name: "DeleteObject",
-  description: "Delete an ABAP object from the SAP system via ADT deletion API. Requires transport request for transportable objects. Object must not be locked by another user.",
+  description: "Delete an ABAP object from the SAP system via ADT deletion API. Object URI is built automatically from object_name and object_type. Transport request optional for $TMP objects.",
   inputSchema: {
     type: "object",
     properties: {
-      object_uri: {
-        type: "string",
-        description: "Full ADT object URI (e.g., /sap/bc/adt/oo/classes/zcl_my_class, /sap/bc/adt/functions/groups/zok_fg_mcp01/fmodules/z_test_fm_mcp01)"
-      },
       object_name: { 
         type: "string", 
         description: "Object name (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, Z_TEST_FM_MCP01)" 
@@ -68,7 +64,6 @@ export const TOOL_DEFINITION = {
 } as const;
 
 interface DeleteObjectArgs {
-  object_uri?: string;
   object_name: string;
   object_type: string;
   function_group_name?: string;
@@ -171,7 +166,6 @@ async function deleteObject(
  */
 export async function handleDeleteObject(args: any) {
   const {
-    object_uri,
     object_name,
     object_type,
     function_group_name,
@@ -186,8 +180,8 @@ export async function handleDeleteObject(args: any) {
   logger.info(`🚀 Starting DeleteObject: ${object_name} (type: ${object_type})`);
   
   try {
-    // Get or build object URI
-    const uri = object_uri || getObjectUri(object_type, object_name, function_group_name);
+    // Build object URI from object_name and object_type
+    const uri = getObjectUri(object_type, object_name, function_group_name);
     
     // Delete object
     const response = await deleteObject(uri, transport_request);

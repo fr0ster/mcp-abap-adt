@@ -14,6 +14,7 @@
 
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../lib/utils';
+import { validateTransportRequest } from '../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import * as crypto from 'crypto';
 import { getConfig } from '../index';
@@ -76,7 +77,7 @@ export const TOOL_DEFINITION = {
         description: "Heading field label (max 55 chars)"
       }
     },
-    required: ["data_element_name", "package_name", "transport_request", "domain_name"]
+    required: ["data_element_name", "package_name", "domain_name"]
   }
 } as const;
 
@@ -84,7 +85,7 @@ interface DataElementArgs {
   data_element_name: string;
   description?: string;
   package_name: string;
-  transport_request: string;
+  transport_request?: string;
   domain_name: string;
   data_type?: string;
   length?: number;
@@ -307,12 +308,12 @@ export async function handleCreateDataElement(args: any) {
     if (!args?.package_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
     }
-    if (!args?.transport_request) {
-      throw new McpError(ErrorCode.InvalidParams, 'Transport request is required');
-    }
     if (!args?.domain_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Domain name is required');
     }
+    
+    // Validate transport_request: required for non-$TMP packages
+    validateTransportRequest(args.package_name, args.transport_request);
 
     const sessionId = generateSessionId();
     const username = process.env.SAP_USER || 'MPCUSER';

@@ -8,7 +8,7 @@
 
 const {
   initializeTestEnvironment,
-  getEnabledTestCase,
+  getAllEnabledTestCases,
   validateTransportRequest,
   printTestHeader,
   printTestParams,
@@ -22,35 +22,56 @@ initializeTestEnvironment();
 const { handleCreateDomain } = require('../dist/handlers/handleCreateDomain');
 
 async function testCreateDomain() {
-  // Load test case from YAML
-  const testCase = getEnabledTestCase('create_domain');
+  // Load all enabled test cases from YAML
+  const testCases = getAllEnabledTestCases('create_domain');
   
-  printTestHeader('CreateDomain', testCase);
+  console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
+  
+  let passedTests = 0;
+  let failedTests = 0;
+  
+  for (const testCase of testCases) {
+    printTestHeader('CreateDomain', testCase);
 
-  // Test parameters from YAML
-  const testArgs = testCase.params;
+    // Test parameters from YAML
+    const testArgs = testCase.params;
 
-  // Validate transport request
-  if (!validateTransportRequest(testArgs)) {
-    await waitForConfirmation(
-      '⚠️  Using default transport request! Update test-config.yaml with a valid request.',
-      5
-    );
-  }
-
-  printTestParams(testArgs);
-  console.log('--- Starting domain creation flow ---\n');
-
-  try {
-    const result = await handleCreateDomain(testArgs);
-    
-    if (!printTestResult(result, 'CreateDomain')) {
-      process.exit(1);
+    // Validate transport request
+    if (!validateTransportRequest(testArgs)) {
+      await waitForConfirmation(
+        '⚠️  Using default transport request! Update test-config.yaml with a valid request.',
+        5
+      );
     }
 
-  } catch (error) {
-    console.error('❌ Unexpected error during domain creation:');
-    console.error(error);
+    printTestParams(testArgs);
+    console.log('--- Starting domain creation flow ---\n');
+
+    try {
+      const result = await handleCreateDomain(testArgs);
+      
+      if (printTestResult(result, 'CreateDomain')) {
+        passedTests++;
+      } else {
+        failedTests++;
+      }
+
+    } catch (error) {
+      console.error('❌ Unexpected error during domain creation:');
+      console.error(error);
+      failedTests++;
+    }
+    
+    console.log('\n' + '='.repeat(60) + '\n');
+  }
+  
+  // Print summary
+  console.log(`\n📊 Test Summary:`);
+  console.log(`   ✅ Passed: ${passedTests}`);
+  console.log(`   ❌ Failed: ${failedTests}`);
+  console.log(`   📝 Total:  ${testCases.length}`);
+  
+  if (failedTests > 0) {
     process.exit(1);
   }
 }
@@ -58,11 +79,11 @@ async function testCreateDomain() {
 // Run the test
 testCreateDomain()
   .then(() => {
-    console.log('\n=== Test completed successfully ===');
+    console.log('\n=== All tests completed successfully ===');
     process.exit(0);
   })
   .catch(error => {
-    console.error('\n=== Test failed ===');
+    console.error('\n=== Tests failed ===');
     console.error(error);
     process.exit(1);
   });

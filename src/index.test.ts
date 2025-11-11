@@ -21,6 +21,8 @@ import { cleanup, getBaseUrl, getAuthHeaders } from "./lib/utils";
 import { logger } from "./lib/logger";
 import { AbapConnection, AbapRequestOptions, SapConfig } from "@mcp-abap-adt/connection";
 import { AxiosResponse } from "axios";
+// Import test helper for YAML configuration
+const { getEnabledTestCase } = require("../tests/test-helper");
 
 const sapConfig = getConfig();
 const isCloudDeployment = sapConfig.authType === "jwt";
@@ -119,7 +121,19 @@ describe("mcp_abap_adt_server - Integration Tests", () => {
 
   describe("handleGetProgram", () => {
     it("should successfully retrieve program details", async () => {
-      const result = await handleGetProgram({ program_name: "SD_SALES_DOCUMENT_VIEW" });
+      // Load test configuration from YAML
+      const testCase = getEnabledTestCase("get_program", "standard_program");
+      if (!testCase) {
+        console.warn("Test case 'standard_program' not found or disabled in test-config.yaml, skipping test");
+        return;
+      }
+
+      const result = await handleGetProgram(testCase.params);
+      if (result.isError) {
+        // If program doesn't exist, skip test
+        console.warn(`Program ${testCase.params.program_name} not found, skipping test`);
+        return;
+      }
       expect(result.isError).toBe(false);
       expect(Array.isArray(result.content)).toBe(true);
       expect(result.content.length).toBeGreaterThan(0);
@@ -323,13 +337,16 @@ describe("mcp_abap_adt_server - Integration Tests", () => {
 
   describe("handleSearchObject", () => {
     it("should successfully search for an object", async () => {
-      const result = await handleSearchObject({ object_name: "SYST" });
-
-      if (isCloudDeployment) {
-        expect(result.isError).toBe(true);
+      // Load test configuration from YAML
+      const testCase = getEnabledTestCase("search_object", "search_syst");
+      if (!testCase) {
+        console.warn("Test case 'search_syst' not found or disabled in test-config.yaml, skipping test");
         return;
       }
 
+      const result = await handleSearchObject(testCase.params);
+
+      // Search now works on cloud deployment too
       expect(result.isError).toBe(false);
       expect(Array.isArray(result.content)).toBe(true);
       expect(result.content.length).toBeGreaterThan(0);

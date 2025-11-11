@@ -53,20 +53,33 @@ function loadTestConfig() {
 }
 
 /**
- * Get enabled test case from config (returns first enabled)
+ * Get enabled test case from config (returns first enabled or by name)
  * @param {string} handlerName - Name of the handler (e.g., 'create_domain', 'get_program')
- * @returns {object} Test case with params
+ * @param {string} [testCaseName] - Optional: specific test case name to find
+ * @returns {object|null} Test case with params, or null if not found
  */
-function getEnabledTestCase(handlerName) {
+function getEnabledTestCase(handlerName, testCaseName) {
   const config = loadTestConfig();
   const handlerTests = config[handlerName]?.test_cases || [];
 
-  const enabledTest = handlerTests.find(tc => tc.enabled === true);
+  let enabledTest;
+  if (testCaseName) {
+    // Find specific test case by name
+    enabledTest = handlerTests.find(tc => tc.name === testCaseName && tc.enabled === true);
+  } else {
+    // Find first enabled test case
+    enabledTest = handlerTests.find(tc => tc.enabled === true);
+  }
 
   if (!enabledTest) {
-    console.error(`❌ No enabled test case found for "${handlerName}" in test-config.yaml`);
-    console.error(`Please set enabled: true for at least one test case under ${handlerName}`);
-    process.exit(1);
+    if (testCaseName) {
+      console.warn(`⚠️  Test case "${testCaseName}" not found or disabled for "${handlerName}" in test-config.yaml`);
+    } else {
+      console.error(`❌ No enabled test case found for "${handlerName}" in test-config.yaml`);
+      console.error(`Please set enabled: true for at least one test case under ${handlerName}`);
+      process.exit(1);
+    }
+    return null;
   }
 
   return enabledTest;

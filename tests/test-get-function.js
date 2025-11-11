@@ -17,7 +17,11 @@ initializeTestEnvironment();
 const { handleGetFunction } = require('../dist/handlers/handleGetFunction');
 
 async function testGetFunction() {
-  const testCases = getAllEnabledTestCases('get_function');
+  // Try get_function_test first, fallback to get_function
+  let testCases = getAllEnabledTestCases('get_function_test');
+  if (testCases.length === 0) {
+    testCases = getAllEnabledTestCases('get_function');
+  }
   
   console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
   
@@ -27,6 +31,14 @@ async function testGetFunction() {
   for (const testCase of testCases) {
     printTestHeader('GetFunction', testCase);
     const params = testCase.params;
+    
+    // Map function_module_name to function_name and function_group_name to function_group
+    if (params.function_module_name && !params.function_name) {
+      params.function_name = params.function_module_name;
+    }
+    if (params.function_group_name && !params.function_group) {
+      params.function_group = params.function_group_name;
+    }
     
     printTestParams(params);
     console.log('--- Retrieving function module ---\n');

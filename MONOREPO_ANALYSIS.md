@@ -6,26 +6,26 @@
 
 **Ключова вимога:** Зміни в реалізації MCP функцій (handlers) **не повинні впливати** на:
 - ✅ Коннект до ABAP (connection layer)
-- ✅ Підключення до сервера (transport layer: SSE/STDIO/HTTP)
 
 **Архітектура:**
 ```
-Server = Transport Layer + ABAP Connection + Handlers (MCP функції)
+Server = ABAP Connection + Handlers (MCP функції)
 ```
 
 **Переваги:**
-- Зміни в handlers не вимагають змін в connection/transport
+- Зміни в handlers не вимагають змін в connection
 - Можна імпортувати класи handlers для пакетного створення об'єктів
 - Незалежна розробка та тестування кожного шару
 
 ### Поступовий підхід (знизу вгору)
 
 **Етап 1:** Винести нижні рівні абстракції (рекомендовано почати з цього):
-1. Transport Layer (SSE/STDIO/HTTP) + інтерфейс
-2. ABAP Connection + інтерфейс
-3. Утіліти
+1. ABAP Connection + інтерфейс
+2. Утіліти
 
 **Етап 2:** Handlers залишаються в server, але використовують винесені компоненти
+
+**Примітка:** Transport layer (SSE/STDIO/HTTP) залишається в server, оскільки використовує MCP SDK без додавання власної логіки.
 
 ---
 
@@ -44,31 +44,12 @@ Server = Transport Layer + ABAP Connection + Handlers (MCP функції)
 
 ---
 
-### Пакет 2: Transport Layer (`@mcp-abap-adt/transport`) ⭐ ПОЧАТИ З ЦЬОГО
-**Компоненти:**
-- `StdioTransport` - реалізація STDIO протоколу
-- `SSETransport` - реалізація Server-Sent Events  
-- `StreamableHttpTransport` - реалізація Streamable HTTP
-- `TransportInterface` - інтерфейс для транспортів
-- `parseTransportConfig()` - парсинг конфігурації транспорту
-- Логіка створення та управління транспортами
-
-**Залежності:**
-- `@modelcontextprotocol/sdk` - MCP SDK
-- НЕ залежить від connection (transport працює незалежно)
-
-**Чому почати з цього:**
-- ✅ Найнижчий рівень абстракції
-- ✅ Не залежить від інших компонентів
-- ✅ Використовується сервером, але не залежить від handlers
-
----
-
-### Пакет 3: MCP Server Core (`@mcp-abap-adt/server`)
+### Пакет 2: MCP Server Core (`@mcp-abap-adt/server`)
 **Компоненти:**
 - `mcp_abap_adt_server` - основний клас сервера
-  - Використовує: Transport Layer + ABAP Connection + Handlers
+  - Використовує: ABAP Connection + Handlers + Transport (MCP SDK)
   - Координує роботу всіх компонентів
+  - Transport layer залишається в server (використовує MCP SDK без додавання власної логіки)
 - Всі handlers (57 файлів у `src/handlers/`) - реалізація MCP функцій
   - Використовують ABAP Connection через інтерфейс
   - Можуть бути імпортовані окремо для пакетного створення
@@ -77,25 +58,24 @@ Server = Transport Layer + ABAP Connection + Handlers (MCP функції)
 - Конфігурація та логінг (`logger`, `timeouts`)
 
 **Залежності:**
-- `@modelcontextprotocol/sdk`
+- `@modelcontextprotocol/sdk` - для transport layer
 - `@mcp-abap-adt/connection` - через інтерфейс
-- `@mcp-abap-adt/transport` - через інтерфейс
 - `@mcp-abap-adt/utils` (опціонально)
 
 **Архітектура:**
 ```typescript
 class mcp_abap_adt_server {
-  private transport: TransportInterface;      // з @mcp-abap-adt/transport
   private connection: AbapConnection;        // з @mcp-abap-adt/connection
   private handlers: Map<string, Handler>;     // локальні handlers
+  // Transport використовує MCP SDK напряму (не виносимо в окремий пакет)
   
-  // Зміни в handlers НЕ впливають на transport/connection
+  // Зміни в handlers НЕ впливають на connection
 }
 ```
 
 ---
 
-### Пакет 4: Utilities (`@mcp-abap-adt/utils`)
+### Пакет 3: Utilities (`@mcp-abap-adt/utils`)
 **Компоненти:**
 - Пакетне створення об'єктів
   - Імпортує класи handlers для використання функцій
@@ -127,18 +107,13 @@ async function batchCreateClasses(connection: AbapConnection, classes: string[])
 ## Плюси розбиття
 
 ### 1. Ізоляція змін (Основна мета) ⭐
-✅ **Зміни в handlers НЕ впливають на connection/transport**
+✅ **Зміни в handlers НЕ впливають на connection**
 - Додавання нових MCP функцій не вимагає змін в ABAP connection
-- Зміни в логіці обробки не впливають на transport layer
 - Незалежна розробка та тестування кожного шару
 
-✅ **Зміни в connection НЕ впливають на transport/handlers**
-- Оновлення автентифікації не вимагає змін в transport
+✅ **Зміни в connection НЕ впливають на handlers**
+- Оновлення автентифікації не вимагає змін в handlers
 - Зміни в ABAP API не впливають на handlers (через інтерфейс)
-
-✅ **Зміни в transport НЕ впливають на connection/handlers**
-- Додавання нового протоколу не вимагає змін в connection
-- Зміни в транспортному шарі не впливають на бізнес-логіку
 
 ### 2. Модульність та перевикористання
 ✅ **Connection layer** можна використовувати окремо в інших проектах
@@ -146,9 +121,6 @@ async function batchCreateClasses(connection: AbapConnection, classes: string[])
 - CLI інструменти для роботи з ABAP
 - Тестування ABAP API незалежно від MCP
 
-✅ **Transport layer** можна замінити або розширити
-- Додавання нових протоколів (WebSocket, gRPC)
-- Використання connection layer з іншими протоколами
 
 ✅ **Handlers можна імпортувати окремо**
 - Пакетне створення об'єктів через імпорт handler функцій
@@ -167,7 +139,6 @@ async function batchCreateClasses(connection: AbapConnection, classes: string[])
 ### 3. Тестування
 ✅ Легше тестувати окремі компоненти
 - Connection layer тестується без MCP сервера
-- Transport layer тестується з mock connection
 - Handlers тестуються з mock connection
 
 ✅ Можливість unit-тестів для кожного пакету окремо
@@ -193,8 +164,7 @@ async function batchCreateClasses(connection: AbapConnection, classes: string[])
 - Breaking changes в одному пакеті впливають на інші
 
 ❌ **Circular dependencies**
-- `server` залежить від `connection` та `transport`
-- `transport` може залежати від `connection`
+- `server` залежить від `connection`
 - Потрібна ретельна архітектура
 
 ### 2. Трудозатратність міграції
@@ -277,36 +247,7 @@ async function batchCreateClasses(connection: AbapConnection, classes: string[])
    - Root `tsconfig.json` з references
    - Окремі `tsconfig.json` для кожного пакету
 
-### Фаза 2: Розбиття transport layer ⭐ ПОЧАТИ З ЦЬОГО
-**Час: 2-3 дні**
-
-**Чому почати з transport:**
-- Найнижчий рівень абстракції
-- Не залежить від connection або handlers
-- Використовується сервером, але не залежить від бізнес-логіки
-
-1. Виділення transport логіки з `src/index.ts`:
-   - `parseTransportConfig()` → `packages/transport/src/config.ts`
-   - Логіка `StdioServerTransport`, `SSEServerTransport`, `StreamableHTTPServerTransport`
-   - Створення абстракції `TransportInterface`
-   - Логіка створення HTTP сервера для SSE/HTTP
-
-2. Створення `packages/transport/package.json`
-   - Залежності: `@modelcontextprotocol/sdk`
-   - НЕ залежить від connection
-
-3. Створення інтерфейсу `TransportInterface`:
-   ```typescript
-   export interface TransportInterface {
-     connect(server: Server): Promise<void>;
-     close(): Promise<void>;
-   }
-   ```
-
-4. Рефакторинг `mcp_abap_adt_server.run()` для використання transport layer
-5. Тестування transport layer окремо
-
-### Фаза 3: Розбиття connection layer
+### Фаза 2: Розбиття connection layer ⭐ ПОЧАТИ З ЦЬОГО
 **Час: 1-2 дні**
 
 1. Перенесення файлів:
@@ -322,7 +263,7 @@ async function batchCreateClasses(connection: AbapConnection, classes: string[])
 4. Тестування connection layer окремо
 5. Оновлення handlers для використання connection через інтерфейс
 
-### Фаза 4: Розбиття utilities
+### Фаза 3: Розбиття utilities
 **Час: 1-2 дні**
 
 1. Перенесення утіліт:
@@ -330,7 +271,6 @@ async function batchCreateClasses(connection: AbapConnection, classes: string[])
    - `src/lib/getObjectsListCache.ts` → `packages/utils/src/`
    - `src/lib/writeResultToFile.ts` → `packages/utils/src/`
    - `src/lib/utils.ts` (частково) → `packages/utils/src/`
-   - `src/utils/transportValidation.ts` → `packages/utils/src/`
 
 2. Створення функцій для пакетного створення (якщо ще немає)
    - Імпорт handler функцій з server
@@ -340,7 +280,7 @@ async function batchCreateClasses(connection: AbapConnection, classes: string[])
    - Залежності: `@mcp-abap-adt/connection` (через інтерфейс)
    - Опціонально: `@mcp-abap-adt/server` (для імпорту handlers)
 
-### Фаза 5: Рефакторинг server core
+### Фаза 4: Рефакторинг server core
 **Час: 3-4 дні**
 
 **Важливо:** Handlers залишаються в server, але використовують винесені компоненти
@@ -363,7 +303,6 @@ async function batchCreateClasses(connection: AbapConnection, classes: string[])
 
 4. Створення `packages/server/package.json`:
    - Залежності: 
-     - `@mcp-abap-adt/transport` (через інтерфейс)
      - `@mcp-abap-adt/connection` (через інтерфейс)
      - `@mcp-abap-adt/utils` (опціонально)
 
@@ -518,7 +457,6 @@ async function batchCreateClasses(connection: AbapConnection, classes: string[])
 **Структура:**
 ```
 @mcp-abap-adt/connection     → ПУБЛІЧНИЙ (MIT)
-@mcp-abap-adt/transport      → ПУБЛІЧНИЙ (MIT)
 @mcp-abap-adt/utils          → ПУБЛІЧНИЙ (MIT)
 @mcp-abap-adt/server         → ПРИВАТНИЙ або з обмеженнями
 ```
@@ -530,7 +468,7 @@ async function batchCreateClasses(connection: AbapConnection, classes: string[])
 - ✅ Сервер залишається під контролем
 
 **Реалізація:**
-- Connection/Transport/Utils → публічні npm пакети
+- Connection/Utils → публічні npm пакети
 - Server → приватний npm пакет або GitHub Packages з обмеженнями
 - Server може використовувати публічні пакети як залежності
 
@@ -538,7 +476,6 @@ async function batchCreateClasses(connection: AbapConnection, classes: string[])
 ```bash
 # Базові компоненти - публічні
 npm install @mcp-abap-adt/connection
-npm install @mcp-abap-adt/transport
 
 # Сервер - з контролем доступу
 npm install @fr0ster/mcp-abap-adt-server --registry=https://npm.pkg.github.com
@@ -609,7 +546,6 @@ const server = new McpAbapAdtServer({
 **Структура:**
 ```
 @mcp-abap-adt/connection     → Публічний scope
-@mcp-abap-adt/transport      → Публічний scope
 @fr0ster/mcp-abap-adt-server → Приватний scope (контрольований)
 ```
 
@@ -669,7 +605,7 @@ if (license.isValid()) {
 **Найкращий варіант: Гібридний підхід (Стратегія 1)**
 
 **Чому:**
-1. ✅ **Connection/Transport/Utils** - публічні, прості в інсталяції
+1. ✅ **Connection/Utils** - публічні, прості в інсталяції
    - Користувачі можуть використовувати їх окремо
    - `npm install @mcp-abap-adt/connection` - працює відразу
 
@@ -685,7 +621,6 @@ if (license.isValid()) {
 ```bash
 # Публічні пакети
 npm publish --access public @mcp-abap-adt/connection
-npm publish --access public @mcp-abap-adt/transport
 npm publish --access public @mcp-abap-adt/utils
 
 # Приватний сервер
@@ -703,19 +638,19 @@ npm publish --access restricted @fr0ster/mcp-abap-adt-server
 
 ### Основні рекомендації:
 
-1. **Розпочати з transport layer** (знизу вгору підхід):
-   - Найнижчий рівень абстракції
-   - Не залежить від connection або handlers
-   - Використовується сервером, але не залежить від бізнес-логіки
-   - Потім connection layer, потім utils, в кінці рефакторинг server
+1. **Розпочати з connection layer** (знизу вгору підхід):
+   - Найнижчий рівень абстракції з власною логікою
+   - Не залежить від handlers
+   - Потім utils, в кінці рефакторинг server
+   - Transport layer залишається в server (використовує MCP SDK)
 
 2. **Використати гібридний підхід для балансу:**
-   - **Connection/Transport/Utils** → публічні npm пакети (проста інсталяція)
+   - **Connection/Utils** → публічні npm пакети (проста інсталяція)
    - **Server** → приватний пакет або GitHub Packages (контроль розповсюдження)
 
 3. **Архітектура з ізоляцією змін:**
    - Handlers залишаються в server, але використовують connection через інтерфейс
-   - Зміни в handlers НЕ впливають на connection/transport
+   - Зміни в handlers НЕ впливають на connection
    - Можна імпортувати handlers для пакетного створення об'єктів
 
 4. **Альтернативи безкоштовні:**
@@ -729,5 +664,5 @@ npm publish --access restricted @fr0ster/mcp-abap-adt-server
 - ✅ Зберегти контроль над сервером (приватний пакет або ліцензування)
 - ✅ Гнучко керувати доступом до різних компонентів
 
-**Найкраще рішення:** Гібридний підхід з публічними базовими пакетами та контрольованим сервером через GitHub Packages (безкоштовно) або приватний npm пакет ($7/місяць).
+**Найкраще рішення:** Гібридний підхід з публічними базовими пакетами (connection, utils) та контрольованим сервером через GitHub Packages (безкоштовно) або приватний npm пакет ($7/місяць).
 

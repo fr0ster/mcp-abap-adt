@@ -1,0 +1,25 @@
+{
+  "name": "@mcp-abap-adt/connection",
+  "version": "0.1.0",
+  "description": "ABAP connection layer for MCP ABAP ADT server",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "jest"
+  },
+  "dependencies": {
+    "axios": "^1.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.2.1",
+    "typescript": "^5.9.2"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fr0ster/mcp-abap-adt.git",
+    "directory": "packages/connection"
+  }
+}
+

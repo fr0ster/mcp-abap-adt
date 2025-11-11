@@ -23,5 +23,9 @@
   "terminal.integrated.allowChords": false,
   "terminal.integrated.commandsToSkipShell": [],
   "terminal.integrated.cwd": "${workspaceFolder}",
-  "cSpell.language": "en"
+  "cSpell.language": "en",
+  "cSpell.words": [
+    "atomsvc",
+    "usagereferences"
+  ]
 }

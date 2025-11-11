@@ -2,7 +2,7 @@
 /**
  * Universal test runner for MCP ABAP ADT handlers
  * Runs all enabled tests from test-config.yaml
- * 
+ *
  * Usage:
  *   node tests/run-all-tests.js                    # Run all enabled tests
  *   node tests/run-all-tests.js create_domain      # Run specific handler test
@@ -25,17 +25,96 @@ initializeTestEnvironment();
 
 // Map handler names to their handler functions
 const HANDLER_MAP = {
+  // Transport
+  'create_transport': () => require('../dist/handlers/handleCreateTransport').handleCreateTransport,
+  'get_transport': () => require('../dist/handlers/handleGetTransport').handleGetTransport,
+
+  // Package
+  'create_package': () => require('../dist/handlers/handleCreatePackage').handleCreatePackage,
+  'get_package': () => require('../dist/handlers/handleGetPackage').handleGetPackage,
+
+  // Domain
   'create_domain': () => require('../dist/handlers/handleCreateDomain').handleCreateDomain,
+  'update_domain': () => require('../dist/handlers/handleUpdateDomain').handleUpdateDomain,
+  'get_domain': () => require('../dist/handlers/handleGetDomain').handleGetDomain,
+
+  // Data Element
+  'create_data_element': () => require('../dist/handlers/handleCreateDataElement').handleCreateDataElement,
+  'update_data_element': () => require('../dist/handlers/handleUpdateDataElement').handleUpdateDataElement,
+  'get_data_element': () => require('../dist/handlers/handleGetDataElement').handleGetDataElement,
+
+  // Class
+  'create_class': () => require('../dist/handlers/handleCreateClass').handleCreateClass,
+  'update_class_source': () => require('../dist/handlers/handleUpdateClassSource').handleUpdateClassSource,
   'get_class': () => require('../dist/handlers/handleGetClass').handleGetClass,
+
+  // Program
+  'create_program': () => require('../dist/handlers/handleCreateProgram').handleCreateProgram,
+  'update_program_source': () => require('../dist/handlers/handleUpdateProgramSource').handleUpdateProgramSource,
+  'get_program': () => require('../dist/handlers/handleGetProgram').handleGetProgram,
+
+  // Interface
+  'create_interface': () => require('../dist/handlers/handleCreateInterface').handleCreateInterface,
+  'update_interface_source': () => require('../dist/handlers/handleUpdateInterfaceSource').handleUpdateInterfaceSource,
+  'get_interface': () => require('../dist/handlers/handleGetInterface').handleGetInterface,
+
+  // Table
+  'create_table': () => require('../dist/handlers/handleCreateTable').handleCreateTable,
   'get_table': () => require('../dist/handlers/handleGetTable').handleGetTable,
   'get_table_contents': () => require('../dist/handlers/handleGetTableContents').handleGetTableContents,
-  'get_package': () => require('../dist/handlers/handleGetPackage').handleGetPackage,
-  'search_object': () => require('../dist/handlers/handleSearchObject').handleSearchObject,
+
+  // Structure
+  'create_structure': () => require('../dist/handlers/handleCreateStructure').handleCreateStructure,
+  'get_structure': () => require('../dist/handlers/handleGetStructure').handleGetStructure,
+
+  // View
+  'create_view': () => require('../dist/handlers/handleCreateView').handleCreateView,
+  'update_view_source': () => require('../dist/handlers/handleUpdateViewSource').handleUpdateViewSource,
+  'get_view': () => require('../dist/handlers/handleGetView').handleGetView,
+
+  // Function Group
+  'create_function_group': () => require('../dist/handlers/handleCreateFunctionGroup').handleCreateFunctionGroup,
+  'get_function_group': () => require('../dist/handlers/handleGetFunctionGroup').handleGetFunctionGroup,
+
+  // Function Module
+  'create_function_module': () => require('../dist/handlers/handleCreateFunctionModule').handleCreateFunctionModule,
+  'update_function_module_source': () => require('../dist/handlers/handleUpdateFunctionModuleSource').handleUpdateFunctionModuleSource,
+  'get_function_test': () => require('../dist/handlers/handleGetFunction').handleGetFunction,
+  'get_function': () => require('../dist/handlers/handleGetFunction').handleGetFunction,
+
+  // Delete - Individual handlers for each object type
+  'delete_domain': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject,
+  'delete_data_element': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject,
+  'delete_class': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject,
+  'delete_program': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject,
+  'delete_interface': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject,
+  'delete_function_module': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject,
+  'delete_function_group': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject,
+  'delete_object': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject, // Legacy support
+
+  // Get operations
+  'get_type_info': () => require('../dist/handlers/handleGetTypeInfo').handleGetTypeInfo,
+  'get_prog_full_code': () => require('../dist/handlers/handleGetProgFullCode').handleGetProgFullCode,
+  'get_includes_list': () => require('../dist/handlers/handleGetIncludesList').handleGetIncludesList,
+  'get_objects_list': () => require('../dist/handlers/handleGetObjectsList').handleGetObjectsList,
+  'get_object_structure': () => require('../dist/handlers/handleGetObjectStructure').handleGetObjectStructure,
+  'get_transaction': () => require('../dist/handlers/handleGetTransaction').handleGetTransaction,
+  'get_enhancements': () => require('../dist/handlers/handleGetEnhancements').handleGetEnhancements,
+  'get_include': () => require('../dist/handlers/handleGetInclude').handleGetInclude,
+
+  // Search and Query
   'get_sql_query': () => require('../dist/handlers/handleGetSqlQuery').handleGetSqlQuery,
+  'search_object': () => require('../dist/handlers/handleSearchObject').handleSearchObject,
   'get_where_used': () => require('../dist/handlers/handleGetWhereUsed').handleGetWhereUsed,
   'get_object_info': () => require('../dist/handlers/handleGetObjectInfo').handleGetObjectInfo,
+
+  // Analysis
   'get_abap_ast': () => require('../dist/handlers/handleGetAbapAST').handleGetAbapAST,
   'get_abap_semantic_analysis': () => require('../dist/handlers/handleGetAbapSemanticAnalysis').handleGetAbapSemanticAnalysis,
+
+  // Activation and Check
+  'activate_object': () => require('../dist/handlers/handleActivateObject').handleActivateObject,
+  'check_object': () => require('../dist/handlers/handleCheckObject').handleCheckObject,
 };
 
 /**
@@ -43,21 +122,21 @@ const HANDLER_MAP = {
  */
 function listAvailableTests() {
   const config = loadTestConfig();
-  
+
   console.log('\n=== Available Tests ===\n');
-  
+
   for (const [handlerName, handlerConfig] of Object.entries(config)) {
     if (handlerName === 'environment' || handlerName === 'test_settings') {
       continue;
     }
-    
+
     const testCases = handlerConfig.test_cases || [];
     const enabledCount = testCases.filter(tc => tc.enabled).length;
-    
+
     console.log(`${handlerName}:`);
     console.log(`  Total test cases: ${testCases.length}`);
     console.log(`  Enabled: ${enabledCount}`);
-    
+
     testCases.forEach((tc, idx) => {
       const status = tc.enabled ? '✅' : '⭕';
       console.log(`    ${status} [${idx + 1}] ${tc.name}: ${tc.description || 'N/A'}`);
@@ -67,21 +146,114 @@ function listAvailableTests() {
 }
 
 /**
+ * Cleanup object before create (delete if exists, ignore errors)
+ */
+async function cleanupObject(handlerName, testArgs) {
+  // Map create handlers to delete handlers and extract object info
+  const cleanupMap = {
+    'create_domain': {
+      deleteHandler: 'delete_domain',
+      getParams: (args) => ({
+        object_name: args.domain_name,
+        object_type: 'DOMA/DM',
+        package_name: args.package_name
+      })
+    },
+    'create_data_element': {
+      deleteHandler: 'delete_data_element',
+      getParams: (args) => ({
+        object_name: args.data_element_name,
+        object_type: 'DTEL/DE',
+        package_name: args.package_name
+      })
+    },
+    'create_class': {
+      deleteHandler: 'delete_class',
+      getParams: (args) => ({
+        object_name: args.class_name,
+        object_type: 'CLAS/OC',
+        package_name: args.package_name
+      })
+    },
+    'create_program': {
+      deleteHandler: 'delete_program',
+      getParams: (args) => ({
+        object_name: args.program_name,
+        object_type: 'PROG/P',
+        package_name: args.package_name
+      })
+    },
+    'create_interface': {
+      deleteHandler: 'delete_interface',
+      getParams: (args) => ({
+        object_name: args.interface_name,
+        object_type: 'INTF/OI',
+        package_name: args.package_name
+      })
+    },
+    'create_function_module': {
+      deleteHandler: 'delete_function_module',
+      getParams: (args) => ({
+        object_name: args.function_module_name,
+        object_type: 'FUGR/FF',
+        function_group_name: args.function_group_name,
+        package_name: args.package_name
+      })
+    },
+    'create_function_group': {
+      deleteHandler: 'delete_function_group',
+      getParams: (args) => ({
+        object_name: args.function_group_name,
+        object_type: 'FUGR/F',
+        package_name: args.package_name
+      })
+    }
+  };
+
+  const cleanup = cleanupMap[handlerName];
+  if (!cleanup) {
+    return; // No cleanup needed for this handler
+  }
+
+  const deleteHandlerLoader = HANDLER_MAP[cleanup.deleteHandler];
+  if (!deleteHandlerLoader) {
+    return; // Delete handler not found
+  }
+
+  const deleteHandler = deleteHandlerLoader();
+  const deleteParams = cleanup.getParams(testArgs);
+
+  try {
+    console.log(`🧹 Cleanup: Attempting to delete ${deleteParams.object_name} (${deleteParams.object_type})...`);
+    await deleteHandler(deleteParams);
+    console.log(`✅ Cleanup: Object deleted (or didn't exist)\n`);
+  } catch (error) {
+    // Ignore errors - object might not exist
+    console.log(`ℹ️  Cleanup: Object doesn't exist or couldn't be deleted (ignoring)\n`);
+  }
+}
+
+/**
  * Run a single test case
  */
 async function runTestCase(handlerName, testCase) {
   printTestHeader(handlerName, testCase);
-  
+
   // Get handler function
   const handlerLoader = HANDLER_MAP[handlerName];
   if (!handlerLoader) {
     console.error(`❌ No handler found for: ${handlerName}`);
     return false;
   }
-  
+
   const handler = handlerLoader();
   const testArgs = testCase.params;
-  
+
+  // Cleanup before create operations
+  if (handlerName.startsWith('create_')) {
+    await cleanupObject(handlerName, testArgs);
+  }
+
   // Special validation for create_domain
   if (handlerName === 'create_domain') {
     if (!validateTransportRequest(testArgs)) {
@@ -91,11 +263,11 @@ async function runTestCase(handlerName, testCase) {
       );
     }
   }
-  
+
   printTestParams(testArgs);
-  
+
   console.log(`--- Running ${handlerName} ---\n`);
-  
+
   try {
     const result = await handler(testArgs);
     return printTestResult(result, handlerName);
@@ -112,25 +284,25 @@ async function runTestCase(handlerName, testCase) {
 async function runHandlerTests(handlerName, settings) {
   const config = loadTestConfig();
   const handlerConfig = config[handlerName];
-  
+
   if (!handlerConfig || !handlerConfig.test_cases) {
     console.error(`❌ No test configuration found for: ${handlerName}`);
     return { total: 0, passed: 0, failed: 0 };
   }
-  
+
   const enabledTests = handlerConfig.test_cases.filter(tc => tc.enabled);
-  
+
   if (enabledTests.length === 0) {
     console.warn(`⚠️  No enabled tests found for: ${handlerName}`);
     return { total: 0, passed: 0, failed: 0 };
   }
-  
+
   let passed = 0;
   let failed = 0;
-  
+
   for (const testCase of enabledTests) {
     const success = await runTestCase(handlerName, testCase);
-    
+
     if (success) {
       passed++;
     } else {
@@ -140,10 +312,10 @@ async function runHandlerTests(handlerName, settings) {
         break;
       }
     }
-    
+
     console.log('\n' + '-'.repeat(60) + '\n');
   }
-  
+
   return { total: enabledTests.length, passed, failed };
 }
 
@@ -153,42 +325,42 @@ async function runHandlerTests(handlerName, settings) {
 async function runAllTests() {
   const config = loadTestConfig();
   const settings = getTestSettings();
-  
+
   console.log('\n' + '='.repeat(60));
   console.log('Running All Enabled Tests');
   console.log('='.repeat(60) + '\n');
-  
+
   const results = {
     handlers: 0,
     totalTests: 0,
     passed: 0,
     failed: 0
   };
-  
+
   for (const [handlerName, handlerConfig] of Object.entries(config)) {
     // Skip meta sections
     if (handlerName === 'environment' || handlerName === 'test_settings') {
       continue;
     }
-    
+
     // Skip if no enabled tests
     const enabledTests = handlerConfig.test_cases?.filter(tc => tc.enabled) || [];
     if (enabledTests.length === 0) {
       continue;
     }
-    
+
     results.handlers++;
-    
+
     const handlerResults = await runHandlerTests(handlerName, settings);
     results.totalTests += handlerResults.total;
     results.passed += handlerResults.passed;
     results.failed += handlerResults.failed;
-    
+
     if (settings.fail_fast && handlerResults.failed > 0) {
       break;
     }
   }
-  
+
   // Print summary
   console.log('\n' + '='.repeat(60));
   console.log('Test Summary');
@@ -198,7 +370,7 @@ async function runAllTests() {
   console.log(`✅ Passed: ${results.passed}`);
   console.log(`❌ Failed: ${results.failed}`);
   console.log('='.repeat(60) + '\n');
-  
+
   return results.failed === 0;
 }
 
@@ -207,58 +379,58 @@ async function runAllTests() {
  */
 async function main() {
   const args = process.argv.slice(2);
-  
+
   // Handle --list flag
   if (args.includes('--list')) {
     listAvailableTests();
     process.exit(0);
   }
-  
+
   // Handle specific handler test
   if (args.length > 0 && !args[0].startsWith('--')) {
     const input = args[0];
     const settings = getTestSettings();
-    
+
     // Check if format is handler:index
     if (input.includes(':')) {
       const [handlerName, indexStr] = input.split(':');
       const testIndex = parseInt(indexStr, 10);
-      
+
       if (isNaN(testIndex) || testIndex < 1) {
         console.error(`❌ Invalid test index: ${indexStr}`);
         process.exit(1);
       }
-      
+
       // Run specific test case by index
       const config = loadTestConfig();
       const handlerConfig = config[handlerName];
-      
+
       if (!handlerConfig || !handlerConfig.test_cases) {
         console.error(`❌ No test configuration found for: ${handlerName}`);
         process.exit(1);
       }
-      
+
       const testCase = handlerConfig.test_cases[testIndex - 1];
-      
+
       if (!testCase) {
         console.error(`❌ Test case #${testIndex} not found for ${handlerName}`);
         console.error(`Available test cases: 1-${handlerConfig.test_cases.length}`);
         process.exit(1);
       }
-      
+
       const success = await runTestCase(handlerName, testCase);
       console.log(`\n${success ? '✅' : '❌'} Test ${success ? 'PASSED' : 'FAILED'}`);
       process.exit(success ? 0 : 1);
     }
-    
+
     // Run all tests for the handler
     const handlerName = input;
     const results = await runHandlerTests(handlerName, settings);
-    
+
     console.log(`\n✅ Passed: ${results.passed}/${results.total}`);
     process.exit(results.failed === 0 ? 0 : 1);
   }
-  
+
   // Run all tests
   const success = await runAllTests();
   process.exit(success ? 0 : 1);

@@ -371,7 +371,100 @@ get_interface:
 # Step 4: Delete interface (will be added to delete_object group)
 
 # ============================================================================
-# GROUP 8: DELETE OBJECTS (Cleanup)
+# GROUP 8: TABLE - Create Operation
+# ============================================================================
+# Step 1: Create table
+create_table:
+  test_cases:
+    - name: "test_table"
+      enabled: false
+      description: "Create test table (DDL-based)"
+      params:
+        table_name: "<YOUR_TABLE_NAME>"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
+        ddl_code: |
+          @EndUserText.label : 'Test Table'
+          @AbapCatalog.tableCategory : #TRANSPARENT
+          define table <YOUR_TABLE_NAME_LOWER> {
+            key client : abap.clnt not null;
+            key id : abap.char(10);
+            name : abap.char(255);
+            created_at : abap.dats;
+          }
+
+# ============================================================================
+# GROUP 9: STRUCTURE - Create Operation
+# ============================================================================
+# Step 1: Create structure
+create_structure:
+  test_cases:
+    - name: "test_structure"
+      enabled: false
+      description: "Create test structure"
+      params:
+        structure_name: "<YOUR_STRUCTURE_NAME>"
+        description: "Test structure created via MCP"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
+        fields:
+          - name: "FIELD1"
+            description: "First field"
+            data_type: "CHAR"
+            length: 10
+          - name: "FIELD2"
+            description: "Second field"
+            data_type: "CHAR"
+            length: 20
+
+# ============================================================================
+# GROUP 10: VIEW - Create and Update Operations
+# ============================================================================
+# Step 1: Create view
+create_view:
+  test_cases:
+    - name: "test_view"
+      enabled: false
+      description: "Create test CDS view"
+      params:
+        view_name: "<YOUR_VIEW_NAME>"
+        description: "Test CDS view created via MCP"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
+        ddl_source: |
+          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>'
+          @EndUserText.label: 'Test CDS View'
+          define view <YOUR_VIEW_NAME>
+            as select from mara
+          {
+            matnr,
+            mbrsh,
+            mtart
+          }
+
+# Step 2: Update view source
+update_view_source:
+  test_cases:
+    - name: "test_view"
+      enabled: false
+      description: "Update test view created in create_view"
+      params:
+        view_name: "<YOUR_VIEW_NAME>"
+        activate: true
+        ddl_source: |
+          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>'
+          @EndUserText.label: 'Test CDS View Updated'
+          define view <YOUR_VIEW_NAME>
+            as select from mara
+          {
+            matnr,
+            mbrsh,
+            mtart,
+            meins
+          }
+
+# ============================================================================
+# GROUP 11: DELETE OBJECTS (Cleanup)
 # ============================================================================
 # Delete all objects created in previous groups (in reverse order)
 delete_object:
@@ -454,7 +547,7 @@ get_table_contents:
         max_rows: 10
 
 # ============================================================================
-# GROUP 9: FUNCTION GROUP - Full CRUD Cycle
+# GROUP 12: FUNCTION GROUP - Full CRUD Cycle
 # ============================================================================
 # Object name: <YOUR_FUNCTION_GROUP_NAME> (used in all function group tests)
 # Uses: package "<YOUR_PACKAGE_NAME>"
@@ -557,7 +650,8 @@ get_structure:
 get_include:
   test_cases:
     - name: "standard_include"
-      enabled: true
+      enabled: false
+      description: "Get include for program (S4HANA only, not available in Cloud)"
       params:
         include_name: "SAPMV45A"  # Standard program include
         program_name: "SAPMV45A"
@@ -570,6 +664,65 @@ get_type_info:
         type_name: "MARA"
         type_kind: "TABL"
 
+get_prog_full_code:
+  test_cases:
+    - name: "standard_function_group"
+      enabled: true
+      description: "Get full code for function group (Cloud compatible)"
+      params:
+        name: "SRFC"
+        type: "FUGR"
+    - name: "standard_program"
+      enabled: false
+      description: "Get full code for program (S4HANA only, not available in Cloud)"
+      params:
+        name: "SAPMV45A"
+        type: "PROG/P"
+
+get_includes_list:
+  test_cases:
+    - name: "standard_function_group"
+      enabled: true
+      description: "Get includes list for function group (Cloud compatible)"
+      params:
+        object_name: "SRFC"
+        object_type: "FUGR"
+        detailed: false
+    - name: "standard_program"
+      enabled: false
+      description: "Get includes list for program (S4HANA only, not available in Cloud)"
+      params:
+        object_name: "SAPMV45A"
+        object_type: "PROG/P"
+        detailed: false
+
+get_objects_list:
+  test_cases:
+    - name: "standard_function_group"
+      enabled: true
+      description: "Get objects list for function group (Cloud compatible)"
+      params:
+        parent_name: "SRFC"
+        parent_tech_name: "SRFC"
+        parent_type: "FUGR"
+        with_short_descriptions: true
+    - name: "standard_program"
+      enabled: false
+      description: "Get objects list for program (S4HANA only, not available in Cloud)"
+      params:
+        parent_name: "/CBY/PURBOOK_EN"
+        parent_tech_name: "/CBY/PURBOOK_EN"
+        parent_type: "PROG/P"
+        with_short_descriptions: true
+
+get_object_structure:
+  test_cases:
+    - name: "standard_view"
+      enabled: true
+      params:
+        objecttype: "DDLS/DF"
+        objectname: "/CBY/ACQ_DDL"
+
 get_transaction:
   test_cases:
     - name: "standard_transaction"
@@ -579,8 +732,15 @@ get_transaction:
 
 get_enhancements:
   test_cases:
-    - name: "program_enhancements"
+    - name: "class_enhancements"
       enabled: true
+      description: "Get enhancements for class (Cloud compatible)"
+      params:
+        object_name: "CL_ABAP_TYPEDESCR"
+        object_type: "CLAS/OC"
+    - name: "program_enhancements"
+      enabled: false
+      description: "Get enhancements for program (S4HANA only, not available in Cloud)"
       params:
         object_name: "SAPMV45A"
         object_type: "PROG/P"

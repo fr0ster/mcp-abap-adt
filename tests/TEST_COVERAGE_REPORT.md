@@ -6,7 +6,7 @@ Generated: 2025-01-11
 
 - **Total Handlers**: 57
 - **Total Test Files**: 80
-- **Test Config Sections**: 43
+- **Test Config Sections**: 51 (updated 2025-01-11)
 
 ## Coverage by Category
 
@@ -23,11 +23,11 @@ Generated: 2025-01-11
 | `handleCreateFunctionModule` | `test-create-function-module.js` | `create_function_module` | ✅ |
 | `handleCreatePackage` | `test-create-package.js` | `create_package` | ✅ |
 | `handleCreateTransport` | `test-create-transport.js` | `create_transport` | ✅ |
-| `handleCreateTable` | `test-create-table.js` | ❌ | ⚠️ No config |
-| `handleCreateStructure` | `test-create-structure.js` | ❌ | ⚠️ No config |
-| `handleCreateView` | `test-create-view.js` | ❌ | ⚠️ No config |
+| `handleCreateTable` | `test-create-table.js` | `create_table` | ✅ |
+| `handleCreateStructure` | `test-create-structure.js` | `create_structure` | ✅ |
+| `handleCreateView` | `test-create-view.js` | `create_view` | ✅ |
 
-**Coverage**: 9/12 (75%) with config, 12/12 (100%) with test files
+**Coverage**: 12/12 (100%) with config, 12/12 (100%) with test files
 
 ### ✅ UPDATE Operations (Fully Covered)
 
@@ -39,9 +39,9 @@ Generated: 2025-01-11
 | `handleUpdateDomain` | `test-update-domain.js` | `update_domain` | ✅ |
 | `handleUpdateDataElement` | `test-update-data-element.js` | `update_data_element` | ✅ |
 | `handleUpdateFunctionModuleSource` | `test-update-function-module-source.js` | `update_function_module_source` | ✅ |
-| `handleUpdateViewSource` | `test-update-view-source.js` | ❌ | ⚠️ No config |
+| `handleUpdateViewSource` | `test-update-view-source.js` | `update_view_source` | ✅ |
 
-**Coverage**: 6/7 (86%) with config, 7/7 (100%) with test files
+**Coverage**: 7/7 (100%) with config, 7/7 (100%) with test files
 
 ### ✅ GET/READ Operations (Mostly Covered)
 
@@ -67,21 +67,21 @@ Generated: 2025-01-11
 | `handleGetSqlQuery` | `test-get-sql-query.js` | `get_sql_query` | ✅ |
 | `handleGetWhereUsed` | `test-where-used.js` | `get_where_used` | ✅ |
 | `handleGetObjectInfo` | Various | `get_object_info` | ✅ |
-| `handleGetProgFullCode` | `test-get-prog-full-code.js` | ❌ | ⚠️ No config |
+| `handleGetProgFullCode` | `test-get-prog-full-code.js` | `get_prog_full_code` | ✅ |
 | `handleGetAbapAST` | Various | `get_abap_ast` | ✅ |
 | `handleGetAbapSemanticAnalysis` | Various | `get_abap_semantic_analysis` | ✅ |
 | `handleGetAllTypes` | `test-get-adt-types.ts` | ❌ | ⚠️ No config |
 | `handleGetEnhancementSpot` | `test-get-enhancement-spot.js` | ❌ | ⚠️ No config |
 | `handleGetEnhancementImpl` | Various | ❌ | ⚠️ No config |
 | `handleGetBdef` | `test-get-bdef.js` | ❌ | ⚠️ No config |
-| `handleGetIncludesList` | `test-get-includes-list.js` | ❌ | ⚠️ No config |
-| `handleGetObjectStructure` | `test-get-object-structure.js` | ❌ | ⚠️ No config |
+| `handleGetIncludesList` | `test-get-includes-list.js` | `get_includes_list` | ✅ |
+| `handleGetObjectStructure` | `test-get-object-structure.js` | `get_object_structure` | ✅ |
 | `handleGetObjectsByType` | `test-get-objects-by-type.js` | ❌ | ⚠️ No config |
-| `handleGetObjectsList` | `test-get-objects-list.js` | ❌ | ⚠️ No config |
+| `handleGetObjectsList` | `test-get-objects-list.js` | `get_objects_list` | ✅ |
 | `handleGetObjectNodeFromCache` | `test-get-object-node-from-cache.js` | ❌ | ⚠️ No config |
 | `handleGetAbapSystemSymbols` | Various | ❌ | ⚠️ No config |
 
-**Coverage**: 15/33 (45%) with config, 33/33 (100%) with test files
+**Coverage**: 19/33 (58%) with config, 33/33 (100%) with test files
 
 ### ✅ DELETE Operations (Fully Covered)
 
@@ -136,30 +136,31 @@ The following handlers have test files but are missing from `test-config.yaml`:
 
 | Operation Type | Handlers | With Config | With Test Files | Config Coverage |
 |----------------|----------|-------------|-----------------|-----------------|
-| CREATE | 12 | 9 | 12 | 75% |
-| UPDATE | 7 | 6 | 7 | 86% |
-| GET/READ | 33 | 15 | 33 | 45% |
+| CREATE | 12 | 12 | 12 | 100% |
+| UPDATE | 7 | 7 | 7 | 100% |
+| GET/READ | 33 | 19 | 33 | 58% |
 | DELETE | 1 | 1 | 1 | 100% |
 | UTILITY | 4 | 3 | 4 | 75% |
-| **TOTAL** | **57** | **34** | **57** | **60%** |
+| **TOTAL** | **57** | **42** | **57** | **74%** |
 
 ### Overall Coverage
 
 - **Handlers with test files**: 57/57 (100%)
-- **Handlers with test-config.yaml sections**: 34/57 (60%)
+- **Handlers with test-config.yaml sections**: 42/57 (74%) ⬆️ (was 60%)
 - **Critical path coverage** (Create → Update → Get → Delete): ✅ Fully covered
+- **Cloud vs S4HANA**: Tests support both environments (Cloud: FUGR/CLAS, S4HANA: PROG/P with enabled: false)
 
 ## Recommendations
 
 ### High Priority
 
-1. **Add missing CREATE configs**: `create_table`, `create_structure`, `create_view`
-2. **Add missing UPDATE configs**: `update_view_source`
-3. **Add missing GET configs for commonly used handlers**: 
-   - `get_prog_full_code`
-   - `get_includes_list`
-   - `get_objects_list`
-   - `get_object_structure`
+1. ✅ **Add missing CREATE configs**: `create_table`, `create_structure`, `create_view` - **COMPLETED**
+2. ✅ **Add missing UPDATE configs**: `update_view_source` - **COMPLETED**
+3. ✅ **Add missing GET configs for commonly used handlers**: 
+   - ✅ `get_prog_full_code` - **COMPLETED**
+   - ✅ `get_includes_list` - **COMPLETED**
+   - ✅ `get_objects_list` - **COMPLETED**
+   - ✅ `get_object_structure` - **COMPLETED**
 
 ### Medium Priority
 

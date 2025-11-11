@@ -54,23 +54,28 @@ All CREATE/UPDATE/DELETE tests have been migrated to use YAML configuration:
 - [x] test-get-structure.js - `get_structure` ✅
 
 #### Group 2: Additional GET Tests (enabled: false, can be enabled)
-- [ ] test-get-package.js - `get_package`
-- [ ] test-get-include.js - `get_include`
-- [ ] test-get-type-info.js - `get_type_info`
-- [ ] test-get-interface.js - `get_interface`
-- [ ] test-get-transaction.js - `get_transaction`
-- [ ] test-get-enhancements.js - `get_enhancements`
-- [ ] test-get-sql-query.js - `get_sql_query`
+- [x] test-get-package.js - `get_package` ✅
+- [x] test-get-include.js - `get_include` ✅ (disabled for Cloud, S4HANA only)
+- [x] test-get-type-info.js - `get_type_info` ✅
+- [x] test-get-interface.js - `get_interface` ✅
+- [x] test-get-transaction.js - `get_transaction` ✅
+- [x] test-get-enhancements.js - `get_enhancements` ✅
+- [x] test-get-sql-query.js - `get_sql_query` ✅
+- [x] test-get-prog-full-code.js - `get_prog_full_code` ✅ (Cloud: FUGR, S4HANA: PROG/P)
+- [x] test-get-includes-list.js - `get_includes_list` ✅ (Cloud: FUGR, S4HANA: PROG/P)
+- [x] test-get-objects-list.js - `get_objects_list` ✅ (Cloud: FUGR, S4HANA: PROG/P)
+- [x] test-get-object-structure.js - `get_object_structure` ✅
 
 #### Group 3: Search Test
 - [x] test-search-object.js - `search_object` ✅
 
 **Current Status:** 
 - ✅ Group 1 (7 tests) - COMPLETED
+- ✅ Group 2 (11 tests) - COMPLETED (all migrated to test-helper)
 - ✅ Group 3 (1 test) - COMPLETED (test-search-object.js)
-- YAML configs created for all GET handlers
-- Template created and applied to Group 1 and Group 3 tests
-- Need to apply template to Group 2 tests (7 files)
+- ✅ YAML configs created for all GET handlers
+- ✅ Template created and applied to all GET tests
+- ✅ Cloud/S4HANA compatibility: Tests support both (Cloud uses FUGR/CLAS, S4HANA uses PROG/P with enabled: false)
 
 ---
 
@@ -107,16 +112,21 @@ After all GET tests are migrated:
 
 ## 📊 Progress
 
-**Completed:** 26/32 test files (81%)
+**Completed:** 37/37 test files (100%) ✅
 - CREATE/UPDATE/DELETE: 18/18 ✅
-- GET/SEARCH: 8/14 ⏳ (Group 1 ✅ + Group 3 ✅)
+- GET/SEARCH: 19/19 ✅ (Group 1 ✅ + Group 2 ✅ + Group 3 ✅)
+
+**Recent Updates (2025-01-11):**
+1. ✅ Added high-priority test configs: `create_table`, `create_structure`, `create_view`, `update_view_source`
+2. ✅ Added GET test configs: `get_prog_full_code`, `get_includes_list`, `get_objects_list`, `get_object_structure`
+3. ✅ Updated all GET tests to use `test-helper` and `getAllEnabledTestCases()`
+4. ✅ Added Cloud/S4HANA compatibility: Cloud tests use FUGR/CLAS, S4HANA tests (PROG/P) have `enabled: false` by default
+5. ✅ Test coverage increased from 60% to 74% in test-config.yaml
 
 **Next Steps:**
-1. ✅ Apply YAML template to Group 1 GET tests (7 files) - DONE
-2. ✅ Update test-search-object.js to use getAllEnabledTestCases format - DONE
-3. Apply YAML template to Group 2 GET tests (7 files)
-4. Refactor index.test.ts to use test file imports
+1. Refactor index.test.ts to use test file imports (optional)
+2. Add remaining GET configs for advanced handlers (optional)
 
 ---
 
-Last Updated: 2025-11-11
+Last Updated: 2025-01-11

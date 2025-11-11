@@ -1,44 +1,72 @@
-// Test for handleGetObjectsList
+/**
+ * Test GetObjectsList handler
+ * Tests retrieving list of objects for a parent object
+ */
+
+const {
+  initializeTestEnvironment,
+  getAllEnabledTestCases,
+  printTestHeader,
+  printTestParams,
+  printTestResult
+} = require('./test-helper');
+
+// Initialize test environment
+initializeTestEnvironment();
 
 const { handleGetObjectsList } = require('../dist/handlers/handleGetObjectsList');
-const assert = require('assert');
 
-async function run() {
-    // Test parameters: replace with values that match your system
-    // Allow overriding parameters from the command line
-    const parent_name = process.argv[2] || '/CBY/PURBOOK_EN';
-    const parent_type = process.argv[3] || 'PROG/P';
-    const args = {
-        parent_name,
-        parent_tech_name: parent_name,
-        parent_type,
-        with_short_descriptions: true
-    };
+async function testGetObjectsList() {
+  const testCases = getAllEnabledTestCases('get_objects_list');
 
-    const result = await handleGetObjectsList(args);
+  console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
 
-    // Verify that the result contains a content array with objects
-    assert(result && result.content && Array.isArray(result.content), 'Result must have content array');
-    const jsonBlock = result.content.find(x => x.type === 'json');
-    assert(jsonBlock, 'Result must contain JSON block');
-    assert(jsonBlock.json && Array.isArray(jsonBlock.json.objects), 'JSON must have objects array');
-    assert(jsonBlock.json.objects.length > 0, 'Objects array must not be empty');
+  let passedTests = 0;
+  let failedTests = 0;
 
-    // Log the retrieved objects for manual inspection
-    console.dir(jsonBlock.json.objects, { depth: null, maxArrayLength: 100 });
+  for (const testCase of testCases) {
+    printTestHeader('GetObjectsList', testCase);
+    const params = testCase.params;
 
-    // Ensure each object includes OBJECT_TYPE, OBJECT_NAME, TECH_NAME, and OBJECT_URI
-    for (const obj of jsonBlock.json.objects) {
-        assert(obj.OBJECT_TYPE, 'Each object must have OBJECT_TYPE');
-        assert(obj.OBJECT_NAME, 'Each object must have OBJECT_NAME');
-        assert(obj.TECH_NAME, 'Each object must have TECH_NAME');
-        assert(obj.OBJECT_URI, 'Each object must have OBJECT_URI');
+    printTestParams(params);
+    console.log('--- Retrieving objects list ---\n');
+
+    try {
+      const result = await handleGetObjectsList(params);
+
+      if (printTestResult(result, 'GetObjectsList')) {
+        passedTests++;
+      } else {
+        failedTests++;
+      }
+
+    } catch (error) {
+      console.error('❌ Unexpected error:');
+      console.error(error);
+      failedTests++;
     }
 
-    console.log('handleGetObjectsList test passed');
+    console.log('\n' + '='.repeat(60) + '\n');
+  }
+
+  console.log(`\n📊 Test Summary:`);
+  console.log(`   ✅ Passed: ${passedTests}`);
+  console.log(`   ❌ Failed: ${failedTests}`);
+  console.log(`   📝 Total:  ${testCases.length}`);
+
+  if (failedTests > 0) {
+    process.exit(1);
+  }
 }
 
-run().catch(e => {
-    console.error('handleGetObjectsList test failed:', e);
+// Run tests
+testGetObjectsList()
+  .then(() => {
+    console.log('\n=== All tests completed successfully ===');
+    process.exit(0);
+  })
+  .catch(error => {
+    console.error('\n=== Tests failed ===');
+    console.error(error);
     process.exit(1);
-});
+  });

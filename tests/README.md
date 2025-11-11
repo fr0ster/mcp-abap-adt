@@ -87,6 +87,16 @@ main();
 - Update transport requests before running write operations
 - Run `npm run build` before testing
 
+## 🌐 Cloud vs S4HANA Compatibility
+
+Tests are configured to support both Cloud and S4HANA environments:
+
+- **Cloud-compatible tests** (enabled: true): Use FUGR (Function Groups) and CLAS/OC (Classes)
+- **S4HANA-only tests** (enabled: false): Use PROG/P (Programs) - can be enabled for on-premise systems
+- **Test configs** include both variants where applicable (e.g., `get_prog_full_code` has both FUGR and PROG/P test cases)
+
+To enable S4HANA tests, set `enabled: true` in `test-config.yaml` for the corresponding test cases.
+
 ## Test Categories
 
 ### Activation Tests
@@ -123,15 +133,18 @@ main();
 - `test-rm07docs-fast.js` - Fast timeout tests for RM07DOCS
 
 ### Include Tests
-- `test-get-includes-list.js` - Test include list retrieval
+- `test-get-includes-list.js` - Test include list retrieval (uses test-helper, supports Cloud/FUGR and S4HANA/PROG)
 - `test-includes-list-timeout.js` - Test include list timeout handling
 
-### Program Tests
-- `test-get-program.js` - Test program retrieval
-- `test-sapmv45a-large-program.js` - Test large program handling (SAPMV45A)
-- `test-sapmv45a-large-program-fixed.js` - Fixed version of large program test
+### Program/Function Group Tests
+- `test-get-program.js` - Test program retrieval (S4HANA only, disabled in Cloud)
+- `test-get-prog-full-code.js` - Test full code retrieval with includes (Cloud: FUGR, S4HANA: PROG/P)
+- `test-sapmv45a-large-program.js` - Test large program handling (SAPMV45A, S4HANA only)
+- `test-sapmv45a-large-program-fixed.js` - Fixed version of large program test (S4HANA only)
 
-### Object Structure Tests
+### Object List/Structure Tests
+- `test-get-objects-list.js` - Test objects list retrieval (uses test-helper, supports Cloud/FUGR and S4HANA/PROG)
+- `test-get-object-structure.js` - Test object structure retrieval (uses test-helper)
 - `test-node-structure.js` - Test SAP node structure API
 - `test-related-objects.js` - Test related objects functionality
 - `test-simplified-related-types.js` - Simplified related types test

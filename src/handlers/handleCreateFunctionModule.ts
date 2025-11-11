@@ -1,6 +1,6 @@
 /**
  * Handler: CreateFunctionModule
- * 
+ *
  * Creates a new ABAP function module within an existing function group.
  * Workflow based on Eclipse ADT API:
  * 1. Create function module metadata (POST with XML)
@@ -8,7 +8,7 @@
  * 3. Upload source code (PUT)
  * 4. UNLOCK function module (POST with _action=UNLOCK)
  * 5. Activate (POST to activation endpoint)
- * 
+ *
  * @param function_group_name - Parent function group name (e.g., ZOK_FUNC_TEST_0001)
  * @param function_module_name - Function module name (e.g., Z_OK_TEST_0001)
  * @param source_code - ABAP source code for the function module
@@ -18,7 +18,7 @@
  */
 
 import { AxiosResponse } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName, logger } from '../lib/utils';
+import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName, logger, getSystemInformation } from '../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
@@ -27,28 +27,28 @@ export const TOOL_DEFINITION = {
   inputSchema: {
     type: "object",
     properties: {
-      function_group_name: { 
-        type: "string", 
-        description: "Parent function group name (e.g., ZTEST_FG_001)" 
+      function_group_name: {
+        type: "string",
+        description: "Parent function group name (e.g., ZTEST_FG_001)"
       },
-      function_module_name: { 
-        type: "string", 
-        description: "Function module name (e.g., Z_TEST_FUNCTION_001). Must follow SAP naming conventions (start with Z or Y, max 30 chars)." 
+      function_module_name: {
+        type: "string",
+        description: "Function module name (e.g., Z_TEST_FUNCTION_001). Must follow SAP naming conventions (start with Z or Y, max 30 chars)."
       },
-      source_code: { 
-        type: "string", 
-        description: "ABAP source code for the function module including signature (FUNCTION name IMPORTING/EXPORTING ... ENDFUNCTION)." 
+      source_code: {
+        type: "string",
+        description: "ABAP source code for the function module including signature (FUNCTION name IMPORTING/EXPORTING ... ENDFUNCTION)."
       },
-      description: { 
-        type: "string", 
-        description: "Optional description for the function module" 
+      description: {
+        type: "string",
+        description: "Optional description for the function module"
       },
-      transport_request: { 
-        type: "string", 
-        description: "Transport request number (e.g., E19K905635). Required for transportable packages." 
+      transport_request: {
+        type: "string",
+        description: "Transport request number (e.g., E19K905635). Required for transportable packages."
       },
-      activate: { 
-        type: "boolean", 
+      activate: {
+        type: "boolean",
         description: "Whether to activate the function module after creation (default: true)",
         default: true
       }
@@ -77,19 +77,25 @@ async function createFunctionModuleMetadata(
 ): Promise<AxiosResponse> {
   const baseUrl = await getBaseUrl();
   const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
-  
+
   let url = `${baseUrl}/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules`;
   if (corrNr) {
     url += `?corrNr=${corrNr}`;
   }
-  
+
   logger.info(`📝 Creating function module metadata: ${functionModuleName}`);
-  
+  logger.info(`   Function Group: ${functionGroupName}`);
+  logger.info(`   URL: ${url}`);
+
+  // Function Module XML doesn't need masterSystem/responsible attributes
+  // It's a child object of Function Group, which already has these attributes
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
 <fmodule:abapFunctionModule xmlns:fmodule="http://www.sap.com/adt/functions/fmodules" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:name="${functionModuleName}" adtcore:type="FUGR/FF">
   <adtcore:containerRef adtcore:name="${functionGroupName}" adtcore:type="FUGR/F" adtcore:uri="/sap/bc/adt/functions/groups/${encodedGroupName}"/>
 </fmodule:abapFunctionModule>`;
-  
+
+  logger.info(`   XML payload: ${xmlPayload}`);
+
   const response = await makeAdtRequestWithTimeout(
     url,
     'POST',
@@ -101,9 +107,9 @@ async function createFunctionModuleMetadata(
       'Accept': 'application/vnd.sap.adt.functions.fmodules+xml'
     }
   );
-  
+
   logger.info(`✅ Function module metadata created: ${functionModuleName}`);
-  
+
   return response;
 }
 
@@ -118,10 +124,11 @@ async function lockFunctionModule(
   const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
   const encodedModuleName = encodeSapObjectName(functionModuleName).toLowerCase();
   const url = `${baseUrl}/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules/${encodedModuleName}?_action=LOCK&accessMode=MODIFY`;
-  
+
   logger.info(`🔒 Locking function module: ${functionModuleName} in group ${functionGroupName}`);
   logger.info(`   Lock URL: ${url}`);
-  
+  logger.info(`   Encoded Group: ${encodedGroupName}, Encoded Module: ${encodedModuleName}`);
+
   const response = await makeAdtRequestWithTimeout(
     url,
     'POST',
@@ -133,30 +140,30 @@ async function lockFunctionModule(
       'x-sap-adt-sessiontype': 'stateful'
     }
   );
-  
+
   logger.info(`   Lock response status: ${response.status}`);
   logger.info(`   Lock response headers set-cookie: ${JSON.stringify(response.headers['set-cookie'])}`);
   logger.info(`   Lock response data (first 200 chars): ${typeof response.data === 'string' ? response.data.substring(0, 200) : JSON.stringify(response.data).substring(0, 200)}`);
-  
+
   // Parse lock handle from XML response
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '@_'
   });
-  
+
   const lockData = parser.parse(response.data);
   const lockHandle = lockData['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-  
+
   if (!lockHandle) {
     logger.error(`Failed to parse lock handle from response. Full response data: ${JSON.stringify(response.data)}`);
     logger.error(`Parsed lock data: ${JSON.stringify(lockData)}`);
     throw new Error('Failed to acquire lock handle from response');
   }
-  
+
   logger.info(`✅ Function module locked, handle: ${lockHandle}`);
   logger.info(`   Lock response status: ${response.status}`);
   logger.info(`   Lock response headers: ${JSON.stringify(response.headers)}`);
-  
+
   return lockHandle;
 }
 
@@ -173,19 +180,19 @@ async function uploadFunctionModuleSource(
   const baseUrl = await getBaseUrl();
   const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
   const encodedModuleName = encodeSapObjectName(functionModuleName).toLowerCase();
-  
+
   // Build URL with lockHandle and corrNr as query parameters
   let url = `${baseUrl}/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules/${encodedModuleName}/source/main?lockHandle=${lockHandle}`;
   if (corrNr) {
     url += `&corrNr=${corrNr}`;
   }
-  
+
   logger.info(`📤 Uploading source code for function module: ${functionModuleName}`);
   logger.info(`   URL: ${url}`);
   logger.info(`   LockHandle: ${lockHandle}`);
   logger.info(`   Source code length: ${sourceCode.length} chars`);
-  logger.info(`   Source preview: ${sourceCode.substring(0, 100)}...`);
-  
+  logger.info(`   Source code:\n${sourceCode}`);
+
   const response = await makeAdtRequestWithTimeout(
     url,
     'PUT',
@@ -199,7 +206,7 @@ async function uploadFunctionModuleSource(
       'x-sap-adt-sessiontype': 'stateful'
     }
   );  logger.info(`✅ Function module source uploaded successfully`);
-  
+
   return response;
 }
 
@@ -215,9 +222,9 @@ async function unlockFunctionModule(
   const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
   const encodedModuleName = encodeSapObjectName(functionModuleName).toLowerCase();
   const url = `${baseUrl}/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules/${encodedModuleName}?_action=UNLOCK&lockHandle=${lockHandle}`;
-  
+
   logger.info(`🔓 Unlocking function module: ${functionModuleName}`);
-  
+
   const response = await makeAdtRequestWithTimeout(
     url,
     'POST',
@@ -229,9 +236,9 @@ async function unlockFunctionModule(
       'x-sap-adt-sessiontype': 'stateful'
     }
   );
-  
+
   logger.info(`✅ Function module unlocked successfully`);
-  
+
   return response;
 }
 
@@ -246,14 +253,14 @@ async function activateFunctionModule(
   const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
   const encodedModuleName = encodeSapObjectName(functionModuleName).toLowerCase();
   const objectUri = `/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules/${encodedModuleName}`;
-  
+
   logger.info(`⚡ Activating function module: ${functionModuleName}`);
-  
+
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
 <adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
   <adtcore:objectReference adtcore:uri="${objectUri}" adtcore:name="${functionModuleName}"/>
 </adtcore:objectReferences>`;
-  
+
   const response = await makeAdtRequestWithTimeout(
     `${baseUrl}/sap/bc/adt/activation`,
     'POST',
@@ -265,9 +272,9 @@ async function activateFunctionModule(
       'Accept': 'application/xml'
     }
   );
-  
+
   logger.info(`✅ Function module activated successfully`);
-  
+
   return response;
 }
 
@@ -288,20 +295,20 @@ export async function handleCreateFunctionModule(args: any) {
   if (!function_group_name || !function_module_name || !source_code) {
     return return_error('function_group_name, function_module_name, and source_code are required');
   }
-  
+
   // Validate function module name (max 30 chars, SAP naming)
   if (function_module_name.length > 30) {
     return return_error('Function module name must not exceed 30 characters');
   }
-  
+
   if (!/^[ZY]/i.test(function_module_name)) {
     return return_error('Function module name must start with Z or Y (customer namespace)');
   }
-  
+
   logger.info(`🚀 Starting CreateFunctionModule: ${function_module_name} in ${function_group_name}`);
-  
+
   let lockHandle: string | undefined;
-  
+
   try {
     // Step 1: Create function module metadata
     await createFunctionModuleMetadata(
@@ -310,10 +317,10 @@ export async function handleCreateFunctionModule(args: any) {
       description || function_module_name,
       transport_request
     );
-    
+
     // Step 2: Lock function module
     lockHandle = await lockFunctionModule(function_group_name, function_module_name);
-    
+
     // Step 3: Upload source code
     await uploadFunctionModuleSource(
       function_group_name,
@@ -322,18 +329,18 @@ export async function handleCreateFunctionModule(args: any) {
       transport_request,
       source_code
     );
-    
+
     // Step 4: Unlock function module
     await unlockFunctionModule(function_group_name, function_module_name, lockHandle);
     lockHandle = undefined; // Mark as unlocked
-    
+
     // Step 5: Activate (if requested)
     if (activate) {
       await activateFunctionModule(function_group_name, function_module_name);
     }
-    
+
     logger.info(`✅ CreateFunctionModule completed successfully: ${function_module_name}`);
-    
+
     return return_response({
       data: {
         success: true,
@@ -344,10 +351,10 @@ export async function handleCreateFunctionModule(args: any) {
         message: `Function module ${function_module_name} created successfully${activate ? ' and activated' : ''}`
       }
     } as AxiosResponse);
-    
+
   } catch (error: any) {
     logger.error(`❌ CreateFunctionModule failed: ${error}`);
-    
+
     // Try to unlock if we have a lock handle
     if (lockHandle) {
       try {
@@ -357,10 +364,10 @@ export async function handleCreateFunctionModule(args: any) {
         logger.error(`❌ Failed to unlock after error: ${unlockError}`);
       }
     }
-    
+
     // Parse error message for better user feedback
     let errorMessage = `Failed to create function module: ${error}`;
-    
+
     if (error.response?.status === 400) {
       errorMessage = `Bad request. Check if function module name is valid and function group exists.`;
     } else if (error.response?.status === 404) {
@@ -383,7 +390,7 @@ export async function handleCreateFunctionModule(args: any) {
         // Ignore parse errors, use default message
       }
     }
-    
+
     return return_error(errorMessage);
   }
 }

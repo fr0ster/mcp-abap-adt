@@ -1,6 +1,6 @@
 /**
  * CreatePackage Handler - Create ABAP Package via ADT API
- * 
+ *
  * Eclipse ADT workflow for package creation:
  * 1. POST /sap/bc/adt/packages/validation - Validate package parameters (basic check)
  * 2. POST /sap/bc/adt/cts/transportchecks - Check transport requirements
@@ -53,6 +53,10 @@ export const TOOL_DEFINITION = {
       application_component: {
         type: "string",
         description: "Application component (optional, e.g., BC-ABA)"
+      },
+      responsible: {
+        type: "string",
+        description: "User responsible for the package (e.g., CB9980002377). If not provided, uses SAP_USERNAME or SAP_USER environment variable."
       }
     },
     required: ["package_name", "super_package"]
@@ -68,6 +72,7 @@ interface CreatePackageArgs {
   transport_layer?: string;
   transport_request?: string;
   application_component?: string;
+  responsible?: string;
 }
 
 /**
@@ -116,7 +121,7 @@ async function checkTransportRequirements(
   transportLayer: string
 ): Promise<string[]> {
   const url = `${baseUrl}/sap/bc/adt/cts/transportchecks`;
-  
+
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
   <asx:values>
     <DATA>
@@ -133,8 +138,8 @@ async function checkTransportRequirements(
 </asx:abap>`;
 
   console.log('[DEBUG] Step 2: Checking transport requirements');
-  const response = await makeAdtRequestWithTimeout(url, 'POST', 'default', xmlBody, 
-    { transportLayer }, 
+  const response = await makeAdtRequestWithTimeout(url, 'POST', 'default', xmlBody,
+    { transportLayer },
     {
       'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.transport.service.checkData',
       'Content-Type': 'application/vnd.sap.as+xml; charset=UTF-8; dataname=com.sap.adt.transport.service.checkData'
@@ -206,42 +211,55 @@ async function createPackage(
   baseUrl: string,
   swcomp: string,
   transportLayer: string,
-  transportRequest: string
+  transportRequest?: string,
+  isLocalPackage?: boolean
 ): Promise<any> {
   const url = `${baseUrl}/sap/bc/adt/packages`;
-  const username = process.env.SAP_USERNAME || process.env.SAP_USER || 'DEVELOPER';
-  
+  const username = args.responsible || process.env.SAP_USERNAME || process.env.SAP_USER || 'DEVELOPER';
+
+  // For local packages: softwareComponent = "ZLOCAL", transportLayer empty
+  // For transportable packages: softwareComponent = swcomp (HOME), transportLayer = transportLayer
+  const softwareComponentName = isLocalPackage ? 'ZLOCAL' : swcomp;
+  const transportLayerXml = isLocalPackage
+    ? '<pak:transportLayer/>'
+    : `<pak:transportLayer pak:name="${transportLayer}"/>`;
+
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${args.description || args.package_name}" adtcore:language="EN" adtcore:name="${args.package_name}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="EN" adtcore:masterSystem="${process.env.SAP_SYSTEM || 'E19'}" adtcore:responsible="${username}">
-    
+
   <adtcore:packageRef adtcore:name="${args.package_name}"/>
-    
-  <pak:attributes pak:isEncapsulated="true" pak:packageType="${args.package_type || 'development'}"/>
-    
+
+  <pak:attributes pak:isEncapsulated="false" pak:packageType="${args.package_type || 'development'}" pak:recordChanges="false"/>
+
   <pak:superPackage adtcore:name="${args.super_package}"/>
-    
-  <pak:applicationComponent pak:name="${args.application_component || ''}"/>
-    
+
+  <pak:applicationComponent/>
+
   <pak:transport>
-        
-    <pak:softwareComponent pak:name="${swcomp}"/>
-        
-    <pak:transportLayer pak:name="${transportLayer}"/>
-      
+
+    <pak:softwareComponent pak:name="${softwareComponentName}"/>
+
+    ${transportLayerXml}
+
   </pak:transport>
-    
+
   <pak:translation/>
-    
+
   <pak:useAccesses/>
-    
+
   <pak:packageInterfaces/>
-    
+
   <pak:subPackages/>
-  
+
 </pak:package>`;
 
   console.log('[DEBUG] Step 4: Creating package');
+
+  // For local packages: no corrNr in query params
+  // For transportable packages: include corrNr
+  const queryParams = transportRequest ? { corrNr: transportRequest } : undefined;
+
   const response = await makeAdtRequestWithTimeout(url, 'POST', 'default', xmlBody,
-    { corrNr: transportRequest },
+    queryParams,
     {
       'Accept': 'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml',
       'Content-Type': 'application/vnd.sap.adt.packages.v2+xml'
@@ -250,7 +268,7 @@ async function createPackage(
 
   const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
   const result = parser.parse(response.data);
-  
+
   console.log('[DEBUG] Package created successfully');
   return result['pak:package'];
 }
@@ -260,11 +278,11 @@ async function createPackage(
  */
 async function checkPackage(packageName: string, baseUrl: string): Promise<void> {
   const url = `${baseUrl}/sap/bc/adt/checkruns`;
-  
+
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
-    
+
   <chkrun:checkObject adtcore:uri="/sap/bc/adt/packages/${packageName.toLowerCase()}" chkrun:version="active"/>
-  
+
 </chkrun:checkObjectList>`;
 
   console.log('[DEBUG] Step 5: Checking package');
@@ -276,7 +294,7 @@ async function checkPackage(packageName: string, baseUrl: string): Promise<void>
   const parser = new XMLParser({ ignoreAttributes: false });
   const result = parser.parse(response.data);
   const reports = result['chkrun:checkRunReports']?.['chkrun:checkReport'];
-  
+
   if (reports) {
     const status = reports['@_chkrun:status'] || reports['status'];
     console.log('[DEBUG] Check status:', status);
@@ -303,35 +321,56 @@ export async function handleCreatePackage(args: any) {
     console.log(`[DEBUG] Super package: ${typedArgs.super_package}`);
     console.log(`[DEBUG] Type: ${typedArgs.package_type || 'development'}`);
 
+    // Determine if this is a local package
+    // Local package = no transport_request AND no software_component AND no transport_layer
+    const hasTransportRequest = !!typedArgs.transport_request;
+    const hasSoftwareComponent = !!typedArgs.software_component;
+    const hasTransportLayer = !!typedArgs.transport_layer;
+
+    const isLocalPackage = !hasTransportRequest && !hasSoftwareComponent && !hasTransportLayer;
+
     // Determine software component and transport layer
+    // For local packages: use HOME and empty layer (will be overridden to ZLOCAL in XML)
+    // For transportable packages: use provided or defaults
     const swcomp = typedArgs.software_component || 'HOME';
     const transportLayer = typedArgs.transport_layer || process.env.SAP_TRANSPORT_LAYER || 'ZE19';
 
     // Step 1: Basic validation
     await validatePackageBasic(typedArgs, baseUrl);
 
-    // Step 2: Check transport requirements
-    const availableTransports = await checkTransportRequirements(typedArgs, baseUrl, transportLayer);
-
-    // Determine transport request to use
+    // Step 2: Check transport requirements (only for non-local packages)
     let transportRequest = typedArgs.transport_request;
-    if (!transportRequest && availableTransports.length > 0) {
-      transportRequest = availableTransports[0];
-      console.log(`[DEBUG] Using first available transport: ${transportRequest}`);
+    if (!isLocalPackage && transportLayer) {
+      const availableTransports = await checkTransportRequirements(typedArgs, baseUrl, transportLayer);
+
+      // Use provided transport or first available
+      if (!transportRequest && availableTransports.length > 0) {
+        transportRequest = availableTransports[0];
+        console.log(`[DEBUG] Using first available transport: ${transportRequest}`);
+      }
     }
 
-    if (!transportRequest) {
+    // Transport request is optional for local packages
+    if (transportRequest) {
+      console.log(`[DEBUG] Using transport request: ${transportRequest}`);
+    } else if (isLocalPackage) {
+      console.log(`[DEBUG] Creating local package (no transport request, software component, or transport layer)`);
+    } else {
       throw new McpError(
         ErrorCode.InvalidParams,
-        'Transport request is required. Please provide transport_request parameter or create a transport first.'
+        'Transport request is required for transportable packages. Please provide transport_request parameter or create a transport first.'
       );
     }
 
-    // Step 3: Full validation
-    await validatePackageFull(typedArgs, baseUrl, swcomp, transportLayer);
+    // Step 3: Full validation (only for non-local packages)
+    if (!isLocalPackage) {
+      await validatePackageFull(typedArgs, baseUrl, swcomp, transportLayer);
+    } else {
+      console.log(`[DEBUG] Skipping full validation for local package`);
+    }
 
     // Step 4: Create package
-    const packageData = await createPackage(typedArgs, baseUrl, swcomp, transportLayer, transportRequest);
+    const packageData = await createPackage(typedArgs, baseUrl, swcomp, transportLayer, transportRequest, isLocalPackage);
 
     // Step 5: Check package
     await checkPackage(typedArgs.package_name, baseUrl);

@@ -1,53 +1,72 @@
 /**
- * Test script for GetClass handler
- * Configuration loaded from tests/test-config.yaml
+ * Test GetClass handler
+ * Tests retrieving class source code
  */
 
 const {
   initializeTestEnvironment,
-  getEnabledTestCase,
+  getAllEnabledTestCases,
   printTestHeader,
   printTestParams,
   printTestResult
 } = require('./test-helper');
 
-// Initialize test environment before importing handlers
+// Initialize test environment
 initializeTestEnvironment();
 
 const { handleGetClass } = require('../dist/handlers/handleGetClass');
 
-async function main() {
-  try {
-    // Load test case from YAML (or use command line arg)
-    let testArgs;
+async function testGetClass() {
+  const testCases = getAllEnabledTestCases('get_class');
+  
+  console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
+  
+  let passedTests = 0;
+  let failedTests = 0;
+  
+  for (const testCase of testCases) {
+    printTestHeader('GetClass', testCase);
+    const params = testCase.params;
     
-    if (process.argv[2]) {
-      // Command line argument takes precedence
-      testArgs = {
-        class_name: process.argv[2],
-        filePath: process.argv[3] || undefined
-      };
-      console.log('Using command line arguments');
-      printTestParams(testArgs);
-    } else {
-      // Load from YAML config
-      const testCase = getEnabledTestCase('get_class');
-      printTestHeader('GetClass', testCase);
-      testArgs = testCase.params;
-      printTestParams(testArgs);
+    printTestParams(params);
+    console.log('--- Retrieving class ---\n');
+    
+    try {
+      const result = await handleGetClass(params);
+      
+      if (printTestResult(result, 'GetClass')) {
+        passedTests++;
+      } else {
+        failedTests++;
+      }
+      
+    } catch (error) {
+      console.error('❌ Unexpected error:');
+      console.error(error);
+      failedTests++;
     }
-
-    const result = await handleGetClass(testArgs);
     
-    if (!printTestResult(result, 'GetClass')) {
-      process.exit(1);
-    }
-    
-    process.exit(0);
-  } catch (e) {
-    console.error('❌ Error:', e);
+    console.log('\n' + '='.repeat(60) + '\n');
+  }
+  
+  console.log(`\n📊 Test Summary:`);
+  console.log(`   ✅ Passed: ${passedTests}`);
+  console.log(`   ❌ Failed: ${failedTests}`);
+  console.log(`   📝 Total:  ${testCases.length}`);
+  
+  if (failedTests > 0) {
     process.exit(1);
   }
 }
 
-main();
+// Run the test
+testGetClass()
+  .then(() => {
+    console.log('\n=== All tests completed successfully ===');
+    process.exit(0);
+  })
+  .catch(error => {
+    console.error('\n=== Tests failed ===');
+    console.error(error);
+    process.exit(1);
+  });

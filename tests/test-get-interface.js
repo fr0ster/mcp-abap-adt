@@ -1,19 +1,72 @@
-// Test for handleGetInterface
+/**
+ * Test script for GetInterface MCP tool
+ * Tests reading interface information from SAP system
+ *
+ * Configuration is loaded from tests/test-config.yaml
+ */
 
-const { handleGetInterface } = require('../src/handlers/handleGetInterface');
+const {
+  initializeTestEnvironment,
+  getAllEnabledTestCases,
+  printTestHeader,
+  printTestParams,
+  printTestResult
+} = require('./test-helper');
 
-async function main() {
-  try {
-    const args = {
-      interface_name: process.argv[2] || 'ZIF_MY_INTERFACE'
-    };
-    const result = await handleGetInterface(args);
-    console.log('handleGetInterface result:', JSON.stringify(result, null, 2));
+// Initialize test environment before importing handlers
+initializeTestEnvironment();
+
+const { handleGetInterface } = require('../dist/handlers/handleGetInterface');
+
+async function testGetInterface() {
+  // Load all enabled test cases from YAML
+  const testCases = getAllEnabledTestCases('get_interface');
+
+  console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
+
+  let passedTests = 0;
+  let failedTests = 0;
+
+  for (const testCase of testCases) {
+    printTestHeader('GetInterface', testCase);
+
+    printTestParams(testCase.params);
+
+    try {
+      console.log('\n--- Retrieving interface ---\n');
+
+      const result = await handleGetInterface(testCase.params);
+
+      if (result.isError) {
+        throw new Error(result.content[0]?.text || 'Unknown error');
+      }
+
+      printTestResult(result, true);
+      passedTests++;
+    } catch (error) {
+      console.error(`\n❌ GetInterface test FAILED:`);
+      console.error(error.message || error);
+      failedTests++;
+    }
+
+    console.log('\n' + '='.repeat(60) + '\n');
+  }
+
+  console.log('\n📊 Test Summary:');
+  console.log(`   ✅ Passed: ${passedTests}`);
+  console.log(`   ❌ Failed: ${failedTests}`);
+  console.log(`   📝 Total:  ${testCases.length}\n`);
+
+  if (failedTests === 0) {
+    console.log('=== All tests completed successfully ===\n');
     process.exit(0);
-  } catch (e) {
-    console.error('Error:', e);
+  } else {
+    console.log('=== Some tests failed ===\n');
     process.exit(1);
   }
 }
 
-main();
+testGetInterface().catch((error) => {
+  console.error('Fatal error:', error);
+  process.exit(1);
+});

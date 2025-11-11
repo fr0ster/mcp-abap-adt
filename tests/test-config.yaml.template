@@ -1,156 +1,527 @@
 # Template for MCP ABAP ADT test configuration
 # Copy this file to test-config.yaml and fill in real values before running tests
+#
+# Tests are organized in groups with dependencies:
+# 1. Transport -> 2. Package -> 3. Create -> 4. Update -> 5. Get -> 6. Delete
+# Each object type uses the same object name across all operations
 
-# Domain Creation Tests
+# ============================================================================
+# GROUP 1: TRANSPORT MANAGEMENT
+# ============================================================================
+# Step 1: Create transport request (used by all subsequent tests)
+create_transport:
+  test_cases:
+    - name: "workbench_transport"
+      enabled: true
+      description: "Create a workbench transport request (required for package and transportable objects)"
+      params:
+        transport_type: "workbench"
+        description: "Test transport created via MCP for test suite"
+        owner: "<YOUR_RESPONSIBLE_USER>"  # ⚠️ UPDATE WITH YOUR USERNAME (e.g., CB9980002377)
+        # target_system: "<YOUR_TARGET>"  # Optional: if not provided or empty, uses "LOCAL"
+
+# Step 2: Get transport (read created transport)
+get_transport:
+  test_cases:
+    - name: "created_transport"
+      enabled: true
+      description: "Retrieve transport created by create_transport test"
+      params:
+        transport_number: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE WITH TRANSPORT FROM create_transport
+        include_objects: true
+        include_tasks: true
+
+# ============================================================================
+# GROUP 2: PACKAGE MANAGEMENT
+# ============================================================================
+# Step 1: Create package (uses transport from GROUP 1)
+create_package:
+  test_cases:
+    - name: "test_package"
+      enabled: true
+      description: "Create test package (used by all object creation tests)"
+      params:
+        package_name: "<YOUR_PACKAGE_NAME>"
+        description: "Test package created via MCP for test suite"
+        super_package: "<YOUR_SUPER_PACKAGE>"  # Use ZLOCAL OR $TMP for local packages
+        package_type: "development"
+        responsible: "<YOUR_RESPONSIBLE_USER>"  # ⚠️ UPDATE WITH YOUR USER ID (e.g., CB9980002377)
+        # software_component: "<YOUR_SOFTWARE_COMPONENT>"  # Optional - omit for local packages
+        # transport_layer: "<YOUR_TRANSPORT_LAYER>"  # Optional - omit for local packages
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional - omit for local packages
+        application_component: ""
+
+# Step 2: Get package (read created package)
+get_package:
+  test_cases:
+    - name: "test_package"
+      enabled: true
+      params:
+        package_name: "<YOUR_PACKAGE_NAME>"
+
+# ============================================================================
+# GROUP 3: DOMAIN - Full CRUD Cycle
+# ============================================================================
+# Object name: <YOUR_DOMAIN_NAME> (used in all domain tests)
+# Uses: package "<YOUR_PACKAGE_NAME>" + transport from GROUP 1
+
+# Step 1: Create domain
 create_domain:
   test_cases:
-    # Local package test - no transport required
-    - name: "local_char_domain"
+    - name: "test_domain"
       enabled: true
-      description: "Create a domain in $TMP (local package, no transport required)"
+      description: "Create test domain (used in subsequent domain tests)"
       params:
-        domain_name: "ZZ_TMP_DOMAIN_01"
-        description: "Test local domain in $TMP"
-        package_name: "$TMP"
-        # transport_request: not required for $TMP
-        datatype: "CHAR"
-        length: 50
-        decimals: 0
-        lowercase: false
-        sign_exists: false
-    
-    # Local package with fixed values
-    - name: "local_domain_with_fixed_values"
-      enabled: false
-      description: "Create a domain with fixed values in $TMP"
-      params:
-        domain_name: "ZZ_TMP_DOMAIN_FV"
-        description: "Test domain with fixed values"
-        package_name: "$TMP"
-        datatype: "CHAR"
-        length: 10
-        decimals: 0
-        lowercase: false
-        sign_exists: false
-        fixed_values:
-          - low: "001"
-            text: "First value"
-          - low: "002"
-            text: "Second value"
-          - low: "003"
-            text: "Third value"
-    
-    # Transportable package test - transport required
-    - name: "transportable_char_domain"
-      enabled: false
-      description: "Create a domain in transportable package (transport required)"
-      params:
-        domain_name: "ZZ_TEST_MCP_01"
+        domain_name: "<YOUR_DOMAIN_NAME>"
         description: "Test domain created via MCP"
-        package_name: "ZOK_LOCAL"
-        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
+        package_name: "<YOUR_PACKAGE_NAME>"
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE WITH TRANSPORT FROM create_transport
         datatype: "CHAR"
         length: 50
         decimals: 0
         lowercase: false
         sign_exists: false
 
-# Data Element Creation Tests
+# Step 2: Update domain
+update_domain:
+  test_cases:
+    - name: "test_domain"
+      enabled: true
+      description: "Update test domain created in create_domain"
+      params:
+        domain_name: "<YOUR_DOMAIN_NAME>"
+        description: "Updated test domain description"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE WITH TRANSPORT FROM create_transport
+        datatype: "CHAR"
+        length: 60
+        decimals: 0
+        lowercase: false
+        sign_exists: false
+
+# Step 3: Get domain
+get_domain:
+  test_cases:
+    - name: "test_domain"
+      enabled: true
+      params:
+        domain_name: "<YOUR_DOMAIN_NAME>"
+
+# Step 4: Delete domain (will be added to delete_object group)
+
+# ============================================================================
+# GROUP 4: DATA ELEMENT - Full CRUD Cycle
+# ============================================================================
+# Object name: <YOUR_DATA_ELEMENT_NAME> (used in all data element tests)
+# Uses: domain "<YOUR_DOMAIN_NAME>" + package "<YOUR_PACKAGE_NAME>" + transport
+
+# Step 1: Create data element
 create_data_element:
   test_cases:
-    - name: "basic_data_element"
-      enabled: false
-      description: "Create a simple data element based on domain"
+    - name: "test_data_element"
+      enabled: true
+      description: "Create test data element (uses domain from GROUP 3)"
       params:
-        data_element_name: "ZZ_E_TEST_MCP_01"
+        data_element_name: "<YOUR_DATA_ELEMENT_NAME>"
         description: "Test data element created via MCP"
-        package_name: "ZOK_LOCAL"
-        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
-        domain_name: "ZZ_TEST_MCP_01"  # Use domain created by create_domain test
+        package_name: "<YOUR_PACKAGE_NAME>"
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE WITH TRANSPORT FROM create_transport
+        domain_name: "<YOUR_DOMAIN_NAME>"  # Uses domain from GROUP 3
         data_type: "CHAR"
         length: 50
         decimals: 0
-        short_label: "ShortLbl"
-        medium_label: "Medium Label"
-        field_label_long: "MCP Test Field Long"
-        field_label_heading: "MCP Test Heading"
+        short_label: "TestLbl"
+        medium_label: "Test Field"
+        field_label_long: "Test Field Long Label"
+        field_label_heading: "Test Heading"
 
-# Data Element Update Tests
+# Step 2: Update data element
 update_data_element:
   test_cases:
-    # Update data element in $TMP
-    - name: "update_tmp_data_element"
-      enabled: false
-      description: "Update data element in $TMP package"
+    - name: "test_data_element"
+      enabled: true
+      description: "Update test data element created in create_data_element"
       params:
-        data_element_name: "ZZ_TMP_DTEL_01"
-        description: "Updated data element description"
-        package_name: "$TMP"
-        type_kind: "domain"  # domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType
-        type_name: "ZZ_TMP_DOMAIN_01"  # domain/data element/class name depending on type_kind
+        data_element_name: "<YOUR_DATA_ELEMENT_NAME>"
+        description: "Updated MCP data element"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE WITH TRANSPORT FROM create_transport
+        type_kind: "domain"
+        type_name: "<YOUR_DOMAIN_NAME>"
         field_label_short: "Upd Test"
         field_label_medium: "Updated Test Field"
         field_label_long: "Updated Test Field Long Label"
         field_label_heading: "Updated Test Heading"
-        search_help: ""
-        search_help_parameter: ""
-        set_get_parameter: ""
-        default_component_name: ""
-    
-    # Update data element in transportable package
-    - name: "update_transportable_data_element"
-      enabled: false
-      description: "Update data element in transportable package"
-      params:
-        data_element_name: "ZZ_TEST_DTEL_01"
-        description: "Updated MCP data element"
-        package_name: "ZOK_LOCAL"
-        transport_request: "YOURREQUEST"
-        type_kind: "domain"
-        type_name: "ZZ_TEST_MCP_01"
-        field_label_short: "Upd MCP"
-        field_label_medium: "Updated MCP Field"
-        field_label_long: "Updated MCP Field Long Label"
-        field_label_heading: "Updated MCP Heading"
 
-# Transport Management Tests
-create_transport:
+# Step 3: Get data element
+get_data_element:
   test_cases:
-    - name: "workbench_transport"
-      enabled: false
-      description: "Create a workbench transport request"
+    - name: "test_data_element"
+      enabled: true
       params:
-        transport_type: "workbench"
-        description: "Test transport created via MCP"
-        target_system: "QAS"  # Update with your target system
+        data_element_name: "<YOUR_DATA_ELEMENT_NAME>"
 
-get_transport:
+# Step 4: Delete data element (will be added to delete_object group)
+
+# ============================================================================
+# GROUP 5: CLASS - Full CRUD Cycle
+# ============================================================================
+# Object name: <YOUR_CLASS_NAME> (used in all class tests)
+# Uses: package "<YOUR_PACKAGE_NAME>" + transport
+
+# Step 1: Create class
+create_class:
   test_cases:
-    - name: "existing_transport"
-      enabled: false
-      description: "Retrieve existing transport information"
+    - name: "test_class"
+      enabled: true
+      description: "Create test class (used in subsequent class tests)"
       params:
-        transport_number: "<YOUR_TRANSPORT_NUMBER>"  # ⚠️ UPDATE WITH REAL TRANSPORT
-        include_objects: true
-        include_tasks: true
+        class_name: "<YOUR_CLASS_NAME>"
+        description: "Test ABAP Class created via MCP ABAP ADT"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE WITH TRANSPORT FROM create_transport
+        superclass: ""
+        final: false
+        abstract: false
+        create_protected: false
+        source_code: |
+          CLASS <YOUR_CLASS_NAME> DEFINITION
+            PUBLIC
+            FINAL
+            CREATE PUBLIC .
 
-# Program Tests
-get_program:
+            PUBLIC SECTION.
+              METHODS: constructor.
+            PROTECTED SECTION.
+            PRIVATE SECTION.
+          ENDCLASS.
+
+          CLASS <YOUR_CLASS_NAME> IMPLEMENTATION.
+            METHOD constructor.
+              " Initialization logic here
+              WRITE: / 'Class instance created'.
+            ENDMETHOD.
+          ENDCLASS.
+
+# Step 2: Update class source
+update_class_source:
   test_cases:
-    - name: "standard_program"
-      enabled: false
+    - name: "test_class"
+      enabled: true
+      description: "Update test class created in create_class"
       params:
-        program_name: "SAPMV45A"
+        class_name: "<YOUR_CLASS_NAME>"
+        activate: true
+        source_code: |
+          CLASS <YOUR_CLASS_NAME> DEFINITION
+            PUBLIC
+            FINAL
+            CREATE PUBLIC .
 
-# Class Tests
+            PUBLIC SECTION.
+              METHODS:
+                constructor,
+                get_message RETURNING VALUE(rv_message) TYPE string.
+            PROTECTED SECTION.
+            PRIVATE SECTION.
+          ENDCLASS.
+
+          CLASS <YOUR_CLASS_NAME> IMPLEMENTATION.
+            METHOD constructor.
+              " Updated initialization logic
+              WRITE: / 'Class instance created - UPDATED'.
+            ENDMETHOD.
+
+            METHOD get_message.
+              rv_message = 'Updated message from MCP test'.
+            ENDMETHOD.
+          ENDCLASS.
+
+# Step 3: Get class
 get_class:
   test_cases:
-    - name: "standard_class"
+    - name: "test_class"
+      enabled: true
+      params:
+        class_name: "<YOUR_CLASS_NAME>"
+
+# Step 4: Delete class (will be added to delete_object group)
+
+# ============================================================================
+# GROUP 6: PROGRAM - Full CRUD Cycle
+# ============================================================================
+# Object name: <YOUR_PROGRAM_NAME> (used in all program tests)
+# Uses: package "<YOUR_PACKAGE_NAME>" + transport
+
+# Step 1: Create program
+create_program:
+  test_cases:
+    - name: "test_program"
+      enabled: true
+      description: "Create test program (used in subsequent program tests)"
+      params:
+        program_name: "<YOUR_PROGRAM_NAME>"
+        description: "Test ABAP Program created via MCP ABAP ADT"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE WITH TRANSPORT FROM create_transport
+        program_type: "1"
+        application: "*"
+        source_code: |
+          *&---------------------------------------------------------------------*
+          *& Report <YOUR_PROGRAM_NAME>
+          *& Test ABAP Program created via MCP ABAP ADT
+          *&---------------------------------------------------------------------*
+          REPORT <YOUR_PROGRAM_NAME>.
+
+          START-OF-SELECTION.
+            WRITE: / 'Program <YOUR_PROGRAM_NAME> executed successfully.'.
+            WRITE: / 'Created via MCP ABAP ADT API.'.
+
+# Step 2: Update program source
+update_program_source:
+  test_cases:
+    - name: "test_program"
+      enabled: true
+      description: "Update test program created in create_program"
+      params:
+        program_name: "<YOUR_PROGRAM_NAME>"
+        activate: true
+        source_code: |
+          *&---------------------------------------------------------------------*
+          *& Report <YOUR_PROGRAM_NAME>
+          *& UPDATED Test ABAP Program via MCP ABAP ADT
+          *&---------------------------------------------------------------------*
+          REPORT <YOUR_PROGRAM_NAME>.
+
+          START-OF-SELECTION.
+            WRITE: / 'Program <YOUR_PROGRAM_NAME> executed successfully - UPDATED'.
+            WRITE: / 'Updated via MCP ABAP ADT API.'.
+            WRITE: / 'Modification date:', sy-datum.
+
+# Step 3: Get program
+get_program:
+  test_cases:
+    - name: "test_program"
+      enabled: true
+      params:
+        program_name: "<YOUR_PROGRAM_NAME>"
+
+# Step 4: Delete program (will be added to delete_object group)
+
+# ============================================================================
+# GROUP 7: INTERFACE - Full CRUD Cycle
+# ============================================================================
+# Object name: <YOUR_INTERFACE_NAME> (used in all interface tests)
+# Uses: package "<YOUR_PACKAGE_NAME>" + transport
+
+# Step 1: Create interface
+create_interface:
+  test_cases:
+    - name: "test_interface"
+      enabled: true
+      description: "Create test interface (used in subsequent interface tests)"
+      params:
+        interface_name: "<YOUR_INTERFACE_NAME>"
+        description: "Test interface created via MCP"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE WITH TRANSPORT FROM create_transport
+        source_code: |
+          INTERFACE <YOUR_INTERFACE_NAME>
+            PUBLIC.
+
+            METHODS test_method
+              IMPORTING
+                iv_param TYPE string
+              RETURNING
+                VALUE(rv_result) TYPE string.
+
+          ENDINTERFACE.
+
+# Step 2: Update interface source
+update_interface_source:
+  test_cases:
+    - name: "test_interface"
+      enabled: true
+      description: "Update test interface created in create_interface"
+      params:
+        interface_name: "<YOUR_INTERFACE_NAME>"
+        activate: true
+        source_code: |
+          INTERFACE <YOUR_INTERFACE_NAME>
+            PUBLIC.
+
+            METHODS:
+              test_method
+                IMPORTING
+                  iv_param TYPE string
+                RETURNING
+                  VALUE(rv_result) TYPE string,
+              get_status RETURNING VALUE(rv_status) TYPE string.
+
+          ENDINTERFACE.
+
+# Step 3: Get interface
+get_interface:
+  test_cases:
+    - name: "test_interface"
+      enabled: true
+      params:
+        interface_name: "<YOUR_INTERFACE_NAME>"
+
+# Step 4: Delete interface (will be added to delete_object group)
+
+# ============================================================================
+# GROUP 8: DELETE OBJECTS (Cleanup)
+# ============================================================================
+# Delete all objects created in previous groups (in reverse order)
+delete_object:
+  test_cases:
+    - name: "delete_interface"
+      enabled: true
+      description: "Delete test interface from GROUP 7"
+      params:
+        test_interface_name: "<YOUR_INTERFACE_NAME>"
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE WITH TRANSPORT FROM create_transport
+        package_name: "<YOUR_PACKAGE_NAME>"
+
+    - name: "delete_program"
+      enabled: true
+      description: "Delete test program from GROUP 6"
+      params:
+        test_program_name: "<YOUR_PROGRAM_NAME>"
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE WITH TRANSPORT FROM create_transport
+        package_name: "<YOUR_PACKAGE_NAME>"
+
+    - name: "delete_class"
+      enabled: true
+      description: "Delete test class from GROUP 5"
+      params:
+        test_class_name: "<YOUR_CLASS_NAME>"
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE WITH TRANSPORT FROM create_transport
+        package_name: "<YOUR_PACKAGE_NAME>"
+
+    - name: "delete_data_element"
+      enabled: true
+      description: "Delete test data element from GROUP 4"
+      params:
+        test_data_element_name: "<YOUR_DATA_ELEMENT_NAME>"
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE WITH TRANSPORT FROM create_transport
+        package_name: "<YOUR_PACKAGE_NAME>"
+
+    - name: "delete_domain"
+      enabled: true
+      description: "Delete test domain from GROUP 3"
+      params:
+        test_domain_name: "<YOUR_DOMAIN_NAME>"
+        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE WITH TRANSPORT FROM create_transport
+        package_name: "<YOUR_PACKAGE_NAME>"
+
+# ============================================================================
+# ADDITIONAL GET TESTS (Read-only, no dependencies)
+# ============================================================================
+# These tests read standard SAP objects (no creation required)
+
+get_table:
+  test_cases:
+    - name: "standard_table"
+      enabled: true
+      params:
+        table_name: "MARA"
+
+get_table_contents:
+  test_cases:
+    - name: "limited_rows"
+      enabled: true
+      params:
+        table_name: "T000"
+        max_rows: 10
+
+# ============================================================================
+# GROUP 9: FUNCTION GROUP - Full CRUD Cycle
+# ============================================================================
+# Object name: <YOUR_FUNCTION_GROUP_NAME> (used in all function group tests)
+# Uses: package "<YOUR_PACKAGE_NAME>"
+
+# Step 1: Create function group
+create_function_group:
+  test_cases:
+    - name: "test_function_group"
+      enabled: true
+      description: "Create test function group (used in subsequent function group tests)"
+      params:
+        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
+        description: "Test function group created via MCP"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
+
+# Step 2: Get function group (read created function group)
+get_function_group:
+  test_cases:
+    - name: "test_function_group"
+      enabled: true
+      params:
+        function_group: "<YOUR_FUNCTION_GROUP_NAME>"
+    - name: "standard_function_group"
       enabled: false
       params:
-        class_name: "CL_ABAP_TYPEDESCR"
+        function_group: "SRFC"
 
-# Function Tests
+# ============================================================================
+# GROUP 10: FUNCTION MODULE - Full CRUD Cycle
+# ============================================================================
+# Object name: <YOUR_FUNCTION_MODULE_NAME> (used in all function module tests)
+# Uses: function group "<YOUR_FUNCTION_GROUP_NAME>" from GROUP 9
+
+# Step 1: Create function module
+create_function_module:
+  test_cases:
+    - name: "test_function_module"
+      enabled: true
+      description: "Create test function module (uses function group from GROUP 9)"
+      params:
+        function_module_name: "<YOUR_FUNCTION_MODULE_NAME>"
+        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
+        description: "Test function module created via MCP"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
+        source_code: |
+          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>
+            IMPORTING
+              VALUE(IV_PARAM) TYPE STRING
+            EXPORTING
+              VALUE(EV_RESULT) TYPE STRING.
+            ev_result = |Result: { iv_param }|.
+          ENDFUNCTION.
+
+# Step 2: Update function module source
+update_function_module_source:
+  test_cases:
+    - name: "test_function_module"
+      enabled: true
+      description: "Update test function module created in create_function_module"
+      params:
+        function_module_name: "<YOUR_FUNCTION_MODULE_NAME>"
+        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
+        activate: true
+        source_code: |
+          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>
+            IMPORTING
+              VALUE(IV_PARAM) TYPE STRING
+            EXPORTING
+              VALUE(EV_RESULT) TYPE STRING.
+            ev_result = |Updated Result: { iv_param }|.
+          ENDFUNCTION.
+
+# Step 3: Get function module (read created function module)
+get_function_test:
+  test_cases:
+    - name: "test_function_module"
+      enabled: true
+      params:
+        function_module_name: "<YOUR_FUNCTION_MODULE_NAME>"
+        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
+
+# Step 4: Get function (standard function for comparison)
 get_function:
   test_cases:
     - name: "standard_function"
@@ -159,99 +530,88 @@ get_function:
         function_name: "RFC_READ_TABLE"
         function_group: "SRFC"
 
-# Table Tests
-get_table:
+get_structure:
   test_cases:
-    - name: "standard_table"
-      enabled: false
+    - name: "standard_structure"
+      enabled: true
       params:
-        table_name: "MARA"
+        structure_name: "MARA"  # Using table as structure example
 
-get_table_contents:
+get_include:
   test_cases:
-    - name: "limited_rows"
-      enabled: false
+    - name: "standard_include"
+      enabled: true
       params:
-        table_name: "T000"
-        max_rows: 10
+        include_name: "SAPMV45A"  # Standard program include
+        program_name: "SAPMV45A"
 
-# Package Tests
-get_package:
+get_type_info:
   test_cases:
-    - name: "standard_package"
-      enabled: false
+    - name: "standard_type"
+      enabled: true
       params:
-        package_name: "$TMP"
+        type_name: "MARA"
+        type_kind: "TABL"
 
-create_package:
+get_transaction:
   test_cases:
-    - name: "basic_package"
-      enabled: false
-      description: "Create a basic development package"
+    - name: "standard_transaction"
+      enabled: true
       params:
-        package_name: "ZOK_TEST_PKG_01"
-        description: "Test package created via MCP"
-        super_package: "ZOK_PACKAGE"  # Parent package
-        package_type: "development"  # or "structure"
-        software_component: "HOME"
-        transport_layer: "ZE19"  # Update with your transport layer
-        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
-        application_component: ""  # Optional, e.g., "BC-ABA"
+        transaction_code: "SE11"
 
-# Search Tests
+get_enhancements:
+  test_cases:
+    - name: "program_enhancements"
+      enabled: true
+      params:
+        object_name: "SAPMV45A"
+        object_type: "PROG/P"
+
+get_sql_query:
+  test_cases:
+    - name: "simple_select"
+      enabled: true
+      params:
+        sql_query: "SELECT MANDT, MTEXT FROM T000 WHERE MANDT < '100'"
+        row_number: 10
+
+# ============================================================================
+# SEARCH AND UTILITY TESTS
+# ============================================================================
+
 search_object:
   test_cases:
     - name: "search_tables"
-      enabled: false
+      enabled: true
       params:
         object_name: "MARA*"
         object_type: "TABL"
         maxResults: 10
 
-# SQL Query Tests
-get_sql_query:
-  test_cases:
-    - name: "simple_select"
-      enabled: false
-      params:
-        sql_query: "SELECT MANDT, MTEXT FROM T000 WHERE MANDT < '100'"
-        row_number: 10
-
-# Where Used Tests
 get_where_used:
   test_cases:
     - name: "table_usage"
-      enabled: false
+      enabled: true
       params:
         object_name: "MARA"
         object_type: "TABL/DT"
         detailed: false
 
-# Enhancement Tests
-get_enhancements:
-  test_cases:
-    - name: "program_enhancements"
-      enabled: false
-      params:
-        object_name: "SAPMV45A"
-        object_type: "PROG/P"
-
-# Object Info Tests
 get_object_info:
   test_cases:
     - name: "class_structure"
-      enabled: false
+      enabled: true
       params:
         parent_type: "CLAS/OC"
         parent_name: "CL_ABAP_TYPEDESCR"
         maxDepth: 2
         enrich: true
 
-# ABAP Parser Tests
 get_abap_ast:
   test_cases:
     - name: "simple_code"
-      enabled: false
+      enabled: true
       params:
         code: |
           REPORT test.
@@ -262,7 +622,7 @@ get_abap_ast:
 get_abap_semantic_analysis:
   test_cases:
     - name: "with_symbols"
-      enabled: false
+      enabled: true
       params:
         code: |
           REPORT test.
@@ -271,236 +631,53 @@ get_abap_semantic_analysis:
           lv_count = 42.
           lv_name = 'Test'.
 
-# View Creation Tests (Classic SE11 Database View)
-create_view:
-  view_name: "ZV_TEST_MCP_VIEW_01"
-  description: "Test Database View created via MCP ABAP ADT"
-  package_name: "ZOK_LOCAL"
-  transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
-  sql_view_name: "ZV_MCP_V01"  # SQL view name (16 chars max)
-  base_table: "MARA"
-  select_fields:
-    - "MATNR"
-    - "MTART"
-    - "MEINS"
-    - "ERSDA"
+# ============================================================================
+# ACTIVATION AND CHECK TESTS
+# ============================================================================
 
-# CDS View Creation Tests (Modern DDLS with DDL Source)
-create_cds:
-  cds_name: "Z_I_TEST_MCP_CDS_01"
-  description: "Test CDS View created via MCP ABAP ADT"
-  package_name: "ZOK_LOCAL"
-  transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
-  ddl_source: |
-    @AbapCatalog.viewEnhancementCategory: [#NONE]
-    @AccessControl.authorizationCheck: #NOT_REQUIRED
-    @EndUserText.label: 'Test CDS View for Materials'
-    @Metadata.ignorePropagatedAnnotations: true
-    @ObjectModel.usageType:{
-      serviceQuality: #X,
-      sizeCategory: #S,
-      dataClass: #MIXED
-    }
-    define view Z_I_TEST_MCP_CDS_01
-      as select from mara
-    {
-      key matnr as Material,
-          mtart as MaterialType,
-          meins as BaseUnitOfMeasure,
-          ersda as CreatedOn,
-          laeda as LastChanged
-    }
-
-# Class Creation Tests
-create_class:
-  class_name: "ZCL_TEST_MCP_01"
-  description: "Test ABAP Class created via MCP ABAP ADT"
-  package_name: "ZOK_LOCAL"
-  transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
-  superclass: ""  # Optional: e.g., "CL_ABAP_BEHAVIOR_HANDLER"
-  final: false
-  abstract: false
-  create_protected: false
-  source_code: |
-    CLASS ZCL_TEST_MCP_01 DEFINITION
-      PUBLIC
-      FINAL
-      CREATE PUBLIC .
-
-      PUBLIC SECTION.
-        METHODS: constructor.
-      PROTECTED SECTION.
-      PRIVATE SECTION.
-    ENDCLASS.
-
-    CLASS ZCL_TEST_MCP_01 IMPLEMENTATION.
-      METHOD constructor.
-        " Initialization logic here
-        WRITE: / 'Class instance created'.
-      ENDMETHOD.
-    ENDCLASS.
-
-# Program Creation Tests
-create_program:
-  program_name: "Z_TEST_PROGRAM_01"
-  description: "Test ABAP Program created via MCP ABAP ADT"
-  package_name: "ZOK_LOCAL"
-  transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
-  program_type: "1"  # 1=Executable, I=Include, M=Module Pool, F=Function Group
-  application: "*"   # Application area (e.g., 'S' for System, 'M' for MM)
-  source_code: |
-    *&---------------------------------------------------------------------*
-    *& Report Z_TEST_PROGRAM_01
-    *& Test ABAP Program created via MCP ABAP ADT
-    *&---------------------------------------------------------------------*
-    REPORT Z_TEST_PROGRAM_01.
-
-    START-OF-SELECTION.
-      WRITE: / 'Program Z_TEST_PROGRAM_01 executed successfully.'.
-      WRITE: / 'Created via MCP ABAP ADT API.'.
-
-# Group Activation Tests
-# Activate 2-3 objects together using /sap/bc/adt/activation/runs endpoint
-# URI is auto-generated from name and type - no need to specify it!
 activate_object:
-  objects:
-    - name: "ZCL_TEST_MCP_01"
-      type: "CLAS/OC"
-    - name: "Z_TEST_PROGRAM_01"
-      type: "PROG/P"
-  preaudit: false  # Set to true for pre-activation check
-
-# Check Object Tests
-# Syntax check for ABAP objects without activation
-# Use friendly type names: 'class', 'program', 'view', 'interface', etc.
-check_object:
   test_cases:
-    - name: "check_cds_views"
+    - name: "test_objects"
       enabled: true
-      description: "Check syntax of CDS views"
+      description: "Activate test class and program from GROUPS 5 and 6"
       params:
         objects:
-          - object_name: "ZOK_I_MARKET_0001"
-            object_type: "view"
+          - object_name: "<YOUR_CLASS_NAME>"
+            object_type: "CLAS/OC"
+          - object_name: "<YOUR_PROGRAM_NAME>"
+            object_type: "PROG/P"
+        preaudit: false
+
+check_object:
+  test_cases:
+    - name: "check_test_objects"
+      enabled: true
+      description: "Check syntax of test objects"
+      params:
+        objects:
+          - object_name: "<YOUR_CLASS_NAME>"
+            object_type: "class"
             version: "active"
-          - object_name: "ZOK_I_ORDER_0001"
-            object_type: "view"
-            version: "active"
-          - object_name: "ZOK_I_PRODUCT_0001"
-            object_type: "view"
+          - object_name: "<YOUR_PROGRAM_NAME>"
+            object_type: "program"
             version: "active"
 
-# Update Class Source Tests
-update_class_source:
-  class_name: "ZCL_TEST_MCP_01"
-  activate: true  # Set to false to skip activation (use ActivateObject later)
-  source_code: |
-    CLASS ZCL_TEST_MCP_01 DEFINITION
-      PUBLIC
-      FINAL
-      CREATE PUBLIC .
-
-      PUBLIC SECTION.
-        METHODS: 
-          constructor,
-          get_message RETURNING VALUE(rv_message) TYPE string.
-      PROTECTED SECTION.
-      PRIVATE SECTION.
-    ENDCLASS.
-
-    CLASS ZCL_TEST_MCP_01 IMPLEMENTATION.
-      METHOD constructor.
-        " Updated initialization logic
-        WRITE: / 'Class instance created - UPDATED'.
-      ENDMETHOD.
-
-      METHOD get_message.
-        rv_message = 'Updated message from MCP test'.
-      ENDMETHOD.
-    ENDCLASS.
-
-# Update Program Source Tests
-update_program_source:
-  program_name: "Z_TEST_PROGRAM_01"
-  activate: true  # Set to false to skip activation (use ActivateObject later)
-  source_code: |
-    *&---------------------------------------------------------------------*
-    *& Report Z_TEST_PROGRAM_01
-    *& UPDATED Test ABAP Program via MCP ABAP ADT
-    *&---------------------------------------------------------------------*
-    REPORT Z_TEST_PROGRAM_01.
-
-    START-OF-SELECTION.
-      WRITE: / 'Program Z_TEST_PROGRAM_01 executed successfully - UPDATED'.
-      WRITE: / 'Updated via MCP ABAP ADT API.'.
-      WRITE: / 'Modification date:', sy-datum.
-
-# Update View Source Tests
-update_view_source:
-  view_name: "ZOK_R_TEST_0002"
-  activate: true  # Set to false to skip activation (use ActivateObject later)
-  ddl_source: |
-    @AbapCatalog.sqlViewName: 'ZV_TEST_SQL'
-    @AbapCatalog.compiler.compareFilter: true
-    @AccessControl.authorizationCheck: #NOT_REQUIRED
-    @EndUserText.label: 'Updated Test View via MCP'
-    define view ZOK_R_TEST_0002
-      as select from mara
-    {
-      key matnr as Material,
-          mtart as MaterialType,
-          matkl as MaterialGroup,
-          meins as BaseUnit,
-          ersda as CreatedOn,
-          laeda as LastChanged
-    }
-
-# Environment Configuration
-# These values can be overridden by environment variables
+# ============================================================================
+# ENVIRONMENT CONFIGURATION
+# ============================================================================
 environment:
-  default_package: "ZOK_LOCAL"
-  default_transport: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
-  default_system: "E19"
-  default_client: "100"
+  default_package: "<YOUR_PACKAGE_NAME>"  # Test package from GROUP 2
+  default_transport: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE WITH TRANSPORT FROM create_transport
+  default_system: "<YOUR_SYSTEM>"  # ⚠️ UPDATE WITH YOUR SYSTEM (e.g., E19)
+  default_client: "<YOUR_CLIENT>"  # ⚠️ UPDATE WITH YOUR CLIENT (e.g., 100)
 
-# Interface Creation Tests
-create_interface:
-  test_cases:
-    - name: "basic_interface"
-      enabled: false
-      description: "Create a simple ABAP interface"
-      params:
-        interface_name: "ZIF_TEST_MCP_01"
-        description: "Test interface created via MCP"
-        package_name: "$TMP"
-        source_code: |
-          INTERFACE zif_test_mcp_01
-            PUBLIC.
-            
-            METHODS test_method
-              IMPORTING
-                iv_param TYPE string
-              RETURNING
-                VALUE(rv_result) TYPE string.
-                
-          ENDINTERFACE.
-
-# Object Deletion Tests
-delete_object:
-  test_cases:
-    - name: "delete_test_interface"
-      enabled: false
-      description: "Test object deletion with transport"
-      params:
-        test_interface_name: "ZIF_TEST_DELETE_01"
-        transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
-        package_name: "$TMP"
-
-# Test Execution Settings
+# ============================================================================
+# TEST EXECUTION SETTINGS
+# ============================================================================
 test_settings:
   fail_fast: false
   verbose: true
   timeout: 30000
   retry_on_failure: false
   max_retries: 1
-  cleanup_after_test: false
+  cleanup_after_test: false  # Set to true to auto-delete objects after tests

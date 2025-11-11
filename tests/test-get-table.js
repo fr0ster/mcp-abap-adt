@@ -1,53 +1,72 @@
 /**
- * Test script for GetTable handler
- * Configuration loaded from tests/test-config.yaml
+ * Test GetTable handler
+ * Tests retrieving table structure
  */
 
 const {
   initializeTestEnvironment,
-  getEnabledTestCase,
+  getAllEnabledTestCases,
   printTestHeader,
   printTestParams,
   printTestResult
 } = require('./test-helper');
 
-// Initialize test environment before importing handlers
+// Initialize test environment
 initializeTestEnvironment();
 
 const { handleGetTable } = require('../dist/handlers/handleGetTable');
 
-async function main() {
-  try {
-    // Load test case from YAML (or use command line arg)
-    let testArgs;
+async function testGetTable() {
+  const testCases = getAllEnabledTestCases('get_table');
+  
+  console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
+  
+  let passedTests = 0;
+  let failedTests = 0;
+  
+  for (const testCase of testCases) {
+    printTestHeader('GetTable', testCase);
+    const params = testCase.params;
     
-    if (process.argv[2]) {
-      // Command line argument takes precedence
-      testArgs = {
-        table_name: process.argv[2],
-        filePath: process.argv[3] || undefined
-      };
-      console.log('Using command line arguments');
-      printTestParams(testArgs);
-    } else {
-      // Load from YAML config
-      const testCase = getEnabledTestCase('get_table');
-      printTestHeader('GetTable', testCase);
-      testArgs = testCase.params;
-      printTestParams(testArgs);
+    printTestParams(params);
+    console.log('--- Retrieving table structure ---\n');
+    
+    try {
+      const result = await handleGetTable(params);
+      
+      if (printTestResult(result, 'GetTable')) {
+        passedTests++;
+      } else {
+        failedTests++;
+      }
+      
+    } catch (error) {
+      console.error('❌ Unexpected error:');
+      console.error(error);
+      failedTests++;
     }
-
-    const result = await handleGetTable(testArgs);
     
-    if (!printTestResult(result, 'GetTable')) {
-      process.exit(1);
-    }
-    
-    process.exit(0);
-  } catch (e) {
-    console.error('❌ Error:', e);
+    console.log('\n' + '='.repeat(60) + '\n');
+  }
+  
+  console.log(`\n📊 Test Summary:`);
+  console.log(`   ✅ Passed: ${passedTests}`);
+  console.log(`   ❌ Failed: ${failedTests}`);
+  console.log(`   📝 Total:  ${testCases.length}`);
+  
+  if (failedTests > 0) {
     process.exit(1);
   }
 }
 
-main();
+// Run the test
+testGetTable()
+  .then(() => {
+    console.log('\n=== All tests completed successfully ===');
+    process.exit(0);
+  })
+  .catch(error => {
+    console.error('\n=== Tests failed ===');
+    console.error(error);
+    process.exit(1);
+  });

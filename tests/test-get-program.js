@@ -1,147 +1,72 @@
-#!/usr/bin/env node
-// Test script for GetProgram tool to examine source code
+/**
+ * Test GetProgram handler
+ * Tests retrieving program source code
+ */
 
-const { spawn } = require('child_process');
-const path = require('path');
+const {
+  initializeTestEnvironment,
+  getAllEnabledTestCases,
+  printTestHeader,
+  printTestParams,
+  printTestResult
+} = require('./test-helper');
 
-// Parse command line arguments
-const args = process.argv.slice(2);
-if (args.length < 1) {
-  console.error('Usage: node test-get-program.js <program_name> [env_file]');
-  console.error('Example: node test-get-program.js RM07DOCS');
-  process.exit(1);
+// Initialize test environment
+initializeTestEnvironment();
+
+const { handleGetProgram } = require('../dist/handlers/handleGetProgram');
+
+async function testGetProgram() {
+  const testCases = getAllEnabledTestCases('get_program');
+  
+  console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
+  
+  let passedTests = 0;
+  let failedTests = 0;
+  
+  for (const testCase of testCases) {
+    printTestHeader('GetProgram', testCase);
+    const params = testCase.params;
+    
+    printTestParams(params);
+    console.log('--- Retrieving program ---\n');
+    
+    try {
+      const result = await handleGetProgram(params);
+      
+      if (printTestResult(result, 'GetProgram')) {
+        passedTests++;
+      } else {
+        failedTests++;
+      }
+      
+    } catch (error) {
+      console.error('❌ Unexpected error:');
+      console.error(error);
+      failedTests++;
+    }
+    
+    console.log('\n' + '='.repeat(60) + '\n');
+  }
+  
+  console.log(`\n📊 Test Summary:`);
+  console.log(`   ✅ Passed: ${passedTests}`);
+  console.log(`   ❌ Failed: ${failedTests}`);
+  console.log(`   📝 Total:  ${testCases.length}`);
+  
+  if (failedTests > 0) {
+    process.exit(1);
+  }
 }
 
-const programName = args[0];
-const filePath = args[1];
-const envFile = args[2] || '.env';
-
-// Absolute path to dist/index.js
-const serverPath = path.resolve(__dirname, '../dist/index.js');
-const envPath = path.resolve(__dirname, '..', envFile);
-
-// Functions for pretty output
-const printBanner = (text) => {
-  const line = '='.repeat(60);
-  console.log('\n' + line);
-  console.log(`  ${text}`);
-  console.log(line + '\n');
-};
-
-// Variable to track if response was received
-let responseReceived = false;
-
-printBanner(`GET PROGRAM TEST - ${programName}`);
-console.log(`Testing with: ${programName}`);
-console.log(`Using env file: ${envPath}`);
-console.log('Starting MCP server in stdio mode...');
-
-const child = spawn('node', [serverPath, `--env=${envPath}`], {
-  stdio: ['pipe', 'pipe', 'pipe']
-});
-
-child.stdout.on('data', (data) => {
-  const dataStr = data.toString();
-
-  // Only parse lines that start with '{' (likely JSON)
-  const lines = dataStr.split('\n');
-  for (const line of lines) {
-    if (line.trim().startsWith('{')) {
-      try {
-        const jsonData = JSON.parse(line);
-        if (jsonData.id === 'test-get-program') {
-          console.log('\n▶ SERVER RESPONSE: PROGRAM SOURCE');
-          console.log('-'.repeat(40));
-
-          if (jsonData.error) {
-            console.log(`❌ ERROR: ${jsonData.error.message} (code ${jsonData.error.code})`);
-          } else {
-            console.log(`✅ SUCCESS: Program source received\n`);
-
-            // Extract and display source code
-            let sourceCode = '';
-            if (jsonData.result?.content?.[0]?.text) {
-              sourceCode = jsonData.result.content[0].text;
-            }
-
-            console.log('SOURCE CODE:');
-            console.log('='.repeat(80));
-            console.log(sourceCode);
-            console.log('='.repeat(80));
-
-            // Analyze INCLUDE statements
-            console.log('\n▶ INCLUDE ANALYSIS');
-            console.log('-'.repeat(40));
-
-            const includePattern = /^\s*INCLUDE\s+([A-Z0-9_<>']+)\s*\.\s*(?:\"|\*.*)?$/gim;
-            const includes = [];
-            let match;
-            while ((match = includePattern.exec(sourceCode)) !== null) {
-              let includeName = match[1];
-              includeName = includeName.replace(/[<>']/g, '').toUpperCase();
-              includes.push({
-                original: match[0].trim(),
-                name: includeName,
-                line: sourceCode.substring(0, match.index).split('\n').length
-              });
-            }
-
-            if (includes.length > 0) {
-              console.log(`Found ${includes.length} INCLUDE statements:`);
-              includes.forEach((inc, i) => {
-                console.log(`${i+1}. Line ${inc.line}: ${inc.name}`);
-                console.log(`   Raw: ${inc.original}`);
-              });
-            } else {
-              console.log('No INCLUDE statements found');
-            }
-          }
-
-          responseReceived = true;
-          console.log('\nTest completed successfully. Stopping server...');
-          child.kill();
-          process.exit(0);
-        }
-      } catch (e) {
-        // Ignore parse errors for non-JSON lines
-      }
-    }
-  }
-});
-
-child.stderr.on('data', (data) => {
-  process.stderr.write(`[STDERR] ${data}`);
-});
-
-child.on('close', (code) => {
-  console.log(`MCP server exited with code: ${code}`);
-});
-
-// Send MCP request to get program source
-function sendGetProgramRequest() {
-  const request = {
-    jsonrpc: "2.0",
-    id: "test-get-program",
-    method: "tools/call",
-    params: {
-      name: "GetProgram",
-      arguments: {
-        program_name: programName,
-        ...(filePath ? { filePath } : {})
-      }
-    }
-  };
-  child.stdin.write(JSON.stringify(request) + "\n");
-  console.log(`[TEST] Sent MCP request for program ${programName}`);
-}
-
-// Give the server 2 seconds to start, then send the request
-setTimeout(sendGetProgramRequest, 2000);
-
-// Set timeout
-setTimeout(() => {
-  if (!responseReceived) {
-    console.log('\nTimeout! No response received. Stopping server...');
-    child.kill();
-  }
-}, 15000);
+// Run the test
+testGetProgram()
+  .then(() => {
+    console.log('\n=== All tests completed successfully ===');
+    process.exit(0);
+  })
+  .catch(error => {
+    console.error('\n=== Tests failed ===');
+    console.error(error);
+    process.exit(1);
+  });

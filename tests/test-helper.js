@@ -25,7 +25,7 @@ function initializeTestEnvironment() {
   // Load environment variables
   const dotenv = require('dotenv');
   const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../e19.env');
-  
+
   if (fs.existsSync(envPath)) {
     dotenv.config({ path: envPath });
     console.log(`[TEST] Loaded environment from: ${envPath}`);
@@ -41,7 +41,7 @@ function initializeTestEnvironment() {
  */
 function loadTestConfig() {
   const configPath = path.resolve(__dirname, 'test-config.yaml');
-  
+
   if (!fs.existsSync(configPath)) {
     console.error('❌ Test configuration file not found: test-config.yaml');
     console.error('Please create tests/test-config.yaml with test parameters');
@@ -60,9 +60,9 @@ function loadTestConfig() {
 function getEnabledTestCase(handlerName) {
   const config = loadTestConfig();
   const handlerTests = config[handlerName]?.test_cases || [];
-  
+
   const enabledTest = handlerTests.find(tc => tc.enabled === true);
-  
+
   if (!enabledTest) {
     console.error(`❌ No enabled test case found for "${handlerName}" in test-config.yaml`);
     console.error(`Please set enabled: true for at least one test case under ${handlerName}`);
@@ -80,9 +80,9 @@ function getEnabledTestCase(handlerName) {
 function getAllEnabledTestCases(handlerName) {
   const config = loadTestConfig();
   const handlerTests = config[handlerName]?.test_cases || [];
-  
+
   const enabledTests = handlerTests.filter(tc => tc.enabled === true);
-  
+
   if (enabledTests.length === 0) {
     console.error(`❌ No enabled test cases found for "${handlerName}" in test-config.yaml`);
     console.error(`Please set enabled: true for at least one test case under ${handlerName}`);
@@ -160,7 +160,7 @@ function printTestResult(result, handlerName) {
   }
 
   console.log(`\n✅ ${handlerName} test PASSED!`);
-  
+
   const resultText = result.content[0].text;
   try {
     const parsedResult = JSON.parse(resultText);
@@ -183,6 +183,79 @@ async function waitForConfirmation(message, timeoutSeconds = 5) {
   await new Promise(resolve => setTimeout(resolve, timeoutSeconds * 1000));
 }
 
+/**
+ * Update transport request number in test-config.yaml
+ * Replaces <YOUR_TRANSPORT_REQUEST> and similar placeholders
+ * @param {string} transportNumber - Transport request number to set
+ */
+function updateTransportRequestInConfig(transportNumber) {
+  const configPath = path.resolve(__dirname, 'test-config.yaml');
+
+  if (!fs.existsSync(configPath)) {
+    console.warn('⚠️  test-config.yaml not found, cannot update transport request');
+    return false;
+  }
+
+  try {
+    let configContent = fs.readFileSync(configPath, 'utf8');
+    const originalContent = configContent;
+    let replacementsCount = 0;
+
+    // Replace transport_request: "<YOUR_TRANSPORT_REQUEST>" (with quotes)
+    const pattern1 = /transport_request:\s*["']<YOUR_TRANSPORT_REQUEST>["']/gi;
+    const matches1 = configContent.match(pattern1);
+    if (matches1) {
+      configContent = configContent.replace(pattern1, `transport_request: "${transportNumber}"`);
+      replacementsCount += matches1.length;
+    }
+
+    // Replace transport_request: <YOUR_TRANSPORT_REQUEST> (without quotes)
+    const pattern2 = /transport_request:\s*<YOUR_TRANSPORT_REQUEST>/gi;
+    const matches2 = configContent.match(pattern2);
+    if (matches2) {
+      configContent = configContent.replace(pattern2, `transport_request: "${transportNumber}"`);
+      replacementsCount += matches2.length;
+    }
+
+    // Update environment.default_transport
+    const pattern3 = /default_transport:\s*["']?<YOUR_TRANSPORT_REQUEST>["']?/gi;
+    const matches3 = configContent.match(pattern3);
+    if (matches3) {
+      configContent = configContent.replace(pattern3, `default_transport: "${transportNumber}"`);
+      replacementsCount += matches3.length;
+    }
+
+    // Update get_transport transport_number (both variants)
+    const pattern4a = /transport_number:\s*["']<YOUR_TRANSPORT_REQUEST>["']/gi;
+    const matches4a = configContent.match(pattern4a);
+    if (matches4a) {
+      configContent = configContent.replace(pattern4a, `transport_number: "${transportNumber}"`);
+      replacementsCount += matches4a.length;
+    }
+
+    const pattern4b = /transport_number:\s*["']?<YOUR_TRANSPORT_NUMBER>["']?/gi;
+    const matches4b = configContent.match(pattern4b);
+    if (matches4b) {
+      configContent = configContent.replace(pattern4b, `transport_number: "${transportNumber}"`);
+      replacementsCount += matches4b.length;
+    }
+
+    // Only write if content changed
+    if (configContent !== originalContent) {
+      fs.writeFileSync(configPath, configContent, 'utf8');
+      console.log(`\n✅ Updated test-config.yaml with transport request: ${transportNumber}`);
+      console.log(`   Replaced ${replacementsCount} placeholder(s) in configuration`);
+      return true;
+    } else {
+      console.log(`\nℹ️  No transport_request placeholders found to update`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`\n❌ Failed to update test-config.yaml:`, error.message);
+    return false;
+  }
+}
+
 module.exports = {
   initializeTestEnvironment,
   loadTestConfig,
@@ -194,5 +267,6 @@ module.exports = {
   printTestHeader,
   printTestParams,
   printTestResult,
-  waitForConfirmation
+  waitForConfirmation,
+  updateTransportRequestInConfig
 };

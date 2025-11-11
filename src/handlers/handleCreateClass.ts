@@ -1,13 +1,13 @@
 /**
  * CreateClass Handler - ABAP Class Creation via ADT API
- * 
+ *
  * Eclipse ADT workflow (stateful session required):
  * 1. POST /sap/bc/adt/oo/classes - Create class with metadata
  * 2. POST /sap/bc/adt/oo/classes/{name}?_action=LOCK - Lock class
  * 3. PUT /sap/bc/adt/oo/classes/{name}/source/main - Upload class source
  * 4. POST /sap/bc/adt/oo/classes/{name}?_action=UNLOCK - Unlock class
  * 5. POST /sap/bc/adt/activation - Activate class
- * 
+ *
  * CRITICAL REQUIREMENTS:
  * - Stateful session: sap-adt-connection-id must be same for all 5 steps
  * - Cookie management: automatic via BaseAbapConnection
@@ -19,6 +19,7 @@ import { return_error, return_response, encodeSapObjectName, logger } from '../l
 import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
+import { getSystemInformation } from '../lib/utils.js';
 
 export const TOOL_DEFINITION = {
   name: "CreateClass",
@@ -26,21 +27,21 @@ export const TOOL_DEFINITION = {
   inputSchema: {
     type: "object",
     properties: {
-      class_name: { 
-        type: "string", 
-        description: "Class name (e.g., ZCL_TEST_CLASS_001). Must follow SAP naming conventions (start with Z or Y)." 
+      class_name: {
+        type: "string",
+        description: "Class name (e.g., ZCL_TEST_CLASS_001). Must follow SAP naming conventions (start with Z or Y)."
       },
       description: {
         type: "string",
         description: "Class description. If not provided, class_name will be used."
       },
-      package_name: { 
-        type: "string", 
-        description: "Package name (e.g., ZOK_LAB, $TMP for local objects)" 
+      package_name: {
+        type: "string",
+        description: "Package name (e.g., ZOK_LAB, $TMP for local objects)"
       },
-      transport_request: { 
-        type: "string", 
-        description: "Transport request number (e.g., E19K905635). Required for transportable packages." 
+      transport_request: {
+        type: "string",
+        description: "Transport request number (e.g., E19K905635). Required for transportable packages."
       },
       superclass: {
         type: "string",
@@ -65,6 +66,14 @@ export const TOOL_DEFINITION = {
       activate: {
         type: "boolean",
         description: "Activate class after creation. Default: true. Set to false for batch operations (activate multiple objects later)."
+      },
+      master_system: {
+        type: "string",
+        description: "Master system ID (e.g., 'TRL' for cloud trial). Optional - will be retrieved from system if not provided."
+      },
+      responsible: {
+        type: "string",
+        description: "User responsible for the object (e.g., 'CB9980002377'). Optional - will be retrieved from system if not provided."
       }
     },
     required: ["class_name", "package_name"]
@@ -76,6 +85,8 @@ interface CreateClassArgs {
   description?: string;
   package_name: string;
   transport_request?: string;
+  master_system?: string;
+  responsible?: string;
   superclass?: string;
   final?: boolean;
   abstract?: boolean;
@@ -113,21 +124,55 @@ ENDCLASS.`;
 async function createClassObject(args: CreateClassArgs, sessionId: string): Promise<AxiosResponse> {
   const description = args.description || args.class_name;
   const url = `/sap/bc/adt/oo/classes${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
-  
-  // Get username (if available) or leave empty
-  const username = process.env.SAP_USERNAME || '';
-  const masterSystem = process.env.SAP_SYSTEM || 'E19';
-  
+
+  // Get masterSystem and responsible - optional, retrieved from system for cloud
+  let masterSystem = args.master_system;
+  let username = args.responsible;
+
+  // If not provided, try to get from system information (cloud systems)
+  if (!masterSystem || !username) {
+    const systemInfo = await getSystemInformation();
+    if (systemInfo) {
+      masterSystem = masterSystem || systemInfo.systemID;
+      username = username || systemInfo.userName;
+    }
+  }
+
+  // Fallback to env or empty (for on-premise, these may not be needed)
+  masterSystem = masterSystem || process.env.SAP_SYSTEM || process.env.SAP_SYSTEM_ID || '';
+  username = username || process.env.SAP_USERNAME || process.env.SAP_USER || '';
+
   // Build class metadata XML following Eclipse ADT format
   // Key point: class:final and class:visibility are XML ATTRIBUTES, not elements
   const finalAttr = args.final ? 'true' : 'false';
   const visibilityAttr = args.create_protected ? 'protected' : 'public';
-  
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?>
-<class:abapClass xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.class_name}" adtcore:type="CLAS/OC" adtcore:masterLanguage="EN" adtcore:masterSystem="${masterSystem}" adtcore:responsible="${username}" class:final="${finalAttr}" class:visibility="${visibilityAttr}">
+
+  // Build class metadata XML - following cloud trial format
+  // Include testclasses and empty superClassRef as required by SAP Cloud
+  const superClassXml = args.superclass
+    ? `<class:superClassRef adtcore:name="${args.superclass}"/>`
+    : '<class:superClassRef/>';
+
+  // Build XML - include masterSystem and responsible only if provided (cloud systems)
+  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
+  const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
+
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><class:abapClass xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.class_name}" adtcore:type="CLAS/OC" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr} class:final="${finalAttr}" class:visibility="${visibilityAttr}">
+
+
+
   <adtcore:packageRef adtcore:name="${args.package_name}"/>
+
+
+
   <class:include adtcore:name="CLAS/OC" adtcore:type="CLAS/OC" class:includeType="testclasses"/>
-  <class:superClassRef${args.superclass ? ` adtcore:name="${args.superclass}"` : ''}/>
+
+
+
+  ${superClassXml}
+
+
+
 </class:abapClass>`;
 
   const headers = {
@@ -145,23 +190,23 @@ async function createClassObject(args: CreateClassArgs, sessionId: string): Prom
  */
 async function lockClass(className: string, sessionId: string): Promise<string> {
   const url = `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
-  
+
   const headers = {
     'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
   };
 
   logger.info(`Locking class: ${className}`);
   const response = await makeAdtRequestWithSession(url, 'POST', sessionId, null, headers);
-  
+
   // Parse lock handle from XML response
   const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
   const result = parser.parse(response.data);
   const lockHandle = result?.['asx:abap']?.['asx:values']?.['DATA']?.['LOCK_HANDLE'];
-  
+
   if (!lockHandle) {
     throw new Error('Failed to obtain lock handle from SAP. Class may be locked by another user.');
   }
-  
+
   logger.info(`Lock acquired: ${lockHandle}`);
   return lockHandle;
 }
@@ -171,15 +216,15 @@ async function lockClass(className: string, sessionId: string): Promise<string> 
  * Lock handle must be passed in URL and maintained in same session
  */
 async function uploadClassSource(
-  className: string, 
-  sourceCode: string, 
-  lockHandle: string, 
-  sessionId: string, 
+  className: string,
+  sourceCode: string,
+  lockHandle: string,
+  sessionId: string,
   transportRequest?: string
 ): Promise<AxiosResponse> {
   const queryParams = `lockHandle=${lockHandle}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
   const url = `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}/source/main?${queryParams}`;
-  
+
   const headers = {
     'Accept': 'text/plain',
     'Content-Type': 'text/plain; charset=utf-8'
@@ -206,7 +251,7 @@ async function unlockClass(className: string, lockHandle: string, sessionId: str
  */
 async function activateClass(className: string, sessionId: string): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
-  
+
   const activationXml = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
   <adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}" adtcore:name="${className}"/>
 </adtcore:objectReferences>`;
@@ -222,19 +267,19 @@ async function activateClass(className: string, sessionId: string): Promise<Axio
 
 /**
  * Main handler for creating ABAP classes
- * 
+ *
  * IMPORTANT: Uses stateful session for all 5 steps
  * IMPORTANT: Cookies are managed automatically by BaseAbapConnection
  * IMPORTANT: Lock handle is maintained within session scope
  */
 export async function handleCreateClass(params: any) {
   const args: CreateClassArgs = params;
-  
+
   // Validate required parameters
   if (!args.class_name || !args.package_name) {
     return return_error(new Error("Missing required parameters: class_name and package_name"));
   }
-  
+
   // Validate transport_request: required for non-$TMP packages
   try {
     validateTransportRequest(args.package_name, args.transport_request);
@@ -245,7 +290,7 @@ export async function handleCreateClass(params: any) {
   const className = args.class_name.toUpperCase();
   const sessionId = generateSessionId();
   let lockHandle: string | null = null;
-  
+
   logger.info(`Starting class creation: ${className} (session: ${sessionId})`);
 
   try {
@@ -258,16 +303,16 @@ export async function handleCreateClass(params: any) {
     logger.info(`✓ Step 1: Class object created`);
 
     // Extract lock handle from response headers (Eclipse approach)
-    lockHandle = createResponse.headers['sap-adt-lockhandle'] || 
+    lockHandle = createResponse.headers['sap-adt-lockhandle'] ||
                  createResponse.headers['lockhandle'] ||
                  createResponse.headers['x-sap-adt-lockhandle'];
-    
+
     if (!lockHandle) {
       // Fallback: try to extract from response body or do explicit LOCK
       logger.warn('Lock handle not found in POST response headers, attempting explicit LOCK');
       lockHandle = await lockClass(className, sessionId);
     }
-    
+
     logger.info(`✓ Step 2: Lock handle obtained: ${lockHandle.substring(0, 10)}...`);
 
     // Step 3: Upload source code (uses lock handle from step 1/2)
@@ -286,11 +331,11 @@ export async function handleCreateClass(params: any) {
     // Step 5: Activate the class (optional)
     let activationWarnings: string[] = [];
     const shouldActivate = args.activate !== false; // Default to true if not specified
-    
+
     if (shouldActivate) {
       const activateResponse = await activateClass(className, sessionId);
       logger.info(`✓ Step 5: Activation completed`);
-      
+
       // Parse activation warnings/errors
       if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
         const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
@@ -298,7 +343,7 @@ export async function handleCreateClass(params: any) {
         const messages = result?.['chkl:messages']?.['msg'];
         if (messages) {
           const msgArray = Array.isArray(messages) ? messages : [messages];
-          activationWarnings = msgArray.map((msg: any) => 
+          activationWarnings = msgArray.map((msg: any) =>
             `${msg['@_type']}: ${msg['shortText']?.['txt'] || 'Unknown'}`
           );
         }
@@ -312,14 +357,14 @@ export async function handleCreateClass(params: any) {
     if (shouldActivate) {
       stepsCompleted.push('activate');
     }
-    
+
     const result = {
       success: true,
       class_name: className,
       package_name: args.package_name,
       transport_request: args.transport_request || null,
       type: 'CLAS/OC',
-      message: shouldActivate 
+      message: shouldActivate
         ? `Class ${className} created and activated successfully`
         : `Class ${className} created successfully (not activated)`,
       uri: `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}`,
@@ -350,7 +395,7 @@ export async function handleCreateClass(params: any) {
     }
 
     logger.error(`Error creating class ${className}:`, error);
-    const errorMessage = error.response?.data 
+    const errorMessage = error.response?.data
       ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
       : error.message;
 

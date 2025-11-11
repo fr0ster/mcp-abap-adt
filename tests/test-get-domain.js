@@ -1,58 +1,76 @@
 /**
- * Test script to get domain structure via ADT
+ * Test script for GetDomain MCP tool
+ * Tests reading domain information from SAP system
+ *
+ * Configuration is loaded from tests/test-config.yaml
  */
 
-const { initializeTestEnvironment } = require('./test-helper');
+const {
+  initializeTestEnvironment,
+  getAllEnabledTestCases,
+  printTestHeader,
+  printTestParams,
+  printTestResult
+} = require('./test-helper');
 
-// Initialize test environment
+// Initialize test environment before importing handlers
 initializeTestEnvironment();
 
-const { makeAdtRequestWithTimeout, getBaseUrl, encodeSapObjectName } = require('../dist/lib/utils');
-const { XMLParser } = require('fast-xml-parser');
+const { handleGetDomain } = require('../dist/handlers/handleGetDomain');
 
-async function getDomain(domainName) {
-  const baseUrl = await getBaseUrl();
-  const domainNameEncoded = encodeSapObjectName(domainName.toLowerCase());
-  
-  const url = `${baseUrl}/sap/bc/adt/ddic/domains/${domainNameEncoded}`;
-  
-  const headers = {
-    'Accept': 'application/vnd.sap.adt.domains.v1+xml, application/vnd.sap.adt.domains.v2+xml'
-  };
-  
-  console.log(`Getting domain: ${domainName}`);
-  console.log(`URL: ${url}\n`);
-  
-  const response = await makeAdtRequestWithTimeout(url, 'GET', 'default', null, undefined, headers);
-  
-  console.log('=== RAW XML Response ===');
-  console.log(response.data);
-  console.log('\n=== Parsed Domain ===');
-  
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  
-  const result = parser.parse(response.data);
-  const domain = result['doma:domain'];
-  
-  console.log(JSON.stringify(domain, null, 2));
-  
-  return domain;
+async function testGetDomain() {
+  // Load all enabled test cases from YAML
+  const testCases = getAllEnabledTestCases('get_domain');
+
+  console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
+
+  let passedTests = 0;
+  let failedTests = 0;
+
+  for (const testCase of testCases) {
+    printTestHeader('GetDomain', testCase);
+
+    // Test parameters from YAML
+    const testArgs = testCase.params;
+
+    printTestParams(testArgs);
+    console.log('--- Starting domain retrieval ---\n');
+
+    try {
+      const result = await handleGetDomain(testArgs);
+
+      if (printTestResult(result, 'GetDomain')) {
+        passedTests++;
+      } else {
+        failedTests++;
+      }
+
+    } catch (error) {
+      console.error('❌ Unexpected error during domain retrieval:');
+      console.error(error);
+      failedTests++;
+    }
+
+    console.log('\n' + '='.repeat(60) + '\n');
+  }
+
+  // Print summary
+  console.log('\n📊 Test Summary:');
+  console.log(`   ✅ Passed: ${passedTests}`);
+  console.log(`   ❌ Failed: ${failedTests}`);
+  console.log(`   📝 Total:  ${testCases.length}`);
+
+  if (failedTests === 0) {
+    console.log('\n=== All tests completed successfully ===\n');
+    process.exit(0);
+  } else {
+    console.log('\n=== Some tests failed ===\n');
+    process.exit(1);
+  }
 }
 
-// Run test
-getDomain('ZZ_TEST_MCP_25')
-  .then(() => {
-    console.log('\n✅ Domain retrieved successfully');
-    process.exit(0);
-  })
-  .catch(error => {
-    console.error('\n❌ Error:', error.message);
-    if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
-    }
-    process.exit(1);
-  });
+// Run tests
+testGetDomain().catch(error => {
+  console.error('Fatal error:', error);
+  process.exit(1);
+});

@@ -1,9 +1,16 @@
 /**
- * Test script for CreateTransport handler
- * Tests transport request creation
+ * Test CreateTransport handler
+ * Tests creating transport requests
  */
 
-const { initializeTestEnvironment, loadTestConfig } = require('./test-helper');
+const {
+  initializeTestEnvironment,
+  getAllEnabledTestCases,
+  printTestHeader,
+  printTestParams,
+  printTestResult,
+  updateTransportRequestInConfig
+} = require('./test-helper');
 
 // Initialize test environment
 initializeTestEnvironment();
@@ -11,102 +18,84 @@ initializeTestEnvironment();
 const { handleCreateTransport } = require('../dist/handlers/handleCreateTransport');
 
 async function testCreateTransport() {
-  console.log('='.repeat(80));
-  console.log('CreateTransport Handler Test');
-  console.log('='.repeat(80));
+  const testCases = getAllEnabledTestCases('create_transport');
 
-  try {
-    // Load test configuration
-    const testConfig = loadTestConfig();
-    const testCase = testConfig.create_transport?.test_cases?.find(tc => tc.name === 'workbench_transport');
-    
-    if (!testCase) {
-      console.error('❌ Test case "workbench_transport" not found in test-config.yaml');
-      return;
-    }
+  console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
 
-    // Use parameters from YAML config
+  let passedTests = 0;
+  let failedTests = 0;
+
+  for (const testCase of testCases) {
+    printTestHeader('CreateTransport', testCase);
+    const params = testCase.params;
+
+    // Add timestamp to description for uniqueness
     const transportData = {
-      transport_type: testCase.params.transport_type,
-      description: testCase.params.description + " - " + new Date().toISOString(),
-      target_system: testCase.params.target_system
+      ...params,
+      description: params.description + " - " + new Date().toISOString()
     };
-    
-    console.log(`\n📝 Creating transport with parameters:`);
-    console.log(JSON.stringify(transportData, null, 2));
 
-    // Call CreateTransport handler
-    console.log('\n🚀 Calling CreateTransport handler...');
-    
-    const startTime = Date.now();
-    const result = await handleCreateTransport(transportData);
-    const duration = Date.now() - startTime;
+    printTestParams(transportData);
+    console.log('--- Creating transport request ---\n');
 
-    console.log(`\n✅ Transport created successfully in ${duration}ms`);
-    console.log('\n📊 Result:');
-    
-    let parsedResult;
     try {
-      // result має MCP формат: { isError, content: [{ type, text }] }
-      const responseText = result.content[0].text;
-      parsedResult = JSON.parse(responseText);
-      console.log(JSON.stringify(parsedResult, null, 2));
-    } catch (e) {
-      console.log(result);
-      parsedResult = null;
-    }
+      const result = await handleCreateTransport(transportData);
 
-    // Verify result
-    if (parsedResult) {
-      console.log('\n✅ Verification Results:');
-      console.log(`   Transport: ${parsedResult.transport_request}`);
-      console.log(`   Description: ${parsedResult.description}`);
-      console.log(`   Type: ${parsedResult.type}`);
-      console.log(`   Status: ${parsedResult.status}`);
-      console.log(`   Owner: ${parsedResult.owner}`);
-      console.log(`   Target: ${parsedResult.target_system || 'N/A'}`);
-      console.log(`   Created: ${parsedResult.created_at} by ${parsedResult.created_by}`);
+      if (printTestResult(result, 'CreateTransport')) {
+        passedTests++;
 
-      // Success checks
-      const checks = {
-        'Transport created': parsedResult.success === true,
-        'Transport number exists': !!parsedResult.transport_request,
-        'Has description': !!parsedResult.description,
-        'Has owner': !!parsedResult.owner,
-        'Has type': !!parsedResult.type
-      };
+        // Extract transport number and update test-config.yaml
+        try {
+          if (result.content && result.content[0] && result.content[0].text) {
+            const parsedResult = JSON.parse(result.content[0].text);
+            if (parsedResult.transport_request) {
+              const transportNumber = parsedResult.transport_request;
+              console.log(`\n💡 Transport number created: ${transportNumber}`);
 
-      console.log('\n🔍 Validation Checks:');
-      for (const [check, passed] of Object.entries(checks)) {
-        console.log(`   ${passed ? '✅' : '❌'} ${check}`);
-      }
-
-      const allPassed = Object.values(checks).every(v => v);
-      if (allPassed) {
-        console.log('\n🎉 All checks passed! Transport request is ready to use.');
-        console.log(`\n💡 Use transport number: ${parsedResult.transport_request} for development objects`);
+              // Automatically update test-config.yaml with the transport number
+              if (updateTransportRequestInConfig(transportNumber)) {
+                console.log(`   ✅ test-config.yaml updated - transport_request values replaced`);
+                console.log(`   ✅ You can now run other tests that require transport_request`);
+              } else {
+                console.log(`   ⚠️  Could not update test-config.yaml automatically`);
+                console.log(`   📝 Please manually update transport_request: "${transportNumber}" in test-config.yaml`);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn(`\n⚠️  Could not extract transport number from result:`, e.message);
+        }
       } else {
-        console.log('\n⚠️  Some checks failed. Please review the results.');
+        failedTests++;
       }
 
-      // Save transport number for future tests
-      if (parsedResult.transport_request) {
-        console.log(`\n📝 Save this transport number for GetTransport test: ${parsedResult.transport_request}`);
-      }
+    } catch (error) {
+      console.error('❌ Unexpected error:');
+      console.error(error);
+      failedTests++;
     }
 
-  } catch (error) {
-    console.error('\n❌ Test failed:', error.message);
-    if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
-    }
+    console.log('\n' + '='.repeat(60) + '\n');
+  }
+
+  console.log(`\n📊 Test Summary:`);
+  console.log(`   ✅ Passed: ${passedTests}`);
+  console.log(`   ❌ Failed: ${failedTests}`);
+  console.log(`   📝 Total:  ${testCases.length}`);
+
+  if (failedTests > 0) {
     process.exit(1);
   }
 }
 
-// Run test
-testCreateTransport().catch(error => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+// Run the test
+testCreateTransport()
+  .then(() => {
+    console.log('\n=== All tests completed successfully ===');
+    process.exit(0);
+  })
+  .catch(error => {
+    console.error('\n=== Tests failed ===');
+    console.error(error);
+    process.exit(1);
+  });

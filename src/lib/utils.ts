@@ -158,7 +158,7 @@ export async function fetchNodeStructure(
 ): Promise<AxiosResponse> {
   const baseUrl = await getBaseUrl();
   const url = `${baseUrl}/sap/bc/adt/repository/nodestructure`;
-  
+
   // Prepare query parameters
   const params = {
     parent_name: parentName,
@@ -197,4 +197,35 @@ export async function makeAdtRequest(
   headers?: Record<string, string>
 ) {
   return getManagedConnection().makeAdtRequest({ url, method, timeout, data, params, headers });
+}
+
+/**
+ * Get system information from SAP ADT (for cloud systems)
+ * Returns systemID and userName if available
+ * This endpoint is available in cloud systems, not in on-premise
+ */
+export async function getSystemInformation(): Promise<{ systemID?: string; userName?: string } | null> {
+  try {
+    const baseUrl = await getBaseUrl();
+    const url = `${baseUrl}/sap/bc/adt/core/http/systeminformation`;
+
+    const headers = {
+      'Accept': 'application/json'
+    };
+
+    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default', null, undefined, headers);
+
+    if (response.data && typeof response.data === 'object') {
+      return {
+        systemID: response.data.systemID,
+        userName: response.data.userName
+      };
+    }
+
+    return null;
+  } catch (error) {
+    // If endpoint doesn't exist (on-premise), return null
+    // This is expected for on-premise systems
+    return null;
+  }
 }

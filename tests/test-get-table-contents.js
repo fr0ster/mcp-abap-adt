@@ -1,53 +1,72 @@
 /**
- * Test script for GetTableContents handler
- * Configuration loaded from tests/test-config.yaml
+ * Test GetTableContents handler
+ * Tests retrieving table data contents
  */
 
 const {
   initializeTestEnvironment,
-  getEnabledTestCase,
+  getAllEnabledTestCases,
   printTestHeader,
   printTestParams,
   printTestResult
 } = require('./test-helper');
 
-// Initialize test environment before importing handlers
+// Initialize test environment
 initializeTestEnvironment();
 
 const { handleGetTableContents } = require('../dist/handlers/handleGetTableContents');
 
-async function main() {
-  try {
-    // Load test case from YAML (or use command line arg)
-    let testArgs;
+async function testGetTableContents() {
+  const testCases = getAllEnabledTestCases('get_table_contents');
+  
+  console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
+  
+  let passedTests = 0;
+  let failedTests = 0;
+  
+  for (const testCase of testCases) {
+    printTestHeader('GetTableContents', testCase);
+    const params = testCase.params;
     
-    if (process.argv[2]) {
-      // Command line argument takes precedence
-      testArgs = {
-        table_name: process.argv[2],
-        max_rows: process.argv[3] ? parseInt(process.argv[3], 10) : 5
-      };
-      console.log('Using command line arguments');
-      printTestParams(testArgs);
-    } else {
-      // Load from YAML config
-      const testCase = getEnabledTestCase('get_table_contents');
-      printTestHeader('GetTableContents', testCase);
-      testArgs = testCase.params;
-      printTestParams(testArgs);
+    printTestParams(params);
+    console.log('--- Retrieving table contents ---\n');
+    
+    try {
+      const result = await handleGetTableContents(params);
+      
+      if (printTestResult(result, 'GetTableContents')) {
+        passedTests++;
+      } else {
+        failedTests++;
+      }
+      
+    } catch (error) {
+      console.error('❌ Unexpected error:');
+      console.error(error);
+      failedTests++;
     }
-
-    const result = await handleGetTableContents(testArgs);
     
-    if (!printTestResult(result, 'GetTableContents')) {
-      process.exit(1);
-    }
-    
-    process.exit(0);
-  } catch (e) {
-    console.error('❌ Error:', e);
+    console.log('\n' + '='.repeat(60) + '\n');
+  }
+  
+  console.log(`\n📊 Test Summary:`);
+  console.log(`   ✅ Passed: ${passedTests}`);
+  console.log(`   ❌ Failed: ${failedTests}`);
+  console.log(`   📝 Total:  ${testCases.length}`);
+  
+  if (failedTests > 0) {
     process.exit(1);
   }
 }
 
-main();
+// Run the test
+testGetTableContents()
+  .then(() => {
+    console.log('\n=== All tests completed successfully ===');
+    process.exit(0);
+  })
+  .catch(error => {
+    console.error('\n=== Tests failed ===');
+    console.error(error);
+    process.exit(1);
+  });

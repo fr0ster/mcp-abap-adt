@@ -2,34 +2,29 @@ import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 /**
  * Validates transport request requirement based on package name.
- * For $TMP (local) package, transport request is optional.
- * For transportable packages, transport request is required.
- * 
- * Note: $TMP is the only local package in SAP. Each user has their own $TMP.
- * 
+ * If transport_request is not provided, we assume it's a local object and let SAP handle the validation.
+ * No strict validation - if creation fails, SAP will return an error.
+ *
  * @param packageName - The package name to validate
  * @param transportRequest - The transport request (optional)
- * @throws {McpError} If validation fails
+ * @param superPackage - The super package name (optional, not used for validation)
  */
 export function validateTransportRequest(
   packageName: string,
-  transportRequest: string | undefined
+  transportRequest: string | undefined,
+  superPackage?: string
 ): void {
-  const isLocal = isLocalPackage(packageName);
-  
-  if (!isLocal && !transportRequest) {
-    throw new McpError(
-      ErrorCode.InvalidParams,
-      'Transport request is required for transportable packages (non-$TMP). For local development, use package_name: "$TMP".'
-    );
-  }
+  // No strict validation - if transport_request is missing, we assume local object
+  // SAP will return an error if transport is actually required
+  // This allows flexible creation of both local and transportable objects
 }
 
 /**
- * Check if package is local ($TMP)
+ * Check if package is local ($TMP or ZLOCAL)
  * @param packageName - The package name to check
- * @returns true if package is $TMP, false otherwise
+ * @returns true if package is $TMP or ZLOCAL, false otherwise
  */
 export function isLocalPackage(packageName: string): boolean {
-  return packageName === '$TMP';
+  const upperName = packageName.toUpperCase();
+  return upperName === '$TMP' || upperName === 'ZLOCAL';
 }

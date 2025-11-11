@@ -1,54 +1,72 @@
 /**
- * Test script for SearchObject handler
- * Configuration loaded from tests/test-config.yaml
+ * Test SearchObject handler
+ * Tests searching for ABAP objects
  */
 
 const {
   initializeTestEnvironment,
-  getEnabledTestCase,
+  getAllEnabledTestCases,
   printTestHeader,
   printTestParams,
   printTestResult
 } = require('./test-helper');
 
-// Initialize test environment before importing handlers
+// Initialize test environment
 initializeTestEnvironment();
 
 const { handleSearchObject } = require('../dist/handlers/handleSearchObject');
 
-async function runTest() {
-  try {
-    // Load test case from YAML (or use command line arg)
-    let testArgs;
+async function testSearchObject() {
+  const testCases = getAllEnabledTestCases('search_object');
+  
+  console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
+  
+  let passedTests = 0;
+  let failedTests = 0;
+  
+  for (const testCase of testCases) {
+    printTestHeader('SearchObject', testCase);
+    const params = testCase.params;
     
-    if (process.argv[2]) {
-      // Command line argument takes precedence
-      testArgs = {
-        object_name: process.argv[2],
-        object_type: process.argv[3] || undefined,
-        maxResults: process.argv[4] ? parseInt(process.argv[4], 10) : 10
-      };
-      console.log('Using command line arguments');
-      printTestParams(testArgs);
-    } else {
-      // Load from YAML config
-      const testCase = getEnabledTestCase('search_object');
-      printTestHeader('SearchObject', testCase);
-      testArgs = testCase.params;
-      printTestParams(testArgs);
+    printTestParams(params);
+    console.log('--- Searching for objects ---\n');
+    
+    try {
+      const result = await handleSearchObject(params);
+      
+      if (printTestResult(result, 'SearchObject')) {
+        passedTests++;
+      } else {
+        failedTests++;
+      }
+      
+    } catch (error) {
+      console.error('❌ Unexpected error:');
+      console.error(error);
+      failedTests++;
     }
-
-    const result = await handleSearchObject(testArgs);
     
-    if (!printTestResult(result, 'SearchObject')) {
-      process.exit(1);
-    }
-    
-    process.exit(0);
-  } catch (err) {
-    console.error('❌ SearchObject ERROR:', err.status, err.body?.error?.message || err.message);
+    console.log('\n' + '='.repeat(60) + '\n');
+  }
+  
+  console.log(`\n📊 Test Summary:`);
+  console.log(`   ✅ Passed: ${passedTests}`);
+  console.log(`   ❌ Failed: ${failedTests}`);
+  console.log(`   📝 Total:  ${testCases.length}`);
+  
+  if (failedTests > 0) {
     process.exit(1);
   }
 }
 
-runTest();
+// Run the test
+testSearchObject()
+  .then(() => {
+    console.log('\n=== All tests completed successfully ===');
+    process.exit(0);
+  })
+  .catch(error => {
+    console.error('\n=== Tests failed ===');
+    console.error(error);
+    process.exit(1);
+  });

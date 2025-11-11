@@ -1,6 +1,6 @@
 /**
  * CreateTransport Handler - Create new ABAP transport request via ADT API
- * 
+ *
  * Creates a new transport request for development objects.
  * Transport requests are essential for moving changes between SAP systems.
  */
@@ -16,19 +16,19 @@ export const TOOL_DEFINITION = {
   inputSchema: {
     type: "object",
     properties: {
-      transport_type: { 
-        type: "string", 
+      transport_type: {
+        type: "string",
         description: "Transport type: 'workbench' (cross-client) or 'customizing' (client-specific)",
         enum: ["workbench", "customizing"],
         default: "workbench"
       },
-      description: { 
-        type: "string", 
-        description: "Transport request description (mandatory)" 
+      description: {
+        type: "string",
+        description: "Transport request description (mandatory)"
       },
-      target_system: { 
-        type: "string", 
-        description: "Target system for transport (optional, e.g., 'PRD', 'QAS')" 
+      target_system: {
+        type: "string",
+        description: "Target system for transport (optional, e.g., 'PRD', 'QAS'). If not provided or empty, uses 'LOCAL'"
       },
       owner: {
         type: "string",
@@ -60,7 +60,10 @@ function buildCreateTransportXml(args: CreateTransportArgs, username: string): s
   const transportType = args.transport_type === 'customizing' ? 'T' : 'K';
   const description = args.description || 'Transport request created via MCP';
   const owner = args.owner || username;
-  const target = args.target_system ? `/${args.target_system}/` : '/E19TOQAS/'; // Default target format
+  // If target_system is not provided or empty, use "LOCAL"
+  const target = args.target_system && args.target_system.trim()
+    ? `/${args.target_system}/`
+    : 'LOCAL';
 
   return `<?xml version="1.0" encoding="ASCII"?>
 <tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="newrequest">
@@ -82,7 +85,7 @@ function parseTransportResponse(xmlData: string): any {
 
   const result = parser.parse(xmlData);
   const root = result['tm:root'] || result['root'];
-  
+
   if (!root) {
     throw new McpError(ErrorCode.InternalError, 'Invalid transport response XML structure - no tm:root found');
   }

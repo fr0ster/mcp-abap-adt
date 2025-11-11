@@ -1,13 +1,13 @@
 /**
  * CreateProgram Handler - ABAP Program Creation via ADT API
- * 
+ *
  * Eclipse ADT workflow (stateful session required):
  * 1. POST /sap/bc/adt/programs/programs - Create program with metadata
  * 2. Extract lock handle from POST response headers
  * 3. PUT /sap/bc/adt/programs/programs/{name}/source/main - Upload program source
  * 4. POST /sap/bc/adt/programs/programs/{name}?_action=UNLOCK - Unlock program
  * 5. POST /sap/bc/adt/activation - Activate program
- * 
+ *
  * CRITICAL REQUIREMENTS:
  * - Stateful session: sap-adt-connection-id must be same for all steps
  * - Cookie management: automatic via BaseAbapConnection
@@ -21,6 +21,7 @@ import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtil
 import { activateObjectInSession } from '../lib/activationUtils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
+import { getSystemInformation } from '../lib/utils.js';
 
 export const TOOL_DEFINITION = {
   name: "CreateProgram",
@@ -28,21 +29,21 @@ export const TOOL_DEFINITION = {
   inputSchema: {
     type: "object",
     properties: {
-      program_name: { 
-        type: "string", 
-        description: "Program name (e.g., Z_TEST_PROGRAM_001). Must follow SAP naming conventions (start with Z or Y)." 
+      program_name: {
+        type: "string",
+        description: "Program name (e.g., Z_TEST_PROGRAM_001). Must follow SAP naming conventions (start with Z or Y)."
       },
       description: {
         type: "string",
         description: "Program description. If not provided, program_name will be used."
       },
-      package_name: { 
-        type: "string", 
-        description: "Package name (e.g., ZOK_LAB, $TMP for local objects)" 
+      package_name: {
+        type: "string",
+        description: "Package name (e.g., ZOK_LAB, $TMP for local objects)"
       },
-      transport_request: { 
-        type: "string", 
-        description: "Transport request number (e.g., E19K905635). Required for transportable packages." 
+      transport_request: {
+        type: "string",
+        description: "Transport request number (e.g., E19K905635). Required for transportable packages."
       },
       program_type: {
         type: "string",
@@ -60,6 +61,14 @@ export const TOOL_DEFINITION = {
       activate: {
         type: "boolean",
         description: "Activate program after creation. Default: true. Set to false for batch operations (activate multiple objects later)."
+      },
+      master_system: {
+        type: "string",
+        description: "Master system ID (e.g., 'TRL' for cloud trial). Optional - will be retrieved from system if not provided."
+      },
+      responsible: {
+        type: "string",
+        description: "User responsible for the object (e.g., 'CB9980002377'). Optional - will be retrieved from system if not provided."
       }
     },
     required: ["program_name", "package_name"]
@@ -71,6 +80,8 @@ interface CreateProgramArgs {
   description?: string;
   package_name: string;
   transport_request?: string;
+  master_system?: string;
+  responsible?: string;
   program_type?: string;
   application?: string;
   source_code?: string;
@@ -89,7 +100,7 @@ function convertProgramType(programType?: string): string {
     'class_pool': 'K',
     'interface_pool': 'J'
   };
-  
+
   return typeMap[programType || 'executable'] || '1';
 }
 
@@ -98,7 +109,7 @@ function convertProgramType(programType?: string): string {
  */
 function generateProgramTemplate(programName: string, programType: string, description: string): string {
   const upperName = programName.toUpperCase();
-  
+
   switch (programType) {
     case 'I': // Include
       return `*&---------------------------------------------------------------------*
@@ -108,7 +119,7 @@ function generateProgramTemplate(programName: string, programType: string, descr
 
 " Include program logic here
 `;
-    
+
     case 'M': // Module Pool
       return `*&---------------------------------------------------------------------*
 *& Module Pool ${upperName}
@@ -117,7 +128,7 @@ function generateProgramTemplate(programName: string, programType: string, descr
 
 PROGRAM ${upperName}.
 `;
-    
+
     case '1': // Executable (Report)
     default:
       return `*&---------------------------------------------------------------------*
@@ -141,14 +152,29 @@ async function createProgramObject(args: CreateProgramArgs, sessionId: string): 
   const programType = convertProgramType(args.program_type); // Convert to SAP code
   const application = args.application || '*'; // Default: cross-application
   const url = `/sap/bc/adt/programs/programs${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
-  
-  // Get username and master system
-  const username = process.env.SAP_USERNAME || '';
-  const masterSystem = process.env.SAP_SYSTEM_ID || 'SAP';
-  
-  // Build program metadata XML following Eclipse ADT format
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?>
-<program:abapProgram xmlns:program="http://www.sap.com/adt/programs/programs" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.program_name}" adtcore:type="PROG/P" adtcore:masterLanguage="EN" adtcore:masterSystem="${masterSystem}" adtcore:responsible="${username}" program:programType="${programType}" program:application="${application}">
+
+  // Get masterSystem and responsible - optional, retrieved from system for cloud
+  let masterSystem = args.master_system;
+  let username = args.responsible;
+
+  // If not provided, try to get from system information (cloud systems)
+  if (!masterSystem || !username) {
+    const systemInfo = await getSystemInformation();
+    if (systemInfo) {
+      masterSystem = masterSystem || systemInfo.systemID;
+      username = username || systemInfo.userName;
+    }
+  }
+
+  // Fallback to env or empty (for on-premise, these may not be needed)
+  masterSystem = masterSystem || process.env.SAP_SYSTEM || process.env.SAP_SYSTEM_ID || '';
+  username = username || process.env.SAP_USERNAME || process.env.SAP_USER || '';
+
+  // Build program metadata XML - include masterSystem and responsible only if provided
+  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
+  const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
+
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><program:abapProgram xmlns:program="http://www.sap.com/adt/programs/programs" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.program_name}" adtcore:type="PROG/P" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr} program:programType="${programType}" program:application="${application}">
   <adtcore:packageRef adtcore:name="${args.package_name}"/>
 </program:abapProgram>`;
 
@@ -167,23 +193,23 @@ async function createProgramObject(args: CreateProgramArgs, sessionId: string): 
  */
 async function lockProgram(programName: string, sessionId: string): Promise<string> {
   const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
-  
+
   const headers = {
     'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
   };
 
   logger.info(`Locking program: ${programName}`);
   const response = await makeAdtRequestWithSession(url, 'POST', sessionId, null, headers);
-  
+
   // Parse lock handle from XML response
   const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
   const result = parser.parse(response.data);
   const lockHandle = result?.['asx:abap']?.['asx:values']?.['DATA']?.['LOCK_HANDLE'];
-  
+
   if (!lockHandle) {
     throw new Error('Failed to obtain lock handle from SAP. Program may be locked by another user.');
   }
-  
+
   logger.info(`Lock acquired: ${lockHandle}`);
   return lockHandle;
 }
@@ -193,15 +219,15 @@ async function lockProgram(programName: string, sessionId: string): Promise<stri
  * Lock handle must be passed in URL and maintained in same session
  */
 async function uploadProgramSource(
-  programName: string, 
-  sourceCode: string, 
-  lockHandle: string, 
-  sessionId: string, 
+  programName: string,
+  sourceCode: string,
+  lockHandle: string,
+  sessionId: string,
   transportRequest?: string
 ): Promise<AxiosResponse> {
   const queryParams = `lockHandle=${lockHandle}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
   const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}/source/main?${queryParams}`;
-  
+
   const headers = {
     'Accept': 'text/plain',
     'Content-Type': 'text/plain; charset=utf-8'
@@ -234,26 +260,26 @@ async function activateProgram(programName: string, sessionId: string): Promise<
 
 /**
  * Main handler for CreateProgram tool
- * 
+ *
  * Workflow:
  * 1. Create program object with metadata
  * 2. Extract lock handle from response (or explicit LOCK)
  * 3. Upload source code
  * 4. Unlock program
  * 5. Activate program
- * 
+ *
  * IMPORTANT: Uses stateful session for all 5 steps
  * IMPORTANT: Cookies are managed automatically by BaseAbapConnection
  * IMPORTANT: Lock handle is maintained within session scope
  */
 export async function handleCreateProgram(params: any) {
   const args: CreateProgramArgs = params;
-  
+
   // Validate required parameters
   if (!args.program_name || !args.package_name) {
     return return_error(new Error("Missing required parameters: program_name and package_name"));
   }
-  
+
   // Validate transport_request: required for non-$TMP packages
   try {
     validateTransportRequest(args.package_name, args.transport_request);
@@ -264,7 +290,7 @@ export async function handleCreateProgram(params: any) {
   const programName = args.program_name.toUpperCase();
   const sessionId = generateSessionId();
   let lockHandle: string | null = null;
-  
+
   logger.info(`Starting program creation: ${programName} (session: ${sessionId})`);
 
   try {
@@ -277,16 +303,16 @@ export async function handleCreateProgram(params: any) {
     logger.info(`✓ Step 1: Program object created`);
 
     // Extract lock handle from response headers (Eclipse approach)
-    lockHandle = createResponse.headers['sap-adt-lockhandle'] || 
+    lockHandle = createResponse.headers['sap-adt-lockhandle'] ||
                  createResponse.headers['lockhandle'] ||
                  createResponse.headers['x-sap-adt-lockhandle'];
-    
+
     if (!lockHandle) {
       // Fallback: try to extract from response body or do explicit LOCK
       logger.warn('Lock handle not found in POST response headers, attempting explicit LOCK');
       lockHandle = await lockProgram(programName, sessionId);
     }
-    
+
     logger.info(`✓ Step 2: Lock handle obtained: ${lockHandle.substring(0, 10)}...`);
 
     // Step 3: Upload source code (uses lock handle from step 1/2)
@@ -306,11 +332,11 @@ export async function handleCreateProgram(params: any) {
     // Step 5: Activate the program (optional)
     let activationWarnings: string[] = [];
     const shouldActivate = args.activate !== false; // Default to true if not specified
-    
+
     if (shouldActivate) {
       const activateResponse = await activateProgram(programName, sessionId);
       logger.info(`✓ Step 5: Activation completed`);
-      
+
       // Parse activation warnings/errors
       if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
         const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
@@ -318,7 +344,7 @@ export async function handleCreateProgram(params: any) {
         const messages = result?.['chkl:messages']?.['msg'];
         if (messages) {
           const msgArray = Array.isArray(messages) ? messages : [messages];
-          activationWarnings = msgArray.map((msg: any) => 
+          activationWarnings = msgArray.map((msg: any) =>
             `${msg['@_type']}: ${msg['shortText']?.['txt'] || 'Unknown'}`
           );
         }
@@ -332,7 +358,7 @@ export async function handleCreateProgram(params: any) {
     if (shouldActivate) {
       stepsCompleted.push('activate');
     }
-    
+
     const result = {
       success: true,
       program_name: programName,
@@ -340,7 +366,7 @@ export async function handleCreateProgram(params: any) {
       transport_request: args.transport_request || null,
       program_type: args.program_type || '1',
       type: 'PROG/P',
-      message: shouldActivate 
+      message: shouldActivate
         ? `Program ${programName} created and activated successfully`
         : `Program ${programName} created successfully (not activated)`,
       uri: `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`,

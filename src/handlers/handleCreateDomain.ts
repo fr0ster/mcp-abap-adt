@@ -11,50 +11,50 @@ export const TOOL_DEFINITION = {
   inputSchema: {
     type: "object",
     properties: {
-      domain_name: { 
-        type: "string", 
-        description: "Domain name (e.g., ZZ_TEST_0001). Must follow SAP naming conventions." 
+      domain_name: {
+        type: "string",
+        description: "Domain name (e.g., ZZ_TEST_0001). Must follow SAP naming conventions."
       },
-      description: { 
-        type: "string", 
-        description: "Domain description. If not provided, domain_name will be used." 
+      description: {
+        type: "string",
+        description: "Domain description. If not provided, domain_name will be used."
       },
-      package_name: { 
-        type: "string", 
-        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects)" 
+      package_name: {
+        type: "string",
+        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects)"
       },
-      transport_request: { 
-        type: "string", 
-        description: "Transport request number (e.g., E19K905635). Required for transportable packages." 
+      transport_request: {
+        type: "string",
+        description: "Transport request number (e.g., E19K905635). Required for transportable packages."
       },
-      datatype: { 
-        type: "string", 
+      datatype: {
+        type: "string",
         description: "Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.",
-        default: "CHAR" 
+        default: "CHAR"
       },
-      length: { 
-        type: "number", 
+      length: {
+        type: "number",
         description: "Field length (max depends on datatype)",
-        default: 100 
+        default: 100
       },
-      decimals: { 
-        type: "number", 
+      decimals: {
+        type: "number",
         description: "Decimal places (for DEC, CURR, QUAN types)",
-        default: 0 
+        default: 0
       },
-      conversion_exit: { 
-        type: "string", 
-        description: "Conversion exit routine name (without CONVERSION_EXIT_ prefix)" 
+      conversion_exit: {
+        type: "string",
+        description: "Conversion exit routine name (without CONVERSION_EXIT_ prefix)"
       },
-      lowercase: { 
-        type: "boolean", 
+      lowercase: {
+        type: "boolean",
         description: "Allow lowercase input",
-        default: false 
+        default: false
       },
-      sign_exists: { 
-        type: "boolean", 
+      sign_exists: {
+        type: "boolean",
         description: "Field has sign (+/-)",
-        default: false 
+        default: false
       },
       value_table: {
         type: "string",
@@ -145,21 +145,21 @@ function parseCheckRunResponse(response: AxiosResponse): { success: boolean; mes
     ignoreAttributes: false,
     attributeNamePrefix: '',
   });
-  
+
   try {
     const result = parser.parse(response.data);
     const checkReport = result['chkrun:checkRunReports']?.['chkrun:checkReport'];
-    
+
     if (checkReport) {
       const status = checkReport['chkrun:status'];
       const statusText = checkReport['chkrun:statusText'] || '';
-      
+
       return {
         success: status === 'processed',
         message: statusText
       };
     }
-    
+
     return { success: false, message: 'Unknown check run status' };
   } catch (error) {
     return { success: false, message: `Failed to parse check run response: ${error}` };
@@ -174,21 +174,21 @@ function parseActivationResponse(response: AxiosResponse): { success: boolean; m
     ignoreAttributes: false,
     attributeNamePrefix: '',
   });
-  
+
   try {
     const result = parser.parse(response.data);
     const properties = result['chkl:messages']?.['chkl:properties'];
-    
+
     if (properties) {
       const activated = properties['activationExecuted'] === 'true' || properties['activationExecuted'] === true;
       const checked = properties['checkExecuted'] === 'true' || properties['checkExecuted'] === true;
-      
+
       return {
         success: activated && checked,
         message: activated ? 'Domain activated successfully' : 'Activation failed'
       };
     }
-    
+
     return { success: false, message: 'Unknown activation status' };
   } catch (error) {
     return { success: false, message: `Failed to parse activation response: ${error}` };
@@ -207,25 +207,25 @@ async function createEmptyDomain(
   // For $TMP package, don't include corrNr parameter
   const corrNrParam = args.transport_request ? `?corrNr=${args.transport_request}` : '';
   const url = `/sap/bc/adt/ddic/domains${corrNrParam}`;
-  
+
   // Minimal XML to create empty domain
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
-<doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" 
-             xmlns:adtcore="http://www.sap.com/adt/core" 
-             adtcore:description="${args.description || args.domain_name}" 
-             adtcore:language="EN" 
-             adtcore:name="${args.domain_name.toUpperCase()}" 
-             adtcore:type="DOMA/DD" 
-             adtcore:masterLanguage="EN" 
+<doma:domain xmlns:doma="http://www.sap.com/dictionary/domain"
+             xmlns:adtcore="http://www.sap.com/adt/core"
+             adtcore:description="${args.description || args.domain_name}"
+             adtcore:language="EN"
+             adtcore:name="${args.domain_name.toUpperCase()}"
+             adtcore:type="DOMA/DD"
+             adtcore:masterLanguage="EN"
              adtcore:responsible="${username}">
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
 </doma:domain>`;
-  
+
   const headers = {
     'Accept': 'application/vnd.sap.adt.domains.v1+xml, application/vnd.sap.adt.domains.v2+xml',
     'Content-Type': 'application/vnd.sap.adt.domains.v2+xml'
   };
-  
+
   const response = await makeAdtRequestWithSession(url, 'POST', sessionId, xmlBody, headers);
   return response;
 }
@@ -238,38 +238,38 @@ async function acquireLockHandle(
   sessionId: string
 ): Promise<string> {
   const domainNameEncoded = encodeSapObjectName(args.domain_name.toLowerCase());
-  
+
   // POST with _action=LOCK&accessMode=MODIFY to get the lock handle
   const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?_action=LOCK&accessMode=MODIFY`;
-  
+
   const headers = {
     'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
   };
-  
+
   try {
     // POST to lock the domain for creation with proper Accept header
     const response = await makeAdtRequestWithSession(url, 'POST', sessionId, null, headers);
-    
+
     // Parse XML response to extract LOCK_HANDLE
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '',
     });
-    
+
     const result = parser.parse(response.data);
     const lockHandle = result?.['asx:abap']?.['asx:values']?.['DATA']?.['LOCK_HANDLE'];
-    
+
     console.log('[DEBUG] acquireLockHandle - parsed result:', JSON.stringify(result, null, 2));
     console.log(`[DEBUG] acquireLockHandle - extracted lockHandle: "${lockHandle}"`);
-    
+
     if (!lockHandle) {
       throw new McpError(ErrorCode.InternalError, 'Failed to obtain lock handle from SAP response');
     }
-    
+
     return lockHandle;
   } catch (error: any) {
     const errorDetails = error.response?.data ? `\nResponse: ${error.response.data}` : '';
-    
+
     // Check if domain already exists
     if (error.response?.data?.includes('ExceptionResourceAlreadyExists')) {
       throw new McpError(
@@ -277,7 +277,7 @@ async function acquireLockHandle(
         `Domain ${args.domain_name} already exists. Please delete it first or use a different name.`
       );
     }
-    
+
     throw new McpError(
       ErrorCode.InternalError,
       `Failed to create empty domain ${args.domain_name}: ${error.message || error}${errorDetails}`
@@ -290,33 +290,33 @@ async function acquireLockHandle(
  * Build XML from scratch using parameters
  */
 async function lockAndCreateDomain(
-  args: DomainArgs, 
+  args: DomainArgs,
   lockHandle: string,
   sessionId: string,
   username: string
 ): Promise<AxiosResponse> {
   const domainNameEncoded = encodeSapObjectName(args.domain_name.toLowerCase());
-  
+
   // For $TMP package, don't include corrNr parameter (but lockHandle is still required)
   const corrNrParam = args.transport_request ? `&corrNr=${args.transport_request}` : '';
   const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?lockHandle=${lockHandle}${corrNrParam}`;
-  
+
   // Build domain XML from parameters
   const datatype = args.datatype || 'CHAR';
   const length = args.length || 100;
   const decimals = args.decimals || 0;
-  
+
   // Build fixValues structure
   let fixValuesXml = '';
   if (args.fixed_values && args.fixed_values.length > 0) {
-    const fixValueItems = args.fixed_values.map(fv => 
+    const fixValueItems = args.fixed_values.map(fv =>
       `      <doma:fixValue>\n        <doma:low>${fv.low}</doma:low>\n        <doma:text>${fv.text}</doma:text>\n      </doma:fixValue>`
     ).join('\n');
     fixValuesXml = `    <doma:fixValues>\n${fixValueItems}\n    </doma:fixValues>`;
   } else {
     fixValuesXml = '    <doma:fixValues/>';
   }
-  
+
   // Build complete XML manually to ensure correct structure
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <doma:domain xmlns:doma="http://www.sap.com/dictionary/domain"
@@ -347,12 +347,12 @@ ${fixValuesXml}
     </doma:valueInformation>
   </doma:content>
 </doma:domain>`;
-  
+
   const headers: Record<string, string> = {
     'Accept': 'application/vnd.sap.adt.domains.v1+xml, application/vnd.sap.adt.domains.v2+xml',
     'Content-Type': 'application/vnd.sap.adt.domains.v2+xml; charset=utf-8'
   };
-  
+
   const response = await makeAdtRequestWithSession(url, 'PUT', sessionId, xmlBody, headers);
   return response;
 }
@@ -363,19 +363,19 @@ ${fixValuesXml}
 async function checkDomainSyntax(domainName: string, sessionId: string): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/checkruns`;
   const xmlBody = buildCheckRunXml(domainName);
-  
+
   const headers = {
     'Accept': 'application/vnd.sap.adt.checkmessages+xml',
     'Content-Type': 'application/vnd.sap.adt.checkobjects+xml'
   };
-  
+
   const response = await makeAdtRequestWithSession(url, 'POST', sessionId, xmlBody, headers);
-  
+
   const checkResult = parseCheckRunResponse(response);
   if (!checkResult.success) {
     throw new McpError(ErrorCode.InternalError, `Domain check failed: ${checkResult.message}`);
   }
-  
+
   return response;
 }
 
@@ -383,13 +383,13 @@ async function checkDomainSyntax(domainName: string, sessionId: string): Promise
  * Step 3: Unlock domain
  */
 async function unlockDomain(
-  domainName: string, 
-  lockHandle: string, 
+  domainName: string,
+  lockHandle: string,
   sessionId: string
 ): Promise<AxiosResponse> {
   const domainNameEncoded = encodeSapObjectName(domainName.toLowerCase());
   const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?_action=UNLOCK&lockHandle=${lockHandle}`;
-  
+
   return makeAdtRequestWithSession(url, 'POST', sessionId);
 }
 
@@ -399,19 +399,19 @@ async function unlockDomain(
 async function activateDomain(domainName: string, sessionId: string): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
   const xmlBody = buildActivationXml(domainName);
-  
+
   const headers = {
     'Accept': 'application/xml',
     'Content-Type': 'application/xml'
   };
-  
+
   const response = await makeAdtRequestWithSession(url, 'POST', sessionId, xmlBody, headers);
-  
+
   const activationResult = parseActivationResponse(response);
   if (!activationResult.success) {
     throw new McpError(ErrorCode.InternalError, `Domain activation failed: ${activationResult.message}`);
   }
-  
+
   return response;
 }
 
@@ -421,18 +421,18 @@ async function activateDomain(domainName: string, sessionId: string): Promise<Ax
 async function getDomainForVerification(domainName: string, sessionId: string): Promise<any> {
   const domainNameEncoded = encodeSapObjectName(domainName.toLowerCase());
   const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?version=workingArea`;
-  
+
   const headers = {
     'Accept': 'application/vnd.sap.adt.domains.v1+xml, application/vnd.sap.adt.domains.v2+xml'
   };
-  
+
   const response = await makeAdtRequestWithSession(url, 'GET', sessionId, undefined, headers);
-  
+
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '',
   });
-  
+
   const result = parser.parse(response.data);
   return result['doma:domain'];
 }
@@ -449,57 +449,58 @@ export async function handleCreateDomain(args: any) {
     if (!args?.package_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
     }
-    
-    // Validate transport_request: required for non-$TMP packages
-    validateTransportRequest(args.package_name, args.transport_request);
+
+    // Validate transport_request: required for non-$TMP, non-ZLOCAL packages
+    // For packages with super_package = ZLOCAL, transport_request is optional
+    validateTransportRequest(args.package_name, args.transport_request, args.super_package);
 
     // Generate session ID for this MCP call (all ADT requests will use this ID)
     const sessionId = generateSessionId();
-    
+
     // Get username from environment or use default
     const username = process.env.SAP_USER || 'MPCUSER';
-    
+
     const typedArgs = args as DomainArgs;
     let lockHandle = '';
 
     try {
       console.log(`[DEBUG] Session ID for all requests: ${sessionId}`);
-      
+
       // Step 1: Create empty domain (POST registers name and locks on transport)
       console.log(`[DEBUG] Step 1: Creating empty domain with sessionId: ${sessionId}`);
       await createEmptyDomain(typedArgs, sessionId, username);
-      
+
       // Step 2: Acquire lock handle
       console.log(`[DEBUG] Step 2: Acquiring lock handle with sessionId: ${sessionId}`);
       lockHandle = await acquireLockHandle(typedArgs, sessionId);
-      
+
       // Wait a bit for SAP to process the lock
       console.log(`[DEBUG] Waiting 500ms for SAP to process lock...`);
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       // Wait a bit before PUT to ensure lock is fully established
       console.log(`[DEBUG] Waiting 500ms before PUT...`);
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       // Step 3: Create domain with full data (PUT with lock handle, build XML from parameters)
       console.log(`[DEBUG] Step 3: PUT domain with sessionId: ${sessionId}, lockHandle: ${lockHandle}`);
       await lockAndCreateDomain(typedArgs, lockHandle, sessionId, username);
-      
+
       // Step 4: Check domain syntax
       await checkDomainSyntax(typedArgs.domain_name, sessionId);
-      
+
       // Step 5: Unlock domain (important!)
       await unlockDomain(typedArgs.domain_name, lockHandle, sessionId);
-      
+
       // Step 6: Activate domain (optional, default true)
       const shouldActivate = typedArgs.activate !== false;
       if (shouldActivate) {
         await activateDomain(typedArgs.domain_name, sessionId);
       }
-      
+
       // Step 7: Verify creation
       const finalDomain = await getDomainForVerification(typedArgs.domain_name, sessionId);
-      
+
       return return_response({
         data: JSON.stringify({
           success: true,
@@ -525,7 +526,7 @@ export async function handleCreateDomain(args: any) {
       }
       throw error;
     }
-    
+
   } catch (error) {
     if (error instanceof McpError) {
       throw error;

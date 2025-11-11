@@ -45,13 +45,13 @@ All CREATE/UPDATE/DELETE tests have been migrated to use YAML configuration:
 ### GET Tests - YAML Migration
 
 #### Group 1: Core GET Tests (enabled: true)
-- [ ] test-get-program.js - `get_program`
-- [ ] test-get-class.js - `get_class`
-- [ ] test-get-function-group.js - `get_function_group`
-- [ ] test-get-function.js - `get_function`
-- [ ] test-get-table.js - `get_table`
-- [ ] test-get-table-contents.js - `get_table_contents`
-- [ ] test-get-structure.js - `get_structure`
+- [x] test-get-program.js - `get_program` ✅
+- [x] test-get-class.js - `get_class` ✅
+- [x] test-get-function-group.js - `get_function_group` ✅
+- [x] test-get-function.js - `get_function` ✅
+- [x] test-get-table.js - `get_table` ✅
+- [x] test-get-table-contents.js - `get_table_contents` ✅
+- [x] test-get-structure.js - `get_structure` ✅
 
 #### Group 2: Additional GET Tests (enabled: false, can be enabled)
 - [ ] test-get-package.js - `get_package`
@@ -63,12 +63,14 @@ All CREATE/UPDATE/DELETE tests have been migrated to use YAML configuration:
 - [ ] test-get-sql-query.js - `get_sql_query`
 
 #### Group 3: Search Test
-- [ ] test-search-object.js - `search_object` (create new file)
+- [x] test-search-object.js - `search_object` ✅
 
 **Current Status:** 
+- ✅ Group 1 (7 tests) - COMPLETED
+- ✅ Group 3 (1 test) - COMPLETED (test-search-object.js)
 - YAML configs created for all GET handlers
-- Template created for test-get-program.js (test-get-program-new.js)
-- Need to apply template to remaining GET tests
+- Template created and applied to Group 1 and Group 3 tests
+- Need to apply template to Group 2 tests (7 files)
 
 ---
 
@@ -105,14 +107,14 @@ After all GET tests are migrated:
 
 ## 📊 Progress
 
-**Completed:** 18/32 test files (56%)
+**Completed:** 26/32 test files (81%)
 - CREATE/UPDATE/DELETE: 18/18 ✅
-- GET/SEARCH: 0/14 ⏳
+- GET/SEARCH: 8/14 ⏳ (Group 1 ✅ + Group 3 ✅)
 
 **Next Steps:**
-1. Apply YAML template to Group 1 GET tests (7 files)
-2. Apply YAML template to Group 2 GET tests (7 files)
-3. Create test-search-object.js
+1. ✅ Apply YAML template to Group 1 GET tests (7 files) - DONE
+2. ✅ Update test-search-object.js to use getAllEnabledTestCases format - DONE
+3. Apply YAML template to Group 2 GET tests (7 files)
 4. Refactor index.test.ts to use test file imports
 
 ---

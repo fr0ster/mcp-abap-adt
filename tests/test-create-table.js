@@ -3,7 +3,13 @@
  * Tests database table creation with comprehensive validation
  */
 
-const { initializeTestEnvironment, loadTestConfig } = require('./test-helper');
+const {
+  initializeTestEnvironment,
+  getAllEnabledTestCases,
+  printTestHeader,
+  printTestParams,
+  printTestResult
+} = require('./test-helper');
 
 // Initialize test environment
 initializeTestEnvironment();
@@ -11,72 +17,56 @@ initializeTestEnvironment();
 const { handleCreateTable } = require('../dist/handlers/handleCreateTable');
 
 async function testCreateTable() {
-  console.log('='.repeat(80));
-  console.log('CreateTable Handler Test');
-  console.log('='.repeat(80));
-
-  try {
-    // Load test configuration
-    const testConfig = loadTestConfig();
+  const testCases = getAllEnabledTestCases('create_table');
+  
+  console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
+  
+  let passedTests = 0;
+  let failedTests = 0;
+  
+  for (const testCase of testCases) {
+    printTestHeader('CreateTable', testCase);
+    const params = testCase.params;
     
-    if (!testConfig.create_table) {
-      console.error('❌ Missing create_table configuration in test-config.yaml');
-      console.log('\n📝 Add this section to your test-config.yaml:');
-      console.log(`
-create_table:
-  table_name: "ZTST_DEMO_TABLE"
-  description: "Test Demo Table for MCP ABAP ADT"
-  package_name: "ZTST"
-  transport_request: "E19K900001"  # Optional
-  fields:
-    - name: "CLIENT"
-      data_type: "CLNT"
-      length: 3
-      is_key: true
-      description: "Client"
-    - name: "ID" 
-      data_type: "CHAR"
-      length: 10
-      is_key: true
-      description: "ID"
-    - name: "DESCRIPTION"
-      data_type: "CHAR"
-      length: 255
-      description: "Description"
-      `);
-      process.exit(1);
+    printTestParams(params);
+    console.log('--- Starting table creation flow ---\n');
+    
+    try {
+      const result = await handleCreateTable(params);
+      
+      if (printTestResult(result, 'CreateTable')) {
+        passedTests++;
+      } else {
+        failedTests++;
+      }
+      
+    } catch (error) {
+      console.error('❌ Unexpected error during table creation:');
+      console.error(error);
+      failedTests++;
     }
-
-    const params = testConfig.create_table;
     
-    console.log('📋 Test Parameters:');
-    console.log(`   Table Name: ${params.table_name}`);
-    console.log(`   Description: ${params.description}`);
-    console.log(`   Package: ${params.package_name}`);
-    console.log(`   Fields: ${params.fields?.length || 0} defined`);
-
-    console.log('\n🚀 Creating table...');
-    
-    const result = await handleCreateTable(params);
-
-    if (result.isError) {
-      console.error('\n❌ Table creation failed:');
-      console.error(result.content[0].text);
-    } else {
-      console.log('\n✅ Table creation completed!');
-      console.log(result.content[0].text);
-    }
-
-  } catch (error) {
-    console.error('\n❌ Test failed:', error.message);
+    console.log('\n' + '='.repeat(60) + '\n');
+  }
+  
+  console.log(`\n📊 Test Summary:`);
+  console.log(`   ✅ Passed: ${passedTests}`);
+  console.log(`   ❌ Failed: ${failedTests}`);
+  console.log(`   📝 Total:  ${testCases.length}`);
+  
+  if (failedTests > 0) {
     process.exit(1);
   }
 }
 
 // Run the test
-testCreateTable().then(() => {
-  console.log('\n✅ CreateTable test completed!');
-}).catch((error) => {
-  console.error('\n💥 Test execution failed:', error);
-  process.exit(1);
-});
+testCreateTable()
+  .then(() => {
+    console.log('\n=== All tests completed successfully ===');
+    process.exit(0);
+  })
+  .catch(error => {
+    console.error('\n=== Tests failed ===');
+    console.error(error);
+    process.exit(1);
+  });

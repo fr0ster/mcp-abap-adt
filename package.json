@@ -33,7 +33,7 @@
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^24.2.1",
-    "commander": "^14.0.0",
+    "commander": "^14.0.2",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "jest": "^30.0.5",

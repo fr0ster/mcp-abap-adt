@@ -1,6 +1,6 @@
 /**
- * Test script for CreateView tool
- * Tests creation of CDS Views or Classic Views via DDL syntax
+ * Test script for UpdateFunctionModuleSource tool
+ * Tests updating source code of existing Function Modules
  */
 
 const {
@@ -14,10 +14,10 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleCreateView } = require('../dist/handlers/handleCreateView');
+const { handleUpdateFunctionModuleSource } = require('../dist/handlers/handleUpdateFunctionModuleSource');
 
-async function testCreateView() {
-  const testCases = getAllEnabledTestCases('create_view');
+async function testUpdateFunctionModuleSource() {
+  const testCases = getAllEnabledTestCases('update_function_module_source');
   
   console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
   
@@ -25,23 +25,23 @@ async function testCreateView() {
   let failedTests = 0;
   
   for (const testCase of testCases) {
-    printTestHeader('CreateView', testCase);
+    printTestHeader('UpdateFunctionModuleSource', testCase);
     const params = testCase.params;
     
     printTestParams(params);
-    console.log('--- Starting view creation flow ---\n');
+    console.log('--- Starting function module source update flow ---\n');
     
     try {
-      const result = await handleCreateView(params);
+      const result = await handleUpdateFunctionModuleSource(params);
       
-      if (printTestResult(result, 'CreateView')) {
+      if (printTestResult(result, 'UpdateFunctionModuleSource')) {
         passedTests++;
       } else {
         failedTests++;
       }
       
     } catch (error) {
-      console.error('❌ Unexpected error during view creation:');
+      console.error('❌ Unexpected error during function module source update:');
       console.error(error);
       failedTests++;
     }
@@ -60,7 +60,7 @@ async function testCreateView() {
 }
 
 // Run the test
-testCreateView()
+testUpdateFunctionModuleSource()
   .then(() => {
     console.log('\n=== All tests completed successfully ===');
     process.exit(0);

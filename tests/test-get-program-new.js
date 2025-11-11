@@ -1,6 +1,6 @@
 /**
- * Test script for CreateView tool
- * Tests creation of CDS Views or Classic Views via DDL syntax
+ * Test GetProgram handler
+ * Tests retrieving program source code
  */
 
 const {
@@ -14,10 +14,10 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleCreateView } = require('../dist/handlers/handleCreateView');
+const { handleGetProgram } = require('../dist/handlers/handleGetProgram');
 
-async function testCreateView() {
-  const testCases = getAllEnabledTestCases('create_view');
+async function testGetProgram() {
+  const testCases = getAllEnabledTestCases('get_program');
   
   console.log(`\n📋 Found ${testCases.length} enabled test case(s)\n`);
   
@@ -25,23 +25,23 @@ async function testCreateView() {
   let failedTests = 0;
   
   for (const testCase of testCases) {
-    printTestHeader('CreateView', testCase);
+    printTestHeader('GetProgram', testCase);
     const params = testCase.params;
     
     printTestParams(params);
-    console.log('--- Starting view creation flow ---\n');
+    console.log('--- Retrieving program ---\n');
     
     try {
-      const result = await handleCreateView(params);
+      const result = await handleGetProgram(params);
       
-      if (printTestResult(result, 'CreateView')) {
+      if (printTestResult(result, 'GetProgram')) {
         passedTests++;
       } else {
         failedTests++;
       }
       
     } catch (error) {
-      console.error('❌ Unexpected error during view creation:');
+      console.error('❌ Unexpected error:');
       console.error(error);
       failedTests++;
     }
@@ -60,7 +60,7 @@ async function testCreateView() {
 }
 
 // Run the test
-testCreateView()
+testGetProgram()
   .then(() => {
     console.log('\n=== All tests completed successfully ===');
     process.exit(0);

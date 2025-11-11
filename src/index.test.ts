@@ -120,7 +120,7 @@ describe("mcp_abap_adt_server - Integration Tests", () => {
 
   describe("handleGetProgram", () => {
     it("should successfully retrieve program details", async () => {
-      const result = await handleGetProgram({ program_name: "RSABAPPROGRAM" });
+      const result = await handleGetProgram({ program_name: "SD_SALES_DOCUMENT_VIEW" });
       expect(result.isError).toBe(false);
       expect(Array.isArray(result.content)).toBe(true);
       expect(result.content.length).toBeGreaterThan(0);
@@ -324,7 +324,7 @@ describe("mcp_abap_adt_server - Integration Tests", () => {
 
   describe("handleSearchObject", () => {
     it("should successfully search for an object", async () => {
-      const result = await handleSearchObject({ query: "SYST" });
+      const result = await handleSearchObject({ object_name: "SYST" });
 
       if (isCloudDeployment) {
         expect(result.isError).toBe(true);

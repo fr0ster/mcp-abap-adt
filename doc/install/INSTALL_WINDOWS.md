@@ -89,9 +89,6 @@ npm install
 
 # Build project
 npm run build
-
-# Verify installation
-npm test
 ```
 
 ## ⚙️ Step 4: Configure SAP Connection

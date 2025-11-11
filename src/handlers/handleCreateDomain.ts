@@ -1,7 +1,7 @@
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName } from '../lib/utils';
 import { makeAdtRequestWithSession, generateSessionId } from '../lib/sessionUtils';
-import { validateTransportRequest } from '../utils/transportValidation.js';
+import { validateTransportRequest } from '../utils/transportValidation';
 import { XMLParser } from 'fast-xml-parser';
 import * as crypto from 'crypto';
 

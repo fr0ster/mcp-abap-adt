@@ -416,6 +416,23 @@ delete_object:
         transport_request: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE WITH TRANSPORT FROM create_transport
         package_name: "<YOUR_PACKAGE_NAME>"
 
+    - name: "delete_function_module"
+      enabled: true
+      description: "Delete test function module from GROUP 10 (MUST be before function_group)"
+      params:
+        test_function_module_name: "<YOUR_FUNCTION_MODULE_NAME>"
+        test_function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
+        package_name: "<YOUR_PACKAGE_NAME>"
+
+    - name: "delete_function_group"
+      enabled: true
+      description: "Delete test function group from GROUP 9 (deletes all FMs inside)"
+      params:
+        test_function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
+        package_name: "<YOUR_PACKAGE_NAME>"
+
 # ============================================================================
 # ADDITIONAL GET TESTS (Read-only, no dependencies)
 # ============================================================================

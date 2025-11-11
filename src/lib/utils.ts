@@ -1,11 +1,16 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { AxiosError, AxiosResponse } from "axios";
 import { getConfig } from "../index"; // getConfig needs to be exported from index.ts
-import { AbapConnection } from "./connection/AbapConnection";
-import { createAbapConnection } from "./connection/connectionFactory";
-import { SapConfig, sapConfigSignature } from "./sapConfig";
-import { getTimeout, getTimeoutConfig } from "./timeouts";
-import { logger } from "./logger"; // Import the MCP-compatible logger
+import {
+  AbapConnection,
+  createAbapConnection,
+  SapConfig,
+  sapConfigSignature,
+  getTimeout,
+  getTimeoutConfig,
+} from "@mcp-abap-adt/connection";
+import { loggerAdapter } from "./loggerAdapter";
+import { logger } from "./logger";
 
 // Initialize connection variables before exports to avoid circular dependency issues
 let overrideConfig: SapConfig | undefined;
@@ -13,7 +18,7 @@ let overrideConnection: AbapConnection | undefined;
 let cachedConnection: AbapConnection | undefined;
 let cachedConfigSignature: string | undefined;
 
-export { McpError, ErrorCode, AxiosResponse, logger, getTimeout, getTimeoutConfig };
+export { McpError, ErrorCode, AxiosResponse, getTimeout, getTimeoutConfig, logger };
 
 /**
  * Encodes SAP object names for use in URLs
@@ -71,7 +76,7 @@ export function getManagedConnection(): AbapConnection {
 
   if (!cachedConnection || cachedConfigSignature !== signature) {
     disposeConnection(cachedConnection);
-    cachedConnection = createAbapConnection(config);
+    cachedConnection = createAbapConnection(config, loggerAdapter);
     cachedConfigSignature = signature;
   }
 
@@ -81,7 +86,7 @@ export function getManagedConnection(): AbapConnection {
 export function setConfigOverride(override?: SapConfig) {
   overrideConfig = override;
   disposeConnection(overrideConnection);
-  overrideConnection = override ? createAbapConnection(override) : undefined;
+  overrideConnection = override ? createAbapConnection(override, loggerAdapter) : undefined;
 
   // Reset shared connection so that it will be re-created lazily with fresh config
   disposeConnection(cachedConnection);

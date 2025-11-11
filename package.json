@@ -43,6 +43,7 @@
     "yaml": "^2.8.1"
   },
   "dependencies": {
+    "@mcp-abap-adt/connection": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.17.2",
     "axios": "^1.11.0",
     "fast-xml-parser": "^5.2.5",

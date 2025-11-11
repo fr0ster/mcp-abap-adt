@@ -78,8 +78,7 @@ import {
   setConfigOverride,
   setConnectionOverride,
 } from "./lib/utils";
-import { SapConfig } from "./lib/sapConfig";
-import { AbapConnection } from "./lib/connection/AbapConnection";
+import { SapConfig, AbapConnection } from "@mcp-abap-adt/connection";
 
 // Import logger
 import { logger } from "./lib/logger";

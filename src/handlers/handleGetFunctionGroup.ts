@@ -1,5 +1,5 @@
-import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../lib/utils';
+import { McpError, ErrorCode } from '../lib/utils';
+import { getReadOnlyClient } from '../lib/clients';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../lib/writeResultToFile';
 
@@ -55,8 +55,7 @@ export async function handleGetFunctionGroup(args: any) {
         if (!args?.function_group) {
             throw new McpError(ErrorCode.InvalidParams, 'Function Group is required');
         }
-        const url = `${await getBaseUrl()}/sap/bc/adt/functions/groups/${encodeSapObjectName(args.function_group)}/source/main`;
-    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+        const response = await getReadOnlyClient().getFunctionGroup(args.function_group);
     // Parse XML responses; otherwise return the payload unchanged
         if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
             const resultObj = parseFunctionGroupXml(response.data);

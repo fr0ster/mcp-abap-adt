@@ -5,7 +5,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "test": "jest",
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run build --workspaces --if-present && tsc -p tsconfig.json",
+    "build:packages": "npm run build --workspaces --if-present",
     "start": "node ./dist/index.js",
     "start:http": "node ./dist/index.js --transport streamable-http",
     "start:sse": "node ./dist/index.js --transport sse",
@@ -43,6 +44,7 @@
     "yaml": "^2.8.1"
   },
   "dependencies": {
+    "@mcp-abap-adt/adt-clients": "workspace:*",
     "@mcp-abap-adt/connection": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.17.2",
     "axios": "^1.11.0",

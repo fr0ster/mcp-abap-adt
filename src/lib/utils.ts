@@ -9,27 +9,26 @@ import {
   getTimeout,
   getTimeoutConfig,
 } from "@mcp-abap-adt/connection";
+import { encodeSapObjectName } from "@mcp-abap-adt/adt-clients";
 import { loggerAdapter } from "./loggerAdapter";
 import { logger } from "./logger";
+import { notifyConnectionResetListeners } from "./connectionEvents";
 
 // Initialize connection variables before exports to avoid circular dependency issues
-let overrideConfig: SapConfig | undefined;
-let overrideConnection: AbapConnection | undefined;
-let cachedConnection: AbapConnection | undefined;
-let cachedConfigSignature: string | undefined;
+// Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
+let overrideConfig: SapConfig | undefined = undefined;
+let overrideConnection: AbapConnection | undefined = undefined;
+let cachedConnection: AbapConnection | undefined = undefined;
+let cachedConfigSignature: string | undefined = undefined;
 
 export { McpError, ErrorCode, AxiosResponse, getTimeout, getTimeoutConfig, logger };
 
 /**
  * Encodes SAP object names for use in URLs
- * Handles namespaces with forward slashes that need to be URL encoded
- * @param objectName - The SAP object name (e.g., '/1CPR/CL_000_0SAP2_FAG')
- * @returns URL-encoded object name
+ * Re-exported from @mcp-abap-adt/adt-clients for backward compatibility
+ * @deprecated Use encodeSapObjectName from @mcp-abap-adt/adt-clients directly
  */
-export function encodeSapObjectName(objectName: string): string {
-  // URL encode the object name to handle namespaces with forward slashes
-  return encodeURIComponent(objectName);
-}
+export { encodeSapObjectName } from "@mcp-abap-adt/adt-clients";
 
 export function return_response(response: AxiosResponse) {
   return {
@@ -92,18 +91,22 @@ export function setConfigOverride(override?: SapConfig) {
   disposeConnection(cachedConnection);
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
+  notifyConnectionResetListeners();
 }
 
 export function setConnectionOverride(connection?: AbapConnection) {
-  if (overrideConnection) {
-    disposeConnection(overrideConnection);
+  const currentOverride = overrideConnection;
+  if (currentOverride) {
+    disposeConnection(currentOverride);
   }
   overrideConnection = connection;
   overrideConfig = undefined;
 
-  disposeConnection(cachedConnection);
+  const currentCached = cachedConnection;
+  disposeConnection(currentCached);
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
+  notifyConnectionResetListeners();
 }
 
 export function cleanup() {
@@ -113,6 +116,7 @@ export function cleanup() {
   overrideConfig = undefined;
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
+  notifyConnectionResetListeners();
 }
 
 export async function getBaseUrl() {
@@ -147,12 +151,7 @@ export async function makeAdtRequestWithTimeout(
 
 /**
  * Fetches node structure from SAP ADT repository
- * @param parentName Parent object name
- * @param parentTechName Parent technical name
- * @param parentType Parent object type (e.g., 'PROG/P')
- * @param nodeKey Node key to fetch (e.g., '000000' for root, '006450' for includes)
- * @param withShortDescriptions Whether to include short descriptions
- * @returns Promise with the response containing node structure
+ * @deprecated Use getReadOnlyClient().fetchNodeStructure() instead
  */
 export async function fetchNodeStructure(
   parentName: string,
@@ -161,36 +160,8 @@ export async function fetchNodeStructure(
   nodeKey: string,
   withShortDescriptions: boolean = true
 ): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/repository/nodestructure`;
-
-  // Prepare query parameters
-  const params = {
-    parent_name: parentName,
-    parent_tech_name: parentTechName,
-    parent_type: parentType,
-    withShortDescriptions: withShortDescriptions.toString()
-  };
-
-  // Prepare XML body
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
-<asx:values>
-<DATA>
-<TV_NODEKEY>${nodeKey}</TV_NODEKEY>
-</DATA>
-</asx:values>
-</asx:abap>`;
-
-  // Make POST request with XML body
-  const response = await makeAdtRequestWithTimeout(
-    url,
-    'POST',
-    'default',
-    xmlBody,
-    params
-  );
-
-  return response;
+  const { getReadOnlyClient } = await import('./clients');
+  return getReadOnlyClient().fetchNodeStructure(parentName, parentTechName, parentType, nodeKey, withShortDescriptions);
 }
 
 export async function makeAdtRequest(
@@ -206,31 +177,21 @@ export async function makeAdtRequest(
 
 /**
  * Get system information from SAP ADT (for cloud systems)
- * Returns systemID and userName if available
- * This endpoint is available in cloud systems, not in on-premise
+ * @deprecated Use getReadOnlyClient().getSystemInformation() instead
  */
 export async function getSystemInformation(): Promise<{ systemID?: string; userName?: string } | null> {
+  const { getReadOnlyClient } = await import('./clients');
+  return getReadOnlyClient().getSystemInformation();
+}
+
+/**
+ * Check if current connection is cloud (JWT auth) or on-premise (basic auth)
+ */
+export function isCloudConnection(): boolean {
   try {
-    const baseUrl = await getBaseUrl();
-    const url = `${baseUrl}/sap/bc/adt/core/http/systeminformation`;
-
-    const headers = {
-      'Accept': 'application/json'
-    };
-
-    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default', null, undefined, headers);
-
-    if (response.data && typeof response.data === 'object') {
-      return {
-        systemID: response.data.systemID,
-        userName: response.data.userName
-      };
-    }
-
-    return null;
-  } catch (error) {
-    // If endpoint doesn't exist (on-premise), return null
-    // This is expected for on-premise systems
-    return null;
+    const config = getConfig();
+    return config.authType === 'jwt';
+  } catch {
+    return false;
   }
 }

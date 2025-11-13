@@ -1,5 +1,5 @@
-import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../lib/utils';
+import { McpError, ErrorCode } from '../lib/utils';
+import { getReadOnlyClient } from '../lib/clients';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../lib/writeResultToFile';
 
@@ -62,8 +62,7 @@ export async function handleGetStructure(args: any) {
         if (!args?.structure_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Structure name is required');
         }
-        const url = `${await getBaseUrl()}/sap/bc/adt/ddic/structures/${encodeSapObjectName(args.structure_name)}/source/main`;
-    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+        const response = await getReadOnlyClient().getStructure(args.structure_name);
     // Parse XML responses; otherwise return the payload untouched
         if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
             const resultObj = parseStructureXml(response.data);

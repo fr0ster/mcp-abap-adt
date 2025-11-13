@@ -1,3 +1,6 @@
 [submodule "packages/connection"]
 	path = packages/connection
 	url = git@github.com:fr0ster/mcp-abap-connection.git
+[submodule "packages/adt-clients"]
+	path = packages/adt-clients
+	url = git@github.com:fr0ster/mcp-abap-adt-clients.git

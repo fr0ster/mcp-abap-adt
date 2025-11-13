@@ -1,6 +1,6 @@
 /**
  * GetDataElement Handler - Retrieve ABAP Data Element information via ADT API
- * 
+ *
  * Retrieves complete data element metadata including:
  * - Type definition (domain reference or built-in type)
  * - Field labels (short, medium, long, heading)
@@ -9,8 +9,9 @@
  * - Package and system information
  */
 
-import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../lib/utils';
+import { McpError, ErrorCode } from '../lib/utils';
+import { return_error, return_response } from '../lib/utils';
+import { getReadOnlyClient } from '../lib/clients';
 import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
@@ -19,9 +20,9 @@ export const TOOL_DEFINITION = {
   inputSchema: {
     type: "object",
     properties: {
-      data_element_name: { 
-        type: "string", 
-        description: "Data element name (e.g., MAKTX, MATNR, ZZ_E_TEST_001)" 
+      data_element_name: {
+        type: "string",
+        description: "Data element name (e.g., MAKTX, MATNR, ZZ_E_TEST_001)"
       }
     },
     required: ["data_element_name"]
@@ -84,24 +85,24 @@ function parseDataElementXml(xmlData: string): any {
     dataType: dtel['dtel:dataType'] || dtel['dataType'],
     dataTypeLength: dtel['dtel:dataTypeLength'] || dtel['dataTypeLength'],
     dataTypeDecimals: dtel['dtel:dataTypeDecimals'] || dtel['dataTypeDecimals'],
-    
+
     // Field labels
     shortFieldLabel: dtel['dtel:shortFieldLabel'] || dtel['shortFieldLabel'],
     shortFieldLength: dtel['dtel:shortFieldLength'] || dtel['shortFieldLength'],
     shortFieldMaxLength: dtel['dtel:shortFieldMaxLength'] || dtel['shortFieldMaxLength'],
-    
+
     mediumFieldLabel: dtel['dtel:mediumFieldLabel'] || dtel['mediumFieldLabel'],
     mediumFieldLength: dtel['dtel:mediumFieldLength'] || dtel['mediumFieldLength'],
     mediumFieldMaxLength: dtel['dtel:mediumFieldMaxLength'] || dtel['mediumFieldMaxLength'],
-    
+
     longFieldLabel: dtel['dtel:longFieldLabel'] || dtel['longFieldLabel'],
     longFieldLength: dtel['dtel:longFieldLength'] || dtel['longFieldLength'],
     longFieldMaxLength: dtel['dtel:longFieldMaxLength'] || dtel['longFieldMaxLength'],
-    
+
     headingFieldLabel: dtel['dtel:headingFieldLabel'] || dtel['headingFieldLabel'],
     headingFieldLength: dtel['dtel:headingFieldLength'] || dtel['headingFieldLength'],
     headingFieldMaxLength: dtel['dtel:headingFieldMaxLength'] || dtel['headingFieldMaxLength'],
-    
+
     // Additional properties
     searchHelp: dtel['dtel:searchHelp'] || dtel['searchHelp'],
     searchHelpParameter: dtel['dtel:searchHelpParameter'] || dtel['searchHelpParameter'],
@@ -131,21 +132,7 @@ export async function handleGetDataElement(args: any) {
     }
 
     const typedArgs = args as DataElementArgs;
-    const baseUrl = await getBaseUrl();
-    const dataElementNameEncoded = encodeSapObjectName(typedArgs.data_element_name.toLowerCase());
-    const url = `${baseUrl}/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}`;
-
-    console.log(`[DEBUG] GetDataElement: ${typedArgs.data_element_name}`);
-    console.log(`[DEBUG] URL: ${url}`);
-
-    const headers = {
-      'Accept': 'application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml'
-    };
-
-    // Make ADT request to get data element
-    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default', null, undefined, headers);
-
-    console.log('[DEBUG] GetDataElement response status:', response.status);
+    const response = await getReadOnlyClient().getDataElement(typedArgs.data_element_name);
 
     // Parse XML to JSON
     const parsedData = parseDataElementXml(response.data);

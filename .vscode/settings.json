@@ -25,8 +25,34 @@
   "terminal.integrated.cwd": "${workspaceFolder}",
   "cSpell.language": "en",
   "cSpell.words": [
+    "adtcore",
+    "ampm",
     "atomsvc",
+    "CLAS",
+    "dataelements",
+    "ddic",
+    "doma",
+    "dtel",
+    "ENDFUNCTION",
+    "fmodules",
+    "FUGR",
+    "Impls",
+    "INTF",
+    "MAKTX",
+    "MATNR",
+    "NODEKEY",
+    "nodestructure",
+    "SDTX",
     "signup",
-    "usagereferences"
+    "streamable",
+    "STRU",
+    "TABL",
+    "usagereferences",
+    "wbobj"
+  ],
+  "git.autoRepositoryDetection": true,
+  "git.scanRepositories": [
+    "packages/connection",
+    "packages/adt-clients"
   ]
 }

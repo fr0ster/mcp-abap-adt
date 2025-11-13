@@ -1,5 +1,6 @@
-import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../lib/utils';
+import { McpError, ErrorCode } from '../lib/utils';
+import { return_error, return_response } from '../lib/utils';
+import { getReadOnlyClient } from '../lib/clients';
 import { writeResultToFile } from '../lib/writeResultToFile';
 
 export const TOOL_DEFINITION = {
@@ -19,33 +20,14 @@ export async function handleGetProgram(args: any) {
         if (!args?.program_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Program name is required');
         }
-        const url = `${await getBaseUrl()}/sap/bc/adt/programs/programs/${encodeSapObjectName(args.program_name)}/source/main`;
-
-        const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+        const response = await getReadOnlyClient().getProgram(args.program_name);
         const plainText = response.data;
         if (args.filePath) {
             writeResultToFile(plainText, args.filePath);
         }
-        return {
-            isError: false,
-            content: [
-                {
-                    type: "text",
-                    text: plainText
-                }
-            ]
-        };
+        return return_response(response);
     }
     catch (error) {
-        // MCP-compliant error response: always return content[] with type "text"
-        return {
-            isError: true,
-            content: [
-                {
-                    type: "text",
-                    text: `ADT error: ${String(error)}`
-                }
-            ]
-        };
+        return return_error(error);
     }
 }

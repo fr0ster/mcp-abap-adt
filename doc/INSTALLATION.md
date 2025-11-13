@@ -32,8 +32,8 @@ Choose your platform:
 # Install Node.js via winget
 winget install OpenJS.NodeJS.LTS
 
-# Clone and build
-git clone https://github.com/fr0ster/mcp-abap-adt.git
+# Clone with submodules and build
+git clone --recurse-submodules https://github.com/fr0ster/mcp-abap-adt.git
 cd mcp-abap-adt
 npm install
 npm run build
@@ -44,8 +44,8 @@ npm run build
 # Install Node.js via Homebrew
 brew install node
 
-# Clone and build
-git clone https://github.com/fr0ster/mcp-abap-adt.git
+# Clone with submodules and build
+git clone --recurse-submodules https://github.com/fr0ster/mcp-abap-adt.git
 cd mcp-abap-adt
 npm install
 npm run build
@@ -57,11 +57,30 @@ npm run build
 curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
-# Clone and build
-git clone https://github.com/fr0ster/mcp-abap-adt.git
+# Clone with submodules and build
+git clone --recurse-submodules https://github.com/fr0ster/mcp-abap-adt.git
 cd mcp-abap-adt
 npm install
 npm run build
+```
+
+### 📦 Working with Git Submodules
+
+This project uses a git submodule for the `@mcp-abap-adt/connection` package. If you've already cloned the repository without submodules, initialize them:
+
+```bash
+# Initialize and update submodules
+git submodule update --init --recursive
+```
+
+To update submodules to their latest commits:
+
+```bash
+# Update all submodules
+git submodule update --remote
+
+# Or update a specific submodule
+git submodule update --remote packages/connection
 ```
 
 ## 📖 Detailed Guides

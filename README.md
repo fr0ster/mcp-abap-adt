@@ -55,6 +55,38 @@ This guide is designed for beginners, so we'll walk through everything step-by-s
 5.  **Troubleshooting:** Common problems and solutions.
 6.  **Available Tools:** A list of the commands you can use.
 
+## 📦 Git Submodules
+
+This project uses a git submodule for the `@mcp-abap-adt/connection` package (located in `packages/connection`). The connection package is maintained in a separate repository: [mcp-abap-connection](https://github.com/fr0ster/mcp-abap-connection).
+
+### Cloning with Submodules
+
+When cloning the repository, include submodules:
+
+```bash
+git clone --recurse-submodules https://github.com/fr0ster/mcp-abap-adt.git
+```
+
+### If You Already Cloned Without Submodules
+
+If you've already cloned the repository, initialize submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+### Updating Submodules
+
+To update submodules to their latest commits:
+
+```bash
+# Update all submodules
+git submodule update --remote
+
+# Or update a specific submodule
+git submodule update --remote packages/connection
+```
+
 ## Testing
 
 - Run `npm test` to execute the Jest suite. The configuration relies on `jest.setup.js` to disable automatic MCP server startup via `MCP_SKIP_AUTO_START`, preventing transport initialization during unit tests.

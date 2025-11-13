@@ -1,0 +1,3 @@
+[submodule "packages/connection"]
+	path = packages/connection
+	url = git@github.com:fr0ster/mcp-abap-connection.git

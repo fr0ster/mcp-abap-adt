@@ -4,12 +4,41 @@
   "description": "ABAP connection layer for MCP ABAP ADT server",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
   "bin": {
     "sap-abap-auth": "./bin/sap-abap-auth.js"
   },
+  "keywords": [
+    "abap",
+    "sap",
+    "adt",
+    "connection",
+    "mcp",
+    "abap-adt"
+  ],
+  "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/fr0ster/mcp-abap-adt#readme",
+  "bugs": {
+    "url": "https://github.com/fr0ster/mcp-abap-adt/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fr0ster/mcp-abap-adt.git",
+    "directory": "packages/connection"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "jest"
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "axios": "^1.11.0",
@@ -20,12 +49,6 @@
   "devDependencies": {
     "@types/node": "^24.2.1",
     "typescript": "^5.9.2"
-  },
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/fr0ster/mcp-abap-adt.git",
-    "directory": "packages/connection"
   }
 }
 

@@ -75,9 +75,9 @@ function getEnabledTestCase(handlerName, testCaseName) {
     if (testCaseName) {
       console.warn(`⚠️  Test case "${testCaseName}" not found or disabled for "${handlerName}" in test-config.yaml`);
     } else {
-      console.error(`❌ No enabled test case found for "${handlerName}" in test-config.yaml`);
-      console.error(`Please set enabled: true for at least one test case under ${handlerName}`);
-      process.exit(1);
+    console.error(`❌ No enabled test case found for "${handlerName}" in test-config.yaml`);
+    console.error(`Please set enabled: true for at least one test case under ${handlerName}`);
+    process.exit(1);
     }
     return null;
   }

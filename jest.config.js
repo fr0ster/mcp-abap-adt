@@ -2,6 +2,10 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   testMatch: ['**/?(*.)+(test).[tj]s'],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/',  // Ignore compiled tests to avoid duplicates
+  ],
   setupFiles: ['<rootDir>/jest.setup.js'],
   testTimeout: 10000, // Increase test timeout to 10 seconds
   forceExit: true, // Force Jest to exit after tests complete

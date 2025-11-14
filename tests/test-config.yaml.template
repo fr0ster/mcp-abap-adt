@@ -245,7 +245,47 @@ get_class:
       params:
         class_name: "<YOUR_CLASS_NAME>"
 
-# Step 4: Delete class (will be added to delete_object group)
+# Step 4: Delete class
+delete_class:
+  test_cases:
+    - name: "test_class"
+      enabled: true
+      description: "Delete test class (cleanup)"
+      params:
+        object_name: "<YOUR_CLASS_NAME>"
+        object_type: "CLAS/OC"
+        package_name: "<YOUR_PACKAGE_NAME>"
+
+# Step 5: Run class (for classes that implement if_oo_adt_classrun)
+run_class:
+  test_cases:
+    - name: "runnable_class"
+      enabled: true
+      description: "Create and run a class that implements if_oo_adt_classrun interface"
+      params:
+        class_name: "<YOUR_RUNNABLE_CLASS_NAME>"
+        description: "Test runnable ABAP Class via MCP ABAP ADT"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        runnable: true
+        source_code: |
+          CLASS <YOUR_RUNNABLE_CLASS_NAME> DEFINITION
+            PUBLIC
+            FINAL
+            CREATE PUBLIC .
+
+            PUBLIC SECTION.
+              INTERFACES if_oo_adt_classrun.
+            PROTECTED SECTION.
+            PRIVATE SECTION.
+          ENDCLASS.
+
+          CLASS <YOUR_RUNNABLE_CLASS_NAME> IMPLEMENTATION.
+            METHOD if_oo_adt_classrun~main.
+              out->write( 'Hello from ADT Class Run!' ).
+              out->write( |System time: { cl_abap_context_info=>get_system_time( ) }| ).
+              out->write( 'Test runnable class executed successfully' ).
+            ENDMETHOD.
+          ENDCLASS.
 
 # ============================================================================
 # GROUP 6: PROGRAM - Full CRUD Cycle

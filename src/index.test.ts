@@ -69,6 +69,10 @@ describe("Dependency Injection", () => {
       } as AxiosResponse;
     }
 
+    async connect(): Promise<void> {
+      // Stub implementation - no-op for testing
+    }
+
     reset(): void {
       this.calls.reset += 1;
     }

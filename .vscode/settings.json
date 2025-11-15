@@ -52,6 +52,7 @@
     "dtel",
     "ENDCLASS",
     "ENDFUNCTION",
+    "ENDINTERFACE",
     "ENDMETHOD",
     "fmodules",
     "FUGR",

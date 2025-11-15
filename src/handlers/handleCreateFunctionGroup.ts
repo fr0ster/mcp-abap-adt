@@ -1,19 +1,16 @@
 /**
  * CreateFunctionGroup Handler - ABAP Function Group Creation via ADT API
  *
- * Eclipse ADT workflow (simpler than classes - no LOCK/UNLOCK needed):
- * 1. POST /sap/bc/adt/functions/groups - Create function group with metadata
- * 2. POST /sap/bc/adt/activation - Activate function group (optional)
+ * Uses FunctionGroupBuilder from @mcp-abap-adt/adt-clients for all operations.
+ * Session and lock management handled internally by builder.
  *
- * Note: Unlike classes, function groups don't require lock/unlock for initial creation.
- * The TOP include and function modules are added separately after creation.
+ * Workflow: validate -> create -> (activate)
  */
 
 import { AxiosResponse } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName, logger, getSystemInformation } from '../lib/utils';
+import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
-import { XMLParser } from 'fast-xml-parser';
-import * as crypto from 'crypto';
+import { FunctionGroupBuilder } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateFunctionGroup",
@@ -55,209 +52,88 @@ interface CreateFunctionGroupArgs {
 }
 
 /**
- * Generate unique session ID - same for all requests in this operation
- */
-function generateSessionId(): string {
-  return crypto.randomUUID().replace(/-/g, '');
-}
-
-/**
- * Step 1: Create function group metadata via POST
- */
-async function createFunctionGroupObject(
-  functionGroupName: string,
-  description: string,
-  packageName: string,
-  transportRequest?: string
-): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/functions/groups`;
-
-  logger.info(`📝 Creating function group metadata: ${functionGroupName}`);
-
-  // Get masterSystem and responsible - optional, retrieved from system for cloud
-  let masterSystem: string | undefined;
-  let username: string | undefined;
-
-  // Try to get from system information (cloud systems)
-  const systemInfo = await getSystemInformation();
-  if (systemInfo) {
-    masterSystem = systemInfo.systemID;
-    username = systemInfo.userName;
-  }
-
-  // Fallback to env or empty (for on-premise, these may not be needed)
-  masterSystem = masterSystem || process.env.SAP_SYSTEM || process.env.SAP_SYSTEM_ID || '';
-  username = username || process.env.SAP_USERNAME || process.env.SAP_USER || '';
-
-  // Build XML payload - include masterSystem and responsible only if provided (cloud systems)
-  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
-  const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
-
-  // Build XML payload for function group creation
-  // Use Eclipse ADT format: group:abapFunctionGroup with v3 API
-  const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
-<group:abapFunctionGroup xmlns:group="http://www.sap.com/adt/functions/groups" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${functionGroupName}" adtcore:type="FUGR/F" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
-  <adtcore:packageRef adtcore:name="${packageName}"/>
-</group:abapFunctionGroup>`;
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/vnd.sap.adt.functions.groups.v3+xml',
-    'Accept': 'application/vnd.sap.adt.functions.groups.v3+xml'
-  };
-
-  // Add transport request if provided
-  const params: Record<string, string> = {};
-  if (transportRequest) {
-    params.corrNr = transportRequest;
-  }
-
-  const response = await makeAdtRequestWithTimeout(
-    url,
-    'POST',
-    'default',
-    xmlPayload,
-    params,
-    headers
-  );
-
-  logger.info(`✅ Function group metadata created: ${functionGroupName}`);
-
-  return response;
-}
-
-/**
- * Step 2: Activate function group
- */
-async function activateFunctionGroup(functionGroupName: string): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl();
-  const encodedName = encodeSapObjectName(functionGroupName).toLowerCase();
-  const objectUri = `/sap/bc/adt/functions/groups/${encodedName}`;
-
-  logger.info(`⚡ Activating function group: ${functionGroupName}`);
-  logger.info(`   Object URI: ${objectUri}`);
-
-  const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
-<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:objectReference adtcore:uri="${objectUri}" adtcore:name="${functionGroupName}"/>
-</adtcore:objectReferences>`;
-
-  logger.info(`   Activation XML: ${xmlPayload}`);
-
-  const response = await makeAdtRequestWithTimeout(
-    `${baseUrl}/sap/bc/adt/activation?method=activate&preauditRequested=true`,
-    'POST',
-    'default',
-    xmlPayload,
-    undefined,
-    {
-      'Content-Type': 'application/xml',
-      'Accept': 'application/xml'
-    }
-  );
-
-  logger.info(`   Activation response status: ${response.status}`);
-  logger.info(`   Activation response data (first 500 chars): ${typeof response.data === 'string' ? response.data.substring(0, 500) : JSON.stringify(response.data).substring(0, 500)}`);
-
-  // Check for activation errors in response
-  if (typeof response.data === 'string' && response.data.includes('exc:exception')) {
-    logger.warn(`⚠️  Activation response contains exception, but status is ${response.status}`);
-  }
-
-  logger.info(`✅ Function group activation completed`);
-
-  return response;
-}
-
-/**
- * Main handler
+ * Main handler for CreateFunctionGroup MCP tool
+ *
+ * Uses FunctionGroupBuilder from @mcp-abap-adt/adt-clients for all operations
+ * Session and lock management handled internally by builder
  */
 export async function handleCreateFunctionGroup(args: any) {
-  const {
-    function_group_name,
-    description,
-    package_name,
-    transport_request,
-    activate = true
-  } = args as CreateFunctionGroupArgs;
-
-  // Validation
-  if (!function_group_name || !package_name) {
-    return return_error('function_group_name and package_name are required');
-  }
-
-  // Validate transport_request: required for non-$TMP packages
   try {
-    validateTransportRequest(package_name, transport_request);
-  } catch (error) {
-    return return_error(error as Error);
-  }
-
-  // Validate function group name (max 26 chars, SAP naming)
-  if (function_group_name.length > 26) {
-    return return_error('Function group name must not exceed 26 characters');
-  }
-
-  if (!/^[ZY]/i.test(function_group_name)) {
-    return return_error('Function group name must start with Z or Y (customer namespace)');
-  }
-
-  logger.info(`🚀 Starting CreateFunctionGroup: ${function_group_name}`);
-
-  try {
-    // Step 1: Create function group metadata
-    await createFunctionGroupObject(
-      function_group_name,
-      description || function_group_name,
-      package_name,
-      transport_request
-    );
-
-    // Step 2: Activate (if requested)
-    if (activate) {
-      await activateFunctionGroup(function_group_name);
+    // Validate required parameters
+    if (!args?.function_group_name) {
+      return return_error(new Error('function_group_name is required'));
+    }
+    if (!args?.package_name) {
+      return return_error(new Error('package_name is required'));
     }
 
-    logger.info(`✅ CreateFunctionGroup completed successfully: ${function_group_name}`);
+    // Validate transport_request: required for non-$TMP packages
+    try {
+      validateTransportRequest(args.package_name, args.transport_request);
+    } catch (error) {
+      return return_error(error as Error);
+    }
 
-    return return_response({
-      data: {
-        success: true,
-        function_group_name,
-        package_name,
-        transport_request: transport_request || 'local',
-        activated: activate,
-        message: `Function group ${function_group_name} created successfully${activate ? ' and activated' : ''}`
+    const typedArgs = args as CreateFunctionGroupArgs;
+    const connection = getManagedConnection();
+    const functionGroupName = typedArgs.function_group_name.toUpperCase();
+
+    logger.info(`Starting function group creation: ${functionGroupName}`);
+
+    try {
+      // Create builder with configuration
+      const builder = new FunctionGroupBuilder(connection, logger, {
+        functionGroupName: functionGroupName,
+        packageName: typedArgs.package_name,
+        transportRequest: typedArgs.transport_request,
+        description: typedArgs.description || functionGroupName
+      });
+
+      // Build operation chain: validate -> create -> (activate)
+      const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
+
+      await builder
+        .validate()
+        .then(b => b.create())
+        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
+        .catch(error => {
+          logger.error('Function group creation chain failed:', error);
+          throw error;
+        });
+
+      logger.info(`✅ CreateFunctionGroup completed successfully: ${functionGroupName}`);
+
+      return return_response({
+        data: JSON.stringify({
+          success: true,
+          function_group_name: functionGroupName,
+          package_name: typedArgs.package_name,
+          transport_request: typedArgs.transport_request || 'local',
+          activated: shouldActivate,
+          message: `Function group ${functionGroupName} created successfully${shouldActivate ? ' and activated' : ''}`
+        })
+      } as AxiosResponse);
+
+    } catch (error: any) {
+      logger.error(`Error creating function group ${functionGroupName}:`, error);
+
+      // Check if function group already exists
+      if (error.message?.includes('already exists') || error.response?.status === 409) {
+        return return_error(new Error(`Function group ${functionGroupName} already exists. Please delete it first or use a different name.`));
       }
-    } as AxiosResponse);
+
+      if (error.response?.status === 400) {
+        return return_error(new Error(`Bad request. Check if function group name is valid and package exists.`));
+      }
+
+      const errorMessage = error.response?.data
+        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+        : error.message || String(error);
+
+      return return_error(new Error(`Failed to create function group ${functionGroupName}: ${errorMessage}`));
+    }
 
   } catch (error: any) {
-    logger.error(`❌ CreateFunctionGroup failed: ${error}`);
-
-    // Parse error message for better user feedback
-    let errorMessage = `Failed to create function group: ${error}`;
-
-    if (error.response?.status === 400) {
-      errorMessage = `Bad request. Check if function group name is valid and package exists.`;
-    } else if (error.response?.status === 409) {
-      errorMessage = `Function group ${function_group_name} already exists.`;
-    } else if (error.response?.data && typeof error.response.data === 'string') {
-      // Try to parse XML error message
-      try {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@_'
-        });
-        const errorData = parser.parse(error.response.data);
-        const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
-        if (errorMsg) {
-          errorMessage = `SAP Error: ${errorMsg}`;
-        }
-      } catch (parseError) {
-        // Ignore parse errors, use default message
-      }
-    }
-
-    return return_error(errorMessage);
+    return return_error(error);
   }
 }

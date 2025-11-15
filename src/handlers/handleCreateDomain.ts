@@ -154,13 +154,17 @@ export async function handleCreateDomain(args: any) {
         fixed_values: typedArgs.fixed_values
       });
 
-      // Build operation chain: create -> check -> unlock -> (activate)
-      // Note: create() already does: create empty -> lock -> create with data -> check -> unlock
-      // But we need to activate separately if needed
+      // Build operation chain: validate -> create -> lock -> update -> check -> unlock -> (activate)
+      // Note: create() creates empty domain, then lock() -> update() fills it with data
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       await builder
-        .create() // This already does create -> lock -> update -> check -> unlock
+        .validate()
+        .then(b => b.create())
+        .then(b => b.lock())
+        .then(b => b.update())
+        .then(b => b.check())
+        .then(b => b.unlock())
         .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
         .catch(error => {
           logger.error('Domain creation chain failed:', error);

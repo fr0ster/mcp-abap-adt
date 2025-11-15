@@ -70,11 +70,12 @@ export async function handleUpdateClassSource(params: any) {
     // Set source code
     builder.setCode(args.source_code);
 
-    // Build operation chain: lock -> update -> check -> unlock -> (activate)
+    // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
     const shouldActivate = args.activate === true; // Default to false if not specified
 
     await builder
-      .lock()
+      .validate()
+      .then(b => b.lock())
       .then(b => b.update())
       .then(b => b.check())
       .then(b => b.unlock())

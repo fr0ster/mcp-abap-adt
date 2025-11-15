@@ -1,21 +1,16 @@
 /**
  * CreateStructure Handler - ABAP Structure Creation via ADT API
- * 
- * APPROACH:
- * - Similar to CreateTable pattern: POST with full XML body for structure creation
- * - Structure-specific XML structure with ddic:structure namespace
- * - Support for structure fields, includes, and type references
- * - Create → Activate → Verify workflow
+ *
+ * Uses StructureBuilder from @mcp-abap-adt/adt-clients for all operations.
+ * Session and lock management handled internally by builder.
+ *
+ * Workflow: validate -> create -> lock -> update -> check -> unlock -> (activate)
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getBaseUrl } from '../lib/utils';
-import { makeAdtRequestWithTimeout } from '../lib/utils';
-import { generateSessionId } from '../lib/sessionUtils';
-import { activateObjectInSession } from '../lib/activationUtils';
+import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
-import { XMLParser, XMLBuilder } from 'fast-xml-parser';
-import * as crypto from 'crypto';
+import { StructureBuilder } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateStructure",
@@ -23,21 +18,21 @@ export const TOOL_DEFINITION = {
   inputSchema: {
     type: "object",
     properties: {
-      structure_name: { 
-        type: "string", 
-        description: "Structure name (e.g., ZZ_S_TEST_001). Must follow SAP naming conventions." 
+      structure_name: {
+        type: "string",
+        description: "Structure name (e.g., ZZ_S_TEST_001). Must follow SAP naming conventions."
       },
-      description: { 
-        type: "string", 
-        description: "Structure description. If not provided, structure_name will be used." 
+      description: {
+        type: "string",
+        description: "Structure description. If not provided, structure_name will be used."
       },
-      package_name: { 
-        type: "string", 
-        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects)" 
+      package_name: {
+        type: "string",
+        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects)"
       },
-      transport_request: { 
-        type: "string", 
-        description: "Transport request number (e.g., E19K905635). Required for transportable packages." 
+      transport_request: {
+        type: "string",
+        description: "Transport request number (e.g., E19K905635). Required for transportable packages."
       },
       fields: {
         type: "array",
@@ -45,29 +40,29 @@ export const TOOL_DEFINITION = {
         items: {
           type: "object",
           properties: {
-            name: { 
-              type: "string", 
-              description: "Field name (e.g., CLIENT, MATERIAL_ID)" 
+            name: {
+              type: "string",
+              description: "Field name (e.g., CLIENT, MATERIAL_ID)"
             },
-            data_type: { 
-              type: "string", 
-              description: "Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc." 
+            data_type: {
+              type: "string",
+              description: "Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc."
             },
-            length: { 
-              type: "number", 
-              description: "Field length" 
+            length: {
+              type: "number",
+              description: "Field length"
             },
-            decimals: { 
-              type: "number", 
+            decimals: {
+              type: "number",
               description: "Decimal places (for DEC, CURR, QUAN types)",
-              default: 0 
+              default: 0
             },
             domain: {
               type: "string",
               description: "Domain name for type reference (optional)"
             },
             data_element: {
-              type: "string", 
+              type: "string",
               description: "Data element name for type reference (optional)"
             },
             structure_ref: {
@@ -75,12 +70,12 @@ export const TOOL_DEFINITION = {
               description: "Include another structure (optional)"
             },
             table_ref: {
-              type: "string", 
+              type: "string",
               description: "Reference to table type (optional)"
             },
-            description: { 
-              type: "string", 
-              description: "Field description" 
+            description: {
+              type: "string",
+              description: "Field description"
             }
           },
           required: ["name"]
@@ -97,7 +92,7 @@ export const TOOL_DEFINITION = {
               description: "Include structure name"
             },
             suffix: {
-              type: "string", 
+              type: "string",
               description: "Optional suffix for include fields"
             }
           },
@@ -135,153 +130,17 @@ interface CreateStructureArgs {
   includes?: StructureInclude[];
 }
 
-/**
- * Build XML for structure creation following DDIC structure pattern
- */
-function buildCreateStructureXml(args: CreateStructureArgs): string {
-  const description = args.description || args.structure_name;
-  
-  // Build fields XML
-  const fieldsXml = args.fields.map(field => {
-    const fieldProps: any = {
-      'ddic:name': field.name,
-      'ddic:description': field.description || ''
-    };
-
-    // Add type information based on what's provided
-    if (field.data_element) {
-      fieldProps['ddic:dataElement'] = field.data_element;
-    } else if (field.domain) {
-      fieldProps['ddic:domainName'] = field.domain;
-    } else if (field.structure_ref) {
-      fieldProps['ddic:structureRef'] = field.structure_ref;
-    } else if (field.table_ref) {
-      fieldProps['ddic:tableRef'] = field.table_ref;
-    } else if (field.data_type) {
-      // Direct type specification
-      fieldProps['ddic:dataType'] = field.data_type;
-      if (field.length !== undefined) {
-        fieldProps['ddic:length'] = field.length;
-      }
-      if (field.decimals !== undefined) {
-        fieldProps['ddic:decimals'] = field.decimals;
-      }
-    }
-
-    return fieldProps;
-  });
-
-  // Build includes XML if provided
-  let includesXml: any = undefined;
-  if (args.includes && args.includes.length > 0) {
-    includesXml = {
-      'ddic:include': args.includes.map(inc => ({
-        'ddic:structureName': inc.name,
-        ...(inc.suffix && { 'ddic:suffix': inc.suffix })
-      }))
-    };
-  }
-
-  const structureData: any = {
-    'ddic:structure': {
-      'adtcore:objectType': 'STRU/DT',
-      'adtcore:name': args.structure_name,
-      'adtcore:description': description,
-      'adtcore:language': 'EN',
-      'adtcore:packageRef': {
-        'adtcore:name': args.package_name
-      },
-      ...(args.transport_request && {
-        'adtcore:transport': {
-          'adtcore:name': args.transport_request
-        }
-      }),
-      ...(includesXml && { 'ddic:includes': includesXml }),
-      'ddic:fields': {
-        'ddic:field': fieldsXml
-      }
-    }
-  };
-
-  const builder = new XMLBuilder({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-    format: true,
-    suppressEmptyNode: true
-  });
-
-  const xmlHeader = '<?xml version="1.0" encoding="UTF-8"?>\n';
-  return xmlHeader + builder.build(structureData);
-}
 
 /**
- * Parse XML response to extract structure creation information
+ * Main handler for CreateStructure MCP tool
+ *
+ * Uses StructureBuilder from @mcp-abap-adt/adt-clients for all operations
+ * Session and lock management handled internally by builder
  */
-function parseStructureCreationResponse(xml: string) {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-    parseAttributeValue: true,
-    trimValues: true
-  });
-  
-  try {
-    const result = parser.parse(xml);
-    
-    // Check for error messages
-    if (result.error || result['asx:abap']?.['asx:values']?.ERROR) {
-      const errorMsg = result.error?.message || 
-        result['asx:abap']?.['asx:values']?.ERROR?.MESSAGE || 
-        'Unknown error during structure creation';
-      throw new Error(errorMsg);
-    }
-    
-    // Look for successful creation indicators
-    if (result['ddic:structure']) {
-      const structure = result['ddic:structure'];
-      return {
-        name: structure['adtcore:name'],
-        description: structure['adtcore:description'],
-        package: structure['adtcore:packageRef']?.['adtcore:name'],
-        status: 'created',
-        objectType: 'structure'
-      };
-    }
-    
-    // Fallback: return raw response
-    return { raw: result, status: 'created' };
-    
-  } catch (parseError) {
-    // If parsing fails, return raw XML
-    return { 
-      raw_xml: xml, 
-      status: 'created',
-      note: 'XML parsing failed, but structure creation might have succeeded'
-    };
-  }
-}
-
-/**
- * Activate the structure after creation
- */
-async function activateStructure(structureName: string, sessionId: string): Promise<AxiosResponse> {
-  const objectUri = `/sap/bc/adt/ddic/structures/${encodeSapObjectName(structureName)}`;
-  return await activateObjectInSession(objectUri, structureName, sessionId, true);
-}
-
-/**
- * Verify structure exists and get its details
- */
-async function verifyStructureCreation(structureName: string) {
-  const url = `${await getBaseUrl()}/sap/bc/adt/ddic/structures/${encodeSapObjectName(structureName)}/source/main`;
-  const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
-  return response;
-}
-
 export async function handleCreateStructure(args: any): Promise<any> {
   try {
     const createStructureArgs = args as CreateStructureArgs;
-    
+
     // Validate required parameters
     if (!createStructureArgs?.structure_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Structure name is required');
@@ -289,135 +148,84 @@ export async function handleCreateStructure(args: any): Promise<any> {
     if (!createStructureArgs?.package_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
     }
-    
+
     // Validate transport_request: required for non-$TMP packages
     validateTransportRequest(createStructureArgs.package_name, createStructureArgs.transport_request);
+
     if (!createStructureArgs?.fields || !Array.isArray(createStructureArgs.fields) || createStructureArgs.fields.length === 0) {
       throw new McpError(ErrorCode.InvalidParams, 'At least one field is required');
     }
 
-    const results: any[] = [];
-    const sessionId = generateSessionId();
-    
-    // Step 1: Create structure
+    const connection = getManagedConnection();
+    const structureName = createStructureArgs.structure_name.toUpperCase();
+
+    logger.info(`Starting structure creation: ${structureName}`);
+
     try {
-      const createUrl = `${await getBaseUrl()}/sap/bc/adt/ddic/structures/${encodeSapObjectName(createStructureArgs.structure_name)}`;
-      const structureXml = buildCreateStructureXml(createStructureArgs);
-      
-      results.push({
-        step: 'create_structure',
-        action: 'POST ' + createUrl,
-        xml_payload: structureXml
+      // Create builder with configuration
+      const builder = new StructureBuilder(connection, logger, {
+        structureName: structureName,
+        packageName: createStructureArgs.package_name,
+        transportRequest: createStructureArgs.transport_request,
+        description: createStructureArgs.description || structureName,
+        fields: createStructureArgs.fields,
+        includes: createStructureArgs.includes
       });
 
-      const createResponse = await makeAdtRequestWithTimeout(createUrl, 'POST', 'default', {
-        'Content-Type': 'application/vnd.sap.adt.ddic.structures.v1+xml'
-      }, structureXml);
+      // Build operation chain: validate -> create -> lock -> update -> check -> unlock -> (activate)
+      const shouldActivate = true; // Default to true for structures
 
-      const createResult = parseStructureCreationResponse(createResponse.data);
-      results.push({
-        step: 'create_structure',
-        status: 'success',
-        result: createResult
-      });
-
-    } catch (createError) {
-      results.push({
-        step: 'create_structure',
-        status: 'error',
-        error: createError instanceof Error ? createError.message : String(createError)
-      });
-      throw createError;
-    }
-
-    // Step 2: Activate structure
-    try {
-      results.push({
-        step: 'activate_structure',
-        action: 'Activating structure ' + createStructureArgs.structure_name
-      });
-
-      const activateResponse = await activateStructure(createStructureArgs.structure_name, sessionId);
-      results.push({
-        step: 'activate_structure',
-        status: 'success',
-        http_status: activateResponse.status
-      });
-
-    } catch (activateError) {
-      results.push({
-        step: 'activate_structure',
-        status: 'error',
-        error: activateError instanceof Error ? activateError.message : String(activateError)
-      });
-      // Continue to verification even if activation fails
-    }
-
-    // Step 3: Verify structure creation
-    try {
-      results.push({
-        step: 'verify_structure',
-        action: 'Getting structure details to verify creation'
-      });
-
-      const verifyResponse = await verifyStructureCreation(createStructureArgs.structure_name);
-      
-      if (typeof verifyResponse.data === 'string' && verifyResponse.data.trim().startsWith('<?xml')) {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '',
-          parseAttributeValue: true,
-          trimValues: true
+      await builder
+        .validate()
+        .then(b => b.create())
+        .then(b => b.lock())
+        .then(b => b.update())
+        .then(b => b.check())
+        .then(b => b.unlock())
+        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
+        .catch(error => {
+          logger.error('Structure creation chain failed:', error);
+          throw error;
         });
-        const verifyResult = parser.parse(verifyResponse.data);
-        
-        results.push({
-          step: 'verify_structure',
-          status: 'success',
-          structure_details: verifyResult
-        });
-      } else {
-        results.push({
-          step: 'verify_structure',
-          status: 'success',
-          raw_response: verifyResponse.data
-        });
+
+      logger.info(`✅ CreateStructure completed successfully: ${structureName}`);
+
+      return return_response({
+        data: JSON.stringify({
+          success: true,
+          structure_name: structureName,
+          package_name: createStructureArgs.package_name,
+          transport_request: createStructureArgs.transport_request || 'local',
+          activated: shouldActivate,
+          message: `Structure ${structureName} created successfully${shouldActivate ? ' and activated' : ''}`
+        })
+      } as AxiosResponse);
+
+    } catch (error: any) {
+      logger.error(`Error creating structure ${structureName}:`, error);
+
+      // Check if structure already exists
+      if (error.message?.includes('already exists') || error.response?.status === 409) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `Structure ${structureName} already exists. Please delete it first or use a different name.`
+        );
       }
 
-    } catch (verifyError) {
-      results.push({
-        step: 'verify_structure',
-        status: 'error',
-        error: verifyError instanceof Error ? verifyError.message : String(verifyError)
-      });
+      const errorMessage = error.response?.data
+        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+        : error.message || String(error);
+
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to create structure ${structureName}: ${errorMessage}`
+      );
     }
 
-    // Summary
-    const successSteps = results.filter(r => r.status === 'success').length;
-    const summary = {
-      structure_name: createStructureArgs.structure_name,
-      package: createStructureArgs.package_name,
-      total_steps: 3,
-      successful_steps: successSteps,
-      overall_status: successSteps >= 2 ? 'success' : 'partial_success',
-      steps: results
-    };
-
-    return {
-      isError: false,
-      content: [{
-        type: "text",
-        text: JSON.stringify(summary, null, 2)
-      }]
-    };
-
-  } catch (error) {
-    return {
-      isError: true,
-      content: [{
-        type: "text",
-        text: `CreateStructure failed: ${error instanceof Error ? error.message : String(error)}`
-      }]
-    };
+  } catch (error: any) {
+    if (error instanceof McpError) {
+      throw error;
+    }
+    return return_error(error);
   }
 }

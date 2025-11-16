@@ -1,29 +1,28 @@
 /**
- * CheckObject Handler - Syntax check for ABAP objects via ADT API
+ * CheckFunctionModule Handler - Syntax check for ABAP function module via ADT API
  *
- * Uses runCheckRun and parseCheckRunResponse from @mcp-abap-adt/adt-clients/core for all operations.
- * Connection management handled internally.
+ * Uses checkFunctionModule from @mcp-abap-adt/adt-clients/core/functionModule for function module-specific checking.
+ * Requires function group name.
  */
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { XMLParser } from 'fast-xml-parser';
-import { runCheckRun, parseCheckRunResponse } from '@mcp-abap-adt/adt-clients/dist/core';
+import { checkFunctionModule } from '@mcp-abap-adt/adt-clients/dist/core/functionModule';
+import { parseCheckRunResponse } from '@mcp-abap-adt/adt-clients/dist/core';
 
 export const TOOL_DEFINITION = {
-  name: "CheckObject",
-  description: "Perform syntax check on an ABAP object without activation. Returns syntax errors, warnings, and messages. Useful for validation during development. Can use session_id and session_state from GetSession to maintain the same session.",
+  name: "CheckFunctionModule",
+  description: "Perform syntax check on an ABAP function module. Returns syntax errors, warnings, and messages. Requires function group name. Can use session_id and session_state from GetSession to maintain the same session.",
   inputSchema: {
     type: "object",
     properties: {
-      object_name: {
+      function_group_name: {
         type: "string",
-        description: "Object name (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE)"
+        description: "Function group name (e.g., Z_FUGR_TEST_0001)"
       },
-      object_type: {
+      function_module_name: {
         type: "string",
-        description: "Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element'",
-        enum: ["class", "program", "interface", "function_group", "table", "structure", "view", "domain", "data_element"]
+        description: "Function module name (e.g., Z_TEST_FM)"
       },
       version: {
         type: "string",
@@ -44,13 +43,13 @@ export const TOOL_DEFINITION = {
         }
       }
     },
-    required: ["object_name", "object_type"]
+    required: ["function_group_name", "function_module_name"]
   }
 } as const;
 
-interface CheckObjectArgs {
-  object_name: string;
-  object_type: string;
+interface CheckFunctionModuleArgs {
+  function_group_name: string;
+  function_module_name: string;
   version?: string;
   session_id?: string;
   session_state?: {
@@ -60,31 +59,21 @@ interface CheckObjectArgs {
   };
 }
 
-
 /**
- * Main handler for CheckObject MCP tool
- *
- * Uses runCheckRun and parseCheckRunResponse from @mcp-abap-adt/adt-clients/core for all operations
- * Connection management handled internally
+ * Main handler for CheckFunctionModule MCP tool
  */
-export async function handleCheckObject(args: any) {
+export async function handleCheckFunctionModule(args: any) {
   try {
     const {
-      object_name,
-      object_type,
+      function_group_name,
+      function_module_name,
       version = 'active',
       session_id,
       session_state
-    } = args as CheckObjectArgs;
+    } = args as CheckFunctionModuleArgs;
 
-    // Validation
-    if (!object_name || !object_type) {
-      return return_error(new Error('object_name and object_type are required'));
-    }
-
-    const validTypes = ['class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element'];
-    if (!validTypes.includes(object_type.toLowerCase())) {
-      return return_error(new Error(`Invalid object_type. Must be one of: ${validTypes.join(', ')}`));
+    if (!function_group_name || !function_module_name) {
+      return return_error(new Error('function_group_name and function_module_name are required'));
     }
 
     const checkVersion = (version && ['active', 'inactive'].includes(version.toLowerCase()))
@@ -105,18 +94,19 @@ export async function handleCheckObject(args: any) {
       await connection.connect();
     }
 
-    const objectName = object_name.toUpperCase();
+    const functionGroupName = function_group_name.toUpperCase();
+    const functionModuleName = function_module_name.toUpperCase();
 
-    logger.info(`Starting object check: ${objectName} (type: ${object_type}, version: ${checkVersion})`);
+    logger.info(`Starting function module check: ${functionModuleName} in group ${functionGroupName} (version: ${checkVersion})`);
 
     try {
-      // Check object using adt-clients function
-      const response = await runCheckRun(
+      // Check function module using function module-specific function
+      const response = await checkFunctionModule(
         connection,
-        object_type.toLowerCase(),
-        objectName,
+        functionGroupName,
+        functionModuleName,
         checkVersion,
-        'abapCheckRun'
+        session_id
       );
 
       // Parse check results
@@ -125,15 +115,15 @@ export async function handleCheckObject(args: any) {
       // Get updated session state after check
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CheckObject completed: ${objectName}`);
+      logger.info(`✅ CheckFunctionModule completed: ${functionModuleName}`);
       logger.info(`   Status: ${checkResult.status}`);
       logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
           success: checkResult.success,
-          object_name: objectName,
-          object_type,
+          function_group_name: functionGroupName,
+          function_module_name: functionModuleName,
           version: checkVersion,
           check_result: checkResult,
           session_id: session_id || null,
@@ -143,21 +133,21 @@ export async function handleCheckObject(args: any) {
             cookie_store: updatedSessionState.cookieStore
           } : null,
           message: checkResult.success
-            ? `Object ${objectName} has no syntax errors`
-            : `Object ${objectName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`
+            ? `Function module ${functionModuleName} has no syntax errors`
+            : `Function module ${functionModuleName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`
         }, null, 2)
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking object ${objectName}:`, error);
+      logger.error(`Error checking function module ${functionModuleName}:`, error);
 
-      // Parse error message
-      let errorMessage = `Failed to check object: ${error.message || String(error)}`;
+      let errorMessage = `Failed to check function module: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `Object ${objectName} not found.`;
+        errorMessage = `Function module ${functionModuleName} not found.`;
       } else if (error.response?.data && typeof error.response.data === 'string') {
         try {
+          const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
             attributeNamePrefix: '@_'
@@ -179,3 +169,4 @@ export async function handleCheckObject(args: any) {
     return return_error(error);
   }
 }
+

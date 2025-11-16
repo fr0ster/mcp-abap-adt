@@ -139,19 +139,14 @@ await builder
 - Remove manual lock/unlock management
 
 ### Phase 3: Generic Handlers (Priority: Medium)
-**Status**: Need analysis ⚠️
+**Status**: ✅ Completed - All generic handlers migrated
 
 **Handlers**:
-- `handleDeleteObject` - Generic delete for all object types
-- `handleActivateObject` - Generic activation for all object types
-- `handleCheckObject` - Generic syntax check for all object types
+- ✅ `handleDeleteObject` - Migrated to `deleteObject` function from `@mcp-abap-adt/adt-clients/core`
+- ✅ `handleActivateObject` - Migrated to `activateObjectsGroup` and `parseActivationResponse` from `@mcp-abap-adt/adt-clients/core`
+- ✅ `handleCheckObject` - Migrated to `runCheckRun` and `parseCheckRunResponse` from `@mcp-abap-adt/adt-clients/core`
 
-**Options**:
-1. **Option A**: Create wrapper functions that use appropriate builder based on object type
-2. **Option B**: Keep generic handlers but use builders internally
-3. **Option C**: Split into type-specific handlers (more consistent with CREATE/UPDATE pattern)
-
-**Recommendation**: Option B - Keep generic handlers for MCP API consistency, but refactor internals to use builders.
+**Implementation**: Option B - Generic handlers kept for MCP API consistency, using adt-clients functions internally.
 
 ## Builders Coverage
 
@@ -169,10 +164,9 @@ await builder
 - TransportBuilder
 - PackageBuilder
 
-### ⚠️ Missing Operations
-- **Delete operations**: Not all builders have `delete()` method
-  - Need to check: class, domain, dataElement, functionGroup, functionModule, program, interface, structure, table, view
-- **Generic operations**: Need wrapper functions for generic handlers
+### ✅ All Operations Available
+- **Delete operations**: Generic `deleteObject` function available in `@mcp-abap-adt/adt-clients/core` for all object types
+- **Generic operations**: All generic handlers migrated to use adt-clients functions
 
 ## Implementation Notes
 
@@ -203,32 +197,32 @@ await builder
 ## Migration Checklist
 
 ### CREATE Handlers
-- [x] handleCreateClass
-- [x] handleCreateDomain
-- [x] handleCreateDataElement
-- [x] handleCreateFunctionGroup
-- [x] handleCreateFunctionModule
-- [x] handleCreateProgram
-- [x] handleCreateInterface
-- [x] handleCreateStructure
-- [x] handleCreateTable
-- [x] handleCreateView
-- [x] handleCreatePackage
-- [x] handleCreateTransport
+- ✅ handleCreateClass
+- ✅ handleCreateDomain
+- ✅ handleCreateDataElement
+- ✅ handleCreateFunctionGroup
+- ✅ handleCreateFunctionModule
+- ✅ handleCreateProgram
+- ✅ handleCreateInterface
+- ✅ handleCreateStructure
+- ✅ handleCreateTable
+- ✅ handleCreateView
+- ✅ handleCreatePackage
+- ✅ handleCreateTransport
 
 ### UPDATE Handlers
-- [x] handleUpdateClassSource
-- [x] handleUpdateDomain
-- [x] handleUpdateDataElement
-- [x] handleUpdateFunctionModuleSource
-- [x] handleUpdateProgramSource
-- [x] handleUpdateInterfaceSource
-- [x] handleUpdateViewSource
+- ✅ handleUpdateClassSource
+- ✅ handleUpdateDomain
+- ✅ handleUpdateDataElement
+- ✅ handleUpdateFunctionModuleSource
+- ✅ handleUpdateProgramSource
+- ✅ handleUpdateInterfaceSource
+- ✅ handleUpdateViewSource
 
 ### Generic Handlers
-- [x] handleDeleteObject → Migrated to deleteObject function
-- [x] handleActivateObject → Migrated to activateObjectsGroup function
-- [x] handleCheckObject → Migrated to runCheckRun function
+- ✅ handleDeleteObject → Migrated to deleteObject function
+- ✅ handleActivateObject → Migrated to activateObjectsGroup function
+- ✅ handleCheckObject → Migrated to runCheckRun function
 
 ## Benefits of Migration
 

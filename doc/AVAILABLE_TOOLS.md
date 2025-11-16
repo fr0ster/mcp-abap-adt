@@ -510,6 +510,6 @@ All functions return MCP-compliant responses in the following format:
 
 ---
 
-*Last updated: 2025-11-13*
+*Last updated: 2025-11-16*
 *Document version: 1.0*
 *Generated automatically from TOOL_DEFINITION exports*

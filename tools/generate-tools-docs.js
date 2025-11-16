@@ -2,24 +2,24 @@
 
 /**
  * Generate AVAILABLE_TOOLS.md documentation from TOOL_DEFINITION exports
- * 
+ *
  * This script automatically generates documentation for all MCP ABAP ADT tools
  * by reading TOOL_DEFINITION from handler files.
- * 
+ *
  * Usage:
  *   node tools/generate-tools-docs.js [--help]
  *   npm run docs:tools
- * 
+ *
  * Options:
  *   --help, -h    Show this help message
- * 
+ *
  * What it does:
  *   1. Scans all handler files in src/handlers/
  *   2. Extracts TOOL_DEFINITION from each handler
  *   3. Groups tools by category
  *   4. Generates markdown documentation with descriptions, parameters, and examples
  *   5. Writes to doc/AVAILABLE_TOOLS.md
- * 
+ *
  * Example:
  *   $ npm run docs:tools
  *   🔍 Loading tools from handlers...
@@ -71,43 +71,43 @@ const CATEGORY_MAP = {
   'GetClass': 'Programs, Classes, Functions',
   'GetFunction': 'Programs, Classes, Functions',
   'GetFunctionGroup': 'Programs, Classes, Functions',
-  
+
   // Tables, structures
   'GetTable': 'Tables and Structures',
   'GetStructure': 'Tables and Structures',
   'GetTableContents': 'Tables and Structures',
-  
+
   // Packages, interfaces
   'GetPackage': 'Packages and Interfaces',
   'GetInterface': 'Packages and Interfaces',
-  
+
   // Includes, hierarchies
   'GetInclude': 'Includes and Hierarchies',
   'GetIncludesList': 'Includes and Hierarchies',
   'GetObjectStructure': 'Includes and Hierarchies',
-  
+
   // Types, descriptions, metadata
   'GetTypeInfo': 'Types, Descriptions, Metadata',
   'GetAdtTypes': 'Types, Descriptions, Metadata',
   'GetObjectInfo': 'Types, Descriptions, Metadata',
-  
+
   // Search, SQL, transactions
   'SearchObject': 'Search, SQL, Transactions',
   'GetSqlQuery': 'Search, SQL, Transactions',
   'GetTransaction': 'Search, SQL, Transactions',
   'GetWhereUsed': 'Search, SQL, Transactions',
-  
+
   // Enhancement
   'GetEnhancements': 'Enhancements',
   'GetEnhancementSpot': 'Enhancements',
   'GetEnhancementImpl': 'Enhancements',
   'GetBdef': 'Enhancements',
-  
+
   // ABAP Parser & Semantic Analysis
   'GetAbapAST': 'ABAP Parser and Semantic Analysis',
   'GetAbapSemanticAnalysis': 'ABAP Parser and Semantic Analysis',
   'GetAbapSystemSymbols': 'ABAP Parser and Semantic Analysis',
-  
+
   // Batch operations
   'GetObjectsByType': 'Batch Operations',
   'GetObjectsList': 'Batch Operations',
@@ -144,37 +144,41 @@ const BATCH_DETECTION_TOOLS = ['DetectObjectTypeListArray', 'DetectObjectTypeLis
 function extractToolDefinition(filePath) {
   try {
     const content = fs.readFileSync(filePath, 'utf8');
-    
-    // Find TOOL_DEFINITION export - handle multiline
-    const toolDefMatch = content.match(/export const TOOL_DEFINITION\s*=\s*\{[\s\S]*?\}\s*as\s*const;/);
+
+    // Find TOOL_DEFINITION export - handle multiline, with or without "as const"
+    let toolDefMatch = content.match(/export const TOOL_DEFINITION\s*=\s*\{[\s\S]*?\}\s*as\s*const;/);
     if (!toolDefMatch) {
-      return null;
+      // Try without "as const"
+      toolDefMatch = content.match(/export const TOOL_DEFINITION\s*=\s*\{[\s\S]*?\}\s*;/);
+      if (!toolDefMatch) {
+        return null;
+      }
     }
-    
+
     const toolDefStr = toolDefMatch[0];
-    
-    // Extract name - handle both "name" and 'name'
-    let nameMatch = toolDefStr.match(/["']name["']:\s*["']([^"']+)["']/);
+
+    // Extract name - handle both "name" and 'name', with or without quotes around key
+    let nameMatch = toolDefStr.match(/["']?name["']?\s*:\s*["']([^"']+)["']/);
     if (!nameMatch) {
-      // Try without quotes around name key
-      nameMatch = toolDefStr.match(/name:\s*["']([^"']+)["']/);
+      // Try with single quotes
+      nameMatch = toolDefStr.match(/["']?name["']?\s*:\s*[']([^']+)[']/);
       if (!nameMatch) return null;
     }
     const name = nameMatch[1];
-    
-    // Extract description - handle multiline descriptions
-    let descMatch = toolDefStr.match(/["']description["']:\s*["']([^"']+)["']/);
+
+    // Extract description - handle multiline descriptions, with or without quotes around key
+    let descMatch = toolDefStr.match(/["']?description["']?\s*:\s*["']([^"']+)["']/);
     if (!descMatch) {
-      descMatch = toolDefStr.match(/description:\s*["']([^"']+)["']/);
+      descMatch = toolDefStr.match(/["']?description["']?\s*:\s*[']([^']+)[']/);
     }
     const description = descMatch ? descMatch[1] : '';
-    
+
     // Extract inputSchema
     const schemaStart = toolDefStr.indexOf('inputSchema:');
     if (schemaStart === -1) {
       return { name, description, inputSchema: null };
     }
-    
+
     // Find the matching brace for inputSchema
     let braceCount = 0;
     let inSchema = false;
@@ -191,12 +195,12 @@ function extractToolDefinition(filePath) {
         }
       }
     }
-    
+
     const schemaStr = toolDefStr.substring(schemaStart, schemaEnd);
-    
+
     // Extract properties - more robust parsing
     const properties = {};
-    
+
     // Find all property definitions
     const propPattern = /["']?(\w+)["']?\s*:\s*\{([^}]*type:\s*["'](\w+)["'][^}]*description:\s*["']([^"']+)["'][^}]*)\}/g;
     let propMatch;
@@ -204,26 +208,26 @@ function extractToolDefinition(filePath) {
       const propName = propMatch[1];
       const propType = propMatch[3];
       const propDesc = propMatch[4];
-      
+
       // Check for default value
       const defaultMatch = propMatch[2].match(/default:\s*([^,}\n]+)/);
-      
+
       properties[propName] = {
         type: propType,
         description: propDesc,
         ...(defaultMatch && { default: defaultMatch[1].trim().replace(/["']/g, '') })
       };
     }
-    
+
     // Extract required fields
     const requiredMatch = schemaStr.match(/required:\s*\[([^\]]*)\]/s);
-    const required = requiredMatch 
+    const required = requiredMatch
       ? requiredMatch[1]
           .split(',')
           .map(s => s.trim().replace(/["']/g, ''))
           .filter(Boolean)
       : [];
-    
+
     return {
       name,
       description,
@@ -245,16 +249,16 @@ function extractToolDefinition(filePath) {
 function loadAllTools() {
   const registryPath = path.join(__dirname, '../src/lib/toolsRegistry.ts');
   const content = fs.readFileSync(registryPath, 'utf8');
-  
+
   const tools = [];
   const handlerFiles = [];
-  
+
   // Extract all handler imports
   const importMatches = content.matchAll(/import \{ TOOL_DEFINITION as (\w+)_Tool \} from '\.\.\/handlers\/(\w+)';/g);
   for (const match of importMatches) {
     const handlerName = match[2];
     const handlerPath = path.join(__dirname, `../src/handlers/${handlerName}.ts`);
-    
+
     if (fs.existsSync(handlerPath)) {
       const toolDef = extractToolDefinition(handlerPath);
       if (toolDef) {
@@ -262,7 +266,7 @@ function loadAllTools() {
       }
     }
   }
-  
+
   return tools;
 }
 
@@ -274,7 +278,7 @@ function formatParameter(propName, propDef) {
   const desc = propDef.description || '';
   const isRequired = false; // Will be determined from required array
   const optional = propDef.default !== undefined ? ' (optional, default: ' + JSON.stringify(propDef.default) + ')' : '';
-  
+
   return `- \`${propName}\` (${type}, ${isRequired ? 'required' : 'optional'}${optional}) - ${desc}`;
 }
 
@@ -283,20 +287,20 @@ function formatParameter(propName, propDef) {
  */
 function generateExample(tool) {
   const example = {};
-  
+
   if (!tool.inputSchema || !tool.inputSchema.properties) {
     return '{}';
   }
-  
+
   for (const [propName, propDef] of Object.entries(tool.inputSchema.properties)) {
     const isRequired = tool.inputSchema.required?.includes(propName) || false;
-    
+
     if (isRequired || propDef.default !== undefined) {
       // Generate example value based on type
       switch (propDef.type) {
         case 'string':
-          example[propName] = propName.includes('name') ? `"ZMY_${propName.toUpperCase().replace('_', '_')}"` 
-            : propName.includes('type') ? `"PROG/P"` 
+          example[propName] = propName.includes('name') ? `"ZMY_${propName.toUpperCase().replace('_', '_')}"`
+            : propName.includes('type') ? `"PROG/P"`
             : `"example_value"`;
           break;
         case 'number':
@@ -316,7 +320,7 @@ function generateExample(tool) {
       }
     }
   }
-  
+
   return JSON.stringify(example, null, 2);
 }
 
@@ -326,7 +330,7 @@ function generateExample(tool) {
 function generateMarkdown(tools) {
   // Group tools by category
   const categories = {};
-  
+
   for (const tool of tools) {
     const category = CATEGORY_MAP[tool.name] || 'Other';
     if (!categories[category]) {
@@ -334,12 +338,12 @@ function generateMarkdown(tools) {
     }
     categories[category].push(tool);
   }
-  
+
   // Sort tools within categories by name
   for (const category of Object.keys(categories)) {
     categories[category].sort((a, b) => a.name.localeCompare(b.name));
   }
-  
+
   let markdown = `# Available Tools Reference - MCP ABAP ADT Server
 
 This document contains a complete list of all tools (functions) provided by the MCP ABAP ADT server, with descriptions of their purpose and parameters.
@@ -352,7 +356,7 @@ This document contains a complete list of all tools (functions) provided by the 
 ## 📋 Table of Contents
 
 `;
-  
+
   // Generate table of contents
   for (const category of CATEGORY_ORDER) {
     if (categories[category]) {
@@ -360,25 +364,25 @@ This document contains a complete list of all tools (functions) provided by the 
       markdown += `- [${category}](#${anchor})\n`;
     }
   }
-  
+
   markdown += '\n---\n\n';
-  
+
   // Generate documentation for each category
   for (const category of CATEGORY_ORDER) {
     if (!categories[category]) continue;
-    
+
     const anchor = category.toLowerCase().replace(/\s+/g, '-');
     markdown += `## ${category}\n\n`;
-    
+
     for (const tool of categories[category]) {
       markdown += `### ${tool.name}\n`;
       markdown += `**Description:** ${tool.description}\n\n`;
-      
+
       // Add special notes if any
       if (TOOL_NOTES[tool.name]) {
         markdown += `${TOOL_NOTES[tool.name]}\n\n`;
       }
-      
+
       // Parameters
       if (tool.inputSchema && tool.inputSchema.properties && Object.keys(tool.inputSchema.properties).length > 0) {
         markdown += `**Parameters:**\n`;
@@ -391,17 +395,17 @@ This document contains a complete list of all tools (functions) provided by the 
       } else {
         markdown += `**Parameters:** None\n\n`;
       }
-      
+
       // Example
       markdown += `**Example:**\n`;
       markdown += `\`\`\`json\n`;
       markdown += generateExample(tool);
       markdown += `\n\`\`\`\n\n`;
-      
+
       markdown += '---\n\n';
     }
   }
-  
+
   // Add batch detection tools section if needed
   const batchTools = tools.filter(t => BATCH_DETECTION_TOOLS.includes(t.name));
   if (batchTools.length > 0) {
@@ -413,7 +417,7 @@ This document contains a complete list of all tools (functions) provided by the 
       markdown += '---\n\n';
     }
   }
-  
+
   // Add notes section
   markdown += `## Notes
 
@@ -467,20 +471,20 @@ All functions return MCP-compliant responses in the following format:
 function main() {
   console.log('🔍 Loading tools from handlers...');
   const tools = loadAllTools();
-  
+
   if (tools.length === 0) {
     console.error('❌ No tools found!');
     process.exit(1);
   }
-  
+
   console.log(`✅ Found ${tools.length} tools`);
   console.log('📝 Generating documentation...');
-  
+
   const markdown = generateMarkdown(tools);
-  
+
   const outputPath = path.join(__dirname, '../doc/AVAILABLE_TOOLS.md');
   fs.writeFileSync(outputPath, markdown, 'utf8');
-  
+
   console.log(`✅ Documentation generated: ${outputPath}`);
   console.log(`📊 Documented ${tools.length} tools`);
 }

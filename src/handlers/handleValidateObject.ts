@@ -1,34 +1,28 @@
 /**
- * CheckObject Handler - Syntax check for ABAP objects via ADT API
+ * ValidateObject Handler - Validate ABAP object name via ADT API
  *
- * Uses runCheckRun and parseCheckRunResponse from @mcp-abap-adt/adt-clients/core for all operations.
+ * Uses validateObjectName from @mcp-abap-adt/adt-clients/core for all operations.
  * Connection management handled internally.
  */
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { XMLParser } from 'fast-xml-parser';
-import { runCheckRun, parseCheckRunResponse } from '@mcp-abap-adt/adt-clients/dist/core';
+import { validateObjectName } from '@mcp-abap-adt/adt-clients/dist/core';
 
 export const TOOL_DEFINITION = {
-  name: "CheckObject",
-  description: "Perform syntax check on an ABAP object without activation. Returns syntax errors, warnings, and messages. Useful for validation during development. Can use session_id and session_state from GetSession to maintain the same session.",
+  name: "ValidateObject",
+  description: "Validate an ABAP object name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.",
   inputSchema: {
     type: "object",
     properties: {
       object_name: {
         type: "string",
-        description: "Object name (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE)"
+        description: "Object name to validate (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE)"
       },
       object_type: {
         type: "string",
-        description: "Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element'",
-        enum: ["class", "program", "interface", "function_group", "table", "structure", "view", "domain", "data_element"]
-      },
-      version: {
-        type: "string",
-        description: "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active",
-        enum: ["active", "inactive"]
+        description: "Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element', 'package'",
+        enum: ["class", "program", "interface", "function_group", "table", "structure", "view", "domain", "data_element", "package"]
       },
       session_id: {
         type: "string",
@@ -48,10 +42,9 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-interface CheckObjectArgs {
+interface ValidateObjectArgs {
   object_name: string;
   object_type: string;
-  version?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -60,36 +53,30 @@ interface CheckObjectArgs {
   };
 }
 
-
 /**
- * Main handler for CheckObject MCP tool
+ * Main handler for ValidateObject MCP tool
  *
- * Uses runCheckRun and parseCheckRunResponse from @mcp-abap-adt/adt-clients/core for all operations
+ * Uses validateObjectName from @mcp-abap-adt/adt-clients/core for all operations
  * Connection management handled internally
  */
-export async function handleCheckObject(args: any) {
+export async function handleValidateObject(args: any) {
   try {
     const {
       object_name,
       object_type,
-      version = 'active',
       session_id,
       session_state
-    } = args as CheckObjectArgs;
+    } = args as ValidateObjectArgs;
 
     // Validation
     if (!object_name || !object_type) {
       return return_error(new Error('object_name and object_type are required'));
     }
 
-    const validTypes = ['class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element'];
+    const validTypes = ['class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element', 'package'];
     if (!validTypes.includes(object_type.toLowerCase())) {
       return return_error(new Error(`Invalid object_type. Must be one of: ${validTypes.join(', ')}`));
     }
-
-    const checkVersion = (version && ['active', 'inactive'].includes(version.toLowerCase()))
-      ? version.toLowerCase() as 'active' | 'inactive'
-      : 'active';
 
     const connection = getManagedConnection();
 
@@ -107,57 +94,51 @@ export async function handleCheckObject(args: any) {
 
     const objectName = object_name.toUpperCase();
 
-    logger.info(`Starting object check: ${objectName} (type: ${object_type}, version: ${checkVersion})`);
+    logger.info(`Starting object validation: ${objectName} (type: ${object_type})`);
 
     try {
-      // Check object using adt-clients function
-      const response = await runCheckRun(
+      // Validate object using adt-clients function
+      const result = await validateObjectName(
         connection,
-        object_type.toLowerCase(),
-        objectName,
-        checkVersion,
-        'abapCheckRun'
+        object_type.toLowerCase() as any,
+        objectName
       );
 
-      // Parse check results
-      const checkResult = parseCheckRunResponse(response);
-
-      // Get updated session state after check
+      // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CheckObject completed: ${objectName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger.info(`✅ ValidateObject completed: ${objectName}`);
+      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
         data: JSON.stringify({
-          success: checkResult.success,
+          success: result.valid,
           object_name: objectName,
           object_type,
-          version: checkVersion,
-          check_result: checkResult,
+          validation_result: result,
           session_id: session_id || null,
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,
             csrf_token: updatedSessionState.csrfToken,
             cookie_store: updatedSessionState.cookieStore
           } : null,
-          message: checkResult.success
-            ? `Object ${objectName} has no syntax errors`
-            : `Object ${objectName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`
+          message: result.valid
+            ? `Object name ${objectName} is valid and available`
+            : `Object name ${objectName} validation failed: ${result.message}`
         }, null, 2)
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking object ${objectName}:`, error);
+      logger.error(`Error validating object ${objectName}:`, error);
 
       // Parse error message
-      let errorMessage = `Failed to check object: ${error.message || String(error)}`;
+      let errorMessage = `Failed to validate object: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
         errorMessage = `Object ${objectName} not found.`;
       } else if (error.response?.data && typeof error.response.data === 'string') {
         try {
+          const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
             attributeNamePrefix: '@_'
@@ -179,3 +160,4 @@ export async function handleCheckObject(args: any) {
     return return_error(error);
   }
 }
+

@@ -73,6 +73,14 @@ describe("Dependency Injection", () => {
       // Stub implementation - no-op for testing
     }
 
+    getSessionState(): any {
+      return null;
+    }
+
+    setSessionState(state: any): void {
+      // Stub implementation - no-op for testing
+    }
+
     reset(): void {
       this.calls.reset += 1;
     }

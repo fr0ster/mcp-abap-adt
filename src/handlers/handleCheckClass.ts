@@ -1,34 +1,33 @@
 /**
- * CheckObject Handler - Syntax check for ABAP objects via ADT API
+ * CheckClass Handler - Syntax check for ABAP class via ADT API
  *
- * Uses runCheckRun and parseCheckRunResponse from @mcp-abap-adt/adt-clients/core for all operations.
- * Connection management handled internally.
+ * Uses checkClass from @mcp-abap-adt/adt-clients/core/class for class-specific checking.
+ * Supports checking existing classes or hypothetical source code.
  */
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { XMLParser } from 'fast-xml-parser';
-import { runCheckRun, parseCheckRunResponse } from '@mcp-abap-adt/adt-clients/dist/core';
+import { checkClass } from '@mcp-abap-adt/adt-clients/dist/core/class';
+import { parseCheckRunResponse } from '@mcp-abap-adt/adt-clients/dist/core';
 
 export const TOOL_DEFINITION = {
-  name: "CheckObject",
-  description: "Perform syntax check on an ABAP object without activation. Returns syntax errors, warnings, and messages. Useful for validation during development. Can use session_id and session_state from GetSession to maintain the same session.",
+  name: "CheckClass",
+  description: "Perform syntax check on an ABAP class. Can check existing class (active/inactive) or hypothetical source code. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.",
   inputSchema: {
     type: "object",
     properties: {
-      object_name: {
+      class_name: {
         type: "string",
-        description: "Object name (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE)"
-      },
-      object_type: {
-        type: "string",
-        description: "Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element'",
-        enum: ["class", "program", "interface", "function_group", "table", "structure", "view", "domain", "data_element"]
+        description: "Class name (e.g., ZCL_MY_CLASS)"
       },
       version: {
         type: "string",
         description: "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active",
         enum: ["active", "inactive"]
+      },
+      source_code: {
+        type: "string",
+        description: "Optional: source code to validate. If provided, validates hypothetical code without creating object."
       },
       session_id: {
         type: "string",
@@ -44,14 +43,14 @@ export const TOOL_DEFINITION = {
         }
       }
     },
-    required: ["object_name", "object_type"]
+    required: ["class_name"]
   }
 } as const;
 
-interface CheckObjectArgs {
-  object_name: string;
-  object_type: string;
+interface CheckClassArgs {
+  class_name: string;
   version?: string;
+  source_code?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -60,31 +59,21 @@ interface CheckObjectArgs {
   };
 }
 
-
 /**
- * Main handler for CheckObject MCP tool
- *
- * Uses runCheckRun and parseCheckRunResponse from @mcp-abap-adt/adt-clients/core for all operations
- * Connection management handled internally
+ * Main handler for CheckClass MCP tool
  */
-export async function handleCheckObject(args: any) {
+export async function handleCheckClass(args: any) {
   try {
     const {
-      object_name,
-      object_type,
+      class_name,
       version = 'active',
+      source_code,
       session_id,
       session_state
-    } = args as CheckObjectArgs;
+    } = args as CheckClassArgs;
 
-    // Validation
-    if (!object_name || !object_type) {
-      return return_error(new Error('object_name and object_type are required'));
-    }
-
-    const validTypes = ['class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element'];
-    if (!validTypes.includes(object_type.toLowerCase())) {
-      return return_error(new Error(`Invalid object_type. Must be one of: ${validTypes.join(', ')}`));
+    if (!class_name) {
+      return return_error(new Error('class_name is required'));
     }
 
     const checkVersion = (version && ['active', 'inactive'].includes(version.toLowerCase()))
@@ -105,18 +94,18 @@ export async function handleCheckObject(args: any) {
       await connection.connect();
     }
 
-    const objectName = object_name.toUpperCase();
+    const className = class_name.toUpperCase();
 
-    logger.info(`Starting object check: ${objectName} (type: ${object_type}, version: ${checkVersion})`);
+    logger.info(`Starting class check: ${className} (version: ${checkVersion}, has source: ${!!source_code})`);
 
     try {
-      // Check object using adt-clients function
-      const response = await runCheckRun(
+      // Check class using class-specific function
+      const response = await checkClass(
         connection,
-        object_type.toLowerCase(),
-        objectName,
+        className,
         checkVersion,
-        'abapCheckRun'
+        source_code,
+        session_id
       );
 
       // Parse check results
@@ -125,15 +114,14 @@ export async function handleCheckObject(args: any) {
       // Get updated session state after check
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CheckObject completed: ${objectName}`);
+      logger.info(`✅ CheckClass completed: ${className}`);
       logger.info(`   Status: ${checkResult.status}`);
       logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
           success: checkResult.success,
-          object_name: objectName,
-          object_type,
+          class_name: className,
           version: checkVersion,
           check_result: checkResult,
           session_id: session_id || null,
@@ -143,21 +131,21 @@ export async function handleCheckObject(args: any) {
             cookie_store: updatedSessionState.cookieStore
           } : null,
           message: checkResult.success
-            ? `Object ${objectName} has no syntax errors`
-            : `Object ${objectName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`
+            ? `Class ${className} has no syntax errors`
+            : `Class ${className} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`
         }, null, 2)
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking object ${objectName}:`, error);
+      logger.error(`Error checking class ${className}:`, error);
 
-      // Parse error message
-      let errorMessage = `Failed to check object: ${error.message || String(error)}`;
+      let errorMessage = `Failed to check class: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `Object ${objectName} not found.`;
+        errorMessage = `Class ${className} not found.`;
       } else if (error.response?.data && typeof error.response.data === 'string') {
         try {
+          const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
             attributeNamePrefix: '@_'
@@ -179,3 +167,4 @@ export async function handleCheckObject(args: any) {
     return return_error(error);
   }
 }
+

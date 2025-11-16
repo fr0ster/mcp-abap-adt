@@ -55,6 +55,16 @@ import { TOOL_DEFINITION as UpdateProgramSource_Tool } from '../handlers/handleU
 import { TOOL_DEFINITION as UpdateViewSource_Tool } from '../handlers/handleUpdateViewSource';
 import { TOOL_DEFINITION as UpdateInterfaceSource_Tool } from '../handlers/handleUpdateInterfaceSource';
 import { TOOL_DEFINITION as UpdateFunctionModuleSource_Tool } from '../handlers/handleUpdateFunctionModuleSource';
+import { TOOL_DEFINITION as GetSession_Tool } from '../handlers/handleGetSession';
+import { TOOL_DEFINITION as ValidateObject_Tool } from '../handlers/handleValidateObject';
+import { TOOL_DEFINITION as LockObject_Tool } from '../handlers/handleLockObject';
+import { TOOL_DEFINITION as UnlockObject_Tool } from '../handlers/handleUnlockObject';
+import { TOOL_DEFINITION as ValidateClass_Tool } from '../handlers/handleValidateClass';
+import { TOOL_DEFINITION as CheckClass_Tool } from '../handlers/handleCheckClass';
+import { TOOL_DEFINITION as ValidateTable_Tool } from '../handlers/handleValidateTable';
+import { TOOL_DEFINITION as CheckTable_Tool } from '../handlers/handleCheckTable';
+import { TOOL_DEFINITION as ValidateFunctionModule_Tool } from '../handlers/handleValidateFunctionModule';
+import { TOOL_DEFINITION as CheckFunctionModule_Tool } from '../handlers/handleCheckFunctionModule';
 
 // Type that describes a tool entry
 export interface ToolDefinition {
@@ -168,9 +178,27 @@ export const ALL_TOOLS: ToolDefinition[] = [
 
   // Deletion
   DeleteObject_Tool,
-  
+
   // Syntax check
   CheckObject_Tool,
+
+  // Session and lock management
+  GetSession_Tool,
+  ValidateObject_Tool,
+  LockObject_Tool,
+  UnlockObject_Tool,
+
+  // Class-specific validation and checking
+  ValidateClass_Tool,
+  CheckClass_Tool,
+
+  // Table-specific validation and checking
+  ValidateTable_Tool,
+  CheckTable_Tool,
+
+  // Function module-specific validation and checking
+  ValidateFunctionModule_Tool,
+  CheckFunctionModule_Tool,
 
   // Dynamically imported tools
   ...DYNAMIC_IMPORT_TOOLS

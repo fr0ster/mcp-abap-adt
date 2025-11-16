@@ -67,6 +67,16 @@ import { handleUpdateProgramSource } from "./handlers/handleUpdateProgramSource"
 import { handleUpdateViewSource } from "./handlers/handleUpdateViewSource";
 import { handleUpdateInterfaceSource } from "./handlers/handleUpdateInterfaceSource";
 import { handleUpdateFunctionModuleSource } from "./handlers/handleUpdateFunctionModuleSource";
+import { handleGetSession } from "./handlers/handleGetSession";
+import { handleValidateObject } from "./handlers/handleValidateObject";
+import { handleLockObject } from "./handlers/handleLockObject";
+import { handleUnlockObject } from "./handlers/handleUnlockObject";
+import { handleValidateClass } from "./handlers/handleValidateClass";
+import { handleCheckClass } from "./handlers/handleCheckClass";
+import { handleValidateTable } from "./handlers/handleValidateTable";
+import { handleCheckTable } from "./handlers/handleCheckTable";
+import { handleValidateFunctionModule } from "./handlers/handleValidateFunctionModule";
+import { handleCheckFunctionModule } from "./handlers/handleCheckFunctionModule";
 
 // Import shared utility functions and types
 import {
@@ -426,6 +436,25 @@ export function getConfig(): SapConfig {
       );
     }
     config.jwtToken = jwtToken;
+
+    // Refresh token is optional but recommended for automatic token renewal
+    const rawRefreshToken = process.env.SAP_REFRESH_TOKEN;
+    const refreshToken = rawRefreshToken ? rawRefreshToken.split('#')[0].trim() : rawRefreshToken;
+    if (refreshToken) {
+      config.refreshToken = refreshToken;
+    }
+
+    // UAA credentials for token refresh (optional but recommended)
+    const rawUaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
+    const uaaUrl = rawUaaUrl ? rawUaaUrl.split('#')[0].trim() : rawUaaUrl;
+    const rawUaaClientId = process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
+    const uaaClientId = rawUaaClientId ? rawUaaClientId.split('#')[0].trim() : rawUaaClientId;
+    const rawUaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
+    const uaaClientSecret = rawUaaClientSecret ? rawUaaClientSecret.split('#')[0].trim() : rawUaaClientSecret;
+
+    if (uaaUrl) config.uaaUrl = uaaUrl;
+    if (uaaClientId) config.uaaClientId = uaaClientId;
+    if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret;
   }
 
   return config;
@@ -675,6 +704,26 @@ export class mcp_abap_adt_server {
           return await handleDeleteObject(request.params.arguments);
         case "CheckObject":
           return await handleCheckObject(request.params.arguments);
+        case "GetSession":
+          return await handleGetSession(request.params.arguments);
+        case "ValidateObject":
+          return await handleValidateObject(request.params.arguments);
+        case "LockObject":
+          return await handleLockObject(request.params.arguments);
+        case "UnlockObject":
+          return await handleUnlockObject(request.params.arguments);
+        case "ValidateClass":
+          return await handleValidateClass(request.params.arguments);
+        case "CheckClass":
+          return await handleCheckClass(request.params.arguments);
+        case "ValidateTable":
+          return await handleValidateTable(request.params.arguments);
+        case "CheckTable":
+          return await handleCheckTable(request.params.arguments);
+        case "ValidateFunctionModule":
+          return await handleValidateFunctionModule(request.params.arguments);
+        case "CheckFunctionModule":
+          return await handleCheckFunctionModule(request.params.arguments);
         default:
           throw new McpError(
             ErrorCode.MethodNotFound,

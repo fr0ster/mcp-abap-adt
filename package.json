@@ -13,7 +13,7 @@
     "dev": "npx @modelcontextprotocol/inspector node ./dist/index.js",
     "dev:http": "node ./tools/dev-http.js",
     "dev:sse": "npx @modelcontextprotocol/inspector node ./dist/index.js --transport sse",
-    "auth": "node ./tools/sap-abap-auth.js auth",
+    "auth": "node ./packages/connection/bin/sap-abap-auth.js auth",
     "clean": "make clean",
     "docs:tools": "node ./tools/generate-tools-docs.js"
   },

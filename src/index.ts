@@ -11,7 +11,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import path from "path";
 import dotenv from "dotenv";
-import { createServer, Server as HttpServer } from "http";
+import { createServer, Server as HttpServer, IncomingHttpHeaders } from "http";
 import { randomUUID } from "crypto";
 
 // Import handler functions
@@ -88,7 +88,7 @@ import {
   setConfigOverride,
   setConnectionOverride,
 } from "./lib/utils";
-import { SapConfig, AbapConnection } from "@mcp-abap-adt/connection";
+import { SapConfig, AbapConnection, getConfigFromEnv } from "@mcp-abap-adt/connection";
 
 // Import logger
 import { logger } from "./lib/logger";
@@ -368,6 +368,7 @@ export function setAbapConnectionOverride(connection?: AbapConnection) {
 
 /**
  * Retrieves SAP configuration from environment variables.
+ * Uses getConfigFromEnv from @mcp-abap-adt/connection package.
  *
  * @returns {SapConfig} The SAP configuration object.
  * @throws {Error} If any required environment variable is missing.
@@ -376,88 +377,7 @@ export function getConfig(): SapConfig {
   if (sapConfigOverride) {
     return sapConfigOverride;
   }
-  // Clean all environment variables from comments (everything after # symbol)
-  const rawUrl = process.env.SAP_URL;
-  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
-  const rawClient = process.env.SAP_CLIENT;
-  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || "basic";
-  const authType = rawAuthType.split('#')[0].trim();
-
-  // Enhanced check for SAP_URL
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(
-      `Missing or invalid SAP_URL. Got: '${url}'.\nRequired variables:\n- SAP_URL (must be a valid URL, e.g. https://<host>)\n- SAP_AUTH_TYPE (optional, defaults to 'basic')`
-    );
-  }
-
-  // Client is only required for basic auth
-  if (authType === "basic" && !client) {
-    throw new Error(
-      `Missing required environment variable: SAP_CLIENT. This is required for basic authentication.`
-    );
-  }
-
-  // Config object
-  const config: SapConfig = {
-    url,
-    authType: authType === "xsuaa" ? "jwt" : (authType as "basic" | "jwt"),
-  };
-
-  // Add client only if it's provided
-  if (client) {
-    config.client = client;
-  }
-
-  // For basic auth, username and password are required
-  if (authType === "basic") {
-    const rawUsername = process.env.SAP_USERNAME;
-    const username = rawUsername ? rawUsername.split('#')[0].trim() : rawUsername;
-    const rawPassword = process.env.SAP_PASSWORD;
-    const password = rawPassword ? rawPassword.split('#')[0].trim() : rawPassword;
-
-    if (!username || !password) {
-      throw new Error(
-        `Basic authentication requires username and password. Missing variables:\n- SAP_USERNAME\n- SAP_PASSWORD`
-      );
-    }
-
-    config.username = username;
-    config.password = password;
-  }
-  // For JWT, the token is required
-  else if (authType === "xsuaa" || authType === "jwt") {
-    const rawJwtToken = process.env.SAP_JWT_TOKEN;
-    const jwtToken = rawJwtToken ? rawJwtToken.split('#')[0].trim() : rawJwtToken;
-
-    if (!jwtToken) {
-      throw new Error(
-        `JWT authentication requires a token. Missing variable:\n- SAP_JWT_TOKEN`
-      );
-    }
-    config.jwtToken = jwtToken;
-
-    // Refresh token is optional but recommended for automatic token renewal
-    const rawRefreshToken = process.env.SAP_REFRESH_TOKEN;
-    const refreshToken = rawRefreshToken ? rawRefreshToken.split('#')[0].trim() : rawRefreshToken;
-    if (refreshToken) {
-      config.refreshToken = refreshToken;
-    }
-
-    // UAA credentials for token refresh (optional but recommended)
-    const rawUaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
-    const uaaUrl = rawUaaUrl ? rawUaaUrl.split('#')[0].trim() : rawUaaUrl;
-    const rawUaaClientId = process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
-    const uaaClientId = rawUaaClientId ? rawUaaClientId.split('#')[0].trim() : rawUaaClientId;
-    const rawUaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
-    const uaaClientSecret = rawUaaClientSecret ? rawUaaClientSecret.split('#')[0].trim() : rawUaaClientSecret;
-
-    if (uaaUrl) config.uaaUrl = uaaUrl;
-    if (uaaClientId) config.uaaClientId = uaaClientId;
-    if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret;
-  }
-
-  return config;
+  return getConfigFromEnv();
 }
 
 /**
@@ -472,6 +392,109 @@ export class mcp_abap_adt_server {
   private httpServer?: HttpServer;
   private currentSseTransport?: SSEServerTransport;
   private shuttingDown = false;
+  private applyAuthHeaders(headers?: IncomingHttpHeaders) {
+    if (!headers) {
+      return;
+    }
+
+    const getHeaderValue = (value?: string | string[]) => {
+      if (!value) {
+        return undefined;
+      }
+      return Array.isArray(value) ? value[0] : value;
+    };
+
+    // Extract JWT token from Authorization header (Bearer) or x-sap-jwt-token
+    let jwtToken: string | undefined;
+    const authorizationHeader = getHeaderValue(headers["authorization"]);
+    if (authorizationHeader) {
+      const bearerMatch = authorizationHeader.match(/Bearer\s+(.+)/i);
+      if (bearerMatch) {
+        jwtToken = bearerMatch[1]?.trim();
+      }
+    }
+
+    // Fallback to x-sap-jwt-token if Authorization header is not present
+    if (!jwtToken) {
+      jwtToken = getHeaderValue(headers["x-sap-jwt-token"])?.trim();
+    }
+
+    // If no JWT token found, skip processing
+    if (!jwtToken) {
+      return;
+    }
+
+    // Extract refresh token
+    const refreshToken = getHeaderValue(headers["x-sap-refresh-token"]);
+
+    // Extract SAP URL and auth type from headers
+    const sapUrl = getHeaderValue(headers["x-sap-url"])?.trim();
+    const sapAuthType = getHeaderValue(headers["x-sap-auth-type"])?.trim();
+
+    const sanitizeToken = (token: string) =>
+      token.length <= 10 ? token : `${token.substring(0, 6)}…${token.substring(token.length - 4)}`;
+
+    let baseConfig: SapConfig | undefined = this.sapConfig;
+    if (!baseConfig || baseConfig.url === "http://placeholder") {
+      try {
+        baseConfig = getConfig();
+      } catch (error) {
+        logger.warn("Failed to load base SAP config when applying headers", {
+          type: "SAP_CONFIG_HEADER_APPLY_FAILED",
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // If base config is not available, create a minimal config from headers
+        if (sapUrl) {
+          baseConfig = {
+            url: sapUrl,
+            authType: (sapAuthType === "jwt" || sapAuthType === "xsuaa") ? "jwt" : "basic",
+          };
+        } else {
+          return;
+        }
+      }
+    }
+
+    // Check if any configuration changed
+    const urlChanged = sapUrl && sapUrl !== baseConfig.url;
+    const authTypeChanged = sapAuthType &&
+      ((sapAuthType === "jwt" || sapAuthType === "xsuaa") ? "jwt" : "basic") !== baseConfig.authType;
+    const tokenChanged =
+      baseConfig.jwtToken !== jwtToken ||
+      (!!refreshToken && refreshToken.trim() !== baseConfig.refreshToken);
+
+    if (!urlChanged && !authTypeChanged && !tokenChanged) {
+      return;
+    }
+
+    const newConfig: SapConfig = {
+      ...baseConfig,
+      authType: sapAuthType ?
+        ((sapAuthType === "jwt" || sapAuthType === "xsuaa") ? "jwt" : "basic") :
+        baseConfig.authType,
+      jwtToken,
+    };
+
+    if (sapUrl) {
+      newConfig.url = sapUrl;
+    }
+
+    if (refreshToken && refreshToken.trim()) {
+      newConfig.refreshToken = refreshToken.trim();
+    }
+
+    setSapConfigOverride(newConfig);
+    this.sapConfig = newConfig;
+
+    logger.info("Updated SAP configuration from HTTP headers", {
+      type: "SAP_CONFIG_UPDATED",
+      urlChanged: Boolean(urlChanged),
+      authTypeChanged: Boolean(authTypeChanged),
+      tokenChanged: Boolean(tokenChanged),
+      hasRefreshToken: Boolean(refreshToken),
+      jwtPreview: sanitizeToken(jwtToken),
+    });
+  }
 
   /**
    * Constructor for the mcp_abap_adt_server class.
@@ -822,6 +845,7 @@ export class mcp_abap_adt_server {
 
       const httpServer = createServer(async (req, res) => {
         try {
+          this.applyAuthHeaders(req.headers);
           await transport.handleRequest(req, res);
         } catch (error) {
           logger.error("Failed to handle HTTP request", {
@@ -887,6 +911,8 @@ export class mcp_abap_adt_server {
       if (pathname.length > 1 && pathname.endsWith("/")) {
         pathname = pathname.slice(0, -1);
       }
+
+      this.applyAuthHeaders(req.headers);
 
       logger.debug("SSE request received", {
         type: "SSE_HTTP_REQUEST",

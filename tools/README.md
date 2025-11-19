@@ -73,7 +73,7 @@ node tools/update-handlers-with-tool-definitions.js [--help]
 
 ### 3. SAP ABAP Authentication CLI
 
-**`sap-abap-auth-browser.js`** - Authentication utility for SAP BTP ABAP Environment.
+The authentication utility is now provided by the `@mcp-abap-adt/connection` package.
 
 ## Requirements
 
@@ -91,13 +91,11 @@ node tools/update-handlers-with-tool-definitions.js [--help]
 ## Usage
 
 ```bash
-# Using npm script
-yarn auth -- -k path/to/service-key.json
-# or
-npm run auth -- -k path/to/service-key.json
+# Using the CLI tool from @mcp-abap-adt/connection package
+npx sap-abap-auth auth -k path/to/service-key.json
 
-# Or directly via Node.js
-node tools/sap-abap-auth-browser.js auth -k path/to/service-key.json
+# Or if installed globally
+sap-abap-auth auth -k path/to/service-key.json
 ```
 
 ## Result
@@ -107,7 +105,7 @@ The CLI utility will:
 1. Read the service key file
 2. Obtain an OAuth2 JWT token via XSUAA (or use basic)
 3. Extract the URL and client of the SAP ABAP system
-4. Update the `.env` file with the required values for JWT (xsuaa) or basic authentication
+4. Update the `.env` file with the required values for JWT (xsuaa) or basic authentication, including refresh token and UAA credentials
 5. Display the operation status in the console
 
 ## Example service key file structure
@@ -137,6 +135,10 @@ SAP_URL=https://your-abap-url
 SAP_CLIENT=100
 SAP_AUTH_TYPE=xsuaa
 SAP_JWT_TOKEN=your_jwt_token_here
+SAP_REFRESH_TOKEN=your_refresh_token_here
+SAP_UAA_URL=https://your-uaa-url
+SAP_UAA_CLIENT_ID=your_client_id
+SAP_UAA_CLIENT_SECRET=your_client_secret
 # or for basic
 # SAP_AUTH_TYPE=basic
 # SAP_USERNAME=your_username
@@ -145,5 +147,6 @@ SAP_JWT_TOKEN=your_jwt_token_here
 
 ## For developers
 
-- To change authentication logic, modify the relevant functions in `sap-abap-auth-browser.js`.
+- The authentication CLI tool is located in `packages/connection/bin/sap-abap-auth.js`.
 - The MCP server automatically uses JWT or basic according to the .env.
+- The server supports refresh token in HTTP headers (`X-SAP-Refresh-Token`, `SAP-Refresh-Token`, or `X-Refresh-Token`) for dynamic token updates.

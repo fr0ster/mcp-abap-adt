@@ -38,7 +38,7 @@ This branch includes several powerful new features:
 - **🚚 Transport Management**: `CreateTransport`, `GetTransport` - Create new transport requests and retrieve complete transport information with objects and tasks
 - **🔍 Enhancement Analysis Tools**: `GetEnhancements`, `GetEnhancementByName` - Comprehensive enhancement discovery and analysis
 - **📋 Include Management**: `GetIncludesList` - Recursive include discovery and hierarchy mapping  
-- **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
+- **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper and automatic token refresh via refresh token
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
 - **⚙️ Advanced Configuration**: Configurable timeouts, flexible .env loading, enhanced logging
 - **🛠️ Developer Tools**: New testing utilities and improved error handling
@@ -130,6 +130,7 @@ See [tools/README.md](tools/README.md) for complete documentation of all develop
 - Override host/port and transport options directly: `node dist/index.js --transport streamable-http --http-port 4000 --http-host 127.0.0.1`.
 - The helper script `node tools/run-http.js --http-port 4000 --http-json-response` forwards all `--http-*` flags and loads the expected `.env` file automatically.
 - Set `MCP_TRANSPORT=streamable-http` (and optional `MCP_HTTP_*` variables) if you prefer configuring the mode via environment variables.
+- **Client Configuration**: See [Client Configuration Guide](doc/CLIENT_CONFIGURATION.md) for details on configuring MCP clients with HTTP headers for dynamic SAP connection setup.
 
 #### Debugging with MCP Inspector
 
@@ -209,8 +210,9 @@ The repository publishes two npm packages. Their READMEs/CHANGELOGs contain the 
 - **[@mcp-abap-adt/connection](packages/connection/)** – connection/auth/session layer (Basic + JWT, session persistence, CLI helper).
 - **[@mcp-abap-adt/adt-clients](packages/adt-clients/)** – Builder-first ADT clients, Management/Lock/Validation helpers, CLI lock tooling.
 
-### Stateful Session Guides
+### Documentation
 
+- `doc/CLIENT_CONFIGURATION.md` – client configuration guide for HTTP/SSE transports with dynamic SAP connection setup.
 - `doc/STATEFUL_SESSION_GUIDE.md` – server/handler workflow (lock/update/unlock orchestration).
 - `packages/adt-clients/docs/STATEFUL_SESSION_GUIDE.md` – Builder & LockClient perspective: session IDs, `onLock`, lock registry.
 - `packages/connection/docs/STATEFUL_SESSION_GUIDE.md` – connection layer: cookies, CSRF tokens, session storage.

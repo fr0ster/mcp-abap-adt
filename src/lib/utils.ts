@@ -8,11 +8,12 @@ import {
   sapConfigSignature,
   getTimeout,
   getTimeoutConfig,
+  FileSessionStorage,
 } from "@mcp-abap-adt/connection";
 import { encodeSapObjectName } from "@mcp-abap-adt/adt-clients";
 import { loggerAdapter } from "./loggerAdapter";
 import { logger } from "./logger";
-import { notifyConnectionResetListeners } from "./connectionEvents";
+import { notifyConnectionResetListeners, registerConnectionResetHook } from "./connectionEvents";
 
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
@@ -20,6 +21,16 @@ let overrideConfig: SapConfig | undefined = undefined;
 let overrideConnection: AbapConnection | undefined = undefined;
 let cachedConnection: AbapConnection | undefined = undefined;
 let cachedConfigSignature: string | undefined = undefined;
+
+// Session storage for stateful sessions (persists cookies and CSRF tokens)
+const sessionStorage = new FileSessionStorage({
+  sessionDir: '.sessions',
+  createDir: true,
+  prettyPrint: false
+});
+
+// Fixed session ID for server connection (allows session persistence across requests)
+const SERVER_SESSION_ID = 'mcp-abap-adt-session';
 
 export { McpError, ErrorCode, AxiosResponse, getTimeout, getTimeoutConfig, logger };
 
@@ -74,9 +85,40 @@ export function getManagedConnection(): AbapConnection {
   const signature = sapConfigSignature(config);
 
   if (!cachedConnection || cachedConfigSignature !== signature) {
+    logger.debug(`[DEBUG] getManagedConnection - Creating new connection (cached: ${!!cachedConnection}, signature changed: ${cachedConfigSignature !== signature})`);
+    if (cachedConnection) {
+      logger.debug(`[DEBUG] getManagedConnection - Old signature: ${cachedConfigSignature?.substring(0, 100)}...`);
+      logger.debug(`[DEBUG] getManagedConnection - New signature: ${signature.substring(0, 100)}...`);
+    }
     disposeConnection(cachedConnection);
-    cachedConnection = createAbapConnection(config, loggerAdapter);
+    cachedConnection = createAbapConnection(config, loggerAdapter, sessionStorage, SERVER_SESSION_ID);
     cachedConfigSignature = signature;
+
+    // Enable stateful session mode to allow session persistence
+    // Note: enableStatefulSession is available in AbstractAbapConnection but not in AbapConnection interface
+    // If sessionStorage and sessionId are provided to createAbapConnection, stateful session should be enabled automatically
+    // But we call it explicitly to ensure it's enabled
+    const connectionWithStateful = cachedConnection as any;
+    if (connectionWithStateful.enableStatefulSession) {
+      connectionWithStateful.enableStatefulSession(SERVER_SESSION_ID, sessionStorage).catch((error: any) => {
+        logger.warn("Failed to enable stateful session", {
+          type: "STATEFUL_SESSION_ENABLE_FAILED",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    }
+
+    // Connect and verify session state (will save if changed)
+    // The connect() method in JwtAbapConnection now compares session state and saves only if changed
+    cachedConnection.connect().catch((error) => {
+      logger.warn("Failed to connect after creating new connection", {
+        type: "CONNECTION_INIT_FAILED",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Don't throw - connection will be established on first use
+    });
+  } else {
+    logger.debug(`[DEBUG] getManagedConnection - Reusing cached connection (signature matches)`);
   }
 
   return cachedConnection;
@@ -118,6 +160,32 @@ export function cleanup() {
   cachedConfigSignature = undefined;
   notifyConnectionResetListeners();
 }
+
+/**
+ * Invalidate cached connection to force recreation with updated config
+ * This is useful when config is updated directly (e.g., token refresh in JwtAbapConnection)
+ * The connection will be recreated on next getManagedConnection() call with updated signature
+ */
+export function invalidateConnectionCache() {
+  disposeConnection(cachedConnection);
+  cachedConnection = undefined;
+  cachedConfigSignature = undefined;
+  // Also invalidate override connection if it exists
+  if (overrideConnection) {
+    disposeConnection(overrideConnection);
+    overrideConnection = undefined;
+  }
+  notifyConnectionResetListeners();
+}
+
+// Register hook to invalidate connection cache when connection is reset
+// This ensures that when token is refreshed in JwtAbapConnection, the cache is invalidated
+registerConnectionResetHook(() => {
+  // When connection is reset (e.g., after token refresh), invalidate cache
+  // so that next getManagedConnection() will recreate connection with updated config
+  cachedConnection = undefined;
+  cachedConfigSignature = undefined;
+});
 
 export async function getBaseUrl() {
   return getManagedConnection().getBaseUrl();

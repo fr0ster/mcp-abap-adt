@@ -427,6 +427,11 @@ export class mcp_abap_adt_server {
     // Extract refresh token
     const refreshToken = getHeaderValue(headers["x-sap-refresh-token"]);
 
+    // Extract UAA credentials for token refresh
+    const uaaUrl = getHeaderValue(headers["x-sap-uaa-url"])?.trim();
+    const uaaClientId = getHeaderValue(headers["x-sap-uaa-client-id"])?.trim();
+    const uaaClientSecret = getHeaderValue(headers["x-sap-uaa-client-secret"])?.trim();
+
     // Extract SAP URL and auth type from headers
     const sapUrl = getHeaderValue(headers["x-sap-url"])?.trim();
     const sapAuthType = getHeaderValue(headers["x-sap-auth-type"])?.trim();
@@ -483,8 +488,35 @@ export class mcp_abap_adt_server {
       newConfig.refreshToken = refreshToken.trim();
     }
 
+    // Add UAA credentials if provided (required for token refresh)
+    if (uaaUrl) {
+      newConfig.uaaUrl = uaaUrl;
+    }
+    if (uaaClientId) {
+      newConfig.uaaClientId = uaaClientId;
+    }
+    if (uaaClientSecret) {
+      newConfig.uaaClientSecret = uaaClientSecret;
+    }
+
     setSapConfigOverride(newConfig);
     this.sapConfig = newConfig;
+
+    // Force connection cache invalidation to ensure next getManagedConnection()
+    // will recreate connection with updated token
+    // Import synchronously to avoid async issues
+    const { invalidateConnectionCache } = require('./lib/utils');
+    try {
+      // Invalidate cache so that next getManagedConnection() will recreate connection
+      // with updated config (including new JWT token)
+      invalidateConnectionCache();
+    } catch (error) {
+      // If invalidation fails, log but continue - connection will be recreated on next use
+      logger.debug("Connection cache invalidation failed", {
+        type: "CONNECTION_CACHE_INVALIDATION_FAILED",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     logger.info("Updated SAP configuration from HTTP headers", {
       type: "SAP_CONFIG_UPDATED",

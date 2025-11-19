@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js"; // Keep for stdio/SSE compatibility
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
@@ -386,12 +387,26 @@ export function getConfig(): SapConfig {
 export class mcp_abap_adt_server {
   private readonly allowProcessExit: boolean;
   private readonly registerSignalHandlers: boolean;
-  private server: Server; // Instance of the MCP server
+  private mcpServer: McpServer; // New recommended MCP server (for StreamableHTTP)
+  private server: Server; // Legacy server (for stdio/SSE compatibility)
   private sapConfig: SapConfig; // SAP configuration
   private transportConfig: TransportConfig;
   private httpServer?: HttpServer;
-  private currentSseTransport?: SSEServerTransport;
   private shuttingDown = false;
+
+  // Client session tracking for StreamableHTTP (like the example)
+  private streamableHttpSessions = new Map<string, {
+    sessionId: string;
+    clientIP: string;
+    connectedAt: Date;
+    requestCount: number;
+  }>();
+
+  // SSE session tracking (McpServer + SSEServerTransport per session)
+  private sseSessions = new Map<string, {
+    server: McpServer;
+    transport: SSEServerTransport;
+  }>();
   private applyAuthHeaders(headers?: IncomingHttpHeaders) {
     if (!headers) {
       return;
@@ -579,6 +594,14 @@ export class mcp_abap_adt_server {
       }
       throw error instanceof Error ? error : new Error(message);
     }
+
+    // Create new recommended McpServer (for StreamableHTTP)
+    this.mcpServer = new McpServer({
+      name: "mcp-abap-adt",
+      version: "0.1.0"
+    });
+
+    // Create legacy Server (for stdio/SSE compatibility)
     this.server = new Server(
       {
         name: "mcp-abap-adt",
@@ -591,7 +614,8 @@ export class mcp_abap_adt_server {
       }
     );
 
-    this.setupHandlers(); // Setup request handlers
+    this.setupHandlers(); // Setup request handlers for legacy Server
+    this.setupMcpServerHandlers(); // Setup handlers for new McpServer
     if (this.registerSignalHandlers) {
       this.setupSignalHandlers();
     }
@@ -789,6 +813,348 @@ export class mcp_abap_adt_server {
 
   }
 
+  /**
+   * Creates a new McpServer instance with all handlers registered
+   * Used for SSE sessions where each session needs its own server instance
+   * @private
+   */
+  private createMcpServerForSession(): McpServer {
+    const server = new McpServer({
+      name: "mcp-abap-adt",
+      version: "0.1.0"
+    });
+
+    // Register all tools using the new API
+    const allTools = getAllTools();
+
+    for (const tool of allTools) {
+      server.registerTool(
+        tool.name,
+        {
+          title: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema as any, // McpServer accepts JSON Schema
+        },
+        async (args: any) => {
+          // Route to appropriate handler (same logic as setupMcpServerHandlers)
+          switch (tool.name) {
+            case "GetProgram":
+              return await handleGetProgram(args);
+            case "GetClass":
+              return await handleGetClass(args);
+            case "GetFunction":
+              return await handleGetFunction(args);
+            case "GetFunctionGroup":
+              return await handleGetFunctionGroup(args);
+            case "GetStructure":
+              return await handleGetStructure(args);
+            case "GetTable":
+              return await handleGetTable(args);
+            case "GetDomain":
+              return await handleGetDomain(args);
+            case "GetTableContents":
+              return await handleGetTableContents(args);
+            case "GetPackage":
+              return await handleGetPackage(args);
+            case "CreatePackage":
+              return await handleCreatePackage(args);
+            case "GetTypeInfo":
+              return await handleGetTypeInfo(args);
+            case "GetInclude":
+              return await handleGetInclude(args);
+            case "SearchObject":
+              return await handleSearchObject(args);
+            case "GetInterface":
+              return await handleGetInterface(args);
+            case "GetTransaction":
+              return await handleGetTransaction(args);
+            case "GetEnhancements":
+              return await handleGetEnhancements(args);
+            case "GetEnhancementSpot":
+              return await handleGetEnhancementSpot(args);
+            case "GetEnhancementImpl":
+              return await handleGetEnhancementImpl(args);
+            case "GetSqlQuery":
+              return await handleGetSqlQuery(args);
+            case "GetIncludesList":
+              return await handleGetIncludesList(args);
+            case "GetWhereUsed":
+              return await handleGetWhereUsed(args);
+            case "GetBdef":
+              return await handleGetBdef(args);
+            case "GetObjectInfo":
+              if (!args || typeof args !== "object") {
+                throw new McpError(ErrorCode.InvalidParams, "Missing or invalid arguments for GetObjectInfo");
+              }
+              return await handleGetObjectInfo(args as { parent_type: string; parent_name: string });
+            case "GetAdtTypes":
+              return await (await import("./handlers/handleGetAllTypes.js")).handleGetAdtTypes(args as any);
+            case "GetObjectStructure":
+              return await (await import("./handlers/handleGetObjectStructure.js")).handleGetObjectStructure(args as any);
+            case "GetObjectsList":
+              return await (await import("./handlers/handleGetObjectsList.js")).handleGetObjectsList(args as any);
+            case "GetObjectsByType":
+              return await (await import("./handlers/handleGetObjectsByType.js")).handleGetObjectsByType(args as any);
+            case "GetProgFullCode":
+              return await (await import("./handlers/handleGetProgFullCode.js")).handleGetProgFullCode(args as any);
+            case "GetObjectNodeFromCache":
+              return await (await import("./handlers/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(args as any);
+            case "DescribeByList":
+              return await (await import("./handlers/handleDescribeByList.js")).handleDescribeByList(args as any);
+            case "GetAbapAST":
+              return await handleGetAbapAST(args);
+            case "GetAbapSemanticAnalysis":
+              return await handleGetAbapSemanticAnalysis(args);
+            case "GetAbapSystemSymbols":
+              return await handleGetAbapSystemSymbols(args);
+            case "CreateDomain":
+              return await handleCreateDomain(args);
+            case "UpdateDomain":
+              return await handleUpdateDomain(args);
+            case "CreateDataElement":
+              return await handleCreateDataElement(args);
+            case "UpdateDataElement":
+              return await handleUpdateDataElement(args);
+            case "GetDataElement":
+              return await handleGetDataElement(args);
+            case "CreateTransport":
+              return await handleCreateTransport(args);
+            case "GetTransport":
+              return await handleGetTransport(args);
+            case "CreateTable":
+              return await handleCreateTable(args);
+            case "CreateStructure":
+              return await handleCreateStructure(args);
+            case "CreateView":
+              return await handleCreateView(args);
+            case "GetView":
+              return await handleGetView(args);
+            case "CreateClass":
+              return await handleCreateClass(args);
+            case "UpdateClassSource":
+              return await handleUpdateClassSource(args);
+            case "CreateProgram":
+              return await handleCreateProgram(args);
+            case "UpdateProgramSource":
+              return await handleUpdateProgramSource(args);
+            case "CreateInterface":
+              return await handleCreateInterface(args);
+            case "CreateFunctionGroup":
+              return await handleCreateFunctionGroup(args);
+            case "CreateFunctionModule":
+              return await handleCreateFunctionModule(args);
+            case "UpdateViewSource":
+              return await handleUpdateViewSource(args);
+            case "UpdateInterfaceSource":
+              return await handleUpdateInterfaceSource(args);
+            case "UpdateFunctionModuleSource":
+              return await handleUpdateFunctionModuleSource(args as any);
+            case "ActivateObject":
+              return await handleActivateObject(args);
+            case "DeleteObject":
+              return await handleDeleteObject(args);
+            case "CheckObject":
+              return await handleCheckObject(args);
+            case "GetSession":
+              return await handleGetSession(args);
+            case "ValidateObject":
+              return await handleValidateObject(args);
+            case "LockObject":
+              return await handleLockObject(args);
+            case "UnlockObject":
+              return await handleUnlockObject(args);
+            case "ValidateClass":
+              return await handleValidateClass(args);
+            case "CheckClass":
+              return await handleCheckClass(args);
+            case "ValidateTable":
+              return await handleValidateTable(args);
+            case "CheckTable":
+              return await handleCheckTable(args);
+            case "ValidateFunctionModule":
+              return await handleValidateFunctionModule(args);
+            case "CheckFunctionModule":
+              return await handleCheckFunctionModule(args);
+            default:
+              throw new McpError(
+                ErrorCode.MethodNotFound,
+                `Unknown tool: ${tool.name}`
+              );
+          }
+        }
+      );
+    }
+
+    return server;
+  }
+
+  /**
+   * Sets up handlers for new McpServer using registerTool (recommended API)
+   * @private
+   */
+  private setupMcpServerHandlers() {
+    // Register all tools using the new API
+    const allTools = getAllTools();
+
+    for (const tool of allTools) {
+      this.mcpServer.registerTool(
+        tool.name,
+        {
+          title: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema as any, // McpServer accepts JSON Schema
+        },
+        async (args: any) => {
+          // Route to appropriate handler
+          switch (tool.name) {
+            case "GetProgram":
+              return await handleGetProgram(args);
+            case "GetClass":
+              return await handleGetClass(args);
+            case "GetFunction":
+              return await handleGetFunction(args);
+            case "GetFunctionGroup":
+              return await handleGetFunctionGroup(args);
+            case "GetStructure":
+              return await handleGetStructure(args);
+            case "GetTable":
+              return await handleGetTable(args);
+            case "GetDomain":
+              return await handleGetDomain(args);
+            case "GetTableContents":
+              return await handleGetTableContents(args);
+            case "GetPackage":
+              return await handleGetPackage(args);
+            case "CreatePackage":
+              return await handleCreatePackage(args);
+            case "GetTypeInfo":
+              return await handleGetTypeInfo(args);
+            case "GetInclude":
+              return await handleGetInclude(args);
+            case "SearchObject":
+              return await handleSearchObject(args);
+            case "GetInterface":
+              return await handleGetInterface(args);
+            case "GetTransaction":
+              return await handleGetTransaction(args);
+            case "GetEnhancements":
+              return await handleGetEnhancements(args);
+            case "GetEnhancementSpot":
+              return await handleGetEnhancementSpot(args);
+            case "GetEnhancementImpl":
+              return await handleGetEnhancementImpl(args);
+            case "GetSqlQuery":
+              return await handleGetSqlQuery(args);
+            case "GetIncludesList":
+              return await handleGetIncludesList(args);
+            case "GetWhereUsed":
+              return await handleGetWhereUsed(args);
+            case "GetBdef":
+              return await handleGetBdef(args);
+            case "GetObjectInfo":
+              if (!args || typeof args !== "object") {
+                throw new McpError(ErrorCode.InvalidParams, "Missing or invalid arguments for GetObjectInfo");
+              }
+              return await handleGetObjectInfo(args as { parent_type: string; parent_name: string });
+            case "GetAdtTypes":
+              return await (await import("./handlers/handleGetAllTypes.js")).handleGetAdtTypes(args as any);
+            case "GetObjectStructure":
+              return await (await import("./handlers/handleGetObjectStructure.js")).handleGetObjectStructure(args as any);
+            case "GetObjectsList":
+              return await (await import("./handlers/handleGetObjectsList.js")).handleGetObjectsList(args as any);
+            case "GetObjectsByType":
+              return await (await import("./handlers/handleGetObjectsByType.js")).handleGetObjectsByType(args as any);
+            case "GetProgFullCode":
+              return await (await import("./handlers/handleGetProgFullCode.js")).handleGetProgFullCode(args as any);
+            case "GetObjectNodeFromCache":
+              return await (await import("./handlers/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(args as any);
+            case "DescribeByList":
+              return await (await import("./handlers/handleDescribeByList.js")).handleDescribeByList(args as any);
+            case "GetAbapAST":
+              return await handleGetAbapAST(args);
+            case "GetAbapSemanticAnalysis":
+              return await handleGetAbapSemanticAnalysis(args);
+            case "GetAbapSystemSymbols":
+              return await handleGetAbapSystemSymbols(args);
+            case "CreateDomain":
+              return await handleCreateDomain(args);
+            case "UpdateDomain":
+              return await handleUpdateDomain(args);
+            case "CreateDataElement":
+              return await handleCreateDataElement(args);
+            case "UpdateDataElement":
+              return await handleUpdateDataElement(args);
+            case "GetDataElement":
+              return await handleGetDataElement(args);
+            case "CreateTransport":
+              return await handleCreateTransport(args);
+            case "GetTransport":
+              return await handleGetTransport(args);
+            case "CreateTable":
+              return await handleCreateTable(args);
+            case "CreateStructure":
+              return await handleCreateStructure(args);
+            case "CreateView":
+              return await handleCreateView(args);
+            case "GetView":
+              return await handleGetView(args);
+            case "CreateClass":
+              return await handleCreateClass(args);
+            case "UpdateClassSource":
+              return await handleUpdateClassSource(args);
+            case "CreateProgram":
+              return await handleCreateProgram(args);
+            case "UpdateProgramSource":
+              return await handleUpdateProgramSource(args);
+            case "CreateInterface":
+              return await handleCreateInterface(args);
+            case "CreateFunctionGroup":
+              return await handleCreateFunctionGroup(args);
+            case "CreateFunctionModule":
+              return await handleCreateFunctionModule(args);
+            case "UpdateViewSource":
+              return await handleUpdateViewSource(args);
+            case "UpdateInterfaceSource":
+              return await handleUpdateInterfaceSource(args);
+            case "UpdateFunctionModuleSource":
+              return await handleUpdateFunctionModuleSource(args as any);
+            case "ActivateObject":
+              return await handleActivateObject(args);
+            case "DeleteObject":
+              return await handleDeleteObject(args);
+            case "CheckObject":
+              return await handleCheckObject(args);
+            case "GetSession":
+              return await handleGetSession(args);
+            case "ValidateObject":
+              return await handleValidateObject(args);
+            case "LockObject":
+              return await handleLockObject(args);
+            case "UnlockObject":
+              return await handleUnlockObject(args);
+            case "ValidateClass":
+              return await handleValidateClass(args);
+            case "CheckClass":
+              return await handleCheckClass(args);
+            case "ValidateTable":
+              return await handleValidateTable(args);
+            case "CheckTable":
+              return await handleCheckTable(args);
+            case "ValidateFunctionModule":
+              return await handleValidateFunctionModule(args);
+            case "CheckFunctionModule":
+              return await handleCheckFunctionModule(args);
+            default:
+              throw new McpError(
+                ErrorCode.MethodNotFound,
+                `Unknown tool: ${tool.name}`
+              );
+          }
+        }
+      );
+    }
+  }
+
   private setupSignalHandlers() {
     const signals: NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
     for (const signal of signals) {
@@ -821,17 +1187,24 @@ export class mcp_abap_adt_server {
       });
     }
 
-    if (this.currentSseTransport) {
+    // Close all SSE sessions
+    for (const [sessionId, session] of this.sseSessions.entries()) {
       try {
-        await this.currentSseTransport.close();
+        await session.transport.close();
+        session.server.server.close();
+        logger.debug("SSE session closed during shutdown", {
+          type: "SSE_SESSION_SHUTDOWN",
+          sessionId,
+        });
       } catch (error) {
-        logger.error("Failed to close SSE transport", {
+        logger.error("Failed to close SSE session", {
           type: "SSE_SHUTDOWN_ERROR",
           error: error instanceof Error ? error.message : String(error),
+          sessionId,
         });
       }
-      this.currentSseTransport = undefined;
     }
+    this.sseSessions.clear();
 
     if (this.httpServer) {
       await new Promise<void>((resolve) => {
@@ -865,24 +1238,146 @@ export class mcp_abap_adt_server {
 
     if (this.transportConfig.type === "streamable-http") {
       const httpConfig = this.transportConfig;
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        enableJsonResponse: httpConfig.enableJsonResponse,
-        allowedOrigins: httpConfig.allowedOrigins,
-        allowedHosts: httpConfig.allowedHosts,
-        enableDnsRebindingProtection: httpConfig.enableDnsRebindingProtection,
-      });
 
-      await this.server.connect(transport);
-
+      // HTTP Server wrapper for StreamableHTTP transport (like the SDK example)
       const httpServer = createServer(async (req, res) => {
+        // Only handle POST requests (like the example)
+        if (req.method !== "POST") {
+          res.writeHead(405, { "Content-Type": "text/plain" });
+          res.end("Method not allowed");
+          return;
+        }
+
+        // Track client (like the example)
+        const clientID = `${req.socket.remoteAddress}:${req.socket.remotePort}`;
+        logger.debug("Client connected", {
+          type: "STREAMABLE_HTTP_CLIENT_CONNECTED",
+          clientID,
+        });
+
+        // Extract session ID from headers (like the example)
+        const clientSessionId = (req.headers["x-session-id"] || req.headers["mcp-session-id"]) as string | undefined;
+
+        let session = this.streamableHttpSessions.get(clientID);
+
+        // If client sent session ID, try to find existing session
+        if (clientSessionId && !session) {
+          // Search for existing session by sessionId (client might have new IP:PORT)
+          for (const [key, sess] of this.streamableHttpSessions.entries()) {
+            if (sess.sessionId === clientSessionId) {
+              session = sess;
+              // Update clientID (port might have changed)
+              this.streamableHttpSessions.delete(key);
+              this.streamableHttpSessions.set(clientID, session);
+              logger.debug("Existing session restored", {
+                type: "STREAMABLE_HTTP_SESSION_RESTORED",
+                sessionId: session.sessionId,
+                clientID,
+              });
+              break;
+            }
+          }
+        }
+
+        // If no session found, create new one
+        if (!session) {
+          session = {
+            sessionId: randomUUID(),
+            clientIP: req.socket.remoteAddress || "unknown",
+            connectedAt: new Date(),
+            requestCount: 0,
+          };
+          this.streamableHttpSessions.set(clientID, session);
+          logger.debug("New session created", {
+            type: "STREAMABLE_HTTP_SESSION_CREATED",
+            sessionId: session.sessionId,
+            clientID,
+            totalSessions: this.streamableHttpSessions.size,
+          });
+        }
+
+        session.requestCount++;
+
+        logger.debug("Request received", {
+          type: "STREAMABLE_HTTP_REQUEST",
+          sessionId: session.sessionId,
+          requestNumber: session.requestCount,
+          clientID,
+        });
+
+        // Handle client disconnect (like the example)
+        req.on("close", () => {
+          this.streamableHttpSessions.delete(clientID);
+          logger.debug("Session closed", {
+            type: "STREAMABLE_HTTP_SESSION_CLOSED",
+            sessionId: session!.sessionId,
+            requestCount: session!.requestCount,
+            totalSessions: this.streamableHttpSessions.size,
+          });
+        });
+
         try {
+          // Apply auth headers before processing
           this.applyAuthHeaders(req.headers);
-          await transport.handleRequest(req, res);
+
+          // Read request body (like the SDK example with Express)
+          let body: any = null;
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) {
+            chunks.push(chunk);
+          }
+          if (chunks.length > 0) {
+            const bodyString = Buffer.concat(chunks).toString('utf-8');
+            try {
+              body = JSON.parse(bodyString);
+            } catch (parseError) {
+              // If body is not JSON, pass as string or null
+              body = bodyString || null;
+            }
+          }
+
+          // KEY MOMENT: Create new StreamableHTTP transport for each request (like the SDK example)
+          // SDK automatically handles:
+          // - Chunked transfer encoding
+          // - Session tracking
+          // - JSON-RPC protocol
+          const transport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: undefined, // Stateless mode (like the SDK example)
+            enableJsonResponse: httpConfig.enableJsonResponse,
+            allowedOrigins: httpConfig.allowedOrigins,
+            allowedHosts: httpConfig.allowedHosts,
+            enableDnsRebindingProtection: httpConfig.enableDnsRebindingProtection,
+          });
+
+          // Close transport when response closes (like the SDK example)
+          res.on("close", () => {
+            transport.close();
+          });
+
+          // Connect transport to new McpServer (like the SDK example)
+          await this.mcpServer.connect(transport);
+
+          logger.debug("Transport connected", {
+            type: "STREAMABLE_HTTP_TRANSPORT_CONNECTED",
+            sessionId: session.sessionId,
+            clientID,
+          });
+
+          // Handle HTTP request through transport (like the SDK example)
+          // Pass body as third parameter if available (like the SDK example)
+          await transport.handleRequest(req, res, body);
+
+          logger.debug("Request completed", {
+            type: "STREAMABLE_HTTP_REQUEST_COMPLETED",
+            sessionId: session.sessionId,
+            clientID,
+          });
         } catch (error) {
           logger.error("Failed to handle HTTP request", {
             type: "HTTP_REQUEST_ERROR",
             error: error instanceof Error ? error.message : String(error),
+            sessionId: session.sessionId,
+            clientID,
           });
           if (!res.headersSent) {
             res.writeHead(500).end("Internal Server Error");
@@ -931,11 +1426,12 @@ export class mcp_abap_adt_server {
     const streamPathMap = new Map<string, string>([
       ["/", "/messages"],
       ["/mcp/events", "/mcp/messages"],
-      ["/sse", "/sse"],
+      ["/sse", "/messages"],
     ]);
     const streamPaths = Array.from(streamPathMap.keys());
     const postPathSet = new Set(streamPathMap.values());
     postPathSet.add("/messages");
+    postPathSet.add("/mcp/messages");
 
     const httpServer = createServer(async (req, res) => {
       const requestUrl = req.url ? new URL(req.url, `http://${req.headers.host ?? `${sseConfig.host}:${sseConfig.port}`}`) : undefined;
@@ -957,76 +1453,151 @@ export class mcp_abap_adt_server {
         },
       });
 
+      // GET /sse, /mcp/events, or / - establish SSE connection
       if (req.method === "GET" && streamPathMap.has(pathname)) {
-        if (this.currentSseTransport) {
-          res.writeHead(409, { "Content-Type": "application/json" }).end(
-            JSON.stringify({ error: "SSE session already established" })
-          );
-          return;
-        }
+        const postEndpoint = streamPathMap.get(pathname) ?? "/messages";
 
-        const postEndpoint = streamPathMap.get(pathname) ?? "/mcp/messages";
+        logger.debug("SSE client connecting", {
+          type: "SSE_CLIENT_CONNECTING",
+          pathname,
+          postEndpoint,
+        });
 
+        // Create new McpServer instance for this session (like the working example)
+        const server = this.createMcpServerForSession();
+
+        // Create SSE transport
         const transport = new SSEServerTransport(postEndpoint, res, {
           allowedHosts: sseConfig.allowedHosts,
           allowedOrigins: sseConfig.allowedOrigins,
           enableDnsRebindingProtection: sseConfig.enableDnsRebindingProtection,
         });
 
-        this.currentSseTransport = transport;
+        const sessionId = transport.sessionId;
+        logger.info("New SSE session created", {
+          type: "SSE_SESSION_CREATED",
+          sessionId,
+          pathname,
+        });
 
-        transport.onclose = () => {
-          logger.info("SSE connection closed", {
-            type: "SSE_CONNECTION_CLOSED",
-            streamPath: pathname,
-          });
-          this.currentSseTransport = undefined;
-        };
+        // Store transport and server for this session
+        this.sseSessions.set(sessionId, {
+          server,
+          transport,
+        });
 
-        transport.onerror = (error) => {
-          logger.error("SSE transport error", {
-            type: "SSE_TRANSPORT_ERROR",
-            error: error instanceof Error ? error.message : String(error),
-          });
-        };
-
+        // Connect transport to server (using server.server like in the example)
         try {
-          await this.server.connect(transport);
+          await server.server.connect(transport);
           logger.info("SSE transport connected", {
             type: "SSE_CONNECTION_READY",
-            streamPath: pathname,
+            sessionId,
+            pathname,
             postEndpoint,
           });
         } catch (error) {
           logger.error("Failed to connect SSE transport", {
             type: "SSE_CONNECT_ERROR",
             error: error instanceof Error ? error.message : String(error),
+            sessionId,
           });
-          this.currentSseTransport = undefined;
+          this.sseSessions.delete(sessionId);
           if (!res.headersSent) {
             res.writeHead(500).end("Internal Server Error");
           } else {
             res.end();
           }
+          return;
         }
+
+        // Cleanup on connection close
+        res.on("close", () => {
+          logger.info("SSE connection closed", {
+            type: "SSE_CONNECTION_CLOSED",
+            sessionId,
+            pathname,
+          });
+          this.sseSessions.delete(sessionId);
+          server.server.close();
+        });
+
+        transport.onerror = (error) => {
+          logger.error("SSE transport error", {
+            type: "SSE_TRANSPORT_ERROR",
+            error: error instanceof Error ? error.message : String(error),
+            sessionId,
+          });
+        };
+
         return;
       }
 
+      // POST /messages or /mcp/messages - handle client messages
       if (req.method === "POST" && postPathSet.has(pathname)) {
-        const transport = this.currentSseTransport;
-        if (!transport) {
-          res.writeHead(503, { "Content-Type": "application/json" }).end(
-            JSON.stringify({ error: "SSE session not initialized" })
+        // Extract sessionId from query string or header
+        let sessionId: string | undefined;
+        if (requestUrl) {
+          sessionId = requestUrl.searchParams.get("sessionId") || undefined;
+        }
+        if (!sessionId) {
+          sessionId = req.headers["x-session-id"] as string | undefined;
+        }
+
+        logger.debug("SSE POST request received", {
+          type: "SSE_POST_REQUEST",
+          sessionId,
+          pathname,
+        });
+
+        if (!sessionId || !this.sseSessions.has(sessionId)) {
+          logger.error("Invalid or missing SSE session", {
+            type: "SSE_INVALID_SESSION",
+            sessionId,
+          });
+          res.writeHead(400, { "Content-Type": "application/json" }).end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: {
+                code: -32000,
+                message: "Invalid or missing sessionId",
+              },
+              id: null,
+            })
           );
           return;
         }
 
+        const session = this.sseSessions.get(sessionId)!;
+        const { transport } = session;
+
         try {
-          await transport.handlePostMessage(req, res);
+          // Read request body
+          let body: any = null;
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) {
+            chunks.push(chunk);
+          }
+          if (chunks.length > 0) {
+            const bodyString = Buffer.concat(chunks).toString('utf-8');
+            try {
+              body = JSON.parse(bodyString);
+            } catch (parseError) {
+              body = bodyString || null;
+            }
+          }
+
+          // Handle POST message through transport (like the working example)
+          await transport.handlePostMessage(req, res, body);
+
+          logger.debug("SSE POST request processed", {
+            type: "SSE_POST_PROCESSED",
+            sessionId,
+          });
         } catch (error) {
           logger.error("Failed to handle SSE POST message", {
             type: "SSE_POST_ERROR",
             error: error instanceof Error ? error.message : String(error),
+            sessionId,
           });
           if (!res.headersSent) {
             res.writeHead(500).end("Internal Server Error");
@@ -1037,7 +1608,8 @@ export class mcp_abap_adt_server {
         return;
       }
 
-  if (req.method === "OPTIONS" && (streamPathMap.has(pathname) || postPathSet.has(pathname))) {
+      // OPTIONS - CORS preflight
+      if (req.method === "OPTIONS" && (streamPathMap.has(pathname) || postPathSet.has(pathname))) {
         res.writeHead(204, {
           "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type",

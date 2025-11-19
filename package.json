@@ -5,7 +5,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "test": "jest",
-    "build": "npm run build --workspaces --if-present && tsc -p tsconfig.json",
+    "build": "npm run build --workspaces --if-present && npx tsc -p tsconfig.json",
     "build:packages": "npm run build --workspaces --if-present",
     "start": "node ./dist/index.js",
     "start:http": "node ./dist/index.js --transport streamable-http",

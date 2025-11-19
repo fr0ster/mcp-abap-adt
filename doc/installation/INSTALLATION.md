@@ -83,6 +83,37 @@ git submodule update --remote
 git submodule update --remote packages/connection
 ```
 
+## ⚠️ Important: Workspace Setup
+
+This project uses **npm workspaces** to manage multiple packages (`@mcp-abap-adt/connection`, `@mcp-abap-adt/adt-clients`). 
+
+**❌ DO NOT run `npm install` in individual package directories!**
+
+**✅ Correct installation process:**
+
+1. **Only run `npm install` in the root directory:**
+   ```bash
+   cd mcp-abap-adt
+   npm install
+   ```
+   This will automatically install dependencies for all workspace packages.
+
+2. **Build all packages from root:**
+   ```bash
+   npm run build
+   ```
+   This will build all workspace packages in the correct order, then build the main project.
+
+**Why?** 
+- npm workspaces automatically link packages together
+- Running `npm install` in root installs all dependencies for all packages
+- The build script ensures packages are built in the correct order (dependencies first)
+- Using `npx tsc` ensures TypeScript is found from `node_modules` without global installation
+
+**If you get errors:**
+- `tsc: command not found` → Make sure you ran `npm install` in the root directory (TypeScript is in `devDependencies`)
+- `Cannot find module '@mcp-abap-adt/connection'` → Run `npm install` in root, then `npm run build` (packages need to be built first)
+
 ## 📖 Detailed Guides
 
 For detailed platform-specific instructions, see:

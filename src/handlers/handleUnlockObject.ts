@@ -7,17 +7,7 @@
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { unlockClass } from '@mcp-abap-adt/adt-clients/dist/core/class';
-import { unlockProgram } from '@mcp-abap-adt/adt-clients/dist/core/program';
-import { unlockInterface } from '@mcp-abap-adt/adt-clients/dist/core/interface';
-import { unlockFunctionGroup } from '@mcp-abap-adt/adt-clients/dist/core/functionGroup';
-import { unlockFunctionModule } from '@mcp-abap-adt/adt-clients/dist/core/functionModule';
-import { unlockStructure } from '@mcp-abap-adt/adt-clients/dist/core/structure';
-import { unlockTable } from '@mcp-abap-adt/adt-clients/dist/core/table';
-import { unlockDomain } from '@mcp-abap-adt/adt-clients/dist/core/domain';
-import { unlockDataElement } from '@mcp-abap-adt/adt-clients/dist/core/dataElement';
-import { unlockDDLS } from '@mcp-abap-adt/adt-clients/dist/core/view';
-import { unlockPackage } from '@mcp-abap-adt/adt-clients/dist/core/package';
+import { LockClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "UnlockObject",
@@ -94,6 +84,7 @@ export async function handleUnlockObject(args: any) {
     }
 
     const connection = getManagedConnection();
+    const lockClient = new LockClient(connection);
 
     // Restore session state if provided
     if (session_state) {
@@ -113,59 +104,12 @@ export async function handleUnlockObject(args: any) {
     logger.info(`Starting object unlock: ${objectName} (type: ${objectType}, session: ${session_id.substring(0, 8)}...)`);
 
     try {
-      // Call appropriate unlock function based on object type
-      switch (objectType) {
-        case 'class': {
-          await unlockClass(connection, objectName, lock_handle, session_id);
-          break;
-        }
-        case 'program': {
-          await unlockProgram(connection, objectName, lock_handle, session_id);
-          break;
-        }
-        case 'interface': {
-          await unlockInterface(connection, objectName, lock_handle, session_id);
-          break;
-        }
-        case 'function_group': {
-          await unlockFunctionGroup(connection, objectName, lock_handle, session_id);
-          break;
-        }
-        case 'function_module': {
-          if (!objectName.includes('|')) {
-            return return_error(new Error('Function module name must be in format GROUP|FM_NAME'));
-          }
-          const [groupName, fmName] = objectName.split('|');
-          await unlockFunctionModule(connection, groupName, fmName, lock_handle, session_id);
-          break;
-        }
-        case 'table': {
-          await unlockTable(connection, objectName, lock_handle, session_id);
-          break;
-        }
-        case 'structure': {
-          await unlockStructure(connection, objectName, lock_handle, session_id);
-          break;
-        }
-        case 'view': {
-          await unlockDDLS(connection, objectName, lock_handle, session_id);
-          break;
-        }
-        case 'domain': {
-          await unlockDomain(connection, objectName, lock_handle, session_id);
-          break;
-        }
-        case 'data_element': {
-          await unlockDataElement(connection, objectName, lock_handle, session_id);
-          break;
-        }
-        case 'package': {
-          await unlockPackage(connection, objectName, lock_handle, session_id);
-          break;
-        }
-        default:
-          return return_error(new Error(`Unsupported object type for unlock: ${objectType}`));
-      }
+      await lockClient.unlock({
+        objectType: objectType as any,
+        objectName,
+        lockHandle: lock_handle,
+        sessionId: session_id
+      });
 
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();

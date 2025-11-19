@@ -7,8 +7,8 @@
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { checkFunctionModule } from '@mcp-abap-adt/adt-clients/dist/core/functionModule';
-import { parseCheckRunResponse } from '@mcp-abap-adt/adt-clients/dist/core';
+import { FunctionModuleBuilder } from '@mcp-abap-adt/adt-clients';
+import { parseCheckRunResponse } from '../lib/checkRunParser';
 
 export const TOOL_DEFINITION = {
   name: "CheckFunctionModule",
@@ -100,14 +100,17 @@ export async function handleCheckFunctionModule(args: any) {
     logger.info(`Starting function module check: ${functionModuleName} in group ${functionGroupName} (version: ${checkVersion})`);
 
     try {
-      // Check function module using function module-specific function
-      const response = await checkFunctionModule(
-        connection,
+      const builder = new FunctionModuleBuilder(connection, logger, {
         functionGroupName,
         functionModuleName,
-        checkVersion,
-        session_id
-      );
+        sessionId: session_id
+      });
+
+      await builder.check(checkVersion);
+      const response = builder.getCheckResult();
+      if (!response) {
+        throw new Error('Function module check did not return a response');
+      }
 
       // Parse check results
       const checkResult = parseCheckRunResponse(response);
@@ -126,7 +129,7 @@ export async function handleCheckFunctionModule(args: any) {
           function_module_name: functionModuleName,
           version: checkVersion,
           check_result: checkResult,
-          session_id: session_id || null,
+          session_id: builder.getSessionId(),
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,
             csrf_token: updatedSessionState.csrfToken,

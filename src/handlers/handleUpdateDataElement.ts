@@ -192,7 +192,22 @@ export async function handleUpdateDataElement(args: any) {
     try {
       // Determine domain name for builder (support deprecated domain_name parameter)
       const domainName = typedArgs.type_name || typedArgs.domain_name;
-      const typeKind = (typedArgs.type_kind || 'domain') as 'domain' | 'builtin';
+      type AdtClientsTypeKind =
+        | 'domain'
+        | 'predefinedAbapType'
+        | 'refToPredefinedAbapType'
+        | 'refToDictionaryType'
+        | 'refToClifType';
+      const rawTypeKind = (typedArgs.type_kind || 'domain').toString().toLowerCase();
+      const typeKindMap: Record<string, AdtClientsTypeKind> = {
+        domain: 'domain',
+        builtin: 'predefinedAbapType',
+        predefinedabaptype: 'predefinedAbapType',
+        reftopredefinedabaptype: 'refToPredefinedAbapType',
+        reftodictionarytype: 'refToDictionaryType',
+        reftocliftype: 'refToClifType'
+      };
+      const typeKind = typeKindMap[rawTypeKind] || 'domain';
 
       // Create builder with configuration
       const builder = new DataElementBuilder(connection, logger, {

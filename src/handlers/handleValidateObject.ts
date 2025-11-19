@@ -7,7 +7,7 @@
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { validateObjectName } from '@mcp-abap-adt/adt-clients/dist/core';
+import { ValidationClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "ValidateObject",
@@ -79,6 +79,7 @@ export async function handleValidateObject(args: any) {
     }
 
     const connection = getManagedConnection();
+    const validationClient = new ValidationClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -97,10 +98,9 @@ export async function handleValidateObject(args: any) {
     logger.info(`Starting object validation: ${objectName} (type: ${object_type})`);
 
     try {
-      // Validate object using adt-clients function
-      const result = await validateObjectName(
-        connection,
-        object_type.toLowerCase() as any,
+      // Validate object using validation client
+      const result = await validationClient.validateObject(
+        object_type.toLowerCase(),
         objectName
       );
 

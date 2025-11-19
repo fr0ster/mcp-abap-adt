@@ -8,7 +8,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
-import { deleteObject } from '@mcp-abap-adt/adt-clients/dist/core';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "DeleteObject",
@@ -66,13 +66,14 @@ export async function handleDeleteObject(args: any) {
     }
 
     const connection = getManagedConnection();
+    const crudClient = new CrudClient(connection);
     const objectName = object_name.toUpperCase();
 
     logger.info(`Starting object deletion: ${objectName} (type: ${object_type})`);
 
     try {
       // Delete object using adt-clients function
-      const response = await deleteObject(connection, {
+      const response = await crudClient.deleteObject({
         object_name: objectName,
         object_type: object_type,
         function_group_name: function_group_name,

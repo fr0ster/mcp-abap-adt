@@ -8,8 +8,8 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { generateSessionId } from '../lib/sessionUtils';
-import { runTableCheckRun } from '@mcp-abap-adt/adt-clients/dist/core/table';
-import { parseCheckRunResponse } from '@mcp-abap-adt/adt-clients/dist/core';
+import { TableBuilder } from '@mcp-abap-adt/adt-clients';
+import { parseCheckRunResponse } from '../lib/checkRunParser';
 
 export const TOOL_DEFINITION = {
   name: "CheckTable",
@@ -97,13 +97,16 @@ export async function handleCheckTable(args: any) {
     logger.info(`Starting table check: ${tableName} (reporter: ${checkReporter}, session: ${sessionId.substring(0, 8)}...)`);
 
     try {
-      // Check table using table-specific function
-      const response = await runTableCheckRun(
-        connection,
-        checkReporter,
+      const builder = new TableBuilder(connection, logger, {
         tableName,
         sessionId
-      );
+      });
+
+      await builder.check(checkReporter as 'tableStatusCheck' | 'abapCheckRun');
+      const response = builder.getCheckResult();
+      if (!response) {
+        throw new Error('Table check did not return a response');
+      }
 
       // Parse check results
       const checkResult = parseCheckRunResponse(response);
@@ -121,7 +124,7 @@ export async function handleCheckTable(args: any) {
           table_name: tableName,
           reporter: checkReporter,
           check_result: checkResult,
-          session_id: sessionId,
+          session_id: builder.getSessionId(),
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,
             csrf_token: updatedSessionState.csrfToken,

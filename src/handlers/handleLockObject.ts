@@ -8,18 +8,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { generateSessionId } from '../lib/sessionUtils';
-import { lockClass, unlockClass } from '@mcp-abap-adt/adt-clients/dist/core/class';
-import { lockProgram, unlockProgram } from '@mcp-abap-adt/adt-clients/dist/core/program';
-import { lockInterface, unlockInterface } from '@mcp-abap-adt/adt-clients/dist/core/interface';
-import { lockFunctionGroup, unlockFunctionGroup } from '@mcp-abap-adt/adt-clients/dist/core/functionGroup';
-import { lockFunctionModule, unlockFunctionModule } from '@mcp-abap-adt/adt-clients/dist/core/functionModule';
-import { lockStructure, unlockStructure } from '@mcp-abap-adt/adt-clients/dist/core/structure';
-import { acquireTableLockHandle } from '@mcp-abap-adt/adt-clients/dist/core/table';
-import { unlockTable } from '@mcp-abap-adt/adt-clients/dist/core/table';
-import { lockDomain, unlockDomain } from '@mcp-abap-adt/adt-clients/dist/core/domain';
-import { lockDataElement, unlockDataElement } from '@mcp-abap-adt/adt-clients/dist/core/dataElement';
-import { lockDDLS, unlockDDLS } from '@mcp-abap-adt/adt-clients/dist/core/view';
-import { lockPackage, unlockPackage } from '@mcp-abap-adt/adt-clients/dist/core/package';
+import { LockClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "LockObject",
@@ -90,6 +79,7 @@ export async function handleLockObject(args: any) {
     }
 
     const connection = getManagedConnection();
+    const lockClient = new LockClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -104,86 +94,33 @@ export async function handleLockObject(args: any) {
     }
 
     // Use provided session_id or generate new one
-    const sessionId = session_id || generateSessionId();
+    const desiredSessionId = session_id || generateSessionId();
     const objectName = object_name.toUpperCase();
     const objectType = object_type.toLowerCase();
 
-    logger.info(`Starting object lock: ${objectName} (type: ${objectType}, session: ${sessionId.substring(0, 8)}...)`);
+    logger.info(`Starting object lock: ${objectName} (type: ${objectType}, session: ${desiredSessionId.substring(0, 8)}...)`);
 
     try {
-      let lockHandle: string;
-      let corrNr: string | undefined;
-
-      // Call appropriate lock function based on object type
-      switch (objectType) {
-        case 'class': {
-          lockHandle = await lockClass(connection, objectName, sessionId);
-          break;
-        }
-        case 'program': {
-          lockHandle = await lockProgram(connection, objectName, sessionId);
-          break;
-        }
-        case 'interface': {
-          const result = await lockInterface(connection, objectName, sessionId);
-          lockHandle = result.lockHandle;
-          corrNr = result.corrNr;
-          break;
-        }
-        case 'function_group': {
-          lockHandle = await lockFunctionGroup(connection, objectName, sessionId);
-          break;
-        }
-        case 'function_module': {
-          if (!objectName.includes('|')) {
-            return return_error(new Error('Function module name must be in format GROUP|FM_NAME'));
-          }
-          const [groupName, fmName] = objectName.split('|');
-          lockHandle = await lockFunctionModule(connection, groupName, fmName, sessionId);
-          break;
-        }
-        case 'table': {
-          lockHandle = await acquireTableLockHandle(connection, objectName, sessionId);
-          break;
-        }
-        case 'structure': {
-          lockHandle = await lockStructure(connection, objectName, sessionId);
-          break;
-        }
-        case 'view': {
-          lockHandle = await lockDDLS(connection, objectName, sessionId);
-          break;
-        }
-        case 'domain': {
-          lockHandle = await lockDomain(connection, objectName, sessionId);
-          break;
-        }
-        case 'data_element': {
-          lockHandle = await lockDataElement(connection, objectName, sessionId);
-          break;
-        }
-        case 'package': {
-          lockHandle = await lockPackage(connection, objectName, sessionId);
-          break;
-        }
-        default:
-          return return_error(new Error(`Unsupported object type for lock: ${objectType}`));
-      }
+      const lockResult = await lockClient.lock({
+        objectType: objectType as any,
+        objectName,
+        sessionId: session_id || desiredSessionId
+      });
 
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
       logger.info(`✅ LockObject completed: ${objectName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger.info(`   Lock handle: ${lockResult.lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
           success: true,
           object_name: objectName,
           object_type: objectType,
-          session_id: sessionId,
-          lock_handle: lockHandle,
-          transport_request: corrNr,
+          session_id: lockResult.sessionId,
+          lock_handle: lockResult.lockHandle,
+          transport_request: lockResult.transportRequest,
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,
             csrf_token: updatedSessionState.csrfToken,

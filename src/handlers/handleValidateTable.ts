@@ -6,7 +6,7 @@
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { validateTableName } from '@mcp-abap-adt/adt-clients/dist/core/table';
+import { TableBuilder } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "ValidateTable",
@@ -86,12 +86,16 @@ export async function handleValidateTable(args: any) {
     logger.info(`Starting table validation: ${tableName}`);
 
     try {
-      // Validate table using table-specific function
-      const result = await validateTableName(
-        connection,
+      const builder = new TableBuilder(connection, logger, {
         tableName,
-        description
-      );
+        sessionId: session_id
+      });
+
+      await builder.validate();
+      const result = builder.getValidationResult();
+      if (!result) {
+        throw new Error('Validation did not return a result');
+      }
 
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
@@ -105,7 +109,7 @@ export async function handleValidateTable(args: any) {
           table_name: tableName,
           description: description || null,
           validation_result: result,
-          session_id: session_id || null,
+          session_id: builder.getSessionId(),
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,
             csrf_token: updatedSessionState.csrfToken,

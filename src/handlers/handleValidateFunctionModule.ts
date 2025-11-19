@@ -7,7 +7,7 @@
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { validateFunctionModuleName } from '@mcp-abap-adt/adt-clients/dist/core/functionModule';
+import { FunctionModuleBuilder } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "ValidateFunctionModule",
@@ -94,13 +94,18 @@ export async function handleValidateFunctionModule(args: any) {
     logger.info(`Starting function module validation: ${functionModuleName} in group ${functionGroupName}`);
 
     try {
-      // Validate function module using function module-specific function
-      const result = await validateFunctionModuleName(
-        connection,
+      const builder = new FunctionModuleBuilder(connection, logger, {
         functionGroupName,
         functionModuleName,
-        description
-      );
+        description,
+        sessionId: session_id
+      });
+
+      await builder.validate();
+      const result = builder.getValidationResult();
+      if (!result) {
+        throw new Error('Validation did not return a result');
+      }
 
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
@@ -115,7 +120,7 @@ export async function handleValidateFunctionModule(args: any) {
           function_module_name: functionModuleName,
           description: description || null,
           validation_result: result,
-          session_id: session_id || null,
+          session_id: builder.getSessionId(),
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,
             csrf_token: updatedSessionState.csrfToken,

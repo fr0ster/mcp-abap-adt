@@ -7,7 +7,7 @@
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { validateClassName } from '@mcp-abap-adt/adt-clients/dist/core/class';
+import { ClassBuilder } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "ValidateClass",
@@ -99,14 +99,19 @@ export async function handleValidateClass(args: any) {
     logger.info(`Starting class validation: ${className}`);
 
     try {
-      // Validate class using class-specific function
-      const result = await validateClassName(
-        connection,
+      const builder = new ClassBuilder(connection, logger, {
         className,
-        package_name,
+        packageName: package_name,
         description,
-        superclass
-      );
+        superclass,
+        sessionId: session_id
+      });
+
+      await builder.validate();
+      const result = builder.getValidationResult();
+      if (!result) {
+        throw new Error('Validation did not return a result');
+      }
 
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
@@ -122,7 +127,7 @@ export async function handleValidateClass(args: any) {
           description: description || null,
           superclass: superclass || null,
           validation_result: result,
-          session_id: session_id || null,
+          session_id: builder.getSessionId(),
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,
             csrf_token: updatedSessionState.csrfToken,

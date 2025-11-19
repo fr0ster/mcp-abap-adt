@@ -9,7 +9,7 @@ Proper session management is **critical** for operations that modify ABAP object
 
 | View | File |
 |------|------|
-| Server / MCP handlers (this file) | `doc/STATEFUL_SESSION_GUIDE.md` |
+| Server / MCP handlers (this file) | `doc/architecture/STATEFUL_SESSION_GUIDE.md` |
 | ADT clients / Builders | `packages/adt-clients/docs/STATEFUL_SESSION_GUIDE.md` |
 | Connection layer / HTTP session | `packages/connection/docs/STATEFUL_SESSION_GUIDE.md` |
 

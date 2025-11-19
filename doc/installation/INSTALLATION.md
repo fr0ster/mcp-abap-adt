@@ -4,9 +4,9 @@ Complete installation guide for MCP ABAP ADT Server across different platforms.
 
 ## 📋 Quick Links
 
-- **[Windows Installation](./install/INSTALL_WINDOWS.md)** - Using PowerShell and winget
-- **[macOS Installation](./install/INSTALL_MACOS.md)** - Using Homebrew
-- **[Linux Installation](./install/INSTALL_LINUX.md)** - Using package managers
+- **[Windows Installation](./platforms/INSTALL_WINDOWS.md)** - Using PowerShell and winget
+- **[macOS Installation](./platforms/INSTALL_MACOS.md)** - Using Homebrew
+- **[Linux Installation](./platforms/INSTALL_LINUX.md)** - Using package managers
 
 ## 🎯 What You'll Get
 
@@ -86,9 +86,9 @@ git submodule update --remote packages/connection
 ## 📖 Detailed Guides
 
 For detailed platform-specific instructions, see:
-- [Windows Installation Guide](./install/INSTALL_WINDOWS.md)
-- [macOS Installation Guide](./install/INSTALL_MACOS.md)
-- [Linux Installation Guide](./install/INSTALL_LINUX.md)
+- [Windows Installation Guide](./platforms/INSTALL_WINDOWS.md)
+- [macOS Installation Guide](./platforms/INSTALL_MACOS.md)
+- [Linux Installation Guide](./platforms/INSTALL_LINUX.md)
 
 ## 🔗 Next Steps
 

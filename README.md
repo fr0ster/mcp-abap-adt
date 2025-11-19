@@ -15,7 +15,7 @@ Two tools are available for batch detection of ABAP object types:
 - **DetectObjectTypeListArray**: Accepts an array of objects via the `objects` parameter.
 - **DetectObjectTypeListJson**: Accepts a JSON payload with an `objects` array via the `payload` parameter.
 
-See [doc/DetectObjectTypeListTools.md](doc/DetectObjectTypeListTools.md) for details and usage examples.
+See [doc/development/DetectObjectTypeListTools.md](doc/development/DetectObjectTypeListTools.md) for details and usage examples.
 
 ## 🆕 What's New in BTP Branch
 
@@ -102,7 +102,7 @@ The project includes utility scripts for maintaining tool definitions and docume
 
 ### Generate Tool Documentation
 
-Automatically generate `doc/AVAILABLE_TOOLS.md` from all handler `TOOL_DEFINITION` exports:
+Automatically generate `doc/user-guide/AVAILABLE_TOOLS.md` from all handler `TOOL_DEFINITION` exports:
 
 ```bash
 npm run docs:tools
@@ -130,7 +130,7 @@ See [tools/README.md](tools/README.md) for complete documentation of all develop
 - Override host/port and transport options directly: `node dist/index.js --transport streamable-http --http-port 4000 --http-host 127.0.0.1`.
 - The helper script `node tools/run-http.js --http-port 4000 --http-json-response` forwards all `--http-*` flags and loads the expected `.env` file automatically.
 - Set `MCP_TRANSPORT=streamable-http` (and optional `MCP_HTTP_*` variables) if you prefer configuring the mode via environment variables.
-- **Client Configuration**: See [Client Configuration Guide](doc/CLIENT_CONFIGURATION.md) for details on configuring MCP clients with HTTP headers for dynamic SAP connection setup.
+- **Client Configuration**: See [Client Configuration Guide](doc/user-guide/CLIENT_CONFIGURATION.md) for details on configuring MCP clients with HTTP headers for dynamic SAP connection setup.
 
 #### Debugging with MCP Inspector
 
@@ -212,10 +212,21 @@ The repository publishes two npm packages. Their READMEs/CHANGELOGs contain the 
 
 ### Documentation
 
-- `doc/CLIENT_CONFIGURATION.md` – client configuration guide for HTTP/SSE transports with dynamic SAP connection setup.
-- `doc/STATEFUL_SESSION_GUIDE.md` – server/handler workflow (lock/update/unlock orchestration).
+**User Guides:**
+- `doc/user-guide/CLIENT_CONFIGURATION.md` – client configuration guide for HTTP/SSE transports with dynamic SAP connection setup.
+- `doc/user-guide/AVAILABLE_TOOLS.md` – complete list of available MCP tools.
+
+**Architecture:**
+- `doc/architecture/STATEFUL_SESSION_GUIDE.md` – server/handler workflow (lock/update/unlock orchestration).
+- `doc/architecture/TOOLS_ARCHITECTURE.md` – MCP tools architecture and handler structure.
 - `packages/adt-clients/docs/STATEFUL_SESSION_GUIDE.md` – Builder & LockClient perspective: session IDs, `onLock`, lock registry.
 - `packages/connection/docs/STATEFUL_SESSION_GUIDE.md` – connection layer: cookies, CSRF tokens, session storage.
+
+**Installation:**
+- `doc/installation/INSTALLATION.md` – installation guide for all platforms.
+
+**Development:**
+- `doc/development/` – development guides, testing, and internal documentation.
 
 ## Contributors
 

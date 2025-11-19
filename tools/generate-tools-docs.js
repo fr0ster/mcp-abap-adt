@@ -18,14 +18,14 @@
  *   2. Extracts TOOL_DEFINITION from each handler
  *   3. Groups tools by category
  *   4. Generates markdown documentation with descriptions, parameters, and examples
- *   5. Writes to doc/AVAILABLE_TOOLS.md
+ *   5. Writes to doc/user-guide/AVAILABLE_TOOLS.md
  *
  * Example:
  *   $ npm run docs:tools
  *   🔍 Loading tools from handlers...
  *   ✅ Found 31 tools
  *   📝 Generating documentation...
- *   ✅ Documentation generated: doc/AVAILABLE_TOOLS.md
+ *   ✅ Documentation generated: doc/user-guide/AVAILABLE_TOOLS.md
  */
 
 const fs = require('fs');
@@ -50,7 +50,7 @@ What it does:
     - Parameter lists with types and descriptions
     - Example JSON for each tool
     - Special notes (e.g., ABAP Cloud limitations)
-  • Writes to doc/AVAILABLE_TOOLS.md
+  • Writes to doc/user-guide/AVAILABLE_TOOLS.md
 
 Examples:
   $ npm run docs:tools
@@ -58,7 +58,7 @@ Examples:
 
 See also:
   • tools/update-handlers-with-tool-definitions.js - Add TOOL_DEFINITION to new handlers
-  • doc/AVAILABLE_TOOLS.md - Generated documentation
+  • doc/user-guide/AVAILABLE_TOOLS.md - Generated documentation
   • TOOLS_ARCHITECTURE.md - Architecture documentation
 `);
   process.exit(0);
@@ -482,7 +482,7 @@ function main() {
 
   const markdown = generateMarkdown(tools);
 
-  const outputPath = path.join(__dirname, '../doc/AVAILABLE_TOOLS.md');
+  const outputPath = path.join(__dirname, '../doc/user-guide/AVAILABLE_TOOLS.md');
   fs.writeFileSync(outputPath, markdown, 'utf8');
 
   console.log(`✅ Documentation generated: ${outputPath}`);

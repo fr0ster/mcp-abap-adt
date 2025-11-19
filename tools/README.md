@@ -8,7 +8,7 @@ This directory contains utility scripts for development and maintenance of the M
 
 **`generate-tools-docs.js`** - Automatically generates tool documentation from handler files.
 
-**Purpose:** Creates `doc/AVAILABLE_TOOLS.md` by extracting `TOOL_DEFINITION` from all handler files.
+**Purpose:** Creates `doc/user-guide/AVAILABLE_TOOLS.md` by extracting `TOOL_DEFINITION` from all handler files.
 
 **Usage:**
 ```bash
@@ -27,7 +27,7 @@ node tools/generate-tools-docs.js [--help]
   - Example JSON for each tool
   - Special notes (e.g., ABAP Cloud limitations)
 
-**Output:** `doc/AVAILABLE_TOOLS.md`
+**Output:** `doc/user-guide/AVAILABLE_TOOLS.md`
 
 **When to use:**
 - After adding new tools

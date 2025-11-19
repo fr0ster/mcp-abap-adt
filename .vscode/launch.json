@@ -12,7 +12,7 @@
       "console": "internalConsole",
       "env": {
         "NODE_ENV": "development",
-        "MCP_SSE_PORT": "3000"
+        "MCP_SSE_PORT": "3001"
       }
     },
     {

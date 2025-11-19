@@ -6,6 +6,36 @@
 # Each object type uses the same object name across all operations
 
 # ============================================================================
+# TEST SETTINGS
+# ============================================================================
+test_settings:
+  fail_fast: false
+  verbose: true
+  retry_on_failure: false
+  max_retries: 1
+  cleanup_after_test: false
+
+  # Timeout configuration (in milliseconds)
+  # Can be overridden per operation type or per specific handler
+  timeouts:
+    default: 10000  # Default timeout for all operations (10 seconds)
+
+    # Operation-specific timeouts (low-level atomic operations)
+    create: 10000   # Create empty object (fast)
+    read: 10000     # Read object metadata/source (fast)
+    check: 10000    # Syntax check (fast)
+    lock: 10000     # Lock object (fast)
+    unlock: 10000   # Unlock object (fast)
+    update: 15000   # Update object content (medium - can be slower)
+    activate: 15000 # Activate object (medium - can be slower)
+    delete: 10000   # Delete object (fast)
+
+    # Handler-specific timeout overrides (optional)
+    # Uncomment and adjust if specific handlers need different timeouts
+    # create_class: 12000
+    # update_domain: 20000
+
+# ============================================================================
 # GROUP 1: TRANSPORT MANAGEMENT
 # ============================================================================
 # Step 1: Create transport request (used by all subsequent tests)
@@ -116,7 +146,7 @@ get_domain:
 # Uses: domain "<YOUR_DOMAIN_NAME>" + package "<YOUR_PACKAGE_NAME>" + transport
 
 # Step 1: Create data element
-create_data_element:
+create_dataElement:
   test_cases:
     - name: "test_data_element"
       enabled: true
@@ -136,7 +166,7 @@ create_data_element:
         field_label_heading: "Test Heading"
 
 # Step 2: Update data element
-update_data_element:
+update_dataElement:
   test_cases:
     - name: "test_data_element"
       enabled: true
@@ -204,7 +234,7 @@ create_class:
           ENDCLASS.
 
 # Step 2: Update class source
-update_class_source:
+update_class:
   test_cases:
     - name: "test_class"
       enabled: true
@@ -237,7 +267,16 @@ update_class_source:
             ENDMETHOD.
           ENDCLASS.
 
-# Step 3: Get class
+# Step 3: Lock/unlock class
+lock_class:
+  test_cases:
+    - name: "test_class"
+      enabled: true
+      description: "Lock and unlock test class"
+      params:
+        class_name: "<YOUR_CLASS_NAME>"
+
+# Step 4: Get class
 get_class:
   test_cases:
     - name: "test_class"

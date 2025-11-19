@@ -85,7 +85,7 @@ This project has specific rules in `.clinerules/` directory:
 
 ### Connection Types
 
-- **CloudAbapConnection**: For SAP BTP Cloud ABAP systems (JWT/XSUAA authentication)
+- **JwtAbapConnection** (formerly CloudAbapConnection): For SAP BTP Cloud ABAP systems (JWT/XSUAA authentication)
 - **OnPremAbapConnection**: For on-premise ABAP systems (Basic auth, OAuth2)
 - **BaseAbapConnection**: Base class with common functionality
 

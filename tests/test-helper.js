@@ -129,6 +129,39 @@ function getEnvironmentConfig() {
 }
 
 /**
+ * Get timeout for specific operation type
+ * @param {string} operationType - Operation type (create, read, update, check, lock, unlock, activate, etc.)
+ * @param {string} [handlerName] - Optional: handler name for handler-specific timeout override
+ * @returns {number} Timeout in milliseconds
+ */
+function getTimeout(operationType, handlerName) {
+  const config = loadTestConfig();
+  const timeouts = config.test_settings?.timeouts || {};
+
+  // Check for handler-specific timeout override
+  if (handlerName && timeouts[handlerName]) {
+    return timeouts[handlerName];
+  }
+
+  // Check for operation-specific timeout
+  if (timeouts[operationType]) {
+    return timeouts[operationType];
+  }
+
+  // Fall back to default timeout
+  return timeouts.default || 10000;
+}
+
+/**
+ * Get global test timeout from configuration
+ * @returns {number} Test timeout in milliseconds
+ */
+function getTestTimeout() {
+  const config = loadTestConfig();
+  return config.test_settings?.test_timeout || 120000;
+}
+
+/**
  * Validate transport request parameter
  * Shows warning if using default value
  */
@@ -276,6 +309,8 @@ module.exports = {
   getAllEnabledTestCases,
   getTestSettings,
   getEnvironmentConfig,
+  getTimeout,
+  getTestTimeout,
   validateTransportRequest,
   printTestHeader,
   printTestParams,

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+> Package-specific changes (e.g., `@mcp-abap-adt/adt-clients`) are tracked in their respective changelog files under `packages/*/CHANGELOG.md`.
+
 ### Added
 - **Documentation Restructure**:
   - New platform-specific installation guides: `INSTALL_WINDOWS.md`, `INSTALL_MACOS.md`, `INSTALL_LINUX.md`

@@ -2,7 +2,18 @@
 
 ## Overview
 
-This guide describes how to properly manage stateful sessions, locks, and cookies when working with SAP ADT (ABAP Development Tools) API. Proper session management is **critical** for operations that modify ABAP objects (update source code, create/modify dictionary objects, etc.).
+This guide (root/server perspective) explains how MCP handlers coordinate **stateful ADT sessions**.  
+Proper session management is **critical** for operations that modify ABAP objects (update source code, create/modify dictionary objects, etc.).
+
+### Related Guides
+
+| View | File |
+|------|------|
+| Server / MCP handlers (this file) | `doc/STATEFUL_SESSION_GUIDE.md` |
+| ADT clients / Builders | `packages/adt-clients/docs/STATEFUL_SESSION_GUIDE.md` |
+| Connection layer / HTTP session | `packages/connection/docs/STATEFUL_SESSION_GUIDE.md` |
+
+Use all three when you need the full picture (HTTP session ↔ ADT session ↔ handler workflow).
 
 ---
 
@@ -92,6 +103,9 @@ All modify operations follow this pattern:
 - System restart
 
 ### Step 1: Lock Object
+
+> 🆕 Prefer using `new LockClient(connection).lock({ objectType: 'class', objectName: 'ZCL_TEST' })`.  
+> It wraps the workflow below, logs `[LOCK] ...` lines, and records lock handles in `.locks/active-locks.json` for recovery.
 
 #### LOCK Request
 

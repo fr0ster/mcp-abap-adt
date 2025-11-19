@@ -89,9 +89,12 @@ git submodule update --remote packages/connection
 
 ## Testing
 
-- Run `npm test` to execute the Jest suite. The configuration relies on `jest.setup.js` to disable automatic MCP server startup via `MCP_SKIP_AUTO_START`, preventing transport initialization during unit tests.
+- **Main Project Tests**: Run `npm test` to execute handler integration tests. The configuration relies on `jest.setup.js` to disable automatic MCP server startup via `MCP_SKIP_AUTO_START`, preventing transport initialization during unit tests.
+- **Package Tests**: Each package (`@mcp-abap-adt/adt-clients`, `@mcp-abap-adt/connection`) has its own test suite. Run tests within each package directory: `cd packages/adt-clients && npm test`.
 - Only files following the `*.test.[tj]s` naming pattern are collected, ensuring CLI helpers do not run as part of the Jest suite.
 - Use `npm test -- --detectOpenHandles` when you need to track pending asynchronous resources after the tests finish.
+
+See [Development & Testing](#-development--testing) section for detailed test organization.
 
 ## Developer Tools
 
@@ -171,9 +174,46 @@ setAbapConnectionOverride(undefined); // fallback to env-configured factory
 
 ## 📋 Development & Testing
 
-For information about testing and development, see the individual package documentation:
-- **[@mcp-abap-adt/adt-clients](packages/adt-clients/)** - ADT clients package with builders and low-level functions
-- **[@mcp-abap-adt/connection](packages/connection/)** - Connection management package
+### Test Organization
+
+The project follows a clear separation of concerns:
+
+- **Package Tests**: All tests for `@mcp-abap-adt/adt-clients` and `@mcp-abap-adt/connection` are located within their respective packages:
+  - `packages/adt-clients/src/__tests__/` – Integration tests for Builders, Clients, and low-level functions
+  - `packages/connection/src/__tests__/` – Tests for connection/auth/session management
+
+- **Handler Tests**: The main project (`mcp-abap-adt`) contains only handler-level integration tests:
+  - `src/index.test.ts` – Tests for MCP handlers (GetProgram, GetClass, GetTable, etc.)
+  - `tests/integration/` – Additional handler integration tests
+
+Handlers use the packages (`@mcp-abap-adt/adt-clients`, `@mcp-abap-adt/connection`) as dependencies but do not test the packages themselves. Package functionality is tested within each package's own test suite.
+
+### Running Tests
+
+```bash
+# Run all tests (packages + handlers)
+npm test
+
+# Run tests for a specific package
+cd packages/adt-clients && npm test
+cd packages/connection && npm test
+
+# Run only handler tests in main project
+npm test -- src/index.test.ts
+```
+
+## Packages & API Documentation
+
+The repository publishes two npm packages. Their READMEs/CHANGELOGs contain the authoritative API documentation:
+
+- **[@mcp-abap-adt/connection](packages/connection/)** – connection/auth/session layer (Basic + JWT, session persistence, CLI helper).
+- **[@mcp-abap-adt/adt-clients](packages/adt-clients/)** – Builder-first ADT clients, Management/Lock/Validation helpers, CLI lock tooling.
+
+### Stateful Session Guides
+
+- `doc/STATEFUL_SESSION_GUIDE.md` – server/handler workflow (lock/update/unlock orchestration).
+- `packages/adt-clients/docs/STATEFUL_SESSION_GUIDE.md` – Builder & LockClient perspective: session IDs, `onLock`, lock registry.
+- `packages/connection/docs/STATEFUL_SESSION_GUIDE.md` – connection layer: cookies, CSRF tokens, session storage.
 
 ## Contributors
 

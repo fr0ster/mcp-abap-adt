@@ -77,10 +77,9 @@ To update submodules to their latest commits:
 
 ```bash
 # Update all submodules
-git submodule update --remote
-
-# Or update a specific submodule
-git submodule update --remote packages/connection
+# Dependencies are automatically installed via npm install
+# To update to latest versions, run:
+npm update @mcp-abap-adt/connection @mcp-abap-adt/adt-clients
 ```
 
 ## ⚠️ Important: Workspace Setup

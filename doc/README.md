@@ -65,8 +65,8 @@ Deprecated or historical documents kept for reference.
 
 ## 📝 Package-Specific Documentation
 
-Some documentation is located within package directories:
+Package-specific documentation is available in the respective npm packages:
 
-- `packages/adt-clients/docs/` - ADT clients package documentation
-- `packages/connection/docs/` - Connection package documentation
+- `@mcp-abap-adt/adt-clients` - ADT clients package documentation
+- `@mcp-abap-adt/connection` - Connection package documentation
 

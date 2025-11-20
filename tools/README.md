@@ -147,6 +147,6 @@ SAP_UAA_CLIENT_SECRET=your_client_secret
 
 ## For developers
 
-- The authentication CLI tool is located in `packages/connection/bin/sap-abap-auth.js`.
+- The authentication CLI tool is available via `npx sap-abap-auth` (from `@mcp-abap-adt/connection` package).
 - The MCP server automatically uses JWT or basic according to the .env.
 - The server supports refresh token in HTTP headers (`X-SAP-Refresh-Token`, `SAP-Refresh-Token`, or `X-Refresh-Token`) for dynamic token updates.

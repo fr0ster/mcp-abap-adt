@@ -4,9 +4,9 @@ This directory is reserved for future roadmaps and strategic planning documents.
 
 ## Current Status
 
-Roadmaps are currently maintained in package-specific locations:
-- `packages/adt-clients/docs/` - ADT clients package roadmaps
-- `packages/connection/docs/` - Connection package roadmaps
+Roadmaps are maintained in the respective npm package repositories:
+- `@mcp-abap-adt/adt-clients` - ADT clients package roadmaps
+- `@mcp-abap-adt/connection` - Connection package roadmaps
 
 ## Future Plans
 

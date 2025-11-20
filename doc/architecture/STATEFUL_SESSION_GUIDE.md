@@ -7,11 +7,11 @@ Proper session management is **critical** for operations that modify ABAP object
 
 ### Related Guides
 
-| View | File |
-|------|------|
+| View | Location |
+|------|----------|
 | Server / MCP handlers (this file) | `doc/architecture/STATEFUL_SESSION_GUIDE.md` |
-| ADT clients / Builders | `packages/adt-clients/docs/STATEFUL_SESSION_GUIDE.md` |
-| Connection layer / HTTP session | `packages/connection/docs/STATEFUL_SESSION_GUIDE.md` |
+| ADT clients / Builders | `@mcp-abap-adt/adt-clients` npm package documentation |
+| Connection layer / HTTP session | `@mcp-abap-adt/connection` npm package documentation |
 
 Use all three when you need the full picture (HTTP session ↔ ADT session ↔ handler workflow).
 

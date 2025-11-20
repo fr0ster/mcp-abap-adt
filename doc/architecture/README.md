@@ -11,7 +11,7 @@ This directory contains technical documentation about the system architecture, d
 
 ## Related Documentation
 
-For related guides from different perspectives:
-- `packages/adt-clients/docs/STATEFUL_SESSION_GUIDE.md` - Builder & LockClient perspective
-- `packages/connection/docs/STATEFUL_SESSION_GUIDE.md` - Connection layer perspective
+For related guides from different perspectives, see the documentation in the respective npm packages:
+- `@mcp-abap-adt/adt-clients` - Builder & LockClient perspective
+- `@mcp-abap-adt/connection` - Connection layer perspective
 

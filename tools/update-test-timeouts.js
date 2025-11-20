@@ -26,7 +26,7 @@ function updateTestFile(filePath) {
   // Determine operation type from filename
   const filename = path.basename(filePath);
   const operationType = OPERATION_MAP[filename];
-  
+
   if (!operationType) {
     console.log(`⚠️  Unknown test type: ${filename}, skipping`);
     return false;
@@ -34,7 +34,7 @@ function updateTestFile(filePath) {
 
   // Check if getTimeout is already imported
   const hasGetTimeout = content.includes('getTimeout');
-  
+
   if (!hasGetTimeout) {
     // Add getTimeout to imports
     content = content.replace(
@@ -53,7 +53,7 @@ function updateTestFile(filePath) {
   // Replace hardcoded timeouts with getTimeout()
   const timeoutPattern = /}, \d+000\);/g;
   const matches = content.match(timeoutPattern);
-  
+
   if (matches) {
     content = content.replace(timeoutPattern, `}, getTimeout('${operationType}'));`);
     modified = true;
@@ -69,8 +69,10 @@ function updateTestFile(filePath) {
 }
 
 // Find all integration test files
+// Note: This script is for the main project tests only
+// Package tests are in their respective repositories
 const testFiles = glob.sync(
-  'packages/adt-clients/src/__tests__/integration/*/{create,read,update,check,lock,unlock,activate,delete}.test.ts',
+  'src/**/*.test.ts',
   { cwd: path.resolve(__dirname, '..') }
 );
 

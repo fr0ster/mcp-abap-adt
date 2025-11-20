@@ -14,9 +14,7 @@
     "declarationMap": true,
     "typeRoots": [
       "./node_modules/@types",
-      "./node_modules/@modelcontextprotocol/sdk/types",
-      "../../node_modules/@types",
-      "../../node_modules/@modelcontextprotocol/sdk/types"
+      "./node_modules/@modelcontextprotocol/sdk/types"
     ],
     "types": [
       "node",
@@ -30,13 +28,5 @@
   ],
   "exclude": [
     "node_modules"
-  ],
-  "references": [
-    {
-      "path": "./packages/connection"
-    },
-    {
-      "path": "./packages/adt-clients"
-    }
   ]
 }

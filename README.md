@@ -55,42 +55,19 @@ This guide is designed for beginners, so we'll walk through everything step-by-s
 5.  **Troubleshooting:** Common problems and solutions.
 6.  **Available Tools:** A list of the commands you can use.
 
-## 📦 Git Submodules
+## 📦 Dependencies
 
-This project uses a git submodule for the `@mcp-abap-adt/connection` package (located in `packages/connection`). The connection package is maintained in a separate repository: [mcp-abap-connection](https://github.com/fr0ster/mcp-abap-connection).
+This project uses two npm packages:
 
-### Cloning with Submodules
+- **[@mcp-abap-adt/connection](https://www.npmjs.com/package/@mcp-abap-adt/connection)** – connection/auth/session layer (Basic + JWT, session persistence, CLI helper). Maintained in [mcp-abap-connection](https://github.com/fr0ster/mcp-abap-connection).
+- **[@mcp-abap-adt/adt-clients](https://www.npmjs.com/package/@mcp-abap-adt/adt-clients)** – Builder-first ADT clients, Management/Lock/Validation helpers, CLI lock tooling. Maintained in [mcp-abap-adt-clients](https://github.com/fr0ster/mcp-abap-adt-clients).
 
-When cloning the repository, include submodules:
-
-```bash
-git clone --recurse-submodules https://github.com/fr0ster/mcp-abap-adt.git
-```
-
-### If You Already Cloned Without Submodules
-
-If you've already cloned the repository, initialize submodules:
-
-```bash
-git submodule update --init --recursive
-```
-
-### Updating Submodules
-
-To update submodules to their latest commits:
-
-```bash
-# Update all submodules
-git submodule update --remote
-
-# Or update a specific submodule
-git submodule update --remote packages/connection
-```
+These packages are automatically installed via `npm install` and are published to npm.
 
 ## Testing
 
 - **Main Project Tests**: Run `npm test` to execute handler integration tests. The configuration relies on `jest.setup.js` to disable automatic MCP server startup via `MCP_SKIP_AUTO_START`, preventing transport initialization during unit tests.
-- **Package Tests**: Each package (`@mcp-abap-adt/adt-clients`, `@mcp-abap-adt/connection`) has its own test suite. Run tests within each package directory: `cd packages/adt-clients && npm test`.
+- **Package Tests**: Each package (`@mcp-abap-adt/adt-clients`, `@mcp-abap-adt/connection`) has its own test suite in their respective repositories.
 - Only files following the `*.test.[tj]s` naming pattern are collected, ensuring CLI helpers do not run as part of the Jest suite.
 - Use `npm test -- --detectOpenHandles` when you need to track pending asynchronous resources after the tests finish.
 
@@ -179,36 +156,30 @@ setAbapConnectionOverride(undefined); // fallback to env-configured factory
 
 The project follows a clear separation of concerns:
 
-- **Package Tests**: All tests for `@mcp-abap-adt/adt-clients` and `@mcp-abap-adt/connection` are located within their respective packages:
-  - `packages/adt-clients/src/__tests__/` – Integration tests for Builders, Clients, and low-level functions
-  - `packages/connection/src/__tests__/` – Tests for connection/auth/session management
+- **Package Tests**: All tests for `@mcp-abap-adt/adt-clients` and `@mcp-abap-adt/connection` are located within their respective repositories and npm packages.
 
 - **Handler Tests**: The main project (`mcp-abap-adt`) contains only handler-level integration tests:
   - `src/index.test.ts` – Tests for MCP handlers (GetProgram, GetClass, GetTable, etc.)
   - `tests/integration/` – Additional handler integration tests
 
-Handlers use the packages (`@mcp-abap-adt/adt-clients`, `@mcp-abap-adt/connection`) as dependencies but do not test the packages themselves. Package functionality is tested within each package's own test suite.
+Handlers use the packages (`@mcp-abap-adt/adt-clients`, `@mcp-abap-adt/connection`) as npm dependencies but do not test the packages themselves. Package functionality is tested within each package's own repository.
 
 ### Running Tests
 
 ```bash
-# Run all tests (packages + handlers)
+# Run handler tests in main project
 npm test
 
-# Run tests for a specific package
-cd packages/adt-clients && npm test
-cd packages/connection && npm test
-
-# Run only handler tests in main project
+# Run only specific handler tests
 npm test -- src/index.test.ts
 ```
 
 ## Packages & API Documentation
 
-The repository publishes two npm packages. Their READMEs/CHANGELOGs contain the authoritative API documentation:
+The project uses two npm packages. Their READMEs/CHANGELOGs contain the authoritative API documentation:
 
-- **[@mcp-abap-adt/connection](packages/connection/)** – connection/auth/session layer (Basic + JWT, session persistence, CLI helper).
-- **[@mcp-abap-adt/adt-clients](packages/adt-clients/)** – Builder-first ADT clients, Management/Lock/Validation helpers, CLI lock tooling.
+- **[@mcp-abap-adt/connection](https://www.npmjs.com/package/@mcp-abap-adt/connection)** – connection/auth/session layer (Basic + JWT, session persistence, CLI helper).
+- **[@mcp-abap-adt/adt-clients](https://www.npmjs.com/package/@mcp-abap-adt/adt-clients)** – Builder-first ADT clients, Management/Lock/Validation helpers, CLI lock tooling.
 
 ### Documentation
 
@@ -219,8 +190,8 @@ The repository publishes two npm packages. Their READMEs/CHANGELOGs contain the 
 **Architecture:**
 - `doc/architecture/STATEFUL_SESSION_GUIDE.md` – server/handler workflow (lock/update/unlock orchestration).
 - `doc/architecture/TOOLS_ARCHITECTURE.md` – MCP tools architecture and handler structure.
-- `packages/adt-clients/docs/STATEFUL_SESSION_GUIDE.md` – Builder & LockClient perspective: session IDs, `onLock`, lock registry.
-- `packages/connection/docs/STATEFUL_SESSION_GUIDE.md` – connection layer: cookies, CSRF tokens, session storage.
+
+For package-specific documentation, see the README files in the respective npm packages.
 
 **Installation:**
 - `doc/installation/INSTALLATION.md` – installation guide for all platforms.

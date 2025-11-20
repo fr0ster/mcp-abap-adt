@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "target": "es2022",
-    "lib": ["es2022"],
+    "lib": [
+      "es2022"
+    ],
     "module": "CommonJS",
     "moduleResolution": "node",
     "strict": true,
@@ -16,10 +18,25 @@
       "../../node_modules/@types",
       "../../node_modules/@modelcontextprotocol/sdk/types"
     ],
-    "types": ["node", "jest"],
+    "types": [
+      "node",
+      "jest"
+    ],
     "outDir": "./dist",
     "noImplicitAny": false
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules"
+  ],
+  "references": [
+    {
+      "path": "./packages/connection"
+    },
+    {
+      "path": "./packages/adt-clients"
+    }
+  ]
 }

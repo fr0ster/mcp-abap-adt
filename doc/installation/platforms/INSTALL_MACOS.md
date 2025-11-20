@@ -87,9 +87,12 @@ git --version
 ## 🚀 Step 4: Install MCP ABAP ADT Server
 
 ```bash
-# Clone repository
-git clone https://github.com/fr0ster/mcp-abap-adt.git
+# Clone repository with submodules
+git clone --recurse-submodules https://github.com/fr0ster/mcp-abap-adt.git
 cd mcp-abap-adt
+
+# If you already cloned without submodules, initialize them:
+# git submodule update --init --recursive
 
 # Install dependencies
 npm install

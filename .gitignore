@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 build/
+coverage/
 package-lock.json
 
 # Environment variables
@@ -36,6 +37,14 @@ Thumbs.db
 
 # TypeScript cache
 *.tsbuildinfo
+
+# Lock state files (persistent lock handles)
+.locks/
+*.locks.json
+
+# Session state files (cookies, CSRF tokens)
+.sessions/
+*.sessions.json
 
 # Optional npm cache directory
 .npm

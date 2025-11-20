@@ -1,0 +1,73 @@
+# Available MCP Tools (local-mcp-http)
+
+The following MCP functions are currently available:
+
+- GetClass
+- GetFunction
+- GetFunctionGroup
+- GetProgram
+- GetStructure
+- GetTable
+- GetTableContents
+- GetInterface
+- GetPackage
+- CreatePackage
+- GetInclude
+- GetIncludesList
+- GetObjectStructure
+- GetAdtTypes
+- GetTypeInfo
+- GetObjectInfo
+- GetSqlQuery
+- GetTransaction
+- SearchObject
+- GetWhereUsed
+- GetBdef
+- GetEnhancementImpl
+- GetEnhancements
+- GetEnhancementSpot
+- GetAbapAST
+- GetAbapSemanticAnalysis
+- GetAbapSystemSymbols
+- GetDomain
+- CreateDomain
+- UpdateDomain
+- GetDataElement
+- CreateDataElement
+- UpdateDataElement
+- GetTransport
+- CreateTransport
+- CreateTable
+- CreateStructure
+- CreateClass
+- UpdateClassSource
+- CreateProgram
+- UpdateProgramSource
+- CreateInterface
+- UpdateInterfaceSource
+- CreateFunctionGroup
+- CreateFunctionModule
+- UpdateFunctionModuleSource
+- CreateView
+- GetView
+- UpdateViewSource
+- ActivateObject
+- DeleteObject
+- CheckObject
+- GetSession
+- ValidateObject
+- LockObject
+- UnlockObject
+- ValidateClass
+- CheckClass
+- ValidateTable
+- CheckTable
+- ValidateFunctionModule
+- CheckFunctionModule
+- GetObjectsByType
+- GetObjectsList
+- GetProgFullCode
+- GetObjectNodeFromCache
+- DescribeByList
+
+See this file for the up-to-date list of available MCP functions.

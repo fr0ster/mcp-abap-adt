@@ -1,14 +1,15 @@
 /**
  * CreateTransport Handler - Create new ABAP transport request via ADT API
  *
- * Creates a new transport request for development objects.
- * Transport requests are essential for moving changes between SAP systems.
+ * Uses TransportBuilder from @mcp-abap-adt/adt-clients for all operations.
+ * Session and lock management handled internally by builder.
+ *
+ * Workflow: create
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl } from '../lib/utils';
-import { XMLParser } from 'fast-xml-parser';
-import * as crypto from 'crypto';
+import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
+import { TransportBuilder } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateTransport",
@@ -46,72 +47,12 @@ interface CreateTransportArgs {
   owner?: string;
 }
 
-/**
- * Generate unique request ID for ADT request
- */
-function generateRequestId(): string {
-  return crypto.randomUUID().replace(/-/g, '');
-}
-
-/**
- * Create transport request XML payload
- */
-function buildCreateTransportXml(args: CreateTransportArgs, username: string): string {
-  const transportType = args.transport_type === 'customizing' ? 'T' : 'K';
-  const description = args.description || 'Transport request created via MCP';
-  const owner = args.owner || username;
-  // If target_system is not provided or empty, use "LOCAL"
-  const target = args.target_system && args.target_system.trim()
-    ? `/${args.target_system}/`
-    : 'LOCAL';
-
-  return `<?xml version="1.0" encoding="ASCII"?>
-<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="newrequest">
-  <tm:request tm:desc="${description}" tm:type="${transportType}" tm:target="${target}" tm:cts_project="">
-    <tm:task tm:owner="${owner}"/>
-  </tm:request>
-</tm:root>`;
-}
-
-/**
- * Parse transport creation response
- */
-function parseTransportResponse(xmlData: string): any {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-    parseAttributeValue: true,
-  });
-
-  const result = parser.parse(xmlData);
-  const root = result['tm:root'] || result['root'];
-
-  if (!root) {
-    throw new McpError(ErrorCode.InternalError, 'Invalid transport response XML structure - no tm:root found');
-  }
-
-  const request = root['tm:request'] || {};
-  const task = request['tm:task'] || {};
-
-  console.log('[DEBUG] CreateTransport parsed request:', JSON.stringify(request, null, 2));
-  console.log('[DEBUG] CreateTransport parsed task:', JSON.stringify(task, null, 2));
-
-  return {
-    transport_number: request['tm:number'],
-    description: request['tm:desc'] || request['tm:description'],
-    type: request['tm:type'],
-    target_system: request['tm:target'],
-    target_desc: request['tm:target_desc'],
-    cts_project: request['tm:cts_project'],
-    cts_project_desc: request['tm:cts_project_desc'],
-    uri: request['tm:uri'],
-    parent: request['tm:parent'],
-    owner: task['tm:owner'] || request['tm:owner'] // Owner is in tm:task
-  };
-}
 
 /**
  * Main handler for CreateTransport MCP tool
+ *
+ * Uses TransportBuilder from @mcp-abap-adt/adt-clients for all operations
+ * Session and lock management handled internally by builder
  */
 export async function handleCreateTransport(args: any) {
   try {
@@ -121,54 +62,116 @@ export async function handleCreateTransport(args: any) {
     }
 
     const typedArgs = args as CreateTransportArgs;
-    const username = process.env.SAP_USERNAME || process.env.SAP_USER || 'DEVELOPER';
+    const connection = getManagedConnection();
 
-    console.log(`[DEBUG] Creating transport: ${typedArgs.description}`);
-    console.log(`[DEBUG] Type: ${typedArgs.transport_type || 'workbench'}`);
-    console.log(`[DEBUG] Owner: ${typedArgs.owner || username}`);
+    logger.info(`Starting transport creation: ${typedArgs.description}`);
 
-    const baseUrl = await getBaseUrl();
-    const url = `${baseUrl}/sap/bc/adt/cts/transportrequests`;
+    try {
+      // Create builder with configuration
+      const builder = new TransportBuilder(connection, logger, {
+        description: typedArgs.description,
+        transportType: typedArgs.transport_type === 'customizing' ? 'customizing' : 'workbench',
+        targetSystem: typedArgs.target_system,
+        owner: typedArgs.owner
+      });
 
-    const xmlBody = buildCreateTransportXml(typedArgs, username);
-    const headers = {
-      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml',
-      'Content-Type': 'text/plain'
-    };
+      // Build operation chain: create
+      await builder
+        .create()
+        .catch(error => {
+          logger.error('Transport creation failed:', error);
+          throw error;
+        });
 
-    console.log(`[DEBUG] POST to: ${url}`);
-    console.log(`[DEBUG] Request body:\n${xmlBody}`);
+      // Get transport number from builder state
+      const transportNumber = builder.getTransportNumber();
+      const taskNumber = builder.getTaskNumber();
+      const createResult = builder.getCreateResult();
 
-    // Create transport request
-    const response = await makeAdtRequestWithTimeout(url, 'POST', 'default', xmlBody, undefined, headers);
+      logger.info(`✅ CreateTransport completed successfully: ${transportNumber || 'unknown'}`);
 
-    console.log('[DEBUG] CreateTransport response status:', response.status);
-    console.log('[DEBUG] CreateTransport response data:', response.data);
+      // Parse response data if available
+      let transportInfo: any = {};
+      if (createResult?.data) {
+        if (typeof createResult.data === 'string') {
+          // If data is XML string, try to parse it
+          try {
+            const { XMLParser } = require('fast-xml-parser');
+            const parser = new XMLParser({
+              ignoreAttributes: false,
+              attributeNamePrefix: '',
+              parseAttributeValue: true,
+            });
+            const result = parser.parse(createResult.data);
+            const root = result['tm:root'] || result['root'];
+            const request = root?.['tm:request'] || {};
+            const task = request?.['tm:task'] || {};
+            transportInfo = {
+              transport_number: request['tm:number'] || transportNumber,
+              description: request['tm:desc'] || request['tm:description'] || typedArgs.description,
+              type: request['tm:type'],
+              target_system: request['tm:target'],
+              target_desc: request['tm:target_desc'],
+              cts_project: request['tm:cts_project'],
+              uri: request['tm:uri'],
+              owner: task['tm:owner'] || request['tm:owner'] || typedArgs.owner
+            };
+          } catch (parseError) {
+            // If parsing fails, use basic info
+            transportInfo = {
+              transport_number: transportNumber,
+              description: typedArgs.description,
+              type: typedArgs.transport_type === 'customizing' ? 'T' : 'K',
+              owner: typedArgs.owner
+            };
+          }
+        } else if (typeof createResult.data === 'object') {
+          transportInfo = createResult.data;
+        }
+      }
 
-    // Parse response and add known information from request
-    const transportInfo = parseTransportResponse(response.data);
-    const requestOwner = typedArgs.owner || username;
+      // Use builder state if response parsing didn't provide transport number
+      if (!transportInfo.transport_number && transportNumber) {
+        transportInfo.transport_number = transportNumber;
+      }
+      if (!transportInfo.task_number && taskNumber) {
+        transportInfo.task_number = taskNumber;
+      }
 
-    return return_response({
-      data: JSON.stringify({
-        success: true,
-        transport_request: transportInfo.transport_number,
-        description: transportInfo.description,
-        type: transportInfo.type,
-        target_system: transportInfo.target_system,
-        target_desc: transportInfo.target_desc,
-        cts_project: transportInfo.cts_project,
-        owner: requestOwner, // Use owner from request since response doesn't include it
-        uri: transportInfo.uri,
-        message: `Transport request ${transportInfo.transport_number} created successfully`
-      }, null, 2),
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-      config: response.config
-    });
+      return return_response({
+        data: JSON.stringify({
+          success: true,
+          transport_request: transportInfo.transport_number || transportNumber,
+          task_number: transportInfo.task_number || taskNumber,
+          description: transportInfo.description || typedArgs.description,
+          type: transportInfo.type || (typedArgs.transport_type === 'customizing' ? 'T' : 'K'),
+          target_system: transportInfo.target_system || typedArgs.target_system || 'LOCAL',
+          target_desc: transportInfo.target_desc,
+          cts_project: transportInfo.cts_project,
+          owner: transportInfo.owner || typedArgs.owner,
+          uri: transportInfo.uri,
+          message: `Transport request ${transportInfo.transport_number || transportNumber || 'unknown'} created successfully`
+        }, null, 2),
+        status: createResult?.status || 200,
+        statusText: createResult?.statusText || 'OK',
+        headers: createResult?.headers || {},
+        config: createResult?.config || {} as any
+      });
 
-  } catch (error) {
+    } catch (error: any) {
+      logger.error(`Error creating transport:`, error);
+
+      const errorMessage = error.response?.data
+        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+        : error.message || String(error);
+
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to create transport: ${errorMessage}`
+      );
+    }
+
+  } catch (error: any) {
     if (error instanceof McpError) {
       throw error;
     }

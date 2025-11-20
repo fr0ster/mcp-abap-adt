@@ -1,5 +1,6 @@
 import { McpError, ErrorCode } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../lib/utils';
+import { return_error, return_response } from '../lib/utils';
+import { getReadOnlyClient } from '../lib/clients';
 import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
@@ -8,9 +9,9 @@ export const TOOL_DEFINITION = {
   inputSchema: {
     type: "object",
     properties: {
-      domain_name: { 
-        type: "string", 
-        description: "Domain name (e.g., MATNR, CHAR20, ZZ_TEST_DOMAIN)" 
+      domain_name: {
+        type: "string",
+        description: "Domain name (e.g., MATNR, CHAR20, ZZ_TEST_DOMAIN)"
       }
     },
     required: ["domain_name"]
@@ -32,35 +33,21 @@ export async function handleGetDomain(args: any) {
     }
 
     const typedArgs = args as DomainArgs;
-    const baseUrl = await getBaseUrl();
-    const domainNameEncoded = encodeSapObjectName(typedArgs.domain_name.toLowerCase());
-    
-    const url = `${baseUrl}/sap/bc/adt/ddic/domains/${domainNameEncoded}`;
-    
-    const headers = {
-      'Accept': 'application/vnd.sap.adt.domains.v1+xml, application/vnd.sap.adt.domains.v2+xml'
-    };
-    
-    console.log(`[GetDomain] Retrieving domain: ${typedArgs.domain_name}`);
-    console.log(`[GetDomain] URL: ${url}`);
-    
-    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default', null, undefined, headers);
-    
-    console.log(`[GetDomain] Response status: ${response.status}`);
-    
+    const response = await getReadOnlyClient().getDomain(typedArgs.domain_name);
+
     // Parse XML response
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '',
     });
-    
+
     const result = parser.parse(response.data);
     const domain = result['doma:domain'];
-    
+
     if (!domain) {
       throw new McpError(ErrorCode.InternalError, 'Failed to parse domain XML response');
     }
-    
+
     // Extract domain information
     const domainInfo = {
       name: domain['adtcore:name'],
@@ -103,10 +90,7 @@ export async function handleGetDomain(args: any) {
         }
       } : null
     };
-    
-    console.log(`[GetDomain] Domain retrieved successfully: ${domainInfo.name}`);
-    console.log(`[GetDomain] Datatype: ${domainInfo.content?.typeInformation?.datatype}, Length: ${domainInfo.content?.typeInformation?.length}`);
-    
+
     return return_response({
       data: JSON.stringify({
         success: true,
@@ -118,14 +102,14 @@ export async function handleGetDomain(args: any) {
       headers: response.headers,
       config: response.config
     });
-    
+
   } catch (error) {
     console.error('[GetDomain] Error:', error);
-    
+
     if (error instanceof McpError) {
       throw error;
     }
-    
+
     return return_error(error);
   }
 }

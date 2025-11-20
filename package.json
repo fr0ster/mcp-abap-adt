@@ -5,14 +5,15 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "test": "jest",
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run build --workspaces --if-present && npx tsc -p tsconfig.json",
+    "build:packages": "npm run build --workspaces --if-present",
     "start": "node ./dist/index.js",
     "start:http": "node ./dist/index.js --transport streamable-http",
     "start:sse": "node ./dist/index.js --transport sse",
     "dev": "npx @modelcontextprotocol/inspector node ./dist/index.js",
     "dev:http": "node ./tools/dev-http.js",
     "dev:sse": "npx @modelcontextprotocol/inspector node ./dist/index.js --transport sse",
-    "auth": "node ./tools/sap-abap-auth.js auth",
+    "auth": "node ./packages/connection/bin/sap-abap-auth.js auth",
     "clean": "make clean",
     "docs:tools": "node ./tools/generate-tools-docs.js"
   },
@@ -23,7 +24,7 @@
     "mcp",
     "model-context-protocol"
   ],
-  "author": "Oleksii Kyslytsia <oleksja.kyslytsja@gmail.com>",
+  "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
   "description": "Embedded ABAP ADT MCP server tailored for the Cloud LLM Hub stack",
   "license": "MIT",
   "repository": {
@@ -43,6 +44,8 @@
     "yaml": "^2.8.1"
   },
   "dependencies": {
+    "@mcp-abap-adt/adt-clients": "workspace:*",
+    "@mcp-abap-adt/connection": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.17.2",
     "axios": "^1.11.0",
     "fast-xml-parser": "^5.2.5",
@@ -51,5 +54,9 @@
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
-  }
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "private": true
 }

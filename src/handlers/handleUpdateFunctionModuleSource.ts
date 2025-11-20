@@ -1,25 +1,15 @@
 /**
  * UpdateFunctionModuleSource Handler - Update Existing ABAP Function Module Source Code
- * 
- * Eclipse ADT workflow (stateful session required):
- * 1. POST /sap/bc/adt/functions/groups/{group}/fmodules/{name}?_action=LOCK - Lock function module
- * 2. PUT /sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main - Upload new source
- * 3. POST /sap/bc/adt/functions/groups/{group}/fmodules/{name}?_action=UNLOCK - Unlock function module
- * 4. POST /sap/bc/adt/activation - Activate function module (optional)
- * 
- * CRITICAL REQUIREMENTS:
- * - Stateful session: 'x-sap-adt-sessiontype': 'stateful' must be set for LOCK/PUT/UNLOCK
- * - Cookie management: automatic via BaseAbapConnection
- * - Lock handle: must be maintained within session scope
- * - Function module must already exist (created via CreateFunctionModule or manually)
- * - Function group must exist and be active
+ *
+ * Uses FunctionModuleBuilder from @mcp-abap-adt/adt-clients for all operations.
+ * Session and lock management handled internally by builder.
+ *
+ * Workflow: validate -> lock -> update -> check -> unlock -> (activate)
  */
 
 import { AxiosResponse } from '../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getBaseUrl } from '../lib/utils';
-import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
-import { activateObjectInSession } from '../lib/activationUtils';
-import { XMLParser } from 'fast-xml-parser';
+import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
+import { FunctionModuleBuilder } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "UpdateFunctionModuleSource",
@@ -27,13 +17,13 @@ export const TOOL_DEFINITION = {
   inputSchema: {
     type: "object",
     properties: {
-      function_group_name: { 
-        type: "string", 
-        description: "Function group name containing the function module (e.g., ZOK_FG_MCP01)." 
+      function_group_name: {
+        type: "string",
+        description: "Function group name containing the function module (e.g., ZOK_FG_MCP01)."
       },
-      function_module_name: { 
-        type: "string", 
-        description: "Function module name (e.g., Z_TEST_FM_MCP01). Function module must already exist." 
+      function_module_name: {
+        type: "string",
+        description: "Function module name (e.g., Z_TEST_FM_MCP01). Function module must already exist."
       },
       source_code: {
         type: "string",
@@ -60,211 +50,64 @@ interface UpdateFunctionModuleSourceArgs {
   activate?: boolean;
 }
 
-/**
- * Step 1: Lock function module for editing
- */
-async function lockFunctionModule(
-  functionGroupName: string, 
-  functionModuleName: string, 
-  sessionId: string
-): Promise<{ response: AxiosResponse; lockHandle: string; corrNr?: string }> {
-  const groupLower = encodeSapObjectName(functionGroupName).toLowerCase();
-  const moduleLower = encodeSapObjectName(functionModuleName).toLowerCase();
-  const url = `/sap/bc/adt/functions/groups/${groupLower}/fmodules/${moduleLower}?_action=LOCK&accessMode=MODIFY`;
-  
-  const headers = {
-    'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
-  };
-
-  logger.info(`🔒 Locking function module: ${functionModuleName} in group ${functionGroupName}`);
-  logger.info(`   Lock URL: ${await getBaseUrl()}${url}`);
-  
-  const response = await makeAdtRequestWithSession(url, 'POST', sessionId, undefined, headers);
-  
-  logger.info(`   Lock response status: ${response.status}`);
-  logger.info(`   Lock response headers set-cookie: ${JSON.stringify(response.headers['set-cookie'])}`);
-  logger.info(`   Lock response data (first 200 chars): ${JSON.stringify(response.data).substring(0, 200)}`);
-
-  // Parse lock handle from XML response
-  const parser = new XMLParser();
-  const result = parser.parse(response.data);
-  const lockHandle = result?.['asx:abap']?.['asx:values']?.['DATA']?.['LOCK_HANDLE'];
-  const corrNr = result?.['asx:abap']?.['asx:values']?.['DATA']?.['CORRNR'];
-
-  if (!lockHandle) {
-    throw new Error('Failed to obtain lock handle from SAP. Function module may be locked by another user.');
-  }
-
-  logger.info(`✅ Function module locked, handle: ${lockHandle}`);
-  logger.info(`   Lock response status: ${response.status}`);
-  logger.info(`   Lock response headers: ${JSON.stringify(response.headers)}`);
-  
-  return { response, lockHandle, corrNr };
-}
 
 /**
- * Step 2: Upload new source code
+ * Main handler for UpdateFunctionModuleSource MCP tool
+ *
+ * Uses FunctionModuleBuilder from @mcp-abap-adt/adt-clients for all operations
+ * Session and lock management handled internally by builder
  */
-async function uploadSource(
-  functionGroupName: string,
-  functionModuleName: string,
-  sourceCode: string,
-  lockHandle: string,
-  sessionId: string,
-  transportRequest?: string
-): Promise<AxiosResponse> {
-  const groupLower = encodeSapObjectName(functionGroupName).toLowerCase();
-  const moduleLower = encodeSapObjectName(functionModuleName).toLowerCase();
-  const queryParams = `lockHandle=${lockHandle}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
-  const url = `/sap/bc/adt/functions/groups/${groupLower}/fmodules/${moduleLower}/source/main?${queryParams}`;
-  
-  const headers = {
-    'Content-Type': 'text/plain; charset=utf-8',
-    'Content-Length': Buffer.byteLength(sourceCode, 'utf8').toString(),
-    'Accept': 'text/plain'
-  };
-
-  logger.info(`📤 Uploading source code for function module: ${functionModuleName}`);
-  logger.info(`   URL: ${await getBaseUrl()}${url}`);
-  logger.info(`   LockHandle: ${lockHandle}`);
-  logger.info(`   Source code length: ${sourceCode.length} chars`);
-  logger.info(`   Source preview: ${sourceCode.substring(0, 100).replace(/\n/g, '\\n')}...`);
-
-  return makeAdtRequestWithSession(url, 'PUT', sessionId, sourceCode, headers);
-}
-
-/**
- * Step 3: Unlock function module
- */
-async function unlockFunctionModule(
-  functionGroupName: string,
-  functionModuleName: string,
-  lockHandle: string,
-  sessionId: string
-): Promise<AxiosResponse> {
-  const groupLower = encodeSapObjectName(functionGroupName).toLowerCase();
-  const moduleLower = encodeSapObjectName(functionModuleName).toLowerCase();
-  const url = `/sap/bc/adt/functions/groups/${groupLower}/fmodules/${moduleLower}?_action=UNLOCK&lockHandle=${lockHandle}`;
-  
-  const headers = {
-    'Accept': 'application/xml'
-  };
-
-  logger.info(`🔓 Unlocking function module: ${functionModuleName}`);
-
-  return makeAdtRequestWithSession(url, 'POST', sessionId, undefined, headers);
-}
-
-/**
- * Step 4: Activate function module (optional)
- */
-async function activateFunctionModule(
-  functionModuleName: string,
-  functionGroupName: string,
-  sessionId: string
-): Promise<AxiosResponse> {
-  const groupLower = encodeSapObjectName(functionGroupName).toLowerCase();
-  const moduleLower = encodeSapObjectName(functionModuleName).toLowerCase();
-  const objectUri = `/sap/bc/adt/functions/groups/${groupLower}/fmodules/${moduleLower}`;
-  
-  logger.info(`⚡ Activating function module: ${functionModuleName}`);
-  const response = await activateObjectInSession(objectUri, functionModuleName, sessionId, true);
-  logger.info(`✅ Function module activated`);
-  return response;
-}
-
-/**
- * Main handler function
- */
-export async function handler(args: UpdateFunctionModuleSourceArgs): Promise<any> {
+export async function handleUpdateFunctionModuleSource(args: UpdateFunctionModuleSourceArgs): Promise<any> {
   try {
-    logger.info(`🚀 Starting UpdateFunctionModuleSource: ${args.function_module_name} in ${args.function_group_name}`);
-
     // Validate inputs
     if (!args.function_module_name || args.function_module_name.length > 30) {
-      return return_error("Function module name is required and must not exceed 30 characters");
+      return return_error(new Error("Function module name is required and must not exceed 30 characters"));
     }
     if (!args.function_group_name || args.function_group_name.length > 30) {
-      return return_error("Function group name is required and must not exceed 30 characters");
+      return return_error(new Error("Function group name is required and must not exceed 30 characters"));
     }
     if (!args.source_code) {
-      return return_error("Source code is required");
+      return return_error(new Error("Source code is required"));
     }
 
-    // Validate Z/Y prefix
-    const modulePrefix = args.function_module_name.charAt(0).toUpperCase();
-    const groupPrefix = args.function_group_name.charAt(0).toUpperCase();
-    if (modulePrefix !== 'Z' && modulePrefix !== 'Y') {
-      return return_error("Function module name must start with Z or Y");
-    }
-    if (groupPrefix !== 'Z' && groupPrefix !== 'Y') {
-      return return_error("Function group name must start with Z or Y");
-    }
+    const connection = getManagedConnection();
+    const functionGroupName = args.function_group_name.toUpperCase();
+    const functionModuleName = args.function_module_name.toUpperCase();
 
-    // Generate session ID for all requests
-    const sessionId = generateSessionId();
-
-    // Step 1: Lock function module
-    const { lockHandle, corrNr } = await lockFunctionModule(
-      args.function_group_name,
-      args.function_module_name,
-      sessionId
-    );
+    logger.info(`Starting function module source update: ${functionModuleName} in ${functionGroupName}`);
 
     try {
-      // Step 2: Upload source code
-      const uploadResponse = await uploadSource(
-        args.function_group_name,
-        args.function_module_name,
-        args.source_code,
-        lockHandle,
-        sessionId,
-        args.transport_request || corrNr
-      );
+      // Create builder with configuration
+      const builder = new FunctionModuleBuilder(connection, logger, {
+        functionGroupName: functionGroupName,
+        functionModuleName: functionModuleName,
+        sourceCode: args.source_code,
+        transportRequest: args.transport_request
+      });
 
-      if (uploadResponse.status !== 200) {
-        throw new Error(`Source upload failed with status ${uploadResponse.status}`);
-      }
+      // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
+      const shouldActivate = args.activate === true;
 
-      logger.info("✅ Function module source uploaded successfully");
+      await builder
+        .validate()
+        .then(b => b.lock())
+        .then(b => b.update())
+        .then(b => b.check())
+        .then(b => b.unlock())
+        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
+        .catch(error => {
+          logger.error('Function module update chain failed:', error);
+          throw error;
+        });
 
-      // Step 3: Unlock function module
-      const unlockResponse = await unlockFunctionModule(
-        args.function_group_name,
-        args.function_module_name,
-        lockHandle,
-        sessionId
-      );
-
-      if (unlockResponse.status !== 200) {
-        logger.warn(`Unlock returned status ${unlockResponse.status}, but continuing...`);
-      } else {
-        logger.info("✅ Function module unlocked successfully");
-      }
-
-      // Step 4: Activate if requested
-      if (args.activate) {
-        const activateResponse = await activateFunctionModule(
-          args.function_module_name,
-          args.function_group_name,
-          sessionId
-        );
-
-        if (activateResponse.status !== 200) {
-          logger.warn(`Activation returned status ${activateResponse.status}`);
-        } else {
-          logger.info("✅ Function module activated successfully");
-        }
-      }
-
-      logger.info(`✅ UpdateFunctionModuleSource completed successfully: ${args.function_module_name}`);
+      logger.info(`✅ UpdateFunctionModuleSource completed successfully: ${functionModuleName}`);
 
       const result = {
         success: true,
-        function_module_name: args.function_module_name,
-        function_group_name: args.function_group_name,
-        activated: args.activate || false,
-        message: `Function module ${args.function_module_name} source code updated successfully${args.activate ? ' and activated' : ''}`
+        function_module_name: functionModuleName,
+        function_group_name: functionGroupName,
+        activated: shouldActivate,
+        message: `Function module ${functionModuleName} source code updated successfully${shouldActivate ? ' and activated' : ''}`
       };
 
       return return_response({
@@ -275,30 +118,17 @@ export async function handler(args: UpdateFunctionModuleSourceArgs): Promise<any
         config: {} as any
       });
 
-    } catch (error) {
-      // If upload or activation fails, try to unlock
-      logger.warn(`Error during update, attempting to unlock...`);
-      try {
-        await unlockFunctionModule(
-          args.function_group_name,
-          args.function_module_name,
-          lockHandle,
-          sessionId
-        );
-        logger.info("✅ Function module unlocked after error");
-      } catch (unlockError) {
-        logger.error(`Failed to unlock after error: ${unlockError}`);
-      }
-      throw error;
+    } catch (error: any) {
+      logger.error(`Error updating function module source ${functionModuleName}:`, error);
+
+      const errorMessage = error.response?.data
+        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+        : error.message || String(error);
+
+      return return_error(new Error(`Failed to update function module source: ${errorMessage}`));
     }
 
   } catch (error: any) {
-    logger.error(`❌ UpdateFunctionModuleSource failed: ${error.message}`);
-    return return_error(`Failed to update function module source: ${error.message}`);
+    return return_error(error);
   }
-}
-
-// Named export for consistency with other handlers
-export async function handleUpdateFunctionModuleSource(args: UpdateFunctionModuleSourceArgs): Promise<any> {
-  return handler(args);
 }

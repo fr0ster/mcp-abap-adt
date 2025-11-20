@@ -1,27 +1,17 @@
 /**
  * CreateProgram Handler - ABAP Program Creation via ADT API
  *
- * Eclipse ADT workflow (stateful session required):
- * 1. POST /sap/bc/adt/programs/programs - Create program with metadata
- * 2. Extract lock handle from POST response headers
- * 3. PUT /sap/bc/adt/programs/programs/{name}/source/main - Upload program source
- * 4. POST /sap/bc/adt/programs/programs/{name}?_action=UNLOCK - Unlock program
- * 5. POST /sap/bc/adt/activation - Activate program
+ * Uses ProgramBuilder from @mcp-abap-adt/adt-clients for all operations.
+ * Session and lock management handled internally by builder.
  *
- * CRITICAL REQUIREMENTS:
- * - Stateful session: sap-adt-connection-id must be same for all steps
- * - Cookie management: automatic via BaseAbapConnection
- * - Lock handle: extracted from POST response headers (no separate LOCK needed)
- * - Program types: 1 (Executable), I (Include), M (Module Pool), F (Function Group), K (Class Pool), J (Interface Pool)
+ * Workflow: validate -> create -> lock -> update -> check -> unlock -> (activate)
  */
 
 import { AxiosResponse } from '../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger } from '../lib/utils';
-import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
-import { activateObjectInSession } from '../lib/activationUtils';
+import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
-import { getSystemInformation } from '../lib/utils.js';
+import { ProgramBuilder } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateProgram",
@@ -144,133 +134,10 @@ START-OF-SELECTION.
 }
 
 /**
- * Step 1: Create program object with metadata
- * Following Eclipse ADT approach
- */
-async function createProgramObject(args: CreateProgramArgs, sessionId: string): Promise<AxiosResponse> {
-  const description = args.description || args.program_name;
-  const programType = convertProgramType(args.program_type); // Convert to SAP code
-  const application = args.application || '*'; // Default: cross-application
-  const url = `/sap/bc/adt/programs/programs${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
-
-  // Get masterSystem and responsible - optional, retrieved from system for cloud
-  let masterSystem = args.master_system;
-  let username = args.responsible;
-
-  // If not provided, try to get from system information (cloud systems)
-  if (!masterSystem || !username) {
-    const systemInfo = await getSystemInformation();
-    if (systemInfo) {
-      masterSystem = masterSystem || systemInfo.systemID;
-      username = username || systemInfo.userName;
-    }
-  }
-
-  // Fallback to env or empty (for on-premise, these may not be needed)
-  masterSystem = masterSystem || process.env.SAP_SYSTEM || process.env.SAP_SYSTEM_ID || '';
-  username = username || process.env.SAP_USERNAME || process.env.SAP_USER || '';
-
-  // Build program metadata XML - include masterSystem and responsible only if provided
-  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
-  const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
-
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><program:abapProgram xmlns:program="http://www.sap.com/adt/programs/programs" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.program_name}" adtcore:type="PROG/P" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr} program:programType="${programType}" program:application="${application}">
-  <adtcore:packageRef adtcore:name="${args.package_name}"/>
-</program:abapProgram>`;
-
-  const headers = {
-    'Accept': 'application/vnd.sap.adt.programs.programs.v2+xml',
-    'Content-Type': 'application/vnd.sap.adt.programs.programs.v2+xml'
-  };
-
-  logger.info(`Creating program object: ${args.program_name}`);
-  return makeAdtRequestWithSession(url, 'POST', sessionId, metadataXml, headers);
-}
-
-/**
- * Step 2: Lock program for modification (fallback if lock handle not in POST response)
- * Returns lock handle that must be used in subsequent requests
- */
-async function lockProgram(programName: string, sessionId: string): Promise<string> {
-  const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
-
-  const headers = {
-    'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
-  };
-
-  logger.info(`Locking program: ${programName}`);
-  const response = await makeAdtRequestWithSession(url, 'POST', sessionId, null, headers);
-
-  // Parse lock handle from XML response
-  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
-  const result = parser.parse(response.data);
-  const lockHandle = result?.['asx:abap']?.['asx:values']?.['DATA']?.['LOCK_HANDLE'];
-
-  if (!lockHandle) {
-    throw new Error('Failed to obtain lock handle from SAP. Program may be locked by another user.');
-  }
-
-  logger.info(`Lock acquired: ${lockHandle}`);
-  return lockHandle;
-}
-
-/**
- * Step 3: Upload program source code
- * Lock handle must be passed in URL and maintained in same session
- */
-async function uploadProgramSource(
-  programName: string,
-  sourceCode: string,
-  lockHandle: string,
-  sessionId: string,
-  transportRequest?: string
-): Promise<AxiosResponse> {
-  const queryParams = `lockHandle=${lockHandle}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
-  const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}/source/main?${queryParams}`;
-
-  const headers = {
-    'Accept': 'text/plain',
-    'Content-Type': 'text/plain; charset=utf-8'
-  };
-
-  logger.info(`Uploading program source: ${programName}, lockHandle: ${lockHandle.substring(0, 10)}...`);
-  return makeAdtRequestWithSession(url, 'PUT', sessionId, sourceCode, headers);
-}
-
-/**
- * Step 4: Unlock program
- * Must use same session and lock handle from step 2
- */
-async function unlockProgram(programName: string, lockHandle: string, sessionId: string): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}?_action=UNLOCK&lockHandle=${lockHandle}`;
-
-  logger.info(`Unlocking program: ${programName}`);
-  return makeAdtRequestWithSession(url, 'POST', sessionId, null);
-}
-
-/**
- * Step 5: Activate program
- * Makes program active and usable in SAP system
- */
-async function activateProgram(programName: string, sessionId: string): Promise<AxiosResponse> {
-  const objectUri = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`;
-  logger.info(`Activating program: ${programName}`);
-  return await activateObjectInSession(objectUri, programName, sessionId, true);
-}
-
-/**
- * Main handler for CreateProgram tool
+ * Main handler for CreateProgram MCP tool
  *
- * Workflow:
- * 1. Create program object with metadata
- * 2. Extract lock handle from response (or explicit LOCK)
- * 3. Upload source code
- * 4. Unlock program
- * 5. Activate program
- *
- * IMPORTANT: Uses stateful session for all 5 steps
- * IMPORTANT: Cookies are managed automatically by BaseAbapConnection
- * IMPORTANT: Lock handle is maintained within session scope
+ * Uses ProgramBuilder from @mcp-abap-adt/adt-clients for all operations
+ * Session and lock management handled internally by builder
  */
 export async function handleCreateProgram(params: any) {
   const args: CreateProgramArgs = params;
@@ -288,56 +155,46 @@ export async function handleCreateProgram(params: any) {
   }
 
   const programName = args.program_name.toUpperCase();
-  const sessionId = generateSessionId();
-  let lockHandle: string | null = null;
+  const connection = getManagedConnection();
 
-  logger.info(`Starting program creation: ${programName} (session: ${sessionId})`);
+  logger.info(`Starting program creation: ${programName}`);
 
   try {
-    // Step 1: Create program object with metadata
-    // After POST, program is automatically locked and lock handle is returned in response headers
-    const createResponse = await createProgramObject(args, sessionId);
-    if (createResponse.status < 200 || createResponse.status >= 300) {
-      throw new Error(`Failed to create program object: ${createResponse.status} ${createResponse.statusText}`);
-    }
-    logger.info(`✓ Step 1: Program object created`);
-
-    // Extract lock handle from response headers (Eclipse approach)
-    lockHandle = createResponse.headers['sap-adt-lockhandle'] ||
-                 createResponse.headers['lockhandle'] ||
-                 createResponse.headers['x-sap-adt-lockhandle'];
-
-    if (!lockHandle) {
-      // Fallback: try to extract from response body or do explicit LOCK
-      logger.warn('Lock handle not found in POST response headers, attempting explicit LOCK');
-      lockHandle = await lockProgram(programName, sessionId);
-    }
-
-    logger.info(`✓ Step 2: Lock handle obtained: ${lockHandle.substring(0, 10)}...`);
-
-    // Step 3: Upload source code (uses lock handle from step 1/2)
+    // Generate source code if not provided
     const programType = convertProgramType(args.program_type);
     const sourceCode = args.source_code || generateProgramTemplate(programName, programType, args.description || programName);
-    const uploadResponse = await uploadProgramSource(programName, sourceCode, lockHandle, sessionId, args.transport_request);
-    if (uploadResponse.status < 200 || uploadResponse.status >= 300) {
-      throw new Error(`Failed to upload source: ${uploadResponse.status} ${uploadResponse.statusText}`);
-    }
-    logger.info(`✓ Step 3: Source code uploaded`);
 
-    // Step 4: Unlock the program
-    await unlockProgram(programName, lockHandle, sessionId);
-    lockHandle = null; // Clear lock handle after successful unlock
-    logger.info(`✓ Step 4: Program unlocked`);
+    // Create builder with configuration
+    const builder = new ProgramBuilder(connection, logger, {
+      programName: programName,
+      packageName: args.package_name,
+      transportRequest: args.transport_request,
+      description: args.description || programName,
+      programType: args.program_type,
+      application: args.application,
+      sourceCode: sourceCode
+    });
 
-    // Step 5: Activate the program (optional)
-    let activationWarnings: string[] = [];
+    // Build operation chain: validate -> create -> lock -> update -> check -> unlock -> (activate)
     const shouldActivate = args.activate !== false; // Default to true if not specified
 
-    if (shouldActivate) {
-      const activateResponse = await activateProgram(programName, sessionId);
-      logger.info(`✓ Step 5: Activation completed`);
+    await builder
+      .validate()
+      .then(b => b.create())
+      .then(b => b.lock())
+      .then(b => b.update())
+      .then(b => b.check())
+      .then(b => b.unlock())
+      .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
+      .catch(error => {
+        logger.error('Program creation chain failed:', error);
+        throw error;
+      });
 
-      // Parse activation warnings/errors
+    // Parse activation warnings if activation was performed
+    let activationWarnings: string[] = [];
+    if (shouldActivate && builder.getActivateResult()) {
+      const activateResponse = builder.getActivateResult()!;
       if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
         const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
         const result = parser.parse(activateResponse.data);
@@ -349,12 +206,10 @@ export async function handleCreateProgram(params: any) {
           );
         }
       }
-    } else {
-      logger.info(`✓ Step 5: Activation skipped (activate=false)`);
     }
 
     // Return success result
-    const stepsCompleted = ['create_object', 'lock', 'upload_source', 'unlock'];
+    const stepsCompleted = ['validate', 'create', 'lock', 'update', 'check', 'unlock'];
     if (shouldActivate) {
       stepsCompleted.push('activate');
     }
@@ -364,7 +219,7 @@ export async function handleCreateProgram(params: any) {
       program_name: programName,
       package_name: args.package_name,
       transport_request: args.transport_request || null,
-      program_type: args.program_type || '1',
+      program_type: args.program_type || 'executable',
       type: 'PROG/P',
       message: shouldActivate
         ? `Program ${programName} created and activated successfully`
@@ -383,19 +238,11 @@ export async function handleCreateProgram(params: any) {
     });
 
   } catch (error: any) {
-    // Attempt to unlock if we have a lock handle
-    if (lockHandle) {
-      try {
-        logger.warn(`Error occurred, attempting to unlock program: ${programName}`);
-        await unlockProgram(programName, lockHandle, sessionId);
-        logger.info(`Program unlocked after error`);
-      } catch (unlockError: any) {
-        logger.error(`Failed to unlock program after error: ${unlockError.message}`);
-      }
-    }
+    logger.error(`Error creating program ${programName}:`, error);
+    const errorMessage = error.response?.data
+      ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+      : error.message || String(error);
 
-    const errorMessage = error.response?.data || error.message || 'Unknown error';
-    logger.error(`Program creation failed: ${errorMessage}`);
     return return_error(new Error(`Failed to create program ${programName}: ${errorMessage}`));
   }
 }

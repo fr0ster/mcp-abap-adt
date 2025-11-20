@@ -1,25 +1,17 @@
 /**
  * CreateClass Handler - ABAP Class Creation via ADT API
  *
- * Eclipse ADT workflow (stateful session required):
- * 1. POST /sap/bc/adt/oo/classes - Create class with metadata
- * 2. POST /sap/bc/adt/oo/classes/{name}?_action=LOCK - Lock class
- * 3. PUT /sap/bc/adt/oo/classes/{name}/source/main - Upload class source
- * 4. POST /sap/bc/adt/oo/classes/{name}?_action=UNLOCK - Unlock class
- * 5. POST /sap/bc/adt/activation - Activate class
+ * Uses ClassBuilder from @mcp-abap-adt/adt-clients for all operations.
+ * Session and lock management handled internally by builder.
  *
- * CRITICAL REQUIREMENTS:
- * - Stateful session: sap-adt-connection-id must be same for all 5 steps
- * - Cookie management: automatic via BaseAbapConnection
- * - Lock handle: must be maintained within session scope
+ * Workflow: validate -> create -> lock -> update -> check -> unlock -> (activate)
  */
 
 import { AxiosResponse } from '../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger } from '../lib/utils';
-import { generateSessionId, makeAdtRequestWithSession } from '../lib/sessionUtils';
+import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
-import { getSystemInformation } from '../lib/utils.js';
+import { ClassBuilder } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateClass",
@@ -118,159 +110,10 @@ ENDCLASS.`;
 }
 
 /**
- * Step 1: Create class object with metadata
- * Following Eclipse ADT approach: final and visibility are XML attributes, not elements
- */
-async function createClassObject(args: CreateClassArgs, sessionId: string): Promise<AxiosResponse> {
-  const description = args.description || args.class_name;
-  const url = `/sap/bc/adt/oo/classes${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
-
-  // Get masterSystem and responsible - optional, retrieved from system for cloud
-  let masterSystem = args.master_system;
-  let username = args.responsible;
-
-  // If not provided, try to get from system information (cloud systems)
-  if (!masterSystem || !username) {
-    const systemInfo = await getSystemInformation();
-    if (systemInfo) {
-      masterSystem = masterSystem || systemInfo.systemID;
-      username = username || systemInfo.userName;
-    }
-  }
-
-  // Fallback to env or empty (for on-premise, these may not be needed)
-  masterSystem = masterSystem || process.env.SAP_SYSTEM || process.env.SAP_SYSTEM_ID || '';
-  username = username || process.env.SAP_USERNAME || process.env.SAP_USER || '';
-
-  // Build class metadata XML following Eclipse ADT format
-  // Key point: class:final and class:visibility are XML ATTRIBUTES, not elements
-  const finalAttr = args.final ? 'true' : 'false';
-  const visibilityAttr = args.create_protected ? 'protected' : 'public';
-
-  // Build class metadata XML - following cloud trial format
-  // Include testclasses and empty superClassRef as required by SAP Cloud
-  const superClassXml = args.superclass
-    ? `<class:superClassRef adtcore:name="${args.superclass}"/>`
-    : '<class:superClassRef/>';
-
-  // Build XML - include masterSystem and responsible only if provided (cloud systems)
-  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
-  const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
-
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><class:abapClass xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.class_name}" adtcore:type="CLAS/OC" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr} class:final="${finalAttr}" class:visibility="${visibilityAttr}">
-
-
-
-  <adtcore:packageRef adtcore:name="${args.package_name}"/>
-
-
-
-  <class:include adtcore:name="CLAS/OC" adtcore:type="CLAS/OC" class:includeType="testclasses"/>
-
-
-
-  ${superClassXml}
-
-
-
-</class:abapClass>`;
-
-  const headers = {
-    'Accept': 'application/vnd.sap.adt.oo.classes.v4+xml',
-    'Content-Type': 'application/vnd.sap.adt.oo.classes.v4+xml'
-  };
-
-  logger.info(`Creating class object: ${args.class_name}`);
-  return makeAdtRequestWithSession(url, 'POST', sessionId, metadataXml, headers);
-}
-
-/**
- * Step 2: Lock class for modification
- * Returns lock handle that must be used in subsequent requests
- */
-async function lockClass(className: string, sessionId: string): Promise<string> {
-  const url = `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
-
-  const headers = {
-    'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
-  };
-
-  logger.info(`Locking class: ${className}`);
-  const response = await makeAdtRequestWithSession(url, 'POST', sessionId, null, headers);
-
-  // Parse lock handle from XML response
-  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
-  const result = parser.parse(response.data);
-  const lockHandle = result?.['asx:abap']?.['asx:values']?.['DATA']?.['LOCK_HANDLE'];
-
-  if (!lockHandle) {
-    throw new Error('Failed to obtain lock handle from SAP. Class may be locked by another user.');
-  }
-
-  logger.info(`Lock acquired: ${lockHandle}`);
-  return lockHandle;
-}
-
-/**
- * Step 3: Upload class source code
- * Lock handle must be passed in URL and maintained in same session
- */
-async function uploadClassSource(
-  className: string,
-  sourceCode: string,
-  lockHandle: string,
-  sessionId: string,
-  transportRequest?: string
-): Promise<AxiosResponse> {
-  const queryParams = `lockHandle=${lockHandle}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
-  const url = `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}/source/main?${queryParams}`;
-
-  const headers = {
-    'Accept': 'text/plain',
-    'Content-Type': 'text/plain; charset=utf-8'
-  };
-
-  logger.info(`Uploading class source: ${className}, lockHandle: ${lockHandle.substring(0, 10)}...`);
-  return makeAdtRequestWithSession(url, 'PUT', sessionId, sourceCode, headers);
-}
-
-/**
- * Step 4: Unlock class
- * Must use same session and lock handle from step 2
- */
-async function unlockClass(className: string, lockHandle: string, sessionId: string): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}?_action=UNLOCK&lockHandle=${lockHandle}`;
-
-  logger.info(`Unlocking class: ${className}`);
-  return makeAdtRequestWithSession(url, 'POST', sessionId, null);
-}
-
-/**
- * Step 5: Activate class
- * Makes class active and usable in SAP system
- */
-async function activateClass(className: string, sessionId: string): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
-
-  const activationXml = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}" adtcore:name="${className}"/>
-</adtcore:objectReferences>`;
-
-  const headers = {
-    'Accept': 'application/xml',
-    'Content-Type': 'application/xml'
-  };
-
-  logger.info(`Activating class: ${className}`);
-  return makeAdtRequestWithSession(url, 'POST', sessionId, activationXml, headers);
-}
-
-/**
  * Main handler for creating ABAP classes
  *
- * IMPORTANT: Uses stateful session for all 5 steps
- * IMPORTANT: Cookies are managed automatically by BaseAbapConnection
- * IMPORTANT: Lock handle is maintained within session scope
+ * Uses ClassBuilder from @mcp-abap-adt/adt-clients for all operations
+ * Session and lock management handled internally by builder
  */
 export async function handleCreateClass(params: any) {
   const args: CreateClassArgs = params;
@@ -288,55 +131,52 @@ export async function handleCreateClass(params: any) {
   }
 
   const className = args.class_name.toUpperCase();
-  const sessionId = generateSessionId();
-  let lockHandle: string | null = null;
+  const connection = getManagedConnection();
 
-  logger.info(`Starting class creation: ${className} (session: ${sessionId})`);
+  logger.info(`Starting class creation: ${className}`);
 
   try {
-    // Step 1: Create class object with metadata
-    // After POST, class is automatically locked and lock handle is returned in response headers
-    const createResponse = await createClassObject(args, sessionId);
-    if (createResponse.status < 200 || createResponse.status >= 300) {
-      throw new Error(`Failed to create class object: ${createResponse.status} ${createResponse.statusText}`);
-    }
-    logger.info(`✓ Step 1: Class object created`);
-
-    // Extract lock handle from response headers (Eclipse approach)
-    lockHandle = createResponse.headers['sap-adt-lockhandle'] ||
-                 createResponse.headers['lockhandle'] ||
-                 createResponse.headers['x-sap-adt-lockhandle'];
-
-    if (!lockHandle) {
-      // Fallback: try to extract from response body or do explicit LOCK
-      logger.warn('Lock handle not found in POST response headers, attempting explicit LOCK');
-      lockHandle = await lockClass(className, sessionId);
-    }
-
-    logger.info(`✓ Step 2: Lock handle obtained: ${lockHandle.substring(0, 10)}...`);
-
-    // Step 3: Upload source code (uses lock handle from step 1/2)
+    // Generate source code if not provided
     const sourceCode = args.source_code || generateClassTemplate(className, args.description || className);
-    const uploadResponse = await uploadClassSource(className, sourceCode, lockHandle, sessionId, args.transport_request);
-    if (uploadResponse.status < 200 || uploadResponse.status >= 300) {
-      throw new Error(`Failed to upload source: ${uploadResponse.status} ${uploadResponse.statusText}`);
-    }
-    logger.info(`✓ Step 3: Source code uploaded`);
 
-    // Step 4: Unlock the class
-    await unlockClass(className, lockHandle, sessionId);
-    lockHandle = null; // Clear lock handle after successful unlock
-    logger.info(`✓ Step 4: Class unlocked`);
+    // Create builder with configuration
+    const builder = new ClassBuilder(connection, logger, {
+      className: className,
+      packageName: args.package_name,
+      transportRequest: args.transport_request,
+      description: args.description || className,
+      superclass: args.superclass,
+      final: args.final || false,
+      abstract: args.abstract || false,
+      createProtected: args.create_protected || false,
+      masterSystem: args.master_system,
+      responsible: args.responsible
+    });
 
-    // Step 5: Activate the class (optional)
-    let activationWarnings: string[] = [];
+    // Set source code
+    builder.setCode(sourceCode);
+
+    // Build operation chain: validate -> create -> lock -> update -> check -> unlock -> (activate)
     const shouldActivate = args.activate !== false; // Default to true if not specified
 
-    if (shouldActivate) {
-      const activateResponse = await activateClass(className, sessionId);
-      logger.info(`✓ Step 5: Activation completed`);
+    await builder
+      .validate()
+      .then(b => b.create())
+      .then(b => b.lock())
+      .then(b => b.update())
+      .then(b => b.check())
+      .then(b => b.unlock())
+      .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
+      .catch(error => {
+        // Builder handles unlock in finally, but we log here
+        logger.error('Class creation chain failed:', error);
+        throw error;
+      });
 
-      // Parse activation warnings/errors
+    // Parse activation warnings if activation was performed
+    let activationWarnings: string[] = [];
+    if (shouldActivate && builder.getActivateResult()) {
+      const activateResponse = builder.getActivateResult()!;
       if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
         const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
         const result = parser.parse(activateResponse.data);
@@ -348,12 +188,10 @@ export async function handleCreateClass(params: any) {
           );
         }
       }
-    } else {
-      logger.info(`✓ Step 5: Activation skipped (activate=false)`);
     }
 
     // Return success result
-    const stepsCompleted = ['create_object', 'lock', 'upload_source', 'unlock'];
+    const stepsCompleted = ['validate', 'create', 'lock', 'update', 'check', 'unlock'];
     if (shouldActivate) {
       stepsCompleted.push('activate');
     }
@@ -384,20 +222,10 @@ export async function handleCreateClass(params: any) {
     });
 
   } catch (error: any) {
-    // CRITICAL: Always try to unlock on error to prevent locked objects
-    if (lockHandle) {
-      try {
-        await unlockClass(className, lockHandle, sessionId);
-        logger.info('Lock released after error');
-      } catch (unlockError) {
-        logger.error('Failed to unlock after error:', unlockError);
-      }
-    }
-
     logger.error(`Error creating class ${className}:`, error);
     const errorMessage = error.response?.data
       ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
-      : error.message;
+      : error.message || String(error);
 
     return return_error(new Error(`Failed to create class ${className}: ${errorMessage}`));
   }

@@ -12,7 +12,7 @@
       "console": "internalConsole",
       "env": {
         "NODE_ENV": "development",
-        "MCP_SSE_PORT": "4004"
+        "MCP_SSE_PORT": "3001"
       }
     },
     {
@@ -26,7 +26,7 @@
       "console": "internalConsole",
       "env": {
         "NODE_ENV": "development",
-        "MCP_HTTP_PORT": "4004"
+        "MCP_HTTP_PORT": "3000"
       }
     },
     {
@@ -40,20 +40,6 @@
       "console": "internalConsole",
       "env": {
         "NODE_ENV": "development"
-      }
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "MCP Inspector - SSE",
-      "program": "${workspaceFolder}/node_modules/@modelcontextprotocol/inspector/dist/index.js",
-      "args": ["node", "${workspaceFolder}/dist/index.js", "--transport", "sse", "--env", "${workspaceFolder}/.env"],
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
-      "skipFiles": ["<node_internals>/**"],
-      "console": "internalConsole",
-      "env": {
-        "NODE_ENV": "development",
-        "MCP_SSE_PORT": "4004"
       }
     },
     {

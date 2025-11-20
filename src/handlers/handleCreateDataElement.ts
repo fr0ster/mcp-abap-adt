@@ -1,23 +1,16 @@
 /**
  * CreateDataElement Handler - ABAP Data Element Creation via ADT API
- * 
- * CURRENT STATE (Simplified):
- * - Step 1: POST creates data element with all properties in one call
- * - Step 2: Activate data element
- * - Step 3: Verify activation
- * - SAP handles locking automatically on transport
- * 
- * APPROACH:
- * - Similar to CreateDomain: POST with full body (combining empty POST + filled PUT)
- * - Simpler than Eclipse (3 steps vs multiple LOCK/UNLOCK operations)
+ *
+ * Uses DataElementBuilder from @mcp-abap-adt/adt-clients for all operations.
+ * Session and lock management handled internally by builder.
+ *
+ * Workflow: create -> activate -> verify
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../lib/utils';
+import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
-import { XMLParser } from 'fast-xml-parser';
-import * as crypto from 'crypto';
-import { getConfig } from '../index';
+import { DataElementBuilder } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateDataElement",
@@ -25,21 +18,21 @@ export const TOOL_DEFINITION = {
   inputSchema: {
     type: "object",
     properties: {
-      data_element_name: { 
-        type: "string", 
-        description: "Data element name (e.g., ZZ_E_TEST_001). Must follow SAP naming conventions." 
+      data_element_name: {
+        type: "string",
+        description: "Data element name (e.g., ZZ_E_TEST_001). Must follow SAP naming conventions."
       },
-      description: { 
-        type: "string", 
-        description: "Data element description. If not provided, data_element_name will be used." 
+      description: {
+        type: "string",
+        description: "Data element description. If not provided, data_element_name will be used."
       },
-      package_name: { 
-        type: "string", 
-        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects)" 
+      package_name: {
+        type: "string",
+        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects)"
       },
-      transport_request: { 
-        type: "string", 
-        description: "Transport request number (e.g., E19K905635). Required for transportable packages." 
+      transport_request: {
+        type: "string",
+        description: "Transport request number (e.g., E19K905635). Required for transportable packages."
       },
       domain_name: {
         type: "string",
@@ -94,210 +87,14 @@ interface DataElementArgs {
   medium_label?: string;
   long_label?: string;
   heading_label?: string;
-}
-
-/**
- * Generate unique session ID for ADT connection
- */
-function generateSessionId(): string {
-  return crypto.randomUUID().replace(/-/g, '');
-}
-
-/**
- * Generate unique request ID for each ADT request
- */
-function generateRequestId(): string {
-  return crypto.randomUUID().replace(/-/g, '');
-}
-
-/**
- * Make ADT request with session and request IDs - STATELESS
- */
-async function makeAdtRequestStateless(
-  url: string,
-  method: string,
-  sessionId: string,
-  data?: any,
-  additionalHeaders?: Record<string, string>
-): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl();
-  const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
-  
-  const requestId = generateRequestId();
-  const headers: Record<string, string> = {
-    'sap-adt-connection-id': sessionId,
-    'sap-adt-request-id': requestId,
-    'X-sap-adt-profiling': 'server-time',
-    ...additionalHeaders
-  };
-  
-  return makeAdtRequestWithTimeout(fullUrl, method, 'default', data, undefined, headers);
-}
-
-/**
- * Build activation XML payload
- */
-function buildActivationXml(dataElementName: string): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/dataelements/${encodeSapObjectName(dataElementName.toLowerCase())}" adtcore:name="${dataElementName.toUpperCase()}"/>
-</adtcore:objectReferences>`;
-}
-
-/**
- * Parse activation response
- */
-function parseActivationResponse(response: AxiosResponse): { success: boolean; message: string } {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  
-  try {
-    const result = parser.parse(response.data);
-    const properties = result['chkl:messages']?.['chkl:properties'];
-    
-    if (properties) {
-      const activated = properties['activationExecuted'] === 'true' || properties['activationExecuted'] === true;
-      const checked = properties['checkExecuted'] === 'true' || properties['checkExecuted'] === true;
-      
-      return {
-        success: activated && checked,
-        message: activated ? 'Data element activated successfully' : 'Activation failed'
-      };
-    }
-    
-    return { success: false, message: 'Unknown activation status' };
-  } catch (error) {
-    return { success: false, message: `Failed to parse activation response: ${error}` };
-  }
-}
-
-/**
- * Create data element with POST (combining empty POST + filled PUT approach)
- */
-async function createDataElement(
-  args: DataElementArgs,
-  sessionId: string,
-  username: string
-): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/ddic/dataelements?corrNr=${args.transport_request}`;
-  
-  const description = args.description || args.data_element_name;
-  const dataType = args.data_type || 'CHAR';
-  const length = args.length || 100;
-  const decimals = args.decimals || 0;
-  const shortLabel = args.short_label || '';
-  const mediumLabel = args.medium_label || '';
-  const longLabel = args.long_label || '';
-  const headingLabel = args.heading_label || '';
-  
-  // Build complete XML with all properties (based on Eclipse PUT body)
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
-<blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel" 
-            xmlns:adtcore="http://www.sap.com/adt/core" 
-            xmlns:atom="http://www.w3.org/2005/Atom" 
-            xmlns:dtel="http://www.sap.com/adt/dictionary/dataelements" 
-            adtcore:description="${description}" 
-            adtcore:language="EN" 
-            adtcore:name="${args.data_element_name.toUpperCase()}" 
-            adtcore:type="DTEL/DE" 
-            adtcore:masterLanguage="EN" 
-            adtcore:responsible="${username}">
-  <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
-  <dtel:dataElement>
-    <dtel:typeKind>domain</dtel:typeKind>
-    <dtel:typeName>${args.domain_name.toUpperCase()}</dtel:typeName>
-    <dtel:dataType>${dataType}</dtel:dataType>
-    <dtel:dataTypeLength>${length}</dtel:dataTypeLength>
-    <dtel:dataTypeDecimals>${decimals}</dtel:dataTypeDecimals>
-    <dtel:shortFieldLabel>${shortLabel}</dtel:shortFieldLabel>
-    <dtel:shortFieldLength>10</dtel:shortFieldLength>
-    <dtel:shortFieldMaxLength>10</dtel:shortFieldMaxLength>
-    <dtel:mediumFieldLabel>${mediumLabel}</dtel:mediumFieldLabel>
-    <dtel:mediumFieldLength>20</dtel:mediumFieldLength>
-    <dtel:mediumFieldMaxLength>20</dtel:mediumFieldMaxLength>
-    <dtel:longFieldLabel>${longLabel}</dtel:longFieldLabel>
-    <dtel:longFieldLength>40</dtel:longFieldLength>
-    <dtel:longFieldMaxLength>40</dtel:longFieldMaxLength>
-    <dtel:headingFieldLabel>${headingLabel}</dtel:headingFieldLabel>
-    <dtel:headingFieldLength>55</dtel:headingFieldLength>
-    <dtel:headingFieldMaxLength>55</dtel:headingFieldMaxLength>
-    <dtel:searchHelp/>
-    <dtel:searchHelpParameter/>
-    <dtel:setGetParameter/>
-    <dtel:defaultComponentName/>
-    <dtel:deactivateInputHistory>false</dtel:deactivateInputHistory>
-    <dtel:changeDocument>false</dtel:changeDocument>
-    <dtel:leftToRightDirection>false</dtel:leftToRightDirection>
-    <dtel:deactivateBIDIFiltering>false</dtel:deactivateBIDIFiltering>
-  </dtel:dataElement>
-</blue:wbobj>`;
-  
-  const headers = {
-    'Accept': 'application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml',
-    'Content-Type': 'application/vnd.sap.adt.dataelements.v2+xml'
-  };
-  
-  console.log(`[DEBUG] createDataElement - POST to create data element`);
-  console.log(`[DEBUG] POST body:\n${xmlBody}`);
-  
-  const response = await makeAdtRequestStateless(url, 'POST', sessionId, xmlBody, headers);
-  console.log('[DEBUG] createDataElement response status:', response.status);
-  console.log('[DEBUG] createDataElement response headers:', response.headers);
-  
-  return response;
-}
-
-/**
- * Activate data element
- */
-async function activateDataElement(dataElementName: string, sessionId: string): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/activation?method=activate&preauditRequested=true`;
-  const xmlBody = buildActivationXml(dataElementName);
-  
-  const headers = {
-    'Accept': 'application/xml',
-    'Content-Type': 'application/xml'
-  };
-  
-  const response = await makeAdtRequestStateless(url, 'POST', sessionId, xmlBody, headers);
-  
-  const activationResult = parseActivationResponse(response);
-  if (!activationResult.success) {
-    throw new McpError(ErrorCode.InternalError, `Data element activation failed: ${activationResult.message}`);
-  }
-  
-  return response;
-}
-
-/**
- * Get data element to verify creation
- */
-async function getDataElementForVerification(dataElementName: string, sessionId: string): Promise<any> {
-  const baseUrl = await getBaseUrl();
-  const dataElementNameEncoded = encodeSapObjectName(dataElementName.toLowerCase());
-  const url = `${baseUrl}/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}`;
-  
-  const headers = {
-    'Accept': 'application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml',
-  };
-  
-  const response = await makeAdtRequestStateless(url, 'GET', sessionId, null, headers);
-  
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  
-  const result = parser.parse(response.data);
-  return result['blue:wbobj'];
+  activate?: boolean;
 }
 
 /**
  * Main handler for CreateDataElement MCP tool
+ *
+ * Uses DataElementBuilder from @mcp-abap-adt/adt-clients for all operations
+ * Session and lock management handled internally by builder
  */
 export async function handleCreateDataElement(args: any) {
   try {
@@ -311,58 +108,103 @@ export async function handleCreateDataElement(args: any) {
     if (!args?.domain_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Domain name is required');
     }
-    
+
     // Validate transport_request: required for non-$TMP packages
     validateTransportRequest(args.package_name, args.transport_request);
 
-    const sessionId = generateSessionId();
-    const username = process.env.SAP_USER || 'MPCUSER';
     const typedArgs = args as DataElementArgs;
+    const connection = getManagedConnection();
+    const dataElementName = typedArgs.data_element_name.toUpperCase();
 
-    console.log(`[DEBUG] Session ID for all requests: ${sessionId}`);
-    
-    // Step 1: Create data element with POST (full body)
-    console.log(`[DEBUG] Step 1: Creating data element with POST`);
-    await createDataElement(typedArgs, sessionId, username);
-    
-    console.log(`[DEBUG] Data element ${typedArgs.data_element_name} created successfully (inactive state)`);
-    
-    // Step 2: Activate data element
-    console.log(`[DEBUG] Step 2: Activating data element`);
-    await activateDataElement(typedArgs.data_element_name, sessionId);
-    
-    console.log(`[DEBUG] Data element ${typedArgs.data_element_name} activated successfully`);
-    
-    // Step 3: Verify activation
-    console.log(`[DEBUG] Step 3: Verifying data element activation`);
-    const finalDataElement = await getDataElementForVerification(typedArgs.data_element_name, sessionId);
-    
-    return return_response({
-      data: JSON.stringify({
-        success: true,
-        data_element_name: typedArgs.data_element_name,
-        package: typedArgs.package_name,
-        transport_request: typedArgs.transport_request,
-        domain_name: typedArgs.domain_name,
-        status: 'active',
-        version: finalDataElement['adtcore:version'] || 'unknown',
-        session_id: sessionId,
-        message: `Data element ${typedArgs.data_element_name} created and activated successfully`,
-        data_element_details: {
-          type_kind: finalDataElement['dtel:dataElement']?.['dtel:typeKind'],
-          type_name: finalDataElement['dtel:dataElement']?.['dtel:typeName'],
-          data_type: finalDataElement['dtel:dataElement']?.['dtel:dataType'],
-          length: finalDataElement['dtel:dataElement']?.['dtel:dataTypeLength'],
-          decimals: finalDataElement['dtel:dataElement']?.['dtel:dataTypeDecimals']
-        }
-      }, null, 2),
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    });
-    
-  } catch (error) {
+    logger.info(`Starting data element creation: ${dataElementName}`);
+
+    try {
+      // Create builder with configuration
+      const builder = new DataElementBuilder(connection, logger, {
+        dataElementName: dataElementName,
+        packageName: typedArgs.package_name,
+        transportRequest: typedArgs.transport_request,
+        description: typedArgs.description || dataElementName,
+        domainName: typedArgs.domain_name.toUpperCase(),
+        dataType: typedArgs.data_type || 'CHAR',
+        length: typedArgs.length || 100,
+        decimals: typedArgs.decimals || 0,
+        shortLabel: typedArgs.short_label,
+        mediumLabel: typedArgs.medium_label,
+        longLabel: typedArgs.long_label,
+        headingLabel: typedArgs.heading_label,
+        typeKind: 'domain'
+      });
+
+      // Build operation chain: validate -> create -> lock -> update -> check -> unlock -> (activate)
+      // Note: create() creates empty data element, then lock() -> update() fills it with data
+      const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
+
+      await builder
+        .validate()
+        .then(b => b.create())
+        .then(b => b.lock())
+        .then(b => b.update())
+        .then(b => b.check())
+        .then(b => b.unlock())
+        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
+        .catch(error => {
+          logger.error('Data element creation chain failed:', error);
+          throw error;
+        });
+
+      // Get data element details from create result (createDataElement already does verification)
+      const createResult = builder.getCreateResult();
+      let dataElementDetails = null;
+      if (createResult?.data && typeof createResult.data === 'object' && 'data_element_details' in createResult.data) {
+        dataElementDetails = (createResult.data as any).data_element_details;
+      }
+
+      // Extract version and other details from response
+      const version = createResult?.data && typeof createResult.data === 'object' && 'version' in createResult.data
+        ? (createResult.data as any).version
+        : 'unknown';
+
+      return return_response({
+        data: JSON.stringify({
+          success: true,
+          data_element_name: dataElementName,
+          package: typedArgs.package_name,
+          transport_request: typedArgs.transport_request,
+          domain_name: typedArgs.domain_name.toUpperCase(),
+          status: 'active',
+          version: version,
+          message: `Data element ${dataElementName} created and activated successfully`,
+          data_element_details: dataElementDetails
+        }, null, 2),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      } as AxiosResponse);
+
+    } catch (error: any) {
+      logger.error(`Error creating data element ${dataElementName}:`, error);
+
+      // Check if data element already exists
+      if (error.message?.includes('already exists') || error.response?.data?.includes('ExceptionResourceAlreadyExists')) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `Data element ${dataElementName} already exists. Please delete it first or use a different name.`
+        );
+      }
+
+      const errorMessage = error.response?.data
+        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+        : error.message || String(error);
+
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to create data element ${dataElementName}: ${errorMessage}`
+      );
+    }
+
+  } catch (error: any) {
     if (error instanceof McpError) {
       throw error;
     }

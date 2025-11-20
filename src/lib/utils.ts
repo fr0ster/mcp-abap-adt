@@ -1,30 +1,45 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { AxiosError, AxiosResponse } from "axios";
 import { getConfig } from "../index"; // getConfig needs to be exported from index.ts
-import { AbapConnection } from "./connection/AbapConnection";
-import { createAbapConnection } from "./connection/connectionFactory";
-import { SapConfig, sapConfigSignature } from "./sapConfig";
-import { getTimeout, getTimeoutConfig } from "./timeouts";
-import { logger } from "./logger"; // Import the MCP-compatible logger
+import {
+  AbapConnection,
+  createAbapConnection,
+  SapConfig,
+  sapConfigSignature,
+  getTimeout,
+  getTimeoutConfig,
+  FileSessionStorage,
+} from "@mcp-abap-adt/connection";
+import { encodeSapObjectName } from "@mcp-abap-adt/adt-clients";
+import { loggerAdapter } from "./loggerAdapter";
+import { logger } from "./logger";
+import { notifyConnectionResetListeners, registerConnectionResetHook } from "./connectionEvents";
 
 // Initialize connection variables before exports to avoid circular dependency issues
-let overrideConfig: SapConfig | undefined;
-let overrideConnection: AbapConnection | undefined;
-let cachedConnection: AbapConnection | undefined;
-let cachedConfigSignature: string | undefined;
+// Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
+let overrideConfig: SapConfig | undefined = undefined;
+let overrideConnection: AbapConnection | undefined = undefined;
+let cachedConnection: AbapConnection | undefined = undefined;
+let cachedConfigSignature: string | undefined = undefined;
 
-export { McpError, ErrorCode, AxiosResponse, logger, getTimeout, getTimeoutConfig };
+// Session storage for stateful sessions (persists cookies and CSRF tokens)
+const sessionStorage = new FileSessionStorage({
+  sessionDir: '.sessions',
+  createDir: true,
+  prettyPrint: false
+});
+
+// Fixed session ID for server connection (allows session persistence across requests)
+const SERVER_SESSION_ID = 'mcp-abap-adt-session';
+
+export { McpError, ErrorCode, AxiosResponse, getTimeout, getTimeoutConfig, logger };
 
 /**
  * Encodes SAP object names for use in URLs
- * Handles namespaces with forward slashes that need to be URL encoded
- * @param objectName - The SAP object name (e.g., '/1CPR/CL_000_0SAP2_FAG')
- * @returns URL-encoded object name
+ * Re-exported from @mcp-abap-adt/adt-clients for backward compatibility
+ * @deprecated Use encodeSapObjectName from @mcp-abap-adt/adt-clients directly
  */
-export function encodeSapObjectName(objectName: string): string {
-  // URL encode the object name to handle namespaces with forward slashes
-  return encodeURIComponent(objectName);
-}
+export { encodeSapObjectName } from "@mcp-abap-adt/adt-clients";
 
 export function return_response(response: AxiosResponse) {
   return {
@@ -70,9 +85,40 @@ export function getManagedConnection(): AbapConnection {
   const signature = sapConfigSignature(config);
 
   if (!cachedConnection || cachedConfigSignature !== signature) {
+    logger.debug(`[DEBUG] getManagedConnection - Creating new connection (cached: ${!!cachedConnection}, signature changed: ${cachedConfigSignature !== signature})`);
+    if (cachedConnection) {
+      logger.debug(`[DEBUG] getManagedConnection - Old signature: ${cachedConfigSignature?.substring(0, 100)}...`);
+      logger.debug(`[DEBUG] getManagedConnection - New signature: ${signature.substring(0, 100)}...`);
+    }
     disposeConnection(cachedConnection);
-    cachedConnection = createAbapConnection(config);
+    cachedConnection = createAbapConnection(config, loggerAdapter, sessionStorage, SERVER_SESSION_ID);
     cachedConfigSignature = signature;
+
+    // Enable stateful session mode to allow session persistence
+    // Note: enableStatefulSession is available in AbstractAbapConnection but not in AbapConnection interface
+    // If sessionStorage and sessionId are provided to createAbapConnection, stateful session should be enabled automatically
+    // But we call it explicitly to ensure it's enabled
+    const connectionWithStateful = cachedConnection as any;
+    if (connectionWithStateful.enableStatefulSession) {
+      connectionWithStateful.enableStatefulSession(SERVER_SESSION_ID, sessionStorage).catch((error: any) => {
+        logger.warn("Failed to enable stateful session", {
+          type: "STATEFUL_SESSION_ENABLE_FAILED",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    }
+
+    // Connect and verify session state (will save if changed)
+    // The connect() method in JwtAbapConnection now compares session state and saves only if changed
+    cachedConnection.connect().catch((error) => {
+      logger.warn("Failed to connect after creating new connection", {
+        type: "CONNECTION_INIT_FAILED",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Don't throw - connection will be established on first use
+    });
+  } else {
+    logger.debug(`[DEBUG] getManagedConnection - Reusing cached connection (signature matches)`);
   }
 
   return cachedConnection;
@@ -81,24 +127,28 @@ export function getManagedConnection(): AbapConnection {
 export function setConfigOverride(override?: SapConfig) {
   overrideConfig = override;
   disposeConnection(overrideConnection);
-  overrideConnection = override ? createAbapConnection(override) : undefined;
+  overrideConnection = override ? createAbapConnection(override, loggerAdapter) : undefined;
 
   // Reset shared connection so that it will be re-created lazily with fresh config
   disposeConnection(cachedConnection);
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
+  notifyConnectionResetListeners();
 }
 
 export function setConnectionOverride(connection?: AbapConnection) {
-  if (overrideConnection) {
-    disposeConnection(overrideConnection);
+  const currentOverride = overrideConnection;
+  if (currentOverride) {
+    disposeConnection(currentOverride);
   }
   overrideConnection = connection;
   overrideConfig = undefined;
 
-  disposeConnection(cachedConnection);
+  const currentCached = cachedConnection;
+  disposeConnection(currentCached);
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
+  notifyConnectionResetListeners();
 }
 
 export function cleanup() {
@@ -108,7 +158,34 @@ export function cleanup() {
   overrideConfig = undefined;
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
+  notifyConnectionResetListeners();
 }
+
+/**
+ * Invalidate cached connection to force recreation with updated config
+ * This is useful when config is updated directly (e.g., token refresh in JwtAbapConnection)
+ * The connection will be recreated on next getManagedConnection() call with updated signature
+ */
+export function invalidateConnectionCache() {
+  disposeConnection(cachedConnection);
+  cachedConnection = undefined;
+  cachedConfigSignature = undefined;
+  // Also invalidate override connection if it exists
+  if (overrideConnection) {
+    disposeConnection(overrideConnection);
+    overrideConnection = undefined;
+  }
+  notifyConnectionResetListeners();
+}
+
+// Register hook to invalidate connection cache when connection is reset
+// This ensures that when token is refreshed in JwtAbapConnection, the cache is invalidated
+registerConnectionResetHook(() => {
+  // When connection is reset (e.g., after token refresh), invalidate cache
+  // so that next getManagedConnection() will recreate connection with updated config
+  cachedConnection = undefined;
+  cachedConfigSignature = undefined;
+});
 
 export async function getBaseUrl() {
   return getManagedConnection().getBaseUrl();
@@ -142,12 +219,7 @@ export async function makeAdtRequestWithTimeout(
 
 /**
  * Fetches node structure from SAP ADT repository
- * @param parentName Parent object name
- * @param parentTechName Parent technical name
- * @param parentType Parent object type (e.g., 'PROG/P')
- * @param nodeKey Node key to fetch (e.g., '000000' for root, '006450' for includes)
- * @param withShortDescriptions Whether to include short descriptions
- * @returns Promise with the response containing node structure
+ * @deprecated Use getReadOnlyClient().fetchNodeStructure() instead
  */
 export async function fetchNodeStructure(
   parentName: string,
@@ -156,36 +228,8 @@ export async function fetchNodeStructure(
   nodeKey: string,
   withShortDescriptions: boolean = true
 ): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/repository/nodestructure`;
-
-  // Prepare query parameters
-  const params = {
-    parent_name: parentName,
-    parent_tech_name: parentTechName,
-    parent_type: parentType,
-    withShortDescriptions: withShortDescriptions.toString()
-  };
-
-  // Prepare XML body
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
-<asx:values>
-<DATA>
-<TV_NODEKEY>${nodeKey}</TV_NODEKEY>
-</DATA>
-</asx:values>
-</asx:abap>`;
-
-  // Make POST request with XML body
-  const response = await makeAdtRequestWithTimeout(
-    url,
-    'POST',
-    'default',
-    xmlBody,
-    params
-  );
-
-  return response;
+  const { getReadOnlyClient } = await import('./clients');
+  return getReadOnlyClient().fetchNodeStructure(parentName, parentTechName, parentType, nodeKey, withShortDescriptions);
 }
 
 export async function makeAdtRequest(
@@ -201,31 +245,21 @@ export async function makeAdtRequest(
 
 /**
  * Get system information from SAP ADT (for cloud systems)
- * Returns systemID and userName if available
- * This endpoint is available in cloud systems, not in on-premise
+ * @deprecated Use getReadOnlyClient().getSystemInformation() instead
  */
 export async function getSystemInformation(): Promise<{ systemID?: string; userName?: string } | null> {
+  const { getReadOnlyClient } = await import('./clients');
+  return getReadOnlyClient().getSystemInformation();
+}
+
+/**
+ * Check if current connection is cloud (JWT auth) or on-premise (basic auth)
+ */
+export function isCloudConnection(): boolean {
   try {
-    const baseUrl = await getBaseUrl();
-    const url = `${baseUrl}/sap/bc/adt/core/http/systeminformation`;
-
-    const headers = {
-      'Accept': 'application/json'
-    };
-
-    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default', null, undefined, headers);
-
-    if (response.data && typeof response.data === 'object') {
-      return {
-        systemID: response.data.systemID,
-        userName: response.data.userName
-      };
-    }
-
-    return null;
-  } catch (error) {
-    // If endpoint doesn't exist (on-premise), return null
-    // This is expected for on-premise systems
-    return null;
+    const config = getConfig();
+    return config.authType === 'jwt';
+  } catch {
+    return false;
   }
 }

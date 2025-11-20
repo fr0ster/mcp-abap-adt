@@ -3,11 +3,18 @@
  */
 
 const { handleGetFunction } = require('../../dist/handlers/handleGetFunction');
+const { isCloudConnection } = require('../../dist/lib/utils');
 const fs = require('fs');
 const path = require('path');
 
 describe('handleGetFunction (integration)', () => {
   it('should return plain text for RFC_READ_TABLE in SDTX', async () => {
+    // RFC_READ_TABLE may not be available on cloud systems
+    if (isCloudConnection()) {
+      console.log('Skipping RFC_READ_TABLE test on cloud deployment');
+      return;
+    }
+
     const args = {
       function_name: 'RFC_READ_TABLE',
       function_group: 'SDTX'
@@ -30,6 +37,12 @@ describe('handleGetFunction (integration)', () => {
   });
 
   it('should write result to file if filePath is provided', async () => {
+    // RFC_READ_TABLE may not be available on cloud systems
+    if (isCloudConnection()) {
+      console.log('Skipping RFC_READ_TABLE file test on cloud deployment');
+      return;
+    }
+
     const filePath = path.join(process.cwd(), 'test-func.txt');
     // Cleanup before
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);

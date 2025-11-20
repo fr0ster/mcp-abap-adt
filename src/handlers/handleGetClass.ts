@@ -1,5 +1,5 @@
-import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../lib/utils';
+import { McpError, ErrorCode } from '../lib/utils';
+import { getReadOnlyClient } from '../lib/clients';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../lib/writeResultToFile';
 
@@ -77,8 +77,7 @@ export async function handleGetClass(args: any) {
         if (!args?.class_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Class name is required');
         }
-        const url = `${await getBaseUrl()}/sap/bc/adt/oo/classes/${encodeSapObjectName(args.class_name)}/source/main`;
-    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+        const response = await getReadOnlyClient().getClass(args.class_name);
     // Parse XML responses; otherwise return the payload unchanged
         if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
             const resultObj = parseClassXml(response.data);

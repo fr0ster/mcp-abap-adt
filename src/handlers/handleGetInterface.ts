@@ -1,5 +1,5 @@
-import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../lib/utils';
+import { McpError, ErrorCode, return_response } from '../lib/utils';
+import { getReadOnlyClient } from '../lib/clients';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../lib/writeResultToFile';
 
@@ -65,8 +65,7 @@ export async function handleGetInterface(args: any) {
         if (!args?.interface_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Interface name is required');
         }
-        const url = `${await getBaseUrl()}/sap/bc/adt/oo/interfaces/${encodeSapObjectName(args.interface_name)}/source/main`;
-    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+        const response = await getReadOnlyClient().getInterface(args.interface_name);
     // Parse XML responses; otherwise return the payload unchanged
         if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
             const result = {

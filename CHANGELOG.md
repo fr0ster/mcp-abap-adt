@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+> Package-specific changes (e.g., `@mcp-abap-adt/adt-clients`) are tracked in their respective changelog files under `packages/*/CHANGELOG.md`.
+
+### Changed
+- **Test Organization**: All package tests have been moved to their respective packages:
+  - `@mcp-abap-adt/adt-clients` tests are now in `packages/adt-clients/src/__tests__/`
+  - `@mcp-abap-adt/connection` tests are now in `packages/connection/src/__tests__/`
+  - Main project (`mcp-abap-adt`) now contains only handler-level integration tests
+  - Handlers use packages as dependencies but do not test package functionality directly
+  - Updated documentation to reflect the new test organization structure
+
 ### Added
 - **Documentation Restructure**:
   - New platform-specific installation guides: `INSTALL_WINDOWS.md`, `INSTALL_MACOS.md`, `INSTALL_LINUX.md`

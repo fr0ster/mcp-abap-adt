@@ -15,7 +15,7 @@ Two tools are available for batch detection of ABAP object types:
 - **DetectObjectTypeListArray**: Accepts an array of objects via the `objects` parameter.
 - **DetectObjectTypeListJson**: Accepts a JSON payload with an `objects` array via the `payload` parameter.
 
-See [doc/DetectObjectTypeListTools.md](doc/DetectObjectTypeListTools.md) for details and usage examples.
+See [doc/development/DetectObjectTypeListTools.md](doc/development/DetectObjectTypeListTools.md) for details and usage examples.
 
 ## 🆕 What's New in BTP Branch
 
@@ -38,7 +38,7 @@ This branch includes several powerful new features:
 - **🚚 Transport Management**: `CreateTransport`, `GetTransport` - Create new transport requests and retrieve complete transport information with objects and tasks
 - **🔍 Enhancement Analysis Tools**: `GetEnhancements`, `GetEnhancementByName` - Comprehensive enhancement discovery and analysis
 - **📋 Include Management**: `GetIncludesList` - Recursive include discovery and hierarchy mapping  
-- **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
+- **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper and automatic token refresh via refresh token
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
 - **⚙️ Advanced Configuration**: Configurable timeouts, flexible .env loading, enhanced logging
 - **🛠️ Developer Tools**: New testing utilities and improved error handling
@@ -55,11 +55,46 @@ This guide is designed for beginners, so we'll walk through everything step-by-s
 5.  **Troubleshooting:** Common problems and solutions.
 6.  **Available Tools:** A list of the commands you can use.
 
+## 📦 Git Submodules
+
+This project uses a git submodule for the `@mcp-abap-adt/connection` package (located in `packages/connection`). The connection package is maintained in a separate repository: [mcp-abap-connection](https://github.com/fr0ster/mcp-abap-connection).
+
+### Cloning with Submodules
+
+When cloning the repository, include submodules:
+
+```bash
+git clone --recurse-submodules https://github.com/fr0ster/mcp-abap-adt.git
+```
+
+### If You Already Cloned Without Submodules
+
+If you've already cloned the repository, initialize submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+### Updating Submodules
+
+To update submodules to their latest commits:
+
+```bash
+# Update all submodules
+git submodule update --remote
+
+# Or update a specific submodule
+git submodule update --remote packages/connection
+```
+
 ## Testing
 
-- Run `npm test` to execute the Jest suite. The configuration relies on `jest.setup.js` to disable automatic MCP server startup via `MCP_SKIP_AUTO_START`, preventing transport initialization during unit tests.
+- **Main Project Tests**: Run `npm test` to execute handler integration tests. The configuration relies on `jest.setup.js` to disable automatic MCP server startup via `MCP_SKIP_AUTO_START`, preventing transport initialization during unit tests.
+- **Package Tests**: Each package (`@mcp-abap-adt/adt-clients`, `@mcp-abap-adt/connection`) has its own test suite. Run tests within each package directory: `cd packages/adt-clients && npm test`.
 - Only files following the `*.test.[tj]s` naming pattern are collected, ensuring CLI helpers do not run as part of the Jest suite.
 - Use `npm test -- --detectOpenHandles` when you need to track pending asynchronous resources after the tests finish.
+
+See [Development & Testing](#-development--testing) section for detailed test organization.
 
 ## Developer Tools
 
@@ -67,7 +102,7 @@ The project includes utility scripts for maintaining tool definitions and docume
 
 ### Generate Tool Documentation
 
-Automatically generate `doc/AVAILABLE_TOOLS.md` from all handler `TOOL_DEFINITION` exports:
+Automatically generate `doc/user-guide/AVAILABLE_TOOLS.md` from all handler `TOOL_DEFINITION` exports:
 
 ```bash
 npm run docs:tools
@@ -95,6 +130,7 @@ See [tools/README.md](tools/README.md) for complete documentation of all develop
 - Override host/port and transport options directly: `node dist/index.js --transport streamable-http --http-port 4000 --http-host 127.0.0.1`.
 - The helper script `node tools/run-http.js --http-port 4000 --http-json-response` forwards all `--http-*` flags and loads the expected `.env` file automatically.
 - Set `MCP_TRANSPORT=streamable-http` (and optional `MCP_HTTP_*` variables) if you prefer configuring the mode via environment variables.
+- **Client Configuration**: See [Client Configuration Guide](doc/user-guide/CLIENT_CONFIGURATION.md) for details on configuring MCP clients with HTTP headers for dynamic SAP connection setup.
 
 #### Debugging with MCP Inspector
 
@@ -136,6 +172,61 @@ setAbapConnectionOverride(undefined); // fallback to env-configured factory
 - `ServerOptions.connection` takes precedence over any `.env` or CLI configuration.
 - Use `setAbapConnectionOverride(connection)` to swap implementations dynamically (e.g. for multi-tenant gateways).
 - Call `cleanup()` when tests finish to release interceptors/caches that the connection might hold.
+
+## 📋 Development & Testing
+
+### Test Organization
+
+The project follows a clear separation of concerns:
+
+- **Package Tests**: All tests for `@mcp-abap-adt/adt-clients` and `@mcp-abap-adt/connection` are located within their respective packages:
+  - `packages/adt-clients/src/__tests__/` – Integration tests for Builders, Clients, and low-level functions
+  - `packages/connection/src/__tests__/` – Tests for connection/auth/session management
+
+- **Handler Tests**: The main project (`mcp-abap-adt`) contains only handler-level integration tests:
+  - `src/index.test.ts` – Tests for MCP handlers (GetProgram, GetClass, GetTable, etc.)
+  - `tests/integration/` – Additional handler integration tests
+
+Handlers use the packages (`@mcp-abap-adt/adt-clients`, `@mcp-abap-adt/connection`) as dependencies but do not test the packages themselves. Package functionality is tested within each package's own test suite.
+
+### Running Tests
+
+```bash
+# Run all tests (packages + handlers)
+npm test
+
+# Run tests for a specific package
+cd packages/adt-clients && npm test
+cd packages/connection && npm test
+
+# Run only handler tests in main project
+npm test -- src/index.test.ts
+```
+
+## Packages & API Documentation
+
+The repository publishes two npm packages. Their READMEs/CHANGELOGs contain the authoritative API documentation:
+
+- **[@mcp-abap-adt/connection](packages/connection/)** – connection/auth/session layer (Basic + JWT, session persistence, CLI helper).
+- **[@mcp-abap-adt/adt-clients](packages/adt-clients/)** – Builder-first ADT clients, Management/Lock/Validation helpers, CLI lock tooling.
+
+### Documentation
+
+**User Guides:**
+- `doc/user-guide/CLIENT_CONFIGURATION.md` – client configuration guide for HTTP/SSE transports with dynamic SAP connection setup.
+- `doc/user-guide/AVAILABLE_TOOLS.md` – complete list of available MCP tools.
+
+**Architecture:**
+- `doc/architecture/STATEFUL_SESSION_GUIDE.md` – server/handler workflow (lock/update/unlock orchestration).
+- `doc/architecture/TOOLS_ARCHITECTURE.md` – MCP tools architecture and handler structure.
+- `packages/adt-clients/docs/STATEFUL_SESSION_GUIDE.md` – Builder & LockClient perspective: session IDs, `onLock`, lock registry.
+- `packages/connection/docs/STATEFUL_SESSION_GUIDE.md` – connection layer: cookies, CSRF tokens, session storage.
+
+**Installation:**
+- `doc/installation/INSTALLATION.md` – installation guide for all platforms.
+
+**Development:**
+- `doc/development/` – development guides, testing, and internal documentation.
 
 ## Contributors
 

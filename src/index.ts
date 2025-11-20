@@ -10,6 +10,7 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
+import * as z from "zod";
 import path from "path";
 import dotenv from "dotenv";
 import { createServer, Server as HttpServer, IncomingHttpHeaders } from "http";
@@ -94,8 +95,70 @@ import { SapConfig, AbapConnection, getConfigFromEnv } from "@mcp-abap-adt/conne
 // Import logger
 import { logger } from "./lib/logger";
 
-// Import tools registry
+// Import tool registry
 import { getAllTools } from "./lib/toolsRegistry";
+
+// Import TOOL_DEFINITION from handlers
+import { TOOL_DEFINITION as GetProgram_Tool } from "./handlers/handleGetProgram";
+import { TOOL_DEFINITION as GetClass_Tool } from "./handlers/handleGetClass";
+import { TOOL_DEFINITION as GetFunction_Tool } from "./handlers/handleGetFunction";
+import { TOOL_DEFINITION as GetFunctionGroup_Tool } from "./handlers/handleGetFunctionGroup";
+import { TOOL_DEFINITION as GetTable_Tool } from "./handlers/handleGetTable";
+import { TOOL_DEFINITION as GetStructure_Tool } from "./handlers/handleGetStructure";
+import { TOOL_DEFINITION as GetTableContents_Tool } from "./handlers/handleGetTableContents";
+import { TOOL_DEFINITION as GetPackage_Tool } from "./handlers/handleGetPackage";
+import { TOOL_DEFINITION as CreatePackage_Tool } from "./handlers/handleCreatePackage";
+import { TOOL_DEFINITION as GetInclude_Tool } from "./handlers/handleGetInclude";
+import { TOOL_DEFINITION as GetIncludesList_Tool } from "./handlers/handleGetIncludesList";
+import { TOOL_DEFINITION as GetTypeInfo_Tool } from "./handlers/handleGetTypeInfo";
+import { TOOL_DEFINITION as GetInterface_Tool } from "./handlers/handleGetInterface";
+import { TOOL_DEFINITION as GetTransaction_Tool } from "./handlers/handleGetTransaction";
+import { TOOL_DEFINITION as SearchObject_Tool } from "./handlers/handleSearchObject";
+import { TOOL_DEFINITION as GetEnhancements_Tool } from "./handlers/handleGetEnhancements";
+import { TOOL_DEFINITION as GetEnhancementImpl_Tool } from "./handlers/handleGetEnhancementImpl";
+import { TOOL_DEFINITION as GetEnhancementSpot_Tool } from "./handlers/handleGetEnhancementSpot";
+import { TOOL_DEFINITION as GetBdef_Tool } from "./handlers/handleGetBdef";
+import { TOOL_DEFINITION as GetSqlQuery_Tool } from "./handlers/handleGetSqlQuery";
+import { TOOL_DEFINITION as GetWhereUsed_Tool } from "./handlers/handleGetWhereUsed";
+import { TOOL_DEFINITION as GetObjectInfo_Tool } from "./handlers/handleGetObjectInfo";
+import { TOOL_DEFINITION as GetAbapAST_Tool } from "./handlers/handleGetAbapAST";
+import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from "./handlers/handleGetAbapSemanticAnalysis";
+import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from "./handlers/handleGetAbapSystemSymbols";
+import { TOOL_DEFINITION as GetDomain_Tool } from "./handlers/handleGetDomain";
+import { TOOL_DEFINITION as CreateDomain_Tool } from "./handlers/handleCreateDomain";
+import { TOOL_DEFINITION as UpdateDomain_Tool } from "./handlers/handleUpdateDomain";
+import { TOOL_DEFINITION as CreateDataElement_Tool } from "./handlers/handleCreateDataElement";
+import { TOOL_DEFINITION as UpdateDataElement_Tool } from "./handlers/handleUpdateDataElement";
+import { TOOL_DEFINITION as GetDataElement_Tool } from "./handlers/handleGetDataElement";
+import { TOOL_DEFINITION as CreateTransport_Tool } from "./handlers/handleCreateTransport";
+import { TOOL_DEFINITION as GetTransport_Tool } from "./handlers/handleGetTransport";
+import { TOOL_DEFINITION as CreateTable_Tool } from "./handlers/handleCreateTable";
+import { TOOL_DEFINITION as CreateStructure_Tool } from "./handlers/handleCreateStructure";
+import { TOOL_DEFINITION as CreateView_Tool } from "./handlers/handleCreateView";
+import { TOOL_DEFINITION as GetView_Tool } from "./handlers/handleGetView";
+import { TOOL_DEFINITION as CreateClass_Tool } from "./handlers/handleCreateClass";
+import { TOOL_DEFINITION as CreateProgram_Tool } from "./handlers/handleCreateProgram";
+import { TOOL_DEFINITION as CreateInterface_Tool } from "./handlers/handleCreateInterface";
+import { TOOL_DEFINITION as CreateFunctionGroup_Tool } from "./handlers/handleCreateFunctionGroup";
+import { TOOL_DEFINITION as CreateFunctionModule_Tool } from "./handlers/handleCreateFunctionModule";
+import { TOOL_DEFINITION as ActivateObject_Tool } from "./handlers/handleActivateObject";
+import { TOOL_DEFINITION as DeleteObject_Tool } from "./handlers/handleDeleteObject";
+import { TOOL_DEFINITION as CheckObject_Tool } from "./handlers/handleCheckObject";
+import { TOOL_DEFINITION as UpdateClassSource_Tool } from "./handlers/handleUpdateClassSource";
+import { TOOL_DEFINITION as UpdateProgramSource_Tool } from "./handlers/handleUpdateProgramSource";
+import { TOOL_DEFINITION as UpdateViewSource_Tool } from "./handlers/handleUpdateViewSource";
+import { TOOL_DEFINITION as UpdateInterfaceSource_Tool } from "./handlers/handleUpdateInterfaceSource";
+import { TOOL_DEFINITION as UpdateFunctionModuleSource_Tool } from "./handlers/handleUpdateFunctionModuleSource";
+import { TOOL_DEFINITION as GetSession_Tool } from "./handlers/handleGetSession";
+import { TOOL_DEFINITION as ValidateObject_Tool } from "./handlers/handleValidateObject";
+import { TOOL_DEFINITION as LockObject_Tool } from "./handlers/handleLockObject";
+import { TOOL_DEFINITION as UnlockObject_Tool } from "./handlers/handleUnlockObject";
+import { TOOL_DEFINITION as ValidateClass_Tool } from "./handlers/handleValidateClass";
+import { TOOL_DEFINITION as CheckClass_Tool } from "./handlers/handleCheckClass";
+import { TOOL_DEFINITION as ValidateTable_Tool } from "./handlers/handleValidateTable";
+import { TOOL_DEFINITION as CheckTable_Tool } from "./handlers/handleCheckTable";
+import { TOOL_DEFINITION as ValidateFunctionModule_Tool } from "./handlers/handleValidateFunctionModule";
+import { TOOL_DEFINITION as CheckFunctionModule_Tool } from "./handlers/handleCheckFunctionModule";
 
 // --- ENV FILE LOADING LOGIC ---
 import fs from "fs";
@@ -824,168 +887,314 @@ export class mcp_abap_adt_server {
       version: "0.1.0"
     });
 
-    // Register all tools using the new API
-    const allTools = getAllTools();
-
-    for (const tool of allTools) {
-      server.registerTool(
-        tool.name,
-        {
-          title: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema as any, // McpServer accepts JSON Schema
-        },
-        async (args: any) => {
-          // Route to appropriate handler (same logic as setupMcpServerHandlers)
-          switch (tool.name) {
-            case "GetProgram":
-              return await handleGetProgram(args);
-            case "GetClass":
-              return await handleGetClass(args);
-            case "GetFunction":
-              return await handleGetFunction(args);
-            case "GetFunctionGroup":
-              return await handleGetFunctionGroup(args);
-            case "GetStructure":
-              return await handleGetStructure(args);
-            case "GetTable":
-              return await handleGetTable(args);
-            case "GetDomain":
-              return await handleGetDomain(args);
-            case "GetTableContents":
-              return await handleGetTableContents(args);
-            case "GetPackage":
-              return await handleGetPackage(args);
-            case "CreatePackage":
-              return await handleCreatePackage(args);
-            case "GetTypeInfo":
-              return await handleGetTypeInfo(args);
-            case "GetInclude":
-              return await handleGetInclude(args);
-            case "SearchObject":
-              return await handleSearchObject(args);
-            case "GetInterface":
-              return await handleGetInterface(args);
-            case "GetTransaction":
-              return await handleGetTransaction(args);
-            case "GetEnhancements":
-              return await handleGetEnhancements(args);
-            case "GetEnhancementSpot":
-              return await handleGetEnhancementSpot(args);
-            case "GetEnhancementImpl":
-              return await handleGetEnhancementImpl(args);
-            case "GetSqlQuery":
-              return await handleGetSqlQuery(args);
-            case "GetIncludesList":
-              return await handleGetIncludesList(args);
-            case "GetWhereUsed":
-              return await handleGetWhereUsed(args);
-            case "GetBdef":
-              return await handleGetBdef(args);
-            case "GetObjectInfo":
-              if (!args || typeof args !== "object") {
-                throw new McpError(ErrorCode.InvalidParams, "Missing or invalid arguments for GetObjectInfo");
-              }
-              return await handleGetObjectInfo(args as { parent_type: string; parent_name: string });
-            case "GetAdtTypes":
-              return await (await import("./handlers/handleGetAllTypes.js")).handleGetAdtTypes(args as any);
-            case "GetObjectStructure":
-              return await (await import("./handlers/handleGetObjectStructure.js")).handleGetObjectStructure(args as any);
-            case "GetObjectsList":
-              return await (await import("./handlers/handleGetObjectsList.js")).handleGetObjectsList(args as any);
-            case "GetObjectsByType":
-              return await (await import("./handlers/handleGetObjectsByType.js")).handleGetObjectsByType(args as any);
-            case "GetProgFullCode":
-              return await (await import("./handlers/handleGetProgFullCode.js")).handleGetProgFullCode(args as any);
-            case "GetObjectNodeFromCache":
-              return await (await import("./handlers/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(args as any);
-            case "DescribeByList":
-              return await (await import("./handlers/handleDescribeByList.js")).handleDescribeByList(args as any);
-            case "GetAbapAST":
-              return await handleGetAbapAST(args);
-            case "GetAbapSemanticAnalysis":
-              return await handleGetAbapSemanticAnalysis(args);
-            case "GetAbapSystemSymbols":
-              return await handleGetAbapSystemSymbols(args);
-            case "CreateDomain":
-              return await handleCreateDomain(args);
-            case "UpdateDomain":
-              return await handleUpdateDomain(args);
-            case "CreateDataElement":
-              return await handleCreateDataElement(args);
-            case "UpdateDataElement":
-              return await handleUpdateDataElement(args);
-            case "GetDataElement":
-              return await handleGetDataElement(args);
-            case "CreateTransport":
-              return await handleCreateTransport(args);
-            case "GetTransport":
-              return await handleGetTransport(args);
-            case "CreateTable":
-              return await handleCreateTable(args);
-            case "CreateStructure":
-              return await handleCreateStructure(args);
-            case "CreateView":
-              return await handleCreateView(args);
-            case "GetView":
-              return await handleGetView(args);
-            case "CreateClass":
-              return await handleCreateClass(args);
-            case "UpdateClassSource":
-              return await handleUpdateClassSource(args);
-            case "CreateProgram":
-              return await handleCreateProgram(args);
-            case "UpdateProgramSource":
-              return await handleUpdateProgramSource(args);
-            case "CreateInterface":
-              return await handleCreateInterface(args);
-            case "CreateFunctionGroup":
-              return await handleCreateFunctionGroup(args);
-            case "CreateFunctionModule":
-              return await handleCreateFunctionModule(args);
-            case "UpdateViewSource":
-              return await handleUpdateViewSource(args);
-            case "UpdateInterfaceSource":
-              return await handleUpdateInterfaceSource(args);
-            case "UpdateFunctionModuleSource":
-              return await handleUpdateFunctionModuleSource(args as any);
-            case "ActivateObject":
-              return await handleActivateObject(args);
-            case "DeleteObject":
-              return await handleDeleteObject(args);
-            case "CheckObject":
-              return await handleCheckObject(args);
-            case "GetSession":
-              return await handleGetSession(args);
-            case "ValidateObject":
-              return await handleValidateObject(args);
-            case "LockObject":
-              return await handleLockObject(args);
-            case "UnlockObject":
-              return await handleUnlockObject(args);
-            case "ValidateClass":
-              return await handleValidateClass(args);
-            case "CheckClass":
-              return await handleCheckClass(args);
-            case "ValidateTable":
-              return await handleValidateTable(args);
-            case "CheckTable":
-              return await handleCheckTable(args);
-            case "ValidateFunctionModule":
-              return await handleValidateFunctionModule(args);
-            case "CheckFunctionModule":
-              return await handleCheckFunctionModule(args);
-            default:
-              throw new McpError(
-                ErrorCode.MethodNotFound,
-                `Unknown tool: ${tool.name}`
-              );
-          }
-        }
-      );
-    }
+    // Register all tools using the same method as main server
+    this.registerAllToolsOnServer(server);
 
     return server;
+  }
+
+  /**
+   * Converts JSON Schema to Zod schema object (not z.object(), but object with Zod fields)
+   * SDK expects inputSchema to be an object with Zod schemas as values, not z.object()
+   */
+  private jsonSchemaToZod(jsonSchema: any): any {
+    // If already a Zod schema object (object with Zod fields), return as-is
+    if (jsonSchema && typeof jsonSchema === 'object' && !jsonSchema.type && !jsonSchema.properties) {
+      // Check if it looks like a Zod schema object (has Zod types as values)
+      const firstValue = Object.values(jsonSchema)[0];
+      if (firstValue && ((firstValue as any).def || (firstValue as any)._def || typeof (firstValue as any).parse === 'function')) {
+        return jsonSchema;
+      }
+    }
+
+    // If it's a JSON Schema object
+    if (jsonSchema && typeof jsonSchema === 'object' && jsonSchema.type === 'object' && jsonSchema.properties) {
+      const zodShape: Record<string, z.ZodTypeAny> = {};
+      const required = jsonSchema.required || [];
+
+      for (const [key, prop] of Object.entries(jsonSchema.properties)) {
+        const propSchema = prop as any;
+        let zodType: z.ZodTypeAny;
+
+        if (propSchema.type === 'string') {
+          if (propSchema.enum && Array.isArray(propSchema.enum) && propSchema.enum.length > 0) {
+            // Use z.enum() for enum values (requires at least 1 element, but z.enum needs 2+)
+            if (propSchema.enum.length === 1) {
+              zodType = z.literal(propSchema.enum[0]);
+            } else {
+              zodType = z.enum(propSchema.enum as [string, ...string[]]);
+            }
+          } else {
+            zodType = z.string();
+          }
+        } else if (propSchema.type === 'number' || propSchema.type === 'integer') {
+          zodType = z.number();
+        } else if (propSchema.type === 'boolean') {
+          zodType = z.boolean();
+        } else if (propSchema.type === 'array') {
+          const items = propSchema.items;
+          if (items?.type === 'string') {
+            zodType = z.array(z.string());
+          } else if (items?.type === 'number' || items?.type === 'integer') {
+            zodType = z.array(z.number());
+          } else if (items?.type === 'boolean') {
+            zodType = z.array(z.boolean());
+          } else if (items?.type === 'object' && items.properties) {
+            // For nested objects in arrays, create object schema
+            const nestedShape: Record<string, z.ZodTypeAny> = {};
+            const nestedRequired = items.required || [];
+            for (const [nestedKey, nestedProp] of Object.entries(items.properties)) {
+              const nestedPropSchema = nestedProp as any;
+              let nestedZodType: z.ZodTypeAny;
+              if (nestedPropSchema.type === 'string') {
+                if (nestedPropSchema.enum && Array.isArray(nestedPropSchema.enum) && nestedPropSchema.enum.length > 0) {
+                  if (nestedPropSchema.enum.length === 1) {
+                    nestedZodType = z.literal(nestedPropSchema.enum[0]);
+                  } else {
+                    nestedZodType = z.enum(nestedPropSchema.enum as [string, ...string[]]);
+                  }
+                } else {
+                  nestedZodType = z.string();
+                }
+              } else if (nestedPropSchema.type === 'number' || nestedPropSchema.type === 'integer') {
+                nestedZodType = z.number();
+              } else if (nestedPropSchema.type === 'boolean') {
+                nestedZodType = z.boolean();
+              } else {
+                nestedZodType = z.any();
+              }
+              if (nestedPropSchema.default !== undefined) {
+                nestedZodType = nestedZodType.default(nestedPropSchema.default);
+              }
+              if (!nestedRequired.includes(nestedKey)) {
+                nestedZodType = nestedZodType.optional();
+              }
+              if (nestedPropSchema.description) {
+                nestedZodType = nestedZodType.describe(nestedPropSchema.description);
+              }
+              nestedShape[nestedKey] = nestedZodType;
+            }
+            zodType = z.array(z.object(nestedShape));
+          } else {
+            zodType = z.array(z.any());
+          }
+        } else if (propSchema.type === 'object' && propSchema.properties) {
+          // For nested objects, create object schema
+          const nestedShape: Record<string, z.ZodTypeAny> = {};
+          const nestedRequired = propSchema.required || [];
+          for (const [nestedKey, nestedProp] of Object.entries(propSchema.properties)) {
+            const nestedPropSchema = nestedProp as any;
+            let nestedZodType: z.ZodTypeAny;
+            if (nestedPropSchema.type === 'string') {
+              if (nestedPropSchema.enum && Array.isArray(nestedPropSchema.enum)) {
+                nestedZodType = z.enum(nestedPropSchema.enum as [string, ...string[]]);
+              } else {
+                nestedZodType = z.string();
+              }
+            } else if (nestedPropSchema.type === 'number' || nestedPropSchema.type === 'integer') {
+              nestedZodType = z.number();
+            } else if (nestedPropSchema.type === 'boolean') {
+              nestedZodType = z.boolean();
+            } else {
+              nestedZodType = z.any();
+            }
+            if (nestedPropSchema.default !== undefined) {
+              nestedZodType = nestedZodType.default(nestedPropSchema.default);
+            }
+            if (!nestedRequired.includes(nestedKey)) {
+              nestedZodType = nestedZodType.optional();
+            }
+            if (nestedPropSchema.description) {
+              nestedZodType = nestedZodType.describe(nestedPropSchema.description);
+            }
+            nestedShape[nestedKey] = nestedZodType;
+          }
+          zodType = z.object(nestedShape);
+        } else {
+          zodType = z.any();
+        }
+
+        // Add default value if present (before optional)
+        if (propSchema.default !== undefined) {
+          zodType = zodType.default(propSchema.default);
+        }
+
+        // Make optional if not in required array (must be after default, before describe)
+        if (!required.includes(key)) {
+          zodType = zodType.optional();
+        }
+
+        // Add description if present (after optional)
+        if (propSchema.description) {
+          zodType = zodType.describe(propSchema.description);
+        }
+
+        zodShape[key] = zodType;
+      }
+
+      // Return object with Zod fields, not z.object()
+      return zodShape;
+    }
+
+    // Fallback: if it's already a Zod schema object, return as-is
+    if (jsonSchema && typeof jsonSchema === 'object' && !jsonSchema.type) {
+      return jsonSchema;
+    }
+
+    // Fallback: return empty object for unknown schemas
+    return {};
+  }
+
+  /**
+   * Helper function to register a tool on McpServer
+   * Wraps handler to convert our response format to MCP format
+   */
+  private registerToolOnServer(
+    server: McpServer,
+    toolName: string,
+    description: string,
+    inputSchema: any,
+    handler: (args: any) => Promise<any>
+  ) {
+    // Convert JSON Schema to Zod if needed, otherwise pass as-is (like in the example)
+    const zodSchema = (inputSchema && typeof inputSchema === 'object' && inputSchema.type === 'object' && inputSchema.properties)
+      ? this.jsonSchemaToZod(inputSchema)
+      : inputSchema;
+
+    server.registerTool(
+      toolName,
+      {
+        description,
+        inputSchema: zodSchema,
+      },
+      async (args: any) => {
+        const result = await handler(args);
+
+        // If error, throw it
+        if (result.isError) {
+          const errorText = result.content
+            ?.map((item: any) => {
+              if (item?.type === "json" && item.json !== undefined) {
+                return JSON.stringify(item.json);
+              }
+              return item?.text || String(item);
+            })
+            .join("\n") || "Unknown error";
+          throw new McpError(ErrorCode.InternalError, errorText);
+        }
+
+        // Convert content to MCP format - JSON items become text
+        const content = (result.content || []).map((item: any) => {
+          if (item?.type === "json" && item.json !== undefined) {
+            return {
+              type: "text" as const,
+              text: JSON.stringify(item.json),
+            };
+          }
+          return {
+            type: "text" as const,
+            text: item?.text || String(item || ""),
+          };
+        });
+
+        return { content };
+      }
+    );
+  }
+
+  /**
+   * Registers all tools on a McpServer instance
+   * Used for both main server and per-session servers
+   */
+  private registerAllToolsOnServer(server: McpServer) {
+    this.registerToolOnServer(server, GetProgram_Tool.name, GetProgram_Tool.description, GetProgram_Tool.inputSchema as any, handleGetProgram);
+    this.registerToolOnServer(server, GetClass_Tool.name, GetClass_Tool.description, GetClass_Tool.inputSchema as any, handleGetClass);
+    this.registerToolOnServer(server, GetFunction_Tool.name, GetFunction_Tool.description, GetFunction_Tool.inputSchema as any, handleGetFunction);
+    this.registerToolOnServer(server, GetFunctionGroup_Tool.name, GetFunctionGroup_Tool.description, GetFunctionGroup_Tool.inputSchema as any, handleGetFunctionGroup);
+    this.registerToolOnServer(server, GetTable_Tool.name, GetTable_Tool.description, GetTable_Tool.inputSchema as any, handleGetTable);
+    this.registerToolOnServer(server, GetStructure_Tool.name, GetStructure_Tool.description, GetStructure_Tool.inputSchema as any, handleGetStructure);
+    this.registerToolOnServer(server, GetTableContents_Tool.name, GetTableContents_Tool.description, GetTableContents_Tool.inputSchema as any, handleGetTableContents);
+    this.registerToolOnServer(server, GetPackage_Tool.name, GetPackage_Tool.description, GetPackage_Tool.inputSchema as any, handleGetPackage);
+    this.registerToolOnServer(server, CreatePackage_Tool.name, CreatePackage_Tool.description, CreatePackage_Tool.inputSchema as any, handleCreatePackage);
+    this.registerToolOnServer(server, GetInclude_Tool.name, GetInclude_Tool.description, GetInclude_Tool.inputSchema as any, handleGetInclude);
+    this.registerToolOnServer(server, GetIncludesList_Tool.name, GetIncludesList_Tool.description, GetIncludesList_Tool.inputSchema as any, handleGetIncludesList);
+    this.registerToolOnServer(server, GetTypeInfo_Tool.name, GetTypeInfo_Tool.description, GetTypeInfo_Tool.inputSchema as any, handleGetTypeInfo);
+    this.registerToolOnServer(server, GetInterface_Tool.name, GetInterface_Tool.description, GetInterface_Tool.inputSchema as any, handleGetInterface);
+    this.registerToolOnServer(server, GetTransaction_Tool.name, GetTransaction_Tool.description, GetTransaction_Tool.inputSchema as any, handleGetTransaction);
+    this.registerToolOnServer(server, SearchObject_Tool.name, SearchObject_Tool.description, SearchObject_Tool.inputSchema as any, handleSearchObject);
+    this.registerToolOnServer(server, GetEnhancements_Tool.name, GetEnhancements_Tool.description, GetEnhancements_Tool.inputSchema as any, handleGetEnhancements);
+    this.registerToolOnServer(server, GetEnhancementSpot_Tool.name, GetEnhancementSpot_Tool.description, GetEnhancementSpot_Tool.inputSchema as any, handleGetEnhancementSpot);
+    this.registerToolOnServer(server, GetEnhancementImpl_Tool.name, GetEnhancementImpl_Tool.description, GetEnhancementImpl_Tool.inputSchema as any, handleGetEnhancementImpl);
+    this.registerToolOnServer(server, GetBdef_Tool.name, GetBdef_Tool.description, GetBdef_Tool.inputSchema as any, handleGetBdef);
+    this.registerToolOnServer(server, GetSqlQuery_Tool.name, GetSqlQuery_Tool.description, GetSqlQuery_Tool.inputSchema as any, handleGetSqlQuery);
+    this.registerToolOnServer(server, GetWhereUsed_Tool.name, GetWhereUsed_Tool.description, GetWhereUsed_Tool.inputSchema as any, handleGetWhereUsed);
+    this.registerToolOnServer(server, GetObjectInfo_Tool.name, GetObjectInfo_Tool.description, GetObjectInfo_Tool.inputSchema as any, async (args: any) => {
+      if (!args || typeof args !== "object") {
+        throw new McpError(ErrorCode.InvalidParams, "Missing or invalid arguments for GetObjectInfo");
+      }
+      return await handleGetObjectInfo(args as { parent_type: string; parent_name: string });
+    });
+    this.registerToolOnServer(server, GetAbapAST_Tool.name, GetAbapAST_Tool.description, GetAbapAST_Tool.inputSchema as any, handleGetAbapAST);
+    this.registerToolOnServer(server, GetAbapSemanticAnalysis_Tool.name, GetAbapSemanticAnalysis_Tool.description, GetAbapSemanticAnalysis_Tool.inputSchema as any, handleGetAbapSemanticAnalysis);
+    this.registerToolOnServer(server, GetAbapSystemSymbols_Tool.name, GetAbapSystemSymbols_Tool.description, GetAbapSystemSymbols_Tool.inputSchema as any, handleGetAbapSystemSymbols);
+    this.registerToolOnServer(server, GetDomain_Tool.name, GetDomain_Tool.description, GetDomain_Tool.inputSchema as any, handleGetDomain);
+    this.registerToolOnServer(server, CreateDomain_Tool.name, CreateDomain_Tool.description, CreateDomain_Tool.inputSchema as any, handleCreateDomain);
+    this.registerToolOnServer(server, UpdateDomain_Tool.name, UpdateDomain_Tool.description, UpdateDomain_Tool.inputSchema as any, handleUpdateDomain);
+    this.registerToolOnServer(server, CreateDataElement_Tool.name, CreateDataElement_Tool.description, CreateDataElement_Tool.inputSchema as any, handleCreateDataElement);
+    this.registerToolOnServer(server, UpdateDataElement_Tool.name, UpdateDataElement_Tool.description, UpdateDataElement_Tool.inputSchema as any, handleUpdateDataElement);
+    this.registerToolOnServer(server, GetDataElement_Tool.name, GetDataElement_Tool.description, GetDataElement_Tool.inputSchema as any, handleGetDataElement);
+    this.registerToolOnServer(server, CreateTransport_Tool.name, CreateTransport_Tool.description, CreateTransport_Tool.inputSchema as any, handleCreateTransport);
+    this.registerToolOnServer(server, GetTransport_Tool.name, GetTransport_Tool.description, GetTransport_Tool.inputSchema as any, handleGetTransport);
+    this.registerToolOnServer(server, CreateTable_Tool.name, CreateTable_Tool.description, CreateTable_Tool.inputSchema as any, handleCreateTable);
+    this.registerToolOnServer(server, CreateStructure_Tool.name, CreateStructure_Tool.description, CreateStructure_Tool.inputSchema as any, handleCreateStructure);
+    this.registerToolOnServer(server, CreateView_Tool.name, CreateView_Tool.description, CreateView_Tool.inputSchema as any, handleCreateView);
+    this.registerToolOnServer(server, GetView_Tool.name, GetView_Tool.description, GetView_Tool.inputSchema as any, handleGetView);
+    this.registerToolOnServer(server, CreateClass_Tool.name, CreateClass_Tool.description, CreateClass_Tool.inputSchema as any, handleCreateClass);
+    this.registerToolOnServer(server, UpdateClassSource_Tool.name, UpdateClassSource_Tool.description, UpdateClassSource_Tool.inputSchema as any, handleUpdateClassSource);
+    this.registerToolOnServer(server, CreateProgram_Tool.name, CreateProgram_Tool.description, CreateProgram_Tool.inputSchema as any, handleCreateProgram);
+    this.registerToolOnServer(server, UpdateProgramSource_Tool.name, UpdateProgramSource_Tool.description, UpdateProgramSource_Tool.inputSchema as any, handleUpdateProgramSource);
+    this.registerToolOnServer(server, CreateInterface_Tool.name, CreateInterface_Tool.description, CreateInterface_Tool.inputSchema as any, handleCreateInterface);
+    this.registerToolOnServer(server, CreateFunctionGroup_Tool.name, CreateFunctionGroup_Tool.description, CreateFunctionGroup_Tool.inputSchema as any, handleCreateFunctionGroup);
+    this.registerToolOnServer(server, CreateFunctionModule_Tool.name, CreateFunctionModule_Tool.description, CreateFunctionModule_Tool.inputSchema as any, handleCreateFunctionModule);
+    this.registerToolOnServer(server, UpdateViewSource_Tool.name, UpdateViewSource_Tool.description, UpdateViewSource_Tool.inputSchema as any, handleUpdateViewSource);
+    this.registerToolOnServer(server, UpdateInterfaceSource_Tool.name, UpdateInterfaceSource_Tool.description, UpdateInterfaceSource_Tool.inputSchema as any, handleUpdateInterfaceSource);
+    this.registerToolOnServer(server, UpdateFunctionModuleSource_Tool.name, UpdateFunctionModuleSource_Tool.description, UpdateFunctionModuleSource_Tool.inputSchema as any, handleUpdateFunctionModuleSource);
+    this.registerToolOnServer(server, ActivateObject_Tool.name, ActivateObject_Tool.description, ActivateObject_Tool.inputSchema as any, handleActivateObject);
+    this.registerToolOnServer(server, DeleteObject_Tool.name, DeleteObject_Tool.description, DeleteObject_Tool.inputSchema as any, handleDeleteObject);
+    this.registerToolOnServer(server, CheckObject_Tool.name, CheckObject_Tool.description, CheckObject_Tool.inputSchema as any, handleCheckObject);
+    this.registerToolOnServer(server, GetSession_Tool.name, GetSession_Tool.description, GetSession_Tool.inputSchema as any, handleGetSession);
+    this.registerToolOnServer(server, ValidateObject_Tool.name, ValidateObject_Tool.description, ValidateObject_Tool.inputSchema as any, handleValidateObject);
+    this.registerToolOnServer(server, LockObject_Tool.name, LockObject_Tool.description, LockObject_Tool.inputSchema as any, handleLockObject);
+    this.registerToolOnServer(server, UnlockObject_Tool.name, UnlockObject_Tool.description, UnlockObject_Tool.inputSchema as any, handleUnlockObject);
+    this.registerToolOnServer(server, ValidateClass_Tool.name, ValidateClass_Tool.description, ValidateClass_Tool.inputSchema as any, handleValidateClass);
+    this.registerToolOnServer(server, CheckClass_Tool.name, CheckClass_Tool.description, CheckClass_Tool.inputSchema as any, handleCheckClass);
+    this.registerToolOnServer(server, ValidateTable_Tool.name, ValidateTable_Tool.description, ValidateTable_Tool.inputSchema as any, handleValidateTable);
+    this.registerToolOnServer(server, CheckTable_Tool.name, CheckTable_Tool.description, CheckTable_Tool.inputSchema as any, handleCheckTable);
+    this.registerToolOnServer(server, ValidateFunctionModule_Tool.name, ValidateFunctionModule_Tool.description, ValidateFunctionModule_Tool.inputSchema as any, handleValidateFunctionModule);
+    this.registerToolOnServer(server, CheckFunctionModule_Tool.name, CheckFunctionModule_Tool.description, CheckFunctionModule_Tool.inputSchema as any, handleCheckFunctionModule);
+
+    // Dynamic import tools
+    this.registerToolOnServer(server, "GetAdtTypes", "Get all ADT types available in the system", { type: "object", properties: {}, required: [] } as any, async (args: any) => {
+      return await (await import("./handlers/handleGetAllTypes.js")).handleGetAdtTypes(args);
+    });
+    this.registerToolOnServer(server, "GetObjectStructure", "Get object structure with includes hierarchy", { type: "object", properties: { object_name: { type: "string" }, object_type: { type: "string" } }, required: ["object_name", "object_type"] } as any, async (args: any) => {
+      return await (await import("./handlers/handleGetObjectStructure.js")).handleGetObjectStructure(args);
+    });
+    this.registerToolOnServer(server, "GetObjectsList", "Get list of objects by package", { type: "object", properties: { package_name: { type: "string" } }, required: ["package_name"] } as any, async (args: any) => {
+      return await (await import("./handlers/handleGetObjectsList.js")).handleGetObjectsList(args);
+    });
+    this.registerToolOnServer(server, "GetObjectsByType", "Get objects by type", { type: "object", properties: { object_type: { type: "string" }, package_name: { type: "string" } }, required: ["object_type"] } as any, async (args: any) => {
+      return await (await import("./handlers/handleGetObjectsByType.js")).handleGetObjectsByType(args);
+    });
+    this.registerToolOnServer(server, "GetProgFullCode", "Get full program code with includes", { type: "object", properties: { program_name: { type: "string" } }, required: ["program_name"] } as any, async (args: any) => {
+      return await (await import("./handlers/handleGetProgFullCode.js")).handleGetProgFullCode(args);
+    });
+    this.registerToolOnServer(server, "GetObjectNodeFromCache", "Get object node from cache", { type: "object", properties: { object_name: { type: "string" }, object_type: { type: "string" } }, required: ["object_name", "object_type"] } as any, async (args: any) => {
+      return await (await import("./handlers/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(args);
+    });
+    this.registerToolOnServer(server, "DescribeByList", "Describe objects by list", { type: "object", properties: { objects: { type: "array", items: { type: "string" } } }, required: ["objects"] } as any, async (args: any) => {
+      return await (await import("./handlers/handleDescribeByList.js")).handleDescribeByList(args);
+    });
   }
 
   /**
@@ -993,166 +1202,9 @@ export class mcp_abap_adt_server {
    * @private
    */
   private setupMcpServerHandlers() {
-    // Register all tools using the new API
-    const allTools = getAllTools();
-
-    for (const tool of allTools) {
-      this.mcpServer.registerTool(
-        tool.name,
-        {
-          title: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema as any, // McpServer accepts JSON Schema
-        },
-        async (args: any) => {
-          // Route to appropriate handler
-          switch (tool.name) {
-            case "GetProgram":
-              return await handleGetProgram(args);
-            case "GetClass":
-              return await handleGetClass(args);
-            case "GetFunction":
-              return await handleGetFunction(args);
-            case "GetFunctionGroup":
-              return await handleGetFunctionGroup(args);
-            case "GetStructure":
-              return await handleGetStructure(args);
-            case "GetTable":
-              return await handleGetTable(args);
-            case "GetDomain":
-              return await handleGetDomain(args);
-            case "GetTableContents":
-              return await handleGetTableContents(args);
-            case "GetPackage":
-              return await handleGetPackage(args);
-            case "CreatePackage":
-              return await handleCreatePackage(args);
-            case "GetTypeInfo":
-              return await handleGetTypeInfo(args);
-            case "GetInclude":
-              return await handleGetInclude(args);
-            case "SearchObject":
-              return await handleSearchObject(args);
-            case "GetInterface":
-              return await handleGetInterface(args);
-            case "GetTransaction":
-              return await handleGetTransaction(args);
-            case "GetEnhancements":
-              return await handleGetEnhancements(args);
-            case "GetEnhancementSpot":
-              return await handleGetEnhancementSpot(args);
-            case "GetEnhancementImpl":
-              return await handleGetEnhancementImpl(args);
-            case "GetSqlQuery":
-              return await handleGetSqlQuery(args);
-            case "GetIncludesList":
-              return await handleGetIncludesList(args);
-            case "GetWhereUsed":
-              return await handleGetWhereUsed(args);
-            case "GetBdef":
-              return await handleGetBdef(args);
-            case "GetObjectInfo":
-              if (!args || typeof args !== "object") {
-                throw new McpError(ErrorCode.InvalidParams, "Missing or invalid arguments for GetObjectInfo");
-              }
-              return await handleGetObjectInfo(args as { parent_type: string; parent_name: string });
-            case "GetAdtTypes":
-              return await (await import("./handlers/handleGetAllTypes.js")).handleGetAdtTypes(args as any);
-            case "GetObjectStructure":
-              return await (await import("./handlers/handleGetObjectStructure.js")).handleGetObjectStructure(args as any);
-            case "GetObjectsList":
-              return await (await import("./handlers/handleGetObjectsList.js")).handleGetObjectsList(args as any);
-            case "GetObjectsByType":
-              return await (await import("./handlers/handleGetObjectsByType.js")).handleGetObjectsByType(args as any);
-            case "GetProgFullCode":
-              return await (await import("./handlers/handleGetProgFullCode.js")).handleGetProgFullCode(args as any);
-            case "GetObjectNodeFromCache":
-              return await (await import("./handlers/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(args as any);
-            case "DescribeByList":
-              return await (await import("./handlers/handleDescribeByList.js")).handleDescribeByList(args as any);
-            case "GetAbapAST":
-              return await handleGetAbapAST(args);
-            case "GetAbapSemanticAnalysis":
-              return await handleGetAbapSemanticAnalysis(args);
-            case "GetAbapSystemSymbols":
-              return await handleGetAbapSystemSymbols(args);
-            case "CreateDomain":
-              return await handleCreateDomain(args);
-            case "UpdateDomain":
-              return await handleUpdateDomain(args);
-            case "CreateDataElement":
-              return await handleCreateDataElement(args);
-            case "UpdateDataElement":
-              return await handleUpdateDataElement(args);
-            case "GetDataElement":
-              return await handleGetDataElement(args);
-            case "CreateTransport":
-              return await handleCreateTransport(args);
-            case "GetTransport":
-              return await handleGetTransport(args);
-            case "CreateTable":
-              return await handleCreateTable(args);
-            case "CreateStructure":
-              return await handleCreateStructure(args);
-            case "CreateView":
-              return await handleCreateView(args);
-            case "GetView":
-              return await handleGetView(args);
-            case "CreateClass":
-              return await handleCreateClass(args);
-            case "UpdateClassSource":
-              return await handleUpdateClassSource(args);
-            case "CreateProgram":
-              return await handleCreateProgram(args);
-            case "UpdateProgramSource":
-              return await handleUpdateProgramSource(args);
-            case "CreateInterface":
-              return await handleCreateInterface(args);
-            case "CreateFunctionGroup":
-              return await handleCreateFunctionGroup(args);
-            case "CreateFunctionModule":
-              return await handleCreateFunctionModule(args);
-            case "UpdateViewSource":
-              return await handleUpdateViewSource(args);
-            case "UpdateInterfaceSource":
-              return await handleUpdateInterfaceSource(args);
-            case "UpdateFunctionModuleSource":
-              return await handleUpdateFunctionModuleSource(args as any);
-            case "ActivateObject":
-              return await handleActivateObject(args);
-            case "DeleteObject":
-              return await handleDeleteObject(args);
-            case "CheckObject":
-              return await handleCheckObject(args);
-            case "GetSession":
-              return await handleGetSession(args);
-            case "ValidateObject":
-              return await handleValidateObject(args);
-            case "LockObject":
-              return await handleLockObject(args);
-            case "UnlockObject":
-              return await handleUnlockObject(args);
-            case "ValidateClass":
-              return await handleValidateClass(args);
-            case "CheckClass":
-              return await handleCheckClass(args);
-            case "ValidateTable":
-              return await handleValidateTable(args);
-            case "CheckTable":
-              return await handleCheckTable(args);
-            case "ValidateFunctionModule":
-              return await handleValidateFunctionModule(args);
-            case "CheckFunctionModule":
-              return await handleCheckFunctionModule(args);
-            default:
-              throw new McpError(
-                ErrorCode.MethodNotFound,
-                `Unknown tool: ${tool.name}`
-              );
-          }
-        }
-      );
-    }
+    // Register all tools using TOOL_DEFINITION from handlers
+    // McpServer automatically handles listTools requests for registered tools
+    this.registerAllToolsOnServer(this.mcpServer);
   }
 
   private setupSignalHandlers() {

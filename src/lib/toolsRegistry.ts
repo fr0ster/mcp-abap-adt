@@ -67,14 +67,18 @@ import { TOOL_DEFINITION as ValidateFunctionModule_Tool } from '../handlers/hand
 import { TOOL_DEFINITION as CheckFunctionModule_Tool } from '../handlers/handleCheckFunctionModule';
 
 // Type that describes a tool entry
+// Supports both JSON Schema format and Zod schema format (object with Zod fields)
 export interface ToolDefinition {
   name: string;
   description: string;
-  inputSchema: {
-    type: string;
-    properties: Record<string, any>;
-    required: readonly string[];
-  };
+  inputSchema:
+    | {
+        // JSON Schema format
+        type: string;
+        properties: Record<string, any>;
+        required: readonly string[];
+      }
+    | Record<string, any>; // Zod schema format (object with Zod fields)
 }
 
 // Static descriptors for tools that rely on dynamic import

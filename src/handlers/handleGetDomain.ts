@@ -2,19 +2,13 @@ import { McpError, ErrorCode } from '../lib/utils';
 import { return_error, return_response } from '../lib/utils';
 import { getReadOnlyClient } from '../lib/clients';
 import { XMLParser } from 'fast-xml-parser';
+import * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: "GetDomain",
   description: "Retrieve ABAP domain structure and properties from SAP system.",
   inputSchema: {
-    type: "object",
-    properties: {
-      domain_name: {
-        type: "string",
-        description: "Domain name (e.g., MATNR, CHAR20, ZZ_TEST_DOMAIN)"
-      }
-    },
-    required: ["domain_name"]
+    domain_name: z.string().describe("Domain name (e.g., MATNR, CHAR20, ZZ_TEST_DOMAIN)")
   }
 } as const;
 

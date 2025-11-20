@@ -86,6 +86,72 @@ git --version
 
 ## 🚀 Step 4: Install MCP ABAP ADT Server
 
+You have two installation options:
+
+### Option A: Install from Pre-built Package (Recommended)
+
+Install from a pre-built `.tgz` package file:
+
+**Global Installation (Recommended):**
+
+```bash
+# Download or obtain the package file
+# Then install globally
+npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
+
+# Verify installation
+mcp-abap-adt --help
+```
+
+**Available commands after installation:**
+- `mcp-abap-adt` - stdio transport (default, for MCP clients)
+- `mcp-abap-adt-http` - HTTP server transport
+- `mcp-abap-adt-sse` - SSE server transport
+
+**Usage examples:**
+```bash
+# HTTP server on default port (3000)
+mcp-abap-adt-http
+
+# HTTP server on custom port
+mcp-abap-adt-http --port 8080
+
+# SSE server accessible from network
+mcp-abap-adt-sse --host 0.0.0.0 --port 3000
+
+# Use custom .env file
+mcp-abap-adt-http --env /path/to/custom/.env --port 8080
+```
+
+**Local Installation (Project-specific):**
+
+```bash
+# Navigate to your project
+cd /path/to/your/project
+
+# Install package locally
+npm install /path/to/fr0ster-mcp-abap-adt-1.1.0.tgz
+
+# Use via npx
+npx mcp-abap-adt-http --port 3000
+```
+
+**Troubleshooting:**
+
+If command not found after global installation:
+```bash
+# Check npm global bin directory
+npm config get prefix
+
+# Add to PATH (add to ~/.zshrc or ~/.bash_profile)
+export PATH="$(npm config get prefix)/bin:$PATH"
+source ~/.zshrc  # or source ~/.bash_profile
+```
+
+### Option B: Install from Source (For Development)
+
+Clone and build from source code:
+
 ```bash
 # Clone repository with submodules
 git clone --recurse-submodules https://github.com/fr0ster/mcp-abap-adt.git

@@ -2,16 +2,13 @@ import { McpError, ErrorCode } from '../lib/utils';
 import { return_error, return_response } from '../lib/utils';
 import { getReadOnlyClient } from '../lib/clients';
 import { writeResultToFile } from '../lib/writeResultToFile';
+import * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: "GetProgram",
   description: "Retrieve ABAP program source code. Returns only the main program source code without includes or enhancements.",
   inputSchema: {
-    type: "object",
-    properties: {
-      program_name: { type: "string", description: "Name of the ABAP program" }
-    },
-    required: ["program_name"]
+    program_name: z.string().describe("Name of the ABAP program")
   }
 } as const;
 

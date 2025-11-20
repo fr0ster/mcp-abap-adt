@@ -10,53 +10,21 @@
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { PackageBuilder } from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: "CreatePackage",
   description: "Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.",
   inputSchema: {
-    type: "object",
-    properties: {
-      package_name: {
-        type: "string",
-        description: "Package name (e.g., ZOK_TEST_0002). Must follow SAP naming conventions (start with Z or Y for customer namespace)."
-      },
-      description: {
-        type: "string",
-        description: "Package description. If not provided, package_name will be used."
-      },
-      super_package: {
-        type: "string",
-        description: "Parent package name (e.g., ZOK_PACKAGE). Required for structure packages."
-      },
-      package_type: {
-        type: "string",
-        description: "Package type: 'development' (default) or 'structure'",
-        enum: ["development", "structure"],
-        default: "development"
-      },
-      software_component: {
-        type: "string",
-        description: "Software component (e.g., HOME, LOCAL). Default: HOME"
-      },
-      transport_layer: {
-        type: "string",
-        description: "Transport layer (e.g., ZE19). Required for transportable packages."
-      },
-      transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required if package is transportable."
-      },
-      application_component: {
-        type: "string",
-        description: "Application component (optional, e.g., BC-ABA)"
-      },
-      responsible: {
-        type: "string",
-        description: "User responsible for the package (e.g., CB9980002377). If not provided, uses SAP_USERNAME or SAP_USER environment variable."
-      }
-    },
-    required: ["package_name", "super_package"]
+    package_name: z.string().describe("Package name (e.g., ZOK_TEST_0002). Must follow SAP naming conventions (start with Z or Y for customer namespace)."),
+    description: z.string().optional().describe("Package description. If not provided, package_name will be used."),
+    super_package: z.string().describe("Parent package name (e.g., ZOK_PACKAGE). Required for structure packages."),
+    package_type: z.enum(["development", "structure"]).default("development").describe("Package type: 'development' (default) or 'structure'"),
+    software_component: z.string().optional().describe("Software component (e.g., HOME, LOCAL). Default: HOME"),
+    transport_layer: z.string().optional().describe("Transport layer (e.g., ZE19). Required for transportable packages."),
+    transport_request: z.string().optional().describe("Transport request number (e.g., E19K905635). Required if package is transportable."),
+    application_component: z.string().optional().describe("Application component (optional, e.g., BC-ABA)"),
+    responsible: z.string().optional().describe("User responsible for the package (e.g., CB9980002377). If not provided, uses SAP_USERNAME or SAP_USER environment variable.")
   }
 } as const;
 

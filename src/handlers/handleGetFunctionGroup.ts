@@ -2,22 +2,13 @@ import { McpError, ErrorCode } from '../lib/utils';
 import { getReadOnlyClient } from '../lib/clients';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../lib/writeResultToFile';
-
+import * as z from 'zod';
 
 export const TOOL_DEFINITION = {
-  "name": "GetFunctionGroup",
-  "description": "Retrieve ABAP Function Group source code.",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "function_group": {
-        "type": "string",
-        "description": "Name of the function group"
-      }
-    },
-    "required": [
-      "function_group"
-    ]
+  name: "GetFunctionGroup",
+  description: "Retrieve ABAP Function Group source code.",
+  inputSchema: {
+    function_group: z.string().describe("Name of the function group")
   }
 } as const;
 

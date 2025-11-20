@@ -7,6 +7,9 @@ build/
 coverage/
 package-lock.json
 
+# NPM packages
+*.tgz
+
 # Environment variables
 .env
 .env.local
@@ -61,3 +64,4 @@ Thumbs.db
 # ANTLR4 generated files
 src/generated/
 tools/antlr/
+fr0ster-mcp-abap-adt-*.tgz

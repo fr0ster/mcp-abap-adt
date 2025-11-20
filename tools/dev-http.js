@@ -71,10 +71,9 @@ function spawnInspector(port) {
   const args = [
     '@modelcontextprotocol/inspector',
     '--transport',
-    'streamable-http',
-    '--url',
+    'http',
+    '--server-url',
     `http://localhost:${port}`,
-    '--dangerously-omit-auth',
   ];
 
   const child = spawn(inspectorCmd, args, {

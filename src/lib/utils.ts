@@ -17,10 +17,10 @@ import { notifyConnectionResetListeners, registerConnectionResetHook } from "./c
 
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
-let overrideConfig: SapConfig | undefined = undefined;
-let overrideConnection: AbapConnection | undefined = undefined;
-let cachedConnection: AbapConnection | undefined = undefined;
-let cachedConfigSignature: string | undefined = undefined;
+let overrideConfig: SapConfig | undefined;
+let overrideConnection: AbapConnection | undefined;
+let cachedConnection: AbapConnection | undefined;
+let cachedConfigSignature: string | undefined;
 
 // Session storage for stateful sessions (persists cookies and CSRF tokens)
 const sessionStorage = new FileSessionStorage({
@@ -137,10 +137,12 @@ export function setConfigOverride(override?: SapConfig) {
 }
 
 export function setConnectionOverride(connection?: AbapConnection) {
+  // Use a local variable to avoid TDZ issues
   const currentOverride = overrideConnection;
   if (currentOverride) {
     disposeConnection(currentOverride);
   }
+  // Assign after reading to avoid TDZ
   overrideConnection = connection;
   overrideConfig = undefined;
 

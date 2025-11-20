@@ -2,22 +2,13 @@ import { McpError, ErrorCode, return_response } from '../lib/utils';
 import { getReadOnlyClient } from '../lib/clients';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../lib/writeResultToFile';
-
+import * as z from 'zod';
 
 export const TOOL_DEFINITION = {
-  "name": "GetInterface",
-  "description": "Retrieve ABAP interface source code.",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "interface_name": {
-        "type": "string",
-        "description": "Name of the ABAP interface"
-      }
-    },
-    "required": [
-      "interface_name"
-    ]
+  name: "GetInterface",
+  description: "Retrieve ABAP interface source code.",
+  inputSchema: {
+    interface_name: z.string().describe("Name of the ABAP interface")
   }
 } as const;
 

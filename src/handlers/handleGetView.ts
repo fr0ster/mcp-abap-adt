@@ -1,6 +1,6 @@
 /**
  * GetView Handler - ABAP Database View Retrieval via ADT API
- * 
+ *
  * APPROACH:
  * - Similar to GetTable pattern: GET request to retrieve view definition
  * - View-specific XML structure with ddic:view namespace
@@ -12,23 +12,14 @@ import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../lib/writeResultToFile';
+import * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: "GetView",
   description: "Retrieve ABAP database view definition including tables, fields, joins, and selection conditions.",
   inputSchema: {
-    type: "object",
-    properties: {
-      view_name: {
-        type: "string",
-        description: "Name of the ABAP database view"
-      },
-      filePath: {
-        type: "string",
-        description: "Optional file path to write the result to"
-      }
-    },
-    required: ["view_name"]
+    view_name: z.string().describe("Name of the ABAP database view"),
+    filePath: z.string().optional().describe("Optional file path to write the result to")
   }
 } as const;
 
@@ -47,28 +38,28 @@ function parseViewXml(xml: string) {
   // DDIC Database View (VIEW/DV)
   if (result['ddic:view']) {
     const v = result['ddic:view'];
-    
+
     // Parse view tables
     const tables = Array.isArray(v['ddic:tables']?.['ddic:table'])
       ? v['ddic:tables']['ddic:table']
       : v['ddic:tables']?.['ddic:table']
       ? [v['ddic:tables']['ddic:table']]
       : [];
-    
+
     // Parse view fields
     const fields = Array.isArray(v['ddic:fields']?.['ddic:field'])
       ? v['ddic:fields']['ddic:field']
       : v['ddic:fields']?.['ddic:field']
       ? [v['ddic:fields']['ddic:field']]
       : [];
-    
+
     // Parse joins
     const joins = Array.isArray(v['ddic:joins']?.['ddic:join'])
       ? v['ddic:joins']['ddic:join']
       : v['ddic:joins']?.['ddic:join']
       ? [v['ddic:joins']['ddic:join']]
       : [];
-    
+
     // Parse selection conditions
     const conditions = Array.isArray(v['ddic:conditions']?.['ddic:condition'])
       ? v['ddic:conditions']['ddic:condition']
@@ -127,7 +118,7 @@ function parseViewXml(xml: string) {
   }
 
   // Complete fallback: return raw XML structure
-  return { 
+  return {
     raw: result,
     note: 'Unrecognized view XML structure, returning raw parsed content'
   };
@@ -141,13 +132,13 @@ function parseViewPropertiesXml(xml: string) {
     ignoreAttributes: false,
     attributeNamePrefix: "@_"
   });
-  
+
   const result = parser.parse(xml);
-  
+
   if (result['opr:objectProperties']?.['opr:object']) {
     const obj = result['opr:objectProperties']['opr:object'];
     const properties = result['opr:objectProperties']['opr:property'] || [];
-    
+
     return {
       name: obj['@_name'],
       text: obj['@_text'],
@@ -163,7 +154,7 @@ function parseViewPropertiesXml(xml: string) {
       })) : []
     };
   }
-  
+
   return {
     raw: result,
     note: 'Unrecognized object properties XML structure'
@@ -178,7 +169,7 @@ async function getViewContents(viewName: string, maxRows: number = 100) {
     // Use SQL query handler to get view data
     const sqlQuery = `SELECT * FROM ${viewName}`;
     const url = `${await getBaseUrl()}/sap/bc/adt/datapreview/freestyle`;
-    
+
     const response = await makeAdtRequestWithTimeout(url, 'POST', 'default', {
       'Content-Type': 'text/plain; charset=utf-8'
     }, sqlQuery);
@@ -226,12 +217,12 @@ export async function handleGetView(args: any) {
     // Step 1: Detect view type and get definition
     let definitionSuccess = false;
     let viewType = 'unknown';
-    
+
     // Try CDS View first (modern views with DDL source)
     try {
       const cdsUrl = `${await getBaseUrl()}/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(args.view_name)}`;
       const cdsResponse = await makeAdtRequestWithTimeout(cdsUrl, 'GET', 'default');
-      
+
       if (cdsResponse.status === 200 && typeof cdsResponse.data === 'string') {
         viewType = 'CDS_VIEW';
         results.definition = {
@@ -245,16 +236,16 @@ export async function handleGetView(args: any) {
     } catch (cdsError) {
       // Not a CDS view or not accessible, try database view
     }
-    
+
     // Try Database View (classic views with metadata only)
     if (!definitionSuccess) {
       try {
         const objectUri = `/sap/bc/adt/vit/wb/object_type/viewdv/object_name/${args.view_name}`;
         const encodedUri = encodeURIComponent(objectUri);
         const propertiesUrl = `${await getBaseUrl()}/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${encodedUri}`;
-        
+
         const propertiesResponse = await makeAdtRequestWithTimeout(propertiesUrl, 'GET', 'default');
-        
+
         if (typeof propertiesResponse.data === 'string' && propertiesResponse.data.trim().startsWith('<?xml')) {
           const viewProperties = parseViewPropertiesXml(propertiesResponse.data);
           viewType = 'DATABASE_VIEW';
@@ -288,7 +279,7 @@ export async function handleGetView(args: any) {
 
     // Add view type to results
     results.view_type = viewType;
-    results.detection_note = viewType === 'CDS_VIEW' 
+    results.detection_note = viewType === 'CDS_VIEW'
       ? 'Modern CDS View detected - has DDL source code'
       : viewType === 'DATABASE_VIEW'
       ? 'Classic Database View detected - metadata only'

@@ -1,0 +1,63 @@
+# Source files (включаємо тільки скомпільовані файли)
+src/
+tsconfig.json
+
+# Tests
+tests/
+test-*.js
+test-*.txt
+jest.config.js
+jest.setup.js
+coverage/
+
+# Development tools
+tools/
+.clinerules/
+.cursor/
+.vscode/
+.editorconfig
+.gitattributes
+.gitmodules
+.gitignore
+Makefile
+Dockerfile
+
+# Documentation (опціонально - можна включити)
+# doc/
+
+# Environment files
+.env
+.env.example
+.env.local
+.env.*.local
+*.env
+
+# Build artifacts that shouldn't be in package
+*.tsbuildinfo
+
+# Lock state and sessions
+.locks/
+*.locks.json
+.sessions/
+*.sessions.json
+
+# Cache files
+.getobjectslist.cache.json
+*.cache.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Config files not needed for production
+sk.json
+smithery.yaml
+.npmrc

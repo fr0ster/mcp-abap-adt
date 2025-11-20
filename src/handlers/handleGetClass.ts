@@ -2,16 +2,13 @@ import { McpError, ErrorCode } from '../lib/utils';
 import { getReadOnlyClient } from '../lib/clients';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../lib/writeResultToFile';
+import * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: "GetClass",
   description: "Retrieve ABAP class source code.",
   inputSchema: {
-    type: "object",
-    properties: {
-      class_name: { type: "string", description: "Name of the ABAP class" }
-    },
-    required: ["class_name"]
+    class_name: z.string().describe("Name of the ABAP class")
   }
 } as const;
 

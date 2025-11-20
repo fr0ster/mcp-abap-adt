@@ -13,19 +13,13 @@ import { McpError, ErrorCode } from '../lib/utils';
 import { return_error, return_response } from '../lib/utils';
 import { getReadOnlyClient } from '../lib/clients';
 import { XMLParser } from 'fast-xml-parser';
+import * as z from 'zod';
 
 export const TOOL_DEFINITION = {
   name: "GetDataElement",
   description: "Retrieve ABAP data element information including type definition, field labels, and metadata from SAP system via ADT API.",
   inputSchema: {
-    type: "object",
-    properties: {
-      data_element_name: {
-        type: "string",
-        description: "Data element name (e.g., MAKTX, MATNR, ZZ_E_TEST_001)"
-      }
-    },
-    required: ["data_element_name"]
+    data_element_name: z.string().describe("Data element name (e.g., MAKTX, MATNR, ZZ_E_TEST_001)")
   }
 } as const;
 

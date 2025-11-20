@@ -2,22 +2,13 @@ import { McpError, ErrorCode } from '../lib/utils';
 import { getReadOnlyClient } from '../lib/clients';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../lib/writeResultToFile';
-
+import * as z from 'zod';
 
 export const TOOL_DEFINITION = {
-  "name": "GetTable",
-  "description": "Retrieve ABAP table structure.",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "table_name": {
-        "type": "string",
-        "description": "Name of the ABAP table"
-      }
-    },
-    "required": [
-      "table_name"
-    ]
+  name: "GetTable",
+  description: "Retrieve ABAP table structure.",
+  inputSchema: {
+    table_name: z.string().describe("Name of the ABAP table")
   }
 } as const;
 

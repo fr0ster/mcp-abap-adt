@@ -75,6 +75,6 @@ Test scripts are located in: `tests/`
 
 ## 🔗 See Also
 
-- [Main README](../../README.md) - Project overview
-- [CHANGELOG](../../CHANGELOG.md) - Version history
-- [ADT API Research](../ADT_API_RESEARCH.md) - ADT API documentation
+- [Main README](../../../README.md) - Project overview
+- [CHANGELOG](../../../CHANGELOG.md) - Version history
+- [Architecture Documentation](../../architecture/) - System architecture and design

@@ -1,0 +1,43 @@
+name: Publish to npm (Optional)
+
+# This workflow is optional and only runs when manually triggered
+# or when you're ready to publish to npm registry
+
+on:
+  workflow_dispatch:  # Manual trigger
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g., v1.1.0)'
+        required: true
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # Note: You need to add NPM_TOKEN to repository secrets
+        # Go to Settings -> Secrets -> Actions -> New repository secret
+        # Get token from https://www.npmjs.com/settings/YOUR_USERNAME/tokens

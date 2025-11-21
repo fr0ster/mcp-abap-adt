@@ -1,0 +1,79 @@
+# Docker ignore file for MCP ABAP ADT Server
+
+# Git
+.git/
+.gitignore
+.gitmodules
+.gitattributes
+
+# Documentation
+doc/
+docs/
+*.md
+!README.md
+
+# Tests
+tests/
+test-*.js
+test-*.txt
+*.test.ts
+*.test.js
+__tests__/
+coverage/
+
+# Development tools
+.github/
+.vscode/
+.idea/
+.clinerules/
+.cursor/
+.editorconfig
+tools/
+Makefile
+
+# Build artifacts (will be built in Docker)
+dist/
+node_modules/
+
+# Environment files (should be provided at runtime)
+.env
+.env.*
+*.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Lock and session files
+.locks/
+.sessions/
+*.locks.json
+*.sessions.json
+
+# Cache files
+.getobjectslist.cache.json
+*.cache.json
+
+# Temp files
+*.bak
+*.tmp
+*.swp
+
+# Package files
+*.tgz
+
+# Config files not needed in container
+sk.json
+smithery.yaml
+.npmrc
+jest.config.js
+jest.setup.js
+tsconfig.json
+
+# TypeScript source (only need compiled dist/)
+src/

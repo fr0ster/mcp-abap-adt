@@ -7,8 +7,9 @@ build/
 coverage/
 package-lock.json
 
-# NPM packages
+# NPM packages (local builds, releases are on GitHub)
 *.tgz
+!*.tgz  # But allow in releases
 
 # Environment variables
 .env

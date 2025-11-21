@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on version tags like v1.1.0, v1.2.3, etc.
+
+permissions:
+  contents: write  # Required for creating releases
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive  # Clone with submodules
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+        continue-on-error: true  # Don't fail release if tests fail
+
+      - name: Create package
+        run: npm pack
+
+      - name: Get package filename
+        id: package
+        run: |
+          PACKAGE_FILE=$(ls fr0ster-mcp-abap-adt-*.tgz)
+          echo "filename=$PACKAGE_FILE" >> $GITHUB_OUTPUT
+          echo "Package created: $PACKAGE_FILE"
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ steps.package.outputs.filename }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          body: |
+            ## Installation
+
+            Download the `.tgz` package and install:
+
+            ```bash
+            # Global installation
+            npm install -g ./${{ steps.package.outputs.filename }}
+
+            # Available commands:
+            mcp-abap-adt          # stdio transport
+            mcp-abap-adt-http     # HTTP server
+            mcp-abap-adt-sse      # SSE server
+            ```
+
+            See [Installation Guide](https://github.com/${{ github.repository }}/blob/main/doc/installation/INSTALLATION.md) for details.
+
+            ## What's Changed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

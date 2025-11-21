@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.1.2] - 2025-11-21
+
+### Fixed
+- **STDIO Transport**: Fixed STDIO transport broken by mixing old `Server` and new `McpServer` APIs
+  - Removed legacy `Server` class and `setupHandlers()` method
+  - Unified all transports (STDIO, HTTP, SSE) to use single `McpServer` instance
+  - Fixed STDIO connection to use `mcpServer.server.connect(transport)` pattern
+  - Removed unused imports: `Server`, `CallToolRequestSchema`, `ListToolsRequestSchema`
+
+### Added
+- **SSE Development Tool**: Created `tools/dev-sse.js` for proper SSE server development workflow
+  - Launches SSE server on port 3001 (default)
+  - Automatically starts MCP Inspector with correct SSE endpoint (`http://localhost:3001/sse`)
+  - Mirrors `dev-http.js` functionality for consistent development experience
+  - Updated `npm run dev:sse` to use new development script
+
 ## [Unreleased]
 
 > Package-specific changes (e.g., `@mcp-abap-adt/adt-clients`) are tracked in their respective repositories and npm packages.

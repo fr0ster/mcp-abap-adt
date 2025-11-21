@@ -7,7 +7,7 @@
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { ValidationClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "ValidateObject",
@@ -79,7 +79,7 @@ export async function handleValidateObject(args: any) {
     }
 
     const connection = getManagedConnection();
-    const validationClient = new ValidationClient(connection);
+    const validationClient = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -98,11 +98,53 @@ export async function handleValidateObject(args: any) {
     logger.info(`Starting object validation: ${objectName} (type: ${object_type})`);
 
     try {
-      // Validate object using validation client
-      const result = await validationClient.validateObject(
-        object_type.toLowerCase(),
-        objectName
-      );
+      // Validate object using specific validation method based on type
+      let result: any;
+
+      switch (object_type.toLowerCase()) {
+        case 'program':
+          await validationClient.validateProgram(objectName);
+          result = validationClient.getValidationResult();
+          break;
+        case 'class':
+          await validationClient.validateClass(objectName);
+          result = validationClient.getValidationResult();
+          break;
+        case 'interface':
+          await validationClient.validateInterface(objectName);
+          result = validationClient.getValidationResult();
+          break;
+        case 'function_group':
+          await validationClient.validateFunctionGroup(objectName);
+          result = validationClient.getValidationResult();
+          break;
+        case 'table':
+          await validationClient.validateTable(objectName);
+          result = validationClient.getValidationResult();
+          break;
+        case 'structure':
+          await validationClient.validateStructure(objectName);
+          result = validationClient.getValidationResult();
+          break;
+        case 'view':
+          await validationClient.validateView(objectName);
+          result = validationClient.getValidationResult();
+          break;
+        case 'domain':
+          await validationClient.validateDomain(objectName);
+          result = validationClient.getValidationResult();
+          break;
+        case 'data_element':
+          await validationClient.validateDataElement(objectName);
+          result = validationClient.getValidationResult();
+          break;
+        case 'package':
+          await validationClient.validatePackage(objectName, ''); // package needs superPackage parameter
+          result = validationClient.getValidationResult();
+          break;
+        default:
+          throw new Error(`Unsupported object type: ${object_type}`);
+      }
 
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();

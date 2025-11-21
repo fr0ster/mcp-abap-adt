@@ -8,7 +8,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { generateSessionId } from '../lib/sessionUtils';
-import { LockClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "LockObject",
@@ -79,7 +79,7 @@ export async function handleLockObject(args: any) {
     }
 
     const connection = getManagedConnection();
-    const lockClient = new LockClient(connection);
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -101,26 +101,74 @@ export async function handleLockObject(args: any) {
     logger.info(`Starting object lock: ${objectName} (type: ${objectType}, session: ${desiredSessionId.substring(0, 8)}...)`);
 
     try {
-      const lockResult = await lockClient.lock({
-        objectType: objectType as any,
-        objectName,
-        sessionId: session_id || desiredSessionId
-      });
+      let lockHandle: string | undefined;
+
+      // Call appropriate lock method based on object type
+      switch (objectType) {
+        case 'class':
+          await client.lockClass(objectName);
+          lockHandle = client.getLockHandle();
+          break;
+        case 'program':
+          await client.lockProgram(objectName);
+          lockHandle = client.getLockHandle();
+          break;
+        case 'interface':
+          await client.lockInterface(objectName);
+          lockHandle = client.getLockHandle();
+          break;
+        case 'function_group':
+          await client.lockFunctionGroup(objectName);
+          lockHandle = client.getLockHandle();
+          break;
+        case 'function_module':
+          // Function module requires function group name which is not provided in this generic handler
+          return return_error(new Error('Function module locking via LockObject is not supported. Function modules require function group name.'));
+        case 'table':
+          await client.lockTable(objectName);
+          lockHandle = client.getLockHandle();
+          break;
+        case 'structure':
+          await client.lockStructure(objectName);
+          lockHandle = client.getLockHandle();
+          break;
+        case 'view':
+          await client.lockView(objectName);
+          lockHandle = client.getLockHandle();
+          break;
+        case 'domain':
+          await client.lockDomain(objectName);
+          lockHandle = client.getLockHandle();
+          break;
+        case 'data_element':
+          await client.lockDataElement(objectName);
+          lockHandle = client.getLockHandle();
+          break;
+        case 'package':
+          // Package requires superPackage parameter - need to fetch it or handle differently
+          return return_error(new Error('Package locking via LockObject is not supported. Use specific package operations.'));
+        default:
+          return return_error(new Error(`Unsupported object_type: ${object_type}`));
+      }
+
+      if (!lockHandle) {
+        throw new Error(`Lock did not return a lock handle for object ${objectName}`);
+      }
 
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
       logger.info(`✅ LockObject completed: ${objectName}`);
-      logger.info(`   Lock handle: ${lockResult.lockHandle.substring(0, 20)}...`);
+      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
           success: true,
           object_name: objectName,
           object_type: objectType,
-          session_id: lockResult.sessionId,
-          lock_handle: lockResult.lockHandle,
-          transport_request: lockResult.transportRequest,
+          session_id: desiredSessionId,
+          lock_handle: lockHandle,
+          transport_request: null, // CrudClient doesn't expose transport request
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,
             csrf_token: updatedSessionState.csrfToken,

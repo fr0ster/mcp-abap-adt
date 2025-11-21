@@ -10,7 +10,7 @@
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
-import { DataElementBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateDataElement",
@@ -119,12 +119,27 @@ export async function handleCreateDataElement(args: any) {
     logger.info(`Starting data element creation: ${dataElementName}`);
 
     try {
-      // Create builder with configuration
-      const builder = new DataElementBuilder(connection, logger, {
-        dataElementName: dataElementName,
-        packageName: typedArgs.package_name,
-        transportRequest: typedArgs.transport_request,
-        description: typedArgs.description || dataElementName,
+      // Create client
+      const client = new CrudClient(connection);
+      const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
+
+      // Validate
+      await client.validateDataElement(dataElementName);
+
+      // Create
+      await client.createDataElement(
+        dataElementName,
+        typedArgs.description || dataElementName,
+        typedArgs.package_name,
+        typedArgs.transport_request
+      );
+
+      // Lock
+      await client.lockDataElement(dataElementName);
+      const lockHandle = client.getLockHandle();
+
+      // Update with properties
+      const properties = {
         domainName: typedArgs.domain_name.toUpperCase(),
         dataType: typedArgs.data_type || 'CHAR',
         length: typedArgs.length || 100,
@@ -134,27 +149,22 @@ export async function handleCreateDataElement(args: any) {
         longLabel: typedArgs.long_label,
         headingLabel: typedArgs.heading_label,
         typeKind: 'domain'
-      });
+      };
+      await client.updateDataElement(dataElementName, properties, lockHandle);
 
-      // Build operation chain: validate -> create -> lock -> update -> check -> unlock -> (activate)
-      // Note: create() creates empty data element, then lock() -> update() fills it with data
-      const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
+      // Check
+      await client.checkDataElement(dataElementName);
 
-      await builder
-        .validate()
-        .then(b => b.create())
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
-        .catch(error => {
-          logger.error('Data element creation chain failed:', error);
-          throw error;
-        });
+      // Unlock
+      await client.unlockDataElement(dataElementName, lockHandle);
+
+      // Activate if requested
+      if (shouldActivate) {
+        await client.activateDataElement(dataElementName);
+      }
 
       // Get data element details from create result (createDataElement already does verification)
-      const createResult = builder.getCreateResult();
+      const createResult = client.getCreateResult();
       let dataElementDetails = null;
       if (createResult?.data && typeof createResult.data === 'object' && 'data_element_details' in createResult.data) {
         dataElementDetails = (createResult.data as any).data_element_details;

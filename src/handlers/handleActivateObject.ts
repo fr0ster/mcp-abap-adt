@@ -10,7 +10,7 @@
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { ManagementClient, parseActivationResponse } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { buildObjectUri } from '../lib/activationUtils';
 
 export const TOOL_DEFINITION = {
@@ -93,7 +93,7 @@ export async function handleActivateObject(params: any) {
 
     const connection = getManagedConnection();
     const preaudit = args.preaudit !== false; // Default: true
-    const managementClient = new ManagementClient(connection);
+    const client = new CrudClient(connection);
 
     logger.info(`Starting activation of ${args.objects.length} object(s)`);
 
@@ -106,15 +106,15 @@ export async function handleActivateObject(params: any) {
 
       logger.debug('Activating objects:', activationObjects);
 
-      // Make group activation request using adt-clients function
-      const response = await managementClient.activateObjectsGroup(activationObjects, preaudit);
+      // Make group activation request using CrudClient
+      const response = await client.activateObjectsGroup(activationObjects, preaudit);
 
       // Debug: log raw response
       logger.debug('Activation response status:', response.status);
       logger.debug('Activation response data:', typeof response.data === 'string' ? response.data.substring(0, 500) : response.data);
 
       // Parse response
-      const activationResult = parseActivationResponse(response.data);
+      const activationResult = client.parseActivationResponse(response.data);
       const success = activationResult.activated && activationResult.checked;
 
       // Build result object

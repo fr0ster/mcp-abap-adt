@@ -7,7 +7,7 @@
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { FunctionModuleBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "ValidateFunctionModule",
@@ -94,15 +94,10 @@ export async function handleValidateFunctionModule(args: any) {
     logger.info(`Starting function module validation: ${functionModuleName} in group ${functionGroupName}`);
 
     try {
-      const builder = new FunctionModuleBuilder(connection, logger, {
-        functionGroupName,
-        functionModuleName,
-        description,
-        sessionId: session_id
-      });
+      const client = new CrudClient(connection);
 
-      await builder.validate();
-      const result = builder.getValidationResult();
+      await client.validateFunctionModule(functionModuleName, functionGroupName);
+      const result = client.getValidationResult();
       if (!result) {
         throw new Error('Validation did not return a result');
       }
@@ -116,11 +111,11 @@ export async function handleValidateFunctionModule(args: any) {
       return return_response({
         data: JSON.stringify({
           success: result.valid,
-          function_group_name: functionGroupName,
           function_module_name: functionModuleName,
+          function_group_name: functionGroupName,
           description: description || null,
           validation_result: result,
-          session_id: builder.getSessionId(),
+          session_id: session_id || null,
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,
             csrf_token: updatedSessionState.csrfToken,

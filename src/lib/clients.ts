@@ -1,4 +1,4 @@
-import { CrudClient, ManagementClient, ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient, ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { getManagedConnection } from './utils';
 import { registerConnectionResetHook } from './connectionEvents';
@@ -8,9 +8,6 @@ let readOnlyClientConnection: AbapConnection | undefined;
 
 let crudClient: CrudClient | undefined;
 let crudClientConnection: AbapConnection | undefined;
-
-let managementClient: ManagementClient | undefined;
-let managementClientConnection: AbapConnection | undefined;
 
 export function getReadOnlyClient(): ReadOnlyClient {
   const connection = getManagedConnection();
@@ -34,24 +31,11 @@ export function getCrudClient(): CrudClient {
   return crudClient;
 }
 
-export function getManagementClient(): ManagementClient {
-  const connection = getManagedConnection();
-
-  if (!managementClient || managementClientConnection !== connection) {
-    managementClient = new ManagementClient(connection);
-    managementClientConnection = connection;
-  }
-
-  return managementClient;
-}
-
 export function resetClientCache() {
   readOnlyClient = undefined;
   readOnlyClientConnection = undefined;
   crudClient = undefined;
   crudClientConnection = undefined;
-  managementClient = undefined;
-  managementClientConnection = undefined;
 }
 
 registerConnectionResetHook(resetClientCache);

@@ -1,6 +1,6 @@
-import { McpError, ErrorCode } from '../lib/utils';
+import { McpError, ErrorCode, getManagedConnection } from '../lib/utils';
 import { return_error, return_response } from '../lib/utils';
-import { getReadOnlyClient } from '../lib/clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { writeResultToFile } from '../lib/writeResultToFile';
 import * as z from 'zod';
 
@@ -17,7 +17,13 @@ export async function handleGetProgram(args: any) {
         if (!args?.program_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Program name is required');
         }
-        const response = await getReadOnlyClient().getProgram(args.program_name);
+        const connection = getManagedConnection();
+        const client = new CrudClient(connection);
+        await client.readProgram(args.program_name);
+        const response = client.getReadResult();
+        if (!response) {
+            throw new McpError(ErrorCode.InternalError, 'Failed to read program');
+        }
         const plainText = response.data;
         if (args.filePath) {
             writeResultToFile(plainText, args.filePath);

@@ -1,17 +1,17 @@
 /**
  * CreateClass Handler - ABAP Class Creation via ADT API
  *
- * Uses ClassBuilder from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by builder.
+ * Uses CrudClient from @mcp-abap-adt/adt-clients for all operations.
+ * Session and lock management handled internally.
  *
- * Workflow: validate -> create -> lock -> update -> check -> unlock -> (activate)
+ * Workflow: create -> lock -> update -> check -> unlock -> (activate)
  */
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
-import { ClassBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateClass",
@@ -139,44 +139,40 @@ export async function handleCreateClass(params: any) {
     // Generate source code if not provided
     const sourceCode = args.source_code || generateClassTemplate(className, args.description || className);
 
-    // Create builder with configuration
-    const builder = new ClassBuilder(connection, logger, {
-      className: className,
-      packageName: args.package_name,
-      transportRequest: args.transport_request,
-      description: args.description || className,
-      superclass: args.superclass,
-      final: args.final || false,
-      abstract: args.abstract || false,
-      createProtected: args.create_protected || false,
-      masterSystem: args.master_system,
-      responsible: args.responsible
-    });
-
-    // Set source code
-    builder.setCode(sourceCode);
-
-    // Build operation chain: validate -> create -> lock -> update -> check -> unlock -> (activate)
     const shouldActivate = args.activate !== false; // Default to true if not specified
 
-    await builder
-      .validate()
-      .then(b => b.create())
-      .then(b => b.lock())
-      .then(b => b.update())
-      .then(b => b.check())
-      .then(b => b.unlock())
-      .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
+    // Use CrudClient for all operations
+    const client = new CrudClient(connection);
+
+    await client
+      .createClass(
+        className,
+        args.description || className,
+        args.package_name,
+        args.transport_request,
+        {
+          superclass: args.superclass,
+          final: args.final || false,
+          abstract: args.abstract || false,
+          createProtected: args.create_protected || false,
+          masterSystem: args.master_system,
+          responsible: args.responsible
+        }
+      )
+      .then(c => c.lockClass(className))
+      .then(c => c.updateClass(className, sourceCode))
+      .then(c => c.checkClass(className))
+      .then(c => c.unlockClass(className))
+      .then(c => shouldActivate ? c.activateClass(className) : Promise.resolve(c))
       .catch(error => {
-        // Builder handles unlock in finally, but we log here
         logger.error('Class creation chain failed:', error);
         throw error;
       });
 
     // Parse activation warnings if activation was performed
     let activationWarnings: string[] = [];
-    if (shouldActivate && builder.getActivateResult()) {
-      const activateResponse = builder.getActivateResult()!;
+    if (shouldActivate && client.getActivateResult()) {
+      const activateResponse = client.getActivateResult()!;
       if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
         const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
         const result = parser.parse(activateResponse.data);

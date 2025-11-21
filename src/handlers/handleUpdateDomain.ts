@@ -10,7 +10,7 @@
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
-import { DomainBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "UpdateDomain",
@@ -141,39 +141,53 @@ export async function handleUpdateDomain(args: any) {
     logger.info(`Starting domain update: ${domainName}`);
 
     try {
-      // Create builder with configuration
-      const builder = new DomainBuilder(connection, logger, {
-        domainName: domainName,
-        packageName: typedArgs.package_name,
-        transportRequest: typedArgs.transport_request,
-        description: typedArgs.description,
-        datatype: typedArgs.datatype,
-        length: typedArgs.length,
-        decimals: typedArgs.decimals,
-        conversion_exit: typedArgs.conversion_exit,
-        lowercase: typedArgs.lowercase,
-        sign_exists: typedArgs.sign_exists,
-        value_table: typedArgs.value_table,
-        fixed_values: typedArgs.fixed_values
-      });
-
-      // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
+      // Create client
+      const client = new CrudClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
-      await builder
-        .validate()
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
-        .catch(error => {
-          logger.error('Domain update chain failed:', error);
-          throw error;
-        });
+      // Validate
+      await client.validateDomain(domainName);
+
+      // Lock
+      await client.lockDomain(domainName);
+      const lockHandle = client.getLockHandle();
+
+      try {
+        // Update with properties
+        const properties = {
+          datatype: typedArgs.datatype,
+          length: typedArgs.length,
+          decimals: typedArgs.decimals,
+          conversion_exit: typedArgs.conversion_exit,
+          lowercase: typedArgs.lowercase,
+          sign_exists: typedArgs.sign_exists,
+          value_table: typedArgs.value_table,
+          fixed_values: typedArgs.fixed_values
+        };
+        await client.updateDomain(domainName, properties, lockHandle);
+
+        // Check
+        await client.checkDomain(domainName);
+
+        // Unlock
+        await client.unlockDomain(domainName, lockHandle);
+
+        // Activate if requested
+        if (shouldActivate) {
+          await client.activateDomain(domainName);
+        }
+      } catch (error) {
+        // Try to unlock on error
+        try {
+          await client.unlockDomain(domainName, lockHandle);
+        } catch (unlockError) {
+          logger.error('Failed to unlock domain after error:', unlockError);
+        }
+        throw error;
+      }
 
       // Get domain details from update result
-      const updateResult = builder.getUpdateResult();
+      const updateResult = client.getUpdateResult();
       let domainDetails = null;
       if (updateResult?.data && typeof updateResult.data === 'object' && 'domain_details' in updateResult.data) {
         domainDetails = (updateResult.data as any).domain_details;

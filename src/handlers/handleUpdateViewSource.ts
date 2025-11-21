@@ -10,7 +10,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
-import { ViewBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "UpdateViewSource",
@@ -63,31 +63,45 @@ export async function handleUpdateViewSource(params: any) {
     logger.info(`Starting view source update: ${viewName}`);
 
     try {
-      // Create builder with configuration
-      const builder = new ViewBuilder(connection, logger, {
-        viewName: viewName,
-        ddlSource: args.ddl_source
-      });
-
-      // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
+      // Create client
+      const client = new CrudClient(connection);
       const shouldActivate = args.activate === true; // Default to false if not specified
 
-      await builder
-        .validate()
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
-        .catch(error => {
-          logger.error('View update chain failed:', error);
-          throw error;
-        });
+      // Validate
+      await client.validateView(viewName);
+
+      // Lock
+      await client.lockView(viewName);
+      const lockHandle = client.getLockHandle();
+
+      try {
+        // Update with DDL source
+        await client.updateView(viewName, args.ddl_source, lockHandle);
+
+        // Check
+        await client.checkView(viewName);
+
+        // Unlock
+        await client.unlockView(viewName, lockHandle);
+
+        // Activate if requested
+        if (shouldActivate) {
+          await client.activateView(viewName);
+        }
+      } catch (error) {
+        // Try to unlock on error
+        try {
+          await client.unlockView(viewName, lockHandle);
+        } catch (unlockError) {
+          logger.error('Failed to unlock view after error:', unlockError);
+        }
+        throw error;
+      }
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];
-      if (shouldActivate && builder.getActivateResult()) {
-        const activateResponse = builder.getActivateResult()!;
+      if (shouldActivate && client.getActivateResult()) {
+        const activateResponse = client.getActivateResult()!;
         if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
           const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
           const result = parser.parse(activateResponse.data);

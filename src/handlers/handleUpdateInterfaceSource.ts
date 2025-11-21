@@ -10,7 +10,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
-import { InterfaceBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "UpdateInterfaceSource",
@@ -73,32 +73,47 @@ export async function handleUpdateInterfaceSource(args: any) {
     logger.info(`Starting interface source update: ${interfaceName}`);
 
     try {
-      // Create builder with configuration
-      const builder = new InterfaceBuilder(connection, logger, {
-        interfaceName: interfaceName,
-        sourceCode: source_code,
-        transportRequest: transport_request
-      });
+      // Create client
+      const client = new CrudClient(connection);
 
       // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
       const shouldActivate = activate !== false; // Default to true if not specified
 
-      await builder
-        .validate()
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
-        .catch(error => {
-          logger.error('Interface update chain failed:', error);
-          throw error;
-        });
+      // Validate
+      await client.validateInterface(interfaceName);
+
+      // Lock
+      await client.lockInterface(interfaceName);
+      const lockHandle = client.getLockHandle();
+
+      try {
+        // Update source code
+        await client.updateInterface(interfaceName, source_code, lockHandle);
+
+        // Check
+        await client.checkInterface(interfaceName);
+
+        // Unlock
+        await client.unlockInterface(interfaceName, lockHandle);
+
+        // Activate if requested
+        if (shouldActivate) {
+          await client.activateInterface(interfaceName);
+        }
+      } catch (error) {
+        // Try to unlock on error
+        try {
+          await client.unlockInterface(interfaceName, lockHandle);
+        } catch (unlockError) {
+          logger.error('Failed to unlock interface after error:', unlockError);
+        }
+        throw error;
+      }
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];
-      if (shouldActivate && builder.getActivateResult()) {
-        const activateResponse = builder.getActivateResult()!;
+      if (shouldActivate && client.getActivateResult()) {
+        const activateResponse = client.getActivateResult()!;
         if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
           const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
           const result = parser.parse(activateResponse.data);

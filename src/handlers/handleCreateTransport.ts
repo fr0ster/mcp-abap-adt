@@ -9,7 +9,7 @@
 
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { TransportBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateTransport",
@@ -67,31 +67,25 @@ export async function handleCreateTransport(args: any) {
     logger.info(`Starting transport creation: ${typedArgs.description}`);
 
     try {
-      // Create builder with configuration
-      const builder = new TransportBuilder(connection, logger, {
-        description: typedArgs.description,
-        transportType: typedArgs.transport_type === 'customizing' ? 'customizing' : 'workbench',
-        targetSystem: typedArgs.target_system,
-        owner: typedArgs.owner
-      });
+      // Create client
+      const client = new CrudClient(connection);
 
-      // Build operation chain: create
-      await builder
-        .create()
-        .catch(error => {
-          logger.error('Transport creation failed:', error);
-          throw error;
-        });
+      // Create transport
+      await client.createTransport(
+        typedArgs.description,
+        typedArgs.transport_type === 'customizing' ? 'customizing' : 'workbench'
+      );
 
-      // Get transport number from builder state
-      const transportNumber = builder.getTransportNumber();
-      const taskNumber = builder.getTaskNumber();
-      const createResult = builder.getCreateResult();
+      // Get create result
+      const createResult = client.getCreateResult();
 
-      logger.info(`✅ CreateTransport completed successfully: ${transportNumber || 'unknown'}`);
+      logger.info(`✅ CreateTransport completed successfully`);
 
       // Parse response data if available
       let transportInfo: any = {};
+      let transportNumber: string | undefined;
+      let taskNumber: string | undefined;
+
       if (createResult?.data) {
         if (typeof createResult.data === 'string') {
           // If data is XML string, try to parse it

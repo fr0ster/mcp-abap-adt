@@ -1,5 +1,5 @@
-import { McpError, ErrorCode } from '../lib/utils';
-import { getReadOnlyClient } from '../lib/clients';
+import { McpError, ErrorCode, getManagedConnection } from '../lib/utils';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../lib/writeResultToFile';
 import * as z from 'zod';
@@ -54,7 +54,13 @@ export async function handleGetTable(args: any) {
         if (!args?.table_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Table name is required');
         }
-        const response = await getReadOnlyClient().getTable(args.table_name);
+        const connection = getManagedConnection();
+        const client = new CrudClient(connection);
+        await client.readTable(args.table_name);
+        const response = client.getReadResult();
+        if (!response) {
+            throw new McpError(ErrorCode.InternalError, 'Failed to read table');
+        }
     // Parse XML responses; fall back to returning the payload as-is
         if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
             const resultObj = parseTableXml(response.data);

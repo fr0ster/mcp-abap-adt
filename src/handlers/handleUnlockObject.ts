@@ -7,7 +7,7 @@
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { LockClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "UnlockObject",
@@ -84,7 +84,7 @@ export async function handleUnlockObject(args: any) {
     }
 
     const connection = getManagedConnection();
-    const lockClient = new LockClient(connection);
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_state) {
@@ -104,12 +104,44 @@ export async function handleUnlockObject(args: any) {
     logger.info(`Starting object unlock: ${objectName} (type: ${objectType}, session: ${session_id.substring(0, 8)}...)`);
 
     try {
-      await lockClient.unlock({
-        objectType: objectType as any,
-        objectName,
-        lockHandle: lock_handle,
-        sessionId: session_id
-      });
+      // Call appropriate unlock method based on object type
+      switch (objectType) {
+        case 'class':
+          await client.unlockClass(objectName, lock_handle);
+          break;
+        case 'program':
+          await client.unlockProgram(objectName, lock_handle);
+          break;
+        case 'interface':
+          await client.unlockInterface(objectName, lock_handle);
+          break;
+        case 'function_group':
+          await client.unlockFunctionGroup(objectName, lock_handle);
+          break;
+        case 'function_module':
+          // Function module requires function group name which is not provided in this generic handler
+          return return_error(new Error('Function module unlocking via UnlockObject is not supported. Function modules require function group name.'));
+        case 'table':
+          await client.unlockTable(objectName, lock_handle);
+          break;
+        case 'structure':
+          await client.unlockStructure(objectName, lock_handle);
+          break;
+        case 'view':
+          await client.unlockView(objectName, lock_handle);
+          break;
+        case 'domain':
+          await client.unlockDomain(objectName, lock_handle);
+          break;
+        case 'data_element':
+          await client.unlockDataElement(objectName, lock_handle);
+          break;
+        case 'package':
+          // Package requires superPackage parameter - need to fetch it or handle differently
+          return return_error(new Error('Package unlocking via UnlockObject is not supported. Use specific package operations.'));
+        default:
+          return return_error(new Error(`Unsupported object_type: ${object_type}`));
+      }
 
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();

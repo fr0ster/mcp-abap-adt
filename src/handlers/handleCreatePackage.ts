@@ -9,7 +9,7 @@
 
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { PackageBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
 
 export const TOOL_DEFINITION = {
@@ -64,28 +64,22 @@ export async function handleCreatePackage(args: any) {
     logger.info(`Starting package creation: ${packageName}`);
 
     try {
-      // Create builder with configuration
-      const builder = new PackageBuilder(connection, logger, {
-        packageName: packageName,
-        superPackage: typedArgs.super_package,
-        description: typedArgs.description || packageName,
-        packageType: typedArgs.package_type,
-        softwareComponent: typedArgs.software_component,
-        transportLayer: typedArgs.transport_layer,
-        transportRequest: typedArgs.transport_request,
-        applicationComponent: typedArgs.application_component,
-        responsible: typedArgs.responsible
-      });
+      // Create client
+      const client = new CrudClient(connection);
 
-      // Build operation chain: validate -> create -> check
-      await builder
-        .validate()
-        .then(b => b.create())
-        .then(b => b.check())
-        .catch(error => {
-          logger.error('Package creation chain failed:', error);
-          throw error;
-        });
+      // Validate
+      await client.validatePackage(packageName, typedArgs.super_package);
+
+      // Create
+      await client.createPackage(
+        packageName,
+        typedArgs.super_package,
+        typedArgs.description || packageName,
+        typedArgs.transport_request
+      );
+
+      // Check
+      await client.checkPackage(packageName, typedArgs.super_package);
 
       logger.info(`✅ CreatePackage completed successfully: ${packageName}`);
 

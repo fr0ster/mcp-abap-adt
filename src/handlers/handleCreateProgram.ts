@@ -11,7 +11,7 @@ import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
-import { ProgramBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateProgram",
@@ -164,37 +164,54 @@ export async function handleCreateProgram(params: any) {
     const programType = convertProgramType(args.program_type);
     const sourceCode = args.source_code || generateProgramTemplate(programName, programType, args.description || programName);
 
-    // Create builder with configuration
-    const builder = new ProgramBuilder(connection, logger, {
-      programName: programName,
-      packageName: args.package_name,
-      transportRequest: args.transport_request,
-      description: args.description || programName,
-      programType: args.program_type,
-      application: args.application,
-      sourceCode: sourceCode
-    });
+    // Create client
+    const client = new CrudClient(connection);
 
     // Build operation chain: validate -> create -> lock -> update -> check -> unlock -> (activate)
     const shouldActivate = args.activate !== false; // Default to true if not specified
 
-    await builder
-      .validate()
-      .then(b => b.create())
-      .then(b => b.lock())
-      .then(b => b.update())
-      .then(b => b.check())
-      .then(b => b.unlock())
-      .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
-      .catch(error => {
-        logger.error('Program creation chain failed:', error);
-        throw error;
-      });
+    // Validate
+    await client.validateProgram(programName);
+    const validationResult = client.getValidationResult();
+    if (!validationResult || validationResult.valid === false) {
+      throw new Error(`Program name validation failed: ${validationResult?.message || 'Invalid program name'}`);
+    }
+
+    // Create
+    await client.createProgram(
+      programName,
+      args.description || programName,
+      args.package_name,
+      args.transport_request,
+      {
+        programType: args.program_type,
+        application: args.application
+      }
+    );
+
+    // Lock
+    await client.lockProgram(programName);
+    const lockHandle = client.getLockHandle();
+
+    // Update source code
+    await client.updateProgram(programName, sourceCode, lockHandle);
+
+    // Check
+    await client.checkProgram(programName);
+    const checkResult = client.getCheckResult();
+
+    // Unlock
+    await client.unlockProgram(programName, lockHandle);
+
+    // Activate if requested
+    if (shouldActivate) {
+      await client.activateProgram(programName);
+    }
 
     // Parse activation warnings if activation was performed
     let activationWarnings: string[] = [];
-    if (shouldActivate && builder.getActivateResult()) {
-      const activateResponse = builder.getActivateResult()!;
+    if (shouldActivate && client.getActivateResult()) {
+      const activateResponse = client.getActivateResult()!;
       if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
         const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
         const result = parser.parse(activateResponse.data);

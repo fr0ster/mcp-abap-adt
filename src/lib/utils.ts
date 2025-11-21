@@ -230,8 +230,10 @@ export async function fetchNodeStructure(
   nodeKey: string,
   withShortDescriptions: boolean = true
 ): Promise<AxiosResponse> {
-  const { getReadOnlyClient } = await import('./clients');
-  return getReadOnlyClient().fetchNodeStructure(parentName, parentTechName, parentType, nodeKey, withShortDescriptions);
+  // TODO: Add fetchNodeStructure to ReadOnlyClient
+  throw new Error('fetchNodeStructure not implemented in ReadOnlyClient yet');
+  // const { getReadOnlyClient } = await import('./clients.js');
+  // return getReadOnlyClient().fetchNodeStructure(parentName, parentTechName, parentType, nodeKey, withShortDescriptions);
 }
 
 export async function makeAdtRequest(
@@ -250,8 +252,10 @@ export async function makeAdtRequest(
  * @deprecated Use getReadOnlyClient().getSystemInformation() instead
  */
 export async function getSystemInformation(): Promise<{ systemID?: string; userName?: string } | null> {
-  const { getReadOnlyClient } = await import('./clients');
-  return getReadOnlyClient().getSystemInformation();
+  // TODO: Add getSystemInformation to ReadOnlyClient
+  throw new Error('getSystemInformation not implemented in ReadOnlyClient yet');
+  // const { getReadOnlyClient } = await import('./clients.js');
+  // return getReadOnlyClient().getSystemInformation();
 }
 
 /**

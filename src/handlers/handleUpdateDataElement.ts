@@ -10,7 +10,7 @@
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
-import { DataElementBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "UpdateDataElement",
@@ -209,41 +209,55 @@ export async function handleUpdateDataElement(args: any) {
       };
       const typeKind = typeKindMap[rawTypeKind] || 'domain';
 
-      // Create builder with configuration
-      const builder = new DataElementBuilder(connection, logger, {
-        dataElementName: dataElementName,
-        packageName: typedArgs.package_name,
-        transportRequest: typedArgs.transport_request,
-        description: typedArgs.description,
-        domainName: domainName?.toUpperCase() || '',
-        dataType: typedArgs.data_type,
-        length: typedArgs.length,
-        decimals: typedArgs.decimals,
-        shortLabel: typedArgs.field_label_short,
-        mediumLabel: typedArgs.field_label_medium,
-        longLabel: typedArgs.field_label_long,
-        headingLabel: typedArgs.field_label_heading,
-        typeKind: typeKind,
-        typeName: typedArgs.type_name?.toUpperCase()
-      });
-
-      // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
+      // Create client
+      const client = new CrudClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
-      await builder
-        .validate()
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
-        .catch(error => {
-          logger.error('Data element update chain failed:', error);
-          throw error;
-        });
+      // Validate
+      await client.validateDataElement(dataElementName);
+
+      // Lock
+      await client.lockDataElement(dataElementName);
+      const lockHandle = client.getLockHandle();
+
+      try {
+        // Update with properties
+        const properties = {
+          domainName: domainName?.toUpperCase() || '',
+          dataType: typedArgs.data_type,
+          length: typedArgs.length,
+          decimals: typedArgs.decimals,
+          shortLabel: typedArgs.field_label_short,
+          mediumLabel: typedArgs.field_label_medium,
+          longLabel: typedArgs.field_label_long,
+          headingLabel: typedArgs.field_label_heading,
+          typeKind: typeKind,
+          typeName: typedArgs.type_name?.toUpperCase()
+        };
+        await client.updateDataElement(dataElementName, properties, lockHandle);
+
+        // Check
+        await client.checkDataElement(dataElementName);
+
+        // Unlock
+        await client.unlockDataElement(dataElementName, lockHandle);
+
+        // Activate if requested
+        if (shouldActivate) {
+          await client.activateDataElement(dataElementName);
+        }
+      } catch (error) {
+        // Try to unlock on error
+        try {
+          await client.unlockDataElement(dataElementName, lockHandle);
+        } catch (unlockError) {
+          logger.error('Failed to unlock data element after error:', unlockError);
+        }
+        throw error;
+      }
 
       // Get data element details from update result
-      const updateResult = builder.getUpdateResult();
+      const updateResult = client.getUpdateResult();
       let dataElementDetails = null;
       if (updateResult?.data && typeof updateResult.data === 'object' && 'data_element_details' in updateResult.data) {
         dataElementDetails = (updateResult.data as any).data_element_details;

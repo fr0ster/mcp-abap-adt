@@ -1,5 +1,5 @@
-import { McpError, ErrorCode } from '../lib/utils';
-import { getReadOnlyClient } from '../lib/clients';
+import { McpError, ErrorCode, getManagedConnection } from '../lib/utils';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../lib/writeResultToFile';
 import * as z from 'zod';
@@ -74,7 +74,13 @@ export async function handleGetClass(args: any) {
         if (!args?.class_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Class name is required');
         }
-        const response = await getReadOnlyClient().getClass(args.class_name);
+        const connection = getManagedConnection();
+        const client = new CrudClient(connection);
+        await client.readClass(args.class_name);
+        const response = client.getReadResult();
+        if (!response) {
+            throw new McpError(ErrorCode.InternalError, 'Failed to read class');
+        }
     // Parse XML responses; otherwise return the payload unchanged
         if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
             const resultObj = parseClassXml(response.data);

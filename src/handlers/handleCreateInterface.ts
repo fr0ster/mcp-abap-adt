@@ -2,7 +2,7 @@
  * CreateInterface Handler - ABAP Interface Creation via ADT API
  *
  * Uses InterfaceBuilder from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by builder.
+ * Session and lock management handled internally by client.
  *
  * Workflow: validate -> create -> lock -> update -> check -> unlock -> (activate)
  */
@@ -11,7 +11,7 @@ import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
-import { InterfaceBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateInterface",
@@ -87,7 +87,7 @@ ENDINTERFACE.`;
  * Main handler for CreateInterface MCP tool
  *
  * Uses InterfaceBuilder from @mcp-abap-adt/adt-clients for all operations
- * Session and lock management handled internally by builder
+ * Session and lock management handled internally by client
  */
 export async function handleCreateInterface(args: any) {
   try {
@@ -116,26 +116,28 @@ export async function handleCreateInterface(args: any) {
       // Generate source code if not provided
       const sourceCode = typedArgs.source_code || generateInterfaceTemplate(interfaceName, typedArgs.description || interfaceName);
 
-      // Create builder with configuration
-      const builder = new InterfaceBuilder(connection, logger, {
-        interfaceName: interfaceName,
-        packageName: typedArgs.package_name,
-        transportRequest: typedArgs.transport_request,
-        description: typedArgs.description || interfaceName,
-        sourceCode: sourceCode
-      });
+      // Create CrudClient
+      const client = new CrudClient(connection);
+      const description = typedArgs.description || interfaceName;
+      const packageName = typedArgs.package_name;
+      const transportRequest = typedArgs.transport_request || '';
+      const shouldActivate = typedArgs.activate !== false;
 
-      // Build operation chain: validate -> create -> lock -> update -> check -> unlock -> (activate)
-      const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
+      // Extract options
+      const masterSystem = typedArgs.master_system;
+      const responsible = typedArgs.responsible;
 
-      await builder
-        .validate()
-        .then(b => b.create())
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
+      // Execute the workflow
+      await client
+        .createInterface(interfaceName, description, packageName, transportRequest, {
+          masterSystem,
+          responsible
+        })
+        .then(c => c.lockInterface(interfaceName))
+        .then(c => c.updateInterface(interfaceName, sourceCode))
+        .then(c => c.checkInterface(interfaceName))
+        .then(c => c.unlockInterface(interfaceName))
+        .then(c => shouldActivate ? c.activateInterface(interfaceName) : Promise.resolve(c))
         .catch(error => {
           logger.error('Interface creation chain failed:', error);
           throw error;
@@ -143,8 +145,8 @@ export async function handleCreateInterface(args: any) {
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];
-      if (shouldActivate && builder.getActivateResult()) {
-        const activateResponse = builder.getActivateResult()!;
+      if (shouldActivate && client.getActivateResult()) {
+        const activateResponse = client.getActivateResult()!;
         if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
           const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
           const result = parser.parse(activateResponse.data);
@@ -158,36 +160,40 @@ export async function handleCreateInterface(args: any) {
         }
       }
 
-      logger.info(`✅ CreateInterface completed successfully: ${interfaceName}`);
-
-      return return_response({
-        data: JSON.stringify({
-          success: true,
-          interface_name: interfaceName,
-          package_name: typedArgs.package_name,
-          transport_request: typedArgs.transport_request || 'local',
-          activated: shouldActivate,
-          message: `Interface ${interfaceName} created successfully${shouldActivate ? ' and activated' : ''}`,
-          activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined
-        })
-      } as AxiosResponse);
-
-    } catch (error: any) {
-      logger.error(`Error creating interface ${interfaceName}:`, error);
-
-      // Check if interface already exists
-      if (error.message?.includes('already exists') || error.response?.status === 409) {
-        return return_error(new Error(`Interface ${interfaceName} already exists. Please delete it first or use a different name.`));
+      // Return success result
+      const stepsCompleted = ['validate', 'create', 'lock', 'update', 'check', 'unlock'];
+      if (shouldActivate) {
+        stepsCompleted.push('activate');
       }
 
-      const errorMessage = error.response?.data
-        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
-        : error.message || String(error);
+      const result = {
+        success: true,
+        interface_name: interfaceName,
+        package_name: packageName,
+        transport_request: transportRequest || null,
+        type: 'INTF/OI',
+        message: shouldActivate
+          ? `Interface ${interfaceName} created and activated successfully`
+          : `Interface ${interfaceName} created successfully (not activated)`,
+        uri: `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName).toLowerCase()}`,
+        steps_completed: stepsCompleted,
+        activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined
+      };
 
-      return return_error(new Error(`Failed to create interface ${interfaceName}: ${errorMessage}`));
+      return return_response({
+        data: JSON.stringify(result, null, 2),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      });
+
+    } catch (error: any) {
+      logger.error('Interface creation failed:', error);
+      return return_error(error);
     }
-
   } catch (error: any) {
+    logger.error('CreateInterface handler error:', error);
     return return_error(error);
   }
 }

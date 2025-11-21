@@ -11,7 +11,7 @@ import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
-import { ViewBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateView",
@@ -80,35 +80,38 @@ export async function handleCreateView(params: any) {
     logger.info(`Starting view creation: ${viewName}`);
 
     try {
-      // Create builder with configuration
-      const builder = new ViewBuilder(connection, logger, {
-        viewName: viewName,
-        packageName: args.package_name,
-        transportRequest: args.transport_request,
-        description: args.description || viewName,
-        ddlSource: args.ddl_source
-      });
-
-      // Build operation chain: validate -> create -> lock -> update -> check -> unlock -> (activate)
+      // Create client
+      const client = new CrudClient(connection);
       const shouldActivate = true; // Default to true for views
 
-      await builder
-        .validate()
-        .then(b => b.create())
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
-        .catch(error => {
-          logger.error('View creation chain failed:', error);
-          throw error;
-        });
+      // Validate
+      await client.validateView(viewName);
+
+      // Create
+      await client.createView(viewName, args.description || viewName, args.package_name, args.transport_request);
+
+      // Lock
+      await client.lockView(viewName);
+      const lockHandle = client.getLockHandle();
+
+      // Update with DDL source
+      await client.updateView(viewName, args.ddl_source, lockHandle);
+
+      // Check
+      await client.checkView(viewName);
+
+      // Unlock
+      await client.unlockView(viewName, lockHandle);
+
+      // Activate
+      if (shouldActivate) {
+        await client.activateView(viewName);
+      }
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];
-      if (shouldActivate && builder.getActivateResult()) {
-        const activateResponse = builder.getActivateResult()!;
+      if (shouldActivate && client.getActivateResult()) {
+        const activateResponse = client.getActivateResult()!;
         if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
           const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
           const result = parser.parse(activateResponse.data);

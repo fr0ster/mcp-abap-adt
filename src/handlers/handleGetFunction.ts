@@ -1,5 +1,5 @@
-import { McpError, ErrorCode } from '../lib/utils';
-import { getReadOnlyClient } from '../lib/clients';
+import { McpError, ErrorCode, getManagedConnection } from '../lib/utils';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../lib/writeResultToFile';
 import * as z from 'zod';
@@ -86,7 +86,13 @@ export async function handleGetFunction(args: any) {
         if (!args?.function_name || !args?.function_group) {
             throw new McpError(ErrorCode.InvalidParams, 'Function name and group are required');
         }
-    const response = await getReadOnlyClient().getFunction(args.function_name, args.function_group);
+    const connection = getManagedConnection();
+    const client = new CrudClient(connection);
+    await client.readFunctionModule(args.function_name, args.function_group);
+    const response = client.getReadResult();
+    if (!response) {
+        throw new McpError(ErrorCode.InternalError, 'Failed to read function module');
+    }
     // Parse XML responses and return JSON; otherwise stream back the plain text
         if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
             const resultObj = parseFunctionXml(response.data);

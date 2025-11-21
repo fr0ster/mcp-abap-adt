@@ -10,7 +10,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
-import { ClassBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "UpdateClassSource",
@@ -62,34 +62,47 @@ export async function handleUpdateClassSource(params: any) {
   logger.info(`Starting UpdateClassSource for ${className}`);
 
   try {
-    // Create builder with class name and source code
-    const builder = new ClassBuilder(connection, logger, {
-      className: className
-    });
-
-    // Set source code
-    builder.setCode(args.source_code);
+    // Create client
+    const client = new CrudClient(connection);
 
     // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
     const shouldActivate = args.activate === true; // Default to false if not specified
 
-    await builder
-      .validate()
-      .then(b => b.lock())
-      .then(b => b.update())
-      .then(b => b.check())
-      .then(b => b.unlock())
-      .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
-      .catch(error => {
-        // Builder handles unlock in finally, but we log here
-        logger.error('Class update chain failed:', error);
-        throw error;
-      });
+    // Validate
+    await client.validateClass(className);
+
+    // Lock
+    await client.lockClass(className);
+    const lockHandle = client.getLockHandle();
+
+    try {
+      // Update source code
+      await client.updateClass(className, args.source_code, lockHandle);
+
+      // Check
+      await client.checkClass(className);
+
+      // Unlock
+      await client.unlockClass(className, lockHandle);
+
+      // Activate if requested
+      if (shouldActivate) {
+        await client.activateClass(className);
+      }
+    } catch (error) {
+      // Try to unlock on error
+      try {
+        await client.unlockClass(className, lockHandle);
+      } catch (unlockError) {
+        logger.error('Failed to unlock class after error:', unlockError);
+      }
+      throw error;
+    }
 
     // Parse activation warnings if activation was performed
     let activationWarnings: string[] = [];
-    if (shouldActivate && builder.getActivateResult()) {
-      const activateResponse = builder.getActivateResult()!;
+    if (shouldActivate && client.getActivateResult()) {
+      const activateResponse = client.getActivateResult()!;
       if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
         const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
         const result = parser.parse(activateResponse.data);

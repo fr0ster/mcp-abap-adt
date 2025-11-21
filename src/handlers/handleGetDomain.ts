@@ -1,6 +1,6 @@
-import { McpError, ErrorCode } from '../lib/utils';
+import { McpError, ErrorCode, getManagedConnection } from '../lib/utils';
 import { return_error, return_response } from '../lib/utils';
-import { getReadOnlyClient } from '../lib/clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import * as z from 'zod';
 
@@ -27,7 +27,13 @@ export async function handleGetDomain(args: any) {
     }
 
     const typedArgs = args as DomainArgs;
-    const response = await getReadOnlyClient().getDomain(typedArgs.domain_name);
+    const connection = getManagedConnection();
+    const client = new CrudClient(connection);
+    await client.readDomain(typedArgs.domain_name);
+    const response = client.getReadResult();
+    if (!response) {
+      throw new McpError(ErrorCode.InternalError, 'Failed to read domain');
+    }
 
     // Parse XML response
     const parser = new XMLParser({

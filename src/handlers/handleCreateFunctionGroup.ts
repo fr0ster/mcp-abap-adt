@@ -10,7 +10,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
-import { FunctionGroupBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateFunctionGroup",
@@ -81,25 +81,25 @@ export async function handleCreateFunctionGroup(args: any) {
     logger.info(`Starting function group creation: ${functionGroupName}`);
 
     try {
-      // Create builder with configuration
-      const builder = new FunctionGroupBuilder(connection, logger, {
-        functionGroupName: functionGroupName,
-        packageName: typedArgs.package_name,
-        transportRequest: typedArgs.transport_request,
-        description: typedArgs.description || functionGroupName
-      });
-
-      // Build operation chain: validate -> create -> (activate)
+      // Create client
+      const client = new CrudClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
-      await builder
-        .validate()
-        .then(b => b.create())
-        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
-        .catch(error => {
-          logger.error('Function group creation chain failed:', error);
-          throw error;
-        });
+      // Validate
+      await client.validateFunctionGroup(functionGroupName);
+
+      // Create
+      await client.createFunctionGroup(
+        functionGroupName,
+        typedArgs.description || functionGroupName,
+        typedArgs.package_name,
+        typedArgs.transport_request
+      );
+
+      // Activate if requested
+      if (shouldActivate) {
+        await client.activateFunctionGroup(functionGroupName);
+      }
 
       logger.info(`✅ CreateFunctionGroup completed successfully: ${functionGroupName}`);
 

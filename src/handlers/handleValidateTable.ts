@@ -6,7 +6,7 @@
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { TableBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "ValidateTable",
@@ -86,13 +86,10 @@ export async function handleValidateTable(args: any) {
     logger.info(`Starting table validation: ${tableName}`);
 
     try {
-      const builder = new TableBuilder(connection, logger, {
-        tableName,
-        sessionId: session_id
-      });
+      const client = new CrudClient(connection);
 
-      await builder.validate();
-      const result = builder.getValidationResult();
+      await client.validateTable(tableName);
+      const result = client.getValidationResult();
       if (!result) {
         throw new Error('Validation did not return a result');
       }
@@ -109,7 +106,7 @@ export async function handleValidateTable(args: any) {
           table_name: tableName,
           description: description || null,
           validation_result: result,
-          session_id: builder.getSessionId(),
+          session_id: session_id || null,
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,
             csrf_token: updatedSessionState.csrfToken,

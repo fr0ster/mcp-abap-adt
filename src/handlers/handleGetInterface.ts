@@ -1,5 +1,5 @@
-import { McpError, ErrorCode, return_response } from '../lib/utils';
-import { getReadOnlyClient } from '../lib/clients';
+import { McpError, ErrorCode, return_response, getManagedConnection } from '../lib/utils';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../lib/writeResultToFile';
 import * as z from 'zod';
@@ -56,7 +56,13 @@ export async function handleGetInterface(args: any) {
         if (!args?.interface_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Interface name is required');
         }
-        const response = await getReadOnlyClient().getInterface(args.interface_name);
+        const connection = getManagedConnection();
+        const client = new CrudClient(connection);
+        await client.readInterface(args.interface_name);
+        const response = client.getReadResult();
+        if (!response) {
+            throw new McpError(ErrorCode.InternalError, 'Failed to read interface');
+        }
     // Parse XML responses; otherwise return the payload unchanged
         if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
             const result = {

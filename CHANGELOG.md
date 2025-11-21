@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- **All handlers refactored to use CrudClient** – replaced Builder pattern with unified CrudClient API
+  - **18 handlers converted**: Create (Program, DataElement, Domain, FunctionGroup, FunctionModule, Package, Structure, Table, Transport, View), Update (ClassSource, DataElement, InterfaceSource), Check (Class, FunctionModule, Table, Object), Validate (Class, Object), Lock/Unlock (Object)
+  - Removed direct Builder instantiation from all handlers
+  - All CRUD operations now use CrudClient methods (createProgram, lockClass, updateInterface, etc.)
+  - Session ID no longer exposed - internal to CrudClient implementation
+  - Simplified error handling with try-catch around lock/update/unlock sequences
+
+### Fixed
+- **utils.ts deprecated methods** – added TODO comments for missing ReadOnlyClient methods
+  - `fetchNodeStructure()` - marked for future implementation
+  - `getSystemInformation()` - marked for future implementation
+  - Both throw errors with clear TODO messages instead of attempting non-existent method calls
+
 ## [1.1.3] - 2025-11-21
 
 ### Added

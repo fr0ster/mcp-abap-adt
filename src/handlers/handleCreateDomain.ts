@@ -10,7 +10,7 @@
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation';
-import { DomainBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateDomain",
@@ -138,12 +138,27 @@ export async function handleCreateDomain(args: any) {
     logger.info(`Starting domain creation: ${domainName}`);
 
     try {
-      // Create builder with configuration
-      const builder = new DomainBuilder(connection, logger, {
-        domainName: domainName,
-        packageName: typedArgs.package_name,
-        transportRequest: typedArgs.transport_request,
-        description: typedArgs.description || domainName,
+      // Create client
+      const client = new CrudClient(connection);
+      const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
+
+      // Validate
+      await client.validateDomain(domainName);
+
+      // Create
+      await client.createDomain(
+        domainName,
+        typedArgs.description || domainName,
+        typedArgs.package_name,
+        typedArgs.transport_request
+      );
+
+      // Lock
+      await client.lockDomain(domainName);
+      const lockHandle = client.getLockHandle();
+
+      // Update with properties
+      const properties = {
         datatype: typedArgs.datatype || 'CHAR',
         length: typedArgs.length || 100,
         decimals: typedArgs.decimals || 0,
@@ -152,27 +167,22 @@ export async function handleCreateDomain(args: any) {
         sign_exists: typedArgs.sign_exists || false,
         value_table: typedArgs.value_table,
         fixed_values: typedArgs.fixed_values
-      });
+      };
+      await client.updateDomain(domainName, properties, lockHandle);
 
-      // Build operation chain: validate -> create -> lock -> update -> check -> unlock -> (activate)
-      // Note: create() creates empty domain, then lock() -> update() fills it with data
-      const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
+      // Check
+      await client.checkDomain(domainName);
 
-      await builder
-        .validate()
-        .then(b => b.create())
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
-        .catch(error => {
-          logger.error('Domain creation chain failed:', error);
-          throw error;
-        });
+      // Unlock
+      await client.unlockDomain(domainName, lockHandle);
+
+      // Activate if requested
+      if (shouldActivate) {
+        await client.activateDomain(domainName);
+      }
 
       // Get domain details from create result (createDomain already does verification)
-      const createResult = builder.getCreateResult();
+      const createResult = client.getCreateResult();
       let domainDetails = null;
       if (createResult?.data && typeof createResult.data === 'object' && 'domain_details' in createResult.data) {
         domainDetails = (createResult.data as any).domain_details;

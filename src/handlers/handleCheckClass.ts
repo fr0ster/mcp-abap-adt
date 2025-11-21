@@ -7,7 +7,7 @@
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { ClassBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../lib/checkRunParser';
 
 export const TOOL_DEFINITION = {
@@ -99,17 +99,9 @@ export async function handleCheckClass(args: any) {
     logger.info(`Starting class check: ${className} (version: ${checkVersion}, has source: ${!!source_code})`);
 
     try {
-      const builder = new ClassBuilder(connection, logger, {
-        className,
-        sessionId: session_id
-      });
-
-      if (source_code) {
-        builder.setCode(source_code);
-      }
-
-      await builder.check(checkVersion);
-      const response = builder.getCheckResult();
+      const client = new CrudClient(connection);
+      await client.checkClass(className);
+      const response = client.getCheckResult();
       if (!response) {
         throw new Error('Class check did not return a response');
       }
@@ -130,7 +122,7 @@ export async function handleCheckClass(args: any) {
           class_name: className,
           version: checkVersion,
           check_result: checkResult,
-          session_id: builder.getSessionId(),
+          session_id: session_id,
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,
             csrf_token: updatedSessionState.csrfToken,

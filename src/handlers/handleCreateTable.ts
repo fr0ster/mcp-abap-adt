@@ -10,7 +10,7 @@
 import { McpError, ErrorCode, AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
-import { TableBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 
 export const TOOL_DEFINITION = {
@@ -78,29 +78,33 @@ export async function handleCreateTable(args: any): Promise<any> {
     logger.info(`Starting table creation: ${tableName}`);
 
     try {
-      // Create builder with configuration
-      const builder = new TableBuilder(connection, logger, {
-        tableName: tableName,
-        packageName: createTableArgs.package_name,
-        transportRequest: createTableArgs.transport_request,
-        ddlCode: createTableArgs.ddl_code
-      });
-
-      // Build operation chain: validate -> create -> lock -> update -> check -> unlock -> (activate)
+      // Create client
+      const client = new CrudClient(connection);
       const shouldActivate = true; // Default to true for tables
 
-      await builder
-        .validate()
-        .then(b => b.create())
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
-        .catch(error => {
-          logger.error('Table creation chain failed:', error);
-          throw error;
-        });
+      // Validate
+      await client.validateTable(tableName);
+
+      // Create
+      await client.createTable(tableName, createTableArgs.package_name, createTableArgs.transport_request);
+
+      // Lock
+      await client.lockTable(tableName);
+      const lockHandle = client.getLockHandle();
+
+      // Update with DDL code
+      await client.updateTable(tableName, createTableArgs.ddl_code, lockHandle);
+
+      // Check
+      await client.checkTable(tableName);
+
+      // Unlock
+      await client.unlockTable(tableName, lockHandle);
+
+      // Activate
+      if (shouldActivate) {
+        await client.activateTable(tableName);
+      }
 
       logger.info(`✅ CreateTable completed successfully: ${tableName}`);
 

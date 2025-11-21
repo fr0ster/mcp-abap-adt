@@ -72,13 +72,75 @@ export async function handleDeleteObject(args: any) {
     logger.info(`Starting object deletion: ${objectName} (type: ${object_type})`);
 
     try {
-      // Delete object using adt-clients function
-      const response = await crudClient.deleteObject({
-        object_name: objectName,
-        object_type: object_type,
-        function_group_name: function_group_name,
-        transport_request: transport_request
-      });
+      let response;
+
+      // Call appropriate delete method based on object type
+      switch (object_type.toLowerCase()) {
+        case 'class':
+        case 'clas/oc':
+          await crudClient.deleteClass(objectName, transport_request);
+          response = crudClient.getDeleteResult();
+          break;
+        case 'program':
+        case 'prog/p':
+          await crudClient.deleteProgram(objectName, transport_request);
+          response = crudClient.getDeleteResult();
+          break;
+        case 'interface':
+        case 'intf/oi':
+          await crudClient.deleteInterface(objectName, transport_request);
+          response = crudClient.getDeleteResult();
+          break;
+        case 'function_group':
+        case 'fugr/f':
+          await crudClient.deleteFunctionGroup(objectName, transport_request);
+          response = crudClient.getDeleteResult();
+          break;
+        case 'function_module':
+        case 'fugr/ff':
+          if (!function_group_name) {
+            return return_error(new Error('function_group_name is required for function_module deletion'));
+          }
+          await crudClient.deleteFunctionModule(objectName, function_group_name, transport_request);
+          response = crudClient.getDeleteResult();
+          break;
+        case 'table':
+        case 'tabl/dt':
+          await crudClient.deleteTable(objectName, transport_request);
+          response = crudClient.getDeleteResult();
+          break;
+        case 'structure':
+        case 'ttyp/st':
+          await crudClient.deleteStructure(objectName, transport_request);
+          response = crudClient.getDeleteResult();
+          break;
+        case 'view':
+        case 'ddls/df':
+          await crudClient.deleteView(objectName, transport_request);
+          response = crudClient.getDeleteResult();
+          break;
+        case 'domain':
+        case 'doma/dm':
+          await crudClient.deleteDomain(objectName, transport_request);
+          response = crudClient.getDeleteResult();
+          break;
+        case 'data_element':
+        case 'dtel/de':
+          await crudClient.deleteDataElement(objectName, transport_request);
+          response = crudClient.getDeleteResult();
+          break;
+        case 'package':
+        case 'devc/k':
+          await crudClient.deletePackage(objectName, transport_request);
+          response = crudClient.getDeleteResult();
+          break;
+        default:
+          return return_error(new Error(`Unsupported object_type: ${object_type}`));
+      }
+
+      if (!response) {
+        throw new Error(`Delete did not return a response for object ${objectName}`);
+      }
 
       logger.info(`✅ DeleteObject completed successfully: ${objectName}`);
 

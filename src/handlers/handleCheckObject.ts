@@ -8,17 +8,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
-import {
-  ClassBuilder,
-  ProgramBuilder,
-  InterfaceBuilder,
-  FunctionGroupBuilder,
-  TableBuilder,
-  StructureBuilder,
-  ViewBuilder,
-  DomainBuilder,
-  DataElementBuilder
-} from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../lib/checkRunParser';
 
 export const TOOL_DEFINITION = {
@@ -121,25 +111,51 @@ export async function handleCheckObject(args: any) {
     logger.info(`Starting object check: ${objectName} (type: ${object_type}, version: ${checkVersion})`);
 
     try {
-      const builder = createBuilder(
-        object_type.toLowerCase(),
-        connection,
-        objectName,
-        session_id,
-        logger
-      );
+      const client = new CrudClient(connection);
+      let response;
 
-      if (!builder) {
-        return return_error(new Error(`Unsupported object_type: ${object_type}`));
+      // Call appropriate check method based on object type
+      switch (object_type.toLowerCase()) {
+        case 'class':
+          await client.checkClass(objectName);
+          response = client.getCheckResult();
+          break;
+        case 'program':
+          await client.checkProgram(objectName);
+          response = client.getCheckResult();
+          break;
+        case 'interface':
+          await client.checkInterface(objectName);
+          response = client.getCheckResult();
+          break;
+        case 'function_group':
+          await client.checkFunctionGroup(objectName);
+          response = client.getCheckResult();
+          break;
+        case 'table':
+          await client.checkTable(objectName);
+          response = client.getCheckResult();
+          break;
+        case 'structure':
+          await client.checkStructure(objectName);
+          response = client.getCheckResult();
+          break;
+        case 'view':
+          await client.checkView(objectName);
+          response = client.getCheckResult();
+          break;
+        case 'domain':
+          await client.checkDomain(objectName);
+          response = client.getCheckResult();
+          break;
+        case 'data_element':
+          await client.checkDataElement(objectName);
+          response = client.getCheckResult();
+          break;
+        default:
+          return return_error(new Error(`Unsupported object_type: ${object_type}`));
       }
 
-      if (builder instanceof TableBuilder) {
-        await builder.check('abapCheckRun');
-      } else {
-        await builder.check(checkVersion as 'active' | 'inactive');
-      }
-
-      const response = builder.getCheckResult?.();
       if (!response) {
         throw new Error(`Check did not return a response for object ${objectName}`);
       }
@@ -161,7 +177,7 @@ export async function handleCheckObject(args: any) {
           object_type,
           version: checkVersion,
           check_result: checkResult,
-          session_id: builder.getSessionId ? builder.getSessionId() : session_id || null,
+          session_id: session_id || null,
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,
             csrf_token: updatedSessionState.csrfToken,
@@ -202,46 +218,5 @@ export async function handleCheckObject(args: any) {
 
   } catch (error: any) {
     return return_error(error);
-  }
-}
-
-function createBuilder(
-  objectType: string,
-  connection: ReturnType<typeof getManagedConnection>,
-  objectName: string,
-  sessionId: string | undefined,
-  builderLogger: typeof logger
-):
-  | ClassBuilder
-  | ProgramBuilder
-  | InterfaceBuilder
-  | FunctionGroupBuilder
-  | TableBuilder
-  | StructureBuilder
-  | ViewBuilder
-  | DomainBuilder
-  | DataElementBuilder
-  | null {
-  switch (objectType) {
-    case 'class':
-      return new ClassBuilder(connection, builderLogger, { className: objectName, sessionId });
-    case 'program':
-      return new ProgramBuilder(connection, builderLogger, { programName: objectName, sessionId });
-    case 'interface':
-      return new InterfaceBuilder(connection, builderLogger, { interfaceName: objectName, sessionId });
-    case 'function_group':
-      return new FunctionGroupBuilder(connection, builderLogger, { functionGroupName: objectName, sessionId });
-    case 'table':
-      return new TableBuilder(connection, builderLogger, { tableName: objectName, sessionId });
-    case 'structure':
-      return new StructureBuilder(connection, builderLogger, { structureName: objectName, sessionId });
-    case 'view':
-      return new ViewBuilder(connection, builderLogger, { viewName: objectName, sessionId });
-    case 'domain':
-      return new DomainBuilder(connection, builderLogger, { domainName: objectName, sessionId });
-    case 'data_element':
-      return new DataElementBuilder(connection, builderLogger, { dataElementName: objectName, sessionId });
-    default:
-      return null;
   }
 }

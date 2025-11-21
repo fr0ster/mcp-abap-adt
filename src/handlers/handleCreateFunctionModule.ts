@@ -10,7 +10,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
 import { validateTransportRequest } from '../utils/transportValidation.js';
-import { FunctionModuleBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateFunctionModule",
@@ -91,31 +91,40 @@ export async function handleCreateFunctionModule(args: any) {
     logger.info(`Starting function module creation: ${functionModuleName} in ${functionGroupName}`);
 
     try {
-      // Create builder with configuration
-      const builder = new FunctionModuleBuilder(connection, logger, {
-        functionGroupName: functionGroupName,
-        functionModuleName: functionModuleName,
-        sourceCode: typedArgs.source_code,
-        description: typedArgs.description || functionModuleName,
-        transportRequest: typedArgs.transport_request
-      });
-
-      // Build operation chain: validate -> create -> lock -> update -> check -> unlock -> (activate)
-      // Note: create() creates empty function module, then lock() -> update() fills it with source code
+      // Create client
+      const client = new CrudClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
-      await builder
-        .validate()
-        .then(b => b.create())
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
-        .catch(error => {
-          logger.error('Function module creation chain failed:', error);
-          throw error;
-        });
+      // Validate
+      await client.validateFunctionModule(functionModuleName, functionGroupName);
+
+      // Create
+      // Note: Package name inherited from parent function group
+      await client.createFunctionModule(
+        functionModuleName,
+        functionGroupName,
+        typedArgs.description || functionModuleName,
+        '', // packageName inherited from function group
+        typedArgs.transport_request
+      );
+
+      // Lock
+      await client.lockFunctionModule(functionModuleName, functionGroupName);
+      const lockHandle = client.getLockHandle();
+
+      // Update with source code
+      await client.updateFunctionModule(functionModuleName, functionGroupName, typedArgs.source_code, lockHandle);
+
+      // Check
+      await client.checkFunctionModule(functionModuleName, functionGroupName);
+
+      // Unlock
+      await client.unlockFunctionModule(functionModuleName, functionGroupName, lockHandle);
+
+      // Activate if requested
+      if (shouldActivate) {
+        await client.activateFunctionModule(functionModuleName, functionGroupName);
+      }
 
       logger.info(`✅ CreateFunctionModule completed successfully: ${functionModuleName}`);
 

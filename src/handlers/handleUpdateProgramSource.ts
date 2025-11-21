@@ -10,7 +10,7 @@
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
-import { ProgramBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "UpdateProgramSource",
@@ -64,21 +64,18 @@ export async function handleUpdateProgramSource(params: any) {
 
     try {
       // Create builder with configuration
-      const builder = new ProgramBuilder(connection, logger, {
-        programName: programName,
-        sourceCode: args.source_code
-      });
+      const builder = new CrudClient(connection);
 
       // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
       const shouldActivate = args.activate === true; // Default to false if not specified
 
       await builder
-        .validate()
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
+        .validateProgram(programName)
+        .then(b => b.lockProgram(programName))
+        .then(b => b.updateProgram(programName, args.source_code))
+        .then(b => b.checkProgram(programName))
+        .then(b => b.unlockProgram(programName))
+        .then(b => shouldActivate ? b.activateProgram(programName) : Promise.resolve(b))
         .catch(error => {
           logger.error('Program update chain failed:', error);
           throw error;

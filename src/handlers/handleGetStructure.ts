@@ -1,5 +1,5 @@
-import { McpError, ErrorCode } from '../lib/utils';
-import { getReadOnlyClient } from '../lib/clients';
+import { McpError, ErrorCode, getManagedConnection } from '../lib/utils';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../lib/writeResultToFile';
 import * as z from 'zod';
@@ -53,7 +53,13 @@ export async function handleGetStructure(args: any) {
         if (!args?.structure_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Structure name is required');
         }
-        const response = await getReadOnlyClient().getStructure(args.structure_name);
+        const connection = getManagedConnection();
+        const client = new CrudClient(connection);
+        await client.readStructure(args.structure_name);
+        const response = client.getReadResult();
+        if (!response) {
+            throw new McpError(ErrorCode.InternalError, 'Failed to read structure');
+        }
     // Parse XML responses; otherwise return the payload untouched
         if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
             const resultObj = parseStructureXml(response.data);

@@ -9,9 +9,9 @@
  * - Package and system information
  */
 
-import { McpError, ErrorCode } from '../lib/utils';
+import { McpError, ErrorCode, getManagedConnection } from '../lib/utils';
 import { return_error, return_response } from '../lib/utils';
-import { getReadOnlyClient } from '../lib/clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import * as z from 'zod';
 
@@ -126,7 +126,13 @@ export async function handleGetDataElement(args: any) {
     }
 
     const typedArgs = args as DataElementArgs;
-    const response = await getReadOnlyClient().getDataElement(typedArgs.data_element_name);
+    const connection = getManagedConnection();
+    const client = new CrudClient(connection);
+    await client.readDataElement(typedArgs.data_element_name);
+    const response = client.getReadResult();
+    if (!response) {
+      throw new McpError(ErrorCode.InternalError, 'Failed to read data element');
+    }
 
     // Parse XML to JSON
     const parsedData = parseDataElementXml(response.data);

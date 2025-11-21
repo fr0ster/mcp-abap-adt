@@ -9,7 +9,7 @@
 
 import { AxiosResponse } from '../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../lib/utils';
-import { FunctionModuleBuilder } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "UpdateFunctionModuleSource",
@@ -77,24 +77,16 @@ export async function handleUpdateFunctionModuleSource(args: UpdateFunctionModul
     logger.info(`Starting function module source update: ${functionModuleName} in ${functionGroupName}`);
 
     try {
-      // Create builder with configuration
-      const builder = new FunctionModuleBuilder(connection, logger, {
-        functionGroupName: functionGroupName,
-        functionModuleName: functionModuleName,
-        sourceCode: args.source_code,
-        transportRequest: args.transport_request
-      });
-
-      // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
+      const client = new CrudClient(connection);
       const shouldActivate = args.activate === true;
 
-      await builder
-        .validate()
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => shouldActivate ? b.activate() : Promise.resolve(b))
+      // Execute operation chain: lock -> update -> check -> unlock -> (activate)
+      await client
+        .lockFunctionModule(functionModuleName, functionGroupName)
+        .then(c => c.updateFunctionModule(functionModuleName, functionGroupName, args.source_code))
+        .then(c => c.checkFunctionModule(functionModuleName, functionGroupName))
+        .then(c => c.unlockFunctionModule(functionModuleName, functionGroupName))
+        .then(c => shouldActivate ? c.activateFunctionModule(functionModuleName, functionGroupName) : Promise.resolve(c))
         .catch(error => {
           logger.error('Function module update chain failed:', error);
           throw error;

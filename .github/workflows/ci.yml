@@ -51,6 +51,6 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $PACKAGE_FILE = Get-ChildItem -Filter "fr0ster-mcp-abap-adt-*.tgz" | Select-Object -First 1
-          npm install -g ".\$PACKAGE_FILE"
+          $PACKAGE_FILE = Get-ChildItem -Filter "fr0ster-mcp-abap-adt-*.tgz" | Select-Object -First 1 -ExpandProperty Name
+          npm install -g $PACKAGE_FILE
           mcp-abap-adt --help

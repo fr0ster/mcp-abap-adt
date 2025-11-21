@@ -161,6 +161,97 @@ import { TOOL_DEFINITION as CheckFunctionModule_Tool } from "./handlers/handleCh
 import fs from "fs";
 
 /**
+ * Display help message
+ */
+function showHelp(): void {
+  const help = `
+MCP ABAP ADT Server - SAP ABAP Development Tools MCP Integration
+
+USAGE:
+  mcp-abap-adt [options]           # Default stdio transport
+  mcp-abap-adt-http [options]      # HTTP StreamableHTTP transport
+  mcp-abap-adt-sse [options]       # Server-Sent Events transport
+
+OPTIONS:
+  --help                           Show this help message
+
+ENVIRONMENT:
+  --env=<path>                     Path to .env file (default: ./.env)
+  --env <path>                     Alternative syntax for --env
+
+TRANSPORT:
+  --transport=<type>               Transport type: stdio|http|streamable-http|sse
+                                   (default: stdio)
+
+HTTP OPTIONS:
+  --http                           Use HTTP StreamableHTTP transport
+  --http-port=<port>               HTTP server port (default: 3000)
+  --http-host=<host>               HTTP server host (default: 0.0.0.0)
+  --http-json-response             Enable JSON response format
+  --http-allowed-origins=<list>    Comma-separated allowed origins for CORS
+  --http-allowed-hosts=<list>      Comma-separated allowed hosts
+  --http-enable-dns-protection     Enable DNS rebinding protection
+
+SSE OPTIONS:
+  --sse                            Use Server-Sent Events transport
+  --sse-port=<port>                SSE server port (default: 3001)
+  --sse-host=<host>                SSE server host (default: 0.0.0.0)
+  --sse-allowed-origins=<list>     Comma-separated allowed origins for CORS
+  --sse-allowed-hosts=<list>       Comma-separated allowed hosts
+  --sse-enable-dns-protection      Enable DNS rebinding protection
+
+ENVIRONMENT VARIABLES:
+  MCP_ENV_PATH                     Path to .env file
+  MCP_SKIP_ENV_LOAD               Skip automatic .env loading (true|false)
+  MCP_SKIP_AUTO_START             Skip automatic server start (true|false)
+  MCP_TRANSPORT                   Default transport type
+  MCP_HTTP_PORT                   Default HTTP port
+  MCP_HTTP_HOST                   Default HTTP host
+  MCP_HTTP_ENABLE_JSON_RESPONSE   Enable JSON responses
+  MCP_HTTP_ALLOWED_ORIGINS        Allowed CORS origins
+  MCP_HTTP_ALLOWED_HOSTS          Allowed hosts
+  MCP_HTTP_ENABLE_DNS_PROTECTION  Enable DNS protection
+  MCP_SSE_PORT                    Default SSE port
+  MCP_SSE_HOST                    Default SSE host
+  MCP_SSE_ALLOWED_ORIGINS         Allowed CORS origins for SSE
+  MCP_SSE_ALLOWED_HOSTS           Allowed hosts for SSE
+  MCP_SSE_ENABLE_DNS_PROTECTION   Enable DNS protection for SSE
+
+SAP CONNECTION (.env file):
+  SAP_URL                         SAP system URL (required)
+  SAP_CLIENT                      SAP client number (required)
+  SAP_AUTH_TYPE                   Authentication type: basic|jwt (default: basic)
+  SAP_USERNAME                    SAP username (for basic auth)
+  SAP_PASSWORD                    SAP password (for basic auth)
+  SAP_JWT_TOKEN                   JWT token (for jwt auth)
+
+EXAMPLES:
+  # Use .env from current directory (default)
+  mcp-abap-adt
+
+  # Use custom .env file
+  mcp-abap-adt --env=/path/to/my.env
+
+  # Start HTTP server on port 8080
+  mcp-abap-adt --transport=http --http-port=8080
+
+  # Start SSE server with CORS
+  mcp-abap-adt-sse --sse-allowed-origins=http://localhost:3000
+
+DOCUMENTATION:
+  https://github.com/fr0ster/mcp-abap-adt
+
+`;
+  console.log(help);
+  process.exit(0);
+}
+
+// Check for --help flag before anything else
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+  showHelp();
+}
+
+/**
  * Parses command line arguments to find env file path
  * Supports both formats:
  * 1. --env=/path/to/.env
@@ -188,37 +279,44 @@ let envFilePath = parseEnvArg() ?? process.env.MCP_ENV_PATH;
 
 if (!skipEnvAutoload) {
   if (!envFilePath) {
+    // Priority order for global installations:
+    // 1. Current working directory (where user runs the command)
+    // 2. Package installation directory
     const possiblePaths = [
-      path.resolve(process.cwd(), ".env"),
-      path.resolve(__dirname, "../.env")
+      path.resolve(process.cwd(), ".env"),      // User's working directory (FIRST!)
+      path.resolve(__dirname, "../.env")         // Package directory
     ];
 
     for (const possiblePath of possiblePaths) {
       if (fs.existsSync(possiblePath)) {
         envFilePath = possiblePath;
-        process.stderr.write(`[MCP-ENV] No --env specified, using found .env: ${envFilePath}\n`);
+        process.stderr.write(`[MCP-ENV] Found .env file: ${envFilePath}\n`);
         break;
       }
     }
 
     if (!envFilePath) {
-      envFilePath = path.resolve(__dirname, "../.env");
-      process.stderr.write(`[MCP-ENV] WARNING: No .env file found, will use path: ${envFilePath}\n`);
+      // Default to current working directory if nothing found
+      envFilePath = path.resolve(process.cwd(), ".env");
+      process.stderr.write(`[MCP-ENV] WARNING: No .env file found, will try: ${envFilePath}\n`);
     }
+  } else {
+    process.stderr.write(`[MCP-ENV] Using .env from argument/env: ${envFilePath}\n`);
   }
 
   if (!path.isAbsolute(envFilePath)) {
     envFilePath = path.resolve(process.cwd(), envFilePath);
+    process.stderr.write(`[MCP-ENV] Resolved relative path to: ${envFilePath}\n`);
   }
-
-  process.stderr.write(`[MCP-ENV] Using .env path: ${envFilePath}\n`);
 
   if (fs.existsSync(envFilePath)) {
     dotenv.config({ path: envFilePath });
-    process.stderr.write(`[MCP-ENV] Successfully loaded environment from: ${envFilePath}\n`);
+    process.stderr.write(`[MCP-ENV] ✓ Successfully loaded: ${envFilePath}\n`);
   } else {
-    logger.error(".env file not found at provided path", { path: envFilePath });
-    process.stderr.write(`ERROR: .env file not found at: ${envFilePath}\n`);
+    logger.error(".env file not found", { path: envFilePath });
+    process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n`);
+    process.stderr.write(`[MCP-ENV]   Current working directory: ${process.cwd()}\n`);
+    process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
     process.exit(1);
   }
 } else if (envFilePath) {

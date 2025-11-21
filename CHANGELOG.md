@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [1.1.4] - 2025-11-21
+
+### Added
+- **--help flag**: Added comprehensive help message showing all CLI options, environment variables, and usage examples
+  - Shows transport options (stdio, http, sse)
+  - Lists all HTTP and SSE configuration options
+  - Documents SAP connection environment variables
+  - Includes practical usage examples
+
+### Fixed
+- **Global installation .env loading**: Fixed .env file discovery for globally installed packages
+  - Now correctly prioritizes `process.cwd()/.env` (user's working directory) over package directory
+  - Works correctly when installed via `npm install -g`
+  - Better error messages showing current directory and suggesting --env flag
+- **--env argument parsing**: Fixed custom .env file path support
+  - Both `--env=/path/to/.env` and `--env /path/to/.env` formats now work correctly
+  - Relative paths are resolved from current working directory
+  - Clear feedback messages showing which .env file is being used
+- **Runtime dependencies**: Moved `dotenv` from devDependencies to dependencies
+  - Fixes "Cannot find module 'dotenv'" error when installed globally
+  - Ensures all runtime dependencies are available in production
+
 ### Changed
 - **All handlers refactored to use CrudClient** – replaced Builder pattern with unified CrudClient API
   - **18 handlers converted**: Create (Program, DataElement, Domain, FunctionGroup, FunctionModule, Package, Structure, Table, Transport, View), Update (ClassSource, DataElement, InterfaceSource), Check (Class, FunctionModule, Table, Object), Validate (Class, Object), Lock/Unlock (Object)

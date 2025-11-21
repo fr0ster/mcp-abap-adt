@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [1.1.6] - 2025-11-21
+
+### Documentation
+- **Comprehensive CLI documentation**: Added detailed documentation for all command line options and configuration
+  - Updated README.md with global installation guide and CLI usage examples
+  - Enhanced INSTALLATION.md with complete CLI options reference
+  - Created new CLI_OPTIONS.md with comprehensive command line reference
+  - Documented environment file priority and auto-discovery behavior
+  - Added troubleshooting section for common CLI issues
+
 ## [1.1.5] - 2025-11-21
 
 ### Added

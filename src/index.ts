@@ -1,13 +1,10 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js"; // Keep for stdio/SSE compatibility
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import {
-  CallToolRequestSchema,
   ErrorCode,
-  ListToolsRequestSchema,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import * as z from "zod";
@@ -450,8 +447,7 @@ export function getConfig(): SapConfig {
 export class mcp_abap_adt_server {
   private readonly allowProcessExit: boolean;
   private readonly registerSignalHandlers: boolean;
-  private mcpServer: McpServer; // New recommended MCP server (for StreamableHTTP)
-  private server: Server; // Legacy server (for stdio/SSE compatibility)
+  private mcpServer: McpServer; // MCP server for all transports
   private sapConfig: SapConfig; // SAP configuration
   private transportConfig: TransportConfig;
   private httpServer?: HttpServer;
@@ -658,27 +654,13 @@ export class mcp_abap_adt_server {
       throw error instanceof Error ? error : new Error(message);
     }
 
-    // Create new recommended McpServer (for StreamableHTTP)
+    // Create McpServer (for all transports)
     this.mcpServer = new McpServer({
       name: "mcp-abap-adt",
       version: "0.1.0"
     });
 
-    // Create legacy Server (for stdio/SSE compatibility)
-    this.server = new Server(
-      {
-        name: "mcp-abap-adt",
-        version: "0.1.0"
-      },
-      {
-        capabilities: {
-          tools: {}
-        }
-      }
-    );
-
-    this.setupHandlers(); // Setup request handlers for legacy Server
-    this.setupMcpServerHandlers(); // Setup handlers for new McpServer
+    this.setupMcpServerHandlers(); // Setup handlers for McpServer
     if (this.registerSignalHandlers) {
       this.setupSignalHandlers();
     }
@@ -710,170 +692,6 @@ export class mcp_abap_adt_server {
         transport: this.transportConfig.type,
       });
     }
-  }
-
-  /**
-   * Sets up request handlers for listing and calling tools.
-   * @private
-   */
-  private setupHandlers() {
-  // Handler for ListToolsRequest - relies on the dynamic tool registry
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: getAllTools()
-    }));
-
-    // Handler for CallToolRequest
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      switch (request.params.name) {
-        case "GetProgram":
-          return await handleGetProgram(request.params.arguments);
-        case "GetClass":
-          return await handleGetClass(request.params.arguments);
-        case "GetFunction":
-          return await handleGetFunction(request.params.arguments);
-        case "GetFunctionGroup":
-          return await handleGetFunctionGroup(request.params.arguments);
-        case "GetStructure":
-          return await handleGetStructure(request.params.arguments);
-        case "GetTable":
-          return await handleGetTable(request.params.arguments);
-        case "GetDomain":
-          return await handleGetDomain(request.params.arguments);
-        case "GetTableContents":
-          return await handleGetTableContents(request.params.arguments);
-        case "GetPackage":
-          return await handleGetPackage(request.params.arguments);
-        case "CreatePackage":
-          return await handleCreatePackage(request.params.arguments);
-        case "GetTypeInfo":
-          return await handleGetTypeInfo(request.params.arguments);
-        case "GetInclude":
-          return await handleGetInclude(request.params.arguments);
-        case "SearchObject":
-          return await handleSearchObject(request.params.arguments);
-        case "GetInterface":
-          return await handleGetInterface(request.params.arguments);
-        case "GetTransaction":
-          return await handleGetTransaction(request.params.arguments);
-        case "GetEnhancements":
-          return await handleGetEnhancements(request.params.arguments);
-        case "GetEnhancementSpot":
-          return await handleGetEnhancementSpot(request.params.arguments);
-        case "GetEnhancementImpl":
-          return await handleGetEnhancementImpl(request.params.arguments);
-        case "GetSqlQuery":
-          return await handleGetSqlQuery(request.params.arguments);
-        case "GetIncludesList":
-          return await handleGetIncludesList(request.params.arguments);
-        case "GetWhereUsed":
-          return await handleGetWhereUsed(request.params.arguments);
-        case "GetBdef":
-          return await handleGetBdef(request.params.arguments);
-        case "GetObjectInfo":
-          if (!request.params.arguments || typeof request.params.arguments !== "object") {
-            throw new McpError(ErrorCode.InvalidParams, "Missing or invalid arguments for GetObjectInfo");
-          }
-          return await handleGetObjectInfo(request.params.arguments as { parent_type: string; parent_name: string });
-        case "GetAdtTypes":
-          return await (await import("./handlers/handleGetAllTypes.js")).handleGetAdtTypes(request.params.arguments as any);
-        case "GetObjectStructure":
-          return await (await import("./handlers/handleGetObjectStructure.js")).handleGetObjectStructure(request.params.arguments as any);
-        case "GetObjectsList":
-          return await (await import("./handlers/handleGetObjectsList.js")).handleGetObjectsList(request.params.arguments as any);
-        case "GetObjectsByType":
-          return await (await import("./handlers/handleGetObjectsByType.js")).handleGetObjectsByType(request.params.arguments as any);
-        case "GetProgFullCode":
-          return await (await import("./handlers/handleGetProgFullCode.js")).handleGetProgFullCode(request.params.arguments as any);
-        case "GetObjectNodeFromCache":
-          return await (await import("./handlers/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(request.params.arguments as any);
-        // case "GetDescription":
-          // return await (await import("./handlers/handleGetDescription.js")).handleGetDescription(request.params.arguments as any);
-        // case "DetectObjectType":
-        //   return await (await import("./handlers/handleDetectObjectType.js")).handleSearchObject(request.params.arguments as any);
-        case "DescribeByList":
-          return await (await import("./handlers/handleDescribeByList.js")).handleDescribeByList(request.params.arguments as any);
-        case "GetAbapAST":
-          return await handleGetAbapAST(request.params.arguments);
-        case "GetAbapSemanticAnalysis":
-          return await handleGetAbapSemanticAnalysis(request.params.arguments);
-        case "GetAbapSystemSymbols":
-          return await handleGetAbapSystemSymbols(request.params.arguments);
-        case "CreateDomain":
-          return await handleCreateDomain(request.params.arguments);
-        case "UpdateDomain":
-          return await handleUpdateDomain(request.params.arguments);
-        case "CreateDataElement":
-          return await handleCreateDataElement(request.params.arguments);
-        case "UpdateDataElement":
-          return await handleUpdateDataElement(request.params.arguments);
-        case "GetDataElement":
-          return await handleGetDataElement(request.params.arguments);
-        case "CreateTransport":
-          return await handleCreateTransport(request.params.arguments);
-        case "GetTransport":
-          return await handleGetTransport(request.params.arguments);
-        case "CreateTable":
-          return await handleCreateTable(request.params.arguments);
-        case "CreateStructure":
-          return await handleCreateStructure(request.params.arguments);
-        case "CreateView":
-          return await handleCreateView(request.params.arguments);
-        case "GetView":
-          return await handleGetView(request.params.arguments);
-        case "CreateClass":
-          return await handleCreateClass(request.params.arguments);
-        case "UpdateClassSource":
-          return await handleUpdateClassSource(request.params.arguments);
-        case "CreateProgram":
-          return await handleCreateProgram(request.params.arguments);
-        case "UpdateProgramSource":
-          return await handleUpdateProgramSource(request.params.arguments);
-        case "CreateInterface":
-          return await handleCreateInterface(request.params.arguments);
-        case "CreateFunctionGroup":
-          return await handleCreateFunctionGroup(request.params.arguments);
-        case "CreateFunctionModule":
-          return await handleCreateFunctionModule(request.params.arguments);
-        case "UpdateViewSource":
-          return await handleUpdateViewSource(request.params.arguments);
-        case "UpdateInterfaceSource":
-          return await handleUpdateInterfaceSource(request.params.arguments);
-        case "UpdateFunctionModuleSource":
-          return await handleUpdateFunctionModuleSource(request.params.arguments as any);
-        case "ActivateObject":
-          return await handleActivateObject(request.params.arguments);
-        case "DeleteObject":
-          return await handleDeleteObject(request.params.arguments);
-        case "CheckObject":
-          return await handleCheckObject(request.params.arguments);
-        case "GetSession":
-          return await handleGetSession(request.params.arguments);
-        case "ValidateObject":
-          return await handleValidateObject(request.params.arguments);
-        case "LockObject":
-          return await handleLockObject(request.params.arguments);
-        case "UnlockObject":
-          return await handleUnlockObject(request.params.arguments);
-        case "ValidateClass":
-          return await handleValidateClass(request.params.arguments);
-        case "CheckClass":
-          return await handleCheckClass(request.params.arguments);
-        case "ValidateTable":
-          return await handleValidateTable(request.params.arguments);
-        case "CheckTable":
-          return await handleCheckTable(request.params.arguments);
-        case "ValidateFunctionModule":
-          return await handleValidateFunctionModule(request.params.arguments);
-        case "CheckFunctionModule":
-          return await handleCheckFunctionModule(request.params.arguments);
-        default:
-          throw new McpError(
-            ErrorCode.MethodNotFound,
-            `Unknown tool: ${request.params.name}`
-          );
-      }
-    });
-
   }
 
   /**
@@ -1231,7 +1049,7 @@ export class mcp_abap_adt_server {
 
   private async shutdown() {
     try {
-      await this.server.close();
+      await this.mcpServer.close();
     } catch (error) {
       logger.error("Failed to close MCP server", {
         type: "SERVER_SHUTDOWN_ERROR",
@@ -1280,7 +1098,7 @@ export class mcp_abap_adt_server {
   async run() {
     if (this.transportConfig.type === "stdio") {
       const transport = new StdioServerTransport();
-      await this.server.connect(transport);
+      await this.mcpServer.server.connect(transport);
       logger.info("Server connected", {
         type: "SERVER_READY",
         transport: "stdio",

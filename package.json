@@ -11,7 +11,7 @@
     "start:sse": "node ./dist/index.js --transport sse",
     "dev": "npx @modelcontextprotocol/inspector node ./dist/index.js",
     "dev:http": "node ./tools/dev-http.js",
-    "dev:sse": "npx @modelcontextprotocol/inspector node ./dist/index.js --transport sse",
+    "dev:sse": "node ./tools/dev-sse.js",
     "auth": "npx sap-abap-auth auth",
     "clean": "make clean",
     "docs:tools": "node ./tools/generate-tools-docs.js",

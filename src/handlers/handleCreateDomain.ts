@@ -24,7 +24,7 @@ export const TOOL_DEFINITION = {
       },
       description: {
         type: "string",
-        description: "Domain description. If not provided, domain_name will be used."
+        description: "(optional) Domain description. If not provided, domain_name will be used."
       },
       package_name: {
         type: "string",
@@ -32,49 +32,49 @@ export const TOOL_DEFINITION = {
       },
       transport_request: {
         type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable packages."
+        description: "(optional) Transport request number (e.g., E19K905635). Required for transportable packages."
       },
       datatype: {
         type: "string",
-        description: "Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.",
+        description: "(optional) Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.",
         default: "CHAR"
       },
       length: {
         type: "number",
-        description: "Field length (max depends on datatype)",
+        description: "(optional) Field length (max depends on datatype)",
         default: 100
       },
       decimals: {
         type: "number",
-        description: "Decimal places (for DEC, CURR, QUAN types)",
+        description: "(optional) Decimal places (for DEC, CURR, QUAN types)",
         default: 0
       },
       conversion_exit: {
         type: "string",
-        description: "Conversion exit routine name (without CONVERSION_EXIT_ prefix)"
+        description: "(optional) Conversion exit routine name (without CONVERSION_EXIT_ prefix)"
       },
       lowercase: {
         type: "boolean",
-        description: "Allow lowercase input",
+        description: "(optional) Allow lowercase input",
         default: false
       },
       sign_exists: {
         type: "boolean",
-        description: "Field has sign (+/-)",
+        description: "(optional) Field has sign (+/-)",
         default: false
       },
       value_table: {
         type: "string",
-        description: "Value table name for foreign key relationship"
+        description: "(optional) Value table name for foreign key relationship"
       },
       activate: {
         type: "boolean",
-        description: "Activate domain after creation (default: true)",
+        description: "(optional) Activate domain after creation (default: true)",
         default: true
       },
       fixed_values: {
         type: "array",
-        description: "Array of fixed values for domain value range",
+        description: "(optional) Array of fixed values for domain value range",
         items: {
           type: "object",
           properties: {

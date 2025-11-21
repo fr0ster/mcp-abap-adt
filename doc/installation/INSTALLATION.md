@@ -47,19 +47,40 @@ After installation, you'll have access to these commands:
 - `mcp-abap-adt-http` - HTTP server transport
 - `mcp-abap-adt-sse` - SSE transport
 
+**Get help on available options:**
+```bash
+mcp-abap-adt --help
+```
+
 **Setup .env file:**
 ```bash
-# Create .env file with your SAP connection details
+# The server automatically looks for .env in your current directory
+cd ~/my-project
 cat > .env << EOF
 SAP_URL=https://your-sap-system.com
 SAP_CLIENT=100
-SAP_AUTH_TYPE=jwt
-SAP_JWT_TOKEN=your-jwt-token
+SAP_AUTH_TYPE=basic
+SAP_USERNAME=your-username
+SAP_PASSWORD=your-password
 EOF
 
-# Run the server
-mcp-abap-adt-http --port 3000
+# Run the server (automatically finds .env in current directory)
+mcp-abap-adt
+
+# Or specify custom .env location
+mcp-abap-adt --env=/path/to/my.env
+mcp-abap-adt --env ~/configs/sap-dev.env
+
+# Start HTTP server on custom port
+mcp-abap-adt-http --http-port=8080
 ```
+
+**Environment File Priority:**
+1. Path specified via `--env` or `--env=` argument  
+2. `.env` in current working directory (where you run the command)
+3. `.env` in package installation directory
+
+This means you can have different `.env` files for different projects and the server will automatically use the one in your current directory.
 
 See [Package Installation Guide](#package-installation-details) below for detailed instructions.
 
@@ -276,6 +297,61 @@ mcp-abap-adt-http --env /opt/config/.env.production --port 8080
 **Example 5: Start SSE server**
 ```bash
 mcp-abap-adt-sse --port 3000
+```
+
+#### Command Line Options
+
+All server commands (`mcp-abap-adt`, `mcp-abap-adt-http`, `mcp-abap-adt-sse`) support the following options:
+
+**General Options:**
+- `--help` - Show complete help message with all available options
+- `--env=<path>` - Path to .env file (default: ./.env in current directory)
+- `--env <path>` - Alternative syntax for specifying .env path
+
+**Transport Selection:**
+- `--transport=<type>` - Transport type: `stdio`, `http`, `streamable-http`, or `sse`
+
+**HTTP Server Options (for `mcp-abap-adt-http`):**
+- `--http-port=<port>` - HTTP server port (default: 3000)
+- `--http-host=<host>` - HTTP server host (default: 0.0.0.0)
+- `--http-json-response` - Enable JSON response format
+- `--http-allowed-origins=<list>` - Comma-separated allowed origins for CORS
+- `--http-allowed-hosts=<list>` - Comma-separated allowed hosts
+- `--http-enable-dns-protection` - Enable DNS rebinding protection
+
+**SSE Server Options (for `mcp-abap-adt-sse`):**
+- `--sse-port=<port>` - SSE server port (default: 3001)
+- `--sse-host=<host>` - SSE server host (default: 0.0.0.0)
+- `--sse-allowed-origins=<list>` - Comma-separated allowed origins for CORS
+- `--sse-allowed-hosts=<list>` - Comma-separated allowed hosts
+- `--sse-enable-dns-protection` - Enable DNS rebinding protection
+
+**Environment Variables:**
+
+You can also configure the server using environment variables:
+- `MCP_ENV_PATH` - Path to .env file
+- `MCP_SKIP_ENV_LOAD` - Skip automatic .env loading (true|false)
+- `MCP_TRANSPORT` - Default transport type
+- `MCP_HTTP_PORT` - Default HTTP port
+- `MCP_HTTP_HOST` - Default HTTP host
+- `MCP_SSE_PORT` - Default SSE port
+- `MCP_SSE_HOST` - Default SSE host
+
+**Examples with Options:**
+
+```bash
+# Show help
+mcp-abap-adt --help
+
+# Use custom .env from different location
+mcp-abap-adt --env=~/configs/sap-production.env
+
+# Start HTTP server with CORS configuration
+mcp-abap-adt-http --http-port=8080 \
+  --http-allowed-origins=http://localhost:3000,https://myapp.com
+
+# Start SSE with DNS protection
+mcp-abap-adt-sse --sse-port=3001 --sse-enable-dns-protection
 ```
 
 **Example 6: Use stdio transport (for MCP clients)**

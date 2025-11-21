@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [1.1.4] - 2025-11-21
+## [1.1.5] - 2025-11-21
 
 ### Added
 - **--help flag**: Added comprehensive help message showing all CLI options, environment variables, and usage examples

@@ -58,25 +58,64 @@ These packages are automatically installed via `npm install` and are published t
 
 ## Running the Server
 
-### Standard Mode (stdio)
+### Global Installation (Recommended)
+After installing globally with `npm install -g`, you can run from any directory:
+
 ```bash
+# Show help
+mcp-abap-adt --help
+
+# Default stdio mode (looks for .env in current directory)
+mcp-abap-adt
+
+# Use custom .env file
+mcp-abap-adt --env=/path/to/my.env
+
+# HTTP mode
+mcp-abap-adt-http --http-port=8080
+
+# SSE mode  
+mcp-abap-adt-sse --sse-port=3001
+```
+
+### Development Mode
+```bash
+# Build and run locally
 npm run build
 npm start
-```
 
-### HTTP Mode
-```bash
-npm run build
+# HTTP mode
 npm run start:http
-```
 
-### SSE Mode
-```bash
-npm run build
+# SSE mode
 npm run start:sse
 ```
 
-See [Client Configuration](doc/user-guide/CLIENT_CONFIGURATION.md) for details on configuring MCP clients.
+### Environment Configuration
+
+The server automatically looks for `.env` file in this order:
+1. Path specified via `--env` argument
+2. `.env` in current working directory (where you run the command)
+3. `.env` in package installation directory
+
+**Example .env file:**
+```bash
+SAP_URL=https://your-sap-system.com
+SAP_CLIENT=100
+SAP_AUTH_TYPE=basic
+SAP_USERNAME=your-username
+SAP_PASSWORD=your-password
+```
+
+For JWT authentication (SAP BTP):
+```bash
+SAP_URL=https://your-btp-system.com
+SAP_CLIENT=100
+SAP_AUTH_TYPE=jwt
+SAP_JWT_TOKEN=your-jwt-token
+```
+
+See [Client Configuration](doc/user-guide/CLIENT_CONFIGURATION.md) for complete configuration options.
 
 ## Development
 

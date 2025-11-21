@@ -6,6 +6,7 @@ This directory contains documentation for developers: testing guides, developmen
 
 - **[ASSISTANT_GUIDELINES.md](ASSISTANT_GUIDELINES.md)** - Guidelines for AI assistants working on this project
 - **[TEST_SYSTEM_SETUP.md](TEST_SYSTEM_SETUP.md)** - Guide for setting up test systems
+- **[SYNC_OPTIONAL_PARAMS.md](SYNC_OPTIONAL_PARAMS.md)** - Tool to sync optional parameters from adt-clients TypeScript interfaces
 - **[DetectObjectTypeListTools.md](DetectObjectTypeListTools.md)** - Documentation for object type detection tools
 
 ## Test Documentation

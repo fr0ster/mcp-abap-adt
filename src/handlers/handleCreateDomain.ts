@@ -28,7 +28,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: "string",
-        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects)"
+        description: "(optional) Package name (e.g., ZOK_LOCAL, $TMP for local objects)"
       },
       transport_request: {
         type: "string",
@@ -91,7 +91,7 @@ export const TOOL_DEFINITION = {
         }
       }
     },
-    required: ["domain_name", "package_name"]
+    required: ["domain_name"]
   }
 } as const;
 

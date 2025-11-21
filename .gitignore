@@ -5,7 +5,6 @@ node_modules/
 dist/
 build/
 coverage/
-package-lock.json
 
 # NPM packages (local builds, releases are on GitHub)
 *.tgz

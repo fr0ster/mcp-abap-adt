@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.3] - 2025-11-21
+
+### Added
+- **Parameter Optionality Sync Tool**: Created `tools/sync-optional-from-interfaces.js` to extract optional parameter information from TypeScript interfaces
+  - Extracts required vs optional fields from `@mcp-abap-adt/adt-clients` builder interfaces
+  - Provides single source of truth for parameter optionality
+  - Prevents drift between TypeScript interfaces and MCP tool definitions
+  - Documentation added in `doc/development/SYNC_OPTIONAL_PARAMS.md`
+
+### Changed
+- **CreateDomain Handler**: Synced parameter optionality with `DomainBuilderConfig` interface
+  - Only `domain_name` is required (was incorrectly requiring `package_name`)
+  - Marked all optional parameters with `(optional)` prefix in descriptions
+  - Ensures consistency with TypeScript interface definitions
+
 ## [1.1.2] - 2025-11-21
 
 ### Fixed

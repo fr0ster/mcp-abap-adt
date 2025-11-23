@@ -253,11 +253,12 @@ function loadAllTools() {
   const tools = [];
   const handlerFiles = [];
 
-  // Extract all handler imports
-  const importMatches = content.matchAll(/import \{ TOOL_DEFINITION as (\w+)_Tool \} from '\.\.\/handlers\/(\w+)';/g);
+  // Extract all handler imports - now supports subdirectories
+  // Pattern: import { TOOL_DEFINITION as XXX_Tool } from '../handlers/subdir/handlerFile';
+  const importMatches = content.matchAll(/import \{ TOOL_DEFINITION as (\w+)_Tool \} from '\.\.\/handlers\/(.+)';/g);
   for (const match of importMatches) {
-    const handlerName = match[2];
-    const handlerPath = path.join(__dirname, `../src/handlers/${handlerName}.ts`);
+    const handlerRelativePath = match[2]; // e.g., "bdef/handleGetBdef" or "program/handleGetProgram"
+    const handlerPath = path.join(__dirname, `../src/handlers/${handlerRelativePath}.ts`);
 
     if (fs.existsSync(handlerPath)) {
       const toolDef = extractToolDefinition(handlerPath);

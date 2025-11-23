@@ -1,70 +1,75 @@
-import { TOOL_DEFINITION as GetProgram_Tool } from '../handlers/handleGetProgram';
-import { TOOL_DEFINITION as GetClass_Tool } from '../handlers/handleGetClass';
-import { TOOL_DEFINITION as GetFunction_Tool } from '../handlers/handleGetFunction';
-import { TOOL_DEFINITION as GetFunctionGroup_Tool } from '../handlers/handleGetFunctionGroup';
-import { TOOL_DEFINITION as GetTable_Tool } from '../handlers/handleGetTable';
-import { TOOL_DEFINITION as GetStructure_Tool } from '../handlers/handleGetStructure';
-import { TOOL_DEFINITION as GetTableContents_Tool } from '../handlers/handleGetTableContents';
-import { TOOL_DEFINITION as GetPackage_Tool } from '../handlers/handleGetPackage';
-import { TOOL_DEFINITION as CreatePackage_Tool } from '../handlers/handleCreatePackage';
-import { TOOL_DEFINITION as GetInclude_Tool } from '../handlers/handleGetInclude';
-import { TOOL_DEFINITION as GetIncludesList_Tool } from '../handlers/handleGetIncludesList';
-import { TOOL_DEFINITION as GetTypeInfo_Tool } from '../handlers/handleGetTypeInfo';
-import { TOOL_DEFINITION as GetInterface_Tool } from '../handlers/handleGetInterface';
-import { TOOL_DEFINITION as GetTransaction_Tool } from '../handlers/handleGetTransaction';
-import { TOOL_DEFINITION as SearchObject_Tool } from '../handlers/handleSearchObject';
-import { TOOL_DEFINITION as GetEnhancements_Tool } from '../handlers/handleGetEnhancements';
-import { TOOL_DEFINITION as GetEnhancementImpl_Tool } from '../handlers/handleGetEnhancementImpl';
-import { TOOL_DEFINITION as GetEnhancementSpot_Tool } from '../handlers/handleGetEnhancementSpot';
-import { TOOL_DEFINITION as GetBdef_Tool } from '../handlers/handleGetBdef';
-import { TOOL_DEFINITION as GetSqlQuery_Tool } from '../handlers/handleGetSqlQuery';
-import { TOOL_DEFINITION as GetWhereUsed_Tool } from '../handlers/handleGetWhereUsed';
-import { TOOL_DEFINITION as GetObjectInfo_Tool } from '../handlers/handleGetObjectInfo';
-import { TOOL_DEFINITION as DescribeByList_Tool } from '../handlers/handleDescribeByList';
-import { TOOL_DEFINITION as GetObjectsByType_Tool } from '../handlers/handleGetObjectsByType';
-import { TOOL_DEFINITION as GetObjectsList_Tool } from '../handlers/handleGetObjectsList';
-import { TOOL_DEFINITION as GetProgFullCode_Tool } from '../handlers/handleGetProgFullCode';
-import { TOOL_DEFINITION as GetObjectNodeFromCache_Tool } from '../handlers/handleGetObjectNodeFromCache';
-import { TOOL_DEFINITION as GetAdtTypes_Tool } from '../handlers/handleGetAllTypes';
-import { TOOL_DEFINITION as GetObjectStructure_Tool } from '../handlers/handleGetObjectStructure';
-import { TOOL_DEFINITION as GetAbapAST_Tool } from '../handlers/handleGetAbapAST';
-import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from '../handlers/handleGetAbapSemanticAnalysis';
-import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from '../handlers/handleGetAbapSystemSymbols';
-import { TOOL_DEFINITION as GetDomain_Tool } from '../handlers/handleGetDomain';
-import { TOOL_DEFINITION as CreateDomain_Tool } from '../handlers/handleCreateDomain';
-import { TOOL_DEFINITION as UpdateDomain_Tool } from '../handlers/handleUpdateDomain';
-import { TOOL_DEFINITION as CreateDataElement_Tool } from '../handlers/handleCreateDataElement';
-import { TOOL_DEFINITION as UpdateDataElement_Tool } from '../handlers/handleUpdateDataElement';
-import { TOOL_DEFINITION as GetDataElement_Tool } from '../handlers/handleGetDataElement';
-import { TOOL_DEFINITION as CreateTransport_Tool } from '../handlers/handleCreateTransport';
-import { TOOL_DEFINITION as GetTransport_Tool } from '../handlers/handleGetTransport';
-import { TOOL_DEFINITION as CreateTable_Tool } from '../handlers/handleCreateTable';
-import { TOOL_DEFINITION as CreateStructure_Tool } from '../handlers/handleCreateStructure';
-import { TOOL_DEFINITION as CreateView_Tool } from '../handlers/handleCreateView';
-import { TOOL_DEFINITION as GetView_Tool } from '../handlers/handleGetView';
-import { TOOL_DEFINITION as CreateClass_Tool } from '../handlers/handleCreateClass';
-import { TOOL_DEFINITION as CreateProgram_Tool } from '../handlers/handleCreateProgram';
-import { TOOL_DEFINITION as CreateInterface_Tool } from '../handlers/handleCreateInterface';
-import { TOOL_DEFINITION as CreateFunctionGroup_Tool } from '../handlers/handleCreateFunctionGroup';
-import { TOOL_DEFINITION as CreateFunctionModule_Tool } from '../handlers/handleCreateFunctionModule';
-import { TOOL_DEFINITION as ActivateObject_Tool } from '../handlers/handleActivateObject';
-import { TOOL_DEFINITION as DeleteObject_Tool } from '../handlers/handleDeleteObject';
-import { TOOL_DEFINITION as CheckObject_Tool } from '../handlers/handleCheckObject';
-import { TOOL_DEFINITION as UpdateClassSource_Tool } from '../handlers/handleUpdateClassSource';
-import { TOOL_DEFINITION as UpdateProgramSource_Tool } from '../handlers/handleUpdateProgramSource';
-import { TOOL_DEFINITION as UpdateViewSource_Tool } from '../handlers/handleUpdateViewSource';
-import { TOOL_DEFINITION as UpdateInterfaceSource_Tool } from '../handlers/handleUpdateInterfaceSource';
-import { TOOL_DEFINITION as UpdateFunctionModuleSource_Tool } from '../handlers/handleUpdateFunctionModuleSource';
-import { TOOL_DEFINITION as GetSession_Tool } from '../handlers/handleGetSession';
-import { TOOL_DEFINITION as ValidateObject_Tool } from '../handlers/handleValidateObject';
-import { TOOL_DEFINITION as LockObject_Tool } from '../handlers/handleLockObject';
-import { TOOL_DEFINITION as UnlockObject_Tool } from '../handlers/handleUnlockObject';
-import { TOOL_DEFINITION as ValidateClass_Tool } from '../handlers/handleValidateClass';
-import { TOOL_DEFINITION as CheckClass_Tool } from '../handlers/handleCheckClass';
-import { TOOL_DEFINITION as ValidateTable_Tool } from '../handlers/handleValidateTable';
-import { TOOL_DEFINITION as CheckTable_Tool } from '../handlers/handleCheckTable';
-import { TOOL_DEFINITION as ValidateFunctionModule_Tool } from '../handlers/handleValidateFunctionModule';
-import { TOOL_DEFINITION as CheckFunctionModule_Tool } from '../handlers/handleCheckFunctionModule';
+import { TOOL_DEFINITION as GetProgram_Tool } from '../handlers/program/handleGetProgram';
+import { TOOL_DEFINITION as GetClass_Tool } from '../handlers/class/handleGetClass';
+import { TOOL_DEFINITION as GetFunction_Tool } from '../handlers/function/handleGetFunction';
+import { TOOL_DEFINITION as GetFunctionGroup_Tool } from '../handlers/function/handleGetFunctionGroup';
+import { TOOL_DEFINITION as GetTable_Tool } from '../handlers/table/handleGetTable';
+import { TOOL_DEFINITION as GetStructure_Tool } from '../handlers/structure/handleGetStructure';
+import { TOOL_DEFINITION as GetTableContents_Tool } from '../handlers/table/handleGetTableContents';
+import { TOOL_DEFINITION as GetPackage_Tool } from '../handlers/package/handleGetPackage';
+import { TOOL_DEFINITION as CreatePackage_Tool } from '../handlers/package/handleCreatePackage';
+import { TOOL_DEFINITION as GetInclude_Tool } from '../handlers/include/handleGetInclude';
+import { TOOL_DEFINITION as GetIncludesList_Tool } from '../handlers/include/handleGetIncludesList';
+import { TOOL_DEFINITION as GetTypeInfo_Tool } from '../handlers/system/handleGetTypeInfo';
+import { TOOL_DEFINITION as GetInterface_Tool } from '../handlers/interface/handleGetInterface';
+import { TOOL_DEFINITION as GetTransaction_Tool } from '../handlers/system/handleGetTransaction';
+import { TOOL_DEFINITION as SearchObject_Tool } from '../handlers/search/handleSearchObject';
+import { TOOL_DEFINITION as GetEnhancements_Tool } from '../handlers/enhancement/handleGetEnhancements';
+import { TOOL_DEFINITION as GetEnhancementImpl_Tool } from '../handlers/enhancement/handleGetEnhancementImpl';
+import { TOOL_DEFINITION as GetEnhancementSpot_Tool } from '../handlers/enhancement/handleGetEnhancementSpot';
+import { TOOL_DEFINITION as GetBdef_Tool } from '../handlers/bdef/handleGetBdef';
+import { TOOL_DEFINITION as CreateBdef_Tool } from '../handlers/bdef/handleCreateBehaviorDefinition';
+import { TOOL_DEFINITION as UpdateBdef_Tool } from '../handlers/bdef/handleUpdateBehaviorDefinition';
+import { TOOL_DEFINITION as CreateDdlx_Tool } from '../handlers/ddlx/handleCreateMetadataExtension';
+import { TOOL_DEFINITION as UpdateDdlx_Tool } from '../handlers/ddlx/handleUpdateMetadataExtension';
+import { TOOL_DEFINITION as GetInactiveObjects_Tool } from '../handlers/system/handleGetInactiveObjects';
+import { TOOL_DEFINITION as GetSqlQuery_Tool } from '../handlers/system/handleGetSqlQuery';
+import { TOOL_DEFINITION as GetWhereUsed_Tool } from '../handlers/system/handleGetWhereUsed';
+import { TOOL_DEFINITION as GetObjectInfo_Tool } from '../handlers/system/handleGetObjectInfo';
+import { TOOL_DEFINITION as DescribeByList_Tool } from '../handlers/system/handleDescribeByList';
+import { TOOL_DEFINITION as GetObjectsByType_Tool } from '../handlers/search/handleGetObjectsByType';
+import { TOOL_DEFINITION as GetObjectsList_Tool } from '../handlers/search/handleGetObjectsList';
+import { TOOL_DEFINITION as GetProgFullCode_Tool } from '../handlers/program/handleGetProgFullCode';
+import { TOOL_DEFINITION as GetObjectNodeFromCache_Tool } from '../handlers/system/handleGetObjectNodeFromCache';
+import { TOOL_DEFINITION as GetAdtTypes_Tool } from '../handlers/system/handleGetAllTypes';
+import { TOOL_DEFINITION as GetObjectStructure_Tool } from '../handlers/system/handleGetObjectStructure';
+import { TOOL_DEFINITION as GetAbapAST_Tool } from '../handlers/system/handleGetAbapAST';
+import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from '../handlers/system/handleGetAbapSemanticAnalysis';
+import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from '../handlers/system/handleGetAbapSystemSymbols';
+import { TOOL_DEFINITION as GetDomain_Tool } from '../handlers/domain/handleGetDomain';
+import { TOOL_DEFINITION as CreateDomain_Tool } from '../handlers/domain/handleCreateDomain';
+import { TOOL_DEFINITION as UpdateDomain_Tool } from '../handlers/domain/handleUpdateDomain';
+import { TOOL_DEFINITION as CreateDataElement_Tool } from '../handlers/data_element/handleCreateDataElement';
+import { TOOL_DEFINITION as UpdateDataElement_Tool } from '../handlers/data_element/handleUpdateDataElement';
+import { TOOL_DEFINITION as GetDataElement_Tool } from '../handlers/data_element/handleGetDataElement';
+import { TOOL_DEFINITION as CreateTransport_Tool } from '../handlers/transport/handleCreateTransport';
+import { TOOL_DEFINITION as GetTransport_Tool } from '../handlers/transport/handleGetTransport';
+import { TOOL_DEFINITION as CreateTable_Tool } from '../handlers/table/handleCreateTable';
+import { TOOL_DEFINITION as CreateStructure_Tool } from '../handlers/structure/handleCreateStructure';
+import { TOOL_DEFINITION as CreateView_Tool } from '../handlers/view/handleCreateView';
+import { TOOL_DEFINITION as GetView_Tool } from '../handlers/view/handleGetView';
+import { TOOL_DEFINITION as CreateClass_Tool } from '../handlers/class/handleCreateClass';
+import { TOOL_DEFINITION as CreateProgram_Tool } from '../handlers/program/handleCreateProgram';
+import { TOOL_DEFINITION as CreateInterface_Tool } from '../handlers/interface/handleCreateInterface';
+import { TOOL_DEFINITION as CreateFunctionGroup_Tool } from '../handlers/function/handleCreateFunctionGroup';
+import { TOOL_DEFINITION as CreateFunctionModule_Tool } from '../handlers/function/handleCreateFunctionModule';
+import { TOOL_DEFINITION as ActivateObject_Tool } from '../handlers/common/handleActivateObject';
+import { TOOL_DEFINITION as DeleteObject_Tool } from '../handlers/common/handleDeleteObject';
+import { TOOL_DEFINITION as CheckObject_Tool } from '../handlers/common/handleCheckObject';
+import { TOOL_DEFINITION as UpdateClassSource_Tool } from '../handlers/class/handleUpdateClassSource';
+import { TOOL_DEFINITION as UpdateProgramSource_Tool } from '../handlers/program/handleUpdateProgramSource';
+import { TOOL_DEFINITION as UpdateViewSource_Tool } from '../handlers/view/handleUpdateViewSource';
+import { TOOL_DEFINITION as UpdateInterfaceSource_Tool } from '../handlers/interface/handleUpdateInterfaceSource';
+import { TOOL_DEFINITION as UpdateFunctionModuleSource_Tool } from '../handlers/function/handleUpdateFunctionModuleSource';
+import { TOOL_DEFINITION as GetSession_Tool } from '../handlers/system/handleGetSession';
+import { TOOL_DEFINITION as ValidateObject_Tool } from '../handlers/common/handleValidateObject';
+import { TOOL_DEFINITION as LockObject_Tool } from '../handlers/common/handleLockObject';
+import { TOOL_DEFINITION as UnlockObject_Tool } from '../handlers/common/handleUnlockObject';
+import { TOOL_DEFINITION as ValidateClass_Tool } from '../handlers/class/handleValidateClass';
+import { TOOL_DEFINITION as CheckClass_Tool } from '../handlers/class/handleCheckClass';
+import { TOOL_DEFINITION as ValidateTable_Tool } from '../handlers/table/handleValidateTable';
+import { TOOL_DEFINITION as CheckTable_Tool } from '../handlers/table/handleCheckTable';
+import { TOOL_DEFINITION as ValidateFunctionModule_Tool } from '../handlers/function/handleValidateFunctionModule';
+import { TOOL_DEFINITION as CheckFunctionModule_Tool } from '../handlers/function/handleCheckFunctionModule';
 
 // Type that describes a tool entry
 // Supports both JSON Schema format and Zod schema format (object with Zod fields)
@@ -72,13 +77,13 @@ export interface ToolDefinition {
   name: string;
   description: string;
   inputSchema:
-    | {
-        // JSON Schema format
-        type: string;
-        properties: Record<string, any>;
-        required: readonly string[];
-      }
-    | Record<string, any>; // Zod schema format (object with Zod fields)
+  | {
+    // JSON Schema format
+    type: string;
+    properties: Record<string, any>;
+    required: readonly string[];
+  }
+  | Record<string, any>; // Zod schema format (object with Zod fields)
 }
 
 // Static descriptors for tools that rely on dynamic import
@@ -126,6 +131,11 @@ export const ALL_TOOLS: ToolDefinition[] = [
 
   // Enhancement
   GetBdef_Tool,
+  CreateBdef_Tool,
+  UpdateBdef_Tool,
+  CreateDdlx_Tool,
+  UpdateDdlx_Tool,
+  GetInactiveObjects_Tool,
   GetEnhancementImpl_Tool,
   GetEnhancements_Tool,
   GetEnhancementSpot_Tool,

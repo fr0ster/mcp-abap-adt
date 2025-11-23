@@ -14,68 +14,74 @@ import { createServer, Server as HttpServer, IncomingHttpHeaders } from "http";
 import { randomUUID } from "crypto";
 
 // Import handler functions
-import { handleGetProgram } from "./handlers/handleGetProgram";
-import { handleGetClass } from "./handlers/handleGetClass";
-import { handleGetFunctionGroup } from "./handlers/handleGetFunctionGroup";
-import { handleGetFunction } from "./handlers/handleGetFunction";
-import { handleGetTable } from "./handlers/handleGetTable";
-import { handleGetStructure } from "./handlers/handleGetStructure";
-import { handleGetTableContents } from "./handlers/handleGetTableContents";
-import { handleGetPackage } from "./handlers/handleGetPackage";
-import { handleCreatePackage } from "./handlers/handleCreatePackage";
-import { handleGetInclude } from "./handlers/handleGetInclude";
-import { handleGetIncludesList } from "./handlers/handleGetIncludesList";
-import { handleGetTypeInfo } from "./handlers/handleGetTypeInfo";
-import { handleGetInterface } from "./handlers/handleGetInterface";
-import { handleGetTransaction } from "./handlers/handleGetTransaction";
-import { handleSearchObject } from "./handlers/handleSearchObject";
-import { handleGetEnhancements } from "./handlers/handleGetEnhancements";
-import { handleGetEnhancementImpl } from "./handlers/handleGetEnhancementImpl";
-import { handleGetEnhancementSpot } from "./handlers/handleGetEnhancementSpot";
-import { handleGetBdef } from "./handlers/handleGetBdef";
-import { handleGetSqlQuery } from "./handlers/handleGetSqlQuery";
-import { handleGetObjectsByType } from "./handlers/handleGetObjectsByType";
-import { handleGetWhereUsed } from "./handlers/handleGetWhereUsed";
-import { handleGetObjectInfo } from "./handlers/handleGetObjectInfo";
-import { handleDescribeByList } from "./handlers/handleDescribeByList";
-import { handleGetAbapAST } from "./handlers/handleGetAbapAST";
-import { handleGetAbapSemanticAnalysis } from "./handlers/handleGetAbapSemanticAnalysis";
-import { handleGetAbapSystemSymbols } from "./handlers/handleGetAbapSystemSymbols";
-import { handleGetDomain } from "./handlers/handleGetDomain";
-import { handleCreateDomain } from "./handlers/handleCreateDomain";
-import { handleUpdateDomain } from "./handlers/handleUpdateDomain";
-import { handleCreateDataElement } from "./handlers/handleCreateDataElement";
-import { handleUpdateDataElement } from "./handlers/handleUpdateDataElement";
-import { handleGetDataElement } from "./handlers/handleGetDataElement";
-import { handleCreateTransport } from "./handlers/handleCreateTransport";
-import { handleGetTransport } from "./handlers/handleGetTransport";
-import { handleCreateTable } from "./handlers/handleCreateTable";
-import { handleCreateStructure } from "./handlers/handleCreateStructure";
-import { handleCreateView } from "./handlers/handleCreateView";
-import { handleGetView } from "./handlers/handleGetView";
-import { handleCreateClass } from "./handlers/handleCreateClass";
-import { handleCreateProgram } from "./handlers/handleCreateProgram";
-import { handleCreateInterface } from "./handlers/handleCreateInterface";
-import { handleCreateFunctionGroup } from "./handlers/handleCreateFunctionGroup";
-import { handleCreateFunctionModule } from "./handlers/handleCreateFunctionModule";
-import { handleActivateObject } from "./handlers/handleActivateObject";
-import { handleDeleteObject } from "./handlers/handleDeleteObject";
-import { handleCheckObject } from "./handlers/handleCheckObject";
-import { handleUpdateClassSource } from "./handlers/handleUpdateClassSource";
-import { handleUpdateProgramSource } from "./handlers/handleUpdateProgramSource";
-import { handleUpdateViewSource } from "./handlers/handleUpdateViewSource";
-import { handleUpdateInterfaceSource } from "./handlers/handleUpdateInterfaceSource";
-import { handleUpdateFunctionModuleSource } from "./handlers/handleUpdateFunctionModuleSource";
-import { handleGetSession } from "./handlers/handleGetSession";
-import { handleValidateObject } from "./handlers/handleValidateObject";
-import { handleLockObject } from "./handlers/handleLockObject";
-import { handleUnlockObject } from "./handlers/handleUnlockObject";
-import { handleValidateClass } from "./handlers/handleValidateClass";
-import { handleCheckClass } from "./handlers/handleCheckClass";
-import { handleValidateTable } from "./handlers/handleValidateTable";
-import { handleCheckTable } from "./handlers/handleCheckTable";
-import { handleValidateFunctionModule } from "./handlers/handleValidateFunctionModule";
-import { handleCheckFunctionModule } from "./handlers/handleCheckFunctionModule";
+// Import handler functions
+import { handleGetProgram } from "./handlers/program/handleGetProgram";
+import { handleGetClass } from "./handlers/class/handleGetClass";
+import { handleGetFunctionGroup } from "./handlers/function/handleGetFunctionGroup";
+import { handleGetFunction } from "./handlers/function/handleGetFunction";
+import { handleGetTable } from "./handlers/table/handleGetTable";
+import { handleGetStructure } from "./handlers/structure/handleGetStructure";
+import { handleGetTableContents } from "./handlers/table/handleGetTableContents";
+import { handleGetPackage } from "./handlers/package/handleGetPackage";
+import { handleCreatePackage } from "./handlers/package/handleCreatePackage";
+import { handleGetInclude } from "./handlers/include/handleGetInclude";
+import { handleGetIncludesList } from "./handlers/include/handleGetIncludesList";
+import { handleGetTypeInfo } from "./handlers/system/handleGetTypeInfo";
+import { handleGetInterface } from "./handlers/interface/handleGetInterface";
+import { handleGetTransaction } from "./handlers/system/handleGetTransaction";
+import { handleSearchObject } from "./handlers/search/handleSearchObject";
+import { handleGetEnhancements } from "./handlers/enhancement/handleGetEnhancements";
+import { handleGetEnhancementImpl } from "./handlers/enhancement/handleGetEnhancementImpl";
+import { handleGetEnhancementSpot } from "./handlers/enhancement/handleGetEnhancementSpot";
+import { handleGetBdef } from "./handlers/bdef/handleGetBdef";
+import { handleGetSqlQuery } from "./handlers/system/handleGetSqlQuery";
+import { handleGetObjectsByType } from "./handlers/search/handleGetObjectsByType";
+import { handleGetWhereUsed } from "./handlers/system/handleGetWhereUsed";
+import { handleGetObjectInfo } from "./handlers/system/handleGetObjectInfo";
+import { handleDescribeByList } from "./handlers/system/handleDescribeByList";
+import { handleGetAbapAST } from "./handlers/system/handleGetAbapAST";
+import { handleGetAbapSemanticAnalysis } from "./handlers/system/handleGetAbapSemanticAnalysis";
+import { handleGetAbapSystemSymbols } from "./handlers/system/handleGetAbapSystemSymbols";
+import { handleGetDomain } from "./handlers/domain/handleGetDomain";
+import { handleCreateDomain } from "./handlers/domain/handleCreateDomain";
+import { handleUpdateDomain } from "./handlers/domain/handleUpdateDomain";
+import { handleCreateDataElement } from "./handlers/data_element/handleCreateDataElement";
+import { handleUpdateDataElement } from "./handlers/data_element/handleUpdateDataElement";
+import { handleGetDataElement } from "./handlers/data_element/handleGetDataElement";
+import { handleCreateTransport } from "./handlers/transport/handleCreateTransport";
+import { handleGetTransport } from "./handlers/transport/handleGetTransport";
+import { handleCreateTable } from "./handlers/table/handleCreateTable";
+import { handleCreateStructure } from "./handlers/structure/handleCreateStructure";
+import { handleCreateView } from "./handlers/view/handleCreateView";
+import { handleGetView } from "./handlers/view/handleGetView";
+import { handleCreateClass } from "./handlers/class/handleCreateClass";
+import { handleCreateProgram } from "./handlers/program/handleCreateProgram";
+import { handleCreateInterface } from "./handlers/interface/handleCreateInterface";
+import { handleCreateFunctionGroup } from "./handlers/function/handleCreateFunctionGroup";
+import { handleCreateFunctionModule } from "./handlers/function/handleCreateFunctionModule";
+import { handleActivateObject } from "./handlers/common/handleActivateObject";
+import { handleDeleteObject } from "./handlers/common/handleDeleteObject";
+import { handleCheckObject } from "./handlers/common/handleCheckObject";
+import { handleUpdateClassSource } from "./handlers/class/handleUpdateClassSource";
+import { handleUpdateProgramSource } from "./handlers/program/handleUpdateProgramSource";
+import { handleUpdateViewSource } from "./handlers/view/handleUpdateViewSource";
+import { handleUpdateInterfaceSource } from "./handlers/interface/handleUpdateInterfaceSource";
+import { handleUpdateFunctionModuleSource } from "./handlers/function/handleUpdateFunctionModuleSource";
+import { handleGetSession } from "./handlers/system/handleGetSession";
+import { handleValidateObject } from "./handlers/common/handleValidateObject";
+import { handleLockObject } from "./handlers/common/handleLockObject";
+import { handleUnlockObject } from "./handlers/common/handleUnlockObject";
+import { handleValidateClass } from "./handlers/class/handleValidateClass";
+import { handleCheckClass } from "./handlers/class/handleCheckClass";
+import { handleValidateTable } from "./handlers/table/handleValidateTable";
+import { handleCheckTable } from "./handlers/table/handleCheckTable";
+import { handleValidateFunctionModule } from "./handlers/function/handleValidateFunctionModule";
+import { handleCheckFunctionModule } from "./handlers/function/handleCheckFunctionModule";
+import { handleCreateBehaviorDefinition } from "./handlers/bdef/handleCreateBehaviorDefinition";
+import { handleUpdateBehaviorDefinition } from "./handlers/bdef/handleUpdateBehaviorDefinition";
+import { handleCreateMetadataExtension } from "./handlers/ddlx/handleCreateMetadataExtension";
+import { handleUpdateMetadataExtension } from "./handlers/ddlx/handleUpdateMetadataExtension";
+import { handleGetInactiveObjects } from "./handlers/system/handleGetInactiveObjects";
 
 // Import shared utility functions and types
 import {
@@ -96,66 +102,71 @@ import { logger } from "./lib/logger";
 import { getAllTools } from "./lib/toolsRegistry";
 
 // Import TOOL_DEFINITION from handlers
-import { TOOL_DEFINITION as GetProgram_Tool } from "./handlers/handleGetProgram";
-import { TOOL_DEFINITION as GetClass_Tool } from "./handlers/handleGetClass";
-import { TOOL_DEFINITION as GetFunction_Tool } from "./handlers/handleGetFunction";
-import { TOOL_DEFINITION as GetFunctionGroup_Tool } from "./handlers/handleGetFunctionGroup";
-import { TOOL_DEFINITION as GetTable_Tool } from "./handlers/handleGetTable";
-import { TOOL_DEFINITION as GetStructure_Tool } from "./handlers/handleGetStructure";
-import { TOOL_DEFINITION as GetTableContents_Tool } from "./handlers/handleGetTableContents";
-import { TOOL_DEFINITION as GetPackage_Tool } from "./handlers/handleGetPackage";
-import { TOOL_DEFINITION as CreatePackage_Tool } from "./handlers/handleCreatePackage";
-import { TOOL_DEFINITION as GetInclude_Tool } from "./handlers/handleGetInclude";
-import { TOOL_DEFINITION as GetIncludesList_Tool } from "./handlers/handleGetIncludesList";
-import { TOOL_DEFINITION as GetTypeInfo_Tool } from "./handlers/handleGetTypeInfo";
-import { TOOL_DEFINITION as GetInterface_Tool } from "./handlers/handleGetInterface";
-import { TOOL_DEFINITION as GetTransaction_Tool } from "./handlers/handleGetTransaction";
-import { TOOL_DEFINITION as SearchObject_Tool } from "./handlers/handleSearchObject";
-import { TOOL_DEFINITION as GetEnhancements_Tool } from "./handlers/handleGetEnhancements";
-import { TOOL_DEFINITION as GetEnhancementImpl_Tool } from "./handlers/handleGetEnhancementImpl";
-import { TOOL_DEFINITION as GetEnhancementSpot_Tool } from "./handlers/handleGetEnhancementSpot";
-import { TOOL_DEFINITION as GetBdef_Tool } from "./handlers/handleGetBdef";
-import { TOOL_DEFINITION as GetSqlQuery_Tool } from "./handlers/handleGetSqlQuery";
-import { TOOL_DEFINITION as GetWhereUsed_Tool } from "./handlers/handleGetWhereUsed";
-import { TOOL_DEFINITION as GetObjectInfo_Tool } from "./handlers/handleGetObjectInfo";
-import { TOOL_DEFINITION as GetAbapAST_Tool } from "./handlers/handleGetAbapAST";
-import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from "./handlers/handleGetAbapSemanticAnalysis";
-import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from "./handlers/handleGetAbapSystemSymbols";
-import { TOOL_DEFINITION as GetDomain_Tool } from "./handlers/handleGetDomain";
-import { TOOL_DEFINITION as CreateDomain_Tool } from "./handlers/handleCreateDomain";
-import { TOOL_DEFINITION as UpdateDomain_Tool } from "./handlers/handleUpdateDomain";
-import { TOOL_DEFINITION as CreateDataElement_Tool } from "./handlers/handleCreateDataElement";
-import { TOOL_DEFINITION as UpdateDataElement_Tool } from "./handlers/handleUpdateDataElement";
-import { TOOL_DEFINITION as GetDataElement_Tool } from "./handlers/handleGetDataElement";
-import { TOOL_DEFINITION as CreateTransport_Tool } from "./handlers/handleCreateTransport";
-import { TOOL_DEFINITION as GetTransport_Tool } from "./handlers/handleGetTransport";
-import { TOOL_DEFINITION as CreateTable_Tool } from "./handlers/handleCreateTable";
-import { TOOL_DEFINITION as CreateStructure_Tool } from "./handlers/handleCreateStructure";
-import { TOOL_DEFINITION as CreateView_Tool } from "./handlers/handleCreateView";
-import { TOOL_DEFINITION as GetView_Tool } from "./handlers/handleGetView";
-import { TOOL_DEFINITION as CreateClass_Tool } from "./handlers/handleCreateClass";
-import { TOOL_DEFINITION as CreateProgram_Tool } from "./handlers/handleCreateProgram";
-import { TOOL_DEFINITION as CreateInterface_Tool } from "./handlers/handleCreateInterface";
-import { TOOL_DEFINITION as CreateFunctionGroup_Tool } from "./handlers/handleCreateFunctionGroup";
-import { TOOL_DEFINITION as CreateFunctionModule_Tool } from "./handlers/handleCreateFunctionModule";
-import { TOOL_DEFINITION as ActivateObject_Tool } from "./handlers/handleActivateObject";
-import { TOOL_DEFINITION as DeleteObject_Tool } from "./handlers/handleDeleteObject";
-import { TOOL_DEFINITION as CheckObject_Tool } from "./handlers/handleCheckObject";
-import { TOOL_DEFINITION as UpdateClassSource_Tool } from "./handlers/handleUpdateClassSource";
-import { TOOL_DEFINITION as UpdateProgramSource_Tool } from "./handlers/handleUpdateProgramSource";
-import { TOOL_DEFINITION as UpdateViewSource_Tool } from "./handlers/handleUpdateViewSource";
-import { TOOL_DEFINITION as UpdateInterfaceSource_Tool } from "./handlers/handleUpdateInterfaceSource";
-import { TOOL_DEFINITION as UpdateFunctionModuleSource_Tool } from "./handlers/handleUpdateFunctionModuleSource";
-import { TOOL_DEFINITION as GetSession_Tool } from "./handlers/handleGetSession";
-import { TOOL_DEFINITION as ValidateObject_Tool } from "./handlers/handleValidateObject";
-import { TOOL_DEFINITION as LockObject_Tool } from "./handlers/handleLockObject";
-import { TOOL_DEFINITION as UnlockObject_Tool } from "./handlers/handleUnlockObject";
-import { TOOL_DEFINITION as ValidateClass_Tool } from "./handlers/handleValidateClass";
-import { TOOL_DEFINITION as CheckClass_Tool } from "./handlers/handleCheckClass";
-import { TOOL_DEFINITION as ValidateTable_Tool } from "./handlers/handleValidateTable";
-import { TOOL_DEFINITION as CheckTable_Tool } from "./handlers/handleCheckTable";
-import { TOOL_DEFINITION as ValidateFunctionModule_Tool } from "./handlers/handleValidateFunctionModule";
-import { TOOL_DEFINITION as CheckFunctionModule_Tool } from "./handlers/handleCheckFunctionModule";
+import { TOOL_DEFINITION as GetProgram_Tool } from "./handlers/program/handleGetProgram";
+import { TOOL_DEFINITION as GetClass_Tool } from "./handlers/class/handleGetClass";
+import { TOOL_DEFINITION as GetFunction_Tool } from "./handlers/function/handleGetFunction";
+import { TOOL_DEFINITION as GetFunctionGroup_Tool } from "./handlers/function/handleGetFunctionGroup";
+import { TOOL_DEFINITION as GetTable_Tool } from "./handlers/table/handleGetTable";
+import { TOOL_DEFINITION as GetStructure_Tool } from "./handlers/structure/handleGetStructure";
+import { TOOL_DEFINITION as GetTableContents_Tool } from "./handlers/table/handleGetTableContents";
+import { TOOL_DEFINITION as GetPackage_Tool } from "./handlers/package/handleGetPackage";
+import { TOOL_DEFINITION as CreatePackage_Tool } from "./handlers/package/handleCreatePackage";
+import { TOOL_DEFINITION as GetInclude_Tool } from "./handlers/include/handleGetInclude";
+import { TOOL_DEFINITION as GetIncludesList_Tool } from "./handlers/include/handleGetIncludesList";
+import { TOOL_DEFINITION as GetTypeInfo_Tool } from "./handlers/system/handleGetTypeInfo";
+import { TOOL_DEFINITION as GetInterface_Tool } from "./handlers/interface/handleGetInterface";
+import { TOOL_DEFINITION as GetTransaction_Tool } from "./handlers/system/handleGetTransaction";
+import { TOOL_DEFINITION as SearchObject_Tool } from "./handlers/search/handleSearchObject";
+import { TOOL_DEFINITION as GetEnhancements_Tool } from "./handlers/enhancement/handleGetEnhancements";
+import { TOOL_DEFINITION as GetEnhancementImpl_Tool } from "./handlers/enhancement/handleGetEnhancementImpl";
+import { TOOL_DEFINITION as GetEnhancementSpot_Tool } from "./handlers/enhancement/handleGetEnhancementSpot";
+import { TOOL_DEFINITION as GetBdef_Tool } from "./handlers/bdef/handleGetBdef";
+import { TOOL_DEFINITION as GetSqlQuery_Tool } from "./handlers/system/handleGetSqlQuery";
+import { TOOL_DEFINITION as GetWhereUsed_Tool } from "./handlers/system/handleGetWhereUsed";
+import { TOOL_DEFINITION as GetObjectInfo_Tool } from "./handlers/system/handleGetObjectInfo";
+import { TOOL_DEFINITION as GetAbapAST_Tool } from "./handlers/system/handleGetAbapAST";
+import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from "./handlers/system/handleGetAbapSemanticAnalysis";
+import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from "./handlers/system/handleGetAbapSystemSymbols";
+import { TOOL_DEFINITION as GetDomain_Tool } from "./handlers/domain/handleGetDomain";
+import { TOOL_DEFINITION as CreateDomain_Tool } from "./handlers/domain/handleCreateDomain";
+import { TOOL_DEFINITION as UpdateDomain_Tool } from "./handlers/domain/handleUpdateDomain";
+import { TOOL_DEFINITION as CreateDataElement_Tool } from "./handlers/data_element/handleCreateDataElement";
+import { TOOL_DEFINITION as UpdateDataElement_Tool } from "./handlers/data_element/handleUpdateDataElement";
+import { TOOL_DEFINITION as GetDataElement_Tool } from "./handlers/data_element/handleGetDataElement";
+import { TOOL_DEFINITION as CreateTransport_Tool } from "./handlers/transport/handleCreateTransport";
+import { TOOL_DEFINITION as GetTransport_Tool } from "./handlers/transport/handleGetTransport";
+import { TOOL_DEFINITION as CreateTable_Tool } from "./handlers/table/handleCreateTable";
+import { TOOL_DEFINITION as CreateStructure_Tool } from "./handlers/structure/handleCreateStructure";
+import { TOOL_DEFINITION as CreateView_Tool } from "./handlers/view/handleCreateView";
+import { TOOL_DEFINITION as GetView_Tool } from "./handlers/view/handleGetView";
+import { TOOL_DEFINITION as CreateClass_Tool } from "./handlers/class/handleCreateClass";
+import { TOOL_DEFINITION as CreateProgram_Tool } from "./handlers/program/handleCreateProgram";
+import { TOOL_DEFINITION as CreateInterface_Tool } from "./handlers/interface/handleCreateInterface";
+import { TOOL_DEFINITION as CreateFunctionGroup_Tool } from "./handlers/function/handleCreateFunctionGroup";
+import { TOOL_DEFINITION as CreateFunctionModule_Tool } from "./handlers/function/handleCreateFunctionModule";
+import { TOOL_DEFINITION as ActivateObject_Tool } from "./handlers/common/handleActivateObject";
+import { TOOL_DEFINITION as DeleteObject_Tool } from "./handlers/common/handleDeleteObject";
+import { TOOL_DEFINITION as CheckObject_Tool } from "./handlers/common/handleCheckObject";
+import { TOOL_DEFINITION as UpdateClassSource_Tool } from "./handlers/class/handleUpdateClassSource";
+import { TOOL_DEFINITION as UpdateProgramSource_Tool } from "./handlers/program/handleUpdateProgramSource";
+import { TOOL_DEFINITION as UpdateViewSource_Tool } from "./handlers/view/handleUpdateViewSource";
+import { TOOL_DEFINITION as UpdateInterfaceSource_Tool } from "./handlers/interface/handleUpdateInterfaceSource";
+import { TOOL_DEFINITION as UpdateFunctionModuleSource_Tool } from "./handlers/function/handleUpdateFunctionModuleSource";
+import { TOOL_DEFINITION as GetSession_Tool } from "./handlers/system/handleGetSession";
+import { TOOL_DEFINITION as ValidateObject_Tool } from "./handlers/common/handleValidateObject";
+import { TOOL_DEFINITION as LockObject_Tool } from "./handlers/common/handleLockObject";
+import { TOOL_DEFINITION as UnlockObject_Tool } from "./handlers/common/handleUnlockObject";
+import { TOOL_DEFINITION as ValidateClass_Tool } from "./handlers/class/handleValidateClass";
+import { TOOL_DEFINITION as CheckClass_Tool } from "./handlers/class/handleCheckClass";
+import { TOOL_DEFINITION as ValidateTable_Tool } from "./handlers/table/handleValidateTable";
+import { TOOL_DEFINITION as CheckTable_Tool } from "./handlers/table/handleCheckTable";
+import { TOOL_DEFINITION as ValidateFunctionModule_Tool } from "./handlers/function/handleValidateFunctionModule";
+import { TOOL_DEFINITION as CheckFunctionModule_Tool } from "./handlers/function/handleCheckFunctionModule";
+import { TOOL_DEFINITION as CreateBdef_Tool } from "./handlers/bdef/handleCreateBehaviorDefinition";
+import { TOOL_DEFINITION as UpdateBdef_Tool } from "./handlers/bdef/handleUpdateBehaviorDefinition";
+import { TOOL_DEFINITION as CreateDdlx_Tool } from "./handlers/ddlx/handleCreateMetadataExtension";
+import { TOOL_DEFINITION as UpdateDdlx_Tool } from "./handlers/ddlx/handleUpdateMetadataExtension";
+import { TOOL_DEFINITION as GetInactiveObjects_Tool } from "./handlers/system/handleGetInactiveObjects";
 
 // --- ENV FILE LOADING LOGIC ---
 import fs from "fs";
@@ -252,6 +263,25 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
 }
 
 /**
+ * Helper to determine transport type early for .env loading logic
+ */
+function getTransportType(): string {
+  const args = process.argv;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith("--transport=")) {
+      return arg.split("=")[1].toLowerCase();
+    }
+    if (arg === "--transport" && i + 1 < args.length) {
+      return args[i + 1].toLowerCase();
+    }
+    if (arg === "--http") return "streamable-http";
+    if (arg === "--sse") return "sse";
+  }
+  return process.env.MCP_TRANSPORT || "streamable-http"; // Default to HTTP
+}
+
+/**
  * Parses command line arguments to find env file path
  * Supports both formats:
  * 1. --env=/path/to/.env
@@ -274,17 +304,20 @@ function parseEnvArg(): string | undefined {
 
 // Find .env file path from arguments
 const skipEnvAutoload = process.env.MCP_SKIP_ENV_LOAD === "true";
+const transportType = getTransportType();
+const isHttp = transportType === "http" || transportType === "streamable-http" || transportType === "server";
+const isSse = transportType === "sse";
+const isStdio = transportType === "stdio";
+const isEnvMandatory = isStdio || isSse;
 
 let envFilePath = parseEnvArg() ?? process.env.MCP_ENV_PATH;
 
 if (!skipEnvAutoload) {
   if (!envFilePath) {
-    // Priority order for global installations:
+    // Priority order:
     // 1. Current working directory (where user runs the command)
-    // 2. Package installation directory
     const possiblePaths = [
-      path.resolve(process.cwd(), ".env"),      // User's working directory (FIRST!)
-      path.resolve(__dirname, "../.env")         // Package directory
+      path.resolve(process.cwd(), ".env")        // User's working directory
     ];
 
     for (const possiblePath of possiblePaths) {
@@ -298,7 +331,9 @@ if (!skipEnvAutoload) {
     if (!envFilePath) {
       // Default to current working directory if nothing found
       envFilePath = path.resolve(process.cwd(), ".env");
-      process.stderr.write(`[MCP-ENV] WARNING: No .env file found, will try: ${envFilePath}\n`);
+      if (isEnvMandatory) {
+        process.stderr.write(`[MCP-ENV] WARNING: No .env file found, will try: ${envFilePath}\n`);
+      }
     }
   } else {
     process.stderr.write(`[MCP-ENV] Using .env from argument/env: ${envFilePath}\n`);
@@ -313,11 +348,17 @@ if (!skipEnvAutoload) {
     dotenv.config({ path: envFilePath });
     process.stderr.write(`[MCP-ENV] ✓ Successfully loaded: ${envFilePath}\n`);
   } else {
-    logger.error(".env file not found", { path: envFilePath });
-    process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n`);
-    process.stderr.write(`[MCP-ENV]   Current working directory: ${process.cwd()}\n`);
-    process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
-    process.exit(1);
+    if (isEnvMandatory) {
+      logger.error(".env file not found", { path: envFilePath });
+      process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n`);
+      process.stderr.write(`[MCP-ENV]   Current working directory: ${process.cwd()}\n`);
+      process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' requires .env file.\n`);
+      process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
+      process.exit(1);
+    } else {
+      process.stderr.write(`[MCP-ENV] NOTE: .env file not found at: ${envFilePath}\n`);
+      process.stderr.write(`[MCP-ENV]   Continuing without .env (optional for ${transportType} mode)\n`);
+    }
   }
 } else if (envFilePath) {
   if (!path.isAbsolute(envFilePath)) {
@@ -341,27 +382,28 @@ logger.info("SAP configuration loaded", {
   ENV_PATH: envLogPath,
   CWD: process.cwd(),
   DIRNAME: __dirname,
+  TRANSPORT: transportType
 });
 
 type TransportConfig =
   | { type: "stdio" }
   | {
-      type: "streamable-http";
-      host: string;
-      port: number;
-      enableJsonResponse: boolean;
-      allowedOrigins?: string[];
-      allowedHosts?: string[];
-      enableDnsRebindingProtection: boolean;
-    }
+    type: "streamable-http";
+    host: string;
+    port: number;
+    enableJsonResponse: boolean;
+    allowedOrigins?: string[];
+    allowedHosts?: string[];
+    enableDnsRebindingProtection: boolean;
+  }
   | {
-      type: "sse";
-      host: string;
-      port: number;
-      allowedOrigins?: string[];
-      allowedHosts?: string[];
-      enableDnsRebindingProtection: boolean;
-    };
+    type: "sse";
+    host: string;
+    port: number;
+    allowedOrigins?: string[];
+    allowedHosts?: string[];
+    enableDnsRebindingProtection: boolean;
+  };
 
 function getArgValue(name: string): string | undefined {
   const args = process.argv;
@@ -432,7 +474,8 @@ function resolveListOption(argName: string, envName: string): string[] | undefin
 
 function parseTransportConfig(): TransportConfig {
   const transportInput = getArgValue("--transport") ?? process.env.MCP_TRANSPORT;
-  const normalized = transportInput ? transportInput.trim().toLowerCase() : undefined;
+  // Default to streamable-http if not provided (Requirement 1.2)
+  const normalized = transportInput ? transportInput.trim().toLowerCase() : "streamable-http";
 
   if (
     normalized &&
@@ -474,7 +517,9 @@ function parseTransportConfig(): TransportConfig {
     normalized === "http" ||
     normalized === "streamable-http" ||
     normalized === "server" ||
-    hasFlag("--http");
+    hasFlag("--http") ||
+    // Default to HTTP if not stdio/sse
+    (!sseRequested && normalized !== "stdio");
 
   if (httpRequested) {
     const port = resolvePortOption("--http-port", "MCP_HTTP_PORT", 3000);
@@ -1088,28 +1133,33 @@ export class mcp_abap_adt_server {
     this.registerToolOnServer(server, CheckTable_Tool.name, CheckTable_Tool.description, CheckTable_Tool.inputSchema as any, handleCheckTable);
     this.registerToolOnServer(server, ValidateFunctionModule_Tool.name, ValidateFunctionModule_Tool.description, ValidateFunctionModule_Tool.inputSchema as any, handleValidateFunctionModule);
     this.registerToolOnServer(server, CheckFunctionModule_Tool.name, CheckFunctionModule_Tool.description, CheckFunctionModule_Tool.inputSchema as any, handleCheckFunctionModule);
+    this.registerToolOnServer(server, CreateBdef_Tool.name, CreateBdef_Tool.description, CreateBdef_Tool.inputSchema as any, handleCreateBehaviorDefinition);
+    this.registerToolOnServer(server, UpdateBdef_Tool.name, UpdateBdef_Tool.description, UpdateBdef_Tool.inputSchema as any, handleUpdateBehaviorDefinition);
+    this.registerToolOnServer(server, CreateDdlx_Tool.name, CreateDdlx_Tool.description, CreateDdlx_Tool.inputSchema as any, handleCreateMetadataExtension);
+    this.registerToolOnServer(server, UpdateDdlx_Tool.name, UpdateDdlx_Tool.description, UpdateDdlx_Tool.inputSchema as any, handleUpdateMetadataExtension);
+    this.registerToolOnServer(server, GetInactiveObjects_Tool.name, GetInactiveObjects_Tool.description, GetInactiveObjects_Tool.inputSchema as any, handleGetInactiveObjects);
 
     // Dynamic import tools
     this.registerToolOnServer(server, "GetAdtTypes", "Get all ADT types available in the system", { type: "object", properties: {}, required: [] } as any, async (args: any) => {
-      return await (await import("./handlers/handleGetAllTypes.js")).handleGetAdtTypes(args);
+      return await (await import("./handlers/system/handleGetAllTypes.js")).handleGetAdtTypes(args);
     });
     this.registerToolOnServer(server, "GetObjectStructure", "Get object structure with includes hierarchy", { type: "object", properties: { object_name: { type: "string" }, object_type: { type: "string" } }, required: ["object_name", "object_type"] } as any, async (args: any) => {
-      return await (await import("./handlers/handleGetObjectStructure.js")).handleGetObjectStructure(args);
+      return await (await import("./handlers/system/handleGetObjectStructure.js")).handleGetObjectStructure(args);
     });
     this.registerToolOnServer(server, "GetObjectsList", "Get list of objects by package", { type: "object", properties: { package_name: { type: "string" } }, required: ["package_name"] } as any, async (args: any) => {
-      return await (await import("./handlers/handleGetObjectsList.js")).handleGetObjectsList(args);
+      return await (await import("./handlers/search/handleGetObjectsList.js")).handleGetObjectsList(args);
     });
     this.registerToolOnServer(server, "GetObjectsByType", "Get objects by type", { type: "object", properties: { object_type: { type: "string" }, package_name: { type: "string" } }, required: ["object_type"] } as any, async (args: any) => {
-      return await (await import("./handlers/handleGetObjectsByType.js")).handleGetObjectsByType(args);
+      return await (await import("./handlers/search/handleGetObjectsByType.js")).handleGetObjectsByType(args);
     });
     this.registerToolOnServer(server, "GetProgFullCode", "Get full program code with includes", { type: "object", properties: { program_name: { type: "string" } }, required: ["program_name"] } as any, async (args: any) => {
-      return await (await import("./handlers/handleGetProgFullCode.js")).handleGetProgFullCode(args);
+      return await (await import("./handlers/program/handleGetProgFullCode.js")).handleGetProgFullCode(args);
     });
     this.registerToolOnServer(server, "GetObjectNodeFromCache", "Get object node from cache", { type: "object", properties: { object_name: { type: "string" }, object_type: { type: "string" } }, required: ["object_name", "object_type"] } as any, async (args: any) => {
-      return await (await import("./handlers/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(args);
+      return await (await import("./handlers/system/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(args);
     });
     this.registerToolOnServer(server, "DescribeByList", "Describe objects by list", { type: "object", properties: { objects: { type: "array", items: { type: "string" } } }, required: ["objects"] } as any, async (args: any) => {
-      return await (await import("./handlers/handleDescribeByList.js")).handleDescribeByList(args);
+      return await (await import("./handlers/system/handleDescribeByList.js")).handleDescribeByList(args);
     });
   }
 

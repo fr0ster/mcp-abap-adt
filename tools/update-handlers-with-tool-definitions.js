@@ -183,19 +183,29 @@ function main() {
     process.exit(1);
   }
   
-  const files = fs.readdirSync(handlersDir)
-    .filter(file => file.endsWith('.ts') && file.startsWith('handle'));
-  
   let updatedCount = 0;
   
-  files.forEach(file => {
-    const handlerName = path.basename(file, '.ts');
-    const filePath = path.join(handlersDir, file);
+  // Recursively scan all subdirectories for handler files
+  function scanDirectory(dir) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
     
-    if (updateHandlerFile(filePath, handlerName)) {
-      updatedCount++;
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      
+      if (entry.isDirectory()) {
+        // Recursively scan subdirectories
+        scanDirectory(fullPath);
+      } else if (entry.isFile() && entry.name.endsWith('.ts') && entry.name.startsWith('handle')) {
+        const handlerName = path.basename(entry.name, '.ts');
+        
+        if (updateHandlerFile(fullPath, handlerName)) {
+          updatedCount++;
+        }
+      }
     }
-  });
+  }
+  
+  scanDirectory(handlersDir);
   
   console.log(`\n${updatedCount === 0 ? '✅ All handlers already have TOOL_DEFINITION' : `📝 Updated ${updatedCount} file(s) - please review and update parameters!`}`);
   

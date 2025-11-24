@@ -10,7 +10,7 @@ import { return_error, return_response, logger, getManagedConnection } from '../
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
-  name: "UpdatePackage",
+  name: "UpdatePackageLow",
   description: "[low-level] Update description of an existing ABAP package. Requires lock handle from LockObject and superPackage. - use UpdatePackageSource for full workflow with lock/unlock.",
   inputSchema: {
     type: "object",

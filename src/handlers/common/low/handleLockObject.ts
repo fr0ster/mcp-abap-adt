@@ -11,7 +11,7 @@ import { generateSessionId } from '../../../lib/sessionUtils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
-  name: "LockObject",
+  name: "LockObjectLow",
   description: "[low-level] Lock an ABAP object for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. Use GetSession first to get a session_id, then use that session_id for lock, update, and unlock operations.",
   inputSchema: {
     type: "object",

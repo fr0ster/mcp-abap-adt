@@ -10,7 +10,7 @@ import { return_error, return_response, logger, getManagedConnection } from '../
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
-  name: "CreateDataElement",
+  name: "CreateDataElementLow",
   description: "[low-level] Create a new ABAP data element. - use CreateDataElement (high-level) for full workflow with validation, lock, update, check, unlock, and activate.",
   inputSchema: {
     type: "object",

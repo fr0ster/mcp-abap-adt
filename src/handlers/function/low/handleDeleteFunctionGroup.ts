@@ -10,7 +10,7 @@ import { return_error, return_response, logger, getManagedConnection } from '../
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
-  name: "DeleteFunctionGroup",
+  name: "DeleteFunctionGroupLow",
   description: "[low-level] Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for $TMP objects.",
   inputSchema: {
     type: "object",

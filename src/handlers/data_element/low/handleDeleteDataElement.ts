@@ -10,7 +10,7 @@ import { return_error, return_response, logger, getManagedConnection } from '../
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
-  name: "DeleteDataElement",
+  name: "DeleteDataElementLow",
   description: "[low-level] Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for $TMP objects.",
   inputSchema: {
     type: "object",

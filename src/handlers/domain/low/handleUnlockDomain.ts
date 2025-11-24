@@ -10,7 +10,7 @@ import { return_error, return_response, logger, getManagedConnection } from '../
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
-  name: "UnlockDomain",
+  name: "UnlockDomainLow",
   description: "[low-level] Unlock an ABAP domain after modification. Must use the same session_id and lock_handle from LockDomain operation.",
   inputSchema: {
     type: "object",

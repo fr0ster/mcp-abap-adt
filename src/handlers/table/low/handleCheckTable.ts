@@ -12,7 +12,7 @@ import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 
 export const TOOL_DEFINITION = {
-  name: "CheckTable",
+  name: "CheckTableLow",
   description: "[low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Requires session_id for stateful operations. Can use session_id and session_state from GetSession to maintain the same session.",
   inputSchema: {
     type: "object",

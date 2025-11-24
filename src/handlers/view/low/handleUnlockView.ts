@@ -10,7 +10,7 @@ import { return_error, return_response, logger, getManagedConnection } from '../
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
-  name: "UnlockView",
+  name: "UnlockViewLow",
   description: "[low-level] Unlock an ABAP view after modification. Must use the same session_id and lock_handle from LockView operation.",
   inputSchema: {
     type: "object",

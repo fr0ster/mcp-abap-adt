@@ -11,7 +11,7 @@ import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 
 export const TOOL_DEFINITION = {
-  name: "CheckMetadataExtension",
+  name: "CheckMetadataExtensionLow",
   description: "[low-level] Perform syntax check on an ABAP metadata extension. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.",
   inputSchema: {
     type: "object",

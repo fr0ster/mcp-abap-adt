@@ -11,7 +11,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
-  name: "DeleteObject",
+  name: "DeleteObjectLow",
   description: "[low-level] Delete an ABAP object from the SAP system via ADT deletion API. Object URI is built automatically from object_name and object_type. Transport request optional for $TMP objects.",
   inputSchema: {
     type: "object",

@@ -10,7 +10,7 @@ import { return_error, return_response, logger, getManagedConnection } from '../
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
-  name: "CreateTransport",
+  name: "CreateTransportLow",
   description: "[low-level] Create a new ABAP transport request.",
   inputSchema: {
     type: "object",

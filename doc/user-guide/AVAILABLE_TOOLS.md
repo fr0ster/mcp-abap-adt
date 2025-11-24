@@ -35,33 +35,33 @@ The navigation below mirrors the document structure for easier discovery.
     - [UpdateFunctionModule](#updatefunctionmodule-high)
     - [UpdateProgram](#updateprogram-high)
   - [Low-Level Tools](#programs,-classes,-functions-low-level)
-    - [CheckClass](#checkclass-low)
-    - [CheckFunctionGroup](#checkfunctiongroup-low)
-    - [CheckFunctionModule](#checkfunctionmodule-low)
-    - [CheckProgram](#checkprogram-low)
-    - [CreateClass](#createclass-low)
-    - [CreateFunctionGroup](#createfunctiongroup-low)
-    - [CreateFunctionModule](#createfunctionmodule-low)
-    - [CreateProgram](#createprogram-low)
-    - [DeleteClass](#deleteclass-low)
-    - [DeleteFunctionGroup](#deletefunctiongroup-low)
-    - [DeleteFunctionModule](#deletefunctionmodule-low)
-    - [DeleteProgram](#deleteprogram-low)
-    - [LockClass](#lockclass-low)
-    - [LockFunctionGroup](#lockfunctiongroup-low)
-    - [LockFunctionModule](#lockfunctionmodule-low)
-    - [LockProgram](#lockprogram-low)
-    - [UnlockClass](#unlockclass-low)
-    - [UnlockFunctionGroup](#unlockfunctiongroup-low)
-    - [UnlockFunctionModule](#unlockfunctionmodule-low)
-    - [UnlockProgram](#unlockprogram-low)
-    - [UpdateClass](#updateclass-low)
-    - [UpdateFunctionModule](#updatefunctionmodule-low)
-    - [UpdateProgram](#updateprogram-low)
-    - [ValidateClass](#validateclass-low)
-    - [ValidateFunctionGroup](#validatefunctiongroup-low)
-    - [ValidateFunctionModule](#validatefunctionmodule-low)
-    - [ValidateProgram](#validateprogram-low)
+    - [CheckClassLow](#checkclasslow-low)
+    - [CheckFunctionGroupLow](#checkfunctiongrouplow-low)
+    - [CheckFunctionModuleLow](#checkfunctionmodulelow-low)
+    - [CheckProgramLow](#checkprogramlow-low)
+    - [CreateClassLow](#createclasslow-low)
+    - [CreateFunctionGroupLow](#createfunctiongrouplow-low)
+    - [CreateFunctionModuleLow](#createfunctionmodulelow-low)
+    - [CreateProgramLow](#createprogramlow-low)
+    - [DeleteClassLow](#deleteclasslow-low)
+    - [DeleteFunctionGroupLow](#deletefunctiongrouplow-low)
+    - [DeleteFunctionModuleLow](#deletefunctionmodulelow-low)
+    - [DeleteProgramLow](#deleteprogramlow-low)
+    - [LockClassLow](#lockclasslow-low)
+    - [LockFunctionGroupLow](#lockfunctiongrouplow-low)
+    - [LockFunctionModuleLow](#lockfunctionmodulelow-low)
+    - [LockProgramLow](#lockprogramlow-low)
+    - [UnlockClassLow](#unlockclasslow-low)
+    - [UnlockFunctionGroupLow](#unlockfunctiongrouplow-low)
+    - [UnlockFunctionModuleLow](#unlockfunctionmodulelow-low)
+    - [UnlockProgramLow](#unlockprogramlow-low)
+    - [UpdateClassLow](#updateclasslow-low)
+    - [UpdateFunctionModuleLow](#updatefunctionmodulelow-low)
+    - [UpdateProgramLow](#updateprogramlow-low)
+    - [ValidateClassLow](#validateclasslow-low)
+    - [ValidateFunctionGroupLow](#validatefunctiongrouplow-low)
+    - [ValidateFunctionModuleLow](#validatefunctionmodulelow-low)
+    - [ValidateProgramLow](#validateprogramlow-low)
 - [Tables and Structures](#tables-and-structures) (49 tools – 8 high-level, 35 low-level, 6 read-only)
   - [Read-Only Tools](#tables-and-structures-read-only)
     - [GetDataElement](#getdataelement-readonly)
@@ -80,41 +80,41 @@ The navigation below mirrors the document structure for easier discovery.
     - [UpdateDomain](#updatedomain-high)
     - [UpdateView](#updateview-high)
   - [Low-Level Tools](#tables-and-structures-low-level)
-    - [CheckDataElement](#checkdataelement-low)
-    - [CheckDomain](#checkdomain-low)
-    - [CheckStructure](#checkstructure-low)
-    - [CheckTable](#checktable-low)
-    - [CheckView](#checkview-low)
-    - [CreateDataElement](#createdataelement-low)
-    - [CreateDomain](#createdomain-low)
-    - [CreateStructure](#createstructure-low)
-    - [CreateTable](#createtable-low)
-    - [CreateView](#createview-low)
-    - [DeleteDataElement](#deletedataelement-low)
-    - [DeleteDomain](#deletedomain-low)
-    - [DeleteStructure](#deletestructure-low)
-    - [DeleteTable](#deletetable-low)
-    - [DeleteView](#deleteview-low)
-    - [LockDataElement](#lockdataelement-low)
-    - [LockDomain](#lockdomain-low)
-    - [LockStructure](#lockstructure-low)
-    - [LockTable](#locktable-low)
-    - [LockView](#lockview-low)
-    - [UnlockDataElement](#unlockdataelement-low)
-    - [UnlockDomain](#unlockdomain-low)
-    - [UnlockStructure](#unlockstructure-low)
-    - [UnlockTable](#unlocktable-low)
-    - [UnlockView](#unlockview-low)
-    - [UpdateDataElement](#updatedataelement-low)
-    - [UpdateDomain](#updatedomain-low)
-    - [UpdateStructure](#updatestructure-low)
-    - [UpdateTable](#updatetable-low)
-    - [UpdateView](#updateview-low)
-    - [ValidateDataElement](#validatedataelement-low)
-    - [ValidateDomain](#validatedomain-low)
-    - [ValidateStructure](#validatestructure-low)
-    - [ValidateTable](#validatetable-low)
-    - [ValidateView](#validateview-low)
+    - [CheckDataElementLow](#checkdataelementlow-low)
+    - [CheckDomainLow](#checkdomainlow-low)
+    - [CheckStructureLow](#checkstructurelow-low)
+    - [CheckTableLow](#checktablelow-low)
+    - [CheckViewLow](#checkviewlow-low)
+    - [CreateDataElementLow](#createdataelementlow-low)
+    - [CreateDomainLow](#createdomainlow-low)
+    - [CreateStructureLow](#createstructurelow-low)
+    - [CreateTableLow](#createtablelow-low)
+    - [CreateViewLow](#createviewlow-low)
+    - [DeleteDataElementLow](#deletedataelementlow-low)
+    - [DeleteDomainLow](#deletedomainlow-low)
+    - [DeleteStructureLow](#deletestructurelow-low)
+    - [DeleteTableLow](#deletetablelow-low)
+    - [DeleteViewLow](#deleteviewlow-low)
+    - [LockDataElementLow](#lockdataelementlow-low)
+    - [LockDomainLow](#lockdomainlow-low)
+    - [LockStructureLow](#lockstructurelow-low)
+    - [LockTableLow](#locktablelow-low)
+    - [LockViewLow](#lockviewlow-low)
+    - [UnlockDataElementLow](#unlockdataelementlow-low)
+    - [UnlockDomainLow](#unlockdomainlow-low)
+    - [UnlockStructureLow](#unlockstructurelow-low)
+    - [UnlockTableLow](#unlocktablelow-low)
+    - [UnlockViewLow](#unlockviewlow-low)
+    - [UpdateDataElementLow](#updatedataelementlow-low)
+    - [UpdateDomainLow](#updatedomainlow-low)
+    - [UpdateStructureLow](#updatestructurelow-low)
+    - [UpdateTableLow](#updatetablelow-low)
+    - [UpdateViewLow](#updateviewlow-low)
+    - [ValidateDataElementLow](#validatedataelementlow-low)
+    - [ValidateDomainLow](#validatedomainlow-low)
+    - [ValidateStructureLow](#validatestructurelow-low)
+    - [ValidateTableLow](#validatetablelow-low)
+    - [ValidateViewLow](#validateviewlow-low)
 - [Packages and Interfaces](#packages-and-interfaces) (19 tools – 3 high-level, 14 low-level, 2 read-only)
   - [Read-Only Tools](#packages-and-interfaces-read-only)
     - [GetInterface](#getinterface-readonly)
@@ -124,20 +124,20 @@ The navigation below mirrors the document structure for easier discovery.
     - [CreatePackage](#createpackage-high)
     - [UpdateInterface](#updateinterface-high)
   - [Low-Level Tools](#packages-and-interfaces-low-level)
-    - [CheckInterface](#checkinterface-low)
-    - [CheckPackage](#checkpackage-low)
-    - [CreateInterface](#createinterface-low)
-    - [CreatePackage](#createpackage-low)
-    - [DeleteInterface](#deleteinterface-low)
-    - [DeletePackage](#deletepackage-low)
-    - [LockInterface](#lockinterface-low)
-    - [LockPackage](#lockpackage-low)
-    - [UnlockInterface](#unlockinterface-low)
-    - [UnlockPackage](#unlockpackage-low)
-    - [UpdateInterface](#updateinterface-low)
-    - [UpdatePackage](#updatepackage-low)
-    - [ValidateInterface](#validateinterface-low)
-    - [ValidatePackage](#validatepackage-low)
+    - [CheckInterfaceLow](#checkinterfacelow-low)
+    - [CheckPackageLow](#checkpackagelow-low)
+    - [CreateInterfaceLow](#createinterfacelow-low)
+    - [CreatePackageLow](#createpackagelow-low)
+    - [DeleteInterfaceLow](#deleteinterfacelow-low)
+    - [DeletePackageLow](#deletepackagelow-low)
+    - [LockInterfaceLow](#lockinterfacelow-low)
+    - [LockPackageLow](#lockpackagelow-low)
+    - [UnlockInterfaceLow](#unlockinterfacelow-low)
+    - [UnlockPackageLow](#unlockpackagelow-low)
+    - [UpdateInterfaceLow](#updateinterfacelow-low)
+    - [UpdatePackageLow](#updatepackagelow-low)
+    - [ValidateInterfaceLow](#validateinterfacelow-low)
+    - [ValidatePackageLow](#validatepackagelow-low)
 - [Includes and Hierarchies](#includes-and-hierarchies) (2 tools – 2 read-only)
   - [Read-Only Tools](#includes-and-hierarchies-read-only)
     - [GetInclude](#getinclude-readonly)
@@ -167,7 +167,7 @@ The navigation below mirrors the document structure for easier discovery.
   - [High-Level Tools](#search,-sql,-transactions-high-level)
     - [CreateTransport](#createtransport-high)
   - [Low-Level Tools](#search,-sql,-transactions-low-level)
-    - [CreateTransport](#createtransport-low)
+    - [CreateTransportLow](#createtransportlow-low)
 - [Enhancements](#enhancements) (22 tools – 4 high-level, 14 low-level, 4 read-only)
   - [Read-Only Tools](#enhancements-read-only)
     - [GetBdef](#getbdef-readonly)
@@ -180,20 +180,20 @@ The navigation below mirrors the document structure for easier discovery.
     - [UpdateBehaviorDefinition](#updatebehaviordefinition-high)
     - [UpdateMetadataExtension](#updatemetadataextension-high)
   - [Low-Level Tools](#enhancements-low-level)
-    - [CheckBehaviorDefinition](#checkbehaviordefinition-low)
-    - [CheckMetadataExtension](#checkmetadataextension-low)
-    - [CreateBehaviorDefinition](#createbehaviordefinition-low)
-    - [CreateMetadataExtension](#createmetadataextension-low)
-    - [DeleteBehaviorDefinition](#deletebehaviordefinition-low)
-    - [DeleteMetadataExtension](#deletemetadataextension-low)
-    - [LockBehaviorDefinition](#lockbehaviordefinition-low)
-    - [LockMetadataExtension](#lockmetadataextension-low)
-    - [UnlockBehaviorDefinition](#unlockbehaviordefinition-low)
-    - [UnlockMetadataExtension](#unlockmetadataextension-low)
-    - [UpdateBehaviorDefinition](#updatebehaviordefinition-low)
-    - [UpdateMetadataExtension](#updatemetadataextension-low)
-    - [ValidateBehaviorDefinition](#validatebehaviordefinition-low)
-    - [ValidateMetadataExtension](#validatemetadataextension-low)
+    - [CheckBehaviorDefinitionLow](#checkbehaviordefinitionlow-low)
+    - [CheckMetadataExtensionLow](#checkmetadataextensionlow-low)
+    - [CreateBehaviorDefinitionLow](#createbehaviordefinitionlow-low)
+    - [CreateMetadataExtensionLow](#createmetadataextensionlow-low)
+    - [DeleteBehaviorDefinitionLow](#deletebehaviordefinitionlow-low)
+    - [DeleteMetadataExtensionLow](#deletemetadataextensionlow-low)
+    - [LockBehaviorDefinitionLow](#lockbehaviordefinitionlow-low)
+    - [LockMetadataExtensionLow](#lockmetadataextensionlow-low)
+    - [UnlockBehaviorDefinitionLow](#unlockbehaviordefinitionlow-low)
+    - [UnlockMetadataExtensionLow](#unlockmetadataextensionlow-low)
+    - [UpdateBehaviorDefinitionLow](#updatebehaviordefinitionlow-low)
+    - [UpdateMetadataExtensionLow](#updatemetadataextensionlow-low)
+    - [ValidateBehaviorDefinitionLow](#validatebehaviordefinitionlow-low)
+    - [ValidateMetadataExtensionLow](#validatemetadataextensionlow-low)
 
 ---
 
@@ -422,7 +422,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 *Low-level tools perform a single operation (one method call to CrudClient).*
 
-### CheckClass {#checkclass-low}
+### CheckClassLow {#checkclasslow-low}
 **Description:** [low-level] Perform syntax check on an ABAP class. Can check existing class (active/inactive) or hypothetical source code. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -439,7 +439,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CheckFunctionGroup {#checkfunctiongroup-low}
+### CheckFunctionGroupLow {#checkfunctiongrouplow-low}
 **Description:** [low-level] Perform syntax check on an ABAP function group. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -454,7 +454,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CheckFunctionModule {#checkfunctionmodule-low}
+### CheckFunctionModuleLow {#checkfunctionmodulelow-low}
 **Description:** [low-level] Perform syntax check on an ABAP function module. Returns syntax errors, warnings, and messages. Requires function group name. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -473,7 +473,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CheckProgram {#checkprogram-low}
+### CheckProgramLow {#checkprogramlow-low}
 **Description:** [low-level] Perform syntax check on an ABAP program. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -488,7 +488,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CreateClass {#createclass-low}
+### CreateClassLow {#createclasslow-low}
 **Description:** [low-level] Create a new ABAP class. - use CreateClass (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Parameters:**
@@ -518,7 +518,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CreateFunctionGroup {#createfunctiongroup-low}
+### CreateFunctionGroupLow {#createfunctiongrouplow-low}
 **Description:** [low-level] Create a new ABAP function group. - use CreateFunctionGroup (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Parameters:**
@@ -539,7 +539,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CreateFunctionModule {#createfunctionmodule-low}
+### CreateFunctionModuleLow {#createfunctionmodulelow-low}
 **Description:** [low-level] Create a new ABAP function module. - use CreateFunctionModule (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Parameters:**
@@ -562,7 +562,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CreateProgram {#createprogram-low}
+### CreateProgramLow {#createprogramlow-low}
 **Description:** [low-level] Create a new ABAP program. - use CreateProgram (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Parameters:**
@@ -588,7 +588,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### DeleteClass {#deleteclass-low}
+### DeleteClassLow {#deleteclasslow-low}
 **Description:** [low-level] Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Parameters:**
@@ -602,7 +602,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### DeleteFunctionGroup {#deletefunctiongroup-low}
+### DeleteFunctionGroupLow {#deletefunctiongrouplow-low}
 **Description:** [low-level] Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Parameters:**
@@ -616,7 +616,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### DeleteFunctionModule {#deletefunctionmodule-low}
+### DeleteFunctionModuleLow {#deletefunctionmodulelow-low}
 **Description:** [low-level] Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Parameters:**
@@ -633,7 +633,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### DeleteProgram {#deleteprogram-low}
+### DeleteProgramLow {#deleteprogramlow-low}
 **Description:** [low-level] Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Parameters:**
@@ -647,7 +647,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### LockClass {#lockclass-low}
+### LockClassLow {#lockclasslow-low}
 **Description:** [low-level] Lock an ABAP class for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Parameters:**
@@ -662,7 +662,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### LockFunctionGroup {#lockfunctiongroup-low}
+### LockFunctionGroupLow {#lockfunctiongrouplow-low}
 **Description:** [low-level] Lock an ABAP function group for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Parameters:**
@@ -677,7 +677,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### LockFunctionModule {#lockfunctionmodule-low}
+### LockFunctionModuleLow {#lockfunctionmodulelow-low}
 **Description:** [low-level] Lock an ABAP function module for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Parameters:**
@@ -695,7 +695,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### LockProgram {#lockprogram-low}
+### LockProgramLow {#lockprogramlow-low}
 **Description:** [low-level] Lock an ABAP program for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Parameters:**
@@ -710,7 +710,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UnlockClass {#unlockclass-low}
+### UnlockClassLow {#unlockclasslow-low}
 **Description:** [low-level] Unlock an ABAP class after modification. Must use the same session_id and lock_handle from LockClass operation.
 
 **Parameters:**
@@ -729,7 +729,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UnlockFunctionGroup {#unlockfunctiongroup-low}
+### UnlockFunctionGroupLow {#unlockfunctiongrouplow-low}
 **Description:** [low-level] Unlock an ABAP function group after modification. Must use the same session_id and lock_handle from LockFunctionGroup operation.
 
 **Parameters:**
@@ -748,7 +748,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UnlockFunctionModule {#unlockfunctionmodule-low}
+### UnlockFunctionModuleLow {#unlockfunctionmodulelow-low}
 **Description:** [low-level] Unlock an ABAP function module after modification. Must use the same session_id and lock_handle from LockFunctionModule operation.
 
 **Parameters:**
@@ -769,7 +769,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UnlockProgram {#unlockprogram-low}
+### UnlockProgramLow {#unlockprogramlow-low}
 **Description:** [low-level] Unlock an ABAP program after modification. Must use the same session_id and lock_handle from LockProgram operation.
 
 **Parameters:**
@@ -788,7 +788,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UpdateClass {#updateclass-low}
+### UpdateClassLow {#updateclasslow-low}
 **Description:** [low-level] Update source code of an existing ABAP class. Requires lock handle from LockObject. - use UpdateClass (high-level) for full workflow with lock/unlock/activate.
 
 **Parameters:**
@@ -808,7 +808,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UpdateFunctionModule {#updatefunctionmodule-low}
+### UpdateFunctionModuleLow {#updatefunctionmodulelow-low}
 **Description:** [low-level] Update source code of an existing ABAP function module. Requires lock handle from LockObject and function group name. - use UpdateFunctionModule (high-level) for full workflow with lock/unlock/activate.
 
 **Parameters:**
@@ -830,7 +830,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UpdateProgram {#updateprogram-low}
+### UpdateProgramLow {#updateprogramlow-low}
 **Description:** [low-level] Update source code of an existing ABAP program. Requires lock handle from LockObject. - use UpdateProgram (high-level) for full workflow with lock/unlock/activate.
 
 **Parameters:**
@@ -850,7 +850,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### ValidateClass {#validateclass-low}
+### ValidateClassLow {#validateclasslow-low}
 **Description:** [low-level] Validate an ABAP class name before creation. Checks if the name is valid, available, and validates package, description, and superclass if provided. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -868,7 +868,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### ValidateFunctionGroup {#validatefunctiongroup-low}
+### ValidateFunctionGroupLow {#validatefunctiongrouplow-low}
 **Description:** [low-level] Validate an ABAP function group name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -883,7 +883,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### ValidateFunctionModule {#validatefunctionmodule-low}
+### ValidateFunctionModuleLow {#validatefunctionmodulelow-low}
 **Description:** [low-level] Validate an ABAP function module name before creation. Checks if the name is valid and available. Requires function group name. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -902,7 +902,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### ValidateProgram {#validateprogram-low}
+### ValidateProgramLow {#validateprogramlow-low}
 **Description:** [low-level] Validate an ABAP program name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -1228,7 +1228,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 *Low-level tools perform a single operation (one method call to CrudClient).*
 
-### CheckDataElement {#checkdataelement-low}
+### CheckDataElementLow {#checkdataelementlow-low}
 **Description:** [low-level] Perform syntax check on an ABAP data element. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -1243,7 +1243,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CheckDomain {#checkdomain-low}
+### CheckDomainLow {#checkdomainlow-low}
 **Description:** [low-level] Perform syntax check on an ABAP domain. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -1258,7 +1258,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CheckStructure {#checkstructure-low}
+### CheckStructureLow {#checkstructurelow-low}
 **Description:** [low-level] Perform syntax check on an ABAP structure. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -1273,7 +1273,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CheckTable {#checktable-low}
+### CheckTableLow {#checktablelow-low}
 **Description:** [low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Requires session_id for stateful operations. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -1289,7 +1289,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CheckView {#checkview-low}
+### CheckViewLow {#checkviewlow-low}
 **Description:** [low-level] Perform syntax check on an ABAP view. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -1304,7 +1304,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CreateDataElement {#createdataelement-low}
+### CreateDataElementLow {#createdataelementlow-low}
 **Description:** [low-level] Create a new ABAP data element. - use CreateDataElement (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Parameters:**
@@ -1329,7 +1329,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CreateDomain {#createdomain-low}
+### CreateDomainLow {#createdomainlow-low}
 **Description:** [low-level] Create a new ABAP domain. - use CreateDomain (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Parameters:**
@@ -1355,7 +1355,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CreateStructure {#createstructure-low}
+### CreateStructureLow {#createstructurelow-low}
 **Description:** [low-level] Create a new ABAP structure. - use CreateStructure (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Parameters:**
@@ -1381,7 +1381,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CreateTable {#createtable-low}
+### CreateTableLow {#createtablelow-low}
 **Description:** [low-level] Create a new ABAP table. - use CreateTable (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Parameters:**
@@ -1400,7 +1400,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CreateView {#createview-low}
+### CreateViewLow {#createviewlow-low}
 **Description:** [low-level] Create a new ABAP view. - use CreateView (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Parameters:**
@@ -1426,7 +1426,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### DeleteDataElement {#deletedataelement-low}
+### DeleteDataElementLow {#deletedataelementlow-low}
 **Description:** [low-level] Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Parameters:**
@@ -1440,7 +1440,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### DeleteDomain {#deletedomain-low}
+### DeleteDomainLow {#deletedomainlow-low}
 **Description:** [low-level] Delete an ABAP domain from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Parameters:**
@@ -1454,7 +1454,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### DeleteStructure {#deletestructure-low}
+### DeleteStructureLow {#deletestructurelow-low}
 **Description:** [low-level] Delete an ABAP structure from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Parameters:**
@@ -1468,7 +1468,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### DeleteTable {#deletetable-low}
+### DeleteTableLow {#deletetablelow-low}
 **Description:** [low-level] Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Parameters:**
@@ -1482,7 +1482,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### DeleteView {#deleteview-low}
+### DeleteViewLow {#deleteviewlow-low}
 **Description:** [low-level] Delete an ABAP view from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Parameters:**
@@ -1496,7 +1496,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### LockDataElement {#lockdataelement-low}
+### LockDataElementLow {#lockdataelementlow-low}
 **Description:** [low-level] Lock an ABAP data element for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Parameters:**
@@ -1511,7 +1511,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### LockDomain {#lockdomain-low}
+### LockDomainLow {#lockdomainlow-low}
 **Description:** [low-level] Lock an ABAP domain for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Parameters:**
@@ -1526,7 +1526,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### LockStructure {#lockstructure-low}
+### LockStructureLow {#lockstructurelow-low}
 **Description:** [low-level] Lock an ABAP structure for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Parameters:**
@@ -1541,7 +1541,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### LockTable {#locktable-low}
+### LockTableLow {#locktablelow-low}
 **Description:** [low-level] Lock an ABAP table for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Parameters:**
@@ -1556,7 +1556,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### LockView {#lockview-low}
+### LockViewLow {#lockviewlow-low}
 **Description:** [low-level] Lock an ABAP view for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Parameters:**
@@ -1571,7 +1571,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UnlockDataElement {#unlockdataelement-low}
+### UnlockDataElementLow {#unlockdataelementlow-low}
 **Description:** [low-level] Unlock an ABAP data element after modification. Must use the same session_id and lock_handle from LockDataElement operation.
 
 **Parameters:**
@@ -1590,7 +1590,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UnlockDomain {#unlockdomain-low}
+### UnlockDomainLow {#unlockdomainlow-low}
 **Description:** [low-level] Unlock an ABAP domain after modification. Must use the same session_id and lock_handle from LockDomain operation.
 
 **Parameters:**
@@ -1609,7 +1609,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UnlockStructure {#unlockstructure-low}
+### UnlockStructureLow {#unlockstructurelow-low}
 **Description:** [low-level] Unlock an ABAP structure after modification. Must use the same session_id and lock_handle from LockStructure operation.
 
 **Parameters:**
@@ -1628,7 +1628,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UnlockTable {#unlocktable-low}
+### UnlockTableLow {#unlocktablelow-low}
 **Description:** [low-level] Unlock an ABAP table after modification. Must use the same session_id and lock_handle from LockTable operation.
 
 **Parameters:**
@@ -1647,7 +1647,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UnlockView {#unlockview-low}
+### UnlockViewLow {#unlockviewlow-low}
 **Description:** [low-level] Unlock an ABAP view after modification. Must use the same session_id and lock_handle from LockView operation.
 
 **Parameters:**
@@ -1666,7 +1666,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UpdateDataElement {#updatedataelement-low}
+### UpdateDataElementLow {#updatedataelementlow-low}
 **Description:** [low-level] Update properties of an existing ABAP data element. Requires lock handle from LockObject. - use UpdateDataElement (high-level) for full workflow with lock/unlock/activate.
 
 **Parameters:**
@@ -1686,7 +1686,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UpdateDomain {#updatedomain-low}
+### UpdateDomainLow {#updatedomainlow-low}
 **Description:** [low-level] Update properties of an existing ABAP domain. Requires lock handle from LockObject. - use UpdateDomain (high-level) for full workflow with lock/unlock/activate.
 
 **Parameters:**
@@ -1706,7 +1706,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UpdateStructure {#updatestructure-low}
+### UpdateStructureLow {#updatestructurelow-low}
 **Description:** [low-level] Update DDL source code of an existing ABAP structure. Requires lock handle from LockObject. - use UpdateStructureSource for full workflow with lock/unlock.
 
 **Parameters:**
@@ -1726,7 +1726,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UpdateTable {#updatetable-low}
+### UpdateTableLow {#updatetablelow-low}
 **Description:** [low-level] Update DDL source code of an existing ABAP table. Requires lock handle from LockObject. - use CreateTable for full workflow with lock/unlock.
 
 **Parameters:**
@@ -1746,7 +1746,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UpdateView {#updateview-low}
+### UpdateViewLow {#updateviewlow-low}
 **Description:** [low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockObject. - use UpdateView (high-level) for full workflow with lock/unlock/activate.
 
 **Parameters:**
@@ -1766,7 +1766,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### ValidateDataElement {#validatedataelement-low}
+### ValidateDataElementLow {#validatedataelementlow-low}
 **Description:** [low-level] Validate an ABAP data element name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -1781,7 +1781,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### ValidateDomain {#validatedomain-low}
+### ValidateDomainLow {#validatedomainlow-low}
 **Description:** [low-level] Validate an ABAP domain name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -1796,7 +1796,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### ValidateStructure {#validatestructure-low}
+### ValidateStructureLow {#validatestructurelow-low}
 **Description:** [low-level] Validate an ABAP structure name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -1811,7 +1811,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### ValidateTable {#validatetable-low}
+### ValidateTableLow {#validatetablelow-low}
 **Description:** [low-level] Validate an ABAP table name before creation. Checks if the name is valid and available. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -1827,7 +1827,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### ValidateView {#validateview-low}
+### ValidateViewLow {#validateviewlow-low}
 **Description:** [low-level] Validate an ABAP view name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -1935,7 +1935,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 *Low-level tools perform a single operation (one method call to CrudClient).*
 
-### CheckInterface {#checkinterface-low}
+### CheckInterfaceLow {#checkinterfacelow-low}
 **Description:** [low-level] Perform syntax check on an ABAP interface. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -1950,7 +1950,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CheckPackage {#checkpackage-low}
+### CheckPackageLow {#checkpackagelow-low}
 **Description:** [low-level] Perform syntax check on an ABAP package. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -1968,7 +1968,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CreateInterface {#createinterface-low}
+### CreateInterfaceLow {#createinterfacelow-low}
 **Description:** [low-level] Create a new ABAP interface. - use CreateInterface (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Parameters:**
@@ -1991,7 +1991,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CreatePackage {#createpackage-low}
+### CreatePackageLow {#createpackagelow-low}
 **Description:** [low-level] Create a new ABAP package. - use CreatePackage (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Parameters:**
@@ -2012,7 +2012,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### DeleteInterface {#deleteinterface-low}
+### DeleteInterfaceLow {#deleteinterfacelow-low}
 **Description:** [low-level] Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Parameters:**
@@ -2026,7 +2026,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### DeletePackage {#deletepackage-low}
+### DeletePackageLow {#deletepackagelow-low}
 **Description:** [low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Parameters:**
@@ -2040,7 +2040,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### LockInterface {#lockinterface-low}
+### LockInterfaceLow {#lockinterfacelow-low}
 **Description:** [low-level] Lock an ABAP interface for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Parameters:**
@@ -2055,7 +2055,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### LockPackage {#lockpackage-low}
+### LockPackageLow {#lockpackagelow-low}
 **Description:** [low-level] Lock an ABAP package for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. Requires super_package.
 
 **Parameters:**
@@ -2073,7 +2073,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UnlockInterface {#unlockinterface-low}
+### UnlockInterfaceLow {#unlockinterfacelow-low}
 **Description:** [low-level] Unlock an ABAP interface after modification. Must use the same session_id and lock_handle from LockInterface operation.
 
 **Parameters:**
@@ -2092,7 +2092,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UnlockPackage {#unlockpackage-low}
+### UnlockPackageLow {#unlockpackagelow-low}
 **Description:** [low-level] Unlock an ABAP package after modification. Requires lock handle from LockObject and superPackage. - must use the same session_id and lock_handle from LockObject.
 
 **Parameters:**
@@ -2113,7 +2113,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UpdateInterface {#updateinterface-low}
+### UpdateInterfaceLow {#updateinterfacelow-low}
 **Description:** [low-level] Update source code of an existing ABAP interface. Requires lock handle from LockObject. - use UpdateInterface (high-level) for full workflow with lock/unlock/activate.
 
 **Parameters:**
@@ -2133,7 +2133,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UpdatePackage {#updatepackage-low}
+### UpdatePackageLow {#updatepackagelow-low}
 **Description:** [low-level] Update description of an existing ABAP package. Requires lock handle from LockObject and superPackage. - use UpdatePackageSource for full workflow with lock/unlock.
 
 **Parameters:**
@@ -2155,7 +2155,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### ValidateInterface {#validateinterface-low}
+### ValidateInterfaceLow {#validateinterfacelow-low}
 **Description:** [low-level] Validate an ABAP interface name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -2170,7 +2170,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### ValidatePackage {#validatepackage-low}
+### ValidatePackageLow {#validatepackagelow-low}
 **Description:** [low-level] Validate an ABAP package name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -2534,7 +2534,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 *Low-level tools perform a single operation (one method call to CrudClient).*
 
-### CreateTransport {#createtransport-low}
+### CreateTransportLow {#createtransportlow-low}
 **Description:** [low-level] Create a new ABAP transport request.
 
 **Parameters:**
@@ -2693,7 +2693,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 *Low-level tools perform a single operation (one method call to CrudClient).*
 
-### CheckBehaviorDefinition {#checkbehaviordefinition-low}
+### CheckBehaviorDefinitionLow {#checkbehaviordefinitionlow-low}
 **Description:** [low-level] Perform syntax check on an ABAP behavior definition. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -2708,7 +2708,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CheckMetadataExtension {#checkmetadataextension-low}
+### CheckMetadataExtensionLow {#checkmetadataextensionlow-low}
 **Description:** [low-level] Perform syntax check on an ABAP metadata extension. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -2723,7 +2723,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CreateBehaviorDefinition {#createbehaviordefinition-low}
+### CreateBehaviorDefinitionLow {#createbehaviordefinitionlow-low}
 **Description:** [low-level] Create a new ABAP Behavior Definition. - use CreateBehaviorDefinition (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Parameters:**
@@ -2751,7 +2751,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### CreateMetadataExtension {#createmetadataextension-low}
+### CreateMetadataExtensionLow {#createmetadataextensionlow-low}
 **Description:** [low-level] Create a new ABAP Metadata Extension. - use CreateMetadataExtension (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Parameters:**
@@ -2775,7 +2775,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### DeleteBehaviorDefinition {#deletebehaviordefinition-low}
+### DeleteBehaviorDefinitionLow {#deletebehaviordefinitionlow-low}
 **Description:** [low-level] Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Parameters:**
@@ -2789,7 +2789,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### DeleteMetadataExtension {#deletemetadataextension-low}
+### DeleteMetadataExtensionLow {#deletemetadataextensionlow-low}
 **Description:** [low-level] Delete an ABAP metadata extension from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Parameters:**
@@ -2803,7 +2803,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### LockBehaviorDefinition {#lockbehaviordefinition-low}
+### LockBehaviorDefinitionLow {#lockbehaviordefinitionlow-low}
 **Description:** [low-level] Lock an ABAP behavior definition for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Parameters:**
@@ -2818,7 +2818,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### LockMetadataExtension {#lockmetadataextension-low}
+### LockMetadataExtensionLow {#lockmetadataextensionlow-low}
 **Description:** [low-level] Lock an ABAP metadata extension for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Parameters:**
@@ -2833,7 +2833,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UnlockBehaviorDefinition {#unlockbehaviordefinition-low}
+### UnlockBehaviorDefinitionLow {#unlockbehaviordefinitionlow-low}
 **Description:** [low-level] Unlock an ABAP behavior definition after modification. Must use the same session_id and lock_handle from LockBehaviorDefinition operation.
 
 **Parameters:**
@@ -2852,7 +2852,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UnlockMetadataExtension {#unlockmetadataextension-low}
+### UnlockMetadataExtensionLow {#unlockmetadataextensionlow-low}
 **Description:** [low-level] Unlock an ABAP metadata extension after modification. Must use the same session_id and lock_handle from LockMetadataExtension operation.
 
 **Parameters:**
@@ -2871,7 +2871,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UpdateBehaviorDefinition {#updatebehaviordefinition-low}
+### UpdateBehaviorDefinitionLow {#updatebehaviordefinitionlow-low}
 **Description:** [low-level] Update source code of an existing ABAP behavior definition. Requires lock handle from LockObject. - use UpdateBehaviorDefinition (high-level) for full workflow with lock/unlock/activate.
 
 **Parameters:**
@@ -2891,7 +2891,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UpdateMetadataExtension {#updatemetadataextension-low}
+### UpdateMetadataExtensionLow {#updatemetadataextensionlow-low}
 **Description:** [low-level] Update source code of an existing ABAP metadata extension. Requires lock handle from LockObject. - use UpdateMetadataExtension (high-level) for full workflow with lock/unlock/activate.
 
 **Parameters:**
@@ -2911,7 +2911,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### ValidateBehaviorDefinition {#validatebehaviordefinition-low}
+### ValidateBehaviorDefinitionLow {#validatebehaviordefinitionlow-low}
 **Description:** [low-level] Validate an ABAP behavior definition name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
@@ -2931,7 +2931,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### ValidateMetadataExtension {#validatemetadataextension-low}
+### ValidateMetadataExtensionLow {#validatemetadataextensionlow-low}
 **Description:** [low-level] Validate an ABAP metadata extension name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**

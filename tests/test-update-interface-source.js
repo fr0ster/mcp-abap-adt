@@ -19,7 +19,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleUpdateInterfaceSource } = require('../dist/handlers/handleUpdateInterfaceSource');
+const { handleUpdateInterfaceSource } = require('../dist/handlers/interface/high/handleUpdateInterfaceSource');
 
 async function testUpdateInterfaceSource() {
   const testCases = getAllEnabledTestCases('update_interface_source');

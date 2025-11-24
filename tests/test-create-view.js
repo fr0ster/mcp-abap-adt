@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleCreateView } = require('../dist/handlers/handleCreateView');
+const { handleCreateView } = require('../dist/handlers/view/high/handleCreateView');
 
 async function testCreateView() {
   const testCases = getAllEnabledTestCases('create_view');

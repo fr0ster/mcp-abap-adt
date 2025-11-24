@@ -15,73 +15,73 @@ import { randomUUID } from "crypto";
 
 // Import handler functions
 // Import handler functions
-import { handleGetProgram } from "./handlers/program/handleGetProgram";
-import { handleGetClass } from "./handlers/class/handleGetClass";
-import { handleGetFunctionGroup } from "./handlers/function/handleGetFunctionGroup";
-import { handleGetFunction } from "./handlers/function/handleGetFunction";
-import { handleGetTable } from "./handlers/table/handleGetTable";
-import { handleGetStructure } from "./handlers/structure/handleGetStructure";
-import { handleGetTableContents } from "./handlers/table/handleGetTableContents";
-import { handleGetPackage } from "./handlers/package/handleGetPackage";
-import { handleCreatePackage } from "./handlers/package/handleCreatePackage";
-import { handleGetInclude } from "./handlers/include/handleGetInclude";
-import { handleGetIncludesList } from "./handlers/include/handleGetIncludesList";
-import { handleGetTypeInfo } from "./handlers/system/handleGetTypeInfo";
-import { handleGetInterface } from "./handlers/interface/handleGetInterface";
-import { handleGetTransaction } from "./handlers/system/handleGetTransaction";
-import { handleSearchObject } from "./handlers/search/handleSearchObject";
-import { handleGetEnhancements } from "./handlers/enhancement/handleGetEnhancements";
-import { handleGetEnhancementImpl } from "./handlers/enhancement/handleGetEnhancementImpl";
-import { handleGetEnhancementSpot } from "./handlers/enhancement/handleGetEnhancementSpot";
-import { handleGetBdef } from "./handlers/bdef/handleGetBdef";
-import { handleGetSqlQuery } from "./handlers/system/handleGetSqlQuery";
-import { handleGetObjectsByType } from "./handlers/search/handleGetObjectsByType";
-import { handleGetWhereUsed } from "./handlers/system/handleGetWhereUsed";
-import { handleGetObjectInfo } from "./handlers/system/handleGetObjectInfo";
-import { handleDescribeByList } from "./handlers/system/handleDescribeByList";
-import { handleGetAbapAST } from "./handlers/system/handleGetAbapAST";
-import { handleGetAbapSemanticAnalysis } from "./handlers/system/handleGetAbapSemanticAnalysis";
-import { handleGetAbapSystemSymbols } from "./handlers/system/handleGetAbapSystemSymbols";
-import { handleGetDomain } from "./handlers/domain/handleGetDomain";
-import { handleCreateDomain } from "./handlers/domain/handleCreateDomain";
-import { handleUpdateDomain } from "./handlers/domain/handleUpdateDomain";
-import { handleCreateDataElement } from "./handlers/data_element/handleCreateDataElement";
-import { handleUpdateDataElement } from "./handlers/data_element/handleUpdateDataElement";
-import { handleGetDataElement } from "./handlers/data_element/handleGetDataElement";
-import { handleCreateTransport } from "./handlers/transport/handleCreateTransport";
-import { handleGetTransport } from "./handlers/transport/handleGetTransport";
-import { handleCreateTable } from "./handlers/table/handleCreateTable";
-import { handleCreateStructure } from "./handlers/structure/handleCreateStructure";
-import { handleCreateView } from "./handlers/view/handleCreateView";
-import { handleGetView } from "./handlers/view/handleGetView";
-import { handleCreateClass } from "./handlers/class/handleCreateClass";
-import { handleCreateProgram } from "./handlers/program/handleCreateProgram";
-import { handleCreateInterface } from "./handlers/interface/handleCreateInterface";
-import { handleCreateFunctionGroup } from "./handlers/function/handleCreateFunctionGroup";
-import { handleCreateFunctionModule } from "./handlers/function/handleCreateFunctionModule";
-import { handleActivateObject } from "./handlers/common/handleActivateObject";
-import { handleDeleteObject } from "./handlers/common/handleDeleteObject";
-import { handleCheckObject } from "./handlers/common/handleCheckObject";
-import { handleUpdateClassSource } from "./handlers/class/handleUpdateClassSource";
-import { handleUpdateProgramSource } from "./handlers/program/handleUpdateProgramSource";
-import { handleUpdateViewSource } from "./handlers/view/handleUpdateViewSource";
-import { handleUpdateInterfaceSource } from "./handlers/interface/handleUpdateInterfaceSource";
-import { handleUpdateFunctionModuleSource } from "./handlers/function/handleUpdateFunctionModuleSource";
-import { handleGetSession } from "./handlers/system/handleGetSession";
-import { handleValidateObject } from "./handlers/common/handleValidateObject";
-import { handleLockObject } from "./handlers/common/handleLockObject";
-import { handleUnlockObject } from "./handlers/common/handleUnlockObject";
-import { handleValidateClass } from "./handlers/class/handleValidateClass";
-import { handleCheckClass } from "./handlers/class/handleCheckClass";
-import { handleValidateTable } from "./handlers/table/handleValidateTable";
-import { handleCheckTable } from "./handlers/table/handleCheckTable";
-import { handleValidateFunctionModule } from "./handlers/function/handleValidateFunctionModule";
-import { handleCheckFunctionModule } from "./handlers/function/handleCheckFunctionModule";
-import { handleCreateBehaviorDefinition } from "./handlers/bdef/handleCreateBehaviorDefinition";
-import { handleUpdateBehaviorDefinition } from "./handlers/bdef/handleUpdateBehaviorDefinition";
-import { handleCreateMetadataExtension } from "./handlers/ddlx/handleCreateMetadataExtension";
-import { handleUpdateMetadataExtension } from "./handlers/ddlx/handleUpdateMetadataExtension";
-import { handleGetInactiveObjects } from "./handlers/system/handleGetInactiveObjects";
+import { handleGetProgram } from "./handlers/program/low/handleGetProgram";
+import { handleGetClass } from "./handlers/class/low/handleGetClass";
+import { handleGetFunctionGroup } from "./handlers/function/low/handleGetFunctionGroup";
+import { handleGetFunction } from "./handlers/function/low/handleGetFunction";
+import { handleGetTable } from "./handlers/table/low/handleGetTable";
+import { handleGetStructure } from "./handlers/structure/low/handleGetStructure";
+import { handleGetTableContents } from "./handlers/table/low/handleGetTableContents";
+import { handleGetPackage } from "./handlers/package/low/handleGetPackage";
+import { handleCreatePackage } from "./handlers/package/high/handleCreatePackage";
+import { handleGetInclude } from "./handlers/include/low/handleGetInclude";
+import { handleGetIncludesList } from "./handlers/include/low/handleGetIncludesList";
+import { handleGetTypeInfo } from "./handlers/system/low/handleGetTypeInfo";
+import { handleGetInterface } from "./handlers/interface/low/handleGetInterface";
+import { handleGetTransaction } from "./handlers/system/low/handleGetTransaction";
+import { handleSearchObject } from "./handlers/search/low/handleSearchObject";
+import { handleGetEnhancements } from "./handlers/enhancement/low/handleGetEnhancements";
+import { handleGetEnhancementImpl } from "./handlers/enhancement/low/handleGetEnhancementImpl";
+import { handleGetEnhancementSpot } from "./handlers/enhancement/low/handleGetEnhancementSpot";
+import { handleGetBdef } from "./handlers/bdef/low/handleGetBdef";
+import { handleGetSqlQuery } from "./handlers/system/low/handleGetSqlQuery";
+import { handleGetObjectsByType } from "./handlers/search/low/handleGetObjectsByType";
+import { handleGetWhereUsed } from "./handlers/system/low/handleGetWhereUsed";
+import { handleGetObjectInfo } from "./handlers/system/low/handleGetObjectInfo";
+import { handleDescribeByList } from "./handlers/system/low/handleDescribeByList";
+import { handleGetAbapAST } from "./handlers/system/low/handleGetAbapAST";
+import { handleGetAbapSemanticAnalysis } from "./handlers/system/low/handleGetAbapSemanticAnalysis";
+import { handleGetAbapSystemSymbols } from "./handlers/system/low/handleGetAbapSystemSymbols";
+import { handleGetDomain } from "./handlers/domain/low/handleGetDomain";
+import { handleCreateDomain } from "./handlers/domain/high/handleCreateDomain";
+import { handleUpdateDomain } from "./handlers/domain/high/handleUpdateDomain";
+import { handleCreateDataElement } from "./handlers/data_element/high/handleCreateDataElement";
+import { handleUpdateDataElement } from "./handlers/data_element/high/handleUpdateDataElement";
+import { handleGetDataElement } from "./handlers/data_element/low/handleGetDataElement";
+import { handleCreateTransport } from "./handlers/transport/high/handleCreateTransport";
+import { handleGetTransport } from "./handlers/transport/low/handleGetTransport";
+import { handleCreateTable } from "./handlers/table/high/handleCreateTable";
+import { handleCreateStructure } from "./handlers/structure/high/handleCreateStructure";
+import { handleCreateView } from "./handlers/view/high/handleCreateView";
+import { handleGetView } from "./handlers/view/low/handleGetView";
+import { handleCreateClass } from "./handlers/class/high/handleCreateClass";
+import { handleCreateProgram } from "./handlers/program/high/handleCreateProgram";
+import { handleCreateInterface } from "./handlers/interface/high/handleCreateInterface";
+import { handleCreateFunctionGroup } from "./handlers/function/high/handleCreateFunctionGroup";
+import { handleCreateFunctionModule } from "./handlers/function/high/handleCreateFunctionModule";
+import { handleActivateObject } from "./handlers/common/low/handleActivateObject";
+import { handleDeleteObject } from "./handlers/common/low/handleDeleteObject";
+import { handleCheckObject } from "./handlers/common/low/handleCheckObject";
+import { handleUpdateClassSource } from "./handlers/class/high/handleUpdateClassSource";
+import { handleUpdateProgramSource } from "./handlers/program/high/handleUpdateProgramSource";
+import { handleUpdateViewSource } from "./handlers/view/high/handleUpdateViewSource";
+import { handleUpdateInterfaceSource } from "./handlers/interface/high/handleUpdateInterfaceSource";
+import { handleUpdateFunctionModuleSource } from "./handlers/function/high/handleUpdateFunctionModuleSource";
+import { handleGetSession } from "./handlers/system/low/handleGetSession";
+import { handleValidateObject } from "./handlers/common/low/handleValidateObject";
+import { handleLockObject } from "./handlers/common/low/handleLockObject";
+import { handleUnlockObject } from "./handlers/common/low/handleUnlockObject";
+import { handleValidateClass } from "./handlers/class/low/handleValidateClass";
+import { handleCheckClass } from "./handlers/class/low/handleCheckClass";
+import { handleValidateTable } from "./handlers/table/low/handleValidateTable";
+import { handleCheckTable } from "./handlers/table/low/handleCheckTable";
+import { handleValidateFunctionModule } from "./handlers/function/low/handleValidateFunctionModule";
+import { handleCheckFunctionModule } from "./handlers/function/low/handleCheckFunctionModule";
+import { handleCreateBehaviorDefinition } from "./handlers/bdef/high/handleCreateBehaviorDefinition";
+import { handleUpdateBehaviorDefinition } from "./handlers/bdef/high/handleUpdateBehaviorDefinition";
+import { handleCreateMetadataExtension } from "./handlers/ddlx/high/handleCreateMetadataExtension";
+import { handleUpdateMetadataExtension } from "./handlers/ddlx/high/handleUpdateMetadataExtension";
+import { handleGetInactiveObjects } from "./handlers/system/low/handleGetInactiveObjects";
 
 // Import shared utility functions and types
 import {
@@ -102,71 +102,71 @@ import { logger } from "./lib/logger";
 import { getAllTools } from "./lib/toolsRegistry";
 
 // Import TOOL_DEFINITION from handlers
-import { TOOL_DEFINITION as GetProgram_Tool } from "./handlers/program/handleGetProgram";
-import { TOOL_DEFINITION as GetClass_Tool } from "./handlers/class/handleGetClass";
-import { TOOL_DEFINITION as GetFunction_Tool } from "./handlers/function/handleGetFunction";
-import { TOOL_DEFINITION as GetFunctionGroup_Tool } from "./handlers/function/handleGetFunctionGroup";
-import { TOOL_DEFINITION as GetTable_Tool } from "./handlers/table/handleGetTable";
-import { TOOL_DEFINITION as GetStructure_Tool } from "./handlers/structure/handleGetStructure";
-import { TOOL_DEFINITION as GetTableContents_Tool } from "./handlers/table/handleGetTableContents";
-import { TOOL_DEFINITION as GetPackage_Tool } from "./handlers/package/handleGetPackage";
-import { TOOL_DEFINITION as CreatePackage_Tool } from "./handlers/package/handleCreatePackage";
-import { TOOL_DEFINITION as GetInclude_Tool } from "./handlers/include/handleGetInclude";
-import { TOOL_DEFINITION as GetIncludesList_Tool } from "./handlers/include/handleGetIncludesList";
-import { TOOL_DEFINITION as GetTypeInfo_Tool } from "./handlers/system/handleGetTypeInfo";
-import { TOOL_DEFINITION as GetInterface_Tool } from "./handlers/interface/handleGetInterface";
-import { TOOL_DEFINITION as GetTransaction_Tool } from "./handlers/system/handleGetTransaction";
-import { TOOL_DEFINITION as SearchObject_Tool } from "./handlers/search/handleSearchObject";
-import { TOOL_DEFINITION as GetEnhancements_Tool } from "./handlers/enhancement/handleGetEnhancements";
-import { TOOL_DEFINITION as GetEnhancementImpl_Tool } from "./handlers/enhancement/handleGetEnhancementImpl";
-import { TOOL_DEFINITION as GetEnhancementSpot_Tool } from "./handlers/enhancement/handleGetEnhancementSpot";
-import { TOOL_DEFINITION as GetBdef_Tool } from "./handlers/bdef/handleGetBdef";
-import { TOOL_DEFINITION as GetSqlQuery_Tool } from "./handlers/system/handleGetSqlQuery";
-import { TOOL_DEFINITION as GetWhereUsed_Tool } from "./handlers/system/handleGetWhereUsed";
-import { TOOL_DEFINITION as GetObjectInfo_Tool } from "./handlers/system/handleGetObjectInfo";
-import { TOOL_DEFINITION as GetAbapAST_Tool } from "./handlers/system/handleGetAbapAST";
-import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from "./handlers/system/handleGetAbapSemanticAnalysis";
-import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from "./handlers/system/handleGetAbapSystemSymbols";
-import { TOOL_DEFINITION as GetDomain_Tool } from "./handlers/domain/handleGetDomain";
-import { TOOL_DEFINITION as CreateDomain_Tool } from "./handlers/domain/handleCreateDomain";
-import { TOOL_DEFINITION as UpdateDomain_Tool } from "./handlers/domain/handleUpdateDomain";
-import { TOOL_DEFINITION as CreateDataElement_Tool } from "./handlers/data_element/handleCreateDataElement";
-import { TOOL_DEFINITION as UpdateDataElement_Tool } from "./handlers/data_element/handleUpdateDataElement";
-import { TOOL_DEFINITION as GetDataElement_Tool } from "./handlers/data_element/handleGetDataElement";
-import { TOOL_DEFINITION as CreateTransport_Tool } from "./handlers/transport/handleCreateTransport";
-import { TOOL_DEFINITION as GetTransport_Tool } from "./handlers/transport/handleGetTransport";
-import { TOOL_DEFINITION as CreateTable_Tool } from "./handlers/table/handleCreateTable";
-import { TOOL_DEFINITION as CreateStructure_Tool } from "./handlers/structure/handleCreateStructure";
-import { TOOL_DEFINITION as CreateView_Tool } from "./handlers/view/handleCreateView";
-import { TOOL_DEFINITION as GetView_Tool } from "./handlers/view/handleGetView";
-import { TOOL_DEFINITION as CreateClass_Tool } from "./handlers/class/handleCreateClass";
-import { TOOL_DEFINITION as CreateProgram_Tool } from "./handlers/program/handleCreateProgram";
-import { TOOL_DEFINITION as CreateInterface_Tool } from "./handlers/interface/handleCreateInterface";
-import { TOOL_DEFINITION as CreateFunctionGroup_Tool } from "./handlers/function/handleCreateFunctionGroup";
-import { TOOL_DEFINITION as CreateFunctionModule_Tool } from "./handlers/function/handleCreateFunctionModule";
-import { TOOL_DEFINITION as ActivateObject_Tool } from "./handlers/common/handleActivateObject";
-import { TOOL_DEFINITION as DeleteObject_Tool } from "./handlers/common/handleDeleteObject";
-import { TOOL_DEFINITION as CheckObject_Tool } from "./handlers/common/handleCheckObject";
-import { TOOL_DEFINITION as UpdateClassSource_Tool } from "./handlers/class/handleUpdateClassSource";
-import { TOOL_DEFINITION as UpdateProgramSource_Tool } from "./handlers/program/handleUpdateProgramSource";
-import { TOOL_DEFINITION as UpdateViewSource_Tool } from "./handlers/view/handleUpdateViewSource";
-import { TOOL_DEFINITION as UpdateInterfaceSource_Tool } from "./handlers/interface/handleUpdateInterfaceSource";
-import { TOOL_DEFINITION as UpdateFunctionModuleSource_Tool } from "./handlers/function/handleUpdateFunctionModuleSource";
-import { TOOL_DEFINITION as GetSession_Tool } from "./handlers/system/handleGetSession";
-import { TOOL_DEFINITION as ValidateObject_Tool } from "./handlers/common/handleValidateObject";
-import { TOOL_DEFINITION as LockObject_Tool } from "./handlers/common/handleLockObject";
-import { TOOL_DEFINITION as UnlockObject_Tool } from "./handlers/common/handleUnlockObject";
-import { TOOL_DEFINITION as ValidateClass_Tool } from "./handlers/class/handleValidateClass";
-import { TOOL_DEFINITION as CheckClass_Tool } from "./handlers/class/handleCheckClass";
-import { TOOL_DEFINITION as ValidateTable_Tool } from "./handlers/table/handleValidateTable";
-import { TOOL_DEFINITION as CheckTable_Tool } from "./handlers/table/handleCheckTable";
-import { TOOL_DEFINITION as ValidateFunctionModule_Tool } from "./handlers/function/handleValidateFunctionModule";
-import { TOOL_DEFINITION as CheckFunctionModule_Tool } from "./handlers/function/handleCheckFunctionModule";
-import { TOOL_DEFINITION as CreateBdef_Tool } from "./handlers/bdef/handleCreateBehaviorDefinition";
-import { TOOL_DEFINITION as UpdateBdef_Tool } from "./handlers/bdef/handleUpdateBehaviorDefinition";
-import { TOOL_DEFINITION as CreateDdlx_Tool } from "./handlers/ddlx/handleCreateMetadataExtension";
-import { TOOL_DEFINITION as UpdateDdlx_Tool } from "./handlers/ddlx/handleUpdateMetadataExtension";
-import { TOOL_DEFINITION as GetInactiveObjects_Tool } from "./handlers/system/handleGetInactiveObjects";
+import { TOOL_DEFINITION as GetProgram_Tool } from "./handlers/program/low/handleGetProgram";
+import { TOOL_DEFINITION as GetClass_Tool } from "./handlers/class/low/handleGetClass";
+import { TOOL_DEFINITION as GetFunction_Tool } from "./handlers/function/low/handleGetFunction";
+import { TOOL_DEFINITION as GetFunctionGroup_Tool } from "./handlers/function/low/handleGetFunctionGroup";
+import { TOOL_DEFINITION as GetTable_Tool } from "./handlers/table/low/handleGetTable";
+import { TOOL_DEFINITION as GetStructure_Tool } from "./handlers/structure/low/handleGetStructure";
+import { TOOL_DEFINITION as GetTableContents_Tool } from "./handlers/table/low/handleGetTableContents";
+import { TOOL_DEFINITION as GetPackage_Tool } from "./handlers/package/low/handleGetPackage";
+import { TOOL_DEFINITION as CreatePackage_Tool } from "./handlers/package/high/handleCreatePackage";
+import { TOOL_DEFINITION as GetInclude_Tool } from "./handlers/include/low/handleGetInclude";
+import { TOOL_DEFINITION as GetIncludesList_Tool } from "./handlers/include/low/handleGetIncludesList";
+import { TOOL_DEFINITION as GetTypeInfo_Tool } from "./handlers/system/low/handleGetTypeInfo";
+import { TOOL_DEFINITION as GetInterface_Tool } from "./handlers/interface/low/handleGetInterface";
+import { TOOL_DEFINITION as GetTransaction_Tool } from "./handlers/system/low/handleGetTransaction";
+import { TOOL_DEFINITION as SearchObject_Tool } from "./handlers/search/low/handleSearchObject";
+import { TOOL_DEFINITION as GetEnhancements_Tool } from "./handlers/enhancement/low/handleGetEnhancements";
+import { TOOL_DEFINITION as GetEnhancementImpl_Tool } from "./handlers/enhancement/low/handleGetEnhancementImpl";
+import { TOOL_DEFINITION as GetEnhancementSpot_Tool } from "./handlers/enhancement/low/handleGetEnhancementSpot";
+import { TOOL_DEFINITION as GetBdef_Tool } from "./handlers/bdef/low/handleGetBdef";
+import { TOOL_DEFINITION as GetSqlQuery_Tool } from "./handlers/system/low/handleGetSqlQuery";
+import { TOOL_DEFINITION as GetWhereUsed_Tool } from "./handlers/system/low/handleGetWhereUsed";
+import { TOOL_DEFINITION as GetObjectInfo_Tool } from "./handlers/system/low/handleGetObjectInfo";
+import { TOOL_DEFINITION as GetAbapAST_Tool } from "./handlers/system/low/handleGetAbapAST";
+import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from "./handlers/system/low/handleGetAbapSemanticAnalysis";
+import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from "./handlers/system/low/handleGetAbapSystemSymbols";
+import { TOOL_DEFINITION as GetDomain_Tool } from "./handlers/domain/low/handleGetDomain";
+import { TOOL_DEFINITION as CreateDomain_Tool } from "./handlers/domain/high/handleCreateDomain";
+import { TOOL_DEFINITION as UpdateDomain_Tool } from "./handlers/domain/high/handleUpdateDomain";
+import { TOOL_DEFINITION as CreateDataElement_Tool } from "./handlers/data_element/high/handleCreateDataElement";
+import { TOOL_DEFINITION as UpdateDataElement_Tool } from "./handlers/data_element/high/handleUpdateDataElement";
+import { TOOL_DEFINITION as GetDataElement_Tool } from "./handlers/data_element/low/handleGetDataElement";
+import { TOOL_DEFINITION as CreateTransport_Tool } from "./handlers/transport/high/handleCreateTransport";
+import { TOOL_DEFINITION as GetTransport_Tool } from "./handlers/transport/low/handleGetTransport";
+import { TOOL_DEFINITION as CreateTable_Tool } from "./handlers/table/high/handleCreateTable";
+import { TOOL_DEFINITION as CreateStructure_Tool } from "./handlers/structure/high/handleCreateStructure";
+import { TOOL_DEFINITION as CreateView_Tool } from "./handlers/view/high/handleCreateView";
+import { TOOL_DEFINITION as GetView_Tool } from "./handlers/view/low/handleGetView";
+import { TOOL_DEFINITION as CreateClass_Tool } from "./handlers/class/high/handleCreateClass";
+import { TOOL_DEFINITION as CreateProgram_Tool } from "./handlers/program/high/handleCreateProgram";
+import { TOOL_DEFINITION as CreateInterface_Tool } from "./handlers/interface/high/handleCreateInterface";
+import { TOOL_DEFINITION as CreateFunctionGroup_Tool } from "./handlers/function/high/handleCreateFunctionGroup";
+import { TOOL_DEFINITION as CreateFunctionModule_Tool } from "./handlers/function/high/handleCreateFunctionModule";
+import { TOOL_DEFINITION as ActivateObject_Tool } from "./handlers/common/low/handleActivateObject";
+import { TOOL_DEFINITION as DeleteObject_Tool } from "./handlers/common/low/handleDeleteObject";
+import { TOOL_DEFINITION as CheckObject_Tool } from "./handlers/common/low/handleCheckObject";
+import { TOOL_DEFINITION as UpdateClassSource_Tool } from "./handlers/class/high/handleUpdateClassSource";
+import { TOOL_DEFINITION as UpdateProgramSource_Tool } from "./handlers/program/high/handleUpdateProgramSource";
+import { TOOL_DEFINITION as UpdateViewSource_Tool } from "./handlers/view/high/handleUpdateViewSource";
+import { TOOL_DEFINITION as UpdateInterfaceSource_Tool } from "./handlers/interface/high/handleUpdateInterfaceSource";
+import { TOOL_DEFINITION as UpdateFunctionModuleSource_Tool } from "./handlers/function/high/handleUpdateFunctionModuleSource";
+import { TOOL_DEFINITION as GetSession_Tool } from "./handlers/system/low/handleGetSession";
+import { TOOL_DEFINITION as ValidateObject_Tool } from "./handlers/common/low/handleValidateObject";
+import { TOOL_DEFINITION as LockObject_Tool } from "./handlers/common/low/handleLockObject";
+import { TOOL_DEFINITION as UnlockObject_Tool } from "./handlers/common/low/handleUnlockObject";
+import { TOOL_DEFINITION as ValidateClass_Tool } from "./handlers/class/low/handleValidateClass";
+import { TOOL_DEFINITION as CheckClass_Tool } from "./handlers/class/low/handleCheckClass";
+import { TOOL_DEFINITION as ValidateTable_Tool } from "./handlers/table/low/handleValidateTable";
+import { TOOL_DEFINITION as CheckTable_Tool } from "./handlers/table/low/handleCheckTable";
+import { TOOL_DEFINITION as ValidateFunctionModule_Tool } from "./handlers/function/low/handleValidateFunctionModule";
+import { TOOL_DEFINITION as CheckFunctionModule_Tool } from "./handlers/function/low/handleCheckFunctionModule";
+import { TOOL_DEFINITION as CreateBdef_Tool } from "./handlers/bdef/high/handleCreateBehaviorDefinition";
+import { TOOL_DEFINITION as UpdateBdef_Tool } from "./handlers/bdef/high/handleUpdateBehaviorDefinition";
+import { TOOL_DEFINITION as CreateDdlx_Tool } from "./handlers/ddlx/high/handleCreateMetadataExtension";
+import { TOOL_DEFINITION as UpdateDdlx_Tool } from "./handlers/ddlx/high/handleUpdateMetadataExtension";
+import { TOOL_DEFINITION as GetInactiveObjects_Tool } from "./handlers/system/low/handleGetInactiveObjects";
 
 // --- ENV FILE LOADING LOGIC ---
 import fs from "fs";
@@ -179,78 +179,121 @@ function showHelp(): void {
 MCP ABAP ADT Server - SAP ABAP Development Tools MCP Integration
 
 USAGE:
-  mcp-abap-adt [options]           # Default stdio transport
-  mcp-abap-adt-http [options]      # HTTP StreamableHTTP transport
-  mcp-abap-adt-sse [options]       # Server-Sent Events transport
+  mcp-abap-adt [options]
+
+DESCRIPTION:
+  MCP server for interacting with SAP ABAP systems via ADT (ABAP Development Tools).
+  Supports multiple transport modes: HTTP (default), stdio, and SSE.
+
+TRANSPORT MODES:
+  Default: HTTP (can work without .env file, receives config via HTTP headers)
+  stdio:   --transport=stdio (for MCP clients like Cline, Cursor, Claude Desktop)
+  SSE:     --transport=sse
 
 OPTIONS:
   --help                           Show this help message
 
-ENVIRONMENT:
+ENVIRONMENT FILE:
   --env=<path>                     Path to .env file (default: ./.env)
   --env <path>                     Alternative syntax for --env
 
-TRANSPORT:
+TRANSPORT SELECTION:
   --transport=<type>               Transport type: stdio|http|streamable-http|sse
-                                   (default: stdio)
+                                   Default: http (streamable-http)
+                                   Shortcuts: --http (same as --transport=http)
+                                             --sse (same as --transport=sse)
+                                             --stdio (same as --transport=stdio)
 
-HTTP OPTIONS:
-  --http                           Use HTTP StreamableHTTP transport
+HTTP/STREAMABLE-HTTP OPTIONS:
   --http-port=<port>               HTTP server port (default: 3000)
   --http-host=<host>               HTTP server host (default: 0.0.0.0)
   --http-json-response             Enable JSON response format
   --http-allowed-origins=<list>    Comma-separated allowed origins for CORS
+                                   Example: --http-allowed-origins=http://localhost:3000,https://example.com
   --http-allowed-hosts=<list>      Comma-separated allowed hosts
   --http-enable-dns-protection     Enable DNS rebinding protection
 
-SSE OPTIONS:
-  --sse                            Use Server-Sent Events transport
+SSE (SERVER-SENT EVENTS) OPTIONS:
   --sse-port=<port>                SSE server port (default: 3001)
   --sse-host=<host>                SSE server host (default: 0.0.0.0)
   --sse-allowed-origins=<list>     Comma-separated allowed origins for CORS
+                                   Example: --sse-allowed-origins=http://localhost:3000
   --sse-allowed-hosts=<list>       Comma-separated allowed hosts
-  --sse-enable-dns-protection      Enable DNS rebinding protection
+  --sse-enable-dns-protection     Enable DNS rebinding protection
 
 ENVIRONMENT VARIABLES:
   MCP_ENV_PATH                     Path to .env file
-  MCP_SKIP_ENV_LOAD               Skip automatic .env loading (true|false)
-  MCP_SKIP_AUTO_START             Skip automatic server start (true|false)
-  MCP_TRANSPORT                   Default transport type
-  MCP_HTTP_PORT                   Default HTTP port
-  MCP_HTTP_HOST                   Default HTTP host
-  MCP_HTTP_ENABLE_JSON_RESPONSE   Enable JSON responses
-  MCP_HTTP_ALLOWED_ORIGINS        Allowed CORS origins
-  MCP_HTTP_ALLOWED_HOSTS          Allowed hosts
-  MCP_HTTP_ENABLE_DNS_PROTECTION  Enable DNS protection
-  MCP_SSE_PORT                    Default SSE port
-  MCP_SSE_HOST                    Default SSE host
-  MCP_SSE_ALLOWED_ORIGINS         Allowed CORS origins for SSE
-  MCP_SSE_ALLOWED_HOSTS           Allowed hosts for SSE
-  MCP_SSE_ENABLE_DNS_PROTECTION   Enable DNS protection for SSE
+  MCP_SKIP_ENV_LOAD                Skip automatic .env loading (true|false)
+  MCP_SKIP_AUTO_START              Skip automatic server start (true|false)
+  MCP_TRANSPORT                    Default transport type (stdio|http|sse)
+  MCP_HTTP_PORT                    Default HTTP port (default: 3000)
+  MCP_HTTP_HOST                    Default HTTP host (default: 0.0.0.0)
+  MCP_HTTP_ENABLE_JSON_RESPONSE   Enable JSON responses (true|false)
+  MCP_HTTP_ALLOWED_ORIGINS         Allowed CORS origins (comma-separated)
+  MCP_HTTP_ALLOWED_HOSTS           Allowed hosts (comma-separated)
+  MCP_HTTP_ENABLE_DNS_PROTECTION   Enable DNS protection (true|false)
+  MCP_SSE_PORT                     Default SSE port (default: 3001)
+  MCP_SSE_HOST                     Default SSE host (default: 0.0.0.0)
+  MCP_SSE_ALLOWED_ORIGINS          Allowed CORS origins for SSE (comma-separated)
+  MCP_SSE_ALLOWED_HOSTS            Allowed hosts for SSE (comma-separated)
+  MCP_SSE_ENABLE_DNS_PROTECTION    Enable DNS protection for SSE (true|false)
 
 SAP CONNECTION (.env file):
-  SAP_URL                         SAP system URL (required)
-  SAP_CLIENT                      SAP client number (required)
-  SAP_AUTH_TYPE                   Authentication type: basic|jwt (default: basic)
-  SAP_USERNAME                    SAP username (for basic auth)
-  SAP_PASSWORD                    SAP password (for basic auth)
-  SAP_JWT_TOKEN                   JWT token (for jwt auth)
+  SAP_URL                          SAP system URL (required)
+                                   Example: https://your-system.sap.com
+  SAP_CLIENT                       SAP client number (required)
+                                   Example: 100
+  SAP_AUTH_TYPE                    Authentication type: basic|jwt (default: basic)
+  SAP_USERNAME                     SAP username (required for basic auth)
+  SAP_PASSWORD                     SAP password (required for basic auth)
+  SAP_JWT_TOKEN                    JWT token (required for jwt auth)
 
 EXAMPLES:
-  # Use .env from current directory (default)
+  # Default HTTP mode (works without .env file)
   mcp-abap-adt
+
+  # HTTP server on custom port
+  mcp-abap-adt --http-port=8080
+
+  # Use stdio mode (for MCP clients, requires .env file)
+  mcp-abap-adt --transport=stdio
 
   # Use custom .env file
   mcp-abap-adt --env=/path/to/my.env
 
-  # Start HTTP server on port 8080
-  mcp-abap-adt --transport=http --http-port=8080
+  # Start HTTP server with CORS enabled
+  mcp-abap-adt --transport=http --http-port=3000 \\
+                --http-allowed-origins=http://localhost:3000,https://example.com
 
-  # Start SSE server with CORS
-  mcp-abap-adt-sse --sse-allowed-origins=http://localhost:3000
+  # Start SSE server on custom port
+  mcp-abap-adt --transport=sse --sse-port=3001
+
+  # Start SSE server with CORS and DNS protection
+  mcp-abap-adt --transport=sse --sse-port=3001 \\
+                --sse-allowed-origins=http://localhost:3000 \\
+                --sse-enable-dns-protection
+
+  # Using shortcuts
+  mcp-abap-adt --http --http-port=8080
+  mcp-abap-adt --sse --sse-port=3001
+
+QUICK REFERENCE:
+  Transport types:
+    http            - HTTP StreamableHTTP transport (default)
+    streamable-http - Same as http
+    stdio           - Standard input/output (for MCP clients, requires .env file)
+    sse             - Server-Sent Events transport
+
+  Common use cases:
+    Web interfaces (HTTP):        mcp-abap-adt (default, no .env needed)
+    MCP clients (Cline, Cursor):  mcp-abap-adt --transport=stdio
+    Web interfaces (SSE):         mcp-abap-adt --transport=sse --sse-port=3001
 
 DOCUMENTATION:
   https://github.com/fr0ster/mcp-abap-adt
+  Installation:    doc/installation/INSTALLATION.md
+  Configuration:   doc/user-guide/CLIENT_CONFIGURATION.md
+  Available Tools: doc/user-guide/AVAILABLE_TOOLS.md
 
 `;
   console.log(help);
@@ -278,7 +321,7 @@ function getTransportType(): string {
     if (arg === "--http") return "streamable-http";
     if (arg === "--sse") return "sse";
   }
-  return process.env.MCP_TRANSPORT || "streamable-http"; // Default to HTTP
+  return process.env.MCP_TRANSPORT || "streamable-http"; // Default to HTTP (can work without .env file)
 }
 
 /**
@@ -1141,25 +1184,25 @@ export class mcp_abap_adt_server {
 
     // Dynamic import tools
     this.registerToolOnServer(server, "GetAdtTypes", "Get all ADT types available in the system", { type: "object", properties: {}, required: [] } as any, async (args: any) => {
-      return await (await import("./handlers/system/handleGetAllTypes.js")).handleGetAdtTypes(args);
+      return await (await import("./handlers/system/low/handleGetAllTypes.js")).handleGetAdtTypes(args);
     });
     this.registerToolOnServer(server, "GetObjectStructure", "Get object structure with includes hierarchy", { type: "object", properties: { object_name: { type: "string" }, object_type: { type: "string" } }, required: ["object_name", "object_type"] } as any, async (args: any) => {
-      return await (await import("./handlers/system/handleGetObjectStructure.js")).handleGetObjectStructure(args);
+      return await (await import("./handlers/system/low/handleGetObjectStructure.js")).handleGetObjectStructure(args);
     });
     this.registerToolOnServer(server, "GetObjectsList", "Get list of objects by package", { type: "object", properties: { package_name: { type: "string" } }, required: ["package_name"] } as any, async (args: any) => {
-      return await (await import("./handlers/search/handleGetObjectsList.js")).handleGetObjectsList(args);
+      return await (await import("./handlers/search/low/handleGetObjectsList.js")).handleGetObjectsList(args);
     });
     this.registerToolOnServer(server, "GetObjectsByType", "Get objects by type", { type: "object", properties: { object_type: { type: "string" }, package_name: { type: "string" } }, required: ["object_type"] } as any, async (args: any) => {
-      return await (await import("./handlers/search/handleGetObjectsByType.js")).handleGetObjectsByType(args);
+      return await (await import("./handlers/search/low/handleGetObjectsByType.js")).handleGetObjectsByType(args);
     });
     this.registerToolOnServer(server, "GetProgFullCode", "Get full program code with includes", { type: "object", properties: { program_name: { type: "string" } }, required: ["program_name"] } as any, async (args: any) => {
-      return await (await import("./handlers/program/handleGetProgFullCode.js")).handleGetProgFullCode(args);
+      return await (await import("./handlers/program/low/handleGetProgFullCode.js")).handleGetProgFullCode(args);
     });
     this.registerToolOnServer(server, "GetObjectNodeFromCache", "Get object node from cache", { type: "object", properties: { object_name: { type: "string" }, object_type: { type: "string" } }, required: ["object_name", "object_type"] } as any, async (args: any) => {
-      return await (await import("./handlers/system/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(args);
+      return await (await import("./handlers/system/low/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(args);
     });
     this.registerToolOnServer(server, "DescribeByList", "Describe objects by list", { type: "object", properties: { objects: { type: "array", items: { type: "string" } } }, required: ["objects"] } as any, async (args: any) => {
-      return await (await import("./handlers/system/handleDescribeByList.js")).handleDescribeByList(args);
+      return await (await import("./handlers/system/low/handleDescribeByList.js")).handleDescribeByList(args);
     });
   }
 

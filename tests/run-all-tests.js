@@ -26,95 +26,95 @@ initializeTestEnvironment();
 // Map handler names to their handler functions
 const HANDLER_MAP = {
   // Transport
-  'create_transport': () => require('../dist/handlers/handleCreateTransport').handleCreateTransport,
-  'get_transport': () => require('../dist/handlers/handleGetTransport').handleGetTransport,
+  'create_transport': () => require('../dist/handlers/transport/high/handleCreateTransport').handleCreateTransport,
+  'get_transport': () => require('../dist/handlers/transport/low/handleGetTransport').handleGetTransport,
 
   // Package
-  'create_package': () => require('../dist/handlers/handleCreatePackage').handleCreatePackage,
-  'get_package': () => require('../dist/handlers/handleGetPackage').handleGetPackage,
+  'create_package': () => require('../dist/handlers/package/high/handleCreatePackage').handleCreatePackage,
+  'get_package': () => require('../dist/handlers/package/low/handleGetPackage').handleGetPackage,
 
   // Domain
-  'create_domain': () => require('../dist/handlers/handleCreateDomain').handleCreateDomain,
-  'update_domain': () => require('../dist/handlers/handleUpdateDomain').handleUpdateDomain,
-  'get_domain': () => require('../dist/handlers/handleGetDomain').handleGetDomain,
+  'create_domain': () => require('../dist/handlers/domain/high/handleCreateDomain').handleCreateDomain,
+  'update_domain': () => require('../dist/handlers/domain/high/handleUpdateDomain').handleUpdateDomain,
+  'get_domain': () => require('../dist/handlers/domain/low/handleGetDomain').handleGetDomain,
 
   // Data Element
-  'create_data_element': () => require('../dist/handlers/handleCreateDataElement').handleCreateDataElement,
-  'update_data_element': () => require('../dist/handlers/handleUpdateDataElement').handleUpdateDataElement,
-  'get_data_element': () => require('../dist/handlers/handleGetDataElement').handleGetDataElement,
+  'create_data_element': () => require('../dist/handlers/data_element/high/handleCreateDataElement').handleCreateDataElement,
+  'update_data_element': () => require('../dist/handlers/data_element/high/handleUpdateDataElement').handleUpdateDataElement,
+  'get_data_element': () => require('../dist/handlers/data_element/low/handleGetDataElement').handleGetDataElement,
 
   // Class
-  'create_class': () => require('../dist/handlers/handleCreateClass').handleCreateClass,
-  'update_class_source': () => require('../dist/handlers/handleUpdateClassSource').handleUpdateClassSource,
-  'get_class': () => require('../dist/handlers/handleGetClass').handleGetClass,
+  'create_class': () => require('../dist/handlers/class/high/handleCreateClass').handleCreateClass,
+  'update_class_source': () => require('../dist/handlers/class/high/handleUpdateClassSource').handleUpdateClassSource,
+  'get_class': () => require('../dist/handlers/class/low/handleGetClass').handleGetClass,
 
   // Program
-  'create_program': () => require('../dist/handlers/handleCreateProgram').handleCreateProgram,
-  'update_program_source': () => require('../dist/handlers/handleUpdateProgramSource').handleUpdateProgramSource,
-  'get_program': () => require('../dist/handlers/handleGetProgram').handleGetProgram,
+  'create_program': () => require('../dist/handlers/program/high/handleCreateProgram').handleCreateProgram,
+  'update_program_source': () => require('../dist/handlers/program/high/handleUpdateProgramSource').handleUpdateProgramSource,
+  'get_program': () => require('../dist/handlers/program/low/handleGetProgram').handleGetProgram,
 
   // Interface
-  'create_interface': () => require('../dist/handlers/handleCreateInterface').handleCreateInterface,
-  'update_interface_source': () => require('../dist/handlers/handleUpdateInterfaceSource').handleUpdateInterfaceSource,
-  'get_interface': () => require('../dist/handlers/handleGetInterface').handleGetInterface,
+  'create_interface': () => require('../dist/handlers/interface/high/handleCreateInterface').handleCreateInterface,
+  'update_interface_source': () => require('../dist/handlers/interface/high/handleUpdateInterfaceSource').handleUpdateInterfaceSource,
+  'get_interface': () => require('../dist/handlers/interface/low/handleGetInterface').handleGetInterface,
 
   // Table
-  'create_table': () => require('../dist/handlers/handleCreateTable').handleCreateTable,
-  'get_table': () => require('../dist/handlers/handleGetTable').handleGetTable,
-  'get_table_contents': () => require('../dist/handlers/handleGetTableContents').handleGetTableContents,
+  'create_table': () => require('../dist/handlers/table/high/handleCreateTable').handleCreateTable,
+  'get_table': () => require('../dist/handlers/table/low/handleGetTable').handleGetTable,
+  'get_table_contents': () => require('../dist/handlers/table/low/handleGetTableContents').handleGetTableContents,
 
   // Structure
-  'create_structure': () => require('../dist/handlers/handleCreateStructure').handleCreateStructure,
-  'get_structure': () => require('../dist/handlers/handleGetStructure').handleGetStructure,
+  'create_structure': () => require('../dist/handlers/structure/high/handleCreateStructure').handleCreateStructure,
+  'get_structure': () => require('../dist/handlers/structure/low/handleGetStructure').handleGetStructure,
 
   // View
-  'create_view': () => require('../dist/handlers/handleCreateView').handleCreateView,
-  'update_view_source': () => require('../dist/handlers/handleUpdateViewSource').handleUpdateViewSource,
-  'get_view': () => require('../dist/handlers/handleGetView').handleGetView,
+  'create_view': () => require('../dist/handlers/view/high/handleCreateView').handleCreateView,
+  'update_view_source': () => require('../dist/handlers/view/high/handleUpdateViewSource').handleUpdateViewSource,
+  'get_view': () => require('../dist/handlers/view/low/handleGetView').handleGetView,
 
   // Function Group
-  'create_function_group': () => require('../dist/handlers/handleCreateFunctionGroup').handleCreateFunctionGroup,
-  'get_function_group': () => require('../dist/handlers/handleGetFunctionGroup').handleGetFunctionGroup,
+  'create_function_group': () => require('../dist/handlers/function/high/handleCreateFunctionGroup').handleCreateFunctionGroup,
+  'get_function_group': () => require('../dist/handlers/function/low/handleGetFunctionGroup').handleGetFunctionGroup,
 
   // Function Module
-  'create_function_module': () => require('../dist/handlers/handleCreateFunctionModule').handleCreateFunctionModule,
-  'update_function_module_source': () => require('../dist/handlers/handleUpdateFunctionModuleSource').handleUpdateFunctionModuleSource,
-  'get_function_test': () => require('../dist/handlers/handleGetFunction').handleGetFunction,
-  'get_function': () => require('../dist/handlers/handleGetFunction').handleGetFunction,
+  'create_function_module': () => require('../dist/handlers/function/high/handleCreateFunctionModule').handleCreateFunctionModule,
+  'update_function_module_source': () => require('../dist/handlers/function/high/handleUpdateFunctionModuleSource').handleUpdateFunctionModuleSource,
+  'get_function_test': () => require('../dist/handlers/function/low/handleGetFunction').handleGetFunction,
+  'get_function': () => require('../dist/handlers/function/low/handleGetFunction').handleGetFunction,
 
   // Delete - Individual handlers for each object type
-  'delete_domain': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject,
-  'delete_data_element': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject,
-  'delete_class': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject,
-  'delete_program': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject,
-  'delete_interface': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject,
-  'delete_function_module': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject,
-  'delete_function_group': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject,
-  'delete_object': () => require('../dist/handlers/handleDeleteObject').handleDeleteObject, // Legacy support
+  'delete_domain': () => require('../dist/handlers/common/low/handleDeleteObject').handleDeleteObject,
+  'delete_data_element': () => require('../dist/handlers/common/low/handleDeleteObject').handleDeleteObject,
+  'delete_class': () => require('../dist/handlers/common/low/handleDeleteObject').handleDeleteObject,
+  'delete_program': () => require('../dist/handlers/common/low/handleDeleteObject').handleDeleteObject,
+  'delete_interface': () => require('../dist/handlers/common/low/handleDeleteObject').handleDeleteObject,
+  'delete_function_module': () => require('../dist/handlers/common/low/handleDeleteObject').handleDeleteObject,
+  'delete_function_group': () => require('../dist/handlers/common/low/handleDeleteObject').handleDeleteObject,
+  'delete_object': () => require('../dist/handlers/common/low/handleDeleteObject').handleDeleteObject, // Legacy support
 
   // Get operations
-  'get_type_info': () => require('../dist/handlers/handleGetTypeInfo').handleGetTypeInfo,
-  'get_prog_full_code': () => require('../dist/handlers/handleGetProgFullCode').handleGetProgFullCode,
-  'get_includes_list': () => require('../dist/handlers/handleGetIncludesList').handleGetIncludesList,
-  'get_objects_list': () => require('../dist/handlers/handleGetObjectsList').handleGetObjectsList,
-  'get_object_structure': () => require('../dist/handlers/handleGetObjectStructure').handleGetObjectStructure,
-  'get_transaction': () => require('../dist/handlers/handleGetTransaction').handleGetTransaction,
-  'get_enhancements': () => require('../dist/handlers/handleGetEnhancements').handleGetEnhancements,
-  'get_include': () => require('../dist/handlers/handleGetInclude').handleGetInclude,
+  'get_type_info': () => require('../dist/handlers/system/low/handleGetTypeInfo').handleGetTypeInfo,
+  'get_prog_full_code': () => require('../dist/handlers/program/low/handleGetProgFullCode').handleGetProgFullCode,
+  'get_includes_list': () => require('../dist/handlers/include/low/handleGetIncludesList').handleGetIncludesList,
+  'get_objects_list': () => require('../dist/handlers/search/low/handleGetObjectsList').handleGetObjectsList,
+  'get_object_structure': () => require('../dist/handlers/system/low/handleGetObjectStructure').handleGetObjectStructure,
+  'get_transaction': () => require('../dist/handlers/system/low/handleGetTransaction').handleGetTransaction,
+  'get_enhancements': () => require('../dist/handlers/enhancement/low/handleGetEnhancements').handleGetEnhancements,
+  'get_include': () => require('../dist/handlers/include/low/handleGetInclude').handleGetInclude,
 
   // Search and Query
-  'get_sql_query': () => require('../dist/handlers/handleGetSqlQuery').handleGetSqlQuery,
-  'search_object': () => require('../dist/handlers/handleSearchObject').handleSearchObject,
-  'get_where_used': () => require('../dist/handlers/handleGetWhereUsed').handleGetWhereUsed,
-  'get_object_info': () => require('../dist/handlers/handleGetObjectInfo').handleGetObjectInfo,
+  'get_sql_query': () => require('../dist/handlers/system/low/handleGetSqlQuery').handleGetSqlQuery,
+  'search_object': () => require('../dist/handlers/search/low/handleSearchObject').handleSearchObject,
+  'get_where_used': () => require('../dist/handlers/system/low/handleGetWhereUsed').handleGetWhereUsed,
+  'get_object_info': () => require('../dist/handlers/system/low/handleGetObjectInfo').handleGetObjectInfo,
 
   // Analysis
-  'get_abap_ast': () => require('../dist/handlers/handleGetAbapAST').handleGetAbapAST,
-  'get_abap_semantic_analysis': () => require('../dist/handlers/handleGetAbapSemanticAnalysis').handleGetAbapSemanticAnalysis,
+  'get_abap_ast': () => require('../dist/handlers/system/low/handleGetAbapAST').handleGetAbapAST,
+  'get_abap_semantic_analysis': () => require('../dist/handlers/system/low/handleGetAbapSemanticAnalysis').handleGetAbapSemanticAnalysis,
 
   // Activation and Check
-  'activate_object': () => require('../dist/handlers/handleActivateObject').handleActivateObject,
-  'check_object': () => require('../dist/handlers/handleCheckObject').handleCheckObject,
+  'activate_object': () => require('../dist/handlers/common/low/handleActivateObject').handleActivateObject,
+  'check_object': () => require('../dist/handlers/common/low/handleCheckObject').handleCheckObject,
 };
 
 /**

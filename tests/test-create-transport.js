@@ -15,7 +15,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleCreateTransport } = require('../dist/handlers/handleCreateTransport');
+const { handleCreateTransport } = require('../dist/handlers/transport/high/handleCreateTransport');
 
 async function testCreateTransport() {
   const testCases = getAllEnabledTestCases('create_transport');

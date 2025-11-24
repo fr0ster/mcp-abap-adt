@@ -728,7 +728,7 @@ When implementing stateful operations:
 - SAP Note: ABAP Development Tools (ADT)
 - Transaction SM12: Lock Management
 - BaseAbapConnection.ts - Cookie and CSRF management
-- handleUpdateClassSource.ts - Complete implementation example
+- `src/handlers/class/handleUpdateClassSource.ts` - Complete implementation example
 
 ---
 

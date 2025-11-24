@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleGetClass } = require('../dist/handlers/handleGetClass');
+const { handleGetClass } = require('../dist/handlers/class/low/handleGetClass');
 
 async function testGetClass() {
   const testCases = getAllEnabledTestCases('get_class');

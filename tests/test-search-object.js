@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleSearchObject } = require('../dist/handlers/handleSearchObject');
+const { handleSearchObject } = require('../dist/handlers/search/low/handleSearchObject');
 
 async function testSearchObject() {
   const testCases = getAllEnabledTestCases('search_object');

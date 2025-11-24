@@ -34,25 +34,27 @@ Implement specific update handlers that are currently missing.
 ## Phase 3: Behavior Definition (BDEF) Handlers
 Implement full CRUD support for Behavior Definitions.
 
-- [ ] **Create `handleCreateBehaviorDefinition.ts`**
-    - Implement `createBehaviorDefinition`.
-- [ ] **Create `handleUpdateBehaviorDefinition.ts`**
-    - Implement `updateBehaviorDefinition`.
+- [x] **Create `handleCreateBehaviorDefinition.ts`** ✅ Completed in v1.1.8
+    - Implemented `createBehaviorDefinition` with support for Managed, Unmanaged, Abstract, and Projection types.
+- [x] **Create `handleUpdateBehaviorDefinition.ts`** ✅ Completed in v1.1.8
+    - Implemented `updateBehaviorDefinition` with lock handling and activation support.
 - [ ] **Create `handleActivateBehaviorDefinition.ts`** (Optional/Specific)
     - Implement `activateBehaviorDefinition` if generic activation is insufficient.
+    - Note: Generic `ActivateObject` handler may be sufficient for BDEF activation.
 
 ## Phase 4: Metadata Extension (MDE) Handlers
 Implement full CRUD support for Metadata Extensions.
 
-- [ ] **Create `handleCreateMetadataExtension.ts`**
-    - Implement `createMetadataExtension`.
-- [ ] **Create `handleUpdateMetadataExtension.ts`**
-    - Implement `updateMetadataExtension`.
+- [x] **Create `handleCreateMetadataExtension.ts`** ✅ Completed in v1.1.8
+    - Implemented `createMetadataExtension` with automatic activation support.
+- [x] **Create `handleUpdateMetadataExtension.ts`** ✅ Completed in v1.1.8
+    - Implemented `updateMetadataExtension` with lock handling and activation support.
 - [ ] **Create `handleActivateMetadataExtension.ts`** (Optional/Specific)
     - Implement `activateMetadataExtension` if generic activation is insufficient.
+    - Note: Generic `ActivateObject` handler may be sufficient for DDLX activation.
 
 ## Phase 5: Utilities
 Add missing utility handlers.
 
-- [ ] **Create `handleGetInactiveObjects.ts`**
-    - Implement `getInactiveObjects` to list objects waiting for activation.
+- [x] **Create `handleGetInactiveObjects.ts`** ✅ Completed in v1.1.8
+    - Implemented `getInactiveObjects` to list objects waiting for activation.

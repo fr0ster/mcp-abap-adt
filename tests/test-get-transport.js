@@ -8,7 +8,7 @@ const { initializeTestEnvironment, loadTestConfig } = require('./test-helper');
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleGetTransport } = require('../dist/handlers/handleGetTransport');
+const { handleGetTransport } = require('../dist/handlers/transport/low/handleGetTransport');
 
 async function testGetTransport() {
   console.log('='.repeat(80));

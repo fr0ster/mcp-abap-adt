@@ -15,7 +15,7 @@ These handlers accept `object_type` parameter and use switch statements to dispa
 
 1. **Violates SRP** - each handler handles multiple object types instead of one
 2. **Poor discoverability** - users must know exact object_type strings
-3. **Inconsistent with other handlers** - we have specific handlers like `handleCreateClass`, `handleUpdateProgram`, but generic `handleDeleteObject`
+3. **Inconsistent with other handlers** - we have specific handlers like `handleCreateClass` (in `class/`), `handleUpdateProgram` (in `program/`), but generic `handleDeleteObject` (in `common/`)
 4. **Maintenance burden** - adding new object types requires updating multiple switch statements
 5. **Poor type safety** - generic handlers have complex conditional logic
 
@@ -89,10 +89,10 @@ Not blocking release, but should be addressed in next major version.
 
 ## Related Files
 
-- `/src/handlers/handleActivateObject.ts`
-- `/src/handlers/handleDeleteObject.ts`
-- `/src/handlers/handleLockObject.ts`
-- `/src/handlers/handleUnlockObject.ts`
+- `/src/handlers/common/handleActivateObject.ts`
+- `/src/handlers/common/handleDeleteObject.ts`
+- `/src/handlers/common/handleLockObject.ts`
+- `/src/handlers/common/handleUnlockObject.ts`
 - `/src/lib/toolsRegistry.ts`
 
 ## Decision Log

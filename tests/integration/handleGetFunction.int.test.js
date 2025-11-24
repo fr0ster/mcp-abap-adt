@@ -2,7 +2,7 @@
  * Integration test for handleGetFunction (real ABAP server, .env required)
  */
 
-const { handleGetFunction } = require('../../dist/handlers/handleGetFunction');
+const { handleGetFunction } = require('../../dist/handlers/function/low/handleGetFunction');
 const { isCloudConnection } = require('../../dist/lib/utils');
 const fs = require('fs');
 const path = require('path');

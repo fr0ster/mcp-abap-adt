@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleGetFunction } = require('../dist/handlers/handleGetFunction');
+const { handleGetFunction } = require('../dist/handlers/function/low/handleGetFunction');
 
 async function testGetFunction() {
   // Try get_function_test first, fallback to get_function

@@ -18,8 +18,8 @@ npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
 
 # Available commands:
 mcp-abap-adt          # stdio transport (default)
-mcp-abap-adt-http     # HTTP server
-mcp-abap-adt-sse      # SSE server
+mcp-abap-adt --transport=http     # HTTP server
+mcp-abap-adt --transport=sse      # SSE server
 ```
 
 **Configuration:**
@@ -33,7 +33,7 @@ SAP_JWT_TOKEN=your-jwt-token
 EOF
 
 # Run HTTP server
-mcp-abap-adt-http --port 3000
+mcp-abap-adt --transport=http --port 3000
 ```
 
 See [Installation Guide](../installation/INSTALLATION.md#package-installation-details) for detailed instructions.
@@ -74,15 +74,15 @@ mcp-abap-adt [--env /path/to/.env]
 ```
 Use with MCP clients like Claude Desktop, VSCode extensions.
 
-### `mcp-abap-adt-http` - HTTP server
+### `mcp-abap-adt --transport=http` - HTTP server
 ```bash
-mcp-abap-adt-http [--port 3000] [--host localhost] [--env /path/to/.env]
+mcp-abap-adt --transport=http [--port 3000] [--host localhost] [--env /path/to/.env]
 ```
 Starts HTTP server with StreamableHTTP transport.
 
-### `mcp-abap-adt-sse` - SSE server
+### `mcp-abap-adt --transport=sse` - SSE server
 ```bash
-mcp-abap-adt-sse [--port 3000] [--host localhost] [--env /path/to/.env]
+mcp-abap-adt --transport=sse [--port 3000] [--host localhost] [--env /path/to/.env]
 ```
 Starts HTTP server with Server-Sent Events transport.
 
@@ -90,15 +90,15 @@ Starts HTTP server with Server-Sent Events transport.
 
 ### Example 1: HTTP Server on Port 8080
 ```bash
-mcp-abap-adt-http --port 8080
+mcp-abap-adt --transport=http --port 8080
 ```
 
 ### Example 2: SSE Server Accessible from Network
 ```bash
-mcp-abap-adt-sse --host 0.0.0.0 --port 3000
+mcp-abap-adt --transport=sse --host 0.0.0.0 --port 3000
 ```
 
 ### Example 3: Custom Environment File
 ```bash
-mcp-abap-adt-http --env /opt/config/.env.production --port 8080
+mcp-abap-adt --transport=http --env /opt/config/.env.production --port 8080
 ```

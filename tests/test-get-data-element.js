@@ -8,7 +8,7 @@ const { initializeTestEnvironment } = require('./test-helper');
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleGetDataElement } = require('../dist/handlers/handleGetDataElement');
+const { handleGetDataElement } = require('../dist/handlers/data_element/low/handleGetDataElement');
 
 async function testGetDataElement() {
   console.log('='.repeat(80));

@@ -2,6 +2,64 @@
 
 ## [Unreleased]
 
+## [1.1.8] - 2025-11-24
+
+### Added
+- **DDLX (Metadata Extension) Management Tools**:
+  - `CreateMetadataExtension`: Create new ABAP Metadata Extensions (DDLX) with automatic activation
+  - `UpdateMetadataExtension`: Update source code of existing Metadata Extensions
+  - Full CRUD workflow: Create → Lock → Check → Unlock → Activate
+  - Support for transport request validation
+  - Integrated with CrudClient API for consistent behavior
+
+- **BDEF (Behavior Definition) Management Tools**:
+  - `CreateBehaviorDefinition`: Create new ABAP Behavior Definitions (BDEF) with support for Managed, Unmanaged, Abstract, and Projection implementation types
+  - `UpdateBehaviorDefinition`: Update source code of existing Behavior Definitions
+  - Full CRUD workflow: Create → Lock → Check → Unlock → Activate
+  - Support for root entity specification and implementation type selection
+  - Transport request validation integrated
+
+- **System Management Tools**:
+  - `GetInactiveObjects`: Retrieve list of inactive ABAP objects (objects that have been modified but not activated)
+  - Provides count and detailed list of objects waiting for activation
+  - Useful for monitoring development progress and identifying objects requiring attention
+
+### Changed
+- **Handler Organization Refactoring**: All handlers reorganized into categorized subdirectories for better maintainability:
+  - `bdef/` - Behavior Definition handlers (GetBdef, CreateBehaviorDefinition, UpdateBehaviorDefinition)
+  - `class/` - Class handlers (GetClass, CreateClass, UpdateClassSource, ValidateClass, CheckClass)
+  - `common/` - Common handlers (ActivateObject, DeleteObject, CheckObject, LockObject, UnlockObject, ValidateObject)
+  - `data_element/` - Data Element handlers (GetDataElement, CreateDataElement, UpdateDataElement)
+  - `ddlx/` - Metadata Extension handlers (CreateMetadataExtension, UpdateMetadataExtension)
+  - `domain/` - Domain handlers (GetDomain, CreateDomain, UpdateDomain)
+  - `enhancement/` - Enhancement handlers (GetEnhancements, GetEnhancementImpl, GetEnhancementSpot)
+  - `function/` - Function handlers (GetFunction, GetFunctionGroup, CreateFunctionGroup, CreateFunctionModule, UpdateFunctionModuleSource, ValidateFunctionModule, CheckFunctionModule)
+  - `include/` - Include handlers (GetInclude, GetIncludesList)
+  - `interface/` - Interface handlers (GetInterface, CreateInterface, UpdateInterfaceSource)
+  - `package/` - Package handlers (GetPackage, CreatePackage)
+  - `program/` - Program handlers (GetProgram, CreateProgram, UpdateProgramSource)
+  - `search/` - Search handlers (SearchObject, GetObjectsByType, GetObjectsList)
+  - `structure/` - Structure handlers (GetStructure, CreateStructure)
+  - `system/` - System handlers (GetTypeInfo, GetTransaction, GetSqlQuery, GetWhereUsed, GetObjectInfo, GetSession, GetAbapAST, GetAbapSemanticAnalysis, GetAbapSystemSymbols, GetAllTypes, GetObjectStructure, GetObjectNodeFromCache, GetInactiveObjects)
+  - `table/` - Table handlers (GetTable, GetTableContents, CreateTable, ValidateTable, CheckTable)
+  - `transport/` - Transport handlers (GetTransport, CreateTransport)
+  - `view/` - View handlers (GetView, CreateView, UpdateViewSource)
+  - This reorganization improves code navigation, reduces merge conflicts, and makes the codebase more maintainable
+
+- **Dependencies Updated**:
+  - `@mcp-abap-adt/adt-clients`: ^0.1.9 → ^0.1.12
+  - `@mcp-abap-adt/connection`: ^0.1.4 → ^0.1.9
+  - Updated to leverage new CrudClient methods for DDLX and BDEF operations
+
+- **Index and Tools Registry Updates**:
+  - `src/index.ts`: Updated all handler imports to reflect new subdirectory structure
+  - `src/lib/toolsRegistry.ts`: Updated tool definitions imports to match new handler locations
+  - All 81 handler files moved and imports updated consistently
+
+### Documentation
+- Added `implementation_plan.md`: Plan for future refactoring of read handlers to `src/readers` directory
+- Added `roadmap.md`: Roadmap for implementing missing handlers and extending generic handlers to support new object types
+
 ## [1.1.6] - 2025-11-21
 
 ### Documentation

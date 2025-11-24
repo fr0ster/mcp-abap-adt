@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleGetProgFullCode } = require('../dist/handlers/handleGetProgFullCode');
+const { handleGetProgFullCode } = require('../dist/handlers/program/low/handleGetProgFullCode');
 
 async function testGetProgFullCode() {
   const testCases = getAllEnabledTestCases('get_prog_full_code');

@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleCreateTable } = require('../dist/handlers/handleCreateTable');
+const { handleCreateTable } = require('../dist/handlers/table/high/handleCreateTable');
 
 async function testCreateTable() {
   const testCases = getAllEnabledTestCases('create_table');

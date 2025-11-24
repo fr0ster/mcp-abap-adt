@@ -16,7 +16,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleCreateDataElement } = require('../dist/handlers/handleCreateDataElement');
+const { handleCreateDataElement } = require('../dist/handlers/data_element/high/handleCreateDataElement');
 
 async function testCreateDataElement() {
   // Load all enabled test cases from YAML

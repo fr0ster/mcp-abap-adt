@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleCreateFunctionModule } = require('../dist/handlers/handleCreateFunctionModule');
+const { handleCreateFunctionModule } = require('../dist/handlers/function/high/handleCreateFunctionModule');
 
 async function testCreateFunctionModule() {
   const testCases = getAllEnabledTestCases('create_function_module');

@@ -65,5 +65,5 @@ const HANDLER_TO_INTERFACE = {
 ## Related Files
 
 - `/tools/sync-optional-from-interfaces.js` - The sync script
-- `/src/handlers/handleCreate*.ts` - Handlers that use this
+- `/src/handlers/*/handleCreate*.ts` - Handlers that use this (organized in subdirectories: `class/`, `domain/`, `table/`, etc.)
 - `@mcp-abap-adt/adt-clients` - Source of truth for interfaces

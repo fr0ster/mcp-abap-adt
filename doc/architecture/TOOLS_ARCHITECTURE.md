@@ -13,9 +13,33 @@ Each module now owns its description via a constant `TOOL_DEFINITION` structure 
 
 ## Structure
 
-### 1. Handlers with definitions
+### 1. Handler Organization
 
-Each handler (for example, `src/handlers/handleGetProgram.ts`) contains:
+Handlers are organized into categorized subdirectories under `src/handlers/`:
+- `bdef/` - Behavior Definition handlers
+- `class/` - Class handlers
+- `common/` - Common handlers (activate, delete, check, lock, unlock, validate)
+- `data_element/` - Data Element handlers
+- `ddlx/` - Metadata Extension handlers
+- `domain/` - Domain handlers
+- `enhancement/` - Enhancement handlers
+- `function/` - Function handlers
+- `include/` - Include handlers
+- `interface/` - Interface handlers
+- `package/` - Package handlers
+- `program/` - Program handlers
+- `search/` - Search handlers
+- `structure/` - Structure handlers
+- `system/` - System handlers
+- `table/` - Table handlers
+- `transport/` - Transport handlers
+- `view/` - View handlers
+
+This organization improves code navigation, reduces merge conflicts, and makes the codebase more maintainable.
+
+### 2. Handlers with definitions
+
+Each handler (for example, `src/handlers/program/handleGetProgram.ts`) contains:
 
 ```typescript
 export const TOOL_DEFINITION = {
@@ -35,7 +59,7 @@ export async function handleGetProgram(args: any) {
 }
 ```
 
-### 2. Central registry
+### 3. Central registry
 
 The `src/lib/toolsRegistry.ts` file:
 - Defines the `ToolDefinition` interface for type safety
@@ -57,8 +81,8 @@ export interface ToolDefinition {
 ```
 
 ```typescript
-import { TOOL_DEFINITION as GetProgram_Tool } from '../handlers/handleGetProgram';
-import { TOOL_DEFINITION as GetClass_Tool } from '../handlers/handleGetClass';
+import { TOOL_DEFINITION as GetProgram_Tool } from '../handlers/program/handleGetProgram';
+import { TOOL_DEFINITION as GetClass_Tool } from '../handlers/class/handleGetClass';
 // ... other imports
 
 // Static descriptors for tools that rely on dynamic import
@@ -97,7 +121,7 @@ export function getToolByName(name: string): ToolDefinition | undefined {
 - Some tools (like `GetAdtTypes`, `GetObjectStructure`) use dynamic imports in `index.ts` but are placed in the main `ALL_TOOLS` array, not in `DYNAMIC_IMPORT_TOOLS`
 - The `getToolByName()` helper function allows finding tools by name programmatically
 
-### 3. Usage in index.ts
+### 4. Usage in index.ts
 
 `index.ts` now relies on the dynamic registry instead of a hard-coded list:
 
@@ -118,7 +142,7 @@ this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
     
     // Some tools use dynamic import for performance
     case "GetObjectsList":
-      return await (await import("./handlers/handleGetObjectsList.js"))
+      return await (await import("./handlers/search/low/handleGetObjectsList.js"))
         .handleGetObjectsList(request.params.arguments);
     // ...
   }
@@ -139,7 +163,7 @@ this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 ## How to add a new tool
 
-1. **Create a new handler** under `src/handlers/` (e.g., `handleYourTool.ts`)
+1. **Create a new handler** under the appropriate subdirectory in `src/handlers/` (e.g., `src/handlers/system/handleYourTool.ts` for system tools, `src/handlers/class/handleYourTool.ts` for class tools)
    
 2. **Add a `TOOL_DEFINITION` constant** to the handler:
    ```typescript
@@ -165,7 +189,7 @@ this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 3. **Import and register the tool** in `src/lib/toolsRegistry.ts`:
    ```typescript
-   import { TOOL_DEFINITION as YourTool_Tool } from '../handlers/handleYourTool';
+   import { TOOL_DEFINITION as YourTool_Tool } from '../handlers/system/handleYourTool';
    
    export const ALL_TOOLS: ToolDefinition[] = [
      // ... existing tools
@@ -179,7 +203,7 @@ this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
    
    **For static import:**
    ```typescript
-   import { handleYourTool } from "./handlers/handleYourTool";
+   import { handleYourTool } from "./handlers/system/handleYourTool";
    
    // In setupHandlers():
    case "YourToolName":
@@ -189,7 +213,7 @@ this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
    **For dynamic import:**
    ```typescript
    case "YourToolName":
-     return await (await import("./handlers/handleYourTool.js"))
+     return await (await import("./handlers/system/handleYourTool.js"))
        .handleYourTool(request.params.arguments);
    ```
 
@@ -229,9 +253,9 @@ node tools/generate-tools-docs.js [--help]
 ```
 
 **What it does:**
-- Scans all handler files in `src/handlers/`
+- Scans all handler files in `src/handlers/` and its subdirectories
 - Extracts `TOOL_DEFINITION` from each
-- Groups tools by category
+- Groups tools by category based on subdirectory structure
 - Generates comprehensive markdown documentation
 
 **When to use:**

@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleGetObjectStructure } = require('../dist/handlers/handleGetObjectStructure');
+const { handleGetObjectStructure } = require('../dist/handlers/system/low/handleGetObjectStructure');
 
 async function testGetObjectStructure() {
   const testCases = getAllEnabledTestCases('get_object_structure');

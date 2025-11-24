@@ -24,7 +24,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleUpdateFunctionModuleSource } = require('../dist/handlers/handleUpdateFunctionModuleSource');
+const { handleUpdateFunctionModuleSource } = require('../dist/handlers/function/high/handleUpdateFunctionModuleSource');
 
 // Load test configuration
 const config = loadTestConfig();

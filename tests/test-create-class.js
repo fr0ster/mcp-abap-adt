@@ -16,7 +16,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleCreateClass } = require('../dist/handlers/handleCreateClass');
+const { handleCreateClass } = require('../dist/handlers/class/high/handleCreateClass');
 
 async function testCreateClass() {
   // Load all enabled test cases from YAML

@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleGetObjectsList } = require('../dist/handlers/handleGetObjectsList');
+const { handleGetObjectsList } = require('../dist/handlers/search/low/handleGetObjectsList');
 
 async function testGetObjectsList() {
   const testCases = getAllEnabledTestCases('get_objects_list');

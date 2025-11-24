@@ -1,6 +1,6 @@
 // Test script for handleGetObjectStructure (TypeScript)
 
-import { handleGetObjectStructure } from '../src/handlers/handleGetObjectStructure';
+import { handleGetObjectStructure } from '../src/handlers/system/low/handleGetObjectStructure';
 
 async function main() {
   // Replace with valid test values for your system

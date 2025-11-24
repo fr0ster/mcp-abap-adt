@@ -16,7 +16,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleCreateProgram } = require('../dist/handlers/handleCreateProgram');
+const { handleCreateProgram } = require('../dist/handlers/program/high/handleCreateProgram');
 
 async function testCreateProgram() {
   // Load all enabled test cases from YAML

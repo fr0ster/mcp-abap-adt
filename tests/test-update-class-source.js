@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleUpdateClassSource } = require('../dist/handlers/handleUpdateClassSource');
+const { handleUpdateClassSource } = require('../dist/handlers/class/high/handleUpdateClassSource');
 
 async function testUpdateClassSource() {
   const testCases = getAllEnabledTestCases('update_class_source');

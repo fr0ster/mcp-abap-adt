@@ -3,7 +3,7 @@
  * Tests the new timeout parameters directly
  */
 
-const { handleGetEnhancements } = require('../dist/handlers/handleGetEnhancements');
+const { handleGetEnhancements } = require('../dist/handlers/enhancement/low/handleGetEnhancements');
 const { cleanup } = require('../dist/lib/utils');
 
 async function testEnhancedTimeouts() {

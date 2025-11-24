@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleUpdateProgramSource } = require('../dist/handlers/handleUpdateProgramSource');
+const { handleUpdateProgramSource } = require('../dist/handlers/program/high/handleUpdateProgramSource');
 
 async function testUpdateProgramSource() {
   const testCases = getAllEnabledTestCases('update_program_source');

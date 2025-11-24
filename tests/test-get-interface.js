@@ -16,7 +16,7 @@ const {
 // Initialize test environment before importing handlers
 initializeTestEnvironment();
 
-const { handleGetInterface } = require('../dist/handlers/handleGetInterface');
+const { handleGetInterface } = require('../dist/handlers/interface/low/handleGetInterface');
 
 async function testGetInterface() {
   // Load all enabled test cases from YAML

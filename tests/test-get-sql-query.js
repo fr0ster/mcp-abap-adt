@@ -14,7 +14,7 @@ const {
 // Initialize test environment before importing handlers
 initializeTestEnvironment();
 
-const { handleGetSqlQuery } = require('../dist/handlers/handleGetSqlQuery');
+const { handleGetSqlQuery } = require('../dist/handlers/system/low/handleGetSqlQuery');
 
 async function main() {
   try {

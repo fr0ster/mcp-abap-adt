@@ -23,7 +23,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleCreateFunctionGroup } = require('../dist/handlers/handleCreateFunctionGroup');
+const { handleCreateFunctionGroup } = require('../dist/handlers/function/high/handleCreateFunctionGroup');
 
 /**
  * Main test runner

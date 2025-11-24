@@ -1,6 +1,6 @@
 // Test for handleGetInclude
 
-const { handleGetInclude } = require('../dist/handlers/handleGetInclude');
+const { handleGetInclude } = require('../dist/handlers/include/low/handleGetInclude');
 
 async function main() {
   try {

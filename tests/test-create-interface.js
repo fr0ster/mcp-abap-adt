@@ -22,7 +22,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleCreateInterface } = require('../dist/handlers/handleCreateInterface');
+const { handleCreateInterface } = require('../dist/handlers/interface/high/handleCreateInterface');
 
 async function testCreateInterface() {
   const testCases = getAllEnabledTestCases('create_interface');

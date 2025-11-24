@@ -18,7 +18,7 @@ const {
 // Initialize test environment before importing handlers
 initializeTestEnvironment();
 
-const { handleUpdateDataElement } = require('../dist/handlers/handleUpdateDataElement');
+const { handleUpdateDataElement } = require('../dist/handlers/data_element/high/handleUpdateDataElement');
 
 async function testUpdateDataElement() {
   // Load all enabled test cases from YAML

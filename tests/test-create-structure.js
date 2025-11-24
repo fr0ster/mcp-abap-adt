@@ -16,7 +16,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleCreateStructure } = require('../dist/handlers/handleCreateStructure');
+const { handleCreateStructure } = require('../dist/handlers/structure/high/handleCreateStructure');
 
 async function testCreateStructure() {
   const testCases = getAllEnabledTestCases('create_structure');

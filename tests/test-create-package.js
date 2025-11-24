@@ -16,7 +16,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleCreatePackage } = require('../dist/handlers/handleCreatePackage');
+const { handleCreatePackage } = require('../dist/handlers/package/high/handleCreatePackage');
 
 async function testCreatePackage() {
   const testCases = getAllEnabledTestCases('create_package');

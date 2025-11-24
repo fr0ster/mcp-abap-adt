@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleGetFunctionGroup } = require('../dist/handlers/handleGetFunctionGroup');
+const { handleGetFunctionGroup } = require('../dist/handlers/function/low/handleGetFunctionGroup');
 
 async function testGetFunctionGroup() {
   const testCases = getAllEnabledTestCases('get_function_group');

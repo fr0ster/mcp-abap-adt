@@ -6,7 +6,7 @@
 const { initializeTestEnvironment, loadTestConfig } = require('./test-helper');
 initializeTestEnvironment();
 
-const { handleActivateObject } = require('../dist/handlers/handleActivateObject');
+const { handleActivateObject } = require('../dist/handlers/common/low/handleActivateObject');
 
 async function activateFunctionGroup(functionGroupName) {
   console.log(`🚀 Activating function group: ${functionGroupName}`);

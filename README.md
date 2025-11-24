@@ -16,17 +16,20 @@ This project provides a server that allows you to interact with SAP ABAP systems
 
 ## Features
 
-- **🏗️ Domain Management**: `GetDomain`, `CreateDomain` - Create and manage ABAP domains
-- **📊 Data Element Management**: `GetDataElement`, `CreateDataElement` - Create and retrieve ABAP data elements
-- **📦 Table Management**: `GetTable`, `CreateTable` - Create and retrieve ABAP database tables
+- **🏗️ Domain Management**: `GetDomain`, `CreateDomain`, `UpdateDomain` - Create, retrieve, and update ABAP domains
+- **📊 Data Element Management**: `GetDataElement`, `CreateDataElement`, `UpdateDataElement` - Create, retrieve, and update ABAP data elements
+- **📦 Table Management**: `GetTable`, `CreateTable`, `GetTableContents` - Create and retrieve ABAP database tables with data preview
 - **🏛️ Structure Management**: `GetStructure`, `CreateStructure` - Create and retrieve ABAP structures
-- **👁️ View Management**: `GetView`, `CreateView` - Create CDS Views and Classic Views
-- **🎓 Class Management**: `GetClass`, `CreateClass` - Create and retrieve ABAP classes
-- **📝 Program Management**: `GetProgram`, `CreateProgram` - Create and retrieve ABAP programs
+- **👁️ View Management**: `GetView`, `CreateView`, `UpdateViewSource` - Create and manage CDS Views and Classic Views
+- **🎓 Class Management**: `GetClass`, `CreateClass`, `UpdateClassSource` - Create, retrieve, and update ABAP classes
+- **📝 Program Management**: `GetProgram`, `CreateProgram`, `UpdateProgramSource` - Create, retrieve, and update ABAP programs
+- **🔧 Behavior Definition (BDEF) Management**: `GetBdef`, `CreateBehaviorDefinition`, `UpdateBehaviorDefinition` - Create and manage ABAP Behavior Definitions with support for Managed, Unmanaged, Abstract, and Projection types
+- **📋 Metadata Extension (DDLX) Management**: `CreateMetadataExtension`, `UpdateMetadataExtension` - Create and manage ABAP Metadata Extensions
 - **⚡ Activation**: `ActivateObject` - Universal activation for any ABAP object
 - **🚚 Transport Management**: `CreateTransport`, `GetTransport` - Create and retrieve transport requests
-- **🔍 Enhancement Analysis**: `GetEnhancements`, `GetEnhancementByName` - Enhancement discovery
+- **🔍 Enhancement Analysis**: `GetEnhancements`, `GetEnhancementImpl`, `GetEnhancementSpot` - Enhancement discovery and analysis
 - **📋 Include Management**: `GetIncludesList` - Recursive include discovery
+- **🔍 System Tools**: `GetInactiveObjects` - Monitor inactive objects waiting for activation
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
 
@@ -72,10 +75,10 @@ mcp-abap-adt
 mcp-abap-adt --env=/path/to/my.env
 
 # HTTP mode
-mcp-abap-adt-http --http-port=8080
+mcp-abap-adt --transport=http --http-port=8080
 
 # SSE mode  
-mcp-abap-adt-sse --sse-port=3001
+mcp-abap-adt --transport=sse --sse-port=3001
 ```
 
 ### Development Mode

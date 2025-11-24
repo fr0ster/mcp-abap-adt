@@ -44,8 +44,8 @@ npm install ./fr0ster-mcp-abap-adt-1.1.0.tgz
 
 After installation, you'll have access to these commands:
 - `mcp-abap-adt` - Default stdio transport
-- `mcp-abap-adt-http` - HTTP server transport
-- `mcp-abap-adt-sse` - SSE transport
+- `mcp-abap-adt --transport=http` - HTTP server transport
+- `mcp-abap-adt --transport=sse` - SSE transport
 
 **Get help on available options:**
 ```bash
@@ -72,7 +72,7 @@ mcp-abap-adt --env=/path/to/my.env
 mcp-abap-adt --env ~/configs/sap-dev.env
 
 # Start HTTP server on custom port
-mcp-abap-adt-http --http-port=8080
+mcp-abap-adt --transport=http --http-port=8080
 ```
 
 **Environment File Priority:**
@@ -220,8 +220,8 @@ npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
 
 # Verify installation
 mcp-abap-adt --help
-mcp-abap-adt-http --help
-mcp-abap-adt-sse --help
+mcp-abap-adt --transport=http --help
+mcp-abap-adt --transport=sse --help
 ```
 
 **Available commands after global installation:**
@@ -231,10 +231,10 @@ mcp-abap-adt-sse --help
 mcp-abap-adt
 
 # HTTP server transport
-mcp-abap-adt-http --port 3000
+mcp-abap-adt --transport=http --port 3000
 
 # SSE transport
-mcp-abap-adt-sse --port 3000
+mcp-abap-adt --transport=sse --port 3000
 ```
 
 #### Local Installation (Project-specific)
@@ -249,7 +249,7 @@ cd /path/to/your/project
 npm install /path/to/fr0ster-mcp-abap-adt-1.1.0.tgz
 
 # Use via npx
-npx mcp-abap-adt-http --port 3000
+npx mcp-abap-adt --transport=http --port 3000
 ```
 
 #### Configuration
@@ -269,39 +269,39 @@ EOF
 Or use a custom environment file:
 
 ```bash
-mcp-abap-adt-http --env /path/to/custom/.env --port 3000
+mcp-abap-adt --transport=http --env /path/to/custom/.env --port 3000
 ```
 
 #### Usage Examples
 
 **Example 1: Start HTTP server on default port (3000)**
 ```bash
-mcp-abap-adt-http
+mcp-abap-adt --transport=http
 ```
 
 **Example 2: Start HTTP server on custom port**
 ```bash
-mcp-abap-adt-http --port 8080
+mcp-abap-adt --transport=http --port 8080
 ```
 
 **Example 3: Start HTTP server accessible from network**
 ```bash
-mcp-abap-adt-http --host 0.0.0.0 --port 3000
+mcp-abap-adt --transport=http --host 0.0.0.0 --port 3000
 ```
 
 **Example 4: Use custom environment file**
 ```bash
-mcp-abap-adt-http --env /opt/config/.env.production --port 8080
+mcp-abap-adt --transport=http --env /opt/config/.env.production --port 8080
 ```
 
 **Example 5: Start SSE server**
 ```bash
-mcp-abap-adt-sse --port 3000
+mcp-abap-adt --transport=sse --port 3000
 ```
 
 #### Command Line Options
 
-All server commands (`mcp-abap-adt`, `mcp-abap-adt-http`, `mcp-abap-adt-sse`) support the following options:
+All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-adt --transport=sse`) support the following options:
 
 **General Options:**
 - `--help` - Show complete help message with all available options
@@ -311,7 +311,7 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt-http`, `mcp-abap-adt-sse`) su
 **Transport Selection:**
 - `--transport=<type>` - Transport type: `stdio`, `http`, `streamable-http`, or `sse`
 
-**HTTP Server Options (for `mcp-abap-adt-http`):**
+**HTTP Server Options (for `mcp-abap-adt --transport=http`):**
 - `--http-port=<port>` - HTTP server port (default: 3000)
 - `--http-host=<host>` - HTTP server host (default: 0.0.0.0)
 - `--http-json-response` - Enable JSON response format
@@ -319,7 +319,7 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt-http`, `mcp-abap-adt-sse`) su
 - `--http-allowed-hosts=<list>` - Comma-separated allowed hosts
 - `--http-enable-dns-protection` - Enable DNS rebinding protection
 
-**SSE Server Options (for `mcp-abap-adt-sse`):**
+**SSE Server Options (for `mcp-abap-adt --transport=sse`):**
 - `--sse-port=<port>` - SSE server port (default: 3001)
 - `--sse-host=<host>` - SSE server host (default: 0.0.0.0)
 - `--sse-allowed-origins=<list>` - Comma-separated allowed origins for CORS
@@ -347,11 +347,11 @@ mcp-abap-adt --help
 mcp-abap-adt --env=~/configs/sap-production.env
 
 # Start HTTP server with CORS configuration
-mcp-abap-adt-http --http-port=8080 \
+mcp-abap-adt --transport=http --http-port=8080 \
   --http-allowed-origins=http://localhost:3000,https://myapp.com
 
 # Start SSE with DNS protection
-mcp-abap-adt-sse --sse-port=3001 --sse-enable-dns-protection
+mcp-abap-adt --transport=sse --sse-port=3001 --sse-enable-dns-protection
 ```
 
 **Example 6: Use stdio transport (for MCP clients)**

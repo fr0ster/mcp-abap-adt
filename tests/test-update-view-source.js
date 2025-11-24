@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleUpdateViewSource } = require('../dist/handlers/handleUpdateViewSource');
+const { handleUpdateViewSource } = require('../dist/handlers/view/high/handleUpdateViewSource');
 
 async function testUpdateViewSource() {
   const testCases = getAllEnabledTestCases('update_view_source');

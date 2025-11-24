@@ -8,7 +8,7 @@ const { initializeTestEnvironment, loadTestConfig } = require('./test-helper');
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleActivateObject } = require('../dist/handlers/handleActivateObject');
+const { handleActivateObject } = require('../dist/handlers/common/low/handleActivateObject');
 
 async function testActivateObject() {
   console.log('='.repeat(80));

@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleUpdateFunctionModuleSource } = require('../dist/handlers/handleUpdateFunctionModuleSource');
+const { handleUpdateFunctionModuleSource } = require('../dist/handlers/function/high/handleUpdateFunctionModuleSource');
 
 async function testUpdateFunctionModuleSource() {
   const testCases = getAllEnabledTestCases('update_function_module_source');

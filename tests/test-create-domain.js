@@ -19,7 +19,7 @@ const {
 // Initialize test environment before importing handlers
 initializeTestEnvironment();
 
-const { handleCreateDomain } = require('../dist/handlers/handleCreateDomain');
+const { handleCreateDomain } = require('../dist/handlers/domain/high/handleCreateDomain');
 
 async function testCreateDomain() {
   // Load all enabled test cases from YAML

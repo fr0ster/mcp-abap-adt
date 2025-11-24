@@ -14,7 +14,7 @@ const { initializeTestEnvironment, loadTestConfig } = require('./test-helper');
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleCheckObject } = require('../dist/handlers/handleCheckObject');
+const { handleCheckObject } = require('../dist/handlers/common/low/handleCheckObject');
 
 /**
  * Test objects from YAML configuration

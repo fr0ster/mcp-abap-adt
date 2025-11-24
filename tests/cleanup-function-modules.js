@@ -6,7 +6,7 @@
 const { initializeTestEnvironment, loadTestConfig } = require('./test-helper');
 initializeTestEnvironment();
 
-const { handleDeleteObject } = require('../dist/handlers/handleDeleteObject');
+const { handleDeleteObject } = require('../dist/handlers/common/low/handleDeleteObject');
 
 async function cleanup() {
   try {

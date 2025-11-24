@@ -1,6 +1,6 @@
 // Test for handleGetTypeInfo
 
-const { handleGetTypeInfo } = require('../dist/handlers/handleGetTypeInfo');
+const { handleGetTypeInfo } = require('../dist/handlers/system/low/handleGetTypeInfo');
 const assert = require('assert');
 
 async function run() {

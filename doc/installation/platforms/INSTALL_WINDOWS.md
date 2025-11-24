@@ -98,22 +98,22 @@ mcp-abap-adt --help
 
 **Available commands after installation:**
 - `mcp-abap-adt` - stdio transport (default, for MCP clients)
-- `mcp-abap-adt-http` - HTTP server transport
-- `mcp-abap-adt-sse` - SSE server transport
+- `mcp-abap-adt --transport=http` - HTTP server transport
+- `mcp-abap-adt --transport=sse` - SSE server transport
 
 **Usage examples:**
 ```powershell
 # HTTP server on default port (3000)
-mcp-abap-adt-http
+mcp-abap-adt --transport=http
 
 # HTTP server on custom port
-mcp-abap-adt-http --port 8080
+mcp-abap-adt --transport=http --port 8080
 
 # SSE server accessible from network
-mcp-abap-adt-sse --host 0.0.0.0 --port 3000
+mcp-abap-adt --transport=sse --host 0.0.0.0 --port 3000
 
 # Use custom .env file
-mcp-abap-adt-http --env C:\path\to\custom\.env --port 8080
+mcp-abap-adt --transport=http --env C:\path\to\custom\.env --port 8080
 ```
 
 **Local Installation (Project-specific):**
@@ -126,7 +126,7 @@ cd C:\path\to\your\project
 npm install C:\path\to\fr0ster-mcp-abap-adt-1.1.0.tgz
 
 # Use via npx
-npx mcp-abap-adt-http --port 3000
+npx mcp-abap-adt --transport=http --port 3000
 ```
 
 **Troubleshooting:**

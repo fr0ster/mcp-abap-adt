@@ -1,6 +1,6 @@
 // Test for handleGetObjectsByType
 
-const { handleGetObjectsByType } = require('../dist/handlers/search/low/handleGetObjectsByType');
+const { handleGetObjectsByType } = require('../dist/handlers/search/readonly/handleGetObjectsByType');
 const assert = require('assert');
 
 async function run() {

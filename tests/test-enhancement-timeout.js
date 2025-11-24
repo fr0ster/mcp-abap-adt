@@ -5,7 +5,7 @@
  * Tests the timeout handling for individual includes
  */
 
-const { handleGetEnhancements } = require('../dist/handlers/enhancement/low/handleGetEnhancements');
+const { handleGetEnhancements } = require('../dist/handlers/enhancement/readonly/handleGetEnhancements');
 
 // Mock logger to capture timeout messages
 const mockLogger = {
@@ -95,11 +95,11 @@ async function testTimeoutHandling() {
     originalUtils.makeAdtRequestWithTimeout = createMockRequest(['INCLUDE2_TIMEOUT']);
     
     // Import after mocking
-    const { handleGetIncludesList } = require('../dist/handlers/include/low/handleGetIncludesList');
+    const { handleGetIncludesList } = require('../dist/handlers/include/readonly/handleGetIncludesList');
     const originalGetIncludesList = handleGetIncludesList;
     
     // Mock the includes list handler
-    require('../dist/handlers/include/low/handleGetIncludesList').handleGetIncludesList = mockGetIncludesList;
+    require('../dist/handlers/include/readonly/handleGetIncludesList').handleGetIncludesList = mockGetIncludesList;
     
     try {
         console.log('1. Testing sequential processing with individual timeouts...\n');

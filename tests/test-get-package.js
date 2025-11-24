@@ -1,6 +1,6 @@
 // Test for handleGetPackage
 
-const { handleGetPackage } = require('../dist/handlers/package/low/handleGetPackage');
+const { handleGetPackage } = require('../dist/handlers/package/readonly/handleGetPackage');
 
 async function main() {
   try {

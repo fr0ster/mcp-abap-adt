@@ -5,31 +5,34 @@ This roadmap outlines the steps to achieve full coverage of `CrudClient` methods
 ## Phase 1: Update Generic Handlers
 Extend existing generic handlers to support new object types (`behavior_definition`, `metadata_extension`) and missing functionality.
 
-- [ ] **Update `handleLockObject.ts`**
-    - Add support for `behavior_definition` (using `lockBehaviorDefinition`).
-    - Add support for `metadata_extension` (using `lockMetadataExtension`).
-    - Investigate and add support for `package` (using `lockPackage` - requires `superPackage` handling).
+- [x] **Update `handleLockObject.ts`** ✅ Completed
+    - Added support for `behavior_definition` (using `lockBehaviorDefinition`).
+    - Added support for `metadata_extension` (using `lockMetadataExtension`).
+    - Added support for `package` (using `lockPackage` - requires `superPackage` parameter).
 
-- [ ] **Update `handleDeleteObject.ts`**
-    - Add support for `behavior_definition` (using `deleteBehaviorDefinition`).
-    - Add support for `metadata_extension` (using `deleteMetadataExtension`).
+- [x] **Update `handleDeleteObject.ts`** ✅ Already completed
+    - Already supports `behavior_definition` (using `deleteBehaviorDefinition`).
+    - Already supports `metadata_extension` (using `deleteMetadataExtension`).
 
-- [ ] **Update `handleValidateObject.ts`**
-    - Add support for `behavior_definition` (using `validateBehaviorDefinition`).
-    - Add support for `metadata_extension` (using `validateMetadataExtension`).
+- [x] **Update `handleValidateObject.ts`** ✅ Completed
+    - Added enum support for `behavior_definition` and `metadata_extension`.
+    - Note: These types require additional parameters (rootEntity/implementationType for BDEF, description/packageName for DDLX), so validation returns helpful error message directing to specific handlers.
 
-- [ ] **Update `handleCheckObject.ts`**
-    - Add support for `behavior_definition` (using `checkBehaviorDefinition`).
-    - Add support for `metadata_extension` (using `checkMetadataExtension`).
+- [x] **Update `handleCheckObject.ts`** ✅ Already completed
+    - Already supports `behavior_definition` (using `checkBehaviorDefinition`).
+    - Already supports `metadata_extension` (using `checkMetadataExtension`).
 
 ## Phase 2: Missing Specific Handlers (Structure & Package)
 Implement specific update handlers that are currently missing.
 
-- [ ] **Create `handleUpdateStructure.ts`**
-    - Implement `updateStructure` method.
+- [x] **Create `handleUpdateStructure.ts`** ✅ Completed
+    - Implemented `updateStructure` method in `structure/low/handleUpdateStructure.ts`.
+    - Low-level handler: single method call to `CrudClient.updateStructure`.
 
-- [ ] **Create `handleUpdatePackage.ts`**
-    - Implement `updatePackage` method.
+- [x] **Create `handleUpdatePackage.ts`** ✅ Completed
+    - Implemented `updatePackage` method in `package/low/handleUpdatePackage.ts`.
+    - Low-level handler: single method call to `CrudClient.updatePackage`.
+    - Requires `superPackage` parameter.
 
 ## Phase 3: Behavior Definition (BDEF) Handlers
 Implement full CRUD support for Behavior Definitions.

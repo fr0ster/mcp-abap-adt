@@ -13,7 +13,7 @@ import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 
 export const TOOL_DEFINITION = {
   name: "CheckObject",
-  description: "Perform syntax check on an ABAP object without activation. Returns syntax errors, warnings, and messages. Useful for validation during development. Can use session_id and session_state from GetSession to maintain the same session.",
+  description: "[low-level] Perform syntax check on an ABAP object without activation. Returns syntax errors, warnings, and messages. Useful for validation during development. Can use session_id and session_state from GetSession to maintain the same session.",
   inputSchema: {
     type: "object",
     properties: {

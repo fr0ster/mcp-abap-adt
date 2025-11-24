@@ -20,9 +20,9 @@ This project provides a server that allows you to interact with SAP ABAP systems
 - **📊 Data Element Management**: `GetDataElement`, `CreateDataElement`, `UpdateDataElement` - Create, retrieve, and update ABAP data elements
 - **📦 Table Management**: `GetTable`, `CreateTable`, `GetTableContents` - Create and retrieve ABAP database tables with data preview
 - **🏛️ Structure Management**: `GetStructure`, `CreateStructure` - Create and retrieve ABAP structures
-- **👁️ View Management**: `GetView`, `CreateView`, `UpdateViewSource` - Create and manage CDS Views and Classic Views
-- **🎓 Class Management**: `GetClass`, `CreateClass`, `UpdateClassSource` - Create, retrieve, and update ABAP classes
-- **📝 Program Management**: `GetProgram`, `CreateProgram`, `UpdateProgramSource` - Create, retrieve, and update ABAP programs
+- **👁️ View Management**: `GetView`, `CreateView`, `UpdateView` - Create and manage CDS Views and Classic Views
+- **🎓 Class Management**: `GetClass`, `CreateClass`, `UpdateClass` - Create, retrieve, and update ABAP classes
+- **📝 Program Management**: `GetProgram`, `CreateProgram`, `UpdateProgram` - Create, retrieve, and update ABAP programs
 - **🔧 Behavior Definition (BDEF) Management**: `GetBdef`, `CreateBehaviorDefinition`, `UpdateBehaviorDefinition` - Create and manage ABAP Behavior Definitions with support for Managed, Unmanaged, Abstract, and Projection types
 - **📋 Metadata Extension (DDLX) Management**: `CreateMetadataExtension`, `UpdateMetadataExtension` - Create and manage ABAP Metadata Extensions
 - **⚡ Activation**: `ActivateObject` - Universal activation for any ABAP object
@@ -68,14 +68,17 @@ After installing globally with `npm install -g`, you can run from any directory:
 # Show help
 mcp-abap-adt --help
 
-# Default stdio mode (looks for .env in current directory)
+# Default HTTP mode (works without .env file)
 mcp-abap-adt
+
+# HTTP mode on custom port
+mcp-abap-adt --http-port=8080
+
+# Use stdio mode (for MCP clients, requires .env file)
+mcp-abap-adt --transport=stdio
 
 # Use custom .env file
 mcp-abap-adt --env=/path/to/my.env
-
-# HTTP mode
-mcp-abap-adt --transport=http --http-port=8080
 
 # SSE mode  
 mcp-abap-adt --transport=sse --sse-port=3001
@@ -117,6 +120,17 @@ SAP_CLIENT=100
 SAP_AUTH_TYPE=jwt
 SAP_JWT_TOKEN=your-jwt-token
 ```
+
+**Generate .env from Service Key (JWT):**
+```bash
+# Install the connection package globally (one-time setup)
+npm install -g @mcp-abap-adt/connection
+
+# Generate .env file from service key JSON
+sap-abap-auth auth -k path/to/service-key.json
+```
+
+This will automatically create/update `.env` file with JWT tokens and connection details.
 
 See [Client Configuration](doc/user-guide/CLIENT_CONFIGURATION.md) for complete configuration options.
 

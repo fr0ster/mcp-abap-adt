@@ -1,7 +1,7 @@
 // Test for handleGetObjectNodeFromCache
 
-const { handleGetObjectsList } = require('../dist/handlers/search/low/handleGetObjectsList');
-const { handleGetObjectNodeFromCache } = require('../dist/handlers/system/low/handleGetObjectNodeFromCache');
+const { handleGetObjectsList } = require('../dist/handlers/search/readonly/handleGetObjectsList');
+const { handleGetObjectNodeFromCache } = require('../dist/handlers/system/readonly/handleGetObjectNodeFromCache');
 const { loadObjectsListCache } = require('../dist/lib/getObjectsListCache');
 const assert = require('assert');
 

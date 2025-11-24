@@ -11,7 +11,7 @@ import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "ValidateObject",
-  description: "Validate an ABAP object name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.",
+  description: "[low-level] Validate an ABAP object name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.",
   inputSchema: {
     type: "object",
     properties: {
@@ -21,8 +21,8 @@ export const TOOL_DEFINITION = {
       },
       object_type: {
         type: "string",
-        description: "Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element', 'package'",
-        enum: ["class", "program", "interface", "function_group", "table", "structure", "view", "domain", "data_element", "package"]
+        description: "Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'metadata_extension'",
+        enum: ["class", "program", "interface", "function_group", "table", "structure", "view", "domain", "data_element", "package", "behavior_definition", "metadata_extension"]
       },
       session_id: {
         type: "string",
@@ -73,7 +73,7 @@ export async function handleValidateObject(args: any) {
       return return_error(new Error('object_name and object_type are required'));
     }
 
-    const validTypes = ['class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element', 'package'];
+    const validTypes = ['class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'metadata_extension'];
     if (!validTypes.includes(object_type.toLowerCase())) {
       return return_error(new Error(`Invalid object_type. Must be one of: ${validTypes.join(', ')}`));
     }
@@ -142,6 +142,16 @@ export async function handleValidateObject(args: any) {
           await validationClient.validatePackage(objectName, ''); // package needs superPackage parameter
           result = validationClient.getValidationResult();
           break;
+        case 'behavior_definition':
+          // Behavior definition validation requires rootEntity and implementationType
+          // For now, we'll skip validation as these params are not provided in generic handler
+          // TODO: Consider creating specific ValidateBehaviorDefinition handler
+          return return_error(new Error('Behavior definition validation requires rootEntity and implementationType parameters. Use specific validation handler.'));
+        case 'metadata_extension':
+          // Metadata extension validation requires description and packageName
+          // For now, we'll skip validation as these params are not provided in generic handler
+          // TODO: Consider creating specific ValidateMetadataExtension handler
+          return return_error(new Error('Metadata extension validation requires description and packageName parameters. Use specific validation handler.'));
         default:
           throw new Error(`Unsupported object type: ${object_type}`);
       }

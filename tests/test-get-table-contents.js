@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleGetTableContents } = require('../dist/handlers/table/low/handleGetTableContents');
+const { handleGetTableContents } = require('../dist/handlers/table/readonly/handleGetTableContents');
 
 async function testGetTableContents() {
   const testCases = getAllEnabledTestCases('get_table_contents');

@@ -42,7 +42,7 @@ try {
 }
 
 async function testGetView() {
-    const { handleGetView } = require('../dist/handlers/view/low/handleGetView');
+    const { handleGetView } = require('../dist/handlers/view/readonly/handleGetView');
     
     // Test with multiple views - some standard SAP views that should exist
     const testViews = [
@@ -141,7 +141,7 @@ async function testGetView() {
 }
 
 async function testSpecificView() {
-    const { handleGetView } = require('../dist/handlers/view/low/handleGetView');
+    const { handleGetView } = require('../dist/handlers/view/readonly/handleGetView');
     
     // Test with a specific view that's more likely to exist
     const viewName = 'DD02V'; // Dictionary Tables view

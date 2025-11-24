@@ -1,6 +1,6 @@
 // Test script for handleGetAdtTypes (TypeScript)
 
-import { handleGetAdtTypes } from '../src/handlers/system/low/handleGetAllTypes';
+import { handleGetAdtTypes } from '../src/handlers/system/readonly/handleGetAllTypes';
 
 async function main() {
   const args = {};

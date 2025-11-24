@@ -33,13 +33,13 @@ Generated: 2025-01-11
 
 | Handler | Test File | Config Section | Status |
 |---------|-----------|----------------|--------|
-| `handleUpdateClassSource` | `test-update-class-source.js` | `update_class_source` | ✅ |
-| `handleUpdateInterfaceSource` | `test-update-interface-source.js` | `update_interface_source` | ✅ |
-| `handleUpdateProgramSource` | `test-update-program-source.js` | `update_program_source` | ✅ |
+| `handleUpdateClass` | `test-update-class-high.js` | `update_class_high` | ✅ |
+| `handleUpdateInterface` | `test-update-interface-high.js` | `update_interface_high` | ✅ |
+| `handleUpdateProgram` | `test-update-program-high.js` | `update_program_high` | ✅ |
 | `handleUpdateDomain` | `test-update-domain.js` | `update_domain` | ✅ |
 | `handleUpdateDataElement` | `test-update-data-element.js` | `update_data_element` | ✅ |
-| `handleUpdateFunctionModuleSource` | `test-update-function-module-source.js` | `update_function_module_source` | ✅ |
-| `handleUpdateViewSource` | `test-update-view-source.js` | `update_view_source` | ✅ |
+| `handleUpdateFunctionModule` | `test-update-function-module-high.js` | `update_function_module_high` | ✅ |
+| `handleUpdateView` | `test-update-view-high.js` | `update_view_high` | ✅ |
 
 **Coverage**: 7/7 (100%) with config, 7/7 (100%) with test files
 
@@ -112,7 +112,7 @@ The following handlers have test files but are missing from `test-config.yaml`:
    - `create_view` (handler: `handleCreateView`)
 
 2. **Update Operations**:
-   - `update_view_source` (handler: `handleUpdateViewSource`)
+   - `update_view_high` (handler: `handleUpdateView`)
 
 3. **Get Operations**:
    - `get_prog_full_code` (handler: `handleGetProgFullCode`)
@@ -155,7 +155,7 @@ The following handlers have test files but are missing from `test-config.yaml`:
 ### High Priority
 
 1. ✅ **Add missing CREATE configs**: `create_table`, `create_structure`, `create_view` - **COMPLETED**
-2. ✅ **Add missing UPDATE configs**: `update_view_source` - **COMPLETED**
+2. ✅ **Add missing UPDATE configs**: `update_view_high` - **COMPLETED**
 3. ✅ **Add missing GET configs for commonly used handlers**: 
    - ✅ `get_prog_full_code` - **COMPLETED**
    - ✅ `get_includes_list` - **COMPLETED**

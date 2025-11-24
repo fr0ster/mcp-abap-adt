@@ -1,6 +1,6 @@
 // Export SALV class to markdown file
 
-const { handleGetClass } = require('../dist/handlers/class/low/handleGetClass');
+const { handleGetClass } = require('../dist/handlers/class/readonly/handleGetClass');
 const path = require('path');
 
 async function main() {

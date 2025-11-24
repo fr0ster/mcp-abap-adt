@@ -5,9 +5,9 @@ describe('MCP ABAP ADT Server', () => {
 
   describe('Module Imports', () => {
     it('should import handler modules without errors', async () => {
-      await expect(import('../handlers/program/low/handleGetProgram')).resolves.toBeDefined();
-      await expect(import('../handlers/class/low/handleGetClass')).resolves.toBeDefined();
-      await expect(import('../handlers/function/low/handleGetFunction')).resolves.toBeDefined();
+      await expect(import('../handlers/program/readonly/handleGetProgram')).resolves.toBeDefined();
+      await expect(import('../handlers/class/readonly/handleGetClass')).resolves.toBeDefined();
+      await expect(import('../handlers/function/readonly/handleGetFunction')).resolves.toBeDefined();
     });
 
     it('should import utility modules without errors', async () => {

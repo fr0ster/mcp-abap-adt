@@ -11,7 +11,7 @@ import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "UnlockObject",
-  description: "Unlock an ABAP object after modification. Must use the same session_id and lock_handle from the LockObject operation.",
+  description: "[low-level] Unlock an ABAP object after modification. Must use the same session_id and lock_handle from the LockObject operation.",
   inputSchema: {
     type: "object",
     properties: {

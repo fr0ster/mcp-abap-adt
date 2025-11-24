@@ -13,7 +13,7 @@ import { CrudClient, ObjectReference } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "ActivateObject",
-  description: "Activate one or multiple ABAP repository objects. Works with any object type: classes, programs, tables, views, domains, data elements, etc. URI is auto-generated from name and type. Returns activation status and any warnings/errors.",
+  description: "[low-level] Activate one or multiple ABAP repository objects. Works with any object type: classes, programs, tables, views, domains, data elements, etc. URI is auto-generated from name and type. Returns activation status and any warnings/errors.",
   inputSchema: {
     type: "object",
     properties: {

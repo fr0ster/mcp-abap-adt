@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleGetStructure } = require('../dist/handlers/structure/low/handleGetStructure');
+const { handleGetStructure } = require('../dist/handlers/structure/readonly/handleGetStructure');
 
 async function testGetStructure() {
   const testCases = getAllEnabledTestCases('get_structure');

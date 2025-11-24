@@ -233,8 +233,8 @@ create_class:
             ENDMETHOD.
           ENDCLASS.
 
-# Step 2: Update class source
-update_class:
+# Step 2: Update class source (high-level workflow)
+update_class_high:
   test_cases:
     - name: "test_class"
       enabled: true
@@ -356,8 +356,8 @@ create_program:
             WRITE: / 'Program <YOUR_PROGRAM_NAME> executed successfully.'.
             WRITE: / 'Created via MCP ABAP ADT API.'.
 
-# Step 2: Update program source
-update_program_source:
+# Step 2: Update program source (high-level workflow)
+update_program_high:
   test_cases:
     - name: "test_program"
       enabled: true
@@ -416,8 +416,8 @@ create_interface:
 
           ENDINTERFACE.
 
-# Step 2: Update interface source
-update_interface_source:
+# Step 2: Update interface source (high-level workflow)
+update_interface_high:
   test_cases:
     - name: "test_interface"
       enabled: true
@@ -521,8 +521,8 @@ create_view:
             mtart
           }
 
-# Step 2: Update view source
-update_view_source:
+# Step 2: Update view source (high-level workflow)
+update_view_high:
   test_cases:
     - name: "test_view"
       enabled: false
@@ -682,8 +682,8 @@ create_function_module:
             ev_result = |Result: { iv_param }|.
           ENDFUNCTION.
 
-# Step 2: Update function module source
-update_function_module_source:
+# Step 2: Update function module source (high-level workflow)
+update_function_module_high:
   test_cases:
     - name: "test_function_module"
       enabled: true

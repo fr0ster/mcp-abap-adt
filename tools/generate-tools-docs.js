@@ -244,6 +244,33 @@ function extractToolDefinition(filePath) {
 }
 
 /**
+ * Map category folder to display category
+ */
+function getCategoryFromFolder(folder) {
+  const categoryMap = {
+    'class': 'Programs, Classes, Functions',
+    'program': 'Programs, Classes, Functions',
+    'function': 'Programs, Classes, Functions',
+    'table': 'Tables and Structures',
+    'structure': 'Tables and Structures',
+    'package': 'Packages and Interfaces',
+    'interface': 'Packages and Interfaces',
+    'include': 'Includes and Hierarchies',
+    'system': 'Types, Descriptions, Metadata',
+    'enhancement': 'Enhancements',
+    'bdef': 'Enhancements',
+    'ddlx': 'Enhancements',
+    'domain': 'Tables and Structures',
+    'data_element': 'Tables and Structures',
+    'view': 'Tables and Structures',
+    'search': 'Search, SQL, Transactions',
+    'transport': 'Search, SQL, Transactions',
+    'common': 'Other'
+  };
+  return categoryMap[folder] || 'Other';
+}
+
+/**
  * Load all tools from toolsRegistry
  */
 function loadAllTools() {
@@ -251,24 +278,51 @@ function loadAllTools() {
   const content = fs.readFileSync(registryPath, 'utf8');
 
   const tools = [];
-  const handlerFiles = [];
+  const processedHandlers = new Set();
 
   // Extract all handler imports - now supports subdirectories
   // Pattern: import { TOOL_DEFINITION as XXX_Tool } from '../handlers/subdir/handlerFile';
   const importMatches = content.matchAll(/import \{ TOOL_DEFINITION as (\w+)_Tool \} from '\.\.\/handlers\/(.+)';/g);
   for (const match of importMatches) {
-    const handlerRelativePath = match[2]; // e.g., "bdef/handleGetBdef" or "program/handleGetProgram"
+    const handlerRelativePath = match[2]; // e.g., "bdef/low/handleGetBdef" or "program/high/handleCreateProgram"
     const handlerPath = path.join(__dirname, `../src/handlers/${handlerRelativePath}.ts`);
+
+    if (processedHandlers.has(handlerPath)) {
+      continue;
+    }
 
     if (fs.existsSync(handlerPath)) {
       const toolDef = extractToolDefinition(handlerPath);
       if (toolDef) {
+        processedHandlers.add(handlerPath);
+        // Determine if it's low, high, or read-only level based on path
+        const isReadOnly = handlerRelativePath.includes('/readonly/');
+        const isLow = handlerRelativePath.includes('/low/');
+        const isHigh = handlerRelativePath.includes('/high/');
+        toolDef.level = isReadOnly ? 'readonly' : (isLow ? 'low' : (isHigh ? 'high' : 'unknown'));
+        // Extract category folder from path (e.g., "bdef/low/handleGetBdef" -> "bdef")
+        const categoryMatch = handlerRelativePath.match(/^([^\/]+)/);
+        const categoryFolder = categoryMatch ? categoryMatch[1] : 'other';
+        // Map to display category
+        toolDef.category = getCategoryFromFolder(categoryFolder);
+        toolDef.categoryFolder = categoryFolder;
         tools.push(toolDef);
       }
     }
   }
 
   return tools;
+}
+
+function computeLevelTotals(tools) {
+  const totals = { high: 0, low: 0, readonly: 0, other: 0, total: tools.length };
+  for (const tool of tools) {
+    if (tool.level === 'high') totals.high++;
+    else if (tool.level === 'low') totals.low++;
+    else if (tool.level === 'readonly') totals.readonly++;
+    else totals.other++;
+  }
+  return totals;
 }
 
 /**
@@ -328,21 +382,30 @@ function generateExample(tool) {
 /**
  * Generate markdown documentation
  */
-function generateMarkdown(tools) {
-  // Group tools by category
+function generateMarkdown(tools, levelTotals) {
+  // Group tools by category and level
   const categories = {};
 
   for (const tool of tools) {
-    const category = CATEGORY_MAP[tool.name] || 'Other';
+    // Use category from tool (determined from folder path) or fallback to CATEGORY_MAP
+    const category = tool.category || CATEGORY_MAP[tool.name] || 'Other';
     if (!categories[category]) {
-      categories[category] = [];
+      categories[category] = { low: [], high: [], readonly: [], other: [] };
     }
-    categories[category].push(tool);
+    const level = tool.level || 'other';
+    if (level === 'low' || level === 'high' || level === 'readonly') {
+      categories[category][level].push(tool);
+    } else {
+      categories[category].other.push(tool);
+    }
   }
 
   // Sort tools within categories by name
   for (const category of Object.keys(categories)) {
-    categories[category].sort((a, b) => a.name.localeCompare(b.name));
+    categories[category].low.sort((a, b) => a.name.localeCompare(b.name));
+    categories[category].high.sort((a, b) => a.name.localeCompare(b.name));
+    categories[category].readonly.sort((a, b) => a.name.localeCompare(b.name));
+    categories[category].other.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   let markdown = `# Available Tools Reference - MCP ABAP ADT Server
@@ -354,15 +417,75 @@ This document contains a complete list of all tools (functions) provided by the 
 > npm run docs:tools
 > \`\`\`
 
-## 📋 Table of Contents
+## 📊 Tool Summary
+
+- Total tools: ${levelTotals.total}
+- High-level tools: ${levelTotals.high}
+- Low-level tools: ${levelTotals.low}
+- Read-only tools: ${levelTotals.readonly}
+- Other tools: ${levelTotals.other}
+
+## 📋 Navigation
+
+The navigation below mirrors the document structure for easier discovery.
 
 `;
 
-  // Generate table of contents
+  // Generate detailed navigation matching the document hierarchy
   for (const category of CATEGORY_ORDER) {
-    if (categories[category]) {
-      const anchor = category.toLowerCase().replace(/\s+/g, '-');
-      markdown += `- [${category}](#${anchor})\n`;
+    if (!categories[category]) continue;
+
+    const anchor = category.toLowerCase().replace(/\s+/g, '-');
+    const lowCount = categories[category].low.length;
+    const highCount = categories[category].high.length;
+    const readonlyCount = categories[category].readonly.length;
+    const otherCount = categories[category].other.length;
+    const total = lowCount + highCount + readonlyCount + otherCount;
+    markdown += `- [${category}](#${anchor}) (${total} tools`;
+    const breakdown = [];
+    if (highCount) breakdown.push(`${highCount} high-level`);
+    if (lowCount) breakdown.push(`${lowCount} low-level`);
+    if (readonlyCount) breakdown.push(`${readonlyCount} read-only`);
+    if (otherCount) breakdown.push(`${otherCount} other`);
+    if (breakdown.length) {
+      markdown += ` – ${breakdown.join(', ')}`;
+    }
+    markdown += `)\n`;
+
+    if (categories[category].readonly.length > 0) {
+      const readonlyAnchor = `${anchor}-read-only`;
+      markdown += `  - [Read-Only Tools](#${readonlyAnchor})\n`;
+      for (const tool of categories[category].readonly) {
+        const toolAnchor = `${tool.name.toLowerCase().replace(/\s+/g, '-')}-readonly`;
+        markdown += `    - [${tool.name}](#${toolAnchor})\n`;
+      }
+    }
+
+    if (categories[category].high.length > 0) {
+      const highAnchor = `${anchor}-high-level`;
+      markdown += `  - [High-Level Tools](#${highAnchor})\n`;
+      for (const tool of categories[category].high) {
+        const toolAnchor = `${tool.name.toLowerCase().replace(/\s+/g, '-')}-high`;
+        markdown += `    - [${tool.name}](#${toolAnchor})\n`;
+      }
+    }
+
+    if (categories[category].low.length > 0) {
+      const lowAnchor = `${anchor}-low-level`;
+      markdown += `  - [Low-Level Tools](#${lowAnchor})\n`;
+      for (const tool of categories[category].low) {
+        const toolAnchor = `${tool.name.toLowerCase().replace(/\s+/g, '-')}-low`;
+        markdown += `    - [${tool.name}](#${toolAnchor})\n`;
+      }
+    }
+
+    if (categories[category].other.length > 0) {
+      const otherAnchor = `${anchor}-other`;
+      markdown += `  - [Other Tools](#${otherAnchor})\n`;
+      for (const tool of categories[category].other) {
+        const toolAnchor = tool.name.toLowerCase().replace(/\s+/g, '-');
+        markdown += `    - [${tool.name}](#${toolAnchor})\n`;
+      }
     }
   }
 
@@ -375,35 +498,162 @@ This document contains a complete list of all tools (functions) provided by the 
     const anchor = category.toLowerCase().replace(/\s+/g, '-');
     markdown += `## ${category}\n\n`;
 
-    for (const tool of categories[category]) {
-      markdown += `### ${tool.name}\n`;
-      markdown += `**Description:** ${tool.description}\n\n`;
+    // Read-only tools first
+    if (categories[category].readonly.length > 0) {
+      markdown += `### Read-Only Tools {#${anchor}-read-only}\n\n`;
+      markdown += `*Read-only tools retrieve information without modifying the system.*\n\n`;
 
-      // Add special notes if any
-      if (TOOL_NOTES[tool.name]) {
-        markdown += `${TOOL_NOTES[tool.name]}\n\n`;
-      }
+      for (const tool of categories[category].readonly) {
+        const baseAnchor = tool.name.toLowerCase().replace(/\s+/g, '-');
+        const toolAnchor = `${baseAnchor}-readonly`;
+        markdown += `### ${tool.name} {#${toolAnchor}}\n`;
+        markdown += `**Description:** ${tool.description}\n\n`;
 
-      // Parameters
-      if (tool.inputSchema && tool.inputSchema.properties && Object.keys(tool.inputSchema.properties).length > 0) {
-        markdown += `**Parameters:**\n`;
-        for (const [propName, propDef] of Object.entries(tool.inputSchema.properties)) {
-          const isRequired = tool.inputSchema.required?.includes(propName) || false;
-          const optional = propDef.default !== undefined ? ` (default: ${JSON.stringify(propDef.default)})` : '';
-          markdown += `- \`${propName}\` (${propDef.type || 'any'}, ${isRequired ? 'required' : 'optional'}${optional}) - ${propDef.description || ''}\n`;
+        // Add special notes if any
+        if (TOOL_NOTES[tool.name]) {
+          markdown += `${TOOL_NOTES[tool.name]}\n\n`;
         }
-        markdown += '\n';
-      } else {
-        markdown += `**Parameters:** None\n\n`;
+
+        // Parameters
+        if (tool.inputSchema && tool.inputSchema.properties && Object.keys(tool.inputSchema.properties).length > 0) {
+          markdown += `**Parameters:**\n`;
+          for (const [propName, propDef] of Object.entries(tool.inputSchema.properties)) {
+            const isRequired = tool.inputSchema.required?.includes(propName) || false;
+            const optional = propDef.default !== undefined ? ` (default: ${JSON.stringify(propDef.default)})` : '';
+            markdown += `- \`${propName}\` (${propDef.type || 'any'}, ${isRequired ? 'required' : 'optional'}${optional}) - ${propDef.description || ''}\n`;
+          }
+          markdown += '\n';
+        } else {
+          markdown += `**Parameters:** None\n\n`;
+        }
+
+        // Example
+        markdown += `**Example:**\n`;
+        markdown += `\`\`\`json\n`;
+        markdown += generateExample(tool);
+        markdown += `\n\`\`\`\n\n`;
+
+        markdown += '---\n\n';
       }
+      markdown += '\n';
+    }
 
-      // Example
-      markdown += `**Example:**\n`;
-      markdown += `\`\`\`json\n`;
-      markdown += generateExample(tool);
-      markdown += `\n\`\`\`\n\n`;
+    // High-level tools
+    if (categories[category].high.length > 0) {
+      markdown += `### High-Level Tools {#${anchor}-high-level}\n\n`;
+      markdown += `*High-level tools perform a chain of operations (e.g., validate → lock → update → check → unlock → activate).*\n\n`;
 
-      markdown += '---\n\n';
+      for (const tool of categories[category].high) {
+        const baseAnchor = tool.name.toLowerCase().replace(/\s+/g, '-');
+        const toolAnchor = `${baseAnchor}-high`;
+        markdown += `### ${tool.name} {#${toolAnchor}}\n`;
+        markdown += `**Description:** ${tool.description}\n\n`;
+
+        // Add special notes if any
+        if (TOOL_NOTES[tool.name]) {
+          markdown += `${TOOL_NOTES[tool.name]}\n\n`;
+        }
+
+        // Parameters
+        if (tool.inputSchema && tool.inputSchema.properties && Object.keys(tool.inputSchema.properties).length > 0) {
+          markdown += `**Parameters:**\n`;
+          for (const [propName, propDef] of Object.entries(tool.inputSchema.properties)) {
+            const isRequired = tool.inputSchema.required?.includes(propName) || false;
+            const optional = propDef.default !== undefined ? ` (default: ${JSON.stringify(propDef.default)})` : '';
+            markdown += `- \`${propName}\` (${propDef.type || 'any'}, ${isRequired ? 'required' : 'optional'}${optional}) - ${propDef.description || ''}\n`;
+          }
+          markdown += '\n';
+        } else {
+          markdown += `**Parameters:** None\n\n`;
+        }
+
+        // Example
+        markdown += `**Example:**\n`;
+        markdown += `\`\`\`json\n`;
+        markdown += generateExample(tool);
+        markdown += `\n\`\`\`\n\n`;
+
+        markdown += '---\n\n';
+      }
+      markdown += '\n';
+    }
+
+    // Low-level tools
+    if (categories[category].low.length > 0) {
+      markdown += `### Low-Level Tools {#${anchor}-low-level}\n\n`;
+      markdown += `*Low-level tools perform a single operation (one method call to CrudClient).*\n\n`;
+
+      for (const tool of categories[category].low) {
+        const baseAnchor = tool.name.toLowerCase().replace(/\s+/g, '-');
+        const toolAnchor = `${baseAnchor}-low`;
+        markdown += `### ${tool.name} {#${toolAnchor}}\n`;
+        markdown += `**Description:** ${tool.description}\n\n`;
+
+        // Add special notes if any
+        if (TOOL_NOTES[tool.name]) {
+          markdown += `${TOOL_NOTES[tool.name]}\n\n`;
+        }
+
+        // Parameters
+        if (tool.inputSchema && tool.inputSchema.properties && Object.keys(tool.inputSchema.properties).length > 0) {
+          markdown += `**Parameters:**\n`;
+          for (const [propName, propDef] of Object.entries(tool.inputSchema.properties)) {
+            const isRequired = tool.inputSchema.required?.includes(propName) || false;
+            const optional = propDef.default !== undefined ? ` (default: ${JSON.stringify(propDef.default)})` : '';
+            markdown += `- \`${propName}\` (${propDef.type || 'any'}, ${isRequired ? 'required' : 'optional'}${optional}) - ${propDef.description || ''}\n`;
+          }
+          markdown += '\n';
+        } else {
+          markdown += `**Parameters:** None\n\n`;
+        }
+
+        // Example
+        markdown += `**Example:**\n`;
+        markdown += `\`\`\`json\n`;
+        markdown += generateExample(tool);
+        markdown += `\n\`\`\`\n\n`;
+
+        markdown += '---\n\n';
+      }
+      markdown += '\n';
+    }
+
+    // Other tools (without level classification)
+    if (categories[category].other.length > 0) {
+      markdown += `### Other Tools {#${anchor}-other}\n\n`;
+
+      for (const tool of categories[category].other) {
+        const toolAnchor = tool.name.toLowerCase().replace(/\s+/g, '-');
+        markdown += `### ${tool.name} {#${toolAnchor}}\n`;
+        markdown += `**Description:** ${tool.description}\n\n`;
+
+        // Add special notes if any
+        if (TOOL_NOTES[tool.name]) {
+          markdown += `${TOOL_NOTES[tool.name]}\n\n`;
+        }
+
+        // Parameters
+        if (tool.inputSchema && tool.inputSchema.properties && Object.keys(tool.inputSchema.properties).length > 0) {
+          markdown += `**Parameters:**\n`;
+          for (const [propName, propDef] of Object.entries(tool.inputSchema.properties)) {
+            const isRequired = tool.inputSchema.required?.includes(propName) || false;
+            const optional = propDef.default !== undefined ? ` (default: ${JSON.stringify(propDef.default)})` : '';
+            markdown += `- \`${propName}\` (${propDef.type || 'any'}, ${isRequired ? 'required' : 'optional'}${optional}) - ${propDef.description || ''}\n`;
+          }
+          markdown += '\n';
+        } else {
+          markdown += `**Parameters:** None\n\n`;
+        }
+
+        // Example
+        markdown += `**Example:**\n`;
+        markdown += `\`\`\`json\n`;
+        markdown += generateExample(tool);
+        markdown += `\n\`\`\`\n\n`;
+
+        markdown += '---\n\n';
+      }
+      markdown += '\n';
     }
   }
 
@@ -479,9 +729,11 @@ function main() {
   }
 
   console.log(`✅ Found ${tools.length} tools`);
+  const levelTotals = computeLevelTotals(tools);
+  console.log(`📊 Tool levels -> High: ${levelTotals.high}, Low: ${levelTotals.low}, Read-only: ${levelTotals.readonly}, Other: ${levelTotals.other}`);
   console.log('📝 Generating documentation...');
 
-  const markdown = generateMarkdown(tools);
+  const markdown = generateMarkdown(tools, levelTotals);
 
   const outputPath = path.join(__dirname, '../doc/user-guide/AVAILABLE_TOOLS.md');
   fs.writeFileSync(outputPath, markdown, 'utf8');

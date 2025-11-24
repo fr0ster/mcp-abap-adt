@@ -2,7 +2,7 @@
 
 const {
   handleDescribeByList,
-} = require("../dist/handlers/system/low/handleDescribeByList");
+} = require("../dist/handlers/system/readonly/handleDescribeByList");
 
 describe("handleDescribeByList", () => {
   it("should return results for valid objects array", async () => {

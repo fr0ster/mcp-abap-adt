@@ -12,7 +12,7 @@ import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "LockObject",
-  description: "Lock an ABAP object for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. Use GetSession first to get a session_id, then use that session_id for lock, update, and unlock operations.",
+  description: "[low-level] Lock an ABAP object for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. Use GetSession first to get a session_id, then use that session_id for lock, update, and unlock operations.",
   inputSchema: {
     type: "object",
     properties: {
@@ -24,6 +24,10 @@ export const TOOL_DEFINITION = {
         type: "string",
         description: "Object type: 'class', 'program', 'interface', 'function_group', 'function_module', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'metadata_extension'",
         enum: ["class", "program", "interface", "function_group", "function_module", "table", "structure", "view", "domain", "data_element", "package", "behavior_definition", "metadata_extension"]
+      },
+      super_package: {
+        type: "string",
+        description: "Super package (parent package) name. Required only for 'package' object_type."
       },
       session_id: {
         type: "string",
@@ -46,6 +50,7 @@ export const TOOL_DEFINITION = {
 interface LockObjectArgs {
   object_name: string;
   object_type: string;
+  super_package?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -64,6 +69,7 @@ export async function handleLockObject(args: any) {
     const {
       object_name,
       object_type,
+      super_package,
       session_id,
       session_state
     } = args as LockObjectArgs;
@@ -73,7 +79,7 @@ export async function handleLockObject(args: any) {
       return return_error(new Error('object_name and object_type are required'));
     }
 
-    const validTypes = ['class', 'program', 'interface', 'function_group', 'function_module', 'table', 'structure', 'view', 'domain', 'data_element', 'package'];
+    const validTypes = ['class', 'program', 'interface', 'function_group', 'function_module', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'metadata_extension'];
     if (!validTypes.includes(object_type.toLowerCase())) {
       return return_error(new Error(`Invalid object_type. Must be one of: ${validTypes.join(', ')}`));
     }
@@ -153,8 +159,13 @@ export async function handleLockObject(args: any) {
           lockHandle = client.getLockHandle();
           break;
         case 'package':
-          // Package requires superPackage parameter - need to fetch it or handle differently
-          return return_error(new Error('Package locking via LockObject is not supported. Use specific package operations.'));
+          // Package requires superPackage parameter
+          if (!super_package) {
+            return return_error(new Error('super_package is required for package locking. Please provide the parent package name.'));
+          }
+          await client.lockPackage(objectName, super_package.toUpperCase());
+          lockHandle = client.getLockHandle();
+          break;
         default:
           return return_error(new Error(`Unsupported object_type: ${object_type}`));
       }

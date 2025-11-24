@@ -42,10 +42,17 @@ npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
 npm install ./fr0ster-mcp-abap-adt-1.1.0.tgz
 ```
 
-After installation, you'll have access to these commands:
-- `mcp-abap-adt` - Default stdio transport
+After installation, you'll have access to:
+- `mcp-abap-adt` - MCP ABAP ADT Server (default: HTTP mode)
+- `mcp-abap-adt --transport=stdio` - stdio transport (for MCP clients)
 - `mcp-abap-adt --transport=http` - HTTP server transport
 - `mcp-abap-adt --transport=sse` - SSE transport
+
+**For JWT authentication with service keys**, install the connection package separately:
+```bash
+npm install -g @mcp-abap-adt/connection
+sap-abap-auth auth -k path/to/service-key.json
+```
 
 **Get help on available options:**
 ```bash
@@ -53,6 +60,8 @@ mcp-abap-adt --help
 ```
 
 **Setup .env file:**
+
+For basic authentication:
 ```bash
 # The server automatically looks for .env in your current directory
 cd ~/my-project
@@ -63,9 +72,26 @@ SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
 EOF
+```
 
-# Run the server (automatically finds .env in current directory)
+For JWT authentication (SAP BTP) with service key:
+```bash
+# Install the connection package globally (one-time setup)
+npm install -g @mcp-abap-adt/connection
+
+# Generate .env file from service key JSON
+sap-abap-auth auth -k path/to/service-key.json
+
+# This automatically creates/updates .env file with JWT tokens
+```
+
+**Run the server:**
+```bash
+# Default HTTP mode (works without .env file)
 mcp-abap-adt
+
+# stdio mode (for MCP clients, requires .env file)
+mcp-abap-adt --transport=stdio
 
 # Or specify custom .env location
 mcp-abap-adt --env=/path/to/my.env
@@ -227,14 +253,23 @@ mcp-abap-adt --transport=sse --help
 **Available commands after global installation:**
 
 ```bash
-# Default stdio transport
+# Default HTTP mode (works without .env file)
 mcp-abap-adt
 
+# stdio mode (for MCP clients, requires .env file)
+mcp-abap-adt --transport=stdio
+
 # HTTP server transport
-mcp-abap-adt --transport=http --port 3000
+mcp-abap-adt --transport=http --http-port=3000
 
 # SSE transport
-mcp-abap-adt --transport=sse --port 3000
+mcp-abap-adt --transport=sse --sse-port=3001
+```
+
+**For JWT authentication with service keys**, install separately:
+```bash
+npm install -g @mcp-abap-adt/connection
+sap-abap-auth auth -k path/to/service-key.json
 ```
 
 #### Local Installation (Project-specific)

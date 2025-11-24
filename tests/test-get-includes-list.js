@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleGetIncludesList } = require('../dist/handlers/include/low/handleGetIncludesList');
+const { handleGetIncludesList } = require('../dist/handlers/include/readonly/handleGetIncludesList');
 
 async function testGetIncludesList() {
   const testCases = getAllEnabledTestCases('get_includes_list');

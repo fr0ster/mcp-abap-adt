@@ -15,45 +15,45 @@ import { randomUUID } from "crypto";
 
 // Import handler functions
 // Import handler functions
-import { handleGetProgram } from "./handlers/program/low/handleGetProgram";
-import { handleGetClass } from "./handlers/class/low/handleGetClass";
-import { handleGetFunctionGroup } from "./handlers/function/low/handleGetFunctionGroup";
-import { handleGetFunction } from "./handlers/function/low/handleGetFunction";
-import { handleGetTable } from "./handlers/table/low/handleGetTable";
-import { handleGetStructure } from "./handlers/structure/low/handleGetStructure";
-import { handleGetTableContents } from "./handlers/table/low/handleGetTableContents";
-import { handleGetPackage } from "./handlers/package/low/handleGetPackage";
+import { handleGetProgram } from "./handlers/program/readonly/handleGetProgram";
+import { handleGetClass } from "./handlers/class/readonly/handleGetClass";
+import { handleGetFunctionGroup } from "./handlers/function/readonly/handleGetFunctionGroup";
+import { handleGetFunction } from "./handlers/function/readonly/handleGetFunction";
+import { handleGetTable } from "./handlers/table/readonly/handleGetTable";
+import { handleGetStructure } from "./handlers/structure/readonly/handleGetStructure";
+import { handleGetTableContents } from "./handlers/table/readonly/handleGetTableContents";
+import { handleGetPackage } from "./handlers/package/readonly/handleGetPackage";
 import { handleCreatePackage } from "./handlers/package/high/handleCreatePackage";
-import { handleGetInclude } from "./handlers/include/low/handleGetInclude";
-import { handleGetIncludesList } from "./handlers/include/low/handleGetIncludesList";
-import { handleGetTypeInfo } from "./handlers/system/low/handleGetTypeInfo";
-import { handleGetInterface } from "./handlers/interface/low/handleGetInterface";
-import { handleGetTransaction } from "./handlers/system/low/handleGetTransaction";
-import { handleSearchObject } from "./handlers/search/low/handleSearchObject";
-import { handleGetEnhancements } from "./handlers/enhancement/low/handleGetEnhancements";
-import { handleGetEnhancementImpl } from "./handlers/enhancement/low/handleGetEnhancementImpl";
-import { handleGetEnhancementSpot } from "./handlers/enhancement/low/handleGetEnhancementSpot";
-import { handleGetBdef } from "./handlers/bdef/low/handleGetBdef";
-import { handleGetSqlQuery } from "./handlers/system/low/handleGetSqlQuery";
-import { handleGetObjectsByType } from "./handlers/search/low/handleGetObjectsByType";
-import { handleGetWhereUsed } from "./handlers/system/low/handleGetWhereUsed";
-import { handleGetObjectInfo } from "./handlers/system/low/handleGetObjectInfo";
-import { handleDescribeByList } from "./handlers/system/low/handleDescribeByList";
-import { handleGetAbapAST } from "./handlers/system/low/handleGetAbapAST";
-import { handleGetAbapSemanticAnalysis } from "./handlers/system/low/handleGetAbapSemanticAnalysis";
-import { handleGetAbapSystemSymbols } from "./handlers/system/low/handleGetAbapSystemSymbols";
-import { handleGetDomain } from "./handlers/domain/low/handleGetDomain";
+import { handleGetInclude } from "./handlers/include/readonly/handleGetInclude";
+import { handleGetIncludesList } from "./handlers/include/readonly/handleGetIncludesList";
+import { handleGetTypeInfo } from "./handlers/system/readonly/handleGetTypeInfo";
+import { handleGetInterface } from "./handlers/interface/readonly/handleGetInterface";
+import { handleGetTransaction } from "./handlers/system/readonly/handleGetTransaction";
+import { handleSearchObject } from "./handlers/search/readonly/handleSearchObject";
+import { handleGetEnhancements } from "./handlers/enhancement/readonly/handleGetEnhancements";
+import { handleGetEnhancementImpl } from "./handlers/enhancement/readonly/handleGetEnhancementImpl";
+import { handleGetEnhancementSpot } from "./handlers/enhancement/readonly/handleGetEnhancementSpot";
+import { handleGetBdef } from "./handlers/bdef/readonly/handleGetBdef";
+import { handleGetSqlQuery } from "./handlers/system/readonly/handleGetSqlQuery";
+import { handleGetObjectsByType } from "./handlers/search/readonly/handleGetObjectsByType";
+import { handleGetWhereUsed } from "./handlers/system/readonly/handleGetWhereUsed";
+import { handleGetObjectInfo } from "./handlers/system/readonly/handleGetObjectInfo";
+import { handleDescribeByList } from "./handlers/system/readonly/handleDescribeByList";
+import { handleGetAbapAST } from "./handlers/system/readonly/handleGetAbapAST";
+import { handleGetAbapSemanticAnalysis } from "./handlers/system/readonly/handleGetAbapSemanticAnalysis";
+import { handleGetAbapSystemSymbols } from "./handlers/system/readonly/handleGetAbapSystemSymbols";
+import { handleGetDomain } from "./handlers/domain/readonly/handleGetDomain";
 import { handleCreateDomain } from "./handlers/domain/high/handleCreateDomain";
-import { handleUpdateDomain } from "./handlers/domain/high/handleUpdateDomain";
+import { handleUpdateDomain as handleUpdateDomainHigh } from "./handlers/domain/high/handleUpdateDomain";
 import { handleCreateDataElement } from "./handlers/data_element/high/handleCreateDataElement";
-import { handleUpdateDataElement } from "./handlers/data_element/high/handleUpdateDataElement";
-import { handleGetDataElement } from "./handlers/data_element/low/handleGetDataElement";
+import { handleUpdateDataElement as handleUpdateDataElementHigh } from "./handlers/data_element/high/handleUpdateDataElement";
+import { handleGetDataElement } from "./handlers/data_element/readonly/handleGetDataElement";
 import { handleCreateTransport } from "./handlers/transport/high/handleCreateTransport";
-import { handleGetTransport } from "./handlers/transport/low/handleGetTransport";
+import { handleGetTransport } from "./handlers/transport/readonly/handleGetTransport";
 import { handleCreateTable } from "./handlers/table/high/handleCreateTable";
 import { handleCreateStructure } from "./handlers/structure/high/handleCreateStructure";
 import { handleCreateView } from "./handlers/view/high/handleCreateView";
-import { handleGetView } from "./handlers/view/low/handleGetView";
+import { handleGetView } from "./handlers/view/readonly/handleGetView";
 import { handleCreateClass } from "./handlers/class/high/handleCreateClass";
 import { handleCreateProgram } from "./handlers/program/high/handleCreateProgram";
 import { handleCreateInterface } from "./handlers/interface/high/handleCreateInterface";
@@ -62,12 +62,25 @@ import { handleCreateFunctionModule } from "./handlers/function/high/handleCreat
 import { handleActivateObject } from "./handlers/common/low/handleActivateObject";
 import { handleDeleteObject } from "./handlers/common/low/handleDeleteObject";
 import { handleCheckObject } from "./handlers/common/low/handleCheckObject";
-import { handleUpdateClassSource } from "./handlers/class/high/handleUpdateClassSource";
-import { handleUpdateProgramSource } from "./handlers/program/high/handleUpdateProgramSource";
-import { handleUpdateViewSource } from "./handlers/view/high/handleUpdateViewSource";
-import { handleUpdateInterfaceSource } from "./handlers/interface/high/handleUpdateInterfaceSource";
-import { handleUpdateFunctionModuleSource } from "./handlers/function/high/handleUpdateFunctionModuleSource";
-import { handleGetSession } from "./handlers/system/low/handleGetSession";
+import { handleUpdateClass as handleUpdateClassHigh } from "./handlers/class/high/handleUpdateClass";
+import { handleUpdateProgram as handleUpdateProgramHigh } from "./handlers/program/high/handleUpdateProgram";
+import { handleUpdateView as handleUpdateViewHigh } from "./handlers/view/high/handleUpdateView";
+import { handleUpdateInterface as handleUpdateInterfaceHigh } from "./handlers/interface/high/handleUpdateInterface";
+import { handleUpdateFunctionModule as handleUpdateFunctionModuleHigh } from "./handlers/function/high/handleUpdateFunctionModule";
+import { handleUpdateStructure } from "./handlers/structure/low/handleUpdateStructure";
+import { handleUpdatePackage } from "./handlers/package/low/handleUpdatePackage";
+import { handleUpdateTable } from "./handlers/table/low/handleUpdateTable";
+import { handleUnlockPackage } from "./handlers/package/low/handleUnlockPackage";
+import { handleUpdateClass as handleUpdateClassLow } from "./handlers/class/low/handleUpdateClass";
+import { handleUpdateProgram as handleUpdateProgramLow } from "./handlers/program/low/handleUpdateProgram";
+import { handleUpdateInterface as handleUpdateInterfaceLow } from "./handlers/interface/low/handleUpdateInterface";
+import { handleUpdateFunctionModule as handleUpdateFunctionModuleLow } from "./handlers/function/low/handleUpdateFunctionModule";
+import { handleUpdateView as handleUpdateViewLow } from "./handlers/view/low/handleUpdateView";
+import { handleUpdateDomain } from "./handlers/domain/low/handleUpdateDomain";
+import { handleUpdateDataElement } from "./handlers/data_element/low/handleUpdateDataElement";
+import { handleUpdateBehaviorDefinition as handleUpdateBehaviorDefinitionLow } from "./handlers/bdef/low/handleUpdateBehaviorDefinition";
+import { handleUpdateMetadataExtension as handleUpdateMetadataExtensionLow } from "./handlers/ddlx/low/handleUpdateMetadataExtension";
+import { handleGetSession } from "./handlers/system/readonly/handleGetSession";
 import { handleValidateObject } from "./handlers/common/low/handleValidateObject";
 import { handleLockObject } from "./handlers/common/low/handleLockObject";
 import { handleUnlockObject } from "./handlers/common/low/handleUnlockObject";
@@ -78,10 +91,83 @@ import { handleCheckTable } from "./handlers/table/low/handleCheckTable";
 import { handleValidateFunctionModule } from "./handlers/function/low/handleValidateFunctionModule";
 import { handleCheckFunctionModule } from "./handlers/function/low/handleCheckFunctionModule";
 import { handleCreateBehaviorDefinition } from "./handlers/bdef/high/handleCreateBehaviorDefinition";
-import { handleUpdateBehaviorDefinition } from "./handlers/bdef/high/handleUpdateBehaviorDefinition";
+import { handleUpdateBehaviorDefinition as handleUpdateBehaviorDefinitionHigh } from "./handlers/bdef/high/handleUpdateBehaviorDefinition";
 import { handleCreateMetadataExtension } from "./handlers/ddlx/high/handleCreateMetadataExtension";
-import { handleUpdateMetadataExtension } from "./handlers/ddlx/high/handleUpdateMetadataExtension";
-import { handleGetInactiveObjects } from "./handlers/system/low/handleGetInactiveObjects";
+import { handleUpdateMetadataExtension as handleUpdateMetadataExtensionHigh } from "./handlers/ddlx/high/handleUpdateMetadataExtension";
+import { handleGetInactiveObjects } from "./handlers/system/readonly/handleGetInactiveObjects";
+// New low-level handlers imports
+import { handleDeleteClass } from "./handlers/class/low/handleDeleteClass";
+import { handleLockClass } from "./handlers/class/low/handleLockClass";
+import { handleUnlockClass } from "./handlers/class/low/handleUnlockClass";
+import { handleCreateClass as handleCreateClassLow } from "./handlers/class/low/handleCreateClass";
+import { handleCheckProgram } from "./handlers/program/low/handleCheckProgram";
+import { handleDeleteProgram } from "./handlers/program/low/handleDeleteProgram";
+import { handleLockProgram } from "./handlers/program/low/handleLockProgram";
+import { handleUnlockProgram } from "./handlers/program/low/handleUnlockProgram";
+import { handleValidateProgram } from "./handlers/program/low/handleValidateProgram";
+import { handleCreateProgram as handleCreateProgramLow } from "./handlers/program/low/handleCreateProgram";
+import { handleCheckInterface } from "./handlers/interface/low/handleCheckInterface";
+import { handleDeleteInterface } from "./handlers/interface/low/handleDeleteInterface";
+import { handleLockInterface } from "./handlers/interface/low/handleLockInterface";
+import { handleUnlockInterface } from "./handlers/interface/low/handleUnlockInterface";
+import { handleValidateInterface } from "./handlers/interface/low/handleValidateInterface";
+import { handleCreateInterface as handleCreateInterfaceLow } from "./handlers/interface/low/handleCreateInterface";
+import { handleCheckFunctionGroup } from "./handlers/function/low/handleCheckFunctionGroup";
+import { handleDeleteFunctionGroup } from "./handlers/function/low/handleDeleteFunctionGroup";
+import { handleDeleteFunctionModule } from "./handlers/function/low/handleDeleteFunctionModule";
+import { handleLockFunctionGroup } from "./handlers/function/low/handleLockFunctionGroup";
+import { handleLockFunctionModule } from "./handlers/function/low/handleLockFunctionModule";
+import { handleUnlockFunctionGroup } from "./handlers/function/low/handleUnlockFunctionGroup";
+import { handleUnlockFunctionModule } from "./handlers/function/low/handleUnlockFunctionModule";
+import { handleValidateFunctionGroup } from "./handlers/function/low/handleValidateFunctionGroup";
+import { handleCreateFunctionGroup as handleCreateFunctionGroupLow } from "./handlers/function/low/handleCreateFunctionGroup";
+import { handleCreateFunctionModule as handleCreateFunctionModuleLow } from "./handlers/function/low/handleCreateFunctionModule";
+import { handleCheckDataElement } from "./handlers/data_element/low/handleCheckDataElement";
+import { handleDeleteDataElement } from "./handlers/data_element/low/handleDeleteDataElement";
+import { handleLockDataElement } from "./handlers/data_element/low/handleLockDataElement";
+import { handleUnlockDataElement } from "./handlers/data_element/low/handleUnlockDataElement";
+import { handleValidateDataElement } from "./handlers/data_element/low/handleValidateDataElement";
+import { handleCreateDataElement as handleCreateDataElementLow } from "./handlers/data_element/low/handleCreateDataElement";
+import { handleCheckDomain } from "./handlers/domain/low/handleCheckDomain";
+import { handleDeleteDomain } from "./handlers/domain/low/handleDeleteDomain";
+import { handleLockDomain } from "./handlers/domain/low/handleLockDomain";
+import { handleUnlockDomain } from "./handlers/domain/low/handleUnlockDomain";
+import { handleValidateDomain } from "./handlers/domain/low/handleValidateDomain";
+import { handleCreateDomain as handleCreateDomainLow } from "./handlers/domain/low/handleCreateDomain";
+import { handleCheckStructure } from "./handlers/structure/low/handleCheckStructure";
+import { handleDeleteStructure } from "./handlers/structure/low/handleDeleteStructure";
+import { handleLockStructure } from "./handlers/structure/low/handleLockStructure";
+import { handleUnlockStructure } from "./handlers/structure/low/handleUnlockStructure";
+import { handleValidateStructure } from "./handlers/structure/low/handleValidateStructure";
+import { handleCreateStructure as handleCreateStructureLow } from "./handlers/structure/low/handleCreateStructure";
+import { handleDeleteTable } from "./handlers/table/low/handleDeleteTable";
+import { handleLockTable } from "./handlers/table/low/handleLockTable";
+import { handleUnlockTable } from "./handlers/table/low/handleUnlockTable";
+import { handleCreateTable as handleCreateTableLow } from "./handlers/table/low/handleCreateTable";
+import { handleCheckView } from "./handlers/view/low/handleCheckView";
+import { handleDeleteView } from "./handlers/view/low/handleDeleteView";
+import { handleLockView } from "./handlers/view/low/handleLockView";
+import { handleUnlockView } from "./handlers/view/low/handleUnlockView";
+import { handleValidateView } from "./handlers/view/low/handleValidateView";
+import { handleCreateView as handleCreateViewLow } from "./handlers/view/low/handleCreateView";
+import { handleCheckPackage } from "./handlers/package/low/handleCheckPackage";
+import { handleDeletePackage } from "./handlers/package/low/handleDeletePackage";
+import { handleLockPackage } from "./handlers/package/low/handleLockPackage";
+import { handleValidatePackage } from "./handlers/package/low/handleValidatePackage";
+import { handleCreatePackage as handleCreatePackageLow } from "./handlers/package/low/handleCreatePackage";
+import { handleCreateTransport as handleCreateTransportLow } from "./handlers/transport/low/handleCreateTransport";
+import { handleCheckBehaviorDefinition } from "./handlers/bdef/low/handleCheckBehaviorDefinition";
+import { handleDeleteBehaviorDefinition } from "./handlers/bdef/low/handleDeleteBehaviorDefinition";
+import { handleLockBehaviorDefinition } from "./handlers/bdef/low/handleLockBehaviorDefinition";
+import { handleUnlockBehaviorDefinition } from "./handlers/bdef/low/handleUnlockBehaviorDefinition";
+import { handleValidateBehaviorDefinition } from "./handlers/bdef/low/handleValidateBehaviorDefinition";
+import { handleCreateBehaviorDefinition as handleCreateBehaviorDefinitionLow } from "./handlers/bdef/low/handleCreateBehaviorDefinition";
+import { handleCheckMetadataExtension } from "./handlers/ddlx/low/handleCheckMetadataExtension";
+import { handleDeleteMetadataExtension } from "./handlers/ddlx/low/handleDeleteMetadataExtension";
+import { handleLockMetadataExtension } from "./handlers/ddlx/low/handleLockMetadataExtension";
+import { handleUnlockMetadataExtension } from "./handlers/ddlx/low/handleUnlockMetadataExtension";
+import { handleValidateMetadataExtension } from "./handlers/ddlx/low/handleValidateMetadataExtension";
+import { handleCreateMetadataExtension as handleCreateMetadataExtensionLow } from "./handlers/ddlx/low/handleCreateMetadataExtension";
 
 // Import shared utility functions and types
 import {
@@ -102,43 +188,43 @@ import { logger } from "./lib/logger";
 import { getAllTools } from "./lib/toolsRegistry";
 
 // Import TOOL_DEFINITION from handlers
-import { TOOL_DEFINITION as GetProgram_Tool } from "./handlers/program/low/handleGetProgram";
-import { TOOL_DEFINITION as GetClass_Tool } from "./handlers/class/low/handleGetClass";
-import { TOOL_DEFINITION as GetFunction_Tool } from "./handlers/function/low/handleGetFunction";
-import { TOOL_DEFINITION as GetFunctionGroup_Tool } from "./handlers/function/low/handleGetFunctionGroup";
-import { TOOL_DEFINITION as GetTable_Tool } from "./handlers/table/low/handleGetTable";
-import { TOOL_DEFINITION as GetStructure_Tool } from "./handlers/structure/low/handleGetStructure";
-import { TOOL_DEFINITION as GetTableContents_Tool } from "./handlers/table/low/handleGetTableContents";
-import { TOOL_DEFINITION as GetPackage_Tool } from "./handlers/package/low/handleGetPackage";
+import { TOOL_DEFINITION as GetProgram_Tool } from "./handlers/program/readonly/handleGetProgram";
+import { TOOL_DEFINITION as GetClass_Tool } from "./handlers/class/readonly/handleGetClass";
+import { TOOL_DEFINITION as GetFunction_Tool } from "./handlers/function/readonly/handleGetFunction";
+import { TOOL_DEFINITION as GetFunctionGroup_Tool } from "./handlers/function/readonly/handleGetFunctionGroup";
+import { TOOL_DEFINITION as GetTable_Tool } from "./handlers/table/readonly/handleGetTable";
+import { TOOL_DEFINITION as GetStructure_Tool } from "./handlers/structure/readonly/handleGetStructure";
+import { TOOL_DEFINITION as GetTableContents_Tool } from "./handlers/table/readonly/handleGetTableContents";
+import { TOOL_DEFINITION as GetPackage_Tool } from "./handlers/package/readonly/handleGetPackage";
 import { TOOL_DEFINITION as CreatePackage_Tool } from "./handlers/package/high/handleCreatePackage";
-import { TOOL_DEFINITION as GetInclude_Tool } from "./handlers/include/low/handleGetInclude";
-import { TOOL_DEFINITION as GetIncludesList_Tool } from "./handlers/include/low/handleGetIncludesList";
-import { TOOL_DEFINITION as GetTypeInfo_Tool } from "./handlers/system/low/handleGetTypeInfo";
-import { TOOL_DEFINITION as GetInterface_Tool } from "./handlers/interface/low/handleGetInterface";
-import { TOOL_DEFINITION as GetTransaction_Tool } from "./handlers/system/low/handleGetTransaction";
-import { TOOL_DEFINITION as SearchObject_Tool } from "./handlers/search/low/handleSearchObject";
-import { TOOL_DEFINITION as GetEnhancements_Tool } from "./handlers/enhancement/low/handleGetEnhancements";
-import { TOOL_DEFINITION as GetEnhancementImpl_Tool } from "./handlers/enhancement/low/handleGetEnhancementImpl";
-import { TOOL_DEFINITION as GetEnhancementSpot_Tool } from "./handlers/enhancement/low/handleGetEnhancementSpot";
-import { TOOL_DEFINITION as GetBdef_Tool } from "./handlers/bdef/low/handleGetBdef";
-import { TOOL_DEFINITION as GetSqlQuery_Tool } from "./handlers/system/low/handleGetSqlQuery";
-import { TOOL_DEFINITION as GetWhereUsed_Tool } from "./handlers/system/low/handleGetWhereUsed";
-import { TOOL_DEFINITION as GetObjectInfo_Tool } from "./handlers/system/low/handleGetObjectInfo";
-import { TOOL_DEFINITION as GetAbapAST_Tool } from "./handlers/system/low/handleGetAbapAST";
-import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from "./handlers/system/low/handleGetAbapSemanticAnalysis";
-import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from "./handlers/system/low/handleGetAbapSystemSymbols";
-import { TOOL_DEFINITION as GetDomain_Tool } from "./handlers/domain/low/handleGetDomain";
+import { TOOL_DEFINITION as GetInclude_Tool } from "./handlers/include/readonly/handleGetInclude";
+import { TOOL_DEFINITION as GetIncludesList_Tool } from "./handlers/include/readonly/handleGetIncludesList";
+import { TOOL_DEFINITION as GetTypeInfo_Tool } from "./handlers/system/readonly/handleGetTypeInfo";
+import { TOOL_DEFINITION as GetInterface_Tool } from "./handlers/interface/readonly/handleGetInterface";
+import { TOOL_DEFINITION as GetTransaction_Tool } from "./handlers/system/readonly/handleGetTransaction";
+import { TOOL_DEFINITION as SearchObject_Tool } from "./handlers/search/readonly/handleSearchObject";
+import { TOOL_DEFINITION as GetEnhancements_Tool } from "./handlers/enhancement/readonly/handleGetEnhancements";
+import { TOOL_DEFINITION as GetEnhancementImpl_Tool } from "./handlers/enhancement/readonly/handleGetEnhancementImpl";
+import { TOOL_DEFINITION as GetEnhancementSpot_Tool } from "./handlers/enhancement/readonly/handleGetEnhancementSpot";
+import { TOOL_DEFINITION as GetBdef_Tool } from "./handlers/bdef/readonly/handleGetBdef";
+import { TOOL_DEFINITION as GetSqlQuery_Tool } from "./handlers/system/readonly/handleGetSqlQuery";
+import { TOOL_DEFINITION as GetWhereUsed_Tool } from "./handlers/system/readonly/handleGetWhereUsed";
+import { TOOL_DEFINITION as GetObjectInfo_Tool } from "./handlers/system/readonly/handleGetObjectInfo";
+import { TOOL_DEFINITION as GetAbapAST_Tool } from "./handlers/system/readonly/handleGetAbapAST";
+import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from "./handlers/system/readonly/handleGetAbapSemanticAnalysis";
+import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from "./handlers/system/readonly/handleGetAbapSystemSymbols";
+import { TOOL_DEFINITION as GetDomain_Tool } from "./handlers/domain/readonly/handleGetDomain";
 import { TOOL_DEFINITION as CreateDomain_Tool } from "./handlers/domain/high/handleCreateDomain";
-import { TOOL_DEFINITION as UpdateDomain_Tool } from "./handlers/domain/high/handleUpdateDomain";
+import { TOOL_DEFINITION as UpdateDomainHigh_Tool } from "./handlers/domain/high/handleUpdateDomain";
 import { TOOL_DEFINITION as CreateDataElement_Tool } from "./handlers/data_element/high/handleCreateDataElement";
-import { TOOL_DEFINITION as UpdateDataElement_Tool } from "./handlers/data_element/high/handleUpdateDataElement";
-import { TOOL_DEFINITION as GetDataElement_Tool } from "./handlers/data_element/low/handleGetDataElement";
+import { TOOL_DEFINITION as UpdateDataElementHigh_Tool } from "./handlers/data_element/high/handleUpdateDataElement";
+import { TOOL_DEFINITION as GetDataElement_Tool } from "./handlers/data_element/readonly/handleGetDataElement";
 import { TOOL_DEFINITION as CreateTransport_Tool } from "./handlers/transport/high/handleCreateTransport";
-import { TOOL_DEFINITION as GetTransport_Tool } from "./handlers/transport/low/handleGetTransport";
+import { TOOL_DEFINITION as GetTransport_Tool } from "./handlers/transport/readonly/handleGetTransport";
 import { TOOL_DEFINITION as CreateTable_Tool } from "./handlers/table/high/handleCreateTable";
 import { TOOL_DEFINITION as CreateStructure_Tool } from "./handlers/structure/high/handleCreateStructure";
 import { TOOL_DEFINITION as CreateView_Tool } from "./handlers/view/high/handleCreateView";
-import { TOOL_DEFINITION as GetView_Tool } from "./handlers/view/low/handleGetView";
+import { TOOL_DEFINITION as GetView_Tool } from "./handlers/view/readonly/handleGetView";
 import { TOOL_DEFINITION as CreateClass_Tool } from "./handlers/class/high/handleCreateClass";
 import { TOOL_DEFINITION as CreateProgram_Tool } from "./handlers/program/high/handleCreateProgram";
 import { TOOL_DEFINITION as CreateInterface_Tool } from "./handlers/interface/high/handleCreateInterface";
@@ -147,12 +233,25 @@ import { TOOL_DEFINITION as CreateFunctionModule_Tool } from "./handlers/functio
 import { TOOL_DEFINITION as ActivateObject_Tool } from "./handlers/common/low/handleActivateObject";
 import { TOOL_DEFINITION as DeleteObject_Tool } from "./handlers/common/low/handleDeleteObject";
 import { TOOL_DEFINITION as CheckObject_Tool } from "./handlers/common/low/handleCheckObject";
-import { TOOL_DEFINITION as UpdateClassSource_Tool } from "./handlers/class/high/handleUpdateClassSource";
-import { TOOL_DEFINITION as UpdateProgramSource_Tool } from "./handlers/program/high/handleUpdateProgramSource";
-import { TOOL_DEFINITION as UpdateViewSource_Tool } from "./handlers/view/high/handleUpdateViewSource";
-import { TOOL_DEFINITION as UpdateInterfaceSource_Tool } from "./handlers/interface/high/handleUpdateInterfaceSource";
-import { TOOL_DEFINITION as UpdateFunctionModuleSource_Tool } from "./handlers/function/high/handleUpdateFunctionModuleSource";
-import { TOOL_DEFINITION as GetSession_Tool } from "./handlers/system/low/handleGetSession";
+import { TOOL_DEFINITION as UpdateClassHigh_Tool } from "./handlers/class/high/handleUpdateClass";
+import { TOOL_DEFINITION as UpdateProgramHigh_Tool } from "./handlers/program/high/handleUpdateProgram";
+import { TOOL_DEFINITION as UpdateViewHigh_Tool } from "./handlers/view/high/handleUpdateView";
+import { TOOL_DEFINITION as UpdateInterfaceHigh_Tool } from "./handlers/interface/high/handleUpdateInterface";
+import { TOOL_DEFINITION as UpdateFunctionModuleHigh_Tool } from "./handlers/function/high/handleUpdateFunctionModule";
+import { TOOL_DEFINITION as UpdateStructure_Tool } from "./handlers/structure/low/handleUpdateStructure";
+import { TOOL_DEFINITION as UpdatePackage_Tool } from "./handlers/package/low/handleUpdatePackage";
+import { TOOL_DEFINITION as UpdateTable_Tool } from "./handlers/table/low/handleUpdateTable";
+import { TOOL_DEFINITION as UnlockPackage_Tool } from "./handlers/package/low/handleUnlockPackage";
+import { TOOL_DEFINITION as UpdateClass_Tool } from "./handlers/class/low/handleUpdateClass";
+import { TOOL_DEFINITION as UpdateProgram_Tool } from "./handlers/program/low/handleUpdateProgram";
+import { TOOL_DEFINITION as UpdateInterface_Tool } from "./handlers/interface/low/handleUpdateInterface";
+import { TOOL_DEFINITION as UpdateFunctionModule_Tool } from "./handlers/function/low/handleUpdateFunctionModule";
+import { TOOL_DEFINITION as UpdateView_Tool } from "./handlers/view/low/handleUpdateView";
+import { TOOL_DEFINITION as UpdateDomainLow_Tool } from "./handlers/domain/low/handleUpdateDomain";
+import { TOOL_DEFINITION as UpdateDataElementLow_Tool } from "./handlers/data_element/low/handleUpdateDataElement";
+import { TOOL_DEFINITION as UpdateBehaviorDefinitionLow_Tool } from "./handlers/bdef/low/handleUpdateBehaviorDefinition";
+import { TOOL_DEFINITION as UpdateMetadataExtensionLow_Tool } from "./handlers/ddlx/low/handleUpdateMetadataExtension";
+import { TOOL_DEFINITION as GetSession_Tool } from "./handlers/system/readonly/handleGetSession";
 import { TOOL_DEFINITION as ValidateObject_Tool } from "./handlers/common/low/handleValidateObject";
 import { TOOL_DEFINITION as LockObject_Tool } from "./handlers/common/low/handleLockObject";
 import { TOOL_DEFINITION as UnlockObject_Tool } from "./handlers/common/low/handleUnlockObject";
@@ -166,7 +265,80 @@ import { TOOL_DEFINITION as CreateBdef_Tool } from "./handlers/bdef/high/handleC
 import { TOOL_DEFINITION as UpdateBdef_Tool } from "./handlers/bdef/high/handleUpdateBehaviorDefinition";
 import { TOOL_DEFINITION as CreateDdlx_Tool } from "./handlers/ddlx/high/handleCreateMetadataExtension";
 import { TOOL_DEFINITION as UpdateDdlx_Tool } from "./handlers/ddlx/high/handleUpdateMetadataExtension";
-import { TOOL_DEFINITION as GetInactiveObjects_Tool } from "./handlers/system/low/handleGetInactiveObjects";
+import { TOOL_DEFINITION as GetInactiveObjects_Tool } from "./handlers/system/readonly/handleGetInactiveObjects";
+// New low-level handlers TOOL_DEFINITION imports
+import { TOOL_DEFINITION as DeleteClass_Tool } from "./handlers/class/low/handleDeleteClass";
+import { TOOL_DEFINITION as LockClass_Tool } from "./handlers/class/low/handleLockClass";
+import { TOOL_DEFINITION as UnlockClass_Tool } from "./handlers/class/low/handleUnlockClass";
+import { TOOL_DEFINITION as CreateClassLow_Tool } from "./handlers/class/low/handleCreateClass";
+import { TOOL_DEFINITION as CheckProgram_Tool } from "./handlers/program/low/handleCheckProgram";
+import { TOOL_DEFINITION as DeleteProgram_Tool } from "./handlers/program/low/handleDeleteProgram";
+import { TOOL_DEFINITION as LockProgram_Tool } from "./handlers/program/low/handleLockProgram";
+import { TOOL_DEFINITION as UnlockProgram_Tool } from "./handlers/program/low/handleUnlockProgram";
+import { TOOL_DEFINITION as ValidateProgram_Tool } from "./handlers/program/low/handleValidateProgram";
+import { TOOL_DEFINITION as CreateProgramLow_Tool } from "./handlers/program/low/handleCreateProgram";
+import { TOOL_DEFINITION as CheckInterface_Tool } from "./handlers/interface/low/handleCheckInterface";
+import { TOOL_DEFINITION as DeleteInterface_Tool } from "./handlers/interface/low/handleDeleteInterface";
+import { TOOL_DEFINITION as LockInterface_Tool } from "./handlers/interface/low/handleLockInterface";
+import { TOOL_DEFINITION as UnlockInterface_Tool } from "./handlers/interface/low/handleUnlockInterface";
+import { TOOL_DEFINITION as ValidateInterface_Tool } from "./handlers/interface/low/handleValidateInterface";
+import { TOOL_DEFINITION as CreateInterfaceLow_Tool } from "./handlers/interface/low/handleCreateInterface";
+import { TOOL_DEFINITION as CheckFunctionGroup_Tool } from "./handlers/function/low/handleCheckFunctionGroup";
+import { TOOL_DEFINITION as DeleteFunctionGroup_Tool } from "./handlers/function/low/handleDeleteFunctionGroup";
+import { TOOL_DEFINITION as DeleteFunctionModule_Tool } from "./handlers/function/low/handleDeleteFunctionModule";
+import { TOOL_DEFINITION as LockFunctionGroup_Tool } from "./handlers/function/low/handleLockFunctionGroup";
+import { TOOL_DEFINITION as LockFunctionModule_Tool } from "./handlers/function/low/handleLockFunctionModule";
+import { TOOL_DEFINITION as UnlockFunctionGroup_Tool } from "./handlers/function/low/handleUnlockFunctionGroup";
+import { TOOL_DEFINITION as UnlockFunctionModule_Tool } from "./handlers/function/low/handleUnlockFunctionModule";
+import { TOOL_DEFINITION as ValidateFunctionGroup_Tool } from "./handlers/function/low/handleValidateFunctionGroup";
+import { TOOL_DEFINITION as CreateFunctionGroupLow_Tool } from "./handlers/function/low/handleCreateFunctionGroup";
+import { TOOL_DEFINITION as CreateFunctionModuleLow_Tool } from "./handlers/function/low/handleCreateFunctionModule";
+import { TOOL_DEFINITION as CheckDataElement_Tool } from "./handlers/data_element/low/handleCheckDataElement";
+import { TOOL_DEFINITION as DeleteDataElement_Tool } from "./handlers/data_element/low/handleDeleteDataElement";
+import { TOOL_DEFINITION as LockDataElement_Tool } from "./handlers/data_element/low/handleLockDataElement";
+import { TOOL_DEFINITION as UnlockDataElement_Tool } from "./handlers/data_element/low/handleUnlockDataElement";
+import { TOOL_DEFINITION as ValidateDataElement_Tool } from "./handlers/data_element/low/handleValidateDataElement";
+import { TOOL_DEFINITION as CreateDataElementLow_Tool } from "./handlers/data_element/low/handleCreateDataElement";
+import { TOOL_DEFINITION as CheckDomain_Tool } from "./handlers/domain/low/handleCheckDomain";
+import { TOOL_DEFINITION as DeleteDomain_Tool } from "./handlers/domain/low/handleDeleteDomain";
+import { TOOL_DEFINITION as LockDomain_Tool } from "./handlers/domain/low/handleLockDomain";
+import { TOOL_DEFINITION as UnlockDomain_Tool } from "./handlers/domain/low/handleUnlockDomain";
+import { TOOL_DEFINITION as ValidateDomain_Tool } from "./handlers/domain/low/handleValidateDomain";
+import { TOOL_DEFINITION as CreateDomainLow_Tool } from "./handlers/domain/low/handleCreateDomain";
+import { TOOL_DEFINITION as CheckStructure_Tool } from "./handlers/structure/low/handleCheckStructure";
+import { TOOL_DEFINITION as DeleteStructure_Tool } from "./handlers/structure/low/handleDeleteStructure";
+import { TOOL_DEFINITION as LockStructure_Tool } from "./handlers/structure/low/handleLockStructure";
+import { TOOL_DEFINITION as UnlockStructure_Tool } from "./handlers/structure/low/handleUnlockStructure";
+import { TOOL_DEFINITION as ValidateStructure_Tool } from "./handlers/structure/low/handleValidateStructure";
+import { TOOL_DEFINITION as CreateStructureLow_Tool } from "./handlers/structure/low/handleCreateStructure";
+import { TOOL_DEFINITION as DeleteTable_Tool } from "./handlers/table/low/handleDeleteTable";
+import { TOOL_DEFINITION as LockTable_Tool } from "./handlers/table/low/handleLockTable";
+import { TOOL_DEFINITION as UnlockTable_Tool } from "./handlers/table/low/handleUnlockTable";
+import { TOOL_DEFINITION as CreateTableLow_Tool } from "./handlers/table/low/handleCreateTable";
+import { TOOL_DEFINITION as CheckView_Tool } from "./handlers/view/low/handleCheckView";
+import { TOOL_DEFINITION as DeleteView_Tool } from "./handlers/view/low/handleDeleteView";
+import { TOOL_DEFINITION as LockView_Tool } from "./handlers/view/low/handleLockView";
+import { TOOL_DEFINITION as UnlockView_Tool } from "./handlers/view/low/handleUnlockView";
+import { TOOL_DEFINITION as ValidateView_Tool } from "./handlers/view/low/handleValidateView";
+import { TOOL_DEFINITION as CreateViewLow_Tool } from "./handlers/view/low/handleCreateView";
+import { TOOL_DEFINITION as CheckPackage_Tool } from "./handlers/package/low/handleCheckPackage";
+import { TOOL_DEFINITION as DeletePackage_Tool } from "./handlers/package/low/handleDeletePackage";
+import { TOOL_DEFINITION as LockPackage_Tool } from "./handlers/package/low/handleLockPackage";
+import { TOOL_DEFINITION as ValidatePackage_Tool } from "./handlers/package/low/handleValidatePackage";
+import { TOOL_DEFINITION as CreatePackageLow_Tool } from "./handlers/package/low/handleCreatePackage";
+import { TOOL_DEFINITION as CreateTransportLow_Tool } from "./handlers/transport/low/handleCreateTransport";
+import { TOOL_DEFINITION as CheckBehaviorDefinition_Tool } from "./handlers/bdef/low/handleCheckBehaviorDefinition";
+import { TOOL_DEFINITION as DeleteBehaviorDefinition_Tool } from "./handlers/bdef/low/handleDeleteBehaviorDefinition";
+import { TOOL_DEFINITION as LockBehaviorDefinition_Tool } from "./handlers/bdef/low/handleLockBehaviorDefinition";
+import { TOOL_DEFINITION as UnlockBehaviorDefinition_Tool } from "./handlers/bdef/low/handleUnlockBehaviorDefinition";
+import { TOOL_DEFINITION as ValidateBehaviorDefinition_Tool } from "./handlers/bdef/low/handleValidateBehaviorDefinition";
+import { TOOL_DEFINITION as CreateBehaviorDefinitionLow_Tool } from "./handlers/bdef/low/handleCreateBehaviorDefinition";
+import { TOOL_DEFINITION as CheckMetadataExtension_Tool } from "./handlers/ddlx/low/handleCheckMetadataExtension";
+import { TOOL_DEFINITION as DeleteMetadataExtension_Tool } from "./handlers/ddlx/low/handleDeleteMetadataExtension";
+import { TOOL_DEFINITION as LockMetadataExtension_Tool } from "./handlers/ddlx/low/handleLockMetadataExtension";
+import { TOOL_DEFINITION as UnlockMetadataExtension_Tool } from "./handlers/ddlx/low/handleUnlockMetadataExtension";
+import { TOOL_DEFINITION as ValidateMetadataExtension_Tool } from "./handlers/ddlx/low/handleValidateMetadataExtension";
+import { TOOL_DEFINITION as CreateMetadataExtensionLow_Tool } from "./handlers/ddlx/low/handleCreateMetadataExtension";
 
 // --- ENV FILE LOADING LOGIC ---
 import fs from "fs";
@@ -248,6 +420,18 @@ SAP CONNECTION (.env file):
   SAP_PASSWORD                     SAP password (required for basic auth)
   SAP_JWT_TOKEN                    JWT token (required for jwt auth)
 
+GENERATING .ENV FROM SERVICE KEY (JWT Authentication):
+  To generate .env file from SAP BTP service key JSON file, install the
+  connection package globally:
+
+    npm install -g @mcp-abap-adt/connection
+
+  Then use the sap-abap-auth command:
+
+    sap-abap-auth auth -k path/to/service-key.json
+
+  This will create/update .env file with JWT tokens and connection details.
+
 EXAMPLES:
   # Default HTTP mode (works without .env file)
   mcp-abap-adt
@@ -294,6 +478,12 @@ DOCUMENTATION:
   Installation:    doc/installation/INSTALLATION.md
   Configuration:   doc/user-guide/CLIENT_CONFIGURATION.md
   Available Tools: doc/user-guide/AVAILABLE_TOOLS.md
+
+AUTHENTICATION:
+  For JWT authentication with SAP BTP service keys:
+  1. Install: npm install -g @mcp-abap-adt/connection
+  2. Run:     sap-abap-auth auth -k path/to/service-key.json
+  3. This generates .env file with JWT tokens automatically
 
 `;
   console.log(help);
@@ -1120,6 +1310,8 @@ export class mcp_abap_adt_server {
     this.registerToolOnServer(server, GetTableContents_Tool.name, GetTableContents_Tool.description, GetTableContents_Tool.inputSchema as any, handleGetTableContents);
     this.registerToolOnServer(server, GetPackage_Tool.name, GetPackage_Tool.description, GetPackage_Tool.inputSchema as any, handleGetPackage);
     this.registerToolOnServer(server, CreatePackage_Tool.name, CreatePackage_Tool.description, CreatePackage_Tool.inputSchema as any, handleCreatePackage);
+    this.registerToolOnServer(server, UpdatePackage_Tool.name, UpdatePackage_Tool.description, UpdatePackage_Tool.inputSchema as any, handleUpdatePackage);
+    this.registerToolOnServer(server, UnlockPackage_Tool.name, UnlockPackage_Tool.description, UnlockPackage_Tool.inputSchema as any, handleUnlockPackage);
     this.registerToolOnServer(server, GetInclude_Tool.name, GetInclude_Tool.description, GetInclude_Tool.inputSchema as any, handleGetInclude);
     this.registerToolOnServer(server, GetIncludesList_Tool.name, GetIncludesList_Tool.description, GetIncludesList_Tool.inputSchema as any, handleGetIncludesList);
     this.registerToolOnServer(server, GetTypeInfo_Tool.name, GetTypeInfo_Tool.description, GetTypeInfo_Tool.inputSchema as any, handleGetTypeInfo);
@@ -1143,26 +1335,35 @@ export class mcp_abap_adt_server {
     this.registerToolOnServer(server, GetAbapSystemSymbols_Tool.name, GetAbapSystemSymbols_Tool.description, GetAbapSystemSymbols_Tool.inputSchema as any, handleGetAbapSystemSymbols);
     this.registerToolOnServer(server, GetDomain_Tool.name, GetDomain_Tool.description, GetDomain_Tool.inputSchema as any, handleGetDomain);
     this.registerToolOnServer(server, CreateDomain_Tool.name, CreateDomain_Tool.description, CreateDomain_Tool.inputSchema as any, handleCreateDomain);
-    this.registerToolOnServer(server, UpdateDomain_Tool.name, UpdateDomain_Tool.description, UpdateDomain_Tool.inputSchema as any, handleUpdateDomain);
+    this.registerToolOnServer(server, UpdateDomainLow_Tool.name, UpdateDomainLow_Tool.description, UpdateDomainLow_Tool.inputSchema as any, handleUpdateDomain);
+    this.registerToolOnServer(server, UpdateDomainHigh_Tool.name, UpdateDomainHigh_Tool.description, UpdateDomainHigh_Tool.inputSchema as any, handleUpdateDomainHigh);
     this.registerToolOnServer(server, CreateDataElement_Tool.name, CreateDataElement_Tool.description, CreateDataElement_Tool.inputSchema as any, handleCreateDataElement);
-    this.registerToolOnServer(server, UpdateDataElement_Tool.name, UpdateDataElement_Tool.description, UpdateDataElement_Tool.inputSchema as any, handleUpdateDataElement);
+    this.registerToolOnServer(server, UpdateDataElementLow_Tool.name, UpdateDataElementLow_Tool.description, UpdateDataElementLow_Tool.inputSchema as any, handleUpdateDataElement);
+    this.registerToolOnServer(server, UpdateDataElementHigh_Tool.name, UpdateDataElementHigh_Tool.description, UpdateDataElementHigh_Tool.inputSchema as any, handleUpdateDataElementHigh);
     this.registerToolOnServer(server, GetDataElement_Tool.name, GetDataElement_Tool.description, GetDataElement_Tool.inputSchema as any, handleGetDataElement);
     this.registerToolOnServer(server, CreateTransport_Tool.name, CreateTransport_Tool.description, CreateTransport_Tool.inputSchema as any, handleCreateTransport);
     this.registerToolOnServer(server, GetTransport_Tool.name, GetTransport_Tool.description, GetTransport_Tool.inputSchema as any, handleGetTransport);
     this.registerToolOnServer(server, CreateTable_Tool.name, CreateTable_Tool.description, CreateTable_Tool.inputSchema as any, handleCreateTable);
+    this.registerToolOnServer(server, UpdateTable_Tool.name, UpdateTable_Tool.description, UpdateTable_Tool.inputSchema as any, handleUpdateTable);
     this.registerToolOnServer(server, CreateStructure_Tool.name, CreateStructure_Tool.description, CreateStructure_Tool.inputSchema as any, handleCreateStructure);
+    this.registerToolOnServer(server, UpdateStructure_Tool.name, UpdateStructure_Tool.description, UpdateStructure_Tool.inputSchema as any, handleUpdateStructure);
     this.registerToolOnServer(server, CreateView_Tool.name, CreateView_Tool.description, CreateView_Tool.inputSchema as any, handleCreateView);
     this.registerToolOnServer(server, GetView_Tool.name, GetView_Tool.description, GetView_Tool.inputSchema as any, handleGetView);
+    this.registerToolOnServer(server, UpdateView_Tool.name, UpdateView_Tool.description, UpdateView_Tool.inputSchema as any, handleUpdateViewLow);
     this.registerToolOnServer(server, CreateClass_Tool.name, CreateClass_Tool.description, CreateClass_Tool.inputSchema as any, handleCreateClass);
-    this.registerToolOnServer(server, UpdateClassSource_Tool.name, UpdateClassSource_Tool.description, UpdateClassSource_Tool.inputSchema as any, handleUpdateClassSource);
+    this.registerToolOnServer(server, UpdateClass_Tool.name, UpdateClass_Tool.description, UpdateClass_Tool.inputSchema as any, handleUpdateClassLow);
+    this.registerToolOnServer(server, UpdateClassHigh_Tool.name, UpdateClassHigh_Tool.description, UpdateClassHigh_Tool.inputSchema as any, handleUpdateClassHigh);
     this.registerToolOnServer(server, CreateProgram_Tool.name, CreateProgram_Tool.description, CreateProgram_Tool.inputSchema as any, handleCreateProgram);
-    this.registerToolOnServer(server, UpdateProgramSource_Tool.name, UpdateProgramSource_Tool.description, UpdateProgramSource_Tool.inputSchema as any, handleUpdateProgramSource);
+    this.registerToolOnServer(server, UpdateProgram_Tool.name, UpdateProgram_Tool.description, UpdateProgram_Tool.inputSchema as any, handleUpdateProgramLow);
+    this.registerToolOnServer(server, UpdateProgramHigh_Tool.name, UpdateProgramHigh_Tool.description, UpdateProgramHigh_Tool.inputSchema as any, handleUpdateProgramHigh);
     this.registerToolOnServer(server, CreateInterface_Tool.name, CreateInterface_Tool.description, CreateInterface_Tool.inputSchema as any, handleCreateInterface);
+    this.registerToolOnServer(server, UpdateInterface_Tool.name, UpdateInterface_Tool.description, UpdateInterface_Tool.inputSchema as any, handleUpdateInterfaceLow);
     this.registerToolOnServer(server, CreateFunctionGroup_Tool.name, CreateFunctionGroup_Tool.description, CreateFunctionGroup_Tool.inputSchema as any, handleCreateFunctionGroup);
     this.registerToolOnServer(server, CreateFunctionModule_Tool.name, CreateFunctionModule_Tool.description, CreateFunctionModule_Tool.inputSchema as any, handleCreateFunctionModule);
-    this.registerToolOnServer(server, UpdateViewSource_Tool.name, UpdateViewSource_Tool.description, UpdateViewSource_Tool.inputSchema as any, handleUpdateViewSource);
-    this.registerToolOnServer(server, UpdateInterfaceSource_Tool.name, UpdateInterfaceSource_Tool.description, UpdateInterfaceSource_Tool.inputSchema as any, handleUpdateInterfaceSource);
-    this.registerToolOnServer(server, UpdateFunctionModuleSource_Tool.name, UpdateFunctionModuleSource_Tool.description, UpdateFunctionModuleSource_Tool.inputSchema as any, handleUpdateFunctionModuleSource);
+    this.registerToolOnServer(server, UpdateFunctionModule_Tool.name, UpdateFunctionModule_Tool.description, UpdateFunctionModule_Tool.inputSchema as any, handleUpdateFunctionModuleLow);
+    this.registerToolOnServer(server, UpdateViewHigh_Tool.name, UpdateViewHigh_Tool.description, UpdateViewHigh_Tool.inputSchema as any, handleUpdateViewHigh);
+    this.registerToolOnServer(server, UpdateInterfaceHigh_Tool.name, UpdateInterfaceHigh_Tool.description, UpdateInterfaceHigh_Tool.inputSchema as any, handleUpdateInterfaceHigh);
+    this.registerToolOnServer(server, UpdateFunctionModuleHigh_Tool.name, UpdateFunctionModuleHigh_Tool.description, UpdateFunctionModuleHigh_Tool.inputSchema as any, handleUpdateFunctionModuleHigh);
     this.registerToolOnServer(server, ActivateObject_Tool.name, ActivateObject_Tool.description, ActivateObject_Tool.inputSchema as any, handleActivateObject);
     this.registerToolOnServer(server, DeleteObject_Tool.name, DeleteObject_Tool.description, DeleteObject_Tool.inputSchema as any, handleDeleteObject);
     this.registerToolOnServer(server, CheckObject_Tool.name, CheckObject_Tool.description, CheckObject_Tool.inputSchema as any, handleCheckObject);
@@ -1177,32 +1378,108 @@ export class mcp_abap_adt_server {
     this.registerToolOnServer(server, ValidateFunctionModule_Tool.name, ValidateFunctionModule_Tool.description, ValidateFunctionModule_Tool.inputSchema as any, handleValidateFunctionModule);
     this.registerToolOnServer(server, CheckFunctionModule_Tool.name, CheckFunctionModule_Tool.description, CheckFunctionModule_Tool.inputSchema as any, handleCheckFunctionModule);
     this.registerToolOnServer(server, CreateBdef_Tool.name, CreateBdef_Tool.description, CreateBdef_Tool.inputSchema as any, handleCreateBehaviorDefinition);
-    this.registerToolOnServer(server, UpdateBdef_Tool.name, UpdateBdef_Tool.description, UpdateBdef_Tool.inputSchema as any, handleUpdateBehaviorDefinition);
+    this.registerToolOnServer(server, UpdateBdef_Tool.name, UpdateBdef_Tool.description, UpdateBdef_Tool.inputSchema as any, handleUpdateBehaviorDefinitionHigh);
+    this.registerToolOnServer(server, UpdateBehaviorDefinitionLow_Tool.name, UpdateBehaviorDefinitionLow_Tool.description, UpdateBehaviorDefinitionLow_Tool.inputSchema as any, handleUpdateBehaviorDefinitionLow);
     this.registerToolOnServer(server, CreateDdlx_Tool.name, CreateDdlx_Tool.description, CreateDdlx_Tool.inputSchema as any, handleCreateMetadataExtension);
-    this.registerToolOnServer(server, UpdateDdlx_Tool.name, UpdateDdlx_Tool.description, UpdateDdlx_Tool.inputSchema as any, handleUpdateMetadataExtension);
+    this.registerToolOnServer(server, UpdateDdlx_Tool.name, UpdateDdlx_Tool.description, UpdateDdlx_Tool.inputSchema as any, handleUpdateMetadataExtensionHigh);
+    this.registerToolOnServer(server, UpdateMetadataExtensionLow_Tool.name, UpdateMetadataExtensionLow_Tool.description, UpdateMetadataExtensionLow_Tool.inputSchema as any, handleUpdateMetadataExtensionLow);
     this.registerToolOnServer(server, GetInactiveObjects_Tool.name, GetInactiveObjects_Tool.description, GetInactiveObjects_Tool.inputSchema as any, handleGetInactiveObjects);
+
+    // New low-level handlers registration
+    this.registerToolOnServer(server, DeleteClass_Tool.name, DeleteClass_Tool.description, DeleteClass_Tool.inputSchema as any, handleDeleteClass);
+    this.registerToolOnServer(server, LockClass_Tool.name, LockClass_Tool.description, LockClass_Tool.inputSchema as any, handleLockClass);
+    this.registerToolOnServer(server, UnlockClass_Tool.name, UnlockClass_Tool.description, UnlockClass_Tool.inputSchema as any, handleUnlockClass);
+    this.registerToolOnServer(server, CreateClassLow_Tool.name, CreateClassLow_Tool.description, CreateClassLow_Tool.inputSchema as any, handleCreateClassLow);
+    this.registerToolOnServer(server, CheckProgram_Tool.name, CheckProgram_Tool.description, CheckProgram_Tool.inputSchema as any, handleCheckProgram);
+    this.registerToolOnServer(server, DeleteProgram_Tool.name, DeleteProgram_Tool.description, DeleteProgram_Tool.inputSchema as any, handleDeleteProgram);
+    this.registerToolOnServer(server, LockProgram_Tool.name, LockProgram_Tool.description, LockProgram_Tool.inputSchema as any, handleLockProgram);
+    this.registerToolOnServer(server, UnlockProgram_Tool.name, UnlockProgram_Tool.description, UnlockProgram_Tool.inputSchema as any, handleUnlockProgram);
+    this.registerToolOnServer(server, ValidateProgram_Tool.name, ValidateProgram_Tool.description, ValidateProgram_Tool.inputSchema as any, handleValidateProgram);
+    this.registerToolOnServer(server, CreateProgramLow_Tool.name, CreateProgramLow_Tool.description, CreateProgramLow_Tool.inputSchema as any, handleCreateProgramLow);
+    this.registerToolOnServer(server, CheckInterface_Tool.name, CheckInterface_Tool.description, CheckInterface_Tool.inputSchema as any, handleCheckInterface);
+    this.registerToolOnServer(server, DeleteInterface_Tool.name, DeleteInterface_Tool.description, DeleteInterface_Tool.inputSchema as any, handleDeleteInterface);
+    this.registerToolOnServer(server, LockInterface_Tool.name, LockInterface_Tool.description, LockInterface_Tool.inputSchema as any, handleLockInterface);
+    this.registerToolOnServer(server, UnlockInterface_Tool.name, UnlockInterface_Tool.description, UnlockInterface_Tool.inputSchema as any, handleUnlockInterface);
+    this.registerToolOnServer(server, ValidateInterface_Tool.name, ValidateInterface_Tool.description, ValidateInterface_Tool.inputSchema as any, handleValidateInterface);
+    this.registerToolOnServer(server, CreateInterfaceLow_Tool.name, CreateInterfaceLow_Tool.description, CreateInterfaceLow_Tool.inputSchema as any, handleCreateInterfaceLow);
+    this.registerToolOnServer(server, CheckFunctionGroup_Tool.name, CheckFunctionGroup_Tool.description, CheckFunctionGroup_Tool.inputSchema as any, handleCheckFunctionGroup);
+    this.registerToolOnServer(server, DeleteFunctionGroup_Tool.name, DeleteFunctionGroup_Tool.description, DeleteFunctionGroup_Tool.inputSchema as any, handleDeleteFunctionGroup);
+    this.registerToolOnServer(server, DeleteFunctionModule_Tool.name, DeleteFunctionModule_Tool.description, DeleteFunctionModule_Tool.inputSchema as any, handleDeleteFunctionModule);
+    this.registerToolOnServer(server, LockFunctionGroup_Tool.name, LockFunctionGroup_Tool.description, LockFunctionGroup_Tool.inputSchema as any, handleLockFunctionGroup);
+    this.registerToolOnServer(server, LockFunctionModule_Tool.name, LockFunctionModule_Tool.description, LockFunctionModule_Tool.inputSchema as any, handleLockFunctionModule);
+    this.registerToolOnServer(server, UnlockFunctionGroup_Tool.name, UnlockFunctionGroup_Tool.description, UnlockFunctionGroup_Tool.inputSchema as any, handleUnlockFunctionGroup);
+    this.registerToolOnServer(server, UnlockFunctionModule_Tool.name, UnlockFunctionModule_Tool.description, UnlockFunctionModule_Tool.inputSchema as any, handleUnlockFunctionModule);
+    this.registerToolOnServer(server, ValidateFunctionGroup_Tool.name, ValidateFunctionGroup_Tool.description, ValidateFunctionGroup_Tool.inputSchema as any, handleValidateFunctionGroup);
+    this.registerToolOnServer(server, CreateFunctionGroupLow_Tool.name, CreateFunctionGroupLow_Tool.description, CreateFunctionGroupLow_Tool.inputSchema as any, handleCreateFunctionGroupLow);
+    this.registerToolOnServer(server, CreateFunctionModuleLow_Tool.name, CreateFunctionModuleLow_Tool.description, CreateFunctionModuleLow_Tool.inputSchema as any, handleCreateFunctionModuleLow);
+    this.registerToolOnServer(server, CheckDataElement_Tool.name, CheckDataElement_Tool.description, CheckDataElement_Tool.inputSchema as any, handleCheckDataElement);
+    this.registerToolOnServer(server, DeleteDataElement_Tool.name, DeleteDataElement_Tool.description, DeleteDataElement_Tool.inputSchema as any, handleDeleteDataElement);
+    this.registerToolOnServer(server, LockDataElement_Tool.name, LockDataElement_Tool.description, LockDataElement_Tool.inputSchema as any, handleLockDataElement);
+    this.registerToolOnServer(server, UnlockDataElement_Tool.name, UnlockDataElement_Tool.description, UnlockDataElement_Tool.inputSchema as any, handleUnlockDataElement);
+    this.registerToolOnServer(server, ValidateDataElement_Tool.name, ValidateDataElement_Tool.description, ValidateDataElement_Tool.inputSchema as any, handleValidateDataElement);
+    this.registerToolOnServer(server, CreateDataElementLow_Tool.name, CreateDataElementLow_Tool.description, CreateDataElementLow_Tool.inputSchema as any, handleCreateDataElementLow);
+    this.registerToolOnServer(server, CheckDomain_Tool.name, CheckDomain_Tool.description, CheckDomain_Tool.inputSchema as any, handleCheckDomain);
+    this.registerToolOnServer(server, DeleteDomain_Tool.name, DeleteDomain_Tool.description, DeleteDomain_Tool.inputSchema as any, handleDeleteDomain);
+    this.registerToolOnServer(server, LockDomain_Tool.name, LockDomain_Tool.description, LockDomain_Tool.inputSchema as any, handleLockDomain);
+    this.registerToolOnServer(server, UnlockDomain_Tool.name, UnlockDomain_Tool.description, UnlockDomain_Tool.inputSchema as any, handleUnlockDomain);
+    this.registerToolOnServer(server, ValidateDomain_Tool.name, ValidateDomain_Tool.description, ValidateDomain_Tool.inputSchema as any, handleValidateDomain);
+    this.registerToolOnServer(server, CreateDomainLow_Tool.name, CreateDomainLow_Tool.description, CreateDomainLow_Tool.inputSchema as any, handleCreateDomainLow);
+    this.registerToolOnServer(server, CheckStructure_Tool.name, CheckStructure_Tool.description, CheckStructure_Tool.inputSchema as any, handleCheckStructure);
+    this.registerToolOnServer(server, DeleteStructure_Tool.name, DeleteStructure_Tool.description, DeleteStructure_Tool.inputSchema as any, handleDeleteStructure);
+    this.registerToolOnServer(server, LockStructure_Tool.name, LockStructure_Tool.description, LockStructure_Tool.inputSchema as any, handleLockStructure);
+    this.registerToolOnServer(server, UnlockStructure_Tool.name, UnlockStructure_Tool.description, UnlockStructure_Tool.inputSchema as any, handleUnlockStructure);
+    this.registerToolOnServer(server, ValidateStructure_Tool.name, ValidateStructure_Tool.description, ValidateStructure_Tool.inputSchema as any, handleValidateStructure);
+    this.registerToolOnServer(server, CreateStructureLow_Tool.name, CreateStructureLow_Tool.description, CreateStructureLow_Tool.inputSchema as any, handleCreateStructureLow);
+    this.registerToolOnServer(server, DeleteTable_Tool.name, DeleteTable_Tool.description, DeleteTable_Tool.inputSchema as any, handleDeleteTable);
+    this.registerToolOnServer(server, LockTable_Tool.name, LockTable_Tool.description, LockTable_Tool.inputSchema as any, handleLockTable);
+    this.registerToolOnServer(server, UnlockTable_Tool.name, UnlockTable_Tool.description, UnlockTable_Tool.inputSchema as any, handleUnlockTable);
+    this.registerToolOnServer(server, CreateTableLow_Tool.name, CreateTableLow_Tool.description, CreateTableLow_Tool.inputSchema as any, handleCreateTableLow);
+    this.registerToolOnServer(server, CheckView_Tool.name, CheckView_Tool.description, CheckView_Tool.inputSchema as any, handleCheckView);
+    this.registerToolOnServer(server, DeleteView_Tool.name, DeleteView_Tool.description, DeleteView_Tool.inputSchema as any, handleDeleteView);
+    this.registerToolOnServer(server, LockView_Tool.name, LockView_Tool.description, LockView_Tool.inputSchema as any, handleLockView);
+    this.registerToolOnServer(server, UnlockView_Tool.name, UnlockView_Tool.description, UnlockView_Tool.inputSchema as any, handleUnlockView);
+    this.registerToolOnServer(server, ValidateView_Tool.name, ValidateView_Tool.description, ValidateView_Tool.inputSchema as any, handleValidateView);
+    this.registerToolOnServer(server, CreateViewLow_Tool.name, CreateViewLow_Tool.description, CreateViewLow_Tool.inputSchema as any, handleCreateViewLow);
+    this.registerToolOnServer(server, CheckPackage_Tool.name, CheckPackage_Tool.description, CheckPackage_Tool.inputSchema as any, handleCheckPackage);
+    this.registerToolOnServer(server, DeletePackage_Tool.name, DeletePackage_Tool.description, DeletePackage_Tool.inputSchema as any, handleDeletePackage);
+    this.registerToolOnServer(server, LockPackage_Tool.name, LockPackage_Tool.description, LockPackage_Tool.inputSchema as any, handleLockPackage);
+    this.registerToolOnServer(server, ValidatePackage_Tool.name, ValidatePackage_Tool.description, ValidatePackage_Tool.inputSchema as any, handleValidatePackage);
+    this.registerToolOnServer(server, CreatePackageLow_Tool.name, CreatePackageLow_Tool.description, CreatePackageLow_Tool.inputSchema as any, handleCreatePackageLow);
+    this.registerToolOnServer(server, CreateTransportLow_Tool.name, CreateTransportLow_Tool.description, CreateTransportLow_Tool.inputSchema as any, handleCreateTransportLow);
+    this.registerToolOnServer(server, CheckBehaviorDefinition_Tool.name, CheckBehaviorDefinition_Tool.description, CheckBehaviorDefinition_Tool.inputSchema as any, handleCheckBehaviorDefinition);
+    this.registerToolOnServer(server, DeleteBehaviorDefinition_Tool.name, DeleteBehaviorDefinition_Tool.description, DeleteBehaviorDefinition_Tool.inputSchema as any, handleDeleteBehaviorDefinition);
+    this.registerToolOnServer(server, LockBehaviorDefinition_Tool.name, LockBehaviorDefinition_Tool.description, LockBehaviorDefinition_Tool.inputSchema as any, handleLockBehaviorDefinition);
+    this.registerToolOnServer(server, UnlockBehaviorDefinition_Tool.name, UnlockBehaviorDefinition_Tool.description, UnlockBehaviorDefinition_Tool.inputSchema as any, handleUnlockBehaviorDefinition);
+    this.registerToolOnServer(server, ValidateBehaviorDefinition_Tool.name, ValidateBehaviorDefinition_Tool.description, ValidateBehaviorDefinition_Tool.inputSchema as any, handleValidateBehaviorDefinition);
+    this.registerToolOnServer(server, CreateBehaviorDefinitionLow_Tool.name, CreateBehaviorDefinitionLow_Tool.description, CreateBehaviorDefinitionLow_Tool.inputSchema as any, handleCreateBehaviorDefinitionLow);
+    this.registerToolOnServer(server, CheckMetadataExtension_Tool.name, CheckMetadataExtension_Tool.description, CheckMetadataExtension_Tool.inputSchema as any, handleCheckMetadataExtension);
+    this.registerToolOnServer(server, DeleteMetadataExtension_Tool.name, DeleteMetadataExtension_Tool.description, DeleteMetadataExtension_Tool.inputSchema as any, handleDeleteMetadataExtension);
+    this.registerToolOnServer(server, LockMetadataExtension_Tool.name, LockMetadataExtension_Tool.description, LockMetadataExtension_Tool.inputSchema as any, handleLockMetadataExtension);
+    this.registerToolOnServer(server, UnlockMetadataExtension_Tool.name, UnlockMetadataExtension_Tool.description, UnlockMetadataExtension_Tool.inputSchema as any, handleUnlockMetadataExtension);
+    this.registerToolOnServer(server, ValidateMetadataExtension_Tool.name, ValidateMetadataExtension_Tool.description, ValidateMetadataExtension_Tool.inputSchema as any, handleValidateMetadataExtension);
+    this.registerToolOnServer(server, CreateMetadataExtensionLow_Tool.name, CreateMetadataExtensionLow_Tool.description, CreateMetadataExtensionLow_Tool.inputSchema as any, handleCreateMetadataExtensionLow);
 
     // Dynamic import tools
     this.registerToolOnServer(server, "GetAdtTypes", "Get all ADT types available in the system", { type: "object", properties: {}, required: [] } as any, async (args: any) => {
-      return await (await import("./handlers/system/low/handleGetAllTypes.js")).handleGetAdtTypes(args);
+      return await (await import("./handlers/system/readonly/handleGetAllTypes.js")).handleGetAdtTypes(args);
     });
     this.registerToolOnServer(server, "GetObjectStructure", "Get object structure with includes hierarchy", { type: "object", properties: { object_name: { type: "string" }, object_type: { type: "string" } }, required: ["object_name", "object_type"] } as any, async (args: any) => {
-      return await (await import("./handlers/system/low/handleGetObjectStructure.js")).handleGetObjectStructure(args);
+      return await (await import("./handlers/system/readonly/handleGetObjectStructure.js")).handleGetObjectStructure(args);
     });
     this.registerToolOnServer(server, "GetObjectsList", "Get list of objects by package", { type: "object", properties: { package_name: { type: "string" } }, required: ["package_name"] } as any, async (args: any) => {
-      return await (await import("./handlers/search/low/handleGetObjectsList.js")).handleGetObjectsList(args);
+      return await (await import("./handlers/search/readonly/handleGetObjectsList.js")).handleGetObjectsList(args);
     });
     this.registerToolOnServer(server, "GetObjectsByType", "Get objects by type", { type: "object", properties: { object_type: { type: "string" }, package_name: { type: "string" } }, required: ["object_type"] } as any, async (args: any) => {
-      return await (await import("./handlers/search/low/handleGetObjectsByType.js")).handleGetObjectsByType(args);
+      return await (await import("./handlers/search/readonly/handleGetObjectsByType.js")).handleGetObjectsByType(args);
     });
     this.registerToolOnServer(server, "GetProgFullCode", "Get full program code with includes", { type: "object", properties: { program_name: { type: "string" } }, required: ["program_name"] } as any, async (args: any) => {
-      return await (await import("./handlers/program/low/handleGetProgFullCode.js")).handleGetProgFullCode(args);
+      return await (await import("./handlers/program/readonly/handleGetProgFullCode.js")).handleGetProgFullCode(args);
     });
     this.registerToolOnServer(server, "GetObjectNodeFromCache", "Get object node from cache", { type: "object", properties: { object_name: { type: "string" }, object_type: { type: "string" } }, required: ["object_name", "object_type"] } as any, async (args: any) => {
-      return await (await import("./handlers/system/low/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(args);
+      return await (await import("./handlers/system/readonly/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(args);
     });
     this.registerToolOnServer(server, "DescribeByList", "Describe objects by list", { type: "object", properties: { objects: { type: "array", items: { type: "string" } } }, required: ["objects"] } as any, async (args: any) => {
-      return await (await import("./handlers/system/low/handleDescribeByList.js")).handleDescribeByList(args);
+      return await (await import("./handlers/system/readonly/handleDescribeByList.js")).handleDescribeByList(args);
     });
   }
 

@@ -27,23 +27,23 @@
 ### Changed
 - **Handler Organization Refactoring**: All handlers reorganized into categorized subdirectories for better maintainability:
   - `bdef/` - Behavior Definition handlers (GetBdef, CreateBehaviorDefinition, UpdateBehaviorDefinition)
-  - `class/` - Class handlers (GetClass, CreateClass, UpdateClassSource, ValidateClass, CheckClass)
+  - `class/` - Class handlers (GetClass, CreateClass, UpdateClass, ValidateClass, CheckClass)
   - `common/` - Common handlers (ActivateObject, DeleteObject, CheckObject, LockObject, UnlockObject, ValidateObject)
   - `data_element/` - Data Element handlers (GetDataElement, CreateDataElement, UpdateDataElement)
   - `ddlx/` - Metadata Extension handlers (CreateMetadataExtension, UpdateMetadataExtension)
   - `domain/` - Domain handlers (GetDomain, CreateDomain, UpdateDomain)
   - `enhancement/` - Enhancement handlers (GetEnhancements, GetEnhancementImpl, GetEnhancementSpot)
-  - `function/` - Function handlers (GetFunction, GetFunctionGroup, CreateFunctionGroup, CreateFunctionModule, UpdateFunctionModuleSource, ValidateFunctionModule, CheckFunctionModule)
+  - `function/` - Function handlers (GetFunction, GetFunctionGroup, CreateFunctionGroup, CreateFunctionModule, UpdateFunctionModule, ValidateFunctionModule, CheckFunctionModule)
   - `include/` - Include handlers (GetInclude, GetIncludesList)
-  - `interface/` - Interface handlers (GetInterface, CreateInterface, UpdateInterfaceSource)
+  - `interface/` - Interface handlers (GetInterface, CreateInterface, UpdateInterface)
   - `package/` - Package handlers (GetPackage, CreatePackage)
-  - `program/` - Program handlers (GetProgram, CreateProgram, UpdateProgramSource)
+  - `program/` - Program handlers (GetProgram, CreateProgram, UpdateProgram)
   - `search/` - Search handlers (SearchObject, GetObjectsByType, GetObjectsList)
   - `structure/` - Structure handlers (GetStructure, CreateStructure)
   - `system/` - System handlers (GetTypeInfo, GetTransaction, GetSqlQuery, GetWhereUsed, GetObjectInfo, GetSession, GetAbapAST, GetAbapSemanticAnalysis, GetAbapSystemSymbols, GetAllTypes, GetObjectStructure, GetObjectNodeFromCache, GetInactiveObjects)
   - `table/` - Table handlers (GetTable, GetTableContents, CreateTable, ValidateTable, CheckTable)
   - `transport/` - Transport handlers (GetTransport, CreateTransport)
-  - `view/` - View handlers (GetView, CreateView, UpdateViewSource)
+  - `view/` - View handlers (GetView, CreateView, UpdateView)
   - This reorganization improves code navigation, reduces merge conflicts, and makes the codebase more maintainable
 
 - **Dependencies Updated**:

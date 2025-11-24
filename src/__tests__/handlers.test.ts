@@ -1,8 +1,8 @@
-import { TOOL_DEFINITION as GET_PROGRAM_TOOL } from '../handlers/program/low/handleGetProgram';
-import { TOOL_DEFINITION as GET_CLASS_TOOL } from '../handlers/class/low/handleGetClass';
-import { TOOL_DEFINITION as GET_FUNCTION_TOOL } from '../handlers/function/low/handleGetFunction';
-import { TOOL_DEFINITION as GET_TABLE_TOOL } from '../handlers/table/low/handleGetTable';
-import { TOOL_DEFINITION as SEARCH_OBJECT_TOOL } from '../handlers/search/low/handleSearchObject';
+import { TOOL_DEFINITION as GET_PROGRAM_TOOL } from '../handlers/program/readonly/handleGetProgram';
+import { TOOL_DEFINITION as GET_CLASS_TOOL } from '../handlers/class/readonly/handleGetClass';
+import { TOOL_DEFINITION as GET_FUNCTION_TOOL } from '../handlers/function/readonly/handleGetFunction';
+import { TOOL_DEFINITION as GET_TABLE_TOOL } from '../handlers/table/readonly/handleGetTable';
+import { TOOL_DEFINITION as SEARCH_OBJECT_TOOL } from '../handlers/search/readonly/handleSearchObject';
 
 describe('Tool Definitions', () => {
   describe('Tool Names', () => {

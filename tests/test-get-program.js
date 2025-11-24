@@ -14,7 +14,7 @@ const {
 // Initialize test environment
 initializeTestEnvironment();
 
-const { handleGetProgram } = require('../dist/handlers/program/low/handleGetProgram');
+const { handleGetProgram } = require('../dist/handlers/program/readonly/handleGetProgram');
 
 async function testGetProgram() {
   const testCases = getAllEnabledTestCases('get_program');

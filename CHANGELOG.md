@@ -62,6 +62,8 @@
   - `tools/generate-tools-docs.js` now outputs a navigation tree that mirrors the document structure, separates high-/low-/read-only tools, and adds summary counts for each level.
   - `doc/user-guide/AVAILABLE_TOOLS.md` regenerated to include the new navigation, level-specific anchors, and the `[read-only]` marker.
   - Test suite, configs, and helper scripts updated to follow the new directory layout and renamed high-level handlers (`UpdateClass`, `UpdateProgram`, etc.).
+- **Low-Level Tool Names**:
+  - Every low-level handler now advertises a unique MCP tool name suffixed with `Low` (e.g., `CreateClassLow`, `UpdateDomainLow`, `LockPackageLow`). This prevents `Tool <name> is already registered` errors when both low/high versions exist and keeps the server compatible with clients that look up tools by name.
 
 ### Documentation
 - Added `implementation_plan.md`: Plan for future refactoring of read handlers to `src/readers` directory

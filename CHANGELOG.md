@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [1.1.8] - 2025-11-24
+## [1.1.9] - 2025-11-24
 
 ### Added
 - **DDLX (Metadata Extension) Management Tools**:
@@ -18,6 +18,9 @@
   - Full CRUD workflow: Create → Lock → Check → Unlock → Activate
   - Support for root entity specification and implementation type selection
   - Transport request validation integrated
+- **Full Low-Level CRUD Coverage**:
+  - Added dedicated `create`, `lock`, `unlock`, `check`, `validate`, `delete`, and `update` handlers for classes, programs, interfaces, function groups/modules, domains, data elements, packages, tables, views, structures, transports, and more to cover every `CrudClient` method.
+  - Each handler now has a consistent naming scheme (`CreateX`, `UpdateX`, etc.) to match the high-level counterparts.
 
 - **System Management Tools**:
   - `GetInactiveObjects`: Retrieve list of inactive ABAP objects (objects that have been modified but not activated)
@@ -25,7 +28,7 @@
   - Useful for monitoring development progress and identifying objects requiring attention
 
 ### Changed
-- **Handler Organization Refactoring**: All handlers reorganized into categorized subdirectories for better maintainability:
+- **Handler Organization Refactoring**: All handlers reorganized into categorized subdirectories with explicit `high/`, `low/`, and `readonly/` layers for better maintainability. Each low-level handler description now starts with `[low-level]`, and every read handler was moved to the new `readonly/` folders and tagged `[read-only]`. This improves discoverability, enforces single-responsibility boundaries, and makes it clear which tools mutate SAP data.
   - `bdef/` - Behavior Definition handlers (GetBdef, CreateBehaviorDefinition, UpdateBehaviorDefinition)
   - `class/` - Class handlers (GetClass, CreateClass, UpdateClass, ValidateClass, CheckClass)
   - `common/` - Common handlers (ActivateObject, DeleteObject, CheckObject, LockObject, UnlockObject, ValidateObject)
@@ -55,10 +58,18 @@
   - `src/index.ts`: Updated all handler imports to reflect new subdirectory structure
   - `src/lib/toolsRegistry.ts`: Updated tool definitions imports to match new handler locations
   - All 81 handler files moved and imports updated consistently
+- **Tooling Improvements**:
+  - `tools/generate-tools-docs.js` now outputs a navigation tree that mirrors the document structure, separates high-/low-/read-only tools, and adds summary counts for each level.
+  - `doc/user-guide/AVAILABLE_TOOLS.md` regenerated to include the new navigation, level-specific anchors, and the `[read-only]` marker.
+  - Test suite, configs, and helper scripts updated to follow the new directory layout and renamed high-level handlers (`UpdateClass`, `UpdateProgram`, etc.).
 
 ### Documentation
 - Added `implementation_plan.md`: Plan for future refactoring of read handlers to `src/readers` directory
-- Added `roadmap.md`: Roadmap for implementing missing handlers and extending generic handlers to support new object types
+- Removed `roadmap.md`: Work items are complete, so the standalone roadmap is no longer required
+
+## [1.1.8] - 2025-11-24
+
+_Documentation for this tag is intentionally minimal; see the Git tag `v1.1.8` for its exact contents._
 
 ## [1.1.6] - 2025-11-21
 

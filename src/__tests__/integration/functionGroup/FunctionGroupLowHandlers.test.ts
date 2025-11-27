@@ -10,7 +10,7 @@
  *   DEBUG_ADT_LIBS=true        - Library logs
  *   DEBUG_CONNECTORS=true      - Connection logs
  *
- * Run: npm test -- --testPathPattern=integration/functionGroup
+ * Run: npm test -- --testPathPattern=integration/functionGroup/
  */
 
 import { handleValidateFunctionGroup } from '../../../handlers/function/low/handleValidateFunctionGroup';

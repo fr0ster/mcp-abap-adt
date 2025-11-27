@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -76,11 +76,7 @@ export async function handleLockFunctionModule(args: LockFunctionModuleArgs) {
 
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();

@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -88,11 +88,7 @@ export async function handleUpdateFunctionModule(args: UpdateFunctionModuleArgs)
 
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -117,11 +113,15 @@ export async function handleUpdateFunctionModule(args: UpdateFunctionModuleArgs)
 
       logger.info(`✅ UpdateFunctionModule completed: ${functionModuleName}`);
 
+      // Get lock handle from builder (it should still be there after update)
+      const lockHandleFromBuilder = client.getLockHandle();
+
       return return_response({
         data: JSON.stringify({
           success: true,
           function_module_name: functionModuleName,
           function_group_name: functionGroupName,
+          lock_handle: lockHandleFromBuilder || lock_handle, // Return lock handle for unlock
           session_id: session_id || null,
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,

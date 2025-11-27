@@ -46,7 +46,7 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-interface ValidateFunctionModuleArgs extends Pick<FunctionModuleBuilderConfig, 'functionGroupName' | 'functionModuleName' | 'description'> {
+interface ValidateFunctionModuleArgs {
   function_group_name: string;
   function_module_name: string;
   description?: string;
@@ -97,7 +97,7 @@ export async function handleValidateFunctionModule(args: ValidateFunctionModuleA
     try {
       const client = new CrudClient(connection);
 
-      await client.validateFunctionModule({ functionModuleName: functionModuleName, functionGroupName: functionGroupName, packageName: undefined, description: undefined });
+      await client.validateFunctionModule({ functionModuleName: functionModuleName, functionGroupName: functionGroupName, packageName: undefined, description: description });
       const validationResponse = client.getValidationResponse();
       if (!validationResponse) {
         throw new Error('Validation did not return a result');

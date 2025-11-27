@@ -132,6 +132,7 @@ describe('Package Low-Level Handlers Integration', () => {
 
       let lockHandleForCleanup: string | null = null;
       let lockSessionForCleanup: SessionInfo | null = null;
+      let cleanupSession: SessionInfo | null = null;
 
       try {
         // Step 1: Validate
@@ -273,6 +274,9 @@ describe('Package Low-Level Handlers Integration', () => {
         session = updateSessionFromResponse(session, unlockData);
         await delay(getOperationDelay('unlock', testCase));
 
+        // Store session for cleanup (after unlock, use updated session)
+        cleanupSession = session;
+
       } catch (error: any) {
         // Extract step from error message
         const errorMessage = error.message || String(error);
@@ -317,9 +321,13 @@ describe('Package Low-Level Handlers Integration', () => {
 
             await delay(1000);
 
+            // For delete, force a new connection to bypass cache
+            // Even if package was unlocked, it may still be locked in the cached connection
+            console.log(`🧹 Cleanup: Deleting package ${packageName}...`);
             const deleteResponse = await handleDeletePackage({
               package_name: packageName,
-              transport_request: transportRequest
+              transport_request: transportRequest,
+              force_new_connection: true
             });
 
             if (deleteResponse.isError) {

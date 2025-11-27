@@ -10,7 +10,7 @@
  *   DEBUG_ADT_LIBS=true        - Library logs
  *   DEBUG_CONNECTORS=true      - Connection logs
  *
- * Run: npm test -- --testPathPattern=integration/functionModule
+ * Run: npm test -- --testPathPattern=integration/functionModule/
  */
 
 import { handleValidateFunctionModule } from '../../../handlers/function/low/handleValidateFunctionModule';
@@ -92,7 +92,14 @@ describe('FunctionModule Low-Level Handlers Integration', () => {
       let lockSessionForCleanup: SessionInfo | null = null;
 
       try {
-        // Step 1: Validate
+        // Step 1: Validate Function Module
+        // Validation will check both Function Module and Function Group (via fugrname parameter)
+        console.log(`🔍 Step 1: Validating ${functionModuleName}...`);
+        debugLog('VALIDATE_FM', `Validating function module ${functionModuleName}`, {
+          session_id: session.session_id,
+          function_group_name: functionGroupName
+        });
+
         const validateResponse = await handleValidateFunctionModule({
           function_module_name: functionModuleName,
           function_group_name: functionGroupName,
@@ -120,12 +127,14 @@ describe('FunctionModule Low-Level Handlers Integration', () => {
             console.log(`⏭️  FunctionModule ${functionModuleName} already exists, skipping test`);
             return;
           }
-          console.warn(`⚠️  Validation failed for ${functionModuleName}: ${message}. Will attempt create and handle if object exists...`);
+          throw new Error(`Function Module validation failed: ${message}. Cannot proceed.`);
         }
 
         session = updateSessionFromResponse(session, validateData);
+        console.log(`✅ Step 1: Validation successful for ${functionModuleName}`);
 
         // Step 2: Create
+        console.log(`📦 Step 2: Creating ${functionModuleName}...`);
         const createResponse = await handleCreateFunctionModule({
           function_module_name: functionModuleName,
           function_group_name: functionGroupName,
@@ -148,11 +157,13 @@ describe('FunctionModule Low-Level Handlers Integration', () => {
         const createData = parseHandlerResponse(createResponse);
         expect(createData.success).toBe(true);
         expect(createData.function_module_name).toBe(functionModuleName);
+        console.log(`✅ Step 2: Created ${functionModuleName} successfully`);
 
         session = updateSessionFromResponse(session, createData);
         await delay(getOperationDelay('create', testCase));
 
         // Step 3: Lock
+        console.log(`🔒 Step 3: Locking ${functionModuleName}...`);
         const lockResponse = await handleLockFunctionModule({
           function_module_name: functionModuleName,
           function_group_name: functionGroupName,
@@ -173,11 +184,16 @@ describe('FunctionModule Low-Level Handlers Integration', () => {
 
         lockHandleForCleanup = lockHandle;
         lockSessionForCleanup = lockSession;
+        console.log(`✅ Step 3: Locked ${functionModuleName} successfully`);
 
         await delay(getOperationDelay('lock', testCase));
 
         // Step 4: Update
-        const sourceCode = testCase.params.source_code || `FUNCTION ${functionModuleName.toLowerCase()}.\n*"----------------------------------------------------------------------\n*"*"Local Interface:\n*"----------------------------------------------------------------------\nENDFUNCTION.`;
+        console.log(`📝 Step 4: Updating ${functionModuleName}...`);
+        // Remove comment blocks from source code as SAP doesn't allow them in function modules
+        let sourceCode = testCase.params.source_code || `FUNCTION ${functionModuleName.toLowerCase()}.\nENDFUNCTION.`;
+        // Remove comment blocks (lines starting with *")
+        sourceCode = sourceCode.split('\n').filter(line => !line.trim().startsWith('*"')).join('\n');
 
         const updateResponse = await handleUpdateFunctionModule({
           function_module_name: functionModuleName,
@@ -195,16 +211,24 @@ describe('FunctionModule Low-Level Handlers Integration', () => {
         const updateData = parseHandlerResponse(updateResponse);
         expect(updateData.success).toBe(true);
         expect(updateData.session_id).toBe(lockSession.session_id);
+        console.log(`✅ Step 4: Updated ${functionModuleName} successfully`);
+
+        // Update lock session from update response (session state may have changed)
+        const updatedLockSession = updateSessionFromResponse(lockSession, updateData);
+
+        // Use lock handle from update response if available, otherwise use the original one
+        const unlockLockHandle = updateData.lock_handle || lockHandle;
 
         await delay(getOperationDelay('update', testCase));
 
         // Step 5: Unlock
+        console.log(`🔓 Step 5: Unlocking ${functionModuleName}...`);
         const unlockResponse = await handleUnlockFunctionModule({
           function_module_name: functionModuleName,
           function_group_name: functionGroupName,
-          lock_handle: lockHandle,
-          session_id: lockSession.session_id,
-          session_state: lockSession.session_state
+          lock_handle: unlockLockHandle,
+          session_id: updatedLockSession.session_id,
+          session_state: updatedLockSession.session_state
         });
 
         if (unlockResponse.isError) {
@@ -214,11 +238,13 @@ describe('FunctionModule Low-Level Handlers Integration', () => {
         const unlockData = parseHandlerResponse(unlockResponse);
         expect(unlockData.success).toBe(true);
         expect(unlockData.session_id).toBe(lockSession.session_id);
+        console.log(`✅ Step 5: Unlocked ${functionModuleName} successfully`);
 
         session = updateSessionFromResponse(session, unlockData);
         await delay(getOperationDelay('unlock', testCase));
 
         // Step 6: Activate
+        console.log(`⚡ Step 6: Activating ${functionModuleName}...`);
         const activateResponse = await handleActivateFunctionModule({
           function_module_name: functionModuleName,
           function_group_name: functionGroupName,
@@ -232,6 +258,7 @@ describe('FunctionModule Low-Level Handlers Integration', () => {
 
         const activateData = parseHandlerResponse(activateResponse);
         expect(activateData.success).toBe(true);
+        console.log(`✅ Step 6: Activated ${functionModuleName} successfully`);
 
         console.log(`✅ Full workflow completed successfully for ${functionModuleName}`);
 

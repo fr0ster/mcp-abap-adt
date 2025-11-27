@@ -7,7 +7,10 @@
 
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { getConfig } from '../../../index';
+import { loggerAdapter } from '../../../lib/loggerAdapter';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { createAbapConnection, FileSessionStorage } from '@mcp-abap-adt/connection';
 
 export const TOOL_DEFINITION = {
   name: "DeletePackageLow",
@@ -22,6 +25,10 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: "string",
         description: "Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP)."
+      },
+      force_new_connection: {
+        type: "boolean",
+        description: "Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false."
       }
     },
     required: ["package_name"]
@@ -31,6 +38,7 @@ export const TOOL_DEFINITION = {
 interface DeletePackageArgs {
   package_name: string;
   transport_request?: string;
+  force_new_connection?: boolean;
 }
 
 /**
@@ -42,7 +50,8 @@ export async function handleDeletePackage(args: DeletePackageArgs) {
   try {
     const {
       package_name,
-      transport_request
+      transport_request,
+      force_new_connection = false
     } = args as DeletePackageArgs;
 
     // Validation
@@ -50,9 +59,27 @@ export async function handleDeletePackage(args: DeletePackageArgs) {
       return return_error(new Error('package_name is required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
     const packageName = package_name.toUpperCase();
+
+    let connection;
+    if (force_new_connection) {
+      // Create a new connection bypassing cache (useful when package was locked/unlocked)
+      // This ensures we're using a fresh session without any lock state
+      const config = getConfig();
+      const sessionStorage = new FileSessionStorage({
+        sessionDir: '.sessions',
+        createDir: true,
+        prettyPrint: false
+      });
+      const uniqueSessionId = `delete-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      connection = createAbapConnection(config, loggerAdapter, sessionStorage, uniqueSessionId);
+      logger.info(`Creating new connection for package deletion (bypassing cache): ${packageName}`);
+    } else {
+      connection = getManagedConnection();
+    }
+
+    const client = new CrudClient(connection);
+    await connection.connect();
 
     logger.info(`Starting package deletion: ${packageName}`);
 

@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -81,12 +81,8 @@ export async function handleUnlockFunctionModule(args: UnlockFunctionModuleArgs)
     const client = new CrudClient(connection);
 
     // Restore session state if provided
-    if (session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+    if (session_id && session_state) {
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -99,12 +95,8 @@ export async function handleUnlockFunctionModule(args: UnlockFunctionModuleArgs)
 
     try {
       // Unlock function module
+      // Note: unlock() doesn't throw if successful, so if we reach here, unlock succeeded
       await client.unlockFunctionModule({ functionModuleName: functionModuleName, functionGroupName: functionGroupName }, lock_handle);
-      const unlockResult = client.getUnlockResult();
-
-      if (!unlockResult) {
-        throw new Error(`Unlock did not return a response for function module ${functionModuleName}`);
-      }
 
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();

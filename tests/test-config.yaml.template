@@ -8,1297 +8,37 @@
 # ============================================================================
 # TEST SETTINGS
 # ============================================================================
+
+# ============================================================================
+# GLOBAL CONFIGURATION
+# ============================================================================
+
+
+# ============================================================================
+# GLOBAL CONFIGURATION
+# ============================================================================
+
 test_settings:
   fail_fast: false
   verbose: true
+  timeout: 30000
   retry_on_failure: false
   max_retries: 1
-  cleanup_after_test: false
+  cleanup_after_test: false  # Set to true to auto-delete objects after tests
 
-  # Timeout configuration (in milliseconds)
-  # Can be overridden per operation type or per specific handler
-  timeouts:
-    default: 10000  # Default timeout for all operations (10 seconds)
 
-    # Operation-specific timeouts (low-level atomic operations)
-    create: 10000   # Create empty object (fast)
-    read: 10000     # Read object metadata/source (fast)
-    check: 10000    # Syntax check (fast)
-    lock: 10000     # Lock object (fast)
-    unlock: 10000   # Unlock object (fast)
-    update: 15000   # Update object content (medium - can be slower)
-    activate: 15000 # Activate object (medium - can be slower)
-    delete: 10000   # Delete object (fast)
 
-    # Handler-specific timeout overrides (optional)
-    # Uncomment and adjust if specific handlers need different timeouts
-    # create_class: 12000
-    # update_domain: 20000
+environment:
+  default_package: "<YOUR_PACKAGE_NAME>"  # Test package from GROUP 2
+  default_transport: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
+  default_system: "<YOUR_SYSTEM>"  # ⚠️ UPDATE WITH YOUR SYSTEM (e.g., E19)
+  default_client: "<YOUR_CLIENT>"  # ⚠️ UPDATE WITH YOUR CLIENT (e.g., 100)
 
 # ============================================================================
-# GROUP 1: TRANSPORT MANAGEMENT
+# OBJECT TESTS (High-Level, then Low-Level for each object)
 # ============================================================================
-# Step 1: Create transport request (used by all subsequent tests)
-create_transport:
-  test_cases:
-    - name: "workbench_transport"
-      enabled: true
-      description: "Create a workbench transport request (required for package and transportable objects)"
-      params:
-        transport_type: "workbench"
-        description: "Test transport created via MCP for test suite"
-        owner: "<YOUR_RESPONSIBLE_USER>"  # ⚠️ UPDATE WITH YOUR USERNAME (e.g., CB9980002377)
-        # target_system: "<YOUR_TARGET>"  # Optional: if not provided or empty, uses "LOCAL"
 
-# Step 2: Get transport (read created transport)
-get_transport:
-  test_cases:
-    - name: "created_transport"
-      enabled: true
-      description: "Retrieve transport created by create_transport test"
-      params:
-        # transport_number: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        include_objects: true
-        include_tasks: true
-
-# ============================================================================
-# GROUP 2: PACKAGE MANAGEMENT
-# ============================================================================
-# Step 1: Create package (uses transport from GROUP 1)
-# Step 1: High-level test (create → update → delete)
-create_package:
-  test_cases:
-    - name: "test_package_high"
-      enabled: true
-      description: "High-level test: create → update → delete package"
-      params:
-        # Create step
-        package_name: "<YOUR_PACKAGE_NAME>"  # Package where test objects are added (existing package)
-        description: "Test package created via MCP for test suite"
-        # super_package not needed for high-level handler
-        package_type: "development"
-        responsible: "<YOUR_RESPONSIBLE_USER>"  # ⚠️ UPDATE WITH YOUR USER ID (e.g., CB9980002377)
-        # software_component: "<YOUR_SOFTWARE_COMPONENT>"  # Optional - omit for local packages
-        # transport_layer: "<YOUR_TRANSPORT_LAYER>"  # Optional - omit for local packages
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional - omit for local packages
-        application_component: ""
-        # Update step (update description)
-        update_description: "Updated test package description"
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "DEVC/K"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-create_package_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
-      params:
-        # package_name: "<YOUR_SUPER_PACKAGE>"  # Parent package (super_package) - optional, uses default_package from environment if not specified
-        test_package: "<YOUR_PACKAGE_NAME>_LOW"  # Package to create
-        description: "Test package created via low-level MCP handler"
-        updated_description: "Test package created via low-level MCP handler (UPDATED)"
-        package_type: "development"
-        software_component: "ZLOCAL"  # Use your system's software component
-        # responsible: "<YOUR_RESPONSIBLE_USER>"  # Optional
-        # application_component: ""  # Optional
-        operation_delays:
-          create: 5000
-          update: 3000
-          unlock: 5000
-          delete: 20000
-          delete_retry: 20000
-    - name: "test_package_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        package_name: "<YOUR_SUPER_PACKAGE>"  # Parent package (super_package) - use your system's local package (e.g., ZLOCAL for cloud, $TMP for on-premise)
-        test_package: "<YOUR_PACKAGE_NAME>_LOW"  # Package to create
-        description: "Test package created via low-level MCP handler"
-        package_type: "development"
-        responsible: "<YOUR_RESPONSIBLE_USER>"
-        application_component: ""
-        # Update through low-level
-        update_description: "Updated via low-level"
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "DEVC/K"
-
-# Step 3: Read-only test (separate read-only handler)
-get_package:
-  test_cases:
-    - name: "test_package_read"
-      enabled: true
-      description: "Read-only test: read package through read-only handler"
-      params:
-        package_name: "<YOUR_PACKAGE_NAME>"
-
-# ============================================================================
-# GROUP 3: DOMAIN - Full CRUD Cycle
-# ============================================================================
-# Object name: <YOUR_DOMAIN_NAME> (used in all domain tests)
-# Uses: package "<YOUR_PACKAGE_NAME>" + transport from GROUP 1
-
-# Step 1: High-level test (create → update → delete)
-create_domain:
-  test_cases:
-    - name: "test_domain_high"
-      enabled: true
-      description: "High-level test: create → update → delete domain"
-      params:
-        # Create step
-        domain_name: "<YOUR_DOMAIN_NAME>"
-        description: "Test domain created via MCP"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-        datatype: "CHAR"
-        length: 50
-        decimals: 0
-        lowercase: false
-        sign_exists: false
-        # Update step
-        update_description: "Updated test domain description"
-        update_length: 60
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "DOMA"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-create_domain_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
-      params:
-        domain_name: "<YOUR_DOMAIN_NAME>_LOW"
-        description: "Test domain created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        datatype: "CHAR"
-        length: 50
-        decimals: 0
-        lowercase: false
-        sign_exists: false
-        properties:
-          description: "Test domain for low-level handler"
-          datatype: "CHAR"
-          length: 50
-        # Update through low-level
-        update_description: "Updated via low-level"
-        update_length: 60
-    - name: "test_domain_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        domain_name: "<YOUR_DOMAIN_NAME>_LOW"
-        description: "Test domain created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        datatype: "CHAR"
-        length: 50
-        decimals: 0
-        lowercase: false
-        sign_exists: false
-        # Update through low-level
-        update_description: "Updated via low-level"
-        update_length: 60
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "DOMA"
-
-# Step 3: Read-only test (separate read-only handler)
-get_domain:
-  test_cases:
-    - name: "test_domain_read"
-      enabled: true
-      description: "Read-only test: read domain through read-only handler"
-      params:
-        domain_name: "<YOUR_DOMAIN_NAME>"
-
-# ============================================================================
-# GROUP 4: DATA ELEMENT - Full CRUD Cycle
-# ============================================================================
-# Object name: <YOUR_DATA_ELEMENT_NAME> (used in all data element tests)
-# Uses: domain "<YOUR_DOMAIN_NAME>" + package "<YOUR_PACKAGE_NAME>" + transport
-
-# Step 1: High-level test (create → update → delete)
-create_data_element:
-  test_cases:
-    - name: "test_data_element_high"
-      enabled: true
-      description: "High-level test: create → update → delete data element"
-      params:
-        # Create step
-        data_element_name: "<YOUR_DATA_ELEMENT_NAME>"
-        description: "Test data element created via MCP"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-        domain_name: "<YOUR_DOMAIN_NAME>"  # Uses domain from GROUP 3
-        data_type: "CHAR"
-        length: 50
-        decimals: 0
-        short_label: "TestLbl"
-        medium_label: "Test Field"
-        field_label_long: "Test Field Long Label"
-        field_label_heading: "Test Heading"
-        # Update step
-        update_description: "Updated MCP data element"
-        update_field_label_short: "Upd Test"
-        update_field_label_medium: "Updated Test Field"
-        update_field_label_long: "Updated Test Field Long Label"
-        update_field_label_heading: "Updated Test Heading"
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "DTEL"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-create_data_element_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
-      params:
-        data_element_name: "<YOUR_DATA_ELEMENT_NAME>_LOW"
-        description: "Test data element created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        domain_name: "<YOUR_DOMAIN_NAME>"
-        data_type: "CHAR"
-        length: 50
-        decimals: 0
-        short_label: "TestLbl"
-        medium_label: "Test Field"
-        field_label_long: "Test Field Long Label"
-        field_label_heading: "Test Heading"
-        # Update through low-level
-        update_description: "Updated via low-level"
-    - name: "test_data_element_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        data_element_name: "<YOUR_DATA_ELEMENT_NAME>_LOW"
-        description: "Test data element created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        domain_name: "<YOUR_DOMAIN_NAME>"
-        data_type: "CHAR"
-        length: 50
-        decimals: 0
-        short_label: "TestLbl"
-        medium_label: "Test Field"
-        field_label_long: "Test Field Long Label"
-        field_label_heading: "Test Heading"
-        # Update through low-level
-        update_description: "Updated via low-level"
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "DTEL"
-
-# Step 3: Read-only test (separate read-only handler)
-get_data_element:
-  test_cases:
-    - name: "test_data_element_read"
-      enabled: true
-      description: "Read-only test: read data element through read-only handler"
-      params:
-        data_element_name: "<YOUR_DATA_ELEMENT_NAME>"
-
-# ============================================================================
-# GROUP 5: CLASS - Full CRUD Cycle
-# ============================================================================
-# Object name: <YOUR_CLASS_NAME> (used in all class tests)
-# Uses: package "<YOUR_PACKAGE_NAME>" + transport
-
-# Step 1: High-level test (create → update → delete)
-create_class:
-  test_cases:
-    - name: "test_class_high"
-      enabled: true
-      description: "High-level test: create → update → delete class"
-      params:
-        # Create step
-        class_name: "<YOUR_CLASS_NAME>"
-        description: "Test ABAP Class created via MCP ABAP ADT"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-        superclass: ""
-        final: false
-        abstract: false
-        create_protected: false
-        source_code: |
-          CLASS <YOUR_CLASS_NAME> DEFINITION
-            PUBLIC
-            FINAL
-            CREATE PUBLIC .
-
-            PUBLIC SECTION.
-              METHODS: constructor.
-            PROTECTED SECTION.
-            PRIVATE SECTION.
-          ENDCLASS.
-
-          CLASS <YOUR_CLASS_NAME> IMPLEMENTATION.
-            METHOD constructor.
-              " Initialization logic here
-              WRITE: / 'Class instance created'.
-            ENDMETHOD.
-          ENDCLASS.
-        # Update step (will be executed after create)
-        update_source_code: |
-          CLASS <YOUR_CLASS_NAME> DEFINITION
-            PUBLIC
-            FINAL
-            CREATE PUBLIC .
-
-            PUBLIC SECTION.
-              METHODS:
-                constructor,
-                get_message RETURNING VALUE(rv_message) TYPE string.
-            PROTECTED SECTION.
-            PRIVATE SECTION.
-          ENDCLASS.
-
-          CLASS <YOUR_CLASS_NAME> IMPLEMENTATION.
-            METHOD constructor.
-              " Updated initialization logic
-              WRITE: / 'Class instance created - UPDATED'.
-            ENDMETHOD.
-
-            METHOD get_message.
-              rv_message = 'Updated message from MCP test'.
-            ENDMETHOD.
-          ENDCLASS.
-        update_activate: true
-        # Delete step (will be executed after update)
-        delete_after_test: true
-        delete_object_type: "CLAS/OC"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-create_class_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
-      params:
-        class_name: "<YOUR_CLASS_NAME>_LOW"
-        description: "Test ABAP Class created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        superclass: ""
-        final: false
-        abstract: false
-        create_protected: false
-        source_code: |
-          CLASS <YOUR_CLASS_NAME>_LOW DEFINITION
-            PUBLIC
-            FINAL
-            CREATE PUBLIC .
-            PUBLIC SECTION.
-              METHODS: constructor.
-          ENDCLASS.
-          CLASS <YOUR_CLASS_NAME>_LOW IMPLEMENTATION.
-            METHOD constructor.
-              WRITE: / 'Class instance created'.
-            ENDMETHOD.
-          ENDCLASS.
-        # Update through low-level
-        update_source_code: |
-          CLASS <YOUR_CLASS_NAME>_LOW DEFINITION
-            PUBLIC
-            FINAL
-            CREATE PUBLIC .
-            PUBLIC SECTION.
-              METHODS: get_message RETURNING VALUE(rv_message) TYPE string.
-          ENDCLASS.
-          CLASS <YOUR_CLASS_NAME>_LOW IMPLEMENTATION.
-            METHOD get_message.
-              rv_message = 'Updated via low-level handler'.
-            ENDMETHOD.
-          ENDCLASS.
-    - name: "test_class_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        class_name: "<YOUR_CLASS_NAME>_LOW"
-        description: "Test ABAP Class created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        superclass: ""
-        final: false
-        abstract: false
-        create_protected: false
-        # Update through low-level
-        update_source_code: |
-          CLASS <YOUR_CLASS_NAME>_LOW DEFINITION
-            PUBLIC
-            FINAL
-            CREATE PUBLIC .
-            PUBLIC SECTION.
-              METHODS: get_message RETURNING VALUE(rv_message) TYPE string.
-          ENDCLASS.
-          CLASS <YOUR_CLASS_NAME>_LOW IMPLEMENTATION.
-            METHOD get_message.
-              rv_message = 'Updated via low-level handler'.
-            ENDMETHOD.
-          ENDCLASS.
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "CLAS/OC"
-
-# Step 3: Read-only test (separate read-only handler)
-get_class:
-  test_cases:
-    - name: "test_class_read"
-      enabled: true
-      description: "Read-only test: read class through read-only handler"
-      params:
-        class_name: "<YOUR_CLASS_NAME>"
-
-# Step 5: Run class (for classes that implement if_oo_adt_classrun)
-run_class:
-  test_cases:
-    - name: "runnable_class"
-      enabled: true
-      description: "Create and run a class that implements if_oo_adt_classrun interface"
-      params:
-        class_name: "<YOUR_RUNNABLE_CLASS_NAME>"
-        description: "Test runnable ABAP Class via MCP ABAP ADT"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        runnable: true
-        source_code: |
-          CLASS <YOUR_RUNNABLE_CLASS_NAME> DEFINITION
-            PUBLIC
-            FINAL
-            CREATE PUBLIC .
-
-            PUBLIC SECTION.
-              INTERFACES if_oo_adt_classrun.
-            PROTECTED SECTION.
-            PRIVATE SECTION.
-          ENDCLASS.
-
-          CLASS <YOUR_RUNNABLE_CLASS_NAME> IMPLEMENTATION.
-            METHOD if_oo_adt_classrun~main.
-              out->write( 'Hello from ADT Class Run!' ).
-              out->write( |System time: { cl_abap_context_info=>get_system_time( ) }| ).
-              out->write( 'Test runnable class executed successfully' ).
-            ENDMETHOD.
-          ENDCLASS.
-
-# ============================================================================
-# GROUP 6: PROGRAM - Full CRUD Cycle
-# ============================================================================
-# Object name: <YOUR_PROGRAM_NAME> (used in all program tests)
-# Uses: package "<YOUR_PACKAGE_NAME>" + transport
-
-# Step 1: High-level test (create → update → delete)
-create_program:
-  test_cases:
-    - name: "test_program_high"
-      enabled: true
-      description: "High-level test: create → update → delete program"
-      params:
-        # Create step
-        program_name: "<YOUR_PROGRAM_NAME>"
-        description: "Test ABAP Program created via MCP ABAP ADT"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-        program_type: "1"
-        application: "*"
-        source_code: |
-          *&---------------------------------------------------------------------*
-          *& Report <YOUR_PROGRAM_NAME>
-          *& Test ABAP Program created via MCP ABAP ADT
-          *&---------------------------------------------------------------------*
-          REPORT <YOUR_PROGRAM_NAME>.
-
-          START-OF-SELECTION.
-            WRITE: / 'Program <YOUR_PROGRAM_NAME> executed successfully.'.
-            WRITE: / 'Created via MCP ABAP ADT API.'.
-        # Update step
-        update_source_code: |
-          *&---------------------------------------------------------------------*
-          *& Report <YOUR_PROGRAM_NAME>
-          *& UPDATED Test ABAP Program via MCP ABAP ADT
-          *&---------------------------------------------------------------------*
-          REPORT <YOUR_PROGRAM_NAME>.
-
-          START-OF-SELECTION.
-            WRITE: / 'Program <YOUR_PROGRAM_NAME> executed successfully - UPDATED'.
-            WRITE: / 'Updated via MCP ABAP ADT API.'.
-            WRITE: / 'Modification date:', sy-datum.
-        update_activate: true
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "PROG/P"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-create_program_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
-      params:
-        program_name: "<YOUR_PROGRAM_NAME>_LOW"
-        description: "Test ABAP Program created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        program_type: "1"
-        source_code: |
-          *&---------------------------------------------------------------------*
-          *& Report <YOUR_PROGRAM_NAME>_LOW
-          *&---------------------------------------------------------------------*
-          REPORT <YOUR_PROGRAM_NAME>_LOW.
-          START-OF-SELECTION.
-            WRITE: / 'Program created via low-level handler'.
-        # Update through low-level
-        update_source_code: |
-          REPORT <YOUR_PROGRAM_NAME>_LOW.
-          START-OF-SELECTION.
-            WRITE: / 'Updated via low-level handler'.
-    - name: "test_program_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        program_name: "<YOUR_PROGRAM_NAME>_LOW"
-        description: "Test ABAP Program created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        program_type: "1"
-        # Update through low-level
-        update_source_code: |
-          REPORT <YOUR_PROGRAM_NAME>_LOW.
-          START-OF-SELECTION.
-            WRITE: / 'Updated via low-level handler'.
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "PROG/P"
-
-# Step 3: Read-only test (separate read-only handler)
-get_program:
-  test_cases:
-    - name: "test_program_read"
-      enabled: true
-      description: "Read-only test: read program through read-only handler"
-      params:
-        program_name: "<YOUR_PROGRAM_NAME>"
-
-# ============================================================================
-# GROUP 7: INTERFACE - Full CRUD Cycle
-# ============================================================================
-# Object name: <YOUR_INTERFACE_NAME> (used in all interface tests)
-# Uses: package "<YOUR_PACKAGE_NAME>" + transport
-
-# Step 1: High-level test (create → update → delete)
-create_interface:
-  test_cases:
-    - name: "test_interface_high"
-      enabled: true
-      description: "High-level test: create → update → delete interface"
-      params:
-        # Create step
-        interface_name: "<YOUR_INTERFACE_NAME>"
-        description: "Test interface created via MCP"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-        source_code: |
-          INTERFACE <YOUR_INTERFACE_NAME>
-            PUBLIC.
-
-            METHODS test_method
-              IMPORTING
-                iv_param TYPE string
-              RETURNING
-                VALUE(rv_result) TYPE string.
-
-          ENDINTERFACE.
-        # Update step
-        update_source_code: |
-          INTERFACE <YOUR_INTERFACE_NAME>
-            PUBLIC.
-
-            METHODS:
-              test_method
-                IMPORTING
-                  iv_param TYPE string
-                RETURNING
-                  VALUE(rv_result) TYPE string,
-              get_status RETURNING VALUE(rv_status) TYPE string.
-
-          ENDINTERFACE.
-        update_activate: true
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "INTF/OI"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-create_interface_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
-      params:
-        interface_name: "<YOUR_INTERFACE_NAME>_LOW"
-        description: "Test ABAP Interface created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        source_code: |
-          INTERFACE <YOUR_INTERFACE_NAME>_LOW PUBLIC.
-            METHODS: test_method RETURNING VALUE(rv_result) TYPE string.
-          ENDINTERFACE.
-        # Update through low-level
-        update_source_code: |
-          INTERFACE <YOUR_INTERFACE_NAME>_LOW PUBLIC.
-            METHODS: get_status RETURNING VALUE(rv_status) TYPE string.
-          ENDINTERFACE.
-    - name: "test_interface_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        interface_name: "<YOUR_INTERFACE_NAME>_LOW"
-        description: "Test ABAP Interface created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        # Update through low-level
-        update_source_code: |
-          INTERFACE <YOUR_INTERFACE_NAME>_LOW PUBLIC.
-            METHODS: get_status RETURNING VALUE(rv_status) TYPE string.
-          ENDINTERFACE.
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "INTF/OI"
-
-# Step 3: Read-only test (separate read-only handler)
-get_interface:
-  test_cases:
-    - name: "test_interface_read"
-      enabled: true
-      description: "Read-only test: read interface through read-only handler"
-      params:
-        interface_name: "<YOUR_INTERFACE_NAME>"
-
-# ============================================================================
-# GROUP 8: TABLE - Create Operation
-# ============================================================================
-# Step 1: High-level test (create → update → delete)
-create_table:
-  test_cases:
-    - name: "test_table_high"
-      enabled: false
-      description: "High-level test: create → update → delete table"
-      params:
-        # Create step
-        table_name: "<YOUR_TABLE_NAME>"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
-        ddl_code: |
-          @EndUserText.label : 'Test Table'
-          @AbapCatalog.tableCategory : #TRANSPARENT
-          define table <YOUR_TABLE_NAME_LOWER> {
-            key client : abap.clnt not null;
-            key id : abap.char(10);
-            name : abap.char(255);
-            created_at : abap.dats;
-          }
-        # Update step (update DDL code)
-        updated_ddl_code: |
-          @EndUserText.label : 'Test Table Updated'
-          @AbapCatalog.tableCategory : #TRANSPARENT
-          define table <YOUR_TABLE_NAME_LOWER> {
-            key client : abap.clnt not null;
-            key id : abap.char(10);
-            name : abap.char(255);
-            created_at : abap.dats;
-            updated_at : abap.dats;
-          }
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "TABL/DT"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-create_table_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
-      params:
-        table_name: "<YOUR_TABLE_NAME>_LOW"
-        description: "Test table created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        delivery_class: "A"
-        data_browser: "X"
-        data_maintenance: "X"
-        ddl_code: |
-          @EndUserText.label : 'Test Table Low'
-          @AbapCatalog.tableCategory : #TRANSPARENT
-          define table <YOUR_TABLE_NAME_LOWER>_LOW {
-            key client : abap.clnt not null;
-            key id : abap.char(10);
-            name : abap.char(255);
-          }
-        # Update through low-level
-        updated_ddl_code: |
-          @EndUserText.label : 'Test Table Low Updated'
-          @AbapCatalog.tableCategory : #TRANSPARENT
-          define table <YOUR_TABLE_NAME_LOWER>_LOW {
-            key client : abap.clnt not null;
-            key id : abap.char(10);
-            name : abap.char(255);
-            updated_at : abap.dats;
-          }
-    - name: "test_table_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        table_name: "<YOUR_TABLE_NAME>_LOW"
-        description: "Test table created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        delivery_class: "A"
-        data_browser: "X"
-        data_maintenance: "X"
-        # Update through low-level
-        update_description: "Updated via low-level"
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "TABL/DT"
-
-# Step 3: Read-only test (separate read-only handler)
-get_table:
-  test_cases:
-    - name: "test_table_read"
-      enabled: true
-      description: "Read-only test: read table through read-only handler"
-      params:
-        table_name: "<YOUR_TABLE_NAME>"
-
-# ============================================================================
-# GROUP 9: STRUCTURE - Create Operation
-# ============================================================================
-# Step 1: High-level test (create → update → delete)
-create_structure:
-  test_cases:
-    - name: "test_structure_high"
-      enabled: false
-      description: "High-level test: create → update → delete structure"
-      params:
-        # Create step
-        structure_name: "<YOUR_STRUCTURE_NAME>"
-        description: "Test structure created via MCP"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
-        fields:
-          - name: "FIELD1"
-            description: "First field"
-            data_type: "CHAR"
-            length: 10
-          - name: "FIELD2"
-            description: "Second field"
-            data_type: "CHAR"
-            length: 20
-        # Update step (update fields)
-        update_fields:
-          - name: "FIELD1"
-            description: "First field updated"
-            data_type: "CHAR"
-            length: 15
-          - name: "FIELD2"
-            description: "Second field updated"
-            data_type: "CHAR"
-            length: 25
-          - name: "FIELD3"
-            description: "Third field added"
-            data_type: "CHAR"
-            length: 30
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "TTYP/ST"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-create_structure_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
-      params:
-        structure_name: "<YOUR_STRUCTURE_NAME>_LOW"
-        description: "Test structure created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        ddl_code: |
-          @EndUserText.label: 'Test structure created via low-level MCP handler'
-          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          define structure <YOUR_STRUCTURE_NAME>_LOW {
-            field1 : abap.char(10);
-            field2 : abap.char(20);
-          }
-        # Update through low-level
-        updated_ddl_code: |
-          @EndUserText.label: 'Test structure created via low-level MCP handler'
-          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          define structure <YOUR_STRUCTURE_NAME>_LOW {
-            field1 : abap.char(10);
-            field2 : abap.char(20);
-          }
-    - name: "test_structure_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        structure_name: "<YOUR_STRUCTURE_NAME>_LOW"
-        description: "Test structure created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        # Update through low-level
-        update_description: "Updated via low-level"
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "TTYP/ST"
-
-# Step 3: Read-only test (separate read-only handler)
-get_structure:
-  test_cases:
-    - name: "test_structure_read"
-      enabled: true
-      description: "Read-only test: read structure through read-only handler"
-      params:
-        structure_name: "<YOUR_STRUCTURE_NAME>"
-
-# ============================================================================
-# GROUP 10: VIEW - Create and Update Operations
-# ============================================================================
-# Step 1: High-level test (create → update → delete)
-create_view:
-  test_cases:
-    - name: "test_view_high"
-      enabled: false
-      description: "High-level test: create → update → delete view"
-      params:
-        # Create step
-        view_name: "<YOUR_VIEW_NAME>"
-        description: "Test CDS view created via MCP"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
-        ddl_source: |
-          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>'
-          @EndUserText.label: 'Test CDS View'
-          define view <YOUR_VIEW_NAME>
-            as select from mara
-          {
-            matnr,
-            mbrsh,
-            mtart
-          }
-        # Update step
-        update_ddl_source: |
-          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>'
-          @EndUserText.label: 'Test CDS View Updated'
-          define view <YOUR_VIEW_NAME>
-            as select from mara
-          {
-            matnr,
-            mbrsh,
-            mtart,
-            meins
-          }
-        update_activate: true
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "DDLS/DF"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-create_view_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
-      params:
-        view_name: "<YOUR_VIEW_NAME>_LOW"
-        description: "Test CDS view created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        ddl_source: |
-          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>_LOW'
-          @EndUserText.label: 'Test CDS View Low'
-          define view <YOUR_VIEW_NAME>_LOW
-            as select from mara
-          {
-            matnr,
-            mbrsh
-          }
-        # Update through low-level
-        update_ddl_source: |
-          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>_LOW'
-          @EndUserText.label: 'Test CDS View Low Updated'
-          define view <YOUR_VIEW_NAME>_LOW
-            as select from mara
-          {
-            matnr,
-            mbrsh,
-            mtart
-          }
-    - name: "test_view_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        view_name: "<YOUR_VIEW_NAME>_LOW"
-        description: "Test CDS view created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        ddl_source: |
-          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>_LOW'
-          @EndUserText.label: 'Test CDS View Low'
-          define view <YOUR_VIEW_NAME>_LOW
-            as select from mara
-          {
-            matnr,
-            mbrsh
-          }
-        # Update through low-level
-        update_ddl_source: |
-          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>_LOW'
-          @EndUserText.label: 'Test CDS View Low Updated'
-          define view <YOUR_VIEW_NAME>_LOW
-            as select from mara
-          {
-            matnr,
-            mbrsh,
-            mtart
-          }
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "DDLS/DF"
-
-# Step 3: Read-only test (separate read-only handler)
-get_view:
-  test_cases:
-    - name: "test_view_read"
-      enabled: false
-      description: "Read-only test: read view through read-only handler"
-      params:
-        view_name: "<YOUR_VIEW_NAME>"
-
-# ============================================================================
-# GROUP 11: DELETE OBJECTS (Cleanup)
-# ============================================================================
-# Delete all objects created in previous groups (in reverse order)
-delete_object:
-  test_cases:
-    - name: "delete_interface"
-      enabled: true
-      description: "Delete test interface from GROUP 7"
-      params:
-        test_interface_name: "<YOUR_INTERFACE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-        package_name: "<YOUR_PACKAGE_NAME>"
-
-    - name: "delete_program"
-      enabled: true
-      description: "Delete test program from GROUP 6"
-      params:
-        test_program_name: "<YOUR_PROGRAM_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-        package_name: "<YOUR_PACKAGE_NAME>"
-
-    - name: "delete_class"
-      enabled: true
-      description: "Delete test class from GROUP 5"
-      params:
-        test_class_name: "<YOUR_CLASS_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-        package_name: "<YOUR_PACKAGE_NAME>"
-
-    - name: "delete_data_element"
-      enabled: true
-      description: "Delete test data element from GROUP 4"
-      params:
-        test_data_element_name: "<YOUR_DATA_ELEMENT_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-        package_name: "<YOUR_PACKAGE_NAME>"
-
-    - name: "delete_domain"
-      enabled: true
-      description: "Delete test domain from GROUP 3"
-      params:
-        test_domain_name: "<YOUR_DOMAIN_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-        package_name: "<YOUR_PACKAGE_NAME>"
-
-    - name: "delete_function_module"
-      enabled: true
-      description: "Delete test function module from GROUP 10 (MUST be before function_group)"
-      params:
-        test_function_module_name: "<YOUR_FUNCTION_MODULE_NAME>"
-        test_function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
-        package_name: "<YOUR_PACKAGE_NAME>"
-
-    - name: "delete_function_group"
-      enabled: true
-      description: "Delete test function group from GROUP 9 (deletes all FMs inside)"
-      params:
-        test_function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
-        package_name: "<YOUR_PACKAGE_NAME>"
-
-# Individual delete handlers (for run-all-tests.js compatibility)
-delete_domain:
-  test_cases:
-    - name: "test_domain"
-      enabled: true
-      description: "Delete test domain from GROUP 3"
-      params:
-        object_name: "<YOUR_DOMAIN_NAME>"
-        object_type: "DOMA"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        package_name: "<YOUR_PACKAGE_NAME>"
-
-delete_data_element:
-  test_cases:
-    - name: "test_data_element"
-      enabled: true
-      description: "Delete test data element from GROUP 4"
-      params:
-        object_name: "<YOUR_DATA_ELEMENT_NAME>"
-        object_type: "DTEL"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        package_name: "<YOUR_PACKAGE_NAME>"
-
-delete_program:
-  test_cases:
-    - name: "test_program"
-      enabled: true
-      description: "Delete test program from GROUP 6"
-      params:
-        object_name: "<YOUR_PROGRAM_NAME>"
-        object_type: "PROG/P"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        package_name: "<YOUR_PACKAGE_NAME>"
-
-delete_interface:
-  test_cases:
-    - name: "test_interface"
-      enabled: true
-      description: "Delete test interface from GROUP 7"
-      params:
-        object_name: "<YOUR_INTERFACE_NAME>"
-        object_type: "INTF/OI"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        package_name: "<YOUR_PACKAGE_NAME>"
-
-delete_function_module:
-  test_cases:
-    - name: "test_function_module"
-      enabled: true
-      description: "Delete test function module from GROUP 10 (MUST be before function_group)"
-      params:
-        object_name: "<YOUR_FUNCTION_MODULE_NAME>"
-        object_type: "FUGR/FF"
-        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
-        package_name: "<YOUR_PACKAGE_NAME>"
-
-delete_function_group:
-  test_cases:
-    - name: "test_function_group"
-      enabled: true
-      description: "Delete test function group from GROUP 9 (deletes all FMs inside)"
-      params:
-        object_name: "<YOUR_FUNCTION_GROUP_NAME>"
-        object_type: "FUGR"
-        package_name: "<YOUR_PACKAGE_NAME>"
-
-# ============================================================================
-# ADDITIONAL GET TESTS (Read-only, no dependencies)
-# ============================================================================
-# Note: get_table is part of create_table_low test (read operation within low-level test)
-
-get_table_contents:
-  test_cases:
-    - name: "limited_rows"
-      enabled: true
-      params:
-        table_name: "T000"
-        max_rows: 10
-
-get_service_definition:
-  test_cases:
-    - name: "standard_service_definition"
-      enabled: true
-      description: "Read standard SAP service definition"
-      params:
-        service_definition_name: "<YOUR_SERVICE_DEFINITION_NAME>"  # ⚠️ UPDATE WITH EXISTING SERVICE DEFINITION NAME
-
-# ============================================================================
-# GROUP 12: FUNCTION GROUP - Full CRUD Cycle
-# ============================================================================
-# Object name: <YOUR_FUNCTION_GROUP_NAME> (used in all function group tests)
-# Uses: package "<YOUR_PACKAGE_NAME>"
-
-# Step 1: High-level test (create → update → delete)
-create_function_group:
-  test_cases:
-    - name: "test_function_group_high"
-      enabled: true
-      description: "High-level test: create → update → delete function group"
-      params:
-        # Create step
-        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
-        description: "Test function group created via MCP"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
-        # Update step (update description)
-        update_description: "Updated test function group description"
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "FUGR"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-create_function_group_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
-      params:
-        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>_LOW"
-        description: "Test function group created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # Update through low-level
-        update_description: "Updated via low-level"
-    - name: "test_function_group_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>_LOW"
-        description: "Test function group created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # Update through low-level
-        update_description: "Updated via low-level"
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "FUGR"
-
-# Step 3: Read-only test (separate read-only handler)
-get_function_group:
-  test_cases:
-    - name: "test_function_group_read"
-      enabled: true
-      description: "Read-only test: read function group through read-only handler"
-      params:
-        function_group: "<YOUR_FUNCTION_GROUP_NAME>"
-
-# ============================================================================
-# GROUP 10: FUNCTION MODULE - Full CRUD Cycle
-# ============================================================================
-# Object name: <YOUR_FUNCTION_MODULE_NAME> (used in all function module tests)
-# Uses: function group "<YOUR_FUNCTION_GROUP_NAME>" from GROUP 9
-
-# Step 1: Create function module
-create_function_module:
-  test_cases:
-    - name: "test_function_module"
-      enabled: true
-      description: "Create test function module (uses function group from GROUP 9)"
-      params:
-        function_module_name: "<YOUR_FUNCTION_MODULE_NAME>"
-        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
-        description: "Test function module created via MCP"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
-        source_code: |
-          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>
-            IMPORTING
-              VALUE(IV_PARAM) TYPE STRING
-            EXPORTING
-              VALUE(EV_RESULT) TYPE STRING.
-            ev_result = |Result: { iv_param }|.
-          ENDFUNCTION.
-        # Update step
-        update_source_code: |
-          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>
-            IMPORTING
-              VALUE(IV_PARAM) TYPE STRING
-              VALUE(IV_OPTIONAL) TYPE STRING OPTIONAL
-            EXPORTING
-              VALUE(EV_RESULT) TYPE STRING
-              VALUE(EV_STATUS) TYPE STRING.
-            ev_result = |Result: { iv_param }|.
-            ev_status = |Status: OK|.
-          ENDFUNCTION.
-        update_activate: true
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "FUGR/FF"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-create_function_module_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
-      params:
-        function_module_name: "<YOUR_FUNCTION_MODULE_NAME>_LOW"
-        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
-        description: "Test function module created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        source_code: |
-          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>_LOW
-            IMPORTING VALUE(IV_PARAM) TYPE STRING
-            EXPORTING VALUE(EV_RESULT) TYPE STRING.
-            ev_result = |Result: { iv_param }|.
-          ENDFUNCTION.
-        # Update through low-level
-        update_source_code: |
-          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>_LOW
-            IMPORTING VALUE(IV_PARAM) TYPE STRING
-            EXPORTING VALUE(EV_RESULT) TYPE STRING.
-            ev_result = |Updated via low-level: { iv_param }|.
-          ENDFUNCTION.
-    - name: "test_function_module_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        function_module_name: "<YOUR_FUNCTION_MODULE_NAME>_LOW"
-        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
-        description: "Test function module created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # Update through low-level
-        update_source_code: |
-          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>_LOW
-            IMPORTING VALUE(IV_PARAM) TYPE STRING
-            EXPORTING VALUE(EV_RESULT) TYPE STRING.
-            ev_result = |Updated via low-level: { iv_param }|.
-          ENDFUNCTION.
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "FUGR/FF"
-
-# Step 3: Read-only test (separate read-only handler)
-get_function:
-  test_cases:
-    - name: "test_function_module_read"
-      enabled: true
-      description: "Read-only test: read function module through read-only handler"
-      params:
-        function_name: "<YOUR_FUNCTION_MODULE_NAME>"
-        function_group: "<YOUR_FUNCTION_GROUP_NAME>"
-
-# Legacy: get_function_test (deprecated, use get_function)
-get_function_test:
-  test_cases:
-    - name: "test_function_module"
-      enabled: true
-      params:
-        function_module_name: "<YOUR_FUNCTION_MODULE_NAME>"
-        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
-
-# Step 4: Get function (standard function for comparison)
-# Note: get_function is part of create_function_module_low test (read operation within low-level test)
-# Note: get_structure is part of create_structure_low test (read operation within low-level test)
-
-# ============================================================================
-# BEHAVIOR DEFINITION - Low-Level Handler
-# ============================================================================
+# Behavior Definition (Behavior Definition - Low-Level)
 create_behavior_definition_low:
   test_cases:
     - name: "full_workflow"
@@ -1372,50 +112,10 @@ create_behavior_definition_low:
 # ============================================================================
 # METADATA EXTENSION - Low-Level Handler
 # ============================================================================
-create_metadata_extension_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
-      params:
-        name: "<YOUR_METADATA_EXTENSION_NAME>"
-        description: "Test metadata extension created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        # Example of complete metadata extension source code:
-        # @Metadata.layer: #CUSTOMER
-        # annotate entity ZOK_C_CDS_TEST with {
-        #   @EndUserText.label: 'Field 1 Label'
-        #   @UI.identification: [{ position: 10 }]
-        #   Fld1;
-        #   @EndUserText.label: 'Field 2 Label'
-        #   @UI.lineItem: [{ position: 20 }]
-        #   Fld2;
-        #   @EndUserText.label: 'Field 3 Label'
-        #   @UI.lineItem: [{ position: 30 }]
-        #   Fld3;
-        #   @EndUserText.label: 'Child Items'
-        #   @UI.lineItem: [{ position: 40 }]
-        #   @UI.selectionField: [{ position: 1 }]
-        #   _association_name;
-        # }
-        source_code: |
-          @Metadata.layer: #CUSTOMER
-          annotate entity <YOUR_ENTITY_NAME> with {
-            @EndUserText.label: 'Field 1 Label'
-            @UI.identification: [{ position: 10 }]
-            <YOUR_FIELD_1>;
-            @EndUserText.label: 'Field 2 Label'
-            @UI.lineItem: [{ position: 20 }]
-            <YOUR_FIELD_2>;
-            @EndUserText.label: 'Field 3 Label'
-            @UI.lineItem: [{ position: 30 }]
-            <YOUR_FIELD_3>;
-          }
 
-# ============================================================================
-# BEHAVIOR IMPLEMENTATION - Low-Level Handler
-# ============================================================================
+# Behavior Implementation (Behavior Implementation - Low-Level)
+
+# Behavior Implementation (Behavior Implementation - Low-Level)
 create_behavior_implementation_low:
   test_cases:
     - name: "full_workflow"
@@ -1497,214 +197,1042 @@ create_behavior_implementation_low:
 
           ENDCLASS.
 
-get_include:
+
+# Class (Class)
+
+# Class (Class)
+create_class:
   test_cases:
-    - name: "standard_include"
+    - name: "test_class_high"
+      enabled: true
+      description: "High-level test: create → update → delete class"
+      params:
+        # Create step
+        class_name: "<YOUR_CLASS_NAME>"
+        description: "Test ABAP Class created via MCP ABAP ADT"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
+        superclass: ""
+        final: false
+        abstract: false
+        create_protected: false
+        source_code: |
+          CLASS <YOUR_CLASS_NAME> DEFINITION
+            PUBLIC
+            FINAL
+            CREATE PUBLIC .
+
+            PUBLIC SECTION.
+              METHODS: constructor.
+            PROTECTED SECTION.
+            PRIVATE SECTION.
+          ENDCLASS.
+
+          CLASS <YOUR_CLASS_NAME> IMPLEMENTATION.
+            METHOD constructor.
+              " Initialization logic here
+              WRITE: / 'Class instance created'.
+            ENDMETHOD.
+          ENDCLASS.
+        # Update step (will be executed after create)
+        update_source_code: |
+          CLASS <YOUR_CLASS_NAME> DEFINITION
+            PUBLIC
+            FINAL
+            CREATE PUBLIC .
+
+            PUBLIC SECTION.
+              METHODS:
+                constructor,
+                get_message RETURNING VALUE(rv_message) TYPE string.
+            PROTECTED SECTION.
+            PRIVATE SECTION.
+          ENDCLASS.
+
+          CLASS <YOUR_CLASS_NAME> IMPLEMENTATION.
+            METHOD constructor.
+              " Updated initialization logic
+              WRITE: / 'Class instance created - UPDATED'.
+            ENDMETHOD.
+
+            METHOD get_message.
+              rv_message = 'Updated message from MCP test'.
+            ENDMETHOD.
+          ENDCLASS.
+        update_activate: true
+        # Delete step (will be executed after update)
+        delete_after_test: true
+        delete_object_type: "CLAS/OC"
+
+# Step 2: Low-level flow test (create → update → delete through low-level handlers)
+
+# Class (Class - Low-Level)
+
+# Class (Class - Low-Level)
+create_class_low:
+  test_cases:
+    - name: "full_workflow"
       enabled: false
-      description: "Get include for program (S4HANA only, not available in Cloud)"
+      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
-        include_name: "SAPMV45A"  # Standard program include
-        program_name: "SAPMV45A"
-
-get_type_info:
-  test_cases:
-    - name: "standard_type"
-      enabled: true
-      params:
-        type_name: "MARA"
-        type_kind: "TABL"
-
-get_prog_full_code:
-  test_cases:
-    - name: "standard_function_group"
-      enabled: true
-      description: "Get full code for function group (Cloud compatible)"
-      params:
-        name: "SRFC"
-        type: "FUGR"
-    - name: "standard_program"
+        class_name: "<YOUR_CLASS_NAME>_LOW"
+        description: "Test ABAP Class created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        superclass: ""
+        final: false
+        abstract: false
+        create_protected: false
+        source_code: |
+          CLASS <YOUR_CLASS_NAME>_LOW DEFINITION
+            PUBLIC
+            FINAL
+            CREATE PUBLIC .
+            PUBLIC SECTION.
+              METHODS: constructor.
+          ENDCLASS.
+          CLASS <YOUR_CLASS_NAME>_LOW IMPLEMENTATION.
+            METHOD constructor.
+              WRITE: / 'Class instance created'.
+            ENDMETHOD.
+          ENDCLASS.
+        # Update through low-level
+        update_source_code: |
+          CLASS <YOUR_CLASS_NAME>_LOW DEFINITION
+            PUBLIC
+            FINAL
+            CREATE PUBLIC .
+            PUBLIC SECTION.
+              METHODS: get_message RETURNING VALUE(rv_message) TYPE string.
+          ENDCLASS.
+          CLASS <YOUR_CLASS_NAME>_LOW IMPLEMENTATION.
+            METHOD get_message.
+              rv_message = 'Updated via low-level handler'.
+            ENDMETHOD.
+          ENDCLASS.
+    - name: "test_class_low_flow"
       enabled: false
-      description: "Get full code for program (S4HANA only, not available in Cloud)"
+      description: "Low-level flow test: create → update → delete through low-level handlers"
       params:
-        name: "SAPMV45A"
-        type: "PROG/P"
+        class_name: "<YOUR_CLASS_NAME>_LOW"
+        description: "Test ABAP Class created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        superclass: ""
+        final: false
+        abstract: false
+        create_protected: false
+        # Update through low-level
+        update_source_code: |
+          CLASS <YOUR_CLASS_NAME>_LOW DEFINITION
+            PUBLIC
+            FINAL
+            CREATE PUBLIC .
+            PUBLIC SECTION.
+              METHODS: get_message RETURNING VALUE(rv_message) TYPE string.
+          ENDCLASS.
+          CLASS <YOUR_CLASS_NAME>_LOW IMPLEMENTATION.
+            METHOD get_message.
+              rv_message = 'Updated via low-level handler'.
+            ENDMETHOD.
+          ENDCLASS.
+        # Delete through low-level
+        delete_after_test: true
+        delete_object_type: "CLAS/OC"
 
-get_includes_list:
+# Step 3: Read-only test (separate read-only handler)
+
+# Data Element (Data Element)
+
+# Data Element (Data Element)
+create_data_element:
   test_cases:
-    - name: "standard_function_group"
+    - name: "test_data_element_high"
       enabled: true
-      description: "Get includes list for function group (Cloud compatible)"
+      description: "High-level test: create → update → delete data element"
       params:
-        object_name: "SRFC"
-        object_type: "FUGR"
-        detailed: false
-    - name: "standard_program"
+        # Create step
+        data_element_name: "<YOUR_DATA_ELEMENT_NAME>"
+        description: "Test data element created via MCP"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
+        domain_name: "<YOUR_DOMAIN_NAME>"  # Uses domain from GROUP 3
+        data_type: "CHAR"
+        length: 50
+        decimals: 0
+        short_label: "TestLbl"
+        medium_label: "Test Field"
+        field_label_long: "Test Field Long Label"
+        field_label_heading: "Test Heading"
+        # Update step
+        update_description: "Updated MCP data element"
+        update_field_label_short: "Upd Test"
+        update_field_label_medium: "Updated Test Field"
+        update_field_label_long: "Updated Test Field Long Label"
+        update_field_label_heading: "Updated Test Heading"
+        # Delete step
+        delete_after_test: true
+        delete_object_type: "DTEL"
+
+# Step 2: Low-level flow test (create → update → delete through low-level handlers)
+
+# Data Element (Data Element - Low-Level)
+
+# Data Element (Data Element - Low-Level)
+create_data_element_low:
+  test_cases:
+    - name: "full_workflow"
       enabled: false
-      description: "Get includes list for program (S4HANA only, not available in Cloud)"
+      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
-        object_name: "SAPMV45A"
-        object_type: "PROG/P"
-        detailed: false
-
-get_objects_list:
-  test_cases:
-    - name: "standard_function_group"
-      enabled: true
-      description: "Get objects list for function group (Cloud compatible)"
-      params:
-        parent_name: "SRFC"
-        parent_tech_name: "SRFC"
-        parent_type: "FUGR"
-        with_short_descriptions: true
-    - name: "standard_program"
+        data_element_name: "<YOUR_DATA_ELEMENT_NAME>_LOW"
+        description: "Test data element created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        domain_name: "<YOUR_DOMAIN_NAME>"
+        data_type: "CHAR"
+        length: 50
+        decimals: 0
+        short_label: "TestLbl"
+        medium_label: "Test Field"
+        field_label_long: "Test Field Long Label"
+        field_label_heading: "Test Heading"
+        # Update through low-level
+        update_description: "Updated via low-level"
+    - name: "test_data_element_low_flow"
       enabled: false
-      description: "Get objects list for program (S4HANA only, not available in Cloud)"
+      description: "Low-level flow test: create → update → delete through low-level handlers"
       params:
-        parent_name: "/CBY/PURBOOK_EN"
-        parent_tech_name: "/CBY/PURBOOK_EN"
-        parent_type: "PROG/P"
-        with_short_descriptions: true
+        data_element_name: "<YOUR_DATA_ELEMENT_NAME>_LOW"
+        description: "Test data element created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        domain_name: "<YOUR_DOMAIN_NAME>"
+        data_type: "CHAR"
+        length: 50
+        decimals: 0
+        short_label: "TestLbl"
+        medium_label: "Test Field"
+        field_label_long: "Test Field Long Label"
+        field_label_heading: "Test Heading"
+        # Update through low-level
+        update_description: "Updated via low-level"
+        # Delete through low-level
+        delete_after_test: true
+        delete_object_type: "DTEL"
 
-get_object_structure:
-  test_cases:
-    - name: "standard_view"
-      enabled: true
-      params:
-        objecttype: "DDLS/DF"
-        objectname: "/CBY/ACQ_DDL"
+# Step 3: Read-only test (separate read-only handler)
 
-get_transaction:
-  test_cases:
-    - name: "standard_transaction"
-      enabled: true
-      params:
-        transaction_code: "SE11"
+# Domain (Domain)
 
-get_enhancements:
+# Domain (Domain)
+create_domain:
   test_cases:
-    - name: "class_enhancements"
+    - name: "test_domain_high"
       enabled: true
-      description: "Get enhancements for class (Cloud compatible)"
+      description: "High-level test: create → update → delete domain"
       params:
-        object_name: "CL_ABAP_TYPEDESCR"
-        object_type: "CLAS/OC"
-    - name: "program_enhancements"
+        # Create step
+        domain_name: "<YOUR_DOMAIN_NAME>"
+        description: "Test domain created via MCP"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
+        datatype: "CHAR"
+        length: 50
+        decimals: 0
+        lowercase: false
+        sign_exists: false
+        # Update step
+        update_description: "Updated test domain description"
+        update_length: 60
+        # Delete step
+        delete_after_test: true
+        delete_object_type: "DOMA"
+
+# Step 2: Low-level flow test (create → update → delete through low-level handlers)
+
+# Domain (Domain - Low-Level)
+
+# Domain (Domain - Low-Level)
+create_domain_low:
+  test_cases:
+    - name: "full_workflow"
       enabled: false
-      description: "Get enhancements for program (S4HANA only, not available in Cloud)"
+      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
-        object_name: "SAPMV45A"
-        object_type: "PROG/P"
+        domain_name: "<YOUR_DOMAIN_NAME>_LOW"
+        description: "Test domain created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        datatype: "CHAR"
+        length: 50
+        decimals: 0
+        lowercase: false
+        sign_exists: false
+        properties:
+          description: "Test domain for low-level handler"
+          datatype: "CHAR"
+          length: 50
+        # Update through low-level
+        update_description: "Updated via low-level"
+        update_length: 60
+    - name: "test_domain_low_flow"
+      enabled: false
+      description: "Low-level flow test: create → update → delete through low-level handlers"
+      params:
+        domain_name: "<YOUR_DOMAIN_NAME>_LOW"
+        description: "Test domain created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        datatype: "CHAR"
+        length: 50
+        decimals: 0
+        lowercase: false
+        sign_exists: false
+        # Update through low-level
+        update_description: "Updated via low-level"
+        update_length: 60
+        # Delete through low-level
+        delete_after_test: true
+        delete_object_type: "DOMA"
 
-get_sql_query:
+# Step 3: Read-only test (separate read-only handler)
+
+# Function Group (Function Group)
+
+# Function Group (Function Group)
+create_function_group:
   test_cases:
-    - name: "simple_select"
+    - name: "test_function_group_high"
       enabled: true
+      description: "High-level test: create → update → delete function group"
       params:
-        sql_query: "SELECT MANDT, MTEXT FROM T000 WHERE MANDT < '100'"
-        row_number: 10
+        # Create step
+        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
+        description: "Test function group created via MCP"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
+        # Update step (update description)
+        update_description: "Updated test function group description"
+        # Delete step
+        delete_after_test: true
+        delete_object_type: "FUGR"
+
+# Step 2: Low-level flow test (create → update → delete through low-level handlers)
+
+# Function Group (Function Group - Low-Level)
+
+# Function Group (Function Group - Low-Level)
+create_function_group_low:
+  test_cases:
+    - name: "full_workflow"
+      enabled: false
+      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      params:
+        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>_LOW"
+        description: "Test function group created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # Update through low-level
+        update_description: "Updated via low-level"
+    - name: "test_function_group_low_flow"
+      enabled: false
+      description: "Low-level flow test: create → update → delete through low-level handlers"
+      params:
+        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>_LOW"
+        description: "Test function group created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # Update through low-level
+        update_description: "Updated via low-level"
+        # Delete through low-level
+        delete_after_test: true
+        delete_object_type: "FUGR"
+
+# Step 3: Read-only test (separate read-only handler)
+
+# Function Module (Function Module)
+
+# Function Module (Function Module)
+create_function_module:
+  test_cases:
+    - name: "test_function_module"
+      enabled: true
+      description: "Create test function module (uses function group from GROUP 9)"
+      params:
+        function_module_name: "<YOUR_FUNCTION_MODULE_NAME>"
+        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
+        description: "Test function module created via MCP"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
+        source_code: |
+          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>
+            IMPORTING
+              VALUE(IV_PARAM) TYPE STRING
+            EXPORTING
+              VALUE(EV_RESULT) TYPE STRING.
+            ev_result = |Result: { iv_param }|.
+          ENDFUNCTION.
+        # Update step
+        update_source_code: |
+          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>
+            IMPORTING
+              VALUE(IV_PARAM) TYPE STRING
+              VALUE(IV_OPTIONAL) TYPE STRING OPTIONAL
+            EXPORTING
+              VALUE(EV_RESULT) TYPE STRING
+              VALUE(EV_STATUS) TYPE STRING.
+            ev_result = |Result: { iv_param }|.
+            ev_status = |Status: OK|.
+          ENDFUNCTION.
+        update_activate: true
+        # Delete step
+        delete_after_test: true
+        delete_object_type: "FUGR/FF"
+
+# Step 2: Low-level flow test (create → update → delete through low-level handlers)
+
+# Function Module (Function Module - Low-Level)
+
+# Function Module (Function Module - Low-Level)
+create_function_module_low:
+  test_cases:
+    - name: "full_workflow"
+      enabled: false
+      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      params:
+        function_module_name: "<YOUR_FUNCTION_MODULE_NAME>_LOW"
+        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
+        description: "Test function module created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        source_code: |
+          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>_LOW
+            IMPORTING VALUE(IV_PARAM) TYPE STRING
+            EXPORTING VALUE(EV_RESULT) TYPE STRING.
+            ev_result = |Result: { iv_param }|.
+          ENDFUNCTION.
+        # Update through low-level
+        update_source_code: |
+          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>_LOW
+            IMPORTING VALUE(IV_PARAM) TYPE STRING
+            EXPORTING VALUE(EV_RESULT) TYPE STRING.
+            ev_result = |Updated via low-level: { iv_param }|.
+          ENDFUNCTION.
+    - name: "test_function_module_low_flow"
+      enabled: false
+      description: "Low-level flow test: create → update → delete through low-level handlers"
+      params:
+        function_module_name: "<YOUR_FUNCTION_MODULE_NAME>_LOW"
+        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
+        description: "Test function module created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # Update through low-level
+        update_source_code: |
+          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>_LOW
+            IMPORTING VALUE(IV_PARAM) TYPE STRING
+            EXPORTING VALUE(EV_RESULT) TYPE STRING.
+            ev_result = |Updated via low-level: { iv_param }|.
+          ENDFUNCTION.
+        # Delete through low-level
+        delete_after_test: true
+        delete_object_type: "FUGR/FF"
+
+# Step 3: Read-only test (separate read-only handler)
+
+# Interface (Interface)
+
+# Interface (Interface)
+create_interface:
+  test_cases:
+    - name: "test_interface_high"
+      enabled: true
+      description: "High-level test: create → update → delete interface"
+      params:
+        # Create step
+        interface_name: "<YOUR_INTERFACE_NAME>"
+        description: "Test interface created via MCP"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
+        source_code: |
+          INTERFACE <YOUR_INTERFACE_NAME>
+            PUBLIC.
+
+            METHODS test_method
+              IMPORTING
+                iv_param TYPE string
+              RETURNING
+                VALUE(rv_result) TYPE string.
+
+          ENDINTERFACE.
+        # Update step
+        update_source_code: |
+          INTERFACE <YOUR_INTERFACE_NAME>
+            PUBLIC.
+
+            METHODS:
+              test_method
+                IMPORTING
+                  iv_param TYPE string
+                RETURNING
+                  VALUE(rv_result) TYPE string,
+              get_status RETURNING VALUE(rv_status) TYPE string.
+
+          ENDINTERFACE.
+        update_activate: true
+        # Delete step
+        delete_after_test: true
+        delete_object_type: "INTF/OI"
+
+# Step 2: Low-level flow test (create → update → delete through low-level handlers)
+
+# Interface (Interface - Low-Level)
+
+# Interface (Interface - Low-Level)
+create_interface_low:
+  test_cases:
+    - name: "full_workflow"
+      enabled: false
+      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      params:
+        interface_name: "<YOUR_INTERFACE_NAME>_LOW"
+        description: "Test ABAP Interface created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        source_code: |
+          INTERFACE <YOUR_INTERFACE_NAME>_LOW PUBLIC.
+            METHODS: test_method RETURNING VALUE(rv_result) TYPE string.
+          ENDINTERFACE.
+        # Update through low-level
+        update_source_code: |
+          INTERFACE <YOUR_INTERFACE_NAME>_LOW PUBLIC.
+            METHODS: get_status RETURNING VALUE(rv_status) TYPE string.
+          ENDINTERFACE.
+    - name: "test_interface_low_flow"
+      enabled: false
+      description: "Low-level flow test: create → update → delete through low-level handlers"
+      params:
+        interface_name: "<YOUR_INTERFACE_NAME>_LOW"
+        description: "Test ABAP Interface created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        # Update through low-level
+        update_source_code: |
+          INTERFACE <YOUR_INTERFACE_NAME>_LOW PUBLIC.
+            METHODS: get_status RETURNING VALUE(rv_status) TYPE string.
+          ENDINTERFACE.
+        # Delete through low-level
+        delete_after_test: true
+        delete_object_type: "INTF/OI"
+
+# Step 3: Read-only test (separate read-only handler)
+
+# Metadata Extension (Metadata Extension - Low-Level)
+
+# Metadata Extension (Metadata Extension - Low-Level)
+create_metadata_extension_low:
+  test_cases:
+    - name: "full_workflow"
+      enabled: false
+      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      params:
+        name: "<YOUR_METADATA_EXTENSION_NAME>"
+        description: "Test metadata extension created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        # Example of complete metadata extension source code:
+        # @Metadata.layer: #CUSTOMER
+        # annotate entity ZOK_C_CDS_TEST with {
+        #   @EndUserText.label: 'Field 1 Label'
+        #   @UI.identification: [{ position: 10 }]
+        #   Fld1;
+        #   @EndUserText.label: 'Field 2 Label'
+        #   @UI.lineItem: [{ position: 20 }]
+        #   Fld2;
+        #   @EndUserText.label: 'Field 3 Label'
+        #   @UI.lineItem: [{ position: 30 }]
+        #   Fld3;
+        #   @EndUserText.label: 'Child Items'
+        #   @UI.lineItem: [{ position: 40 }]
+        #   @UI.selectionField: [{ position: 1 }]
+        #   _association_name;
+        # }
+        source_code: |
+          @Metadata.layer: #CUSTOMER
+          annotate entity <YOUR_ENTITY_NAME> with {
+            @EndUserText.label: 'Field 1 Label'
+            @UI.identification: [{ position: 10 }]
+            <YOUR_FIELD_1>;
+            @EndUserText.label: 'Field 2 Label'
+            @UI.lineItem: [{ position: 20 }]
+            <YOUR_FIELD_2>;
+            @EndUserText.label: 'Field 3 Label'
+            @UI.lineItem: [{ position: 30 }]
+            <YOUR_FIELD_3>;
+          }
 
 # ============================================================================
-# SEARCH AND UTILITY TESTS
+# BEHAVIOR IMPLEMENTATION - Low-Level Handler
 # ============================================================================
 
-search_object:
+# Package (Package)
+
+# Package (Package)
+create_package:
   test_cases:
-    - name: "search_tables"
+    - name: "test_package_high"
       enabled: true
+      description: "High-level test: create → update → delete package"
       params:
-        object_name: "MARA*"
-        object_type: "TABL"
-        maxResults: 10
+        # Create step
+        package_name: "<YOUR_PACKAGE_NAME>"  # Package where test objects are added (existing package)
+        description: "Test package created via MCP for test suite"
+        # super_package not needed for high-level handler
+        package_type: "development"
+        responsible: "<YOUR_RESPONSIBLE_USER>"  # ⚠️ UPDATE WITH YOUR USER ID (e.g., CB9980002377)
+        # software_component: "<YOUR_SOFTWARE_COMPONENT>"  # Optional - omit for local packages
+        # transport_layer: "<YOUR_TRANSPORT_LAYER>"  # Optional - omit for local packages
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional - omit for local packages
+        application_component: ""
+        # Update step (update description)
+        update_description: "Updated test package description"
+        # Delete step
+        delete_after_test: true
+        delete_object_type: "DEVC/K"
 
-get_where_used:
+# Step 2: Low-level flow test (create → update → delete through low-level handlers)
+
+# Package (Package - Low-Level)
+
+# Package (Package - Low-Level)
+create_package_low:
   test_cases:
-    - name: "table_usage"
-      enabled: true
+    - name: "full_workflow"
+      enabled: false
+      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
-        object_name: "MARA"
-        object_type: "TABL/DT"
-        detailed: false
+        # package_name: "<YOUR_SUPER_PACKAGE>"  # Parent package (super_package) - optional, uses default_package from environment if not specified
+        test_package: "<YOUR_PACKAGE_NAME>_LOW"  # Package to create
+        description: "Test package created via low-level MCP handler"
+        updated_description: "Test package created via low-level MCP handler (UPDATED)"
+        package_type: "development"
+        software_component: "ZLOCAL"  # Use your system's software component
+        # responsible: "<YOUR_RESPONSIBLE_USER>"  # Optional
+        # application_component: ""  # Optional
+        operation_delays:
+          create: 5000
+          update: 3000
+          unlock: 5000
+          delete: 20000
+          delete_retry: 20000
+    - name: "test_package_low_flow"
+      enabled: false
+      description: "Low-level flow test: create → update → delete through low-level handlers"
+      params:
+        package_name: "<YOUR_SUPER_PACKAGE>"  # Parent package (super_package) - use your system's local package (e.g., ZLOCAL for cloud, $TMP for on-premise)
+        test_package: "<YOUR_PACKAGE_NAME>_LOW"  # Package to create
+        description: "Test package created via low-level MCP handler"
+        package_type: "development"
+        responsible: "<YOUR_RESPONSIBLE_USER>"
+        application_component: ""
+        # Update through low-level
+        update_description: "Updated via low-level"
+        # Delete through low-level
+        delete_after_test: true
+        delete_object_type: "DEVC/K"
 
-get_object_info:
+# Step 3: Read-only test (separate read-only handler)
+
+# Program (Program)
+
+# Program (Program)
+create_program:
   test_cases:
-    - name: "class_structure"
+    - name: "test_program_high"
       enabled: true
+      description: "High-level test: create → update → delete program"
       params:
-        parent_type: "CLAS/OC"
-        parent_name: "CL_ABAP_TYPEDESCR"
-        maxDepth: 2
-        enrich: true
+        # Create step
+        program_name: "<YOUR_PROGRAM_NAME>"
+        description: "Test ABAP Program created via MCP ABAP ADT"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
+        program_type: "1"
+        application: "*"
+        source_code: |
+          *&---------------------------------------------------------------------*
+          *& Report <YOUR_PROGRAM_NAME>
+          *& Test ABAP Program created via MCP ABAP ADT
+          *&---------------------------------------------------------------------*
+          REPORT <YOUR_PROGRAM_NAME>.
 
-get_abap_ast:
+          START-OF-SELECTION.
+            WRITE: / 'Program <YOUR_PROGRAM_NAME> executed successfully.'.
+            WRITE: / 'Created via MCP ABAP ADT API.'.
+        # Update step
+        update_source_code: |
+          *&---------------------------------------------------------------------*
+          *& Report <YOUR_PROGRAM_NAME>
+          *& UPDATED Test ABAP Program via MCP ABAP ADT
+          *&---------------------------------------------------------------------*
+          REPORT <YOUR_PROGRAM_NAME>.
+
+          START-OF-SELECTION.
+            WRITE: / 'Program <YOUR_PROGRAM_NAME> executed successfully - UPDATED'.
+            WRITE: / 'Updated via MCP ABAP ADT API.'.
+            WRITE: / 'Modification date:', sy-datum.
+        update_activate: true
+        # Delete step
+        delete_after_test: true
+        delete_object_type: "PROG/P"
+
+# Step 2: Low-level flow test (create → update → delete through low-level handlers)
+
+# Program (Program - Low-Level)
+
+# Program (Program - Low-Level)
+create_program_low:
   test_cases:
-    - name: "simple_code"
-      enabled: true
+    - name: "full_workflow"
+      enabled: false
+      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
-        code: |
-          REPORT test.
-          DATA: lv_text TYPE string.
-          lv_text = 'Hello World'.
-          WRITE: / lv_text.
+        program_name: "<YOUR_PROGRAM_NAME>_LOW"
+        description: "Test ABAP Program created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        program_type: "1"
+        source_code: |
+          *&---------------------------------------------------------------------*
+          *& Report <YOUR_PROGRAM_NAME>_LOW
+          *&---------------------------------------------------------------------*
+          REPORT <YOUR_PROGRAM_NAME>_LOW.
+          START-OF-SELECTION.
+            WRITE: / 'Program created via low-level handler'.
+        # Update through low-level
+        update_source_code: |
+          REPORT <YOUR_PROGRAM_NAME>_LOW.
+          START-OF-SELECTION.
+            WRITE: / 'Updated via low-level handler'.
+    - name: "test_program_low_flow"
+      enabled: false
+      description: "Low-level flow test: create → update → delete through low-level handlers"
+      params:
+        program_name: "<YOUR_PROGRAM_NAME>_LOW"
+        description: "Test ABAP Program created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        program_type: "1"
+        # Update through low-level
+        update_source_code: |
+          REPORT <YOUR_PROGRAM_NAME>_LOW.
+          START-OF-SELECTION.
+            WRITE: / 'Updated via low-level handler'.
+        # Delete through low-level
+        delete_after_test: true
+        delete_object_type: "PROG/P"
 
-get_abap_semantic_analysis:
+# Step 3: Read-only test (separate read-only handler)
+
+# Structure (Structure)
+
+# Structure (Structure)
+create_structure:
   test_cases:
-    - name: "with_symbols"
-      enabled: true
+    - name: "test_structure_high"
+      enabled: false
+      description: "High-level test: create → update → delete structure"
       params:
-        code: |
-          REPORT test.
-          DATA: lv_count TYPE i,
-                lv_name TYPE string.
-          lv_count = 42.
-          lv_name = 'Test'.
+        # Create step
+        structure_name: "<YOUR_STRUCTURE_NAME>"
+        description: "Test structure created via MCP"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
+        fields:
+          - name: "FIELD1"
+            description: "First field"
+            data_type: "CHAR"
+            length: 10
+          - name: "FIELD2"
+            description: "Second field"
+            data_type: "CHAR"
+            length: 20
+        # Update step (update fields)
+        update_fields:
+          - name: "FIELD1"
+            description: "First field updated"
+            data_type: "CHAR"
+            length: 15
+          - name: "FIELD2"
+            description: "Second field updated"
+            data_type: "CHAR"
+            length: 25
+          - name: "FIELD3"
+            description: "Third field added"
+            data_type: "CHAR"
+            length: 30
+        # Delete step
+        delete_after_test: true
+        delete_object_type: "TTYP/ST"
 
-# ============================================================================
-# ACTIVATION AND CHECK TESTS
-# ============================================================================
+# Step 2: Low-level flow test (create → update → delete through low-level handlers)
 
-activate_object:
+# Structure (Structure - Low-Level)
+
+# Structure (Structure - Low-Level)
+create_structure_low:
   test_cases:
-    - name: "test_objects"
-      enabled: true
-      description: "Activate test class and program from GROUPS 5 and 6"
+    - name: "full_workflow"
+      enabled: false
+      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
-        objects:
-          - object_name: "<YOUR_CLASS_NAME>"
-            object_type: "CLAS/OC"
-          - object_name: "<YOUR_PROGRAM_NAME>"
-            object_type: "PROG/P"
-        preaudit: false
+        structure_name: "<YOUR_STRUCTURE_NAME>_LOW"
+        description: "Test structure created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        ddl_code: |
+          @EndUserText.label: 'Test structure created via low-level MCP handler'
+          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+          define structure <YOUR_STRUCTURE_NAME>_LOW {
+            field1 : abap.char(10);
+            field2 : abap.char(20);
+          }
+        # Update through low-level
+        updated_ddl_code: |
+          @EndUserText.label: 'Test structure created via low-level MCP handler'
+          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+          define structure <YOUR_STRUCTURE_NAME>_LOW {
+            field1 : abap.char(10);
+            field2 : abap.char(20);
+          }
+    - name: "test_structure_low_flow"
+      enabled: false
+      description: "Low-level flow test: create → update → delete through low-level handlers"
+      params:
+        structure_name: "<YOUR_STRUCTURE_NAME>_LOW"
+        description: "Test structure created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        # Update through low-level
+        update_description: "Updated via low-level"
+        # Delete through low-level
+        delete_after_test: true
+        delete_object_type: "TTYP/ST"
 
-check_object:
+# Step 3: Read-only test (separate read-only handler)
+
+# Table (Table)
+
+# Table (Table)
+create_table:
   test_cases:
-    - name: "check_test_objects"
-      enabled: true
-      description: "Check syntax of test objects"
+    - name: "test_table_high"
+      enabled: false
+      description: "High-level test: create → update → delete table"
       params:
-        objects:
-          - object_name: "<YOUR_CLASS_NAME>"
-            object_type: "class"
-            version: "active"
-          - object_name: "<YOUR_PROGRAM_NAME>"
-            object_type: "program"
-            version: "active"
+        # Create step
+        table_name: "<YOUR_TABLE_NAME>"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
+        ddl_code: |
+          @EndUserText.label : 'Test Table'
+          @AbapCatalog.tableCategory : #TRANSPARENT
+          define table <YOUR_TABLE_NAME_LOWER> {
+            key client : abap.clnt not null;
+            key id : abap.char(10);
+            name : abap.char(255);
+            created_at : abap.dats;
+          }
+        # Update step (update DDL code)
+        updated_ddl_code: |
+          @EndUserText.label : 'Test Table Updated'
+          @AbapCatalog.tableCategory : #TRANSPARENT
+          define table <YOUR_TABLE_NAME_LOWER> {
+            key client : abap.clnt not null;
+            key id : abap.char(10);
+            name : abap.char(255);
+            created_at : abap.dats;
+            updated_at : abap.dats;
+          }
+        # Delete step
+        delete_after_test: true
+        delete_object_type: "TABL/DT"
 
-# ============================================================================
-# ENVIRONMENT CONFIGURATION
-# ============================================================================
-environment:
-  default_package: "<YOUR_PACKAGE_NAME>"  # Test package from GROUP 2
-  default_transport: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-  default_system: "<YOUR_SYSTEM>"  # ⚠️ UPDATE WITH YOUR SYSTEM (e.g., E19)
-  default_client: "<YOUR_CLIENT>"  # ⚠️ UPDATE WITH YOUR CLIENT (e.g., 100)
+# Step 2: Low-level flow test (create → update → delete through low-level handlers)
 
-# ============================================================================
-# TEST EXECUTION SETTINGS
-# ============================================================================
-test_settings:
-  fail_fast: false
-  verbose: true
-  timeout: 30000
-  retry_on_failure: false
-  max_retries: 1
-  cleanup_after_test: false  # Set to true to auto-delete objects after tests
+# Table (Table - Low-Level)
+
+# Table (Table - Low-Level)
+create_table_low:
+  test_cases:
+    - name: "full_workflow"
+      enabled: false
+      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      params:
+        table_name: "<YOUR_TABLE_NAME>_LOW"
+        description: "Test table created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        delivery_class: "A"
+        data_browser: "X"
+        data_maintenance: "X"
+        ddl_code: |
+          @EndUserText.label : 'Test Table Low'
+          @AbapCatalog.tableCategory : #TRANSPARENT
+          define table <YOUR_TABLE_NAME_LOWER>_LOW {
+            key client : abap.clnt not null;
+            key id : abap.char(10);
+            name : abap.char(255);
+          }
+        # Update through low-level
+        updated_ddl_code: |
+          @EndUserText.label : 'Test Table Low Updated'
+          @AbapCatalog.tableCategory : #TRANSPARENT
+          define table <YOUR_TABLE_NAME_LOWER>_LOW {
+            key client : abap.clnt not null;
+            key id : abap.char(10);
+            name : abap.char(255);
+            updated_at : abap.dats;
+          }
+    - name: "test_table_low_flow"
+      enabled: false
+      description: "Low-level flow test: create → update → delete through low-level handlers"
+      params:
+        table_name: "<YOUR_TABLE_NAME>_LOW"
+        description: "Test table created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        delivery_class: "A"
+        data_browser: "X"
+        data_maintenance: "X"
+        # Update through low-level
+        update_description: "Updated via low-level"
+        # Delete through low-level
+        delete_after_test: true
+        delete_object_type: "TABL/DT"
+
+# Step 3: Read-only test (separate read-only handler)
+
+# Transport (Transport)
+
+# Transport (Transport)
+create_transport:
+  test_cases:
+    - name: "workbench_transport"
+      enabled: true
+      description: "Create a workbench transport request (required for package and transportable objects)"
+      params:
+        transport_type: "workbench"
+        description: "Test transport created via MCP for test suite"
+        owner: "<YOUR_RESPONSIBLE_USER>"  # ⚠️ UPDATE WITH YOUR USERNAME (e.g., CB9980002377)
+        # target_system: "<YOUR_TARGET>"  # Optional: if not provided or empty, uses "LOCAL"
+
+# Step 2: Get transport (read created transport)
+
+# View (View)
+
+# View (View)
+create_view:
+  test_cases:
+    - name: "test_view_high"
+      enabled: false
+      description: "High-level test: create → update → delete view"
+      params:
+        # Create step
+        view_name: "<YOUR_VIEW_NAME>"
+        description: "Test CDS view created via MCP"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
+        ddl_source: |
+          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>'
+          @EndUserText.label: 'Test CDS View'
+          define view <YOUR_VIEW_NAME>
+            as select from mara
+          {
+            matnr,
+            mbrsh,
+            mtart
+          }
+        # Update step
+        update_ddl_source: |
+          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>'
+          @EndUserText.label: 'Test CDS View Updated'
+          define view <YOUR_VIEW_NAME>
+            as select from mara
+          {
+            matnr,
+            mbrsh,
+            mtart,
+            meins
+          }
+        update_activate: true
+        # Delete step
+        delete_after_test: true
+        delete_object_type: "DDLS/DF"
+
+# Step 2: Low-level flow test (create → update → delete through low-level handlers)
+
+# View (View - Low-Level)
+
+# View (View - Low-Level)
+create_view_low:
+  test_cases:
+    - name: "full_workflow"
+      enabled: false
+      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      params:
+        view_name: "<YOUR_VIEW_NAME>_LOW"
+        description: "Test CDS view created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        ddl_source: |
+          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>_LOW'
+          @EndUserText.label: 'Test CDS View Low'
+          define view <YOUR_VIEW_NAME>_LOW
+            as select from mara
+          {
+            matnr,
+            mbrsh
+          }
+        # Update through low-level
+        update_ddl_source: |
+          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>_LOW'
+          @EndUserText.label: 'Test CDS View Low Updated'
+          define view <YOUR_VIEW_NAME>_LOW
+            as select from mara
+          {
+            matnr,
+            mbrsh,
+            mtart
+          }
+    - name: "test_view_low_flow"
+      enabled: false
+      description: "Low-level flow test: create → update → delete through low-level handlers"
+      params:
+        view_name: "<YOUR_VIEW_NAME>_LOW"
+        description: "Test CDS view created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        ddl_source: |
+          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>_LOW'
+          @EndUserText.label: 'Test CDS View Low'
+          define view <YOUR_VIEW_NAME>_LOW
+            as select from mara
+          {
+            matnr,
+            mbrsh
+          }
+        # Update through low-level
+        update_ddl_source: |
+          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>_LOW'
+          @EndUserText.label: 'Test CDS View Low Updated'
+          define view <YOUR_VIEW_NAME>_LOW
+            as select from mara
+          {
+            matnr,
+            mbrsh,
+            mtart
+          }
+        # Delete through low-level
+        delete_after_test: true
+        delete_object_type: "DDLS/DF"
+
+# Step 3: Read-only test (separate read-only handler)
+

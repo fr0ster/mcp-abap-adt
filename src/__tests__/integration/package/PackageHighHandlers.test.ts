@@ -84,43 +84,23 @@ describe('Package High-Level Handlers Integration', () => {
 
     try {
       // Step 1: Create
-      debugLog('CREATE', `Starting high-level package creation for ${packageName}`, {
-        super_package: superPackage,
-        description,
-        software_component: testCase.params.software_component || 'undefined'
-      });
-
-      // Build create args
-      const createArgs = {
-        package_name: packageName,
-        super_package: superPackage,
+      console.log(`📦 High Create: Creating package ${packageName}...`);
+      let createResponse;
+      try {
+        const createArgs = {
+          package_name: packageName,
+          super_package: superPackage,
           description,
           package_type: testCase.params.package_type || 'development',
           software_component: testCase.params.software_component,
           transport_layer: testCase.params.transport_layer,
           transport_request: transportRequest,
           application_component: testCase.params.application_component
-      };
-
-      // Log parameters being passed to handler
-      debugLog('CREATE', `Calling handleCreatePackage with args`, {
-        package_name: createArgs.package_name,
-        super_package: createArgs.super_package,
-        software_component: createArgs.software_component || 'undefined'
-      });
-
-      let createResponse;
-      try {
+        };
         createResponse = await handleCreatePackage(createArgs);
-        debugLog('CREATE', `Handler returned response`, {
-          isError: createResponse.isError
-        });
       } catch (error: any) {
         const errorMsg = error.message || String(error);
         const errorMsgLower = errorMsg.toLowerCase();
-        debugLog('CREATE_ERROR', `Handler threw error: ${errorMsg}`, {
-          error: errorMsg
-        });
         // If package already exists, that's okay - we'll skip test
         if (errorMsgLower.includes('already exists') ||
             errorMsgLower.includes('does already exist') ||
@@ -135,10 +115,6 @@ describe('Package High-Level Handlers Integration', () => {
       if (createResponse.isError) {
         const errorMsg = createResponse.content[0]?.text || 'Unknown error';
         const errorMsgLower = errorMsg.toLowerCase();
-        debugLog('CREATE_ERROR', `Response isError: ${errorMsg}`, {
-          error: errorMsg,
-          response: createResponse
-        });
         // If package already exists, that's okay - we'll skip test
         if (errorMsgLower.includes('already exists') ||
             errorMsgLower.includes('does already exist') ||
@@ -152,32 +128,43 @@ describe('Package High-Level Handlers Integration', () => {
       const createData = parseHandlerResponse(createResponse);
       expect(createData.success).toBe(true);
       expect(createData.package_name).toBe(packageName);
+      console.log(`✅ High Create: Created package ${packageName} successfully`);
 
-      debugLog('CREATE', 'High-level package creation completed successfully', {
-        package_name: createData.package_name,
-        success: createData.success
-      });
+      // Update session from create response (if session state is returned)
+      if (createData.session_id && createData.session_state) {
+        session = updateSessionFromResponse(session, createData);
+      }
 
       await delay(getOperationDelay('create', testCase));
-      console.log(`✅ High-level package creation completed successfully for ${packageName}`);
 
     } catch (error: any) {
       console.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
       // Cleanup: Delete test package
+      // For packages, delete must use a new connection (force_new_connection: true)
+      // because package may still be locked in the same session after create
       if (packageName) {
         try {
+          // Wait before delete to ensure package is unlocked after create
+          await delay(getOperationDelay('delete', testCase));
+
+          console.log(`🧹 Cleanup: Deleting test package ${packageName}...`);
           const deleteResponse = await handleDeletePackage({
             package_name: packageName,
-            transport_request: transportRequest
+            transport_request: transportRequest,
+            force_new_connection: true
           });
 
-          if (!deleteResponse.isError) {
-            console.log(`🧹 Cleaned up test package: ${packageName}`);
+          if (deleteResponse.isError) {
+            const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+            console.warn(`⚠️  Failed to cleanup test package ${packageName}: ${errorMsg}`);
+          } else {
+            console.log(`✅ Cleanup: Deleted test package ${packageName} successfully`);
           }
-        } catch (cleanupError) {
-          console.warn(`⚠️  Failed to cleanup test package ${packageName}: ${cleanupError}`);
+        } catch (cleanupError: any) {
+          const errorMsg = cleanupError.message || String(cleanupError);
+          console.warn(`⚠️  Failed to cleanup test package ${packageName}: ${errorMsg}`);
         }
       }
     }

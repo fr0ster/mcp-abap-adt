@@ -117,6 +117,7 @@ describe('Table Low-Level Handlers Integration', () => {
         });
         const validateResponse = await handleValidateTable({
           table_name: tableName,
+          package_name: packageName,
           description,
           session_id: session.session_id,
           session_state: session.session_state
@@ -154,7 +155,6 @@ define view entity ${tableName} as select from dummy {
           table_name: tableName,
           description,
           package_name: packageName,
-          ddl_code: ddlCode,
           transport_request: transportRequest,
           session_id: session.session_id,
           session_state: session.session_state
@@ -293,8 +293,7 @@ define view entity ${tableName} as select from dummy {
             // Delete table
             const deleteResponse = await handleDeleteTable({
               table_name: tableName,
-              session_id: session.session_id,
-              session_state: session.session_state
+              transport_request: transportRequest
             });
 
             if (!deleteResponse.isError) {

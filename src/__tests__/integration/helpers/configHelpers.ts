@@ -136,14 +136,43 @@ export function getEnabledTestCase(handlerName: string, testCaseName?: string): 
   const config = loadTestConfig();
   const handlerTests = config[handlerName]?.test_cases || [];
 
-  let enabledTest;
-  if (testCaseName) {
-    enabledTest = handlerTests.find((tc: any) => tc.name === testCaseName && tc.enabled === true);
-  } else {
-    enabledTest = handlerTests.find((tc: any) => tc.enabled === true);
+  if (handlerTests.length === 0) {
+    if (process.env.DEBUG_TESTS === 'true') {
+      console.log(`[DEBUG] No test cases found for handler: ${handlerName}`);
+    }
+    return null;
   }
 
-  return enabledTest || null;
+  let enabledTest;
+  if (testCaseName) {
+    const testCase = handlerTests.find((tc: any) => tc.name === testCaseName);
+    if (!testCase) {
+      if (process.env.DEBUG_TESTS === 'true') {
+        console.log(`[DEBUG] Test case "${testCaseName}" not found for handler: ${handlerName}`);
+      }
+      return null;
+    }
+    if (testCase.enabled !== true) {
+      console.log(`⏭️  Test case "${testCaseName}" for handler "${handlerName}" is disabled (enabled: ${testCase.enabled})`);
+      return null;
+    }
+    enabledTest = testCase;
+  } else {
+    enabledTest = handlerTests.find((tc: any) => tc.enabled === true);
+    if (!enabledTest) {
+      const disabledTests = handlerTests.filter((tc: any) => tc.enabled === false);
+      if (disabledTests.length > 0) {
+        console.log(`⏭️  All test cases for handler "${handlerName}" are disabled (${disabledTests.length} test case(s) found, all disabled)`);
+      } else {
+        if (process.env.DEBUG_TESTS === 'true') {
+          console.log(`[DEBUG] No enabled test cases found for handler: ${handlerName}`);
+        }
+      }
+      return null;
+    }
+  }
+
+  return enabledTest;
 }
 
 /**
@@ -183,26 +212,53 @@ export function getOperationDelay(operation: string, testCase?: any): number {
  * Resolve package name (from test case or default)
  */
 export function resolvePackageName(testCase?: any): string {
+  let packageName: string;
+
   if (testCase?.params?.package_name) {
-    return String(testCase.params.package_name).trim();
+    packageName = String(testCase.params.package_name).trim();
+  } else {
+    const config = loadTestConfig();
+    packageName = (config.environment?.default_package || 'ZOK_LOCAL').trim();
   }
 
-  const config = loadTestConfig();
-  return (config.environment?.default_package || 'ZOK_LOCAL').trim();
+  // Validate for placeholders
+  const placeholderPattern = /<[A-Z_]+>/i;
+  if (placeholderPattern.test(packageName)) {
+    throw new Error(
+      `❌ Package name contains placeholder value: "${packageName}"\n` +
+      `Please update tests/test-config.yaml and replace with actual package name.`
+    );
+  }
+
+  return packageName;
 }
 
 /**
  * Resolve transport request (from test case or default)
  */
 export function resolveTransportRequest(testCase?: any): string | undefined {
+  let transportRequest: string | undefined;
+
   if (testCase?.params?.transport_request) {
-    const value = String(testCase.params.transport_request).trim();
-    return value || undefined;
+    transportRequest = String(testCase.params.transport_request).trim();
+  } else {
+    const config = loadTestConfig();
+    const defaultTransport = config.environment?.default_transport;
+    transportRequest = defaultTransport ? String(defaultTransport).trim() : undefined;
   }
 
-  const config = loadTestConfig();
-  const defaultTransport = config.environment?.default_transport;
-  return defaultTransport ? String(defaultTransport).trim() : undefined;
+  // Validate for placeholders (only if value is provided)
+  if (transportRequest) {
+    const placeholderPattern = /<[A-Z_]+>/i;
+    if (placeholderPattern.test(transportRequest)) {
+      throw new Error(
+        `❌ Transport request contains placeholder value: "${transportRequest}"\n` +
+        `Please update tests/test-config.yaml and replace with actual transport request or leave empty.`
+      );
+    }
+  }
+
+  return transportRequest || undefined;
 }
 
 /**

@@ -113,6 +113,26 @@ export function debugLog(step: string, message: string, data?: any): void {
 }
 
 /**
+ * Log test step in simple format (like adt-clients tests)
+ * Enabled via DEBUG_TESTS=true environment variable
+ *
+ * Usage:
+ *   import { logTestStep } from '../helpers/testHelpers';
+ *   logTestStep('validate');
+ *   logTestStep('create');
+ *   logTestStep('check(active)');
+ */
+function logImmediate(message: string): void {
+  process.stdout.write(message + '\n');
+}
+
+export function logTestStep(step: string): void {
+  if (DEBUG_TESTS) {
+    logImmediate(`  → ${step}...`);
+  }
+}
+
+/**
  * Check if error message indicates object was already checked
  * Re-exports from lib/utils for use in tests
  */

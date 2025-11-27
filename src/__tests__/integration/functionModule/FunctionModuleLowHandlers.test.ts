@@ -96,6 +96,7 @@ describe('FunctionModule Low-Level Handlers Integration', () => {
         const validateResponse = await handleValidateFunctionModule({
           function_module_name: functionModuleName,
           function_group_name: functionGroupName,
+          description,
           session_id: session.session_id,
           session_state: session.session_state
         });
@@ -113,7 +114,7 @@ describe('FunctionModule Low-Level Handlers Integration', () => {
         if (!validateData.validation_result?.valid) {
           const message = validateData.validation_result?.message || '';
           const messageLower = message.toLowerCase();
-          if (validateData.validation_result?.exists || 
+          if (validateData.validation_result?.exists ||
               messageLower.includes('already exists') ||
               messageLower.includes('does already exist')) {
             console.log(`⏭️  FunctionModule ${functionModuleName} already exists, skipping test`);

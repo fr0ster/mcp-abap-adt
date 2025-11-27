@@ -151,34 +151,8 @@ export async function handleCreatePackage(args: CreatePackageArgs) {
         createConfig.applicationComponent = application_component;
       }
 
-      // DEBUG: Log before calling createPackage
-      console.log(`[HANDLER] Before createPackage call | softwareComponent: ${createConfig.softwareComponent || 'undefined'}`);
-
-      // Wrapper to log what's passed to CrudClient
-      const originalCreatePackage = client.createPackage.bind(client);
-      const wrappedCreatePackage = async (config: CreatePackageConfig) => {
-        console.log(`[WRAPPER] CrudClient.createPackage called with softwareComponent: ${config.softwareComponent || 'undefined'}`);
-        console.log(`[WRAPPER] Full config:`, JSON.stringify(config, null, 2));
-        try {
-          const result = await originalCreatePackage(config);
-          console.log(`[WRAPPER] ✅ CrudClient.createPackage succeeded`);
-          return result;
-        } catch (error: any) {
-          console.error(`[WRAPPER] ❌ CrudClient.createPackage failed: ${error.message}`);
-          // Find where error was actually thrown
-          const stackLines = error.stack?.split('\n') || [];
-          const errorOrigin = stackLines.find((line: string) =>
-            (line.includes('PackageBuilder.create') || line.includes('CrudClient.createPackage') || line.includes('createPackage'))
-            && !line.includes('test.ts') && !line.includes('WRAPPER')
-          ) || stackLines[1] || 'unknown';
-          console.error(`[WRAPPER] Error thrown at: ${errorOrigin.trim()}`);
-          throw error;
-        }
-      };
-
       try {
-        await wrappedCreatePackage(createConfig);
-        console.log(`[HANDLER] ✅ createPackage call succeeded`);
+        await client.createPackage(createConfig);
       } catch (createError: any) {
         throw createError;
       }

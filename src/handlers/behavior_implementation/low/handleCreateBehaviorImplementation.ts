@@ -8,6 +8,7 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateBehaviorImplementationLow",
@@ -117,17 +118,14 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
 
     try {
       // Create behavior implementation (full workflow)
-      const createConfig: any = {
+      const createConfig: Partial<BehaviorImplementationBuilderConfig> & Pick<BehaviorImplementationBuilderConfig, 'className' | 'packageName' | 'behaviorDefinition'> = {
         className: className,
         behaviorDefinition: behaviorDefinition,
         description: description,
         packageName: package_name.toUpperCase(),
-        transportRequest: transport_request
+        transportRequest: transport_request,
+        ...(implementation_code && { sourceCode: implementation_code })
       };
-
-      if (implementation_code) {
-        createConfig.implementationCode = implementation_code;
-      }
 
       await client.createBehaviorImplementation(createConfig);
       const createResult = client.getCreateResult();

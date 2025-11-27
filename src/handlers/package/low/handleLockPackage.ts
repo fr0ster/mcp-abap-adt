@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 
 export const TOOL_DEFINITION = {
   name: "LockPackageLow",
@@ -76,11 +77,9 @@ export async function handleLockPackage(args: LockPackageArgs) {
 
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      // CRITICAL: Use restoreSessionInConnection to properly restore session
+      // This will set sessionId in connection and enable stateful session mode
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -103,6 +102,10 @@ export async function handleLockPackage(args: LockPackageArgs) {
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
+      // Get actual session ID from connection (may be different from input if new session was created)
+      // Connection.getSessionId() returns the current session ID used by the connection
+      const actualSessionId = connection.getSessionId() || session_id || null;
+
       logger.info(`✅ LockPackage completed: ${packageName}`);
       logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
@@ -111,7 +114,7 @@ export async function handleLockPackage(args: LockPackageArgs) {
           success: true,
           package_name: packageName,
           super_package: superPackage,
-          session_id: session_id || null,
+          session_id: actualSessionId,
           lock_handle: lockHandle,
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,

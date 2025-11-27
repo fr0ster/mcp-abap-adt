@@ -8,6 +8,7 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "ValidateBehaviorImplementationLow",
@@ -105,12 +106,13 @@ export async function handleValidateBehaviorImplementation(args: ValidateBehavio
 
     try {
       // Validate behavior implementation
-      await client.validateBehaviorImplementation({
+      const validateConfig: Partial<BehaviorImplementationBuilderConfig> & Pick<BehaviorImplementationBuilderConfig, 'className' | 'packageName' | 'behaviorDefinition'> = {
         className: className,
         behaviorDefinition: behaviorDefinition,
         packageName: package_name.toUpperCase(),
         description: description
-      });
+      };
+      await client.validateBehaviorImplementation(validateConfig);
       const validationResponse = client.getValidationResponse();
       if (!validationResponse) {
         throw new Error('Validation did not return a result');

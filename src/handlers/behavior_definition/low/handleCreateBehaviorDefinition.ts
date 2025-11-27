@@ -8,6 +8,7 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateBehaviorDefinitionLow",
@@ -70,9 +71,9 @@ interface CreateBehaviorDefinitionArgs {
   name: string;
   description: string;
   package_name: string;
-  transport_request: string;
+  transport_request?: string; // Optional for local packages ($TMP)
   root_entity: string;
-  implementation_type: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection';
+  implementation_type: BehaviorDefinitionImplementationType;
   master_system?: string;
   responsible?: string;
   session_id?: string;
@@ -104,8 +105,9 @@ export async function handleCreateBehaviorDefinition(args: CreateBehaviorDefinit
     } = args as CreateBehaviorDefinitionArgs;
 
     // Validation
-    if (!name || !description || !package_name || !transport_request || !root_entity || !implementation_type) {
-      return return_error(new Error('name, description, package_name, transport_request, root_entity, and implementation_type are required'));
+    // Note: transport_request is optional (can be empty for local objects)
+    if (!name || !description || !package_name || !root_entity || !implementation_type) {
+      return return_error(new Error('name, description, package_name, root_entity, and implementation_type are required'));
     }
 
     const connection = getManagedConnection();
@@ -128,15 +130,16 @@ export async function handleCreateBehaviorDefinition(args: CreateBehaviorDefinit
     logger.info(`Starting behavior definition creation: ${bdefName}`);
 
     try {
-      // Create behavior definition
-      await client.createBehaviorDefinition({
+      // Create behavior definition - using types from adt-clients
+      const createConfig: Pick<BehaviorDefinitionBuilderConfig, 'name' | 'description' | 'packageName' | 'transportRequest' | 'rootEntity' | 'implementationType'> = {
         name: bdefName,
         description,
         packageName: package_name,
         transportRequest: transport_request,
         rootEntity: root_entity,
         implementationType: implementation_type
-      });
+      };
+      await client.createBehaviorDefinition(createConfig);
       const createResult = client.getCreateResult();
 
       if (!createResult) {

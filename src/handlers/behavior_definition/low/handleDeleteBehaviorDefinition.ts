@@ -8,6 +8,7 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "DeleteBehaviorDefinitionLow",
@@ -57,8 +58,12 @@ export async function handleDeleteBehaviorDefinition(args: DeleteBehaviorDefinit
     logger.info(`Starting behavior definition deletion: ${bdefName}`);
 
     try {
-      // Delete behavior definition
-      await client.deleteBehaviorDefinition({ name: bdefName, transportRequest: transport_request });
+      // Delete behavior definition - using types from adt-clients
+      const deleteConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> & Partial<Pick<BehaviorDefinitionBuilderConfig, 'transportRequest'>> = {
+        name: bdefName,
+        ...(transport_request && { transportRequest: transport_request })
+      };
+      await client.deleteBehaviorDefinition(deleteConfig);
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {

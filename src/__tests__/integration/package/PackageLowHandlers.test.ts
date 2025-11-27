@@ -23,7 +23,7 @@ import {
   parseHandlerResponse,
   extractLockHandle,
   delay,
-  debugLog
+  logTestStep
 } from '../helpers/testHelpers';
 import {
   getTestSession,
@@ -114,12 +114,6 @@ describe('Package Low-Level Handlers Integration', () => {
 
     it('should execute full workflow: Validate → Create → Lock → Unlock', async () => {
       if (!hasConfig || !session || !testCase || !testPackageName) {
-        debugLog('TEST_SKIP', 'Skipping test: No configuration or test case', {
-          hasConfig,
-          hasSession: !!session,
-          hasTestCase: !!testCase,
-          hasTestPackageName: !!testPackageName
-        });
         console.log('⏭️  Skipping test: No configuration or test case');
         return;
       }
@@ -136,37 +130,15 @@ describe('Package Low-Level Handlers Integration', () => {
       const transportRequest = resolveTransportRequest(testCase);
       const description = testCase.params.description || `Test package for low-level handler`;
 
-      // Log all parameters read from config
-      console.log('📋 Test Parameters Read from Config:');
-      console.log('  package_name (super_package):', superPackage, testCase.params.package_name ? '(from test case)' : '(from default_package)');
-      console.log('  test_package (package to create):', packageName);
-      console.log('  description:', description);
-      console.log('  package_type:', testCase.params.package_type || 'development');
-      console.log('  software_component:', testCase.params.software_component || '(not set)');
-      console.log('  transport_layer:', testCase.params.transport_layer || '(not set)');
-      console.log('  transport_request:', transportRequest || '(not set)');
-      console.log('  application_component:', testCase.params.application_component || '(not set)');
-      console.log('  session_id:', session.session_id);
-      console.log('  session_state:', session.session_state ? 'present' : 'not present');
-
-      debugLog('TEST_START', `Starting full workflow test for package: ${packageName}`, {
-        packageName,
-        superPackage,
-        transportRequest,
-        description,
-        software_component: testCase.params.software_component,
-        package_type: testCase.params.package_type
-      });
-
       let lockHandleForCleanup: string | null = null;
       let lockSessionForCleanup: SessionInfo | null = null;
 
       try {
         // Step 1: Validate
-        debugLog('VALIDATE', `Starting validation for ${packageName}`, {
-          session_id: session.session_id,
-          has_session_state: !!session.session_state
-        });
+        logTestStep('validate');
+        if (!session) {
+          throw new Error('Session is null');
+        }
         const validateResponse = await handleValidatePackage({
           package_name: packageName,
           super_package: superPackage,
@@ -176,23 +148,15 @@ describe('Package Low-Level Handlers Integration', () => {
 
         if (validateResponse.isError) {
           const errorMsg = validateResponse.content[0]?.text || 'Unknown error';
-          debugLog('VALIDATE_ERROR', `Validation returned error: ${errorMsg}`, {
-            error: errorMsg,
-            response: validateResponse
-          });
           if (errorMsg.includes('already exists')) {
             console.log(`⏭️  Package ${packageName} already exists, skipping test`);
             return;
           }
+          console.error(`Validation failed: ${errorMsg}`);
           throw new Error(`Validation failed: ${errorMsg}`);
         }
 
         const validateData = parseHandlerResponse(validateResponse);
-        debugLog('VALIDATE_RESPONSE', `Validation response parsed`, {
-          valid: validateData.validation_result?.valid,
-          message: validateData.validation_result?.message,
-          exists: validateData.validation_result?.exists
-        });
 
         if (!validateData.validation_result?.valid) {
           const message = validateData.validation_result?.message || '';
@@ -206,19 +170,14 @@ describe('Package Low-Level Handlers Integration', () => {
           console.warn(`⚠️  Validation failed for ${packageName}: ${message}. Will attempt create and handle if object exists...`);
         }
 
-        const oldSessionId = session.session_id;
         session = updateSessionFromResponse(session, validateData);
-        debugLog('VALIDATE', 'Validation completed and session updated', {
-          old_session_id: oldSessionId,
-          new_session_id: session.session_id,
-          session_changed: oldSessionId !== session.session_id
-        });
+        await delay(getOperationDelay('validate', testCase));
 
         // Step 2: Create
-        debugLog('CREATE', `Starting creation for ${packageName}`, {
-          session_id: session.session_id,
-          has_session_state: !!session.session_state
-        });
+        logTestStep('create');
+        if (!session) {
+          throw new Error('Session is null');
+        }
         // Build create args - only include optional params if explicitly provided
         const createArgs: any = {
           package_name: packageName,
@@ -237,18 +196,6 @@ describe('Package Low-Level Handlers Integration', () => {
           createArgs.transport_layer = testCase.params.transport_layer;
         }
 
-        // Log parameters being passed to handler
-        console.log('📤 Parameters Passed to handleCreatePackage:');
-        console.log('  package_name:', createArgs.package_name);
-        console.log('  super_package:', createArgs.super_package);
-        console.log('  description:', createArgs.description);
-        console.log('  package_type:', createArgs.package_type);
-        console.log('  software_component:', createArgs.software_component || '(not set)');
-        console.log('  transport_layer:', createArgs.transport_layer || '(not set)');
-        console.log('  transport_request:', createArgs.transport_request || '(not set)');
-        console.log('  session_id:', createArgs.session_id);
-        console.log('  session_state:', createArgs.session_state ? 'present' : 'not present');
-
         const createResponse = await handleCreatePackage(createArgs);
 
         if (createResponse.isError) {
@@ -264,20 +211,14 @@ describe('Package Low-Level Handlers Integration', () => {
         expect(createData.success).toBe(true);
         expect(createData.package_name).toBe(packageName);
 
-        const oldSessionId2 = session.session_id;
         session = updateSessionFromResponse(session, createData);
-        debugLog('CREATE', 'Creation completed and session updated', {
-          old_session_id: oldSessionId2,
-          new_session_id: session.session_id,
-          session_changed: oldSessionId2 !== session.session_id
-        });
         await delay(getOperationDelay('create', testCase));
 
         // Step 3: Lock
-        debugLog('LOCK', `Starting lock for ${packageName}`, {
-          session_id: session.session_id,
-          has_session_state: !!session.session_state
-        });
+        logTestStep('lock');
+        if (!session) {
+          throw new Error('Session is null');
+        }
         const lockResponse = await handleLockPackage({
           package_name: packageName,
           super_package: superPackage || '',
@@ -286,10 +227,9 @@ describe('Package Low-Level Handlers Integration', () => {
         });
 
         if (lockResponse.isError) {
-          debugLog('LOCK_ERROR', `Lock returned error: ${lockResponse.content[0]?.text || 'Unknown error'}`, {
-            response: lockResponse
-          });
-          throw new Error(`Lock failed: ${lockResponse.content[0]?.text || 'Unknown error'}`);
+          const errorMsg = lockResponse.content[0]?.text || 'Unknown error';
+          console.error(`Lock failed: ${errorMsg}`);
+          throw new Error(`Lock failed: ${errorMsg}`);
         }
 
         const lockData = parseHandlerResponse(lockResponse);
@@ -302,53 +242,36 @@ describe('Package Low-Level Handlers Integration', () => {
         lockHandleForCleanup = lockHandle;
         lockSessionForCleanup = lockSession;
 
-        debugLog('LOCK', 'Lock completed, extracted session', {
-          lock_handle: lockHandle,
-          lock_session_id: lockSession.session_id,
-          has_lock_session_state: !!lockSession.session_state
-        });
+        // IMPORTANT: Update session with lock session to use correct session_id and session_state
+        session = {
+          session_id: lockSession.session_id!,
+          session_state: lockSession.session_state
+        };
 
         await delay(getOperationDelay('lock', testCase));
 
         // Step 4: Unlock
-        debugLog('UNLOCK', `Starting unlock for ${packageName}`, {
-          lock_handle: lockHandle,
-          session_id: lockSession.session_id,
-          has_session_state: !!lockSession.session_state
-        });
+        logTestStep('unlock');
         const unlockResponse = await handleUnlockPackage({
           package_name: packageName,
           super_package: superPackage, // Required for package unlock
           lock_handle: lockHandle,
-          session_id: lockSession.session_id,
+          session_id: lockSession.session_id!,
           session_state: lockSession.session_state
         });
 
         if (unlockResponse.isError) {
-          debugLog('UNLOCK_ERROR', `Unlock returned error: ${unlockResponse.content[0]?.text || 'Unknown error'}`, {
-            response: unlockResponse
-          });
-          throw new Error(`Unlock failed: ${unlockResponse.content[0]?.text || 'Unknown error'}`);
+          const errorMsg = unlockResponse.content[0]?.text || 'Unknown error';
+          console.error(`Unlock failed: ${errorMsg}`);
+          throw new Error(`Unlock failed: ${errorMsg}`);
         }
 
         const unlockData = parseHandlerResponse(unlockResponse);
         expect(unlockData.success).toBe(true);
         expect(unlockData.session_id).toBe(lockSession.session_id);
 
-        const oldSessionId3 = session.session_id;
         session = updateSessionFromResponse(session, unlockData);
-        debugLog('UNLOCK', 'Unlock completed and session updated', {
-          old_session_id: oldSessionId3,
-          new_session_id: session.session_id,
-          session_changed: oldSessionId3 !== session.session_id
-        });
         await delay(getOperationDelay('unlock', testCase));
-
-        debugLog('TEST_COMPLETE', `Full workflow completed successfully for ${packageName}`, {
-          packageName,
-          steps_completed: ['validate', 'create', 'lock', 'unlock']
-        });
-        console.log(`✅ Full workflow completed successfully for ${packageName}`);
 
       } catch (error: any) {
         // Extract step from error message
@@ -376,10 +299,6 @@ describe('Package Low-Level Handlers Integration', () => {
         throw error;
       } finally {
         // Cleanup
-        debugLog('CLEANUP', `Starting cleanup for ${packageName}`, {
-          packageName,
-          hasSession: !!session
-        });
         if (session && packageName) {
           try {
             if (lockHandleForCleanup && lockSessionForCleanup) {
@@ -388,11 +307,11 @@ describe('Package Low-Level Handlers Integration', () => {
                   package_name: packageName,
                   super_package: superPackage, // Required for package unlock
                   lock_handle: lockHandleForCleanup,
-                  session_id: lockSessionForCleanup.session_id,
+                  session_id: lockSessionForCleanup.session_id!,
                   session_state: lockSessionForCleanup.session_state
                 });
               } catch (unlockError: any) {
-                console.warn(`⚠️  Failed to unlock with saved handle: ${unlockError.message}`);
+                // Silent cleanup failure
               }
             }
 
@@ -403,20 +322,11 @@ describe('Package Low-Level Handlers Integration', () => {
               transport_request: transportRequest
             });
 
-            if (!deleteResponse.isError) {
-              debugLog('CLEANUP', `Successfully deleted test package: ${packageName}`);
-              console.log(`🧹 Cleaned up test package: ${packageName}`);
-            } else {
+            if (deleteResponse.isError) {
               const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-              debugLog('CLEANUP_ERROR', `Failed to delete package ${packageName}`, {
-                error: errorMsg
-              });
               console.warn(`⚠️  Failed to delete package ${packageName}: ${errorMsg}`);
             }
           } catch (cleanupError: any) {
-            debugLog('CLEANUP_ERROR', `Failed to cleanup test package ${packageName}`, {
-              error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
-            });
             console.warn(`⚠️  Failed to cleanup test package ${packageName}: ${cleanupError.message || cleanupError}`);
           }
         }

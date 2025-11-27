@@ -9,6 +9,7 @@ import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CheckBdefLow",
@@ -86,8 +87,11 @@ export async function handleCheckBehaviorDefinition(args: CheckBehaviorDefinitio
     logger.info(`Starting behavior definition check: ${bdefName}`);
 
     try {
-      // Check behavior definition
-      await client.checkBehaviorDefinition({ name: bdefName });
+      // Check behavior definition - using types from adt-clients
+      const checkConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = {
+        name: bdefName
+      };
+      await client.checkBehaviorDefinition(checkConfig);
       const response = client.getCheckResult();
 
       if (!response) {

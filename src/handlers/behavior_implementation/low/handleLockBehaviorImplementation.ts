@@ -8,6 +8,7 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { ClassBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "LockBehaviorImplementationLow",
@@ -86,7 +87,8 @@ export async function handleLockBehaviorImplementation(args: LockBehaviorImpleme
 
     try {
       // Lock class (BehaviorImplementation extends ClassBuilder)
-      await client.lockClass({ className });
+      const lockConfig: Pick<ClassBuilderConfig, 'className'> = { className };
+      await client.lockClass(lockConfig);
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {

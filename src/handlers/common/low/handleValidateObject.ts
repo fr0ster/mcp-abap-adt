@@ -21,8 +21,20 @@ export const TOOL_DEFINITION = {
       },
       object_type: {
         type: "string",
-        description: "Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'metadata_extension'",
-        enum: ["class", "program", "interface", "function_group", "table", "structure", "view", "domain", "data_element", "package", "behavior_definition", "metadata_extension"]
+        description: "Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'behavior_implementation', 'metadata_extension'",
+        enum: ["class", "program", "interface", "function_group", "table", "structure", "view", "domain", "data_element", "package", "behavior_definition", "behavior_implementation", "metadata_extension"]
+      },
+      behavior_definition: {
+        type: "string",
+        description: "Optional behavior definition name (required for behavior_implementation validation)"
+      },
+      root_entity: {
+        type: "string",
+        description: "Root entity name (required for behavior_definition validation)"
+      },
+      implementation_type: {
+        type: "string",
+        description: "Implementation type: 'Managed', 'Unmanaged', or 'External' (required for behavior_definition validation)"
       },
       package_name: {
         type: "string",
@@ -55,6 +67,9 @@ interface ValidateObjectArgs {
   object_type: string;
   package_name?: string;
   description?: string;
+  behavior_definition?: string;
+  root_entity?: string;
+  implementation_type?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -76,6 +91,9 @@ export async function handleValidateObject(args: ValidateObjectArgs) {
       object_type,
       package_name,
       description,
+      behavior_definition,
+      root_entity,
+      implementation_type,
       session_id,
       session_state
     } = args as ValidateObjectArgs;
@@ -85,8 +103,9 @@ export async function handleValidateObject(args: ValidateObjectArgs) {
       return return_error(new Error('object_name and object_type are required'));
     }
 
-    const validTypes = ['class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'metadata_extension'];
-    if (!validTypes.includes(object_type.toLowerCase())) {
+    const validTypes = ['class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'behavior_implementation', 'metadata_extension', 'ddlx/ex'];
+    const normalizedType = object_type.toLowerCase();
+    if (!validTypes.includes(normalizedType)) {
       return return_error(new Error(`Invalid object_type. Must be one of: ${validTypes.join(', ')}`));
     }
 
@@ -113,7 +132,7 @@ export async function handleValidateObject(args: ValidateObjectArgs) {
       // Validate object using specific validation method based on type
       let result: any;
 
-      switch (object_type.toLowerCase()) {
+      switch (normalizedType) {
         case 'program':
           await validationClient.validateProgram({
             programName: objectName,
@@ -234,15 +253,59 @@ export async function handleValidateObject(args: ValidateObjectArgs) {
           result = parseValidationResponse(packageResponse);
           break;
         case 'behavior_definition':
-          // Behavior definition validation requires rootEntity and implementationType
-          // For now, we'll skip validation as these params are not provided in generic handler
-          // TODO: Consider creating specific ValidateBehaviorDefinition handler
-          return return_error(new Error('Behavior definition validation requires rootEntity and implementationType parameters. Use specific validation handler.'));
+          if (!package_name || !description || !root_entity || !implementation_type) {
+            return return_error(new Error('Behavior definition validation requires packageName, description, rootEntity, and implementationType parameters'));
+          }
+          const validImplementationTypes = ['Managed', 'Unmanaged', 'Abstract', 'Projection'];
+          const normalizedImplementationType = implementation_type.charAt(0).toUpperCase() + implementation_type.slice(1).toLowerCase();
+          if (!validImplementationTypes.includes(normalizedImplementationType)) {
+            return return_error(new Error(`Invalid implementationType. Must be one of: ${validImplementationTypes.join(', ')}`));
+          }
+          await validationClient.validateBehaviorDefinition({
+            name: objectName,
+            packageName: package_name,
+            description: description,
+            rootEntity: root_entity,
+            implementationType: normalizedImplementationType as 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection'
+          });
+          const behaviorDefinitionResponse = validationClient.getValidationResponse();
+          if (!behaviorDefinitionResponse) {
+            throw new Error('Validation did not return a result');
+          }
+          result = parseValidationResponse(behaviorDefinitionResponse);
+          break;
+        case 'behavior_implementation':
+          if (!package_name) {
+            return return_error(new Error('Behavior implementation validation requires packageName parameter'));
+          }
+          await validationClient.validateBehaviorImplementation({
+            className: objectName,
+            packageName: package_name,
+            behaviorDefinition: behavior_definition || '',
+            ...(description && { description })
+          });
+          const behaviorImplementationResponse = validationClient.getValidationResponse();
+          if (!behaviorImplementationResponse) {
+            throw new Error('Validation did not return a result');
+          }
+          result = parseValidationResponse(behaviorImplementationResponse);
+          break;
         case 'metadata_extension':
-          // Metadata extension validation requires description and packageName
-          // For now, we'll skip validation as these params are not provided in generic handler
-          // TODO: Consider creating specific ValidateMetadataExtension handler
-          return return_error(new Error('Metadata extension validation requires description and packageName parameters. Use specific validation handler.'));
+        case 'ddlx/ex':
+          if (!package_name || !description) {
+            return return_error(new Error('Metadata extension validation requires description and packageName parameters'));
+          }
+          await validationClient.validateMetadataExtension({
+            name: objectName,
+            description: description,
+            packageName: package_name
+          });
+          const metadataExtensionResponse = validationClient.getValidationResponse();
+          if (!metadataExtensionResponse) {
+            throw new Error('Validation did not return a result');
+          }
+          result = parseValidationResponse(metadataExtensionResponse);
+          break;
         default:
           throw new Error(`Unsupported object type: ${object_type}`);
       }

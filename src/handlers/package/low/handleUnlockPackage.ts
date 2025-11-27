@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -82,11 +82,9 @@ export async function handleUnlockPackage(args: UnlockPackageArgs) {
 
     // Restore session state if provided
     if (session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      // CRITICAL: Use restoreSessionInConnection to properly restore session
+      // This will set sessionId in connection and enable stateful session mode
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -98,6 +96,15 @@ export async function handleUnlockPackage(args: UnlockPackageArgs) {
     logger.info(`Starting package unlock: ${packageName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
+      // Get builder instance and set lockHandle in state before unlock
+      // This is needed because PackageBuilder.unlock() checks this.state.lockHandle,
+      // but CrudClient.unlockPackage() only sets (builder as any).lockHandle
+      const builder = (client as any).getPackageBuilder({ packageName, superPackage });
+      if (builder) {
+        // Set lockHandle in state so unlock() can find it
+        (builder as any).state.lockHandle = lock_handle;
+      }
+
       // Unlock package using CrudClient (with proper session state restored)
       await client.unlockPackage({ packageName, superPackage }, lock_handle);
       const unlockResult = client.getUnlockResult();

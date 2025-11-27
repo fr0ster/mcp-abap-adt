@@ -8,6 +8,7 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "UpdateBehaviorDefinitionLow",
@@ -97,11 +98,12 @@ export async function handleUpdateBehaviorDefinition(args: UpdateBehaviorDefinit
     logger.info(`Starting behavior definition update: ${behaviorDefinitionName}`);
 
     try {
-      // Update behavior definition with source code
-      await client.updateBehaviorDefinition({
+      // Update behavior definition with source code - using types from adt-clients
+      const updateConfig: Pick<BehaviorDefinitionBuilderConfig, 'name' | 'sourceCode'> = {
         name: behaviorDefinitionName,
         sourceCode: source_code
-      }, lock_handle);
+      };
+      await client.updateBehaviorDefinition(updateConfig, lock_handle);
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {

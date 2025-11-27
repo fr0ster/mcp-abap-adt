@@ -8,6 +8,7 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "ActivateBehaviorDefinitionLow",
@@ -85,8 +86,11 @@ export async function handleActivateBehaviorDefinition(args: ActivateBehaviorDef
     logger.info(`Starting behavior definition activation: ${behaviorDefinitionName}`);
 
     try {
-      // Activate behavior definition
-      await client.activateBehaviorDefinition({ name: behaviorDefinitionName });
+      // Activate behavior definition - using types from adt-clients
+      const activateConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = {
+        name: behaviorDefinitionName
+      };
+      await client.activateBehaviorDefinition(activateConfig);
       const response = client.getActivateResult();
 
       if (!response) {

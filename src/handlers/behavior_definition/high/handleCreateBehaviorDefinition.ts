@@ -2,11 +2,10 @@
  * CreateBehaviorDefinition Handler - ABAP Behavior Definition Creation via ADT API
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
-import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
     name: "CreateBehaviorDefinition",
@@ -54,7 +53,7 @@ interface CreateBehaviorDefinitionArgs {
     package_name: string;
     transport_request?: string;
     root_entity: string;
-    implementation_type: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection';
+    implementation_type: BehaviorDefinitionImplementationType;
     activate?: boolean;
 }
 
@@ -80,29 +79,34 @@ export async function handleCreateBehaviorDefinition(params: any) {
         const client = new CrudClient(connection);
         const shouldActivate = args.activate !== false;
 
-        // Create
-        await client.createBehaviorDefinition({
+        // Create - using types from adt-clients
+        const createConfig: Pick<BehaviorDefinitionBuilderConfig, 'name' | 'description' | 'packageName' | 'transportRequest' | 'rootEntity' | 'implementationType'> = {
             name,
             description: args.description || name,
             packageName: args.package_name,
             transportRequest: args.transport_request || '',
             rootEntity: args.root_entity,
             implementationType: args.implementation_type
-        });
+        };
+        await client.createBehaviorDefinition(createConfig);
 
-        // Lock
-        await client.lockBehaviorDefinition({ name: name });
+        // Lock - using types from adt-clients
+        const lockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
+        await client.lockBehaviorDefinition(lockConfig);
         const lockHandle = client.getLockHandle();
 
-        // Check (optional, but good practice)
-        await client.checkBehaviorDefinition({ name: name });
+        // Check (optional, but good practice) - using types from adt-clients
+        const checkConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
+        await client.checkBehaviorDefinition(checkConfig);
 
-        // Unlock
-        await client.unlockBehaviorDefinition({ name: name }, lockHandle);
+        // Unlock - using types from adt-clients
+        const unlockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
+        await client.unlockBehaviorDefinition(unlockConfig, lockHandle);
 
-        // Activate if requested
+        // Activate if requested - using types from adt-clients
         if (shouldActivate) {
-            await client.activateBehaviorDefinition({ name: name });
+            const activateConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
+            await client.activateBehaviorDefinition(activateConfig);
         }
 
         const result = {

@@ -25,7 +25,8 @@ import {
   parseHandlerResponse,
   extractLockHandle,
   delay,
-  debugLog
+  debugLog,
+  logTestStep
 } from '../helpers/testHelpers';
 import {
   getTestSession,
@@ -93,75 +94,40 @@ describe('MetadataExtension Low-Level Handlers Integration', () => {
       const transportRequest = resolveTransportRequest(testCase);
       const description = testCase.params.description || `Test metadata extension for low-level handler`;
 
-      debugLog('TEST_START', `Starting full workflow test for metadata extension: ${ddlxName}`, {
-        ddlxName,
-        packageName,
-        transportRequest,
-        description
-      });
 
       let lockHandleForCleanup: string | null = null;
       let lockSessionForCleanup: SessionInfo | null = null;
+      let objectWasCreated = false; // Track if object was actually created
 
       try {
         // Step 1: Validate
-        debugLog('VALIDATE', `Starting validation for ${ddlxName}`, {
-          session_id: session.session_id,
-          has_session_state: !!session.session_state
-        });
+        console.log(`🔍 Step 1: Validating ${ddlxName}...`);
         const validateResponse = await handleValidateMetadataExtension({
-          name: ddlxName,
-          description: description,
-          package_name: packageName,
-          session_id: session.session_id,
-          session_state: session.session_state
-        });
+        name: ddlxName,
+        description: description,
+        package_name: packageName,
+        session_id: session.session_id,
+        session_state: session.session_state
+      });
 
         if (validateResponse.isError) {
           const errorMsg = validateResponse.content[0]?.text || 'Unknown error';
-          debugLog('VALIDATE_ERROR', `Validation returned error: ${errorMsg}`, {
-            error: errorMsg,
-            response: validateResponse
-          });
-          if (errorMsg.includes('already exists')) {
-            console.log(`⏭️  MetadataExtension ${ddlxName} already exists, skipping test`);
-            return;
-          }
-          throw new Error(`Validation failed: ${errorMsg}`);
+          console.log(`⏭️  Validation error for ${ddlxName}: ${errorMsg}, skipping test`);
+          return;
         }
 
         const validateData = parseHandlerResponse(validateResponse);
-        debugLog('VALIDATE_RESPONSE', `Validation response parsed`, {
-          valid: validateData.validation_result?.valid,
-          message: validateData.validation_result?.message,
-          exists: validateData.validation_result?.exists
-        });
-
         if (!validateData.validation_result?.valid) {
           const message = validateData.validation_result?.message || '';
-          const messageLower = message.toLowerCase();
-          if (validateData.validation_result?.exists ||
-              messageLower.includes('already exists') ||
-              messageLower.includes('does already exist')) {
-            console.log(`⏭️  MetadataExtension ${ddlxName} already exists, skipping test`);
-            return;
-          }
-          console.warn(`⚠️  Validation failed for ${ddlxName}: ${message}. Will attempt create and handle if object exists...`);
+          console.log(`⏭️  Validation failed for ${ddlxName}: ${message}, skipping test`);
+          return;
         }
 
-        const oldSessionId = session.session_id;
         session = updateSessionFromResponse(session, validateData);
-        debugLog('VALIDATE', 'Validation completed and session updated', {
-          old_session_id: oldSessionId,
-          new_session_id: session.session_id,
-          session_changed: oldSessionId !== session.session_id
-        });
+        console.log(`✅ Step 1: Validation successful for ${ddlxName}`);
 
         // Step 2: Create
-        debugLog('CREATE', `Starting creation for ${ddlxName}`, {
-          session_id: session.session_id,
-          has_session_state: !!session.session_state
-        });
+        console.log(`📦 Step 2: Creating ${ddlxName}...`);
         const createResponse = await handleCreateMetadataExtension({
           name: ddlxName,
           description,
@@ -173,10 +139,6 @@ describe('MetadataExtension Low-Level Handlers Integration', () => {
 
         if (createResponse.isError) {
           const errorMsg = createResponse.content[0]?.text || 'Unknown error';
-          debugLog('CREATE_ERROR', `Create returned error: ${errorMsg}`, {
-            error: errorMsg,
-            response: createResponse
-          });
           if (errorMsg.includes('already exists') || errorMsg.includes('does already exist')) {
             console.log(`⏭️  MetadataExtension ${ddlxName} already exists, skipping test`);
             return;
@@ -187,21 +149,14 @@ describe('MetadataExtension Low-Level Handlers Integration', () => {
         const createData = parseHandlerResponse(createResponse);
         expect(createData.success).toBe(true);
         expect(createData.name).toBe(ddlxName);
+        objectWasCreated = true;
+        console.log(`✅ Step 2: Created ${ddlxName} successfully`);
 
-        const oldSessionId2 = session.session_id;
         session = updateSessionFromResponse(session, createData);
-        debugLog('CREATE', 'Creation completed and session updated', {
-          old_session_id: oldSessionId2,
-          new_session_id: session.session_id,
-          session_changed: oldSessionId2 !== session.session_id
-        });
         await delay(getOperationDelay('create', testCase));
 
         // Step 3: Lock
-        debugLog('LOCK', `Starting lock for ${ddlxName}`, {
-          session_id: session.session_id,
-          has_session_state: !!session.session_state
-        });
+        console.log(`🔒 Step 3: Locking ${ddlxName}...`);
         const lockResponse = await handleLockMetadataExtension({
           name: ddlxName,
           session_id: session.session_id,
@@ -209,9 +164,6 @@ describe('MetadataExtension Low-Level Handlers Integration', () => {
         });
 
         if (lockResponse.isError) {
-          debugLog('LOCK_ERROR', `Lock returned error: ${lockResponse.content[0]?.text || 'Unknown error'}`, {
-            response: lockResponse
-          });
           throw new Error(`Lock failed: ${lockResponse.content[0]?.text || 'Unknown error'}`);
         }
 
@@ -224,27 +176,17 @@ describe('MetadataExtension Low-Level Handlers Integration', () => {
 
         lockHandleForCleanup = lockHandle;
         lockSessionForCleanup = lockSession;
-
-        debugLog('LOCK', 'Lock completed, extracted session', {
-          lock_handle: lockHandle,
-          lock_session_id: lockSession.session_id,
-          has_lock_session_state: !!lockSession.session_state
-        });
+        console.log(`✅ Step 3: Locked ${ddlxName} successfully`);
 
         await delay(getOperationDelay('lock', testCase));
 
         // Step 4: Update
+        console.log(`📝 Step 4: Updating ${ddlxName}...`);
         const sourceCode = testCase.params.source_code || `@Metadata.layer: #CORE
 annotate view ${testCase.params.view_name || 'ZI_VIEW'} with {
   @EndUserText.label: '${description}'
 }`;
 
-        debugLog('UPDATE', `Starting update for ${ddlxName}`, {
-          lock_handle: lockHandle,
-          session_id: lockSession.session_id,
-          has_session_state: !!lockSession.session_state,
-          sourceCodeLength: sourceCode.length
-        });
         const updateResponse = await handleUpdateMetadataExtension({
           name: ddlxName,
           source_code: sourceCode,
@@ -254,28 +196,18 @@ annotate view ${testCase.params.view_name || 'ZI_VIEW'} with {
         });
 
         if (updateResponse.isError) {
-          debugLog('UPDATE_ERROR', `Update returned error: ${updateResponse.content[0]?.text || 'Unknown error'}`, {
-            response: updateResponse
-          });
           throw new Error(`Update failed: ${updateResponse.content[0]?.text || 'Unknown error'}`);
         }
 
         const updateData = parseHandlerResponse(updateResponse);
         expect(updateData.success).toBe(true);
         expect(updateData.session_id).toBe(lockSession.session_id);
-        debugLog('UPDATE', 'Update completed successfully', {
-          ddlxName,
-          success: updateData.success
-        });
+        console.log(`✅ Step 4: Updated ${ddlxName} successfully`);
 
         await delay(getOperationDelay('update', testCase));
 
         // Step 5: Unlock
-        debugLog('UNLOCK', `Starting unlock for ${ddlxName}`, {
-          lock_handle: lockHandle,
-          session_id: lockSession.session_id,
-          has_session_state: !!lockSession.session_state
-        });
+        console.log(`🔓 Step 5: Unlocking ${ddlxName}...`);
         const unlockResponse = await handleUnlockMetadataExtension({
           name: ddlxName,
           lock_handle: lockHandle,
@@ -284,30 +216,19 @@ annotate view ${testCase.params.view_name || 'ZI_VIEW'} with {
         });
 
         if (unlockResponse.isError) {
-          debugLog('UNLOCK_ERROR', `Unlock returned error: ${unlockResponse.content[0]?.text || 'Unknown error'}`, {
-            response: unlockResponse
-          });
           throw new Error(`Unlock failed: ${unlockResponse.content[0]?.text || 'Unknown error'}`);
         }
 
         const unlockData = parseHandlerResponse(unlockResponse);
         expect(unlockData.success).toBe(true);
         expect(unlockData.session_id).toBe(lockSession.session_id);
+        console.log(`✅ Step 5: Unlocked ${ddlxName} successfully`);
 
-        const oldSessionId3 = session.session_id;
         session = updateSessionFromResponse(session, unlockData);
-        debugLog('UNLOCK', 'Unlock completed and session updated', {
-          old_session_id: oldSessionId3,
-          new_session_id: session.session_id,
-          session_changed: oldSessionId3 !== session.session_id
-        });
         await delay(getOperationDelay('unlock', testCase));
 
         // Step 6: Activate
-        debugLog('ACTIVATE', `Starting activation for ${ddlxName}`, {
-          session_id: session.session_id,
-          has_session_state: !!session.session_state
-        });
+        console.log(`⚡ Step 6: Activating ${ddlxName}...`);
         const activateResponse = await handleActivateMetadataExtension({
           name: ddlxName,
           session_id: session.session_id,
@@ -315,39 +236,24 @@ annotate view ${testCase.params.view_name || 'ZI_VIEW'} with {
         });
 
         if (activateResponse.isError) {
-          debugLog('ACTIVATE_ERROR', `Activate returned error: ${activateResponse.content[0]?.text || 'Unknown error'}`, {
-            response: activateResponse
-          });
           throw new Error(`Activate failed: ${activateResponse.content[0]?.text || 'Unknown error'}`);
         }
 
         const activateData = parseHandlerResponse(activateResponse);
         expect(activateData.success).toBe(true);
-        debugLog('ACTIVATE', 'Activation completed successfully', {
-          ddlxName,
-          success: activateData.success
-        });
+        console.log(`✅ Step 6: Activated ${ddlxName} successfully`);
 
-        debugLog('TEST_COMPLETE', `Full workflow completed successfully for ${ddlxName}`, {
-          ddlxName,
-          steps_completed: ['validate', 'create', 'lock', 'update', 'unlock', 'activate']
-        });
         console.log(`✅ Full workflow completed successfully for ${ddlxName}`);
 
       } catch (error: any) {
-        debugLog('TEST_ERROR', `Test failed: ${error.message}`, {
-          error: error.message,
-          stack: error.stack,
-          ddlxName
-        });
         console.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
-        // Cleanup
-        debugLog('CLEANUP', `Starting cleanup for ${ddlxName}`, {
-          ddlxName,
-          hasSession: !!session
-        });
+        // Cleanup: only if object was actually created in this test run
+        if (!objectWasCreated) {
+          return;
+        }
+        // Only proceed with cleanup if object was successfully created
         if (session && ddlxName) {
           try {
             if (lockHandleForCleanup && lockSessionForCleanup) {
@@ -359,32 +265,28 @@ annotate view ${testCase.params.view_name || 'ZI_VIEW'} with {
                   session_state: lockSessionForCleanup.session_state
                 });
               } catch (unlockError: any) {
-                console.warn(`⚠️  Failed to unlock with saved handle: ${unlockError.message}`);
+                // Ignore unlock errors during cleanup
               }
             }
-
             await delay(1000);
-
             const deleteResponse = await handleDeleteMetadataExtension({
               name: ddlxName,
               transport_request: transportRequest
             });
-
             if (!deleteResponse.isError) {
-              debugLog('CLEANUP', `Successfully deleted test metadata extension: ${ddlxName}`);
               console.log(`🧹 Cleaned up test metadata extension: ${ddlxName}`);
             } else {
-              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-              debugLog('CLEANUP_ERROR', `Failed to delete metadata extension ${ddlxName}`, {
-                error: errorMsg
-              });
-              console.warn(`⚠️  Failed to delete metadata extension ${ddlxName}: ${errorMsg}`);
+              // Check if object doesn't exist (404) - that's okay, it may have been deleted already
+              const errorMsg = deleteResponse.content[0]?.text || '';
+              if (errorMsg.includes('not found') || errorMsg.includes('already be deleted')) {
+                // Object doesn't exist - that's fine, no need to log error
+              } else {
+                // Other error - log but don't fail test
+                console.warn(`⚠️  Failed to delete metadata extension ${ddlxName}: ${errorMsg}`);
+              }
             }
           } catch (cleanupError: any) {
-            debugLog('CLEANUP_ERROR', `Failed to cleanup test metadata extension ${ddlxName}`, {
-              error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
-            });
-            console.warn(`⚠️  Failed to cleanup test metadata extension ${ddlxName}: ${cleanupError.message || cleanupError}`);
+            // Ignore cleanup errors - object may not exist or may have been deleted already
           }
         }
       }

@@ -8,6 +8,7 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionValidationParams, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "ValidateBehaviorDefinitionLow",
@@ -57,7 +58,7 @@ export const TOOL_DEFINITION = {
 interface ValidateBehaviorDefinitionArgs {
   name: string;
   root_entity: string;
-  implementation_type: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection';
+  implementation_type: BehaviorDefinitionImplementationType;
   package_name: string;
   description: string;
   session_id?: string;
@@ -110,12 +111,27 @@ export async function handleValidateBehaviorDefinition(args: ValidateBehaviorDef
     logger.info(`Starting behavior definition validation: ${bdefName}`);
 
     try {
-      // Validate behavior definition
-      await client.validateBehaviorDefinition({
-        rootEntity: root_entity,
-        implementationType: implementation_type,
+      // Validate behavior definition - using BehaviorDefinitionValidationParams from adt-clients
+      // Note: In SAP ADT validation API, objname and rootEntity are both required parameters
+      // but they must have the same value (one value in two parameters)
+      // We use root_entity for both since it's the actual CDS view name
+      const validateParams: BehaviorDefinitionValidationParams = {
+        objname: root_entity, // objname - same as rootEntity
+        rootEntity: root_entity, // rootEntity - CDS view name
         description: description,
-        packageName: package_name.toUpperCase()
+        package: package_name.toUpperCase(),
+        implementationType: implementation_type
+      };
+
+      // CrudClient.validateBehaviorDefinition expects BehaviorDefinitionBuilderConfig,
+      // but we use BehaviorDefinitionValidationParams structure for clarity
+      // Convert to the format expected by CrudClient
+      await client.validateBehaviorDefinition({
+        name: validateParams.objname,
+        rootEntity: validateParams.rootEntity,
+        description: validateParams.description,
+        packageName: validateParams.package,
+        implementationType: validateParams.implementationType
       });
       const validationResponse = client.getValidationResponse();
       if (!validationResponse) {

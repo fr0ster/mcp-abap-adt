@@ -95,14 +95,20 @@ create_package_low:
       enabled: false
       description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
-        package_name: "<YOUR_SUPER_PACKAGE>"  # Parent package (super_package) - use your system's local package (e.g., ZLOCAL for cloud, $TMP for on-premise)
+        # package_name: "<YOUR_SUPER_PACKAGE>"  # Parent package (super_package) - optional, uses default_package from environment if not specified
         test_package: "<YOUR_PACKAGE_NAME>_LOW"  # Package to create
         description: "Test package created via low-level MCP handler"
+        updated_description: "Test package created via low-level MCP handler (UPDATED)"
         package_type: "development"
-        responsible: "<YOUR_RESPONSIBLE_USER>"
-        application_component: ""
-        # Update through low-level
-        update_description: "Updated via low-level"
+        software_component: "ZLOCAL"  # Use your system's software component
+        # responsible: "<YOUR_RESPONSIBLE_USER>"  # Optional
+        # application_component: ""  # Optional
+        operation_delays:
+          create: 5000
+          update: 3000
+          unlock: 5000
+          delete: 20000
+          delete_retry: 20000
     - name: "test_package_low_flow"
       enabled: false
       description: "Low-level flow test: create → update → delete through low-level handlers"
@@ -696,7 +702,7 @@ create_table:
             created_at : abap.dats;
           }
         # Update step (update DDL code)
-        update_ddl_code: |
+        updated_ddl_code: |
           @EndUserText.label : 'Test Table Updated'
           @AbapCatalog.tableCategory : #TRANSPARENT
           define table <YOUR_TABLE_NAME_LOWER> {
@@ -733,7 +739,7 @@ create_table_low:
             name : abap.char(255);
           }
         # Update through low-level
-        update_ddl_code: |
+        updated_ddl_code: |
           @EndUserText.label : 'Test Table Low Updated'
           @AbapCatalog.tableCategory : #TRANSPARENT
           define table <YOUR_TABLE_NAME_LOWER>_LOW {
@@ -821,29 +827,21 @@ create_structure_low:
         description: "Test structure created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
         # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        fields:
-          - name: "FIELD1"
-            description: "First field"
-            data_type: "CHAR"
-            length: 10
-          - name: "FIELD2"
-            description: "Second field"
-            data_type: "CHAR"
-            length: 20
+        ddl_code: |
+          @EndUserText.label: 'Test structure created via low-level MCP handler'
+          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+          define structure <YOUR_STRUCTURE_NAME>_LOW {
+            field1 : abap.char(10);
+            field2 : abap.char(20);
+          }
         # Update through low-level
-        update_fields:
-          - name: "FIELD1"
-            description: "First field updated"
-            data_type: "CHAR"
-            length: 15
-          - name: "FIELD2"
-            description: "Second field updated"
-            data_type: "CHAR"
-            length: 25
-          - name: "FIELD3"
-            description: "Third field added"
-            data_type: "CHAR"
-            length: 30
+        updated_ddl_code: |
+          @EndUserText.label: 'Test structure created via low-level MCP handler'
+          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+          define structure <YOUR_STRUCTURE_NAME>_LOW {
+            field1 : abap.char(10);
+            field2 : abap.char(20);
+          }
     - name: "test_structure_low_flow"
       enabled: false
       description: "Low-level flow test: create → update → delete through low-level handlers"
@@ -1297,6 +1295,207 @@ get_function_test:
 # Step 4: Get function (standard function for comparison)
 # Note: get_function is part of create_function_module_low test (read operation within low-level test)
 # Note: get_structure is part of create_structure_low test (read operation within low-level test)
+
+# ============================================================================
+# BEHAVIOR DEFINITION - Low-Level Handler
+# ============================================================================
+create_behavior_definition_low:
+  test_cases:
+    - name: "full_workflow"
+      enabled: false
+      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      params:
+        name: "<YOUR_BEHAVIOR_DEFINITION_NAME>"
+        description: "Test behavior definition created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        # ⚠️ IMPORTANT: root_entity MUST be an existing CDS view name (not just any name)
+        # The CDS view must exist in the SAP system before creating behavior definition
+        root_entity: "<YOUR_EXISTING_CDS_VIEW_NAME>"  # ⚠️ UPDATE: Replace with existing CDS view name
+        implementation_type: "managed"  # or "unmanaged", "abstract", "projection"
+        # ⚠️ REQUIRED: source_code is mandatory for update step
+        source_code: |
+          managed implementation in class zbp_<your_cds_view_name_lowercase> unique;
+          strict ( 2 );
+
+          define behavior for <YOUR_CDS_VIEW_NAME> //alias <alias_name>
+          persistent table <your_table_name>
+          lock master
+          authorization master ( instance )
+          {
+            create ( authorization : global );
+            update;
+            delete;
+            field ( readonly ) <field_name>;
+            association _children { create; }
+          }
+
+          define behavior for <YOUR_CHILD_ENTITY_NAME> //alias <alias_name>
+          persistent table <your_child_table_name>
+          lock dependent by _parent
+          authorization dependent by _parent
+          {
+            update;
+            delete;
+            field ( readonly ) <child_field_name>;
+            association _parent;
+          }
+        # ⚠️ REQUIRED for HighHandlers test: update_source_code is mandatory for update step
+        update_source_code: |
+          managed implementation in class zbp_<your_cds_view_name_lowercase> unique;
+          strict ( 2 );
+
+          define behavior for <YOUR_CDS_VIEW_NAME> //alias <alias_name>
+          persistent table <your_table_name>
+          lock master
+          authorization master ( instance )
+          {
+            create ( authorization : global );
+            update;
+            delete;
+            field ( readonly ) <field_name>;
+            field ( readonly ) <updated_field_name>;
+            association _children { create; }
+          }
+
+          define behavior for <YOUR_CHILD_ENTITY_NAME> //alias <alias_name>
+          persistent table <your_child_table_name>
+          lock dependent by _parent
+          authorization dependent by _parent
+          {
+            update;
+            delete;
+            field ( readonly ) <child_field_name>;
+            association _parent;
+          }
+
+# ============================================================================
+# METADATA EXTENSION - Low-Level Handler
+# ============================================================================
+create_metadata_extension_low:
+  test_cases:
+    - name: "full_workflow"
+      enabled: false
+      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      params:
+        name: "<YOUR_METADATA_EXTENSION_NAME>"
+        description: "Test metadata extension created via low-level MCP handler"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        # Example of complete metadata extension source code:
+        # @Metadata.layer: #CUSTOMER
+        # annotate entity ZOK_C_CDS_TEST with {
+        #   @EndUserText.label: 'Field 1 Label'
+        #   @UI.identification: [{ position: 10 }]
+        #   Fld1;
+        #   @EndUserText.label: 'Field 2 Label'
+        #   @UI.lineItem: [{ position: 20 }]
+        #   Fld2;
+        #   @EndUserText.label: 'Field 3 Label'
+        #   @UI.lineItem: [{ position: 30 }]
+        #   Fld3;
+        #   @EndUserText.label: 'Child Items'
+        #   @UI.lineItem: [{ position: 40 }]
+        #   @UI.selectionField: [{ position: 1 }]
+        #   _association_name;
+        # }
+        source_code: |
+          @Metadata.layer: #CUSTOMER
+          annotate entity <YOUR_ENTITY_NAME> with {
+            @EndUserText.label: 'Field 1 Label'
+            @UI.identification: [{ position: 10 }]
+            <YOUR_FIELD_1>;
+            @EndUserText.label: 'Field 2 Label'
+            @UI.lineItem: [{ position: 20 }]
+            <YOUR_FIELD_2>;
+            @EndUserText.label: 'Field 3 Label'
+            @UI.lineItem: [{ position: 30 }]
+            <YOUR_FIELD_3>;
+          }
+
+# ============================================================================
+# BEHAVIOR IMPLEMENTATION - Low-Level Handler
+# ============================================================================
+create_behavior_implementation_low:
+  test_cases:
+    - name: "full_workflow"
+      enabled: false
+      description: "Full workflow test: Validate → Create → Check → Lock → Update → Unlock → Activate"
+      params:
+        class_name: "<YOUR_BEHAVIOR_IMPLEMENTATION_CLASS_NAME>"
+        description: "Behavior Implementation for <YOUR_BEHAVIOR_DEFINITION_NAME>"
+        # package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        # ⚠️ IMPORTANT: behavior_definition MUST be an existing Behavior Definition name
+        behavior_definition: "<YOUR_EXISTING_BEHAVIOR_DEFINITION_NAME>"  # ⚠️ UPDATE: Replace with existing Behavior Definition name
+        # ⚠️ source_code is implementations include (local handler class), NOT main class
+        # Main class is created by CreateClass and remains unchanged
+        source_code: |
+          CLASS lhc_<your_behavior_definition_lowercase> DEFINITION INHERITING FROM cl_abap_behavior_handler.
+            PRIVATE SECTION.
+
+              METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
+                IMPORTING keys REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+
+              METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
+                IMPORTING REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+
+          ENDCLASS.
+
+          CLASS lhc_<your_behavior_definition_lowercase> IMPLEMENTATION.
+
+            METHOD get_instance_authorizations.
+            ENDMETHOD.
+
+            METHOD get_global_authorizations.
+            ENDMETHOD.
+
+          ENDCLASS.
+        # ⚠️ REQUIRED for update step: implementation_code is implementations include (local handler class) for update
+        implementation_code: |
+          CLASS lhc_<your_behavior_definition_lowercase> DEFINITION INHERITING FROM cl_abap_behavior_handler.
+            PRIVATE SECTION.
+
+              METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
+                IMPORTING keys REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+
+              METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
+                IMPORTING REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+
+          ENDCLASS.
+
+          CLASS lhc_<your_behavior_definition_lowercase> IMPLEMENTATION.
+
+            METHOD get_instance_authorizations.
+            ENDMETHOD.
+
+            METHOD get_global_authorizations.
+            ENDMETHOD.
+
+          ENDCLASS.
+        # ⚠️ REQUIRED for HighHandlers test: update_source_code is implementations include (local handler class)
+        # ⚠️ NOTE: For managed behavior definitions, READ method is not needed (auto-generated)
+        update_source_code: |
+          CLASS lhc_<your_behavior_definition_lowercase> DEFINITION INHERITING FROM cl_abap_behavior_handler.
+            PRIVATE SECTION.
+
+              METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
+                IMPORTING keys REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+
+              METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
+                IMPORTING REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+
+          ENDCLASS.
+
+          CLASS lhc_<your_behavior_definition_lowercase> IMPLEMENTATION.
+
+            METHOD get_instance_authorizations.
+            ENDMETHOD.
+
+            METHOD get_global_authorizations.
+            ENDMETHOD.
+
+          ENDCLASS.
 
 get_include:
   test_cases:

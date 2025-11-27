@@ -7,6 +7,7 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { TableBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "ValidateTableLow",
@@ -44,7 +45,7 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-interface ValidateTableArgs {
+interface ValidateTableArgs extends Pick<TableBuilderConfig, 'tableName' | 'packageName' | 'description'> {
   table_name: string;
   package_name: string;
   description: string;

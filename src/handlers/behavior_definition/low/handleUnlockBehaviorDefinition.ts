@@ -8,6 +8,7 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "UnlockBehaviorDefinitionLow",
@@ -91,8 +92,11 @@ export async function handleUnlockBehaviorDefinition(args: UnlockBehaviorDefinit
     logger.info(`Starting behavior definition unlock: ${bdefName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
-      // Unlock behavior definition
-      await client.unlockBehaviorDefinition({ name: bdefName }, lock_handle);
+      // Unlock behavior definition - using types from adt-clients
+      const unlockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = {
+        name: bdefName
+      };
+      await client.unlockBehaviorDefinition(unlockConfig, lock_handle);
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {

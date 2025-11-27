@@ -10,6 +10,7 @@ This directory contains documentation for developers: testing guides, developmen
 - **[DetectObjectTypeListTools.md](DetectObjectTypeListTools.md)** - Documentation for object type detection tools
 - **[HANDLERS_COVERAGE.md](HANDLERS_COVERAGE.md)** - Analysis of low-level handlers coverage and implementation status
 - **[TEST_ISSUES_ROADMAP.md](TEST_ISSUES_ROADMAP.md)** - Roadmap for analyzing and fixing test failures with diagnosis and treatment tracking
+- **[logs/](logs/)** - Test log storage policy (logs stored outside git, only snippets in roadmap)
 
 ## Test Documentation
 

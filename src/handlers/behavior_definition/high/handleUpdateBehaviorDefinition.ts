@@ -2,9 +2,9 @@
  * UpdateBehaviorDefinition Handler - ABAP Behavior Definition Update via ADT API
  */
 
-import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
     name: "UpdateBehaviorDefinition",
@@ -55,30 +55,30 @@ export async function handleUpdateBehaviorDefinition(params: any) {
         const shouldActivate = args.activate !== false;
         let lockHandle = args.lock_handle;
 
-        // Lock if not provided
+        // Lock if not provided - using types from adt-clients
         if (!lockHandle) {
-            await client.lockBehaviorDefinition({ name: name });
+            const lockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
+            await client.lockBehaviorDefinition(lockConfig);
             lockHandle = client.getLockHandle();
         }
 
-        // Update
-        await client.updateBehaviorDefinition({
+        // Update - using types from adt-clients
+        const updateConfig: Pick<BehaviorDefinitionBuilderConfig, 'name' | 'sourceCode'> = {
             name,
             sourceCode: args.source_code
-        }, lockHandle);
+        };
+        await client.updateBehaviorDefinition(updateConfig, lockHandle);
 
-        // Unlock if we locked it internally
+        // Unlock if we locked it internally - using types from adt-clients
         if (!args.lock_handle) {
-            await client.unlockBehaviorDefinition({ name: name }, lockHandle);
+            const unlockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
+            await client.unlockBehaviorDefinition(unlockConfig, lockHandle);
         }
 
-        // Activate if requested
+        // Activate if requested - using types from adt-clients
         if (shouldActivate) {
-            // Note: If we locked internally, we unlocked, so activation might fail if it requires lock?
-            // Usually activation is separate. But if we provided lock_handle, we keep it locked?
-            // Standard practice: Update requires lock. Activation might not, or might require its own lock check.
-            // CrudClient.activateBehaviorDefinition doesn't take lock handle.
-            await client.activateBehaviorDefinition({ name: name });
+            const activateConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
+            await client.activateBehaviorDefinition(activateConfig);
         }
 
         const result = {

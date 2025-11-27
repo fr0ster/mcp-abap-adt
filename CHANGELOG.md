@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.1.11] - 2025-01-27
+
+### Fixed
+- **Behavior Implementation test configuration** – fixed test configuration for managed behavior definitions:
+  - Removed `read FOR READ` method from implementation code examples in `test-config.yaml` and `test-config.yaml.template`
+  - For managed behavior definitions, `read` method is auto-generated and should not be included in custom implementation code
+  - Updated both low-level and high-level test configurations with correct implementation code structure
+  - Tests now correctly handle managed behavior implementation classes without superfluous `read` method errors
+
+### Changed
+- **Behavior Implementation HighHandlers test** – simplified test implementation:
+  - Removed manual session state management (save/restore) – CrudClient now manages session internally
+  - Removed low-level handler imports (`handleLockClass`, `handleUnlockClass`, `handleActivateClass`)
+  - Test now uses only CrudClient methods for lock → update → unlock → activate workflow
+  - Aligns with high-level handler pattern where each handler manages its own session and lock/unlock operations
+
+### Added
+- **Test configuration parameter for Behavior Implementation** – added `implementation_code` parameter:
+  - Separate parameter for updating implementations include (local handler class) in low-level handler tests
+  - `update_source_code` parameter for high-level handler tests
+  - Updated test templates with correct implementation code structure
+  - Improved test configuration clarity and maintainability
+
 ## [1.1.10] - 2025-11-26
 
 ### Added

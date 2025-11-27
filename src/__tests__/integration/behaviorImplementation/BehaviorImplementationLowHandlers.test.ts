@@ -1,29 +1,27 @@
 /**
- * Integration tests for BehaviorDefinition Low-Level Handlers
+ * Integration tests for BehaviorImplementation Low-Level Handlers
  *
  * Tests the complete workflow using handler functions directly:
- * GetSession → ValidateBehaviorDefinitionLow → CreateBehaviorDefinitionLow → LockBehaviorDefinitionLow →
- * UpdateBehaviorDefinitionLow → UnlockBehaviorDefinitionLow → ActivateBehaviorDefinitionLow → DeleteBehaviorDefinitionLow
+ * GetSession → ValidateBehaviorImplementationLow → CreateClass → CheckClass → LockBehaviorImplementationLow →
+ * UpdateClass → UnlockClass → ActivateClass → DeleteClass
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Test execution logs
  *   DEBUG_ADT_LIBS=true        - Library logs
  *   DEBUG_CONNECTORS=true      - Connection logs
  *
- * Run: npm test -- --testPathPattern=integration/behaviorDefinition
- *
- * @todo TODO: Apply same step-by-step logging pattern to all other integration tests
- * See: doc/development/TEST_LOGGING_ROADMAP.md
- * Pattern: console.log(`🔍 Step N: [Operation]...`) before, `✅ Step N: [Operation] successfully` after
+ * Run: npm test -- --testPathPattern=integration/behaviorImplementation
  */
 
-import { handleValidateBehaviorDefinition } from '../../../handlers/behavior_definition/low/handleValidateBehaviorDefinition';
-import { handleCreateBehaviorDefinition } from '../../../handlers/behavior_definition/low/handleCreateBehaviorDefinition';
-import { handleLockBehaviorDefinition } from '../../../handlers/behavior_definition/low/handleLockBehaviorDefinition';
-import { handleUpdateBehaviorDefinition } from '../../../handlers/behavior_definition/low/handleUpdateBehaviorDefinition';
-import { handleUnlockBehaviorDefinition } from '../../../handlers/behavior_definition/low/handleUnlockBehaviorDefinition';
-import { handleActivateBehaviorDefinition } from '../../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
-import { handleDeleteBehaviorDefinition } from '../../../handlers/behavior_definition/low/handleDeleteBehaviorDefinition';
+import { handleValidateBehaviorImplementation } from '../../../handlers/behavior_implementation/low/handleValidateBehaviorImplementation';
+import { handleCreateClass } from '../../../handlers/class/low/handleCreateClass';
+import { handleCheckClass } from '../../../handlers/class/low/handleCheckClass';
+import { handleLockBehaviorImplementation } from '../../../handlers/behavior_implementation/low/handleLockBehaviorImplementation';
+import { handleUnlockClass } from '../../../handlers/class/low/handleUnlockClass';
+import { handleActivateClass } from '../../../handlers/class/low/handleActivateClass';
+import { handleDeleteClass } from '../../../handlers/class/low/handleDeleteClass';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getManagedConnection } from '../../../lib/utils';
 
 import {
   parseHandlerResponse,
@@ -49,7 +47,7 @@ import {
 // Load environment variables
 loadTestEnv();
 
-describe('BehaviorDefinition Low-Level Handlers Integration', () => {
+describe('BehaviorImplementation Low-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;
   let hasConfig = false;
 
@@ -65,34 +63,34 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
 
   describe('Full Workflow', () => {
     let testCase: any = null;
-    let testBdefName: string | null = null;
+    let testClassName: string | null = null;
 
     beforeEach(async () => {
       if (!hasConfig || !session) {
         return;
       }
 
-      testCase = getEnabledTestCase('create_behavior_definition_low', 'full_workflow');
+      testCase = getEnabledTestCase('create_behavior_implementation_low', 'full_workflow');
       if (!testCase) {
         return;
       }
 
-      testBdefName = testCase.params.name;
+      testClassName = testCase.params.class_name;
     });
 
-    it('should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate', async () => {
-      if (!hasConfig || !session || !testCase || !testBdefName) {
+    it('should execute full workflow: Validate → Create → Check → Lock → Update → Unlock → Activate', async () => {
+      if (!hasConfig || !session || !testCase || !testClassName) {
         debugLog('TEST_SKIP', 'Skipping test: No configuration or test case', {
           hasConfig,
           hasSession: !!session,
           hasTestCase: !!testCase,
-          hasTestBdefName: !!testBdefName
+          hasTestClassName: !!testClassName
         });
         console.log('⏭️  Skipping test: No configuration or test case');
         return;
       }
 
-      const bdefName = testBdefName;
+      const className = testClassName;
       const packageName = resolvePackageName(testCase);
       const transportRequest = resolveTransportRequest(testCase);
 
@@ -102,15 +100,10 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
       }
       const description = testCase.params.description;
 
-      if (!testCase.params.root_entity) {
-        throw new Error('root_entity is required in test configuration');
+      if (!testCase.params.behavior_definition) {
+        throw new Error('behavior_definition is required in test configuration');
       }
-      const rootEntity = testCase.params.root_entity;
-
-      if (!testCase.params.implementation_type) {
-        throw new Error('implementation_type is required in test configuration');
-      }
-      const implementationType = testCase.params.implementation_type.charAt(0).toUpperCase() + testCase.params.implementation_type.slice(1).toLowerCase();
+      const behaviorDefinition = testCase.params.behavior_definition;
 
       let lockHandleForCleanup: string | null = null;
       let lockSessionForCleanup: SessionInfo | null = null;
@@ -118,42 +111,38 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
 
       try {
         // Step 1: Validate
-        console.log(`🔍 Step 1: Validating ${bdefName}...`);
-        const validateResponse = await handleValidateBehaviorDefinition({
-          name: bdefName,
-          root_entity: rootEntity,
-          implementation_type: implementationType,
-          description: description,
+        console.log(`🔍 Step 1: Validating ${className}...`);
+        const validateResponse = await handleValidateBehaviorImplementation({
+          class_name: className,
+          behavior_definition: behaviorDefinition,
           package_name: packageName,
+          description: description,
           session_id: session.session_id,
           session_state: session.session_state
         });
 
         if (validateResponse.isError) {
           const errorMsg = validateResponse.content[0]?.text || 'Unknown error';
-          console.log(`⏭️  Validation error for ${bdefName}: ${errorMsg}, skipping test`);
+          console.log(`⏭️  Validation error for ${className}: ${errorMsg}, skipping test`);
           return;
         }
 
         const validateData = parseHandlerResponse(validateResponse);
-
         if (!validateData.validation_result?.valid) {
           const message = validateData.validation_result?.message || '';
-          console.log(`⏭️  Validation failed for ${bdefName}: ${message}, skipping test`);
+          console.log(`⏭️  Validation failed for ${className}: ${message}, skipping test`);
           return;
         }
 
         session = updateSessionFromResponse(session, validateData);
-        console.log(`✅ Step 1: Validation successful for ${bdefName}`);
+        console.log(`✅ Step 1: Validation successful for ${className}`);
 
-        // Step 2: Create
-        console.log(`📦 Step 2: Creating ${bdefName}...`);
+        // Step 2: Create (as regular class first)
+        console.log(`📦 Step 2: Creating ${className}...`);
         const createArgs: any = {
-          name: bdefName,
+          class_name: className,
           description,
           package_name: packageName,
-          root_entity: rootEntity,
-          implementation_type: implementationType as 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection',
           session_id: session.session_id,
           session_state: session.session_state
         };
@@ -161,12 +150,12 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
         if (transportRequest) {
           createArgs.transport_request = transportRequest;
         }
-        const createResponse = await handleCreateBehaviorDefinition(createArgs);
+        const createResponse = await handleCreateClass(createArgs);
 
         if (createResponse.isError) {
           const errorMsg = createResponse.content[0]?.text || 'Unknown error';
           if (errorMsg.includes('already exists') || errorMsg.includes('does already exist')) {
-            console.log(`⏭️  BehaviorDefinition ${bdefName} already exists, skipping test`);
+            console.log(`⏭️  BehaviorImplementation ${className} already exists, skipping test`);
             return;
           }
           throw new Error(`Create failed: ${errorMsg}`);
@@ -174,19 +163,37 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
 
         const createData = parseHandlerResponse(createResponse);
         expect(createData.success).toBe(true);
-        expect(createData.name).toBe(bdefName);
+        expect(createData.class_name).toBe(className);
 
         // Mark that object was successfully created
         objectWasCreated = true;
-        console.log(`✅ Step 2: Created ${bdefName} successfully`);
+        console.log(`✅ Step 2: Created ${className} successfully`);
 
         session = updateSessionFromResponse(session, createData);
         await delay(getOperationDelay('create', testCase));
 
-        // Step 3: Lock
-        console.log(`🔒 Step 3: Locking ${bdefName}...`);
-        const lockResponse = await handleLockBehaviorDefinition({
-          name: bdefName,
+        // Step 3: Check
+        console.log(`🔍 Step 3: Checking ${className}...`);
+        const checkResponse = await handleCheckClass({
+          class_name: className,
+          session_id: session.session_id,
+          session_state: session.session_state
+        });
+
+        if (checkResponse.isError) {
+          throw new Error(`Check failed: ${checkResponse.content[0]?.text || 'Unknown error'}`);
+        }
+
+        const checkData = parseHandlerResponse(checkResponse);
+        expect(checkData.success).toBeDefined();
+        console.log(`✅ Step 3: Check successful for ${className}`);
+
+        await delay(getOperationDelay('create', testCase));
+
+        // Step 4: Lock
+        console.log(`🔒 Step 4: Locking ${className}...`);
+        const lockResponse = await handleLockBehaviorImplementation({
+          class_name: className,
           session_id: session.session_id,
           session_state: session.session_state
         });
@@ -204,40 +211,48 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
 
         lockHandleForCleanup = lockHandle;
         lockSessionForCleanup = lockSession;
-        console.log(`✅ Step 3: Locked ${bdefName} successfully`);
+        console.log(`✅ Step 4: Locked ${className} successfully`);
 
         await delay(getOperationDelay('lock', testCase));
 
-        // Step 4: Update
-        console.log(`📝 Step 4: Updating ${bdefName}...`);
-        if (!testCase.params.source_code) {
-          throw new Error('source_code is required in test configuration for update step');
+        // Step 5: Update implementations include (local handler class)
+        console.log(`📝 Step 5: Updating implementations include for ${className}...`);
+        if (!testCase.params.implementation_code) {
+          throw new Error('implementation_code is required in test configuration for update step (implementations include)');
         }
-        const sourceCode = testCase.params.source_code;
+        const implementationCode = testCase.params.implementation_code;
 
-        const updateResponse = await handleUpdateBehaviorDefinition({
-          name: bdefName,
-          source_code: sourceCode,
-          lock_handle: lockHandle,
-          session_id: lockSession.session_id,
-          session_state: lockSession.session_state
+        // Update main source with "FOR BEHAVIOR OF" clause first
+        const connection = getManagedConnection();
+        connection.setSessionState({
+          cookies: lockSession.session_state?.cookies || null,
+          csrfToken: lockSession.session_state?.csrf_token || null,
+          cookieStore: lockSession.session_state?.cookie_store || {}
         });
+        const client = new CrudClient(connection);
 
-        if (updateResponse.isError) {
-          throw new Error(`Update failed: ${updateResponse.content[0]?.text || 'Unknown error'}`);
-        }
+        // Update main source with "FOR BEHAVIOR OF"
+        await client.updateBehaviorImplementationMainSource({
+          className: className,
+          behaviorDefinition: behaviorDefinition
+        }, lockHandle);
 
-        const updateData = parseHandlerResponse(updateResponse);
-        expect(updateData.success).toBe(true);
-        expect(updateData.session_id).toBe(lockSession.session_id);
-        console.log(`✅ Step 4: Updated ${bdefName} successfully`);
+        // Update implementations include with local handler class
+        // Use CrudClient method with custom code
+        await client.updateBehaviorImplementation({
+          className: className,
+          behaviorDefinition: behaviorDefinition,
+          implementationCode: implementationCode
+        }, lockHandle);
+
+        console.log(`✅ Step 5: Updated implementations include for ${className} successfully`);
 
         await delay(getOperationDelay('update', testCase));
 
-        // Step 5: Unlock
-        console.log(`🔓 Step 5: Unlocking ${bdefName}...`);
-        const unlockResponse = await handleUnlockBehaviorDefinition({
-          name: bdefName,
+        // Step 6: Unlock
+        console.log(`🔓 Step 6: Unlocking ${className}...`);
+        const unlockResponse = await handleUnlockClass({
+          class_name: className,
           lock_handle: lockHandle,
           session_id: lockSession.session_id,
           session_state: lockSession.session_state
@@ -249,16 +264,15 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
 
         const unlockData = parseHandlerResponse(unlockResponse);
         expect(unlockData.success).toBe(true);
-        expect(unlockData.session_id).toBe(lockSession.session_id);
-        console.log(`✅ Step 5: Unlocked ${bdefName} successfully`);
+        console.log(`✅ Step 6: Unlocked ${className} successfully`);
 
         session = updateSessionFromResponse(session, unlockData);
         await delay(getOperationDelay('unlock', testCase));
 
-        // Step 6: Activate
-        console.log(`⚡ Step 6: Activating ${bdefName}...`);
-        const activateResponse = await handleActivateBehaviorDefinition({
-          name: bdefName,
+        // Step 7: Activate
+        console.log(`⚡ Step 7: Activating ${className}...`);
+        const activateResponse = await handleActivateClass({
+          class_name: className,
           session_id: session.session_id,
           session_state: session.session_state
         });
@@ -268,29 +282,30 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
         }
 
         const activateData = parseHandlerResponse(activateResponse);
+        if (!activateData.success) {
+          console.error(`❌ Activation failed. Response data:`, JSON.stringify(activateData, null, 2));
+          throw new Error(`Activation failed: ${JSON.stringify(activateData)}`);
+        }
         expect(activateData.success).toBe(true);
-        console.log(`✅ Step 6: Activated ${bdefName} successfully`);
+        console.log(`✅ Step 7: Activated ${className} successfully`);
 
-        console.log(`✅ Full workflow completed successfully for ${bdefName}`);
+        console.log(`✅ Full workflow completed successfully for ${className}`);
 
       } catch (error: any) {
         console.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
         // Cleanup: only if object was actually created in this test run
-        // Skip cleanup if validation failed or object creation was skipped
         if (!objectWasCreated) {
-          // Object was not created - no cleanup needed
           return;
         }
-
         // Only proceed with cleanup if object was successfully created
-        if (session && bdefName) {
+        if (session && className) {
           try {
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
-                await handleUnlockBehaviorDefinition({
-                  name: bdefName,
+                await handleUnlockClass({
+                  class_name: className,
                   lock_handle: lockHandleForCleanup,
                   session_id: lockSessionForCleanup.session_id,
                   session_state: lockSessionForCleanup.session_state
@@ -299,16 +314,13 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
                 // Ignore unlock errors during cleanup
               }
             }
-
             await delay(1000);
-
-            const deleteResponse = await handleDeleteBehaviorDefinition({
-              name: bdefName,
+            const deleteResponse = await handleDeleteClass({
+              class_name: className,
               transport_request: transportRequest
             });
-
             if (!deleteResponse.isError) {
-              console.log(`🧹 Cleaned up test behavior definition: ${bdefName}`);
+              console.log(`🧹 Cleaned up test behavior implementation: ${className}`);
             } else {
               // Check if object doesn't exist (404) - that's okay, it may have been deleted already
               const errorMsg = deleteResponse.content[0]?.text || '';
@@ -316,7 +328,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
                 // Object doesn't exist - that's fine, no need to log error
               } else {
                 // Other error - log but don't fail test
-                console.warn(`⚠️  Failed to delete behavior definition ${bdefName}: ${errorMsg}`);
+                console.warn(`⚠️  Failed to delete behavior implementation ${className}: ${errorMsg}`);
               }
             }
           } catch (cleanupError: any) {
@@ -327,3 +339,4 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
     }, getTimeout('long'));
   });
 });
+

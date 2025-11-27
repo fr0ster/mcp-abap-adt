@@ -8,6 +8,7 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { FunctionModuleBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "ValidateFunctionModuleLow",
@@ -45,7 +46,7 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-interface ValidateFunctionModuleArgs {
+interface ValidateFunctionModuleArgs extends Pick<FunctionModuleBuilderConfig, 'functionGroupName' | 'functionModuleName' | 'description'> {
   function_group_name: string;
   function_module_name: string;
   description?: string;

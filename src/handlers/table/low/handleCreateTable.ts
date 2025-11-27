@@ -8,6 +8,7 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { TableBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "CreateTableLow",
@@ -45,7 +46,7 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-interface CreateTableArgs {
+interface CreateTableArgs extends Pick<TableBuilderConfig, 'tableName' | 'packageName' | 'transportRequest' | 'description'> {
   table_name: string;
   description: string;
   package_name: string;

@@ -186,33 +186,22 @@ The navigation below mirrors the document structure for easier discovery.
     - [CreateTransport](#createtransport-high)
   - [Low-Level Tools](#search,-sql,-transactions-low-level)
     - [CreateTransportLow](#createtransportlow-low)
-- [Enhancements](#enhancements) (24 tools – 4 high-level, 16 low-level, 4 read-only)
+- [Enhancements](#enhancements) (13 tools – 2 high-level, 8 low-level, 3 read-only)
   - [Read-Only Tools](#enhancements-read-only)
-    - [GetBdef](#getbdef-readonly)
     - [GetEnhancementImpl](#getenhancementimpl-readonly)
     - [GetEnhancements](#getenhancements-readonly)
     - [GetEnhancementSpot](#getenhancementspot-readonly)
   - [High-Level Tools](#enhancements-high-level)
-    - [CreateBehaviorDefinition](#createbehaviordefinition-high)
     - [CreateMetadataExtension](#createmetadataextension-high)
-    - [UpdateBehaviorDefinition](#updatebehaviordefinition-high)
     - [UpdateMetadataExtension](#updatemetadataextension-high)
   - [Low-Level Tools](#enhancements-low-level)
-    - [ActivateBehaviorDefinitionLow](#activatebehaviordefinitionlow-low)
     - [ActivateMetadataExtensionLow](#activatemetadataextensionlow-low)
-    - [CheckBehaviorDefinitionLow](#checkbehaviordefinitionlow-low)
     - [CheckMetadataExtensionLow](#checkmetadataextensionlow-low)
-    - [CreateBehaviorDefinitionLow](#createbehaviordefinitionlow-low)
     - [CreateMetadataExtensionLow](#createmetadataextensionlow-low)
-    - [DeleteBehaviorDefinitionLow](#deletebehaviordefinitionlow-low)
     - [DeleteMetadataExtensionLow](#deletemetadataextensionlow-low)
-    - [LockBehaviorDefinitionLow](#lockbehaviordefinitionlow-low)
     - [LockMetadataExtensionLow](#lockmetadataextensionlow-low)
-    - [UnlockBehaviorDefinitionLow](#unlockbehaviordefinitionlow-low)
     - [UnlockMetadataExtensionLow](#unlockmetadataextensionlow-low)
-    - [UpdateBehaviorDefinitionLow](#updatebehaviordefinitionlow-low)
     - [UpdateMetadataExtensionLow](#updatemetadataextensionlow-low)
-    - [ValidateBehaviorDefinitionLow](#validatebehaviordefinitionlow-low)
     - [ValidateMetadataExtensionLow](#validatemetadataextensionlow-low)
 
 ---
@@ -1060,15 +1049,18 @@ The navigation below mirrors the document structure for easier discovery.
 
 **Parameters:**
 - `inputSchema` (string, optional) - Class name to validate (e.g., ZCL_MY_CLASS)
-- `package_name` (string, optional) - Optional package name for validation
-- `description` (string, optional) - Optional description for validation
+- `package_name` (string, required) - Package name for validation (required).
+- `description` (string, required) - Description for validation (required).
 - `superclass` (string, optional) - Optional superclass name for validation (e.g., CL_OBJECT)
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
 **Example:**
 ```json
-{}
+{
+  "package_name": "\"ZMY_PACKAGE_NAME\"",
+  "description": "\"example_value\""
+}
 ```
 
 ---
@@ -1078,6 +1070,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 **Parameters:**
 - `inputSchema` (string, optional) - FunctionGroup name to validate (e.g., Z_MY_PROGRAM).
+- `description` (string, optional) - Optional description for validation
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1112,12 +1105,17 @@ The navigation below mirrors the document structure for easier discovery.
 
 **Parameters:**
 - `inputSchema` (string, optional) - Program name to validate (e.g., Z_MY_PROGRAM).
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `description` (string, required) - Program description. Required for validation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
 **Example:**
 ```json
-{}
+{
+  "package_name": "\"ZMY_PACKAGE_NAME\"",
+  "description": "\"example_value\""
+}
 ```
 
 ---
@@ -1228,8 +1226,7 @@ The navigation below mirrors the document structure for easier discovery.
 - `description` (string, optional) - Data element description. If not provided, data_element_name will be used.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `domain_name` (string, optional) - Domain name to use as type reference (e.g., ZZ_TEST_0001)
-- `data_type` (string, optional (default: "CHAR")) - Data type (e.g., CHAR, NUMC). Usually inherited from domain.
+- `data_type` (string, optional (default: "CHAR")) - Data type (e.g., CHAR, NUMC) or domain name when type_kind is 
 - `length` (number, optional (default: "100")) - Data type length. Usually inherited from domain.
 - `decimals` (number, optional (default: "0")) - Decimal places. Usually inherited from domain.
 - `short_label` (string, optional) - Short field label (max 10 chars)
@@ -1365,7 +1362,6 @@ The navigation below mirrors the document structure for easier discovery.
 - `data_type` (string, optional) - Data type (CHAR, NUMC, etc.) - for predefinedAbapType or refToPredefinedAbapType
 - `length` (number, optional) - Length - for predefinedAbapType or refToPredefinedAbapType
 - `decimals` (number, optional) - Decimals - for predefinedAbapType or refToPredefinedAbapType
-- `domain_name` (string, optional) - Domain name (deprecated - use type_name with type_kind=domain)
 - `field_label_short` (string, optional) - Short field label (max 10 chars)
 - `field_label_medium` (string, optional) - Medium field label (max 20 chars)
 - `field_label_long` (string, optional) - Long field label (max 40 chars)
@@ -1605,7 +1601,7 @@ The navigation below mirrors the document structure for easier discovery.
 - `description` (string, required) - DataElement description.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `domain_name` (string, optional) - Domain name (required for domain-based data elements).
+- `data_type` (string, optional) - Data type (e.g., CHAR, NUMC) or domain name when type_kind is 
 - `type_kind` (string, optional) - Type kind: 
 - `type_name` (string, optional) - Type name (for predefined types).
 - `application` (string, optional (default: "*).")) - Application area (optional, default: 
@@ -1967,7 +1963,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 **Parameters:**
 - `inputSchema` (string, optional) - Data element name (e.g., ZOK_E_TEST_0001). Data element must already exist.
-- `properties` (object, required) - Data element properties object. Can include: description, type_name, type_kind, domain_name, field_label_short, field_label_medium, field_label_long, etc.
+- `properties` (object, required) - Data element properties object. Can include: description, type_name, type_kind, data_type, field_label_short, field_label_medium, field_label_long, etc.
 - `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -2067,12 +2063,17 @@ The navigation below mirrors the document structure for easier discovery.
 
 **Parameters:**
 - `inputSchema` (string, optional) - DataElement name to validate (e.g., Z_MY_PROGRAM).
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `description` (string, required) - DataElement description. Required for validation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
 **Example:**
 ```json
-{}
+{
+  "package_name": "\"ZMY_PACKAGE_NAME\"",
+  "description": "\"example_value\""
+}
 ```
 
 ---
@@ -2083,14 +2084,15 @@ The navigation below mirrors the document structure for easier discovery.
 **Parameters:**
 - `inputSchema` (string, optional) - Domain name to validate (e.g., Z_MY_PROGRAM).
 - `description` (string, required) - Domain description (required for validation).
-- `package_name` (string, optional) - Package name (optional, for validation).
+- `package_name` (string, required) - Package name (required for validation).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
 **Example:**
 ```json
 {
-  "description": "\"example_value\""
+  "description": "\"example_value\"",
+  "package_name": "\"ZMY_PACKAGE_NAME\""
 }
 ```
 
@@ -2101,12 +2103,17 @@ The navigation below mirrors the document structure for easier discovery.
 
 **Parameters:**
 - `inputSchema` (string, optional) - Structure name to validate (e.g., Z_MY_PROGRAM).
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `description` (string, required) - Structure description. Required for validation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
 **Example:**
 ```json
-{}
+{
+  "package_name": "\"ZMY_PACKAGE_NAME\"",
+  "description": "\"example_value\""
+}
 ```
 
 ---
@@ -2116,13 +2123,17 @@ The navigation below mirrors the document structure for easier discovery.
 
 **Parameters:**
 - `inputSchema` (string, optional) - Table name to validate (e.g., Z_MY_TABLE)
-- `description` (string, optional) - Optional description for validation
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `description` (string, required) - Table description. Required for validation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
 **Example:**
 ```json
-{}
+{
+  "package_name": "\"ZMY_PACKAGE_NAME\"",
+  "description": "\"example_value\""
+}
 ```
 
 ---
@@ -2132,12 +2143,17 @@ The navigation below mirrors the document structure for easier discovery.
 
 **Parameters:**
 - `inputSchema` (string, optional) - View name to validate (e.g., Z_MY_PROGRAM).
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `description` (string, required) - View description. Required for validation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
 **Example:**
 ```json
-{}
+{
+  "package_name": "\"ZMY_PACKAGE_NAME\"",
+  "description": "\"example_value\""
+}
 ```
 
 ---
@@ -2314,7 +2330,7 @@ The navigation below mirrors the document structure for easier discovery.
 - `super_package` (string, required) - Super package (parent package) name (e.g., ZOK_PACKAGE). Required.
 - `description` (string, required) - Package description.
 - `package_type` (string, optional) - Package type (development/structure). Defaults to development.
-- `software_component` (string, optional) - Software component (e.g., HOME, ZLOCAL).
+- `software_component` (string, optional) - Software component (e.g., HOME, ZLOCAL). If not provided, SAP will set a default (typically ZLOCAL for local packages).
 - `transport_layer` (string, optional) - Transport layer (e.g., ZDEV). Required for transportable packages.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 - `application_component` (string, optional) - Application component (e.g., BC-ABA).
@@ -2479,12 +2495,17 @@ The navigation below mirrors the document structure for easier discovery.
 
 **Parameters:**
 - `inputSchema` (string, optional) - Interface name to validate (e.g., Z_MY_PROGRAM).
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `description` (string, required) - Interface description. Required for validation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
 **Example:**
 ```json
-{}
+{
+  "package_name": "\"ZMY_PACKAGE_NAME\"",
+  "description": "\"example_value\""
+}
 ```
 
 ---
@@ -2876,18 +2897,6 @@ The navigation below mirrors the document structure for easier discovery.
 
 *Read-only tools retrieve information without modifying the system.*
 
-### GetBdef {#getbdef-readonly}
-**Description:** [read-only] Retrieve the source code of a BDEF (Behavior Definition) for a CDS entity.
-
-**Parameters:** None
-
-**Example:**
-```json
-{}
-```
-
----
-
 ### GetEnhancementImpl {#getenhancementimpl-readonly}
 **Description:** [read-only] Retrieve source code of a specific enhancement implementation by its name and enhancement spot.
 
@@ -2929,29 +2938,6 @@ The navigation below mirrors the document structure for easier discovery.
 
 *High-level tools perform a chain of operations (e.g., validate → lock → update → check → unlock → activate).*
 
-### CreateBehaviorDefinition {#createbehaviordefinition-high}
-**Description:** Create a new ABAP Behavior Definition (BDEF) in SAP system.
-
-**Parameters:**
-- `inputSchema` (string, optional) - Behavior Definition name (usually same as Root Entity name)
-- `description` (string, optional) - Description
-- `package_name` (string, required) - Package name
-- `transport_request` (string, optional) - Transport request number
-- `root_entity` (string, required) - Root Entity name (CDS View name)
-- `implementation_type` (string, required) - Implementation type: 
-- `activate` (boolean, optional) - Activate after creation. Default: true
-
-**Example:**
-```json
-{
-  "package_name": "\"ZMY_PACKAGE_NAME\"",
-  "root_entity": "\"example_value\"",
-  "implementation_type": "\"PROG/P\""
-}
-```
-
----
-
 ### CreateMetadataExtension {#createmetadataextension-high}
 **Description:** Create a new ABAP Metadata Extension (DDLX) in SAP system.
 
@@ -2966,24 +2952,6 @@ The navigation below mirrors the document structure for easier discovery.
 ```json
 {
   "package_name": "\"ZMY_PACKAGE_NAME\""
-}
-```
-
----
-
-### UpdateBehaviorDefinition {#updatebehaviordefinition-high}
-**Description:** Update source code of an ABAP Behavior Definition.
-
-**Parameters:**
-- `inputSchema` (string, optional) - Behavior Definition name
-- `source_code` (string, required) - New source code
-- `lock_handle` (string, optional) - Lock handle from LockObject. If not provided, will attempt to lock internally (not recommended for stateful flows).
-- `activate` (boolean, optional) - Activate after update. Default: true
-
-**Example:**
-```json
-{
-  "source_code": "\"example_value\""
 }
 ```
 
@@ -3012,41 +2980,11 @@ The navigation below mirrors the document structure for easier discovery.
 
 *Low-level tools perform a single operation (one method call to CrudClient).*
 
-### ActivateBehaviorDefinitionLow {#activatebehaviordefinitionlow-low}
-**Description:** [low-level] Activate an ABAP behavior definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Parameters:**
-- `inputSchema` (string, optional) - Behavior definition name (root entity, e.g., ZI_MY_ENTITY).
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
-**Example:**
-```json
-{}
-```
-
----
-
 ### ActivateMetadataExtensionLow {#activatemetadataextensionlow-low}
 **Description:** [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Parameters:**
 - `inputSchema` (string, optional) - Metadata extension name (e.g., ZC_MY_EXTENSION).
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
-**Example:**
-```json
-{}
-```
-
----
-
-### CheckBehaviorDefinitionLow {#checkbehaviordefinitionlow-low}
-**Description:** [low-level] Perform syntax check on an ABAP behavior definition. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Parameters:**
-- `inputSchema` (string, optional) - BehaviorDefinition name (e.g., Z_MY_PROGRAM).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -3068,34 +3006,6 @@ The navigation below mirrors the document structure for easier discovery.
 **Example:**
 ```json
 {}
-```
-
----
-
-### CreateBehaviorDefinitionLow {#createbehaviordefinitionlow-low}
-**Description:** [low-level] Create a new ABAP Behavior Definition. - use CreateBehaviorDefinition (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Parameters:**
-- `inputSchema` (string, optional) - Behavior Definition name (e.g., ZI_MY_BDEF).
-- `description` (string, required) - Behavior Definition description.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
-- `transport_request` (string, required) - Transport request number (e.g., E19K905635). Required.
-- `root_entity` (string, required) - Root entity name (e.g., ZI_MY_ENTITY).
-- `implementation_type` (string, required) - Implementation type: 
-- `master_system` (string, optional) - Master system (optional).
-- `responsible` (string, optional) - User responsible for the behavior definition (optional).
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
-**Example:**
-```json
-{
-  "description": "\"example_value\"",
-  "package_name": "\"ZMY_PACKAGE_NAME\"",
-  "transport_request": "\"example_value\"",
-  "root_entity": "\"example_value\"",
-  "implementation_type": "\"PROG/P\""
-}
 ```
 
 ---
@@ -3124,41 +3034,12 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### DeleteBehaviorDefinitionLow {#deletebehaviordefinitionlow-low}
-**Description:** [low-level] Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
-
-**Parameters:**
-- `inputSchema` (string, optional) - BehaviorDefinition name (e.g., ZI_MY_BDEF).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
-
-**Example:**
-```json
-{}
-```
-
----
-
 ### DeleteMetadataExtensionLow {#deletemetadataextensionlow-low}
 **Description:** [low-level] Delete an ABAP metadata extension from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Parameters:**
 - `inputSchema` (string, optional) - MetadataExtension name (e.g., ZI_MY_DDLX).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
-
-**Example:**
-```json
-{}
-```
-
----
-
-### LockBehaviorDefinitionLow {#lockbehaviordefinitionlow-low}
-**Description:** [low-level] Lock an ABAP behavior definition for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Parameters:**
-- `inputSchema` (string, optional) - BehaviorDefinition name (e.g., ZI_MY_BDEF).
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
 **Example:**
 ```json
@@ -3182,25 +3063,6 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UnlockBehaviorDefinitionLow {#unlockbehaviordefinitionlow-low}
-**Description:** [low-level] Unlock an ABAP behavior definition after modification. Must use the same session_id and lock_handle from LockBehaviorDefinition operation.
-
-**Parameters:**
-- `inputSchema` (string, optional) - BehaviorDefinition name (e.g., ZI_MY_BDEF).
-- `lock_handle` (string, required) - Lock handle from LockBehaviorDefinition operation.
-- `session_id` (string, required) - Session ID from LockBehaviorDefinition operation. Must be the same as used in LockBehaviorDefinition.
-- `session_state` (object, optional) - Session state from LockBehaviorDefinition (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
-**Example:**
-```json
-{
-  "lock_handle": "\"example_value\"",
-  "session_id": "\"example_value\""
-}
-```
-
----
-
 ### UnlockMetadataExtensionLow {#unlockmetadataextensionlow-low}
 **Description:** [low-level] Unlock an ABAP metadata extension after modification. Must use the same session_id and lock_handle from LockMetadataExtension operation.
 
@@ -3215,26 +3077,6 @@ The navigation below mirrors the document structure for easier discovery.
 {
   "lock_handle": "\"example_value\"",
   "session_id": "\"example_value\""
-}
-```
-
----
-
-### UpdateBehaviorDefinitionLow {#updatebehaviordefinitionlow-low}
-**Description:** [low-level] Update source code of an existing ABAP behavior definition. Requires lock handle from LockObject. - use UpdateBehaviorDefinition (high-level) for full workflow with lock/unlock/activate.
-
-**Parameters:**
-- `inputSchema` (string, optional) - Behavior definition name (e.g., ZOK_C_TEST_0001). Behavior definition must already exist.
-- `source_code` (string, required) - Complete behavior definition source code.
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
-**Example:**
-```json
-{
-  "source_code": "\"example_value\"",
-  "lock_handle": "\"example_value\""
 }
 ```
 
@@ -3255,26 +3097,6 @@ The navigation below mirrors the document structure for easier discovery.
 {
   "source_code": "\"example_value\"",
   "lock_handle": "\"example_value\""
-}
-```
-
----
-
-### ValidateBehaviorDefinitionLow {#validatebehaviordefinitionlow-low}
-**Description:** [low-level] Validate an ABAP behavior definition name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Parameters:**
-- `inputSchema` (string, optional) - BehaviorDefinition name to validate (e.g., ZI_MY_BDEF).
-- `root_entity` (string, required) - Root entity name (e.g., ZI_MY_ENTITY). Required for validation.
-- `implementation_type` (string, required) - Implementation type: 
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
-**Example:**
-```json
-{
-  "root_entity": "\"example_value\"",
-  "implementation_type": "\"PROG/P\""
 }
 ```
 
@@ -3334,6 +3156,6 @@ All functions return MCP-compliant responses in the following format:
 
 ---
 
-*Last updated: 2025-11-26*
+*Last updated: 2025-11-27*
 *Document version: 1.0*
 *Generated automatically from TOOL_DEFINITION exports*

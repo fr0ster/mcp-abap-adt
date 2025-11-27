@@ -8,6 +8,7 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "LockBehaviorDefinitionLow",
@@ -85,8 +86,11 @@ export async function handleLockBehaviorDefinition(args: LockBehaviorDefinitionA
     logger.info(`Starting behavior definition lock: ${bdefName}`);
 
     try {
-      // Lock behavior definition
-      await client.lockBehaviorDefinition({ name: bdefName });
+      // Lock behavior definition - using types from adt-clients
+      const lockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = {
+        name: bdefName
+      };
+      await client.lockBehaviorDefinition(lockConfig);
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {

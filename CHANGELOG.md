@@ -1,6 +1,48 @@
 # Changelog
 
+## [1.1.10] - 2025-11-26
+
+### Added
+- **Client Connection Isolation**: Implemented per-session connection isolation to prevent data mixing between different clients
+  - Each client session now maintains its own isolated SAP connection based on `sessionId` and configuration hash
+  - Connections are cached per unique combination of `sessionId` + `sapUrl` + authentication parameters
+  - Uses `AsyncLocalStorage` to pass session context to handlers, ensuring each request uses the correct connection
+  - Prevents race conditions where concurrent requests from different clients could overwrite each other's connection settings
+  - Backward compatible: falls back to global connection cache for non-HTTP transports (stdio)
+
+- **Non-Local Connection Restrictions**: Added security restrictions for non-local connections
+  - **SSE Transport**: Always restricted to localhost connections only (127.0.0.1, ::1, localhost)
+  - **HTTP Transport**: Non-local connections are restricted when:
+    - `.env` file exists (was found at startup)
+    - AND request does not include SAP connection headers (`x-sap-url`, `x-sap-auth-type`)
+  - Non-local connections with SAP headers are allowed (enables multi-tenant scenarios)
+  - Local connections are always allowed regardless of `.env` file presence
+  - Clear error messages guide users when connections are rejected
+
+### Changed
+- **Connection Management**: Refactored `getManagedConnection()` to support session-based connection caching
+  - Added `generateConnectionCacheKey()` function to create unique cache keys from sessionId and config signature
+  - Implemented `getConnectionForSession()` to retrieve or create session-specific connections
+  - Added automatic cleanup of old connection cache entries (older than 1 hour)
+  - Each session uses unique `sessionId` for its `AbapConnection` to prevent session mixing
+
+- **Session Tracking**: Enhanced `streamableHttpSessions` to store SAP configuration per session
+  - Added `sapConfig` field to session objects to track configuration per client
+  - `applyAuthHeaders()` now stores configuration in session object
+  - Session cleanup automatically removes associated connection from cache
+
+### Security
+- **Connection Isolation**: Prevents one client from receiving another client's data when multiple clients connect to different SAP systems
+- **Access Control**: Restricts non-local access when `.env` file is present, requiring explicit SAP headers for remote connections
+
 ## [Unreleased]
+
+### Added
+- **ABAP Unit class test tools**: Added `[low-level]` handlers to cover the new CrudClient APIs for class test includes and ABAP Unit orchestration:
+  - `LockClassTestClassesLow`, `UpdateClassTestClassesLow`, `UnlockClassTestClassesLow`, `ActivateClassTestClassesLow`
+  - `RunClassUnitTestsLow`, `GetClassUnitTestStatusLow`, `GetClassUnitTestResultLow`
+  - All new tools live in `class/low/` and are registered with the server and documentation generator.
+- **Package creation options**: `CreatePackage` (high- and low-level) now accepts optional `package_type`, `software_component`, `transport_layer`, `application_component`, and `responsible` parameters and forwards them directly to `CrudClient`, enabling Cloud systems to pass values such as `ZLOCAL` while keeping the transport layer empty.
 
 ## [1.1.9] - 2025-11-24
 

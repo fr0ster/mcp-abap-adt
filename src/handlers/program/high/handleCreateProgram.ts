@@ -8,7 +8,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection, parseValidationResponse, safeCheckOperation, isCloudConnection } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
@@ -147,6 +147,11 @@ export async function handleCreateProgram(params: any) {
     return return_error(new Error("Missing required parameters: program_name and package_name"));
   }
 
+  // Check if cloud - programs are not available on cloud systems
+  if (isCloudConnection()) {
+    return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
+  }
+
   // Validate transport_request: required for non-$TMP packages
   try {
     validateTransportRequest(args.package_name, args.transport_request);
@@ -171,41 +176,61 @@ export async function handleCreateProgram(params: any) {
     const shouldActivate = args.activate !== false; // Default to true if not specified
 
     // Validate
-    await client.validateProgram(programName);
-    const validationResult = client.getValidationResult();
+    await client.validateProgram({
+      programName,
+      description: args.description || programName,
+      packageName: args.package_name
+    });
+    const validationResponse = client.getValidationResponse();
+    if (!validationResponse) {
+      throw new Error('Validation did not return a result');
+    }
+    const validationResult = parseValidationResponse(validationResponse);
     if (!validationResult || validationResult.valid === false) {
       throw new Error(`Program name validation failed: ${validationResult?.message || 'Invalid program name'}`);
     }
 
     // Create
-    await client.createProgram(
+    await client.createProgram({
       programName,
-      args.description || programName,
-      args.package_name,
-      args.transport_request,
-      {
-        programType: args.program_type,
-        application: args.application
-      }
-    );
+      description: args.description || programName,
+      packageName: args.package_name,
+      transportRequest: args.transport_request,
+      programType: args.program_type,
+      application: args.application
+    });
 
     // Lock
-    await client.lockProgram(programName);
+    await client.lockProgram({ programName });
     const lockHandle = client.getLockHandle();
 
     // Update source code
-    await client.updateProgram(programName, sourceCode, lockHandle);
+    await client.updateProgram({ programName, sourceCode }, lockHandle);
 
     // Check
-    await client.checkProgram(programName);
+    try {
+      await safeCheckOperation(
+        () => client.checkProgram({ programName }),
+        programName,
+        {
+          debug: (message: string) => logger.info(`[CreateProgram] ${message}`)
+        }
+      );
+    } catch (checkError: any) {
+      // If error was marked as "already checked", continue silently
+      if (!(checkError as any).isAlreadyChecked) {
+        // Real check error - rethrow
+        throw checkError;
+      }
+    }
     const checkResult = client.getCheckResult();
 
     // Unlock
-    await client.unlockProgram(programName, lockHandle);
+    await client.unlockProgram({ programName }, lockHandle);
 
     // Activate if requested
     if (shouldActivate) {
-      await client.activateProgram(programName);
+      await client.activateProgram({ programName });
     }
 
     // Parse activation warnings if activation was performed

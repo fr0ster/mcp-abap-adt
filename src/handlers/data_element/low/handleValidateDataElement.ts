@@ -6,7 +6,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { handlerLogger } from '../../../lib/logger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -18,6 +19,14 @@ export const TOOL_DEFINITION = {
       data_element_name: {
         type: "string",
         description: "DataElement name to validate (e.g., Z_MY_PROGRAM)."
+      },
+      package_name: {
+        type: "string",
+        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation."
+      },
+      description: {
+        type: "string",
+        description: "DataElement description. Required for validation."
       },
       session_id: {
         type: "string",
@@ -33,12 +42,14 @@ export const TOOL_DEFINITION = {
         }
       }
     },
-    required: ["data_element_name"]
+    required: ["data_element_name", "package_name", "description"]
   }
 } as const;
 
 interface ValidateDataElementArgs {
   data_element_name: string;
+  package_name: string;
+  description: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -52,17 +63,19 @@ interface ValidateDataElementArgs {
  *
  * Uses CrudClient.validateDataElement - low-level single method call
  */
-export async function handleValidateDataElement(args: any) {
+export async function handleValidateDataElement(args: ValidateDataElementArgs) {
   try {
     const {
       data_element_name,
+      description,
+      package_name,
       session_id,
       session_state
     } = args as ValidateDataElementArgs;
 
     // Validation
-    if (!data_element_name) {
-      return return_error(new Error('data_element_name is required'));
+    if (!data_element_name || !package_name || !description) {
+      return return_error(new Error('data_element_name, package_name, and description are required'));
     }
 
     const connection = getManagedConnection();
@@ -82,18 +95,52 @@ export async function handleValidateDataElement(args: any) {
 
     const dataElementName = data_element_name.toUpperCase();
 
-    logger.info(`Starting data element validation: ${dataElementName}`);
+    handlerLogger.info('ValidateDataElementLow', 'start', `Starting data element validation: ${dataElementName}`, {
+      dataElementName,
+      packageName: package_name,
+      hasDescription: !!description,
+      hasSession: !!(session_id && session_state)
+    });
 
     try {
       // Validate data element
-      await client.validateDataElement(dataElementName);
-      const result = client.getValidationResult();
+      handlerLogger.debug('ValidateDataElementLow', 'validate', `Validating data element: ${dataElementName}`, {
+        dataElementName,
+        packageName: package_name,
+        description: description
+      });
+      let validationResponse;
+      try {
+        await client.validateDataElement({
+          dataElementName: dataElementName,
+          packageName: package_name.toUpperCase(),
+          description: description
+        });
+        validationResponse = client.getValidationResponse();
+      } catch (validateError: any) {
+        // If validation throws an error with response, use it
+        if (validateError.response) {
+          validationResponse = validateError.response;
+        } else {
+          throw validateError;
+        }
+      }
+
+      if (!validationResponse) {
+        handlerLogger.error('ValidateDataElementLow', 'validate', `Validation did not return a result for data element ${dataElementName}`);
+        throw new Error('Validation did not return a result');
+      }
+      const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ValidateDataElement completed: ${dataElementName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      handlerLogger.info('ValidateDataElementLow', 'complete', `Data element validation completed: ${dataElementName}`, {
+        dataElementName,
+        valid: result.valid,
+        message: result.message,
+        exists: result.exists
+      });
 
       return return_response({
         data: JSON.stringify({
@@ -114,6 +161,33 @@ export async function handleValidateDataElement(args: any) {
 
     } catch (error: any) {
       logger.error(`Error validating data element ${dataElementName}:`, error);
+
+      // If validation endpoint returns 400, try to parse it as validation response
+      if (error.response?.status === 400) {
+        try {
+          const result = parseValidationResponse(error.response);
+          const updatedSessionState = connection.getSessionState();
+
+          return return_response({
+            data: JSON.stringify({
+              success: result.valid,
+              data_element_name: dataElementName,
+              validation_result: result,
+              session_id: session_id || null,
+              session_state: updatedSessionState ? {
+                cookies: updatedSessionState.cookies,
+                csrf_token: updatedSessionState.csrfToken,
+                cookie_store: updatedSessionState.cookieStore
+              } : null,
+              message: result.valid
+                ? `DataElement name ${dataElementName} is valid and available`
+                : `DataElement name ${dataElementName} validation failed: ${result.message}`
+            }, null, 2)
+          } as AxiosResponse);
+        } catch (parseError) {
+          // If parsing fails, continue with error handling
+        }
+      }
 
       // Parse error message
       let errorMessage = `Failed to validate data element: ${error.message || String(error)}`;

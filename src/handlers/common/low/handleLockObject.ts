@@ -64,7 +64,7 @@ interface LockObjectArgs {
  *
  * Uses lock functions from @mcp-abap-adt/adt-clients/core for all operations
  */
-export async function handleLockObject(args: any) {
+export async function handleLockObject(args: LockObjectArgs) {
   try {
     const {
       object_name,
@@ -112,50 +112,50 @@ export async function handleLockObject(args: any) {
       // Call appropriate lock method based on object type
       switch (objectType) {
         case 'class':
-          await client.lockClass(objectName);
+          await client.lockClass({ className: objectName });
           lockHandle = client.getLockHandle();
           break;
         case 'program':
-          await client.lockProgram(objectName);
+          await client.lockProgram({ programName: objectName });
           lockHandle = client.getLockHandle();
           break;
         case 'interface':
-          await client.lockInterface(objectName);
+          await client.lockInterface({ interfaceName: objectName });
           lockHandle = client.getLockHandle();
           break;
         case 'function_group':
-          await client.lockFunctionGroup(objectName);
+          await client.lockFunctionGroup({ functionGroupName: objectName });
           lockHandle = client.getLockHandle();
           break;
         case 'function_module':
           // Function module requires function group name which is not provided in this generic handler
           return return_error(new Error('Function module locking via LockObject is not supported. Function modules require function group name.'));
         case 'table':
-          await client.lockTable(objectName);
+          await client.lockTable({ tableName: objectName });
           lockHandle = client.getLockHandle();
           break;
         case 'structure':
-          await client.lockStructure(objectName);
+          await client.lockStructure({ structureName: objectName });
           lockHandle = client.getLockHandle();
           break;
         case 'view':
-          await client.lockView(objectName);
+          await client.lockView({ viewName: objectName });
           lockHandle = client.getLockHandle();
           break;
         case 'domain':
-          await client.lockDomain(objectName);
+          await client.lockDomain({ domainName: objectName });
           lockHandle = client.getLockHandle();
           break;
         case 'data_element':
-          await client.lockDataElement(objectName);
+          await client.lockDataElement({ dataElementName: objectName });
           lockHandle = client.getLockHandle();
           break;
         case 'behavior_definition':
-          await client.lockBehaviorDefinition(objectName);
+          await client.lockBehaviorDefinition({ name: objectName });
           lockHandle = client.getLockHandle();
           break;
         case 'metadata_extension':
-          await client.lockMetadataExtension(objectName);
+          await client.lockMetadataExtension({ name: objectName });
           lockHandle = client.getLockHandle();
           break;
         case 'package':
@@ -163,7 +163,7 @@ export async function handleLockObject(args: any) {
           if (!super_package) {
             return return_error(new Error('super_package is required for package locking. Please provide the parent package name.'));
           }
-          await client.lockPackage(objectName, super_package.toUpperCase());
+          await client.lockPackage({ packageName: objectName, superPackage: super_package.toUpperCase() });
           lockHandle = client.getLockHandle();
           break;
         default:

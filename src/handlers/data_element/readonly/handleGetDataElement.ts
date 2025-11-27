@@ -118,7 +118,7 @@ function parseDataElementXml(xmlData: string): any {
 /**
  * Main handler for GetDataElement MCP tool
  */
-export async function handleGetDataElement(args: any) {
+export async function handleGetDataElement(args: DataElementArgs) {
   try {
     // Validate required parameters
     if (!args?.data_element_name) {

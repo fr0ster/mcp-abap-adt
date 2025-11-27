@@ -7,6 +7,7 @@
 
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { handlerLogger } from '../../../lib/logger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -52,7 +53,7 @@ interface LockDataElementArgs {
  *
  * Uses CrudClient.lockDataElement - low-level single method call
  */
-export async function handleLockDataElement(args: any) {
+export async function handleLockDataElement(args: LockDataElementArgs) {
   try {
     const {
       data_element_name,
@@ -82,22 +83,30 @@ export async function handleLockDataElement(args: any) {
 
     const dataElementName = data_element_name.toUpperCase();
 
-    logger.info(`Starting data element lock: ${dataElementName}`);
+    handlerLogger.info('LockDataElementLow', 'start', `Starting data element lock: ${dataElementName}`, {
+      dataElementName,
+      hasSession: !!(session_id && session_state)
+    });
 
     try {
       // Lock data element
-      await client.lockDataElement(dataElementName);
+      handlerLogger.debug('LockDataElementLow', 'lock', `Locking data element: ${dataElementName}`);
+      await client.lockDataElement({ dataElementName: dataElementName });
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {
+        handlerLogger.error('LockDataElementLow', 'lock', `Lock did not return a lock handle for data element ${dataElementName}`);
         throw new Error(`Lock did not return a lock handle for data element ${dataElementName}`);
       }
 
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ LockDataElement completed: ${dataElementName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      handlerLogger.info('LockDataElementLow', 'complete', `Data element locked: ${dataElementName}`, {
+        dataElementName,
+        lockHandle: lockHandle.substring(0, 20) + '...',
+        status: 'success'
+      });
 
       return return_response({
         data: JSON.stringify({

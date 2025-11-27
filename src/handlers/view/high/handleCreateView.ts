@@ -8,7 +8,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
@@ -85,27 +85,51 @@ export async function handleCreateView(params: any) {
       const shouldActivate = true; // Default to true for views
 
       // Validate
-      await client.validateView(viewName);
+      await client.validateView({
+        viewName,
+        packageName: args.package_name,
+        description: args.description || viewName
+      });
 
       // Create
-      await client.createView(viewName, args.description || viewName, args.package_name, args.transport_request);
+      await client.createView({
+        viewName,
+        description: args.description || viewName,
+        packageName: args.package_name,
+        ddlSource: args.ddl_source || '',
+        transportRequest: args.transport_request
+      });
 
       // Lock
-      await client.lockView(viewName);
+      await client.lockView({ viewName });
       const lockHandle = client.getLockHandle();
 
       // Update with DDL source
-      await client.updateView(viewName, args.ddl_source, lockHandle);
+      await client.updateView({ viewName, ddlSource: args.ddl_source }, lockHandle);
 
       // Check
-      await client.checkView(viewName);
+      try {
+        await safeCheckOperation(
+          () => client.checkView({ viewName }),
+          viewName,
+          {
+            debug: (message: string) => logger.info(`[CreateView] ${message}`)
+          }
+        );
+      } catch (checkError: any) {
+        // If error was marked as "already checked", continue silently
+        if (!(checkError as any).isAlreadyChecked) {
+          // Real check error - rethrow
+          throw checkError;
+        }
+      }
 
       // Unlock
-      await client.unlockView(viewName, lockHandle);
+      await client.unlockView({ viewName }, lockHandle);
 
       // Activate
       if (shouldActivate) {
-        await client.activateView(viewName);
+        await client.activateView({ viewName });
       }
 
       // Parse activation warnings if activation was performed

@@ -58,7 +58,7 @@ interface CheckTableArgs {
 /**
  * Main handler for CheckTable MCP tool
  */
-export async function handleCheckTable(args: any) {
+export async function handleCheckTable(args: CheckTableArgs) {
   try {
     const {
       table_name,
@@ -99,7 +99,7 @@ export async function handleCheckTable(args: any) {
     try {
       const builder = new CrudClient(connection);
 
-      await builder.checkTable(checkReporter as 'tableStatusCheck' | 'abapCheckRun');
+      await builder.checkTable({ tableName });
       const response = builder.getCheckResult();
       if (!response) {
         throw new Error('Table check did not return a response');

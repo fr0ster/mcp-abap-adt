@@ -19,7 +19,7 @@ interface DomainArgs {
 /**
  * Main handler for GetDomain MCP tool
  */
-export async function handleGetDomain(args: any) {
+export async function handleGetDomain(args: DomainArgs) {
   try {
     // Validate required parameters
     if (!args?.domain_name) {

@@ -39,7 +39,7 @@ interface CreateTransportArgs {
  *
  * Uses CrudClient.createTransport - low-level single method call
  */
-export async function handleCreateTransport(args: any) {
+export async function handleCreateTransport(args: CreateTransportArgs) {
   try {
     const {
       description,

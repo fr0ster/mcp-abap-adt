@@ -8,7 +8,7 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -34,13 +34,9 @@ export const TOOL_DEFINITION = {
         type: "string",
         description: "Transport request number (e.g., E19K905635). Required for transportable packages."
       },
-      domain_name: {
-        type: "string",
-        description: "Domain name to use as type reference (e.g., ZZ_TEST_0001)"
-      },
       data_type: {
         type: "string",
-        description: "Data type (e.g., CHAR, NUMC). Usually inherited from domain.",
+        description: "Data type (e.g., CHAR, NUMC) or domain name when type_kind is 'domain'.",
         default: "CHAR"
       },
       length: {
@@ -68,9 +64,15 @@ export const TOOL_DEFINITION = {
       heading_label: {
         type: "string",
         description: "Heading field label (max 55 chars)"
+      },
+      type_kind: {
+        type: "string",
+        description: "Type kind: 'domain' (default), 'predefinedAbapType', 'refToPredefinedAbapType', 'refToDictionaryType', 'refToClifType'. If not specified, defaults to 'domain'.",
+        enum: ["domain", "predefinedAbapType", "refToPredefinedAbapType", "refToDictionaryType", "refToClifType"],
+        default: "domain"
       }
     },
-    required: ["data_element_name", "package_name", "domain_name"]
+    required: ["data_element_name", "package_name"]
   }
 } as const;
 
@@ -79,7 +81,6 @@ interface DataElementArgs {
   description?: string;
   package_name: string;
   transport_request?: string;
-  domain_name: string;
   data_type?: string;
   length?: number;
   decimals?: number;
@@ -87,6 +88,7 @@ interface DataElementArgs {
   medium_label?: string;
   long_label?: string;
   heading_label?: string;
+  type_kind?: 'domain' | 'predefinedAbapType' | 'refToPredefinedAbapType' | 'refToDictionaryType' | 'refToClifType';
   activate?: boolean;
 }
 
@@ -96,7 +98,7 @@ interface DataElementArgs {
  * Uses DataElementBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateDataElement(args: any) {
+export async function handleCreateDataElement(args: DataElementArgs) {
   try {
     // Validate required parameters
     if (!args?.data_element_name) {
@@ -105,9 +107,9 @@ export async function handleCreateDataElement(args: any) {
     if (!args?.package_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
     }
-    if (!args?.domain_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Domain name is required');
-    }
+
+    // Determine typeKind - default to 'domain' if not specified
+    const typeKind = args?.type_kind || 'domain';
 
     // Validate transport_request: required for non-$TMP packages
     validateTransportRequest(args.package_name, args.transport_request);
@@ -124,23 +126,37 @@ export async function handleCreateDataElement(args: any) {
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Validate
-      await client.validateDataElement(dataElementName);
+      await client.validateDataElement({
+        dataElementName,
+        packageName: typedArgs.package_name,
+        description: typedArgs.description || dataElementName
+      });
+
+      // Determine typeKind - default to 'domain' if not specified
+      const typeKind = typedArgs.type_kind || 'domain';
 
       // Create
-      await client.createDataElement(
+      await client.createDataElement({
         dataElementName,
-        typedArgs.description || dataElementName,
-        typedArgs.package_name,
-        typedArgs.transport_request
-      );
+        description: typedArgs.description || dataElementName,
+        packageName: typedArgs.package_name,
+        typeKind: typeKind,
+        dataType: typedArgs.data_type,
+        typeName: typedArgs.type_kind !== 'domain' ? typedArgs.data_type : undefined,
+        length: typedArgs.length,
+        decimals: typedArgs.decimals,
+        transportRequest: typedArgs.transport_request
+      });
 
       // Lock
-      await client.lockDataElement(dataElementName);
+      await client.lockDataElement({ dataElementName });
       const lockHandle = client.getLockHandle();
 
       // Update with properties
-      const properties = {
-        domainName: typedArgs.domain_name.toUpperCase(),
+      const updateConfig: any = {
+        dataElementName,
+        packageName: typedArgs.package_name,
+        description: typedArgs.description || dataElementName,
         dataType: typedArgs.data_type || 'CHAR',
         length: typedArgs.length || 100,
         decimals: typedArgs.decimals || 0,
@@ -148,19 +164,34 @@ export async function handleCreateDataElement(args: any) {
         mediumLabel: typedArgs.medium_label,
         longLabel: typedArgs.long_label,
         headingLabel: typedArgs.heading_label,
-        typeKind: 'domain'
+        typeKind: typeKind
       };
-      await client.updateDataElement(dataElementName, properties, lockHandle);
+
+      await client.updateDataElement(updateConfig, lockHandle);
 
       // Check
-      await client.checkDataElement(dataElementName);
+      try {
+        await safeCheckOperation(
+          () => client.checkDataElement({ dataElementName }),
+          dataElementName,
+          {
+            debug: (message: string) => logger.info(`[CreateDataElement] ${message}`)
+          }
+        );
+      } catch (checkError: any) {
+        // If error was marked as "already checked", continue silently
+        if (!(checkError as any).isAlreadyChecked) {
+          // Real check error - rethrow
+          throw checkError;
+        }
+      }
 
       // Unlock
-      await client.unlockDataElement(dataElementName, lockHandle);
+      await client.unlockDataElement({ dataElementName }, lockHandle);
 
       // Activate if requested
       if (shouldActivate) {
-        await client.activateDataElement(dataElementName);
+        await client.activateDataElement({ dataElementName });
       }
 
       // Get data element details from create result (createDataElement already does verification)
@@ -181,7 +212,7 @@ export async function handleCreateDataElement(args: any) {
           data_element_name: dataElementName,
           package: typedArgs.package_name,
           transport_request: typedArgs.transport_request,
-          domain_name: typedArgs.domain_name.toUpperCase(),
+          data_type: typedArgs.data_type || null,
           status: 'active',
           version: version,
           message: `Data element ${dataElementName} created and activated successfully`,

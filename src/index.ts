@@ -33,12 +33,10 @@ import { handleSearchObject } from "./handlers/search/readonly/handleSearchObjec
 import { handleGetEnhancements } from "./handlers/enhancement/readonly/handleGetEnhancements";
 import { handleGetEnhancementImpl } from "./handlers/enhancement/readonly/handleGetEnhancementImpl";
 import { handleGetEnhancementSpot } from "./handlers/enhancement/readonly/handleGetEnhancementSpot";
-import { handleGetBdef } from "./handlers/bdef/readonly/handleGetBdef";
+import { handleGetBdef } from "./handlers/behavior_definition/readonly/handleGetBdef";
 import { handleGetSqlQuery } from "./handlers/system/readonly/handleGetSqlQuery";
-import { handleGetObjectsByType } from "./handlers/search/readonly/handleGetObjectsByType";
 import { handleGetWhereUsed } from "./handlers/system/readonly/handleGetWhereUsed";
 import { handleGetObjectInfo } from "./handlers/system/readonly/handleGetObjectInfo";
-import { handleDescribeByList } from "./handlers/system/readonly/handleDescribeByList";
 import { handleGetAbapAST } from "./handlers/system/readonly/handleGetAbapAST";
 import { handleGetAbapSemanticAnalysis } from "./handlers/system/readonly/handleGetAbapSemanticAnalysis";
 import { handleGetAbapSystemSymbols } from "./handlers/system/readonly/handleGetAbapSystemSymbols";
@@ -54,6 +52,7 @@ import { handleCreateTable } from "./handlers/table/high/handleCreateTable";
 import { handleCreateStructure } from "./handlers/structure/high/handleCreateStructure";
 import { handleCreateView } from "./handlers/view/high/handleCreateView";
 import { handleGetView } from "./handlers/view/readonly/handleGetView";
+import { handleGetServiceDefinition } from "./handlers/service_definition/readonly/handleGetServiceDefinition";
 import { handleCreateClass } from "./handlers/class/high/handleCreateClass";
 import { handleCreateProgram } from "./handlers/program/high/handleCreateProgram";
 import { handleCreateInterface } from "./handlers/interface/high/handleCreateInterface";
@@ -78,7 +77,7 @@ import { handleUpdateFunctionModule as handleUpdateFunctionModuleLow } from "./h
 import { handleUpdateView as handleUpdateViewLow } from "./handlers/view/low/handleUpdateView";
 import { handleUpdateDomain } from "./handlers/domain/low/handleUpdateDomain";
 import { handleUpdateDataElement } from "./handlers/data_element/low/handleUpdateDataElement";
-import { handleUpdateBehaviorDefinition as handleUpdateBehaviorDefinitionLow } from "./handlers/bdef/low/handleUpdateBehaviorDefinition";
+import { handleUpdateBehaviorDefinition as handleUpdateBehaviorDefinitionLow } from "./handlers/behavior_definition/low/handleUpdateBehaviorDefinition";
 import { handleUpdateMetadataExtension as handleUpdateMetadataExtensionLow } from "./handlers/ddlx/low/handleUpdateMetadataExtension";
 import { handleGetSession } from "./handlers/system/readonly/handleGetSession";
 import { handleValidateObject } from "./handlers/common/low/handleValidateObject";
@@ -90,8 +89,8 @@ import { handleValidateTable } from "./handlers/table/low/handleValidateTable";
 import { handleCheckTable } from "./handlers/table/low/handleCheckTable";
 import { handleValidateFunctionModule } from "./handlers/function/low/handleValidateFunctionModule";
 import { handleCheckFunctionModule } from "./handlers/function/low/handleCheckFunctionModule";
-import { handleCreateBehaviorDefinition } from "./handlers/bdef/high/handleCreateBehaviorDefinition";
-import { handleUpdateBehaviorDefinition as handleUpdateBehaviorDefinitionHigh } from "./handlers/bdef/high/handleUpdateBehaviorDefinition";
+import { handleCreateBehaviorDefinition } from "./handlers/behavior_definition/high/handleCreateBehaviorDefinition";
+import { handleUpdateBehaviorDefinition as handleUpdateBehaviorDefinitionHigh } from "./handlers/behavior_definition/high/handleUpdateBehaviorDefinition";
 import { handleCreateMetadataExtension } from "./handlers/ddlx/high/handleCreateMetadataExtension";
 import { handleUpdateMetadataExtension as handleUpdateMetadataExtensionHigh } from "./handlers/ddlx/high/handleUpdateMetadataExtension";
 import { handleGetInactiveObjects } from "./handlers/system/readonly/handleGetInactiveObjects";
@@ -100,6 +99,13 @@ import { handleDeleteClass } from "./handlers/class/low/handleDeleteClass";
 import { handleLockClass } from "./handlers/class/low/handleLockClass";
 import { handleUnlockClass } from "./handlers/class/low/handleUnlockClass";
 import { handleCreateClass as handleCreateClassLow } from "./handlers/class/low/handleCreateClass";
+import { handleLockClassTestClasses } from "./handlers/class/low/handleLockClassTestClasses";
+import { handleUnlockClassTestClasses } from "./handlers/class/low/handleUnlockClassTestClasses";
+import { handleUpdateClassTestClasses } from "./handlers/class/low/handleUpdateClassTestClasses";
+import { handleActivateClassTestClasses } from "./handlers/class/low/handleActivateClassTestClasses";
+import { handleRunClassUnitTests } from "./handlers/class/low/handleRunClassUnitTests";
+import { handleGetClassUnitTestStatus } from "./handlers/class/low/handleGetClassUnitTestStatus";
+import { handleGetClassUnitTestResult } from "./handlers/class/low/handleGetClassUnitTestResult";
 import { handleCheckProgram } from "./handlers/program/low/handleCheckProgram";
 import { handleDeleteProgram } from "./handlers/program/low/handleDeleteProgram";
 import { handleLockProgram } from "./handlers/program/low/handleLockProgram";
@@ -156,27 +162,36 @@ import { handleLockPackage } from "./handlers/package/low/handleLockPackage";
 import { handleValidatePackage } from "./handlers/package/low/handleValidatePackage";
 import { handleCreatePackage as handleCreatePackageLow } from "./handlers/package/low/handleCreatePackage";
 import { handleCreateTransport as handleCreateTransportLow } from "./handlers/transport/low/handleCreateTransport";
-import { handleCheckBehaviorDefinition } from "./handlers/bdef/low/handleCheckBehaviorDefinition";
-import { handleDeleteBehaviorDefinition } from "./handlers/bdef/low/handleDeleteBehaviorDefinition";
-import { handleLockBehaviorDefinition } from "./handlers/bdef/low/handleLockBehaviorDefinition";
-import { handleUnlockBehaviorDefinition } from "./handlers/bdef/low/handleUnlockBehaviorDefinition";
-import { handleValidateBehaviorDefinition } from "./handlers/bdef/low/handleValidateBehaviorDefinition";
-import { handleCreateBehaviorDefinition as handleCreateBehaviorDefinitionLow } from "./handlers/bdef/low/handleCreateBehaviorDefinition";
+import { handleCheckBehaviorDefinition } from "./handlers/behavior_definition/low/handleCheckBehaviorDefinition";
+import { handleDeleteBehaviorDefinition } from "./handlers/behavior_definition/low/handleDeleteBehaviorDefinition";
+import { handleLockBehaviorDefinition } from "./handlers/behavior_definition/low/handleLockBehaviorDefinition";
+import { handleUnlockBehaviorDefinition } from "./handlers/behavior_definition/low/handleUnlockBehaviorDefinition";
+import { handleValidateBehaviorDefinition } from "./handlers/behavior_definition/low/handleValidateBehaviorDefinition";
+import { handleCreateBehaviorDefinition as handleCreateBehaviorDefinitionLow } from "./handlers/behavior_definition/low/handleCreateBehaviorDefinition";
 import { handleCheckMetadataExtension } from "./handlers/ddlx/low/handleCheckMetadataExtension";
 import { handleDeleteMetadataExtension } from "./handlers/ddlx/low/handleDeleteMetadataExtension";
 import { handleLockMetadataExtension } from "./handlers/ddlx/low/handleLockMetadataExtension";
 import { handleUnlockMetadataExtension } from "./handlers/ddlx/low/handleUnlockMetadataExtension";
 import { handleValidateMetadataExtension } from "./handlers/ddlx/low/handleValidateMetadataExtension";
 import { handleCreateMetadataExtension as handleCreateMetadataExtensionLow } from "./handlers/ddlx/low/handleCreateMetadataExtension";
+import { handleActivateProgram } from "./handlers/program/low/handleActivateProgram";
+import { handleActivateClass } from "./handlers/class/low/handleActivateClass";
+import { handleActivateInterface } from "./handlers/interface/low/handleActivateInterface";
+import { handleActivateFunctionModule } from "./handlers/function/low/handleActivateFunctionModule";
+import { handleActivateFunctionGroup } from "./handlers/function/low/handleActivateFunctionGroup";
+import { handleActivateDataElement } from "./handlers/data_element/low/handleActivateDataElement";
+import { handleActivateDomain } from "./handlers/domain/low/handleActivateDomain";
+import { handleActivateStructure } from "./handlers/structure/low/handleActivateStructure";
+import { handleActivateTable } from "./handlers/table/low/handleActivateTable";
+import { handleActivateView } from "./handlers/view/low/handleActivateView";
+import { handleActivateBehaviorDefinition } from "./handlers/behavior_definition/low/handleActivateBehaviorDefinition";
+import { handleActivateMetadataExtension } from "./handlers/ddlx/low/handleActivateMetadataExtension";
 
 // Import shared utility functions and types
 import {
-  getBaseUrl,
-  getAuthHeaders,
-  makeAdtRequest,
-  return_error,
-  return_response,
   setConfigOverride,
+  sessionContext,
+  removeConnectionForSession,
   setConnectionOverride,
 } from "./lib/utils";
 import { SapConfig, AbapConnection, getConfigFromEnv } from "@mcp-abap-adt/connection";
@@ -185,7 +200,6 @@ import { SapConfig, AbapConnection, getConfigFromEnv } from "@mcp-abap-adt/conne
 import { logger } from "./lib/logger";
 
 // Import tool registry
-import { getAllTools } from "./lib/toolsRegistry";
 
 // Import TOOL_DEFINITION from handlers
 import { TOOL_DEFINITION as GetProgram_Tool } from "./handlers/program/readonly/handleGetProgram";
@@ -206,7 +220,7 @@ import { TOOL_DEFINITION as SearchObject_Tool } from "./handlers/search/readonly
 import { TOOL_DEFINITION as GetEnhancements_Tool } from "./handlers/enhancement/readonly/handleGetEnhancements";
 import { TOOL_DEFINITION as GetEnhancementImpl_Tool } from "./handlers/enhancement/readonly/handleGetEnhancementImpl";
 import { TOOL_DEFINITION as GetEnhancementSpot_Tool } from "./handlers/enhancement/readonly/handleGetEnhancementSpot";
-import { TOOL_DEFINITION as GetBdef_Tool } from "./handlers/bdef/readonly/handleGetBdef";
+import { TOOL_DEFINITION as GetBdef_Tool } from "./handlers/behavior_definition/readonly/handleGetBdef";
 import { TOOL_DEFINITION as GetSqlQuery_Tool } from "./handlers/system/readonly/handleGetSqlQuery";
 import { TOOL_DEFINITION as GetWhereUsed_Tool } from "./handlers/system/readonly/handleGetWhereUsed";
 import { TOOL_DEFINITION as GetObjectInfo_Tool } from "./handlers/system/readonly/handleGetObjectInfo";
@@ -225,6 +239,7 @@ import { TOOL_DEFINITION as CreateTable_Tool } from "./handlers/table/high/handl
 import { TOOL_DEFINITION as CreateStructure_Tool } from "./handlers/structure/high/handleCreateStructure";
 import { TOOL_DEFINITION as CreateView_Tool } from "./handlers/view/high/handleCreateView";
 import { TOOL_DEFINITION as GetView_Tool } from "./handlers/view/readonly/handleGetView";
+import { TOOL_DEFINITION as GetServiceDefinition_Tool } from "./handlers/service_definition/readonly/handleGetServiceDefinition";
 import { TOOL_DEFINITION as CreateClass_Tool } from "./handlers/class/high/handleCreateClass";
 import { TOOL_DEFINITION as CreateProgram_Tool } from "./handlers/program/high/handleCreateProgram";
 import { TOOL_DEFINITION as CreateInterface_Tool } from "./handlers/interface/high/handleCreateInterface";
@@ -249,7 +264,7 @@ import { TOOL_DEFINITION as UpdateFunctionModule_Tool } from "./handlers/functio
 import { TOOL_DEFINITION as UpdateView_Tool } from "./handlers/view/low/handleUpdateView";
 import { TOOL_DEFINITION as UpdateDomainLow_Tool } from "./handlers/domain/low/handleUpdateDomain";
 import { TOOL_DEFINITION as UpdateDataElementLow_Tool } from "./handlers/data_element/low/handleUpdateDataElement";
-import { TOOL_DEFINITION as UpdateBehaviorDefinitionLow_Tool } from "./handlers/bdef/low/handleUpdateBehaviorDefinition";
+import { TOOL_DEFINITION as UpdateBehaviorDefinitionLow_Tool } from "./handlers/behavior_definition/low/handleUpdateBehaviorDefinition";
 import { TOOL_DEFINITION as UpdateMetadataExtensionLow_Tool } from "./handlers/ddlx/low/handleUpdateMetadataExtension";
 import { TOOL_DEFINITION as GetSession_Tool } from "./handlers/system/readonly/handleGetSession";
 import { TOOL_DEFINITION as ValidateObject_Tool } from "./handlers/common/low/handleValidateObject";
@@ -261,8 +276,20 @@ import { TOOL_DEFINITION as ValidateTable_Tool } from "./handlers/table/low/hand
 import { TOOL_DEFINITION as CheckTable_Tool } from "./handlers/table/low/handleCheckTable";
 import { TOOL_DEFINITION as ValidateFunctionModule_Tool } from "./handlers/function/low/handleValidateFunctionModule";
 import { TOOL_DEFINITION as CheckFunctionModule_Tool } from "./handlers/function/low/handleCheckFunctionModule";
-import { TOOL_DEFINITION as CreateBdef_Tool } from "./handlers/bdef/high/handleCreateBehaviorDefinition";
-import { TOOL_DEFINITION as UpdateBdef_Tool } from "./handlers/bdef/high/handleUpdateBehaviorDefinition";
+import { TOOL_DEFINITION as ActivateProgram_Tool } from "./handlers/program/low/handleActivateProgram";
+import { TOOL_DEFINITION as ActivateClass_Tool } from "./handlers/class/low/handleActivateClass";
+import { TOOL_DEFINITION as ActivateInterface_Tool } from "./handlers/interface/low/handleActivateInterface";
+import { TOOL_DEFINITION as ActivateFunctionModule_Tool } from "./handlers/function/low/handleActivateFunctionModule";
+import { TOOL_DEFINITION as ActivateFunctionGroup_Tool } from "./handlers/function/low/handleActivateFunctionGroup";
+import { TOOL_DEFINITION as ActivateDataElement_Tool } from "./handlers/data_element/low/handleActivateDataElement";
+import { TOOL_DEFINITION as ActivateDomain_Tool } from "./handlers/domain/low/handleActivateDomain";
+import { TOOL_DEFINITION as ActivateStructure_Tool } from "./handlers/structure/low/handleActivateStructure";
+import { TOOL_DEFINITION as ActivateTable_Tool } from "./handlers/table/low/handleActivateTable";
+import { TOOL_DEFINITION as ActivateView_Tool } from "./handlers/view/low/handleActivateView";
+import { TOOL_DEFINITION as ActivateBehaviorDefinition_Tool } from "./handlers/behavior_definition/low/handleActivateBehaviorDefinition";
+import { TOOL_DEFINITION as ActivateMetadataExtension_Tool } from "./handlers/ddlx/low/handleActivateMetadataExtension";
+import { TOOL_DEFINITION as CreateBdef_Tool } from "./handlers/behavior_definition/high/handleCreateBehaviorDefinition";
+import { TOOL_DEFINITION as UpdateBdef_Tool } from "./handlers/behavior_definition/high/handleUpdateBehaviorDefinition";
 import { TOOL_DEFINITION as CreateDdlx_Tool } from "./handlers/ddlx/high/handleCreateMetadataExtension";
 import { TOOL_DEFINITION as UpdateDdlx_Tool } from "./handlers/ddlx/high/handleUpdateMetadataExtension";
 import { TOOL_DEFINITION as GetInactiveObjects_Tool } from "./handlers/system/readonly/handleGetInactiveObjects";
@@ -271,6 +298,13 @@ import { TOOL_DEFINITION as DeleteClass_Tool } from "./handlers/class/low/handle
 import { TOOL_DEFINITION as LockClass_Tool } from "./handlers/class/low/handleLockClass";
 import { TOOL_DEFINITION as UnlockClass_Tool } from "./handlers/class/low/handleUnlockClass";
 import { TOOL_DEFINITION as CreateClassLow_Tool } from "./handlers/class/low/handleCreateClass";
+import { TOOL_DEFINITION as LockClassTestClasses_Tool } from "./handlers/class/low/handleLockClassTestClasses";
+import { TOOL_DEFINITION as UnlockClassTestClasses_Tool } from "./handlers/class/low/handleUnlockClassTestClasses";
+import { TOOL_DEFINITION as UpdateClassTestClasses_Tool } from "./handlers/class/low/handleUpdateClassTestClasses";
+import { TOOL_DEFINITION as ActivateClassTestClasses_Tool } from "./handlers/class/low/handleActivateClassTestClasses";
+import { TOOL_DEFINITION as RunClassUnitTests_Tool } from "./handlers/class/low/handleRunClassUnitTests";
+import { TOOL_DEFINITION as GetClassUnitTestStatus_Tool } from "./handlers/class/low/handleGetClassUnitTestStatus";
+import { TOOL_DEFINITION as GetClassUnitTestResult_Tool } from "./handlers/class/low/handleGetClassUnitTestResult";
 import { TOOL_DEFINITION as CheckProgram_Tool } from "./handlers/program/low/handleCheckProgram";
 import { TOOL_DEFINITION as DeleteProgram_Tool } from "./handlers/program/low/handleDeleteProgram";
 import { TOOL_DEFINITION as LockProgram_Tool } from "./handlers/program/low/handleLockProgram";
@@ -327,12 +361,12 @@ import { TOOL_DEFINITION as LockPackage_Tool } from "./handlers/package/low/hand
 import { TOOL_DEFINITION as ValidatePackage_Tool } from "./handlers/package/low/handleValidatePackage";
 import { TOOL_DEFINITION as CreatePackageLow_Tool } from "./handlers/package/low/handleCreatePackage";
 import { TOOL_DEFINITION as CreateTransportLow_Tool } from "./handlers/transport/low/handleCreateTransport";
-import { TOOL_DEFINITION as CheckBehaviorDefinition_Tool } from "./handlers/bdef/low/handleCheckBehaviorDefinition";
-import { TOOL_DEFINITION as DeleteBehaviorDefinition_Tool } from "./handlers/bdef/low/handleDeleteBehaviorDefinition";
-import { TOOL_DEFINITION as LockBehaviorDefinition_Tool } from "./handlers/bdef/low/handleLockBehaviorDefinition";
-import { TOOL_DEFINITION as UnlockBehaviorDefinition_Tool } from "./handlers/bdef/low/handleUnlockBehaviorDefinition";
-import { TOOL_DEFINITION as ValidateBehaviorDefinition_Tool } from "./handlers/bdef/low/handleValidateBehaviorDefinition";
-import { TOOL_DEFINITION as CreateBehaviorDefinitionLow_Tool } from "./handlers/bdef/low/handleCreateBehaviorDefinition";
+import { TOOL_DEFINITION as CheckBehaviorDefinition_Tool } from "./handlers/behavior_definition/low/handleCheckBehaviorDefinition";
+import { TOOL_DEFINITION as DeleteBehaviorDefinition_Tool } from "./handlers/behavior_definition/low/handleDeleteBehaviorDefinition";
+import { TOOL_DEFINITION as LockBehaviorDefinition_Tool } from "./handlers/behavior_definition/low/handleLockBehaviorDefinition";
+import { TOOL_DEFINITION as UnlockBehaviorDefinition_Tool } from "./handlers/behavior_definition/low/handleUnlockBehaviorDefinition";
+import { TOOL_DEFINITION as ValidateBehaviorDefinition_Tool } from "./handlers/behavior_definition/low/handleValidateBehaviorDefinition";
+import { TOOL_DEFINITION as CreateBehaviorDefinitionLow_Tool } from "./handlers/behavior_definition/low/handleCreateBehaviorDefinition";
 import { TOOL_DEFINITION as CheckMetadataExtension_Tool } from "./handlers/ddlx/low/handleCheckMetadataExtension";
 import { TOOL_DEFINITION as DeleteMetadataExtension_Tool } from "./handlers/ddlx/low/handleDeleteMetadataExtension";
 import { TOOL_DEFINITION as LockMetadataExtension_Tool } from "./handlers/ddlx/low/handleLockMetadataExtension";
@@ -825,6 +859,7 @@ export class mcp_abap_adt_server {
   private readonly registerSignalHandlers: boolean;
   private mcpServer: McpServer; // MCP server for all transports
   private sapConfig: SapConfig; // SAP configuration
+  private readonly hasEnvFile: boolean; // Track if .env file was found at startup
   private transportConfig: TransportConfig;
   private httpServer?: HttpServer;
   private shuttingDown = false;
@@ -835,6 +870,7 @@ export class mcp_abap_adt_server {
     clientIP: string;
     connectedAt: Date;
     requestCount: number;
+    sapConfig?: SapConfig; // Store SAP config per session
   }>();
 
   // SSE session tracking (McpServer + SSEServerTransport per session)
@@ -842,7 +878,7 @@ export class mcp_abap_adt_server {
     server: McpServer;
     transport: SSEServerTransport;
   }>();
-  private applyAuthHeaders(headers?: IncomingHttpHeaders) {
+  private applyAuthHeaders(headers?: IncomingHttpHeaders, sessionId?: string) {
     if (!headers) {
       return;
     }
@@ -854,38 +890,51 @@ export class mcp_abap_adt_server {
       return Array.isArray(value) ? value[0] : value;
     };
 
-    // Extract JWT token from Authorization header (Bearer) or x-sap-jwt-token
-    let jwtToken: string | undefined;
-    const authorizationHeader = getHeaderValue(headers["authorization"]);
-    if (authorizationHeader) {
-      const bearerMatch = authorizationHeader.match(/Bearer\s+(.+)/i);
-      if (bearerMatch) {
-        jwtToken = bearerMatch[1]?.trim();
-      }
-    }
-
-    // Fallback to x-sap-jwt-token if Authorization header is not present
-    if (!jwtToken) {
-      jwtToken = getHeaderValue(headers["x-sap-jwt-token"])?.trim();
-    }
-
-    // If no JWT token found, skip processing
-    if (!jwtToken) {
-      return;
-    }
-
-    // Extract refresh token
-    const refreshToken = getHeaderValue(headers["x-sap-refresh-token"]);
-
-    // Extract UAA credentials for token refresh
-    const uaaUrl = getHeaderValue(headers["x-sap-uaa-url"])?.trim();
-    const uaaClientId = getHeaderValue(headers["x-sap-uaa-client-id"])?.trim();
-    const uaaClientSecret = getHeaderValue(headers["x-sap-uaa-client-secret"])?.trim();
-
     // Extract SAP URL and auth type from headers
     const sapUrl = getHeaderValue(headers["x-sap-url"])?.trim();
     const sapAuthType = getHeaderValue(headers["x-sap-auth-type"])?.trim();
 
+    // If no URL or auth type, skip processing
+    if (!sapUrl || !sapAuthType) {
+      return;
+    }
+
+    const isJwtAuth = sapAuthType === "jwt" || sapAuthType === "xsuaa";
+    const isBasicAuth = sapAuthType === "basic";
+
+    // Process JWT authentication
+    if (isJwtAuth) {
+      // Extract JWT token - required for JWT auth
+      const jwtToken = getHeaderValue(headers["x-sap-jwt-token"])?.trim();
+      if (!jwtToken) {
+        return; // JWT token is required for JWT authentication
+      }
+
+      // Extract refresh token - optional for JWT auth
+      const refreshToken = getHeaderValue(headers["x-sap-refresh-token"]);
+
+      // Process JWT config update
+      this.processJwtConfigUpdate(sapUrl, jwtToken, refreshToken, sessionId);
+      return;
+    }
+
+    // Process basic authentication
+    if (isBasicAuth) {
+      // Extract username and password - required for basic auth
+      const username = getHeaderValue(headers["x-sap-login"])?.trim();
+      const password = getHeaderValue(headers["x-sap-password"])?.trim();
+
+      if (!username || !password) {
+        return; // Username and password are required for basic authentication
+      }
+
+      // Process basic auth config update
+      this.processBasicAuthConfigUpdate(sapUrl, username, password, sessionId);
+      return;
+    }
+  }
+
+  private processJwtConfigUpdate(sapUrl: string, jwtToken: string, refreshToken?: string, sessionId?: string) {
     const sanitizeToken = (token: string) =>
       token.length <= 10 ? token : `${token.substring(0, 6)}…${token.substring(token.length - 4)}`;
 
@@ -898,22 +947,16 @@ export class mcp_abap_adt_server {
           type: "SAP_CONFIG_HEADER_APPLY_FAILED",
           error: error instanceof Error ? error.message : String(error),
         });
-        // If base config is not available, create a minimal config from headers
-        if (sapUrl) {
-          baseConfig = {
-            url: sapUrl,
-            authType: (sapAuthType === "jwt" || sapAuthType === "xsuaa") ? "jwt" : "basic",
-          };
-        } else {
-          return;
-        }
+        baseConfig = {
+          url: sapUrl,
+          authType: "jwt",
+        };
       }
     }
 
     // Check if any configuration changed
-    const urlChanged = sapUrl && sapUrl !== baseConfig.url;
-    const authTypeChanged = sapAuthType &&
-      ((sapAuthType === "jwt" || sapAuthType === "xsuaa") ? "jwt" : "basic") !== baseConfig.authType;
+    const urlChanged = sapUrl !== baseConfig.url;
+    const authTypeChanged = "jwt" !== baseConfig.authType;
     const tokenChanged =
       baseConfig.jwtToken !== jwtToken ||
       (!!refreshToken && refreshToken.trim() !== baseConfig.refreshToken);
@@ -924,58 +967,148 @@ export class mcp_abap_adt_server {
 
     const newConfig: SapConfig = {
       ...baseConfig,
-      authType: sapAuthType ?
-        ((sapAuthType === "jwt" || sapAuthType === "xsuaa") ? "jwt" : "basic") :
-        baseConfig.authType,
+      url: sapUrl,
+      authType: "jwt",
       jwtToken,
     };
-
-    if (sapUrl) {
-      newConfig.url = sapUrl;
-    }
 
     if (refreshToken && refreshToken.trim()) {
       newConfig.refreshToken = refreshToken.trim();
     }
 
-    // Add UAA credentials if provided (required for token refresh)
-    if (uaaUrl) {
-      newConfig.uaaUrl = uaaUrl;
-    }
-    if (uaaClientId) {
-      newConfig.uaaClientId = uaaClientId;
-    }
-    if (uaaClientSecret) {
-      newConfig.uaaClientSecret = uaaClientSecret;
-    }
-
     setSapConfigOverride(newConfig);
     this.sapConfig = newConfig;
 
-    // Force connection cache invalidation to ensure next getManagedConnection()
-    // will recreate connection with updated token
-    // Import synchronously to avoid async issues
+    // Store config in session if sessionId is provided
+    if (sessionId) {
+      const session = this.streamableHttpSessions.get(sessionId);
+      if (session) {
+        session.sapConfig = newConfig;
+      }
+    }
+
+    // Force connection cache invalidation (for backward compatibility)
     const { invalidateConnectionCache } = require('./lib/utils');
     try {
-      // Invalidate cache so that next getManagedConnection() will recreate connection
-      // with updated config (including new JWT token)
       invalidateConnectionCache();
     } catch (error) {
-      // If invalidation fails, log but continue - connection will be recreated on next use
       logger.debug("Connection cache invalidation failed", {
         type: "CONNECTION_CACHE_INVALIDATION_FAILED",
         error: error instanceof Error ? error.message : String(error),
       });
     }
 
-    logger.info("Updated SAP configuration from HTTP headers", {
+    logger.info("Updated SAP configuration from HTTP headers (JWT)", {
       type: "SAP_CONFIG_UPDATED",
       urlChanged: Boolean(urlChanged),
       authTypeChanged: Boolean(authTypeChanged),
       tokenChanged: Boolean(tokenChanged),
       hasRefreshToken: Boolean(refreshToken),
       jwtPreview: sanitizeToken(jwtToken),
+      sessionId: sessionId?.substring(0, 8),
     });
+  }
+
+  private processBasicAuthConfigUpdate(sapUrl: string, username: string, password: string, sessionId?: string) {
+    let baseConfig: SapConfig | undefined = this.sapConfig;
+    if (!baseConfig || baseConfig.url === "http://placeholder") {
+      try {
+        baseConfig = getConfig();
+      } catch (error) {
+        logger.warn("Failed to load base SAP config when applying headers", {
+          type: "SAP_CONFIG_HEADER_APPLY_FAILED",
+          error: error instanceof Error ? error.message : String(error),
+        });
+        baseConfig = {
+          url: sapUrl,
+          authType: "basic",
+        };
+      }
+    }
+
+    // Check if any configuration changed
+    const urlChanged = sapUrl !== baseConfig.url;
+    const authTypeChanged = "basic" !== baseConfig.authType;
+    const credentialsChanged =
+      baseConfig.username !== username ||
+      baseConfig.password !== password;
+
+    if (!urlChanged && !authTypeChanged && !credentialsChanged) {
+      return;
+    }
+
+    const newConfig: SapConfig = {
+      ...baseConfig,
+      url: sapUrl,
+      authType: "basic",
+      username,
+      password,
+    };
+
+    setSapConfigOverride(newConfig);
+    this.sapConfig = newConfig;
+
+    // Store config in session if sessionId is provided
+    if (sessionId) {
+      const session = this.streamableHttpSessions.get(sessionId);
+      if (session) {
+        session.sapConfig = newConfig;
+      }
+    }
+
+    // Force connection cache invalidation (for backward compatibility)
+    const { invalidateConnectionCache } = require('./lib/utils');
+    try {
+      invalidateConnectionCache();
+    } catch (error) {
+      logger.debug("Connection cache invalidation failed", {
+        type: "CONNECTION_CACHE_INVALIDATION_FAILED",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    logger.info("Updated SAP configuration from HTTP headers (Basic)", {
+      type: "SAP_CONFIG_UPDATED",
+      urlChanged: Boolean(urlChanged),
+      authTypeChanged: Boolean(authTypeChanged),
+      credentialsChanged: Boolean(credentialsChanged),
+      hasUsername: Boolean(username),
+      sessionId: sessionId?.substring(0, 8),
+    });
+  }
+
+  /**
+   * Check if connection is from localhost
+   */
+  private isLocalConnection(remoteAddress?: string): boolean {
+    if (!remoteAddress) {
+      return false;
+    }
+    // Check for IPv4 localhost
+    if (remoteAddress === "127.0.0.1" || remoteAddress === "localhost") {
+      return true;
+    }
+    // Check for IPv6 localhost
+    if (remoteAddress === "::1" || remoteAddress === "::ffff:127.0.0.1") {
+      return true;
+    }
+    // Check if it's a loopback interface
+    if (remoteAddress.startsWith("127.") || remoteAddress.startsWith("::1")) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Check if request has SAP connection headers
+   */
+  private hasSapHeaders(headers?: IncomingHttpHeaders): boolean {
+    if (!headers) {
+      return false;
+    }
+    const sapUrl = headers["x-sap-url"];
+    const sapAuthType = headers["x-sap-auth-type"];
+    return !!(sapUrl && sapAuthType);
   }
 
   /**
@@ -984,6 +1117,10 @@ export class mcp_abap_adt_server {
   constructor(options?: ServerOptions) {
     this.allowProcessExit = options?.allowProcessExit ?? true;
     this.registerSignalHandlers = options?.registerSignalHandlers ?? true;
+
+    // Check if .env file exists (was loaded at startup)
+    // This is used to determine if we should restrict non-local connections
+    this.hasEnvFile = fs.existsSync(envFilePath || path.resolve(process.cwd(), ".env"));
 
     if (options?.connection) {
       setAbapConnectionOverride(options.connection);
@@ -1349,6 +1486,7 @@ export class mcp_abap_adt_server {
     this.registerToolOnServer(server, UpdateStructure_Tool.name, UpdateStructure_Tool.description, UpdateStructure_Tool.inputSchema as any, handleUpdateStructure);
     this.registerToolOnServer(server, CreateView_Tool.name, CreateView_Tool.description, CreateView_Tool.inputSchema as any, handleCreateView);
     this.registerToolOnServer(server, GetView_Tool.name, GetView_Tool.description, GetView_Tool.inputSchema as any, handleGetView);
+    this.registerToolOnServer(server, GetServiceDefinition_Tool.name, GetServiceDefinition_Tool.description, GetServiceDefinition_Tool.inputSchema as any, handleGetServiceDefinition);
     this.registerToolOnServer(server, UpdateView_Tool.name, UpdateView_Tool.description, UpdateView_Tool.inputSchema as any, handleUpdateViewLow);
     this.registerToolOnServer(server, CreateClass_Tool.name, CreateClass_Tool.description, CreateClass_Tool.inputSchema as any, handleCreateClass);
     this.registerToolOnServer(server, UpdateClass_Tool.name, UpdateClass_Tool.description, UpdateClass_Tool.inputSchema as any, handleUpdateClassLow);
@@ -1390,6 +1528,13 @@ export class mcp_abap_adt_server {
     this.registerToolOnServer(server, LockClass_Tool.name, LockClass_Tool.description, LockClass_Tool.inputSchema as any, handleLockClass);
     this.registerToolOnServer(server, UnlockClass_Tool.name, UnlockClass_Tool.description, UnlockClass_Tool.inputSchema as any, handleUnlockClass);
     this.registerToolOnServer(server, CreateClassLow_Tool.name, CreateClassLow_Tool.description, CreateClassLow_Tool.inputSchema as any, handleCreateClassLow);
+    this.registerToolOnServer(server, LockClassTestClasses_Tool.name, LockClassTestClasses_Tool.description, LockClassTestClasses_Tool.inputSchema as any, handleLockClassTestClasses);
+    this.registerToolOnServer(server, UnlockClassTestClasses_Tool.name, UnlockClassTestClasses_Tool.description, UnlockClassTestClasses_Tool.inputSchema as any, handleUnlockClassTestClasses);
+    this.registerToolOnServer(server, UpdateClassTestClasses_Tool.name, UpdateClassTestClasses_Tool.description, UpdateClassTestClasses_Tool.inputSchema as any, handleUpdateClassTestClasses);
+    this.registerToolOnServer(server, ActivateClassTestClasses_Tool.name, ActivateClassTestClasses_Tool.description, ActivateClassTestClasses_Tool.inputSchema as any, handleActivateClassTestClasses);
+    this.registerToolOnServer(server, RunClassUnitTests_Tool.name, RunClassUnitTests_Tool.description, RunClassUnitTests_Tool.inputSchema as any, handleRunClassUnitTests);
+    this.registerToolOnServer(server, GetClassUnitTestStatus_Tool.name, GetClassUnitTestStatus_Tool.description, GetClassUnitTestStatus_Tool.inputSchema as any, handleGetClassUnitTestStatus);
+    this.registerToolOnServer(server, GetClassUnitTestResult_Tool.name, GetClassUnitTestResult_Tool.description, GetClassUnitTestResult_Tool.inputSchema as any, handleGetClassUnitTestResult);
     this.registerToolOnServer(server, CheckProgram_Tool.name, CheckProgram_Tool.description, CheckProgram_Tool.inputSchema as any, handleCheckProgram);
     this.registerToolOnServer(server, DeleteProgram_Tool.name, DeleteProgram_Tool.description, DeleteProgram_Tool.inputSchema as any, handleDeleteProgram);
     this.registerToolOnServer(server, LockProgram_Tool.name, LockProgram_Tool.description, LockProgram_Tool.inputSchema as any, handleLockProgram);
@@ -1458,6 +1603,18 @@ export class mcp_abap_adt_server {
     this.registerToolOnServer(server, UnlockMetadataExtension_Tool.name, UnlockMetadataExtension_Tool.description, UnlockMetadataExtension_Tool.inputSchema as any, handleUnlockMetadataExtension);
     this.registerToolOnServer(server, ValidateMetadataExtension_Tool.name, ValidateMetadataExtension_Tool.description, ValidateMetadataExtension_Tool.inputSchema as any, handleValidateMetadataExtension);
     this.registerToolOnServer(server, CreateMetadataExtensionLow_Tool.name, CreateMetadataExtensionLow_Tool.description, CreateMetadataExtensionLow_Tool.inputSchema as any, handleCreateMetadataExtensionLow);
+    this.registerToolOnServer(server, ActivateProgram_Tool.name, ActivateProgram_Tool.description, ActivateProgram_Tool.inputSchema as any, handleActivateProgram);
+    this.registerToolOnServer(server, ActivateClass_Tool.name, ActivateClass_Tool.description, ActivateClass_Tool.inputSchema as any, handleActivateClass);
+    this.registerToolOnServer(server, ActivateInterface_Tool.name, ActivateInterface_Tool.description, ActivateInterface_Tool.inputSchema as any, handleActivateInterface);
+    this.registerToolOnServer(server, ActivateFunctionModule_Tool.name, ActivateFunctionModule_Tool.description, ActivateFunctionModule_Tool.inputSchema as any, handleActivateFunctionModule);
+    this.registerToolOnServer(server, ActivateFunctionGroup_Tool.name, ActivateFunctionGroup_Tool.description, ActivateFunctionGroup_Tool.inputSchema as any, handleActivateFunctionGroup);
+    this.registerToolOnServer(server, ActivateDataElement_Tool.name, ActivateDataElement_Tool.description, ActivateDataElement_Tool.inputSchema as any, handleActivateDataElement);
+    this.registerToolOnServer(server, ActivateDomain_Tool.name, ActivateDomain_Tool.description, ActivateDomain_Tool.inputSchema as any, handleActivateDomain);
+    this.registerToolOnServer(server, ActivateStructure_Tool.name, ActivateStructure_Tool.description, ActivateStructure_Tool.inputSchema as any, handleActivateStructure);
+    this.registerToolOnServer(server, ActivateTable_Tool.name, ActivateTable_Tool.description, ActivateTable_Tool.inputSchema as any, handleActivateTable);
+    this.registerToolOnServer(server, ActivateView_Tool.name, ActivateView_Tool.description, ActivateView_Tool.inputSchema as any, handleActivateView);
+    this.registerToolOnServer(server, ActivateBehaviorDefinition_Tool.name, ActivateBehaviorDefinition_Tool.description, ActivateBehaviorDefinition_Tool.inputSchema as any, handleActivateBehaviorDefinition);
+    this.registerToolOnServer(server, ActivateMetadataExtension_Tool.name, ActivateMetadataExtension_Tool.description, ActivateMetadataExtension_Tool.inputSchema as any, handleActivateMetadataExtension);
 
     // Dynamic import tools
     this.registerToolOnServer(server, "GetAdtTypes", "Get all ADT types available in the system", { type: "object", properties: {}, required: [] } as any, async (args: any) => {
@@ -1586,6 +1743,21 @@ export class mcp_abap_adt_server {
           return;
         }
 
+        // HTTP: Restrict non-local connections if .env file exists and no SAP headers provided
+        const remoteAddress = req.socket.remoteAddress;
+        if (this.hasEnvFile && !this.hasSapHeaders(req.headers)) {
+          if (!this.isLocalConnection(remoteAddress)) {
+            logger.warn("HTTP: Non-local connection rejected (has .env but no SAP headers)", {
+              type: "HTTP_NON_LOCAL_REJECTED",
+              remoteAddress,
+              hasEnvFile: this.hasEnvFile,
+            });
+            res.writeHead(403, { "Content-Type": "text/plain" });
+            res.end("Forbidden: Non-local connections require SAP connection headers (x-sap-url, x-sap-auth-type)");
+            return;
+          }
+        }
+
         // Track client (like the example)
         const clientID = `${req.socket.remoteAddress}:${req.socket.remotePort}`;
         logger.debug("Client connected", {
@@ -1645,18 +1817,28 @@ export class mcp_abap_adt_server {
 
         // Handle client disconnect (like the example)
         req.on("close", () => {
-          this.streamableHttpSessions.delete(clientID);
-          logger.debug("Session closed", {
-            type: "STREAMABLE_HTTP_SESSION_CLOSED",
-            sessionId: session!.sessionId,
-            requestCount: session!.requestCount,
-            totalSessions: this.streamableHttpSessions.size,
-          });
+          const closedSession = this.streamableHttpSessions.get(clientID);
+          if (closedSession) {
+            // Clean up connection cache for this session
+            if (closedSession.sapConfig) {
+              removeConnectionForSession(closedSession.sessionId, closedSession.sapConfig);
+            }
+            this.streamableHttpSessions.delete(clientID);
+            logger.debug("Session closed", {
+              type: "STREAMABLE_HTTP_SESSION_CLOSED",
+              sessionId: closedSession.sessionId,
+              requestCount: closedSession.requestCount,
+              totalSessions: this.streamableHttpSessions.size,
+            });
+          }
         });
 
         try {
-          // Apply auth headers before processing
-          this.applyAuthHeaders(req.headers);
+          // Apply auth headers before processing and store config in session
+          this.applyAuthHeaders(req.headers, session.sessionId);
+
+          // Get SAP config for this session (from headers or existing session)
+          const sessionSapConfig = session.sapConfig || this.sapConfig;
 
           // Read request body (like the SDK example with Express)
           let body: any = null;
@@ -1701,9 +1883,19 @@ export class mcp_abap_adt_server {
             clientID,
           });
 
-          // Handle HTTP request through transport (like the SDK example)
-          // Pass body as third parameter if available (like the SDK example)
-          await transport.handleRequest(req, res, body);
+          // Run handlers in AsyncLocalStorage context with session info
+          // This allows getManagedConnection() to access sessionId and config
+          await sessionContext.run(
+            {
+              sessionId: session.sessionId,
+              sapConfig: sessionSapConfig,
+            },
+            async () => {
+              // Handle HTTP request through transport (like the SDK example)
+              // Pass body as third parameter if available (like the SDK example)
+              await transport.handleRequest(req, res, body);
+            }
+          );
 
           logger.debug("Request completed", {
             type: "STREAMABLE_HTTP_REQUEST_COMPLETED",
@@ -1772,6 +1964,18 @@ export class mcp_abap_adt_server {
     postPathSet.add("/mcp/messages");
 
     const httpServer = createServer(async (req, res) => {
+      // SSE: Always restrict to local connections only
+      const remoteAddress = req.socket.remoteAddress;
+      if (!this.isLocalConnection(remoteAddress)) {
+        logger.warn("SSE: Non-local connection rejected", {
+          type: "SSE_NON_LOCAL_REJECTED",
+          remoteAddress,
+        });
+        res.writeHead(403, { "Content-Type": "text/plain" });
+        res.end("Forbidden: SSE transport only accepts local connections");
+        return;
+      }
+
       const requestUrl = req.url ? new URL(req.url, `http://${req.headers.host ?? `${sseConfig.host}:${sseConfig.port}`}`) : undefined;
       let pathname = requestUrl?.pathname ?? "/";
       if (pathname.length > 1 && pathname.endsWith("/")) {

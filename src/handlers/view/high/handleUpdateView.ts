@@ -8,7 +8,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -67,31 +67,59 @@ export async function handleUpdateView(params: any) {
       const client = new CrudClient(connection);
       const shouldActivate = args.activate === true; // Default to false if not specified
 
-      // Validate
-      await client.validateView(viewName);
+      // Validate (for update, "already exists" is expected - object must exist)
+      try {
+        await client.validateView({
+          viewName,
+          packageName: undefined,
+          description: viewName
+        });
+      } catch (validateError: any) {
+        // For update operations, "already exists" is expected - object must exist
+        if (!isAlreadyExistsError(validateError)) {
+          // Real validation error - rethrow
+          throw validateError;
+        }
+        // "Already exists" is OK for update - continue
+        logger.info(`View ${viewName} already exists - this is expected for update operation`);
+      }
 
       // Lock
-      await client.lockView(viewName);
+      await client.lockView({ viewName });
       const lockHandle = client.getLockHandle();
 
       try {
         // Update with DDL source
-        await client.updateView(viewName, args.ddl_source, lockHandle);
+        await client.updateView({ viewName, ddlSource: args.ddl_source }, lockHandle);
 
         // Check
-        await client.checkView(viewName);
+        try {
+          await safeCheckOperation(
+            () => client.checkView({ viewName }),
+            viewName,
+            {
+              debug: (message: string) => logger.info(`[UpdateView] ${message}`)
+            }
+          );
+        } catch (checkError: any) {
+          // If error was marked as "already checked", continue silently
+          if (!(checkError as any).isAlreadyChecked) {
+            // Real check error - rethrow
+            throw checkError;
+          }
+        }
 
         // Unlock
-        await client.unlockView(viewName, lockHandle);
+        await client.unlockView({ viewName }, lockHandle);
 
         // Activate if requested
         if (shouldActivate) {
-          await client.activateView(viewName);
+          await client.activateView({ viewName });
         }
       } catch (error) {
         // Try to unlock on error
         try {
-          await client.unlockView(viewName, lockHandle);
+          await client.unlockView({ viewName: viewName }, lockHandle);
         } catch (unlockError) {
           logger.error('Failed to unlock view after error:', unlockError);
         }

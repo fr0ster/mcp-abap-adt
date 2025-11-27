@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -62,7 +62,7 @@ interface UpdateProgramArgs {
  *
  * Uses CrudClient.updateProgram - low-level single method call
  */
-export async function handleUpdateProgram(args: any) {
+export async function handleUpdateProgram(args: UpdateProgramArgs) {
   try {
     const {
       program_name,
@@ -75,6 +75,11 @@ export async function handleUpdateProgram(args: any) {
     // Validation
     if (!program_name || !source_code || !lock_handle) {
       return return_error(new Error('program_name, source_code, and lock_handle are required'));
+    }
+
+    // Check if cloud - programs are not available on cloud systems
+    if (isCloudConnection()) {
+      return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
     }
 
     const connection = getManagedConnection();
@@ -98,7 +103,7 @@ export async function handleUpdateProgram(args: any) {
 
     try {
       // Update program with source code
-      await client.updateProgram(programName, source_code, lock_handle);
+      await client.updateProgram({ programName: programName, sourceCode: source_code }, lock_handle);
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {

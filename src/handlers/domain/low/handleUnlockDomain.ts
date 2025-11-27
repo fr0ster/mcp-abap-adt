@@ -6,7 +6,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { handlerLogger } from '../../../lib/logger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -57,7 +58,7 @@ interface UnlockDomainArgs {
  *
  * Uses CrudClient.unlockDomain - low-level single method call
  */
-export async function handleUnlockDomain(args: any) {
+export async function handleUnlockDomain(args: UnlockDomainArgs) {
   try {
     const {
       domain_name,
@@ -74,25 +75,53 @@ export async function handleUnlockDomain(args: any) {
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
+    const domainName = domain_name.toUpperCase();
+
+    handlerLogger.info('UnlockDomain', 'start', `Starting unlock for ${domainName}`, {
+      lock_handle: lock_handle,
+      session_id: session_id,
+      has_session_state: !!session_state,
+      session_state_cookies: session_state?.cookies?.substring(0, 50) + '...' || 'none',
+      session_state_csrf: session_state?.csrf_token?.substring(0, 20) + '...' || 'none',
+      session_state_cookie_store_keys: session_state?.cookie_store ? Object.keys(session_state.cookie_store) : []
+    });
+
     // Restore session state if provided
     if (session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
+      handlerLogger.info('UnlockDomain', 'restore_session', 'Restoring session state from Lock', {
+        session_id,
+        cookies_length: session_state.cookies?.length || 0,
+        csrf_token_length: session_state.csrf_token?.length || 0,
+        cookie_store_size: session_state.cookie_store ? Object.keys(session_state.cookie_store).length : 0
+      });
+
+      // CRITICAL: Use restoreSessionInConnection to properly restore session
+      // This will set sessionId in connection and enable stateful session mode
+      await restoreSessionInConnection(connection, session_id, session_state);
+
+      // Verify session was restored
+      const restoredState = connection.getSessionState();
+      handlerLogger.info('UnlockDomain', 'session_restored', 'Session state restored successfully', {
+        session_id,
+        connection_session_id: connection.getSessionId(),
+        restored_cookies_length: restoredState?.cookies?.length || 0,
+        restored_csrf_token_length: restoredState?.csrfToken?.length || 0,
+        restored_cookie_store_size: restoredState?.cookieStore ? Object.keys(restoredState.cookieStore).length : 0,
+        cookies_match: restoredState?.cookies === session_state.cookies,
+        csrf_token_match: restoredState?.csrfToken === session_state.csrf_token
       });
     } else {
+      handlerLogger.warn('UnlockDomain', 'no_session', 'No session state provided (may fail if domain is locked)');
       // Ensure connection is established
       await connection.connect();
     }
-
-    const domainName = domain_name.toUpperCase();
 
     logger.info(`Starting domain unlock: ${domainName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock domain
-      await client.unlockDomain(domainName, lock_handle);
+      handlerLogger.debug('UnlockDomain', 'unlock', `Calling client.unlockDomain({ domainName: ${domainName} }, ${lock_handle})`);
+      await client.unlockDomain({ domainName }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {
@@ -101,6 +130,16 @@ export async function handleUnlockDomain(args: any) {
 
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();
+
+      handlerLogger.info('UnlockDomain', 'success', `Unlock completed for ${domainName}`, {
+        updated_session_state: {
+          has_cookies: !!updatedSessionState?.cookies,
+          cookies_length: updatedSessionState?.cookies?.length || 0,
+          has_csrf_token: !!updatedSessionState?.csrfToken,
+          csrf_token_length: updatedSessionState?.csrfToken?.length || 0,
+          cookie_store_size: updatedSessionState?.cookieStore ? Object.keys(updatedSessionState.cookieStore).length : 0
+        }
+      });
 
       logger.info(`✅ UnlockDomain completed: ${domainName}`);
 

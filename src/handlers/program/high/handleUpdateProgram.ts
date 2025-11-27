@@ -8,7 +8,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection, safeCheckOperation, isAlreadyExistsError, isCloudConnection } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -57,6 +57,11 @@ export async function handleUpdateProgram(params: any) {
       return return_error(new Error("Missing required parameters: program_name and source_code"));
     }
 
+    // Check if cloud - programs are not available on cloud systems
+    if (isCloudConnection()) {
+      return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
+    }
+
     const connection = getManagedConnection();
     const programName = args.program_name.toUpperCase();
 
@@ -69,17 +74,49 @@ export async function handleUpdateProgram(params: any) {
       // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
       const shouldActivate = args.activate === true; // Default to false if not specified
 
-      await builder
-        .validateProgram(programName)
-        .then(b => b.lockProgram(programName))
-        .then(b => b.updateProgram(programName, args.source_code))
-        .then(b => b.checkProgram(programName))
-        .then(b => b.unlockProgram(programName))
-        .then(b => shouldActivate ? b.activateProgram(programName) : Promise.resolve(b))
-        .catch(error => {
-          logger.error('Program update chain failed:', error);
-          throw error;
-        });
+      try {
+        // Validate (for update, "already exists" is expected - object must exist)
+        try {
+          await builder.validateProgram({
+            programName,
+            description: undefined,
+            packageName: undefined
+          });
+        } catch (validateError: any) {
+          // For update operations, "already exists" is expected - object must exist
+          if (!isAlreadyExistsError(validateError)) {
+            // Real validation error - rethrow
+            throw validateError;
+          }
+          // "Already exists" is OK for update - continue
+          logger.info(`Program ${programName} already exists - this is expected for update operation`);
+        }
+        await builder.lockProgram({ programName });
+        const lockHandle = builder.getLockHandle();
+        await builder.updateProgram({ programName, sourceCode: args.source_code }, lockHandle);
+        try {
+          await safeCheckOperation(
+            () => builder.checkProgram({ programName }),
+            programName,
+            {
+              debug: (message: string) => logger.info(`[UpdateProgram] ${message}`)
+            }
+          );
+        } catch (checkError: any) {
+          // If error was marked as "already checked", continue silently
+          if (!(checkError as any).isAlreadyChecked) {
+            // Real check error - rethrow
+            throw checkError;
+          }
+        }
+        await builder.unlockProgram({ programName }, lockHandle);
+        if (shouldActivate) {
+          await builder.activateProgram({ programName });
+        }
+      } catch (error) {
+        logger.error('Program update chain failed:', error);
+        throw error;
+      }
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];

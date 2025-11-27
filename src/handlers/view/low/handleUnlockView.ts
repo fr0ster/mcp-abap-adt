@@ -57,7 +57,7 @@ interface UnlockViewArgs {
  *
  * Uses CrudClient.unlockView - low-level single method call
  */
-export async function handleUnlockView(args: any) {
+export async function handleUnlockView(args: UnlockViewArgs) {
   try {
     const {
       view_name,
@@ -92,7 +92,7 @@ export async function handleUnlockView(args: any) {
 
     try {
       // Unlock view
-      await client.unlockView(viewName, lock_handle);
+      await client.unlockView({ viewName: viewName }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {

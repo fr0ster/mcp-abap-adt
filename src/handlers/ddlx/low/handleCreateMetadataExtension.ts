@@ -82,7 +82,7 @@ interface CreateMetadataExtensionArgs {
  *
  * Uses CrudClient.createMetadataExtension - low-level single method call
  */
-export async function handleCreateMetadataExtension(args: any) {
+export async function handleCreateMetadataExtension(args: CreateMetadataExtensionArgs) {
   try {
     const {
       name,
@@ -122,17 +122,12 @@ export async function handleCreateMetadataExtension(args: any) {
 
     try {
       // Create metadata extension
-      await client.createMetadataExtension(
-        ddlxName,
+      await client.createMetadataExtension({
+        name: ddlxName,
         description,
-        package_name,
-        transport_request,
-        {
-          masterLanguage: master_language,
-          masterSystem: master_system,
-          responsible
-        }
-      );
+        packageName: package_name,
+        transportRequest: transport_request
+      });
       const createResult = client.getCreateResult();
 
       if (!createResult) {

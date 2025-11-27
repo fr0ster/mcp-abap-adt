@@ -77,7 +77,7 @@ interface CreateInterfaceArgs {
  *
  * Uses CrudClient.createInterface - low-level single method call
  */
-export async function handleCreateInterface(args: any) {
+export async function handleCreateInterface(args: CreateInterfaceArgs) {
   try {
     const {
       interface_name,
@@ -116,16 +116,12 @@ export async function handleCreateInterface(args: any) {
 
     try {
       // Create interface
-      await client.createInterface(
+      await client.createInterface({
         interfaceName,
         description,
-        package_name,
-        transport_request,
-        {
-          masterSystem: master_system,
-          responsible
-        }
-      );
+        packageName: package_name,
+        transportRequest: transport_request
+      });
       const createResult = client.getCreateResult();
 
       if (!createResult) {

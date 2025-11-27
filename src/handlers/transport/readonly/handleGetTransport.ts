@@ -143,7 +143,7 @@ function parseTransportXml(xmlData: string, includeObjects: boolean = true, incl
 /**
  * Main handler for GetTransport MCP tool
  */
-export async function handleGetTransport(args: any) {
+export async function handleGetTransport(args: GetTransportArgs) {
   try {
     // Validate required parameters
     if (!args?.transport_number) {

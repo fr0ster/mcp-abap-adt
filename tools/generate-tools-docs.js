@@ -263,6 +263,7 @@ function getCategoryFromFolder(folder) {
     'domain': 'Tables and Structures',
     'data_element': 'Tables and Structures',
     'view': 'Tables and Structures',
+    'service_definition': 'Tables and Structures',
     'search': 'Search, SQL, Transactions',
     'transport': 'Search, SQL, Transactions',
     'common': 'Other'

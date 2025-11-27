@@ -43,7 +43,7 @@ interface DeleteFunctionModuleArgs {
  *
  * Uses CrudClient.deleteFunctionModule - low-level single method call
  */
-export async function handleDeleteFunctionModule(args: any) {
+export async function handleDeleteFunctionModule(args: DeleteFunctionModuleArgs) {
   try {
     const {
       function_module_name,
@@ -65,7 +65,7 @@ export async function handleDeleteFunctionModule(args: any) {
 
     try {
       // Delete function module
-      await client.deleteFunctionModule(functionModuleName, functionGroupName, transport_request);
+      await client.deleteFunctionModule({ functionModuleName: functionModuleName, functionGroupName: functionGroupName, transportRequest: transport_request });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {

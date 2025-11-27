@@ -38,7 +38,7 @@ interface DeleteInterfaceArgs {
  *
  * Uses CrudClient.deleteInterface - low-level single method call
  */
-export async function handleDeleteInterface(args: any) {
+export async function handleDeleteInterface(args: DeleteInterfaceArgs) {
   try {
     const {
       interface_name,
@@ -58,7 +58,7 @@ export async function handleDeleteInterface(args: any) {
 
     try {
       // Delete interface
-      await client.deleteInterface(interfaceName, transport_request);
+      await client.deleteInterface({ interfaceName: interfaceName, transportRequest: transport_request });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {

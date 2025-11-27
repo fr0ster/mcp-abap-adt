@@ -72,7 +72,7 @@ interface CreateFunctionModuleArgs {
  *
  * Uses CrudClient.createFunctionModule - low-level single method call
  */
-export async function handleCreateFunctionModule(args: any) {
+export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs) {
   try {
     const {
       function_module_name,
@@ -111,13 +111,14 @@ export async function handleCreateFunctionModule(args: any) {
 
     try {
       // Create function module
-      await client.createFunctionModule(
+      await client.createFunctionModule({
         functionModuleName,
         functionGroupName,
         description,
-        package_name,
-        transport_request
-      );
+        packageName: package_name,
+        sourceCode: '',
+        transportRequest: transport_request
+      });
       const createResult = client.getCreateResult();
 
       if (!createResult) {

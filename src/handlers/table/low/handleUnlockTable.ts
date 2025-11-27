@@ -57,7 +57,7 @@ interface UnlockTableArgs {
  *
  * Uses CrudClient.unlockTable - low-level single method call
  */
-export async function handleUnlockTable(args: any) {
+export async function handleUnlockTable(args: UnlockTableArgs) {
   try {
     const {
       table_name,
@@ -92,7 +92,7 @@ export async function handleUnlockTable(args: any) {
 
     try {
       // Unlock table
-      await client.unlockTable(tableName, lock_handle);
+      await client.unlockTable({ tableName: tableName }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {

@@ -8,7 +8,7 @@
  * This is a stateless operation - no session management or locking required.
  */
 
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, logErrorSafely } from '../../../lib/utils';
 import { CrudClient, ObjectReference } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -146,11 +146,36 @@ export async function handleActivateObject(params: any) {
       });
 
     } catch (error: any) {
-      const errorMessage = error.response?.data
-        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
-        : error.message || String(error);
+      logErrorSafely(logger, 'ActivateObject', error);
 
-      logger.error(`Activation failed:`, errorMessage);
+      // Safely extract error message
+      let errorMessage: string;
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else {
+          try {
+            const seen = new WeakSet();
+            errorMessage = JSON.stringify(error.response.data, (key, value) => {
+              if (typeof value === 'object' && value !== null) {
+                if (seen.has(value)) {
+                  return '[Circular]';
+                }
+                seen.add(value);
+              }
+              if (key === 'socket' || key === '_httpMessage' || key === 'res' || key === 'req') {
+                return '[HTTP Object]';
+              }
+              return value;
+            });
+          } catch (e) {
+            errorMessage = `HTTP ${error.response.status}: ${error.response.statusText || 'Error'}`;
+          }
+        }
+      } else {
+        errorMessage = error.message || String(error);
+      }
+
       return return_error(new Error(`Failed to activate objects: ${errorMessage}`));
     }
 

@@ -38,7 +38,7 @@ interface DeleteDataElementArgs {
  *
  * Uses CrudClient.deleteDataElement - low-level single method call
  */
-export async function handleDeleteDataElement(args: any) {
+export async function handleDeleteDataElement(args: DeleteDataElementArgs) {
   try {
     const {
       data_element_name,
@@ -58,7 +58,7 @@ export async function handleDeleteDataElement(args: any) {
 
     try {
       // Delete data element
-      await client.deleteDataElement(dataElementName, transport_request);
+      await client.deleteDataElement({ dataElementName: dataElementName, transportRequest: transport_request });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {

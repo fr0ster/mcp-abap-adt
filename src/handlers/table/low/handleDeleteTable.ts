@@ -38,7 +38,7 @@ interface DeleteTableArgs {
  *
  * Uses CrudClient.deleteTable - low-level single method call
  */
-export async function handleDeleteTable(args: any) {
+export async function handleDeleteTable(args: DeleteTableArgs) {
   try {
     const {
       table_name,
@@ -58,7 +58,7 @@ export async function handleDeleteTable(args: any) {
 
     try {
       // Delete table
-      await client.deleteTable(tableName, transport_request);
+      await client.deleteTable({ tableName: tableName, transportRequest: transport_request });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {

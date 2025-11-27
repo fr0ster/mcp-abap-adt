@@ -57,7 +57,7 @@ interface UnlockFunctionGroupArgs {
  *
  * Uses CrudClient.unlockFunctionGroup - low-level single method call
  */
-export async function handleUnlockFunctionGroup(args: any) {
+export async function handleUnlockFunctionGroup(args: UnlockFunctionGroupArgs) {
   try {
     const {
       function_group_name,
@@ -92,7 +92,7 @@ export async function handleUnlockFunctionGroup(args: any) {
 
     try {
       // Unlock function group
-      await client.unlockFunctionGroup(functionGroupName, lock_handle);
+      await client.unlockFunctionGroup({ functionGroupName: functionGroupName }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {

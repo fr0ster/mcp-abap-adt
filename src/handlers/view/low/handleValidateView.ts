@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -18,6 +18,14 @@ export const TOOL_DEFINITION = {
       view_name: {
         type: "string",
         description: "View name to validate (e.g., Z_MY_PROGRAM)."
+      },
+      package_name: {
+        type: "string",
+        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation."
+      },
+      description: {
+        type: "string",
+        description: "View description. Required for validation."
       },
       session_id: {
         type: "string",
@@ -33,12 +41,14 @@ export const TOOL_DEFINITION = {
         }
       }
     },
-    required: ["view_name"]
+    required: ["view_name", "package_name", "description"]
   }
 } as const;
 
 interface ValidateViewArgs {
   view_name: string;
+  package_name: string;
+  description: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -52,17 +62,19 @@ interface ValidateViewArgs {
  *
  * Uses CrudClient.validateView - low-level single method call
  */
-export async function handleValidateView(args: any) {
+export async function handleValidateView(args: ValidateViewArgs) {
   try {
     const {
       view_name,
+      description,
+      package_name,
       session_id,
       session_state
     } = args as ValidateViewArgs;
 
     // Validation
-    if (!view_name) {
-      return return_error(new Error('view_name is required'));
+    if (!view_name || !package_name || !description) {
+      return return_error(new Error('view_name, package_name, and description are required'));
     }
 
     const connection = getManagedConnection();
@@ -86,8 +98,16 @@ export async function handleValidateView(args: any) {
 
     try {
       // Validate view
-      await client.validateView(viewName);
-      const result = client.getValidationResult();
+      await client.validateView({
+        viewName: viewName,
+        packageName: package_name.toUpperCase(),
+        description: description
+      });
+      const validationResponse = client.getValidationResponse();
+      if (!validationResponse) {
+        throw new Error('Validation did not return a result');
+      }
+      const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();

@@ -52,7 +52,7 @@ interface LockClassArgs {
  *
  * Uses CrudClient.lockClass - low-level single method call
  */
-export async function handleLockClass(args: any) {
+export async function handleLockClass(args: LockClassArgs) {
   try {
     const {
       class_name,
@@ -86,7 +86,7 @@ export async function handleLockClass(args: any) {
 
     try {
       // Lock class
-      await client.lockClass(className);
+      await client.lockClass({ className });
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {

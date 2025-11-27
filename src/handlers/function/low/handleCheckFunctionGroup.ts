@@ -53,7 +53,7 @@ interface CheckFunctionGroupArgs {
  *
  * Uses CrudClient.checkFunctionGroup - low-level single method call
  */
-export async function handleCheckFunctionGroup(args: any) {
+export async function handleCheckFunctionGroup(args: CheckFunctionGroupArgs) {
   try {
     const {
       function_group_name,
@@ -87,7 +87,7 @@ export async function handleCheckFunctionGroup(args: any) {
 
     try {
       // Check function group
-      await client.checkFunctionGroup(functionGroupName);
+      await client.checkFunctionGroup({ functionGroupName: functionGroupName });
       const response = client.getCheckResult();
 
       if (!response) {

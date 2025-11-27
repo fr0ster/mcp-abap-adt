@@ -54,7 +54,7 @@ interface CreateTransportArgs {
  * Uses TransportBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateTransport(args: any) {
+export async function handleCreateTransport(args: CreateTransportArgs) {
   try {
     // Validate required parameters
     if (!args?.description) {

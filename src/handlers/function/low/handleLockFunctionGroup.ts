@@ -52,7 +52,7 @@ interface LockFunctionGroupArgs {
  *
  * Uses CrudClient.lockFunctionGroup - low-level single method call
  */
-export async function handleLockFunctionGroup(args: any) {
+export async function handleLockFunctionGroup(args: LockFunctionGroupArgs) {
   try {
     const {
       function_group_name,
@@ -86,7 +86,7 @@ export async function handleLockFunctionGroup(args: any) {
 
     try {
       // Lock function group
-      await client.lockFunctionGroup(functionGroupName);
+      await client.lockFunctionGroup({ functionGroupName: functionGroupName });
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {

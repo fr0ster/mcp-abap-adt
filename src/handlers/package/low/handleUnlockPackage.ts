@@ -62,7 +62,7 @@ interface UnlockPackageArgs {
  *
  * Uses CrudClient.unlockPackage - low-level single method call
  */
-export async function handleUnlockPackage(args: any) {
+export async function handleUnlockPackage(args: UnlockPackageArgs) {
   try {
     const {
       package_name,
@@ -98,8 +98,8 @@ export async function handleUnlockPackage(args: any) {
     logger.info(`Starting package unlock: ${packageName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
-      // Unlock package
-      await client.unlockPackage(packageName, superPackage, lock_handle);
+      // Unlock package using CrudClient (with proper session state restored)
+      await client.unlockPackage({ packageName, superPackage }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {

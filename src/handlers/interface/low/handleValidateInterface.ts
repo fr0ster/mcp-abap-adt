@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -18,6 +18,14 @@ export const TOOL_DEFINITION = {
       interface_name: {
         type: "string",
         description: "Interface name to validate (e.g., Z_MY_PROGRAM)."
+      },
+      package_name: {
+        type: "string",
+        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation."
+      },
+      description: {
+        type: "string",
+        description: "Interface description. Required for validation."
       },
       session_id: {
         type: "string",
@@ -33,12 +41,14 @@ export const TOOL_DEFINITION = {
         }
       }
     },
-    required: ["interface_name"]
+    required: ["interface_name", "package_name", "description"]
   }
 } as const;
 
 interface ValidateInterfaceArgs {
   interface_name: string;
+  package_name: string;
+  description: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -52,17 +62,19 @@ interface ValidateInterfaceArgs {
  *
  * Uses CrudClient.validateInterface - low-level single method call
  */
-export async function handleValidateInterface(args: any) {
+export async function handleValidateInterface(args: ValidateInterfaceArgs) {
   try {
     const {
       interface_name,
+      package_name,
+      description,
       session_id,
       session_state
     } = args as ValidateInterfaceArgs;
 
     // Validation
-    if (!interface_name) {
-      return return_error(new Error('interface_name is required'));
+    if (!interface_name || !package_name || !description) {
+      return return_error(new Error('interface_name, package_name, and description are required'));
     }
 
     const connection = getManagedConnection();
@@ -86,8 +98,16 @@ export async function handleValidateInterface(args: any) {
 
     try {
       // Validate interface
-      await client.validateInterface(interfaceName);
-      const result = client.getValidationResult();
+      await client.validateInterface({
+        interfaceName: interfaceName,
+        packageName: package_name.toUpperCase(),
+        description: description
+      });
+      const validationResponse = client.getValidationResponse();
+      if (!validationResponse) {
+        throw new Error('Validation did not return a result');
+      }
+      const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();

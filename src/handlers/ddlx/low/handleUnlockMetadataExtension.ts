@@ -57,7 +57,7 @@ interface UnlockMetadataExtensionArgs {
  *
  * Uses CrudClient.unlockMetadataExtension - low-level single method call
  */
-export async function handleUnlockMetadataExtension(args: any) {
+export async function handleUnlockMetadataExtension(args: UnlockMetadataExtensionArgs) {
   try {
     const {
       name,
@@ -92,7 +92,7 @@ export async function handleUnlockMetadataExtension(args: any) {
 
     try {
       // Unlock metadata extension
-      await client.unlockMetadataExtension(ddlxName, lock_handle);
+      await client.unlockMetadataExtension({ name: ddlxName }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {

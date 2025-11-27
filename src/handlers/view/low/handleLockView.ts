@@ -52,7 +52,7 @@ interface LockViewArgs {
  *
  * Uses CrudClient.lockView - low-level single method call
  */
-export async function handleLockView(args: any) {
+export async function handleLockView(args: LockViewArgs) {
   try {
     const {
       view_name,
@@ -86,7 +86,7 @@ export async function handleLockView(args: any) {
 
     try {
       // Lock view
-      await client.lockView(viewName);
+      await client.lockView({ viewName: viewName });
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {

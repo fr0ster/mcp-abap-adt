@@ -53,7 +53,7 @@ interface CheckDomainArgs {
  *
  * Uses CrudClient.checkDomain - low-level single method call
  */
-export async function handleCheckDomain(args: any) {
+export async function handleCheckDomain(args: CheckDomainArgs) {
   try {
     const {
       domain_name,
@@ -87,7 +87,7 @@ export async function handleCheckDomain(args: any) {
 
     try {
       // Check domain
-      await client.checkDomain(domainName);
+      await client.checkDomain({ domainName: domainName });
       const response = client.getCheckResult();
 
       if (!response) {

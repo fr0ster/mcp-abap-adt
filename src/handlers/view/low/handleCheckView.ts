@@ -53,7 +53,7 @@ interface CheckViewArgs {
  *
  * Uses CrudClient.checkView - low-level single method call
  */
-export async function handleCheckView(args: any) {
+export async function handleCheckView(args: CheckViewArgs) {
   try {
     const {
       view_name,
@@ -87,7 +87,7 @@ export async function handleCheckView(args: any) {
 
     try {
       // Check view
-      await client.checkView(viewName);
+      await client.checkView({ viewName: viewName });
       const response = client.getCheckResult();
 
       if (!response) {

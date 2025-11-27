@@ -1,5 +1,5 @@
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl } from '../../../lib/utils';
+import { makeAdtRequestWithTimeout, return_error, return_response } from '../../../lib/utils';
 import convert from 'xml-js';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import * as z from 'zod';
@@ -12,13 +12,18 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-export async function handleGetPackage(args: any) {
+interface GetPackageArgs {
+  package_name: string;
+  filePath?: string;
+}
+
+export async function handleGetPackage(args: GetPackageArgs) {
     try {
         if (!args?.package_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
         }
 
-        const nodeContentsUrl = `${await getBaseUrl()}/sap/bc/adt/repository/nodestructure`;
+        const nodeContentsUrl = `/sap/bc/adt/repository/nodestructure`;
         const nodeContentsParams = {
             parent_type: "DEVC/K",
             parent_name: args.package_name,

@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, logErrorSafely } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -87,7 +87,7 @@ interface CreateDomainArgs {
  *
  * Uses CrudClient.createDomain - low-level single method call
  */
-export async function handleCreateDomain(args: any) {
+export async function handleCreateDomain(args: CreateDomainArgs) {
   try {
     const {
       domain_name,
@@ -124,12 +124,12 @@ export async function handleCreateDomain(args: any) {
 
     try {
       // Create domain
-      await client.createDomain(
+      await client.createDomain({
         domainName,
         description,
-        package_name,
-        transport_request
-      );
+        packageName: package_name,
+        transportRequest: transport_request
+      });
       const createResult = client.getCreateResult();
 
       if (!createResult) {
@@ -159,7 +159,7 @@ export async function handleCreateDomain(args: any) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating domain ${domainName}:`, error);
+      logErrorSafely(logger, `CreateDomain ${domainName}`, error);
 
       // Parse error message
       let errorMessage = `Failed to create domain: ${error.message || String(error)}`;

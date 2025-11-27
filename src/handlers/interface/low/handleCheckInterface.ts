@@ -53,7 +53,7 @@ interface CheckInterfaceArgs {
  *
  * Uses CrudClient.checkInterface - low-level single method call
  */
-export async function handleCheckInterface(args: any) {
+export async function handleCheckInterface(args: CheckInterfaceArgs) {
   try {
     const {
       interface_name,
@@ -87,7 +87,7 @@ export async function handleCheckInterface(args: any) {
 
     try {
       // Check interface
-      await client.checkInterface(interfaceName);
+      await client.checkInterface({ interfaceName: interfaceName });
       const response = client.getCheckResult();
 
       if (!response) {

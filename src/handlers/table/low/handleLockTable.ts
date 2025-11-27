@@ -52,7 +52,7 @@ interface LockTableArgs {
  *
  * Uses CrudClient.lockTable - low-level single method call
  */
-export async function handleLockTable(args: any) {
+export async function handleLockTable(args: LockTableArgs) {
   try {
     const {
       table_name,
@@ -86,7 +86,7 @@ export async function handleLockTable(args: any) {
 
     try {
       // Lock table
-      await client.lockTable(tableName);
+      await client.lockTable({ tableName: tableName });
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {

@@ -38,7 +38,7 @@ interface DeleteClassArgs {
  *
  * Uses CrudClient.deleteClass - low-level single method call
  */
-export async function handleDeleteClass(args: any) {
+export async function handleDeleteClass(args: DeleteClassArgs) {
   try {
     const {
       class_name,
@@ -58,7 +58,10 @@ export async function handleDeleteClass(args: any) {
 
     try {
       // Delete class
-      await client.deleteClass(className, transport_request);
+      await client.deleteClass({
+        className,
+        transportRequest: transport_request
+      });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {

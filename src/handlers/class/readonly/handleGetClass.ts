@@ -12,6 +12,11 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
+interface GetClassArgs {
+  [key: string]: any;
+}
+
+
 function parseClassXml(xml: string) {
     const parser = new XMLParser({
         ignoreAttributes: false,
@@ -69,7 +74,7 @@ function parseClassXml(xml: string) {
     return { raw: result };
 }
 
-export async function handleGetClass(args: any) {
+export async function handleGetClass(args: GetClassArgs) {
     try {
         if (!args?.class_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Class name is required');

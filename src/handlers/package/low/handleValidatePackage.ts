@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -53,7 +53,7 @@ interface ValidatePackageArgs {
  *
  * Uses CrudClient.validatePackage - low-level single method call
  */
-export async function handleValidatePackage(args: any) {
+export async function handleValidatePackage(args: ValidatePackageArgs) {
   try {
     const {
       package_name,
@@ -89,8 +89,12 @@ export async function handleValidatePackage(args: any) {
 
     try {
       // Validate package
-      await client.validatePackage(packageName, superPackage);
-      const result = client.getValidationResult();
+      await client.validatePackage({ packageName: packageName, superPackage: superPackage, description: undefined });
+      const validationResponse = client.getValidationResponse();
+      if (!validationResponse) {
+        throw new Error('Validation did not return a result');
+      }
+      const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();

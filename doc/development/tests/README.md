@@ -31,6 +31,14 @@ Documentation for the CreateDomain MCP tool:
 - Error handling
 - Testing examples
 
+### [DEBUGGING.md](DEBUGGING.md)
+Guide for debugging integration tests:
+- Environment variables for debugging (DEBUG_TESTS, DEBUG_HANDLERS, etc.)
+- Session management debugging
+- Lock/Update/Unlock workflow debugging
+- Common issues and solutions
+- Example debug output
+
 ### [test-config.yaml.template](test-config.yaml.template)
 Template for test configuration:
 - Copy to `tests/test-config.yaml` before running tests

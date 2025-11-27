@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -54,7 +54,7 @@ interface ValidateMetadataExtensionArgs {
  *
  * Uses CrudClient.validateMetadataExtension - low-level single method call
  */
-export async function handleValidateMetadataExtension(args: any) {
+export async function handleValidateMetadataExtension(args: ValidateMetadataExtensionArgs) {
   try {
     const {
       name,
@@ -90,8 +90,16 @@ export async function handleValidateMetadataExtension(args: any) {
 
     try {
       // Validate metadata extension
-      await client.validateMetadataExtension(ddlxName, description, package_name);
-      const result = client.getValidationResult();
+      await client.validateMetadataExtension({
+        name: ddlxName,
+        description: description || '',
+        packageName: package_name || ''
+      });
+      const validationResponse = client.getValidationResponse();
+      if (!validationResponse) {
+        throw new Error('Validation did not return a result');
+      }
+      const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();

@@ -62,7 +62,7 @@ interface UpdateTableArgs {
  *
  * Uses CrudClient.updateTable - low-level single method call
  */
-export async function handleUpdateTable(args: any) {
+export async function handleUpdateTable(args: UpdateTableArgs) {
   try {
     const {
       table_name,
@@ -98,7 +98,7 @@ export async function handleUpdateTable(args: any) {
 
     try {
       // Update table with DDL code
-      await client.updateTable(tableName, ddl_code, lock_handle);
+      await client.updateTable({ tableName: tableName, ddlCode: ddl_code }, lock_handle);
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {

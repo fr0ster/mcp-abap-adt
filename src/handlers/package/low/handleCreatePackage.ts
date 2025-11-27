@@ -6,8 +6,12 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, logErrorSafely } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { PackageBuilderConfig } from '@mcp-abap-adt/adt-clients';
+
+// Type matching CrudClient.createPackage signature
+type CreatePackageConfig = Partial<PackageBuilderConfig> & Pick<PackageBuilderConfig, 'packageName' | 'superPackage' | 'description' | 'softwareComponent'>;
 
 export const TOOL_DEFINITION = {
   name: "CreatePackageLow",
@@ -27,9 +31,25 @@ export const TOOL_DEFINITION = {
         type: "string",
         description: "Package description."
       },
+      package_type: {
+        type: "string",
+        description: "Package type (development/structure). Defaults to development."
+      },
+            software_component: {
+              type: "string",
+              description: "Software component (e.g., HOME, ZLOCAL). If not provided, SAP will set a default (typically ZLOCAL for local packages)."
+            },
+      transport_layer: {
+        type: "string",
+        description: "Transport layer (e.g., ZDEV). Required for transportable packages."
+      },
       transport_request: {
         type: "string",
         description: "Transport request number (e.g., E19K905635). Required for transportable packages."
+      },
+      application_component: {
+        type: "string",
+        description: "Application component (e.g., BC-ABA)."
       },
       session_id: {
         type: "string",
@@ -53,7 +73,11 @@ interface CreatePackageArgs {
   package_name: string;
   super_package: string;
   description: string;
+  package_type?: string;
+  software_component?: string;
+  transport_layer?: string;
   transport_request?: string;
+  application_component?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -67,13 +91,17 @@ interface CreatePackageArgs {
  *
  * Uses CrudClient.createPackage - low-level single method call
  */
-export async function handleCreatePackage(args: any) {
+export async function handleCreatePackage(args: CreatePackageArgs) {
   try {
     const {
       package_name,
       super_package,
       description,
+      package_type,
+      software_component,
+      transport_layer,
       transport_request,
+      application_component,
       session_id,
       session_state
     } = args as CreatePackageArgs;
@@ -104,13 +132,57 @@ export async function handleCreatePackage(args: any) {
     logger.info(`Starting package creation: ${packageName} in ${superPackage}`);
 
     try {
-      // Create package
-      await client.createPackage(
+      // Create package - build config object with proper typing
+      const createConfig: CreatePackageConfig = {
         packageName,
         superPackage,
         description,
-        transport_request
-      );
+        packageType: package_type,
+        softwareComponent: software_component
+      };
+      // Only add optional params if explicitly provided
+      if (transport_layer) {
+        createConfig.transportLayer = transport_layer;
+      }
+      if (transport_request) {
+        createConfig.transportRequest = transport_request;
+      }
+      if (application_component) {
+        createConfig.applicationComponent = application_component;
+      }
+
+      // DEBUG: Log before calling createPackage
+      console.log(`[HANDLER] Before createPackage call | softwareComponent: ${createConfig.softwareComponent || 'undefined'}`);
+
+      // Wrapper to log what's passed to CrudClient
+      const originalCreatePackage = client.createPackage.bind(client);
+      const wrappedCreatePackage = async (config: CreatePackageConfig) => {
+        console.log(`[WRAPPER] CrudClient.createPackage called with softwareComponent: ${config.softwareComponent || 'undefined'}`);
+        console.log(`[WRAPPER] Full config:`, JSON.stringify(config, null, 2));
+        try {
+          const result = await originalCreatePackage(config);
+          console.log(`[WRAPPER] ✅ CrudClient.createPackage succeeded`);
+          return result;
+        } catch (error: any) {
+          console.error(`[WRAPPER] ❌ CrudClient.createPackage failed: ${error.message}`);
+          // Find where error was actually thrown
+          const stackLines = error.stack?.split('\n') || [];
+          const errorOrigin = stackLines.find((line: string) =>
+            (line.includes('PackageBuilder.create') || line.includes('CrudClient.createPackage') || line.includes('createPackage'))
+            && !line.includes('test.ts') && !line.includes('WRAPPER')
+          ) || stackLines[1] || 'unknown';
+          console.error(`[WRAPPER] Error thrown at: ${errorOrigin.trim()}`);
+          throw error;
+        }
+      };
+
+      try {
+        await wrappedCreatePackage(createConfig);
+        console.log(`[HANDLER] ✅ createPackage call succeeded`);
+      } catch (createError: any) {
+        throw createError;
+      }
+
       const createResult = client.getCreateResult();
 
       if (!createResult) {
@@ -128,7 +200,11 @@ export async function handleCreatePackage(args: any) {
           package_name: packageName,
           super_package: superPackage,
           description,
+          package_type: package_type || 'development',
+          software_component: software_component || null,
+          transport_layer: transport_layer || null,
           transport_request: transport_request || null,
+          application_component: application_component || null,
           session_id: session_id || null,
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,
@@ -140,7 +216,22 @@ export async function handleCreatePackage(args: any) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating package ${packageName}:`, error);
+      logErrorSafely(logger, `CreatePackage ${packageName}`, error);
+
+      // Check for authentication errors (expired tokens)
+      if (error.message?.includes('Refresh token has expired') ||
+          error.message?.includes('JWT token has expired') ||
+          error.message?.includes('Please re-authenticate')) {
+        return return_error(new Error(`Authentication failed: ${error.message}. Please re-authenticate using the authentication tool or update your credentials.`));
+      }
+
+      // Check for 401/403 authentication errors
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        const authError = error.response?.status === 401
+          ? 'Unauthorized: Authentication failed. Please check your credentials and re-authenticate.'
+          : 'Forbidden: Access denied. Please check your permissions.';
+        return return_error(new Error(authError));
+      }
 
       // Parse error message
       let errorMessage = `Failed to create package: ${error.message || String(error)}`;

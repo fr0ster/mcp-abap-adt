@@ -8,7 +8,7 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -72,10 +72,6 @@ Note: All provided parameters completely replace existing values. Field labels a
       decimals: {
         type: "number",
         description: "Decimals - for predefinedAbapType or refToPredefinedAbapType"
-      },
-      domain_name: {
-        type: "string",
-        description: "Domain name (deprecated - use type_name with type_kind=domain)"
       },
       field_label_short: {
         type: "string",
@@ -149,7 +145,6 @@ interface DataElementArgs {
   data_type?: string;
   length?: number;
   decimals?: number;
-  domain_name?: string;
   field_label_short?: string;
   field_label_medium?: string;
   field_label_long?: string;
@@ -171,7 +166,7 @@ interface DataElementArgs {
  * Uses DataElementBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleUpdateDataElement(args: any) {
+export async function handleUpdateDataElement(args: DataElementArgs) {
   try {
     if (!args?.data_element_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Data element name is required');
@@ -190,8 +185,6 @@ export async function handleUpdateDataElement(args: any) {
     logger.info(`Starting data element update: ${dataElementName}`);
 
     try {
-      // Determine domain name for builder (support deprecated domain_name parameter)
-      const domainName = typedArgs.type_name || typedArgs.domain_name;
       type AdtClientsTypeKind =
         | 'domain'
         | 'predefinedAbapType'
@@ -213,17 +206,30 @@ export async function handleUpdateDataElement(args: any) {
       const client = new CrudClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
-      // Validate
-      await client.validateDataElement(dataElementName);
+      // Validate (for update, "already exists" is expected - object must exist)
+      try {
+        await client.validateDataElement({
+          dataElementName,
+          packageName: typedArgs.package_name,
+          description: typedArgs.description || dataElementName
+        });
+      } catch (validateError: any) {
+        // For update operations, "already exists" is expected - object must exist
+        if (!isAlreadyExistsError(validateError)) {
+          // Real validation error - rethrow
+          throw validateError;
+        }
+        // "Already exists" is OK for update - continue
+        logger.info(`Data element ${dataElementName} already exists - this is expected for update operation`);
+      }
 
       // Lock
-      await client.lockDataElement(dataElementName);
+      await client.lockDataElement({ dataElementName: dataElementName });
       const lockHandle = client.getLockHandle();
 
       try {
         // Update with properties
         const properties = {
-          domainName: domainName?.toUpperCase() || '',
           dataType: typedArgs.data_type,
           length: typedArgs.length,
           decimals: typedArgs.decimals,
@@ -234,22 +240,41 @@ export async function handleUpdateDataElement(args: any) {
           typeKind: typeKind,
           typeName: typedArgs.type_name?.toUpperCase()
         };
-        await client.updateDataElement(dataElementName, properties, lockHandle);
+        await client.updateDataElement({
+          dataElementName,
+          packageName: typedArgs.package_name,
+          description: typedArgs.description || dataElementName,
+          ...properties
+        }, lockHandle);
 
         // Check
-        await client.checkDataElement(dataElementName);
+        try {
+          await safeCheckOperation(
+            () => client.checkDataElement({ dataElementName }),
+            dataElementName,
+            {
+              debug: (message: string) => logger.info(`[UpdateDataElement] ${message}`)
+            }
+          );
+        } catch (checkError: any) {
+          // If error was marked as "already checked", continue silently
+          if (!(checkError as any).isAlreadyChecked) {
+            // Real check error - rethrow
+            throw checkError;
+          }
+        }
 
         // Unlock
-        await client.unlockDataElement(dataElementName, lockHandle);
+        await client.unlockDataElement({ dataElementName }, lockHandle);
 
         // Activate if requested
         if (shouldActivate) {
-          await client.activateDataElement(dataElementName);
+          await client.activateDataElement({ dataElementName });
         }
       } catch (error) {
         // Try to unlock on error
         try {
-          await client.unlockDataElement(dataElementName, lockHandle);
+          await client.unlockDataElement({ dataElementName: dataElementName }, lockHandle);
         } catch (unlockError) {
           logger.error('Failed to unlock data element after error:', unlockError);
         }
@@ -269,7 +294,7 @@ export async function handleUpdateDataElement(args: any) {
           data_element_name: dataElementName,
           package: typedArgs.package_name,
           transport_request: typedArgs.transport_request,
-          domain_name: domainName?.toUpperCase(),
+          data_type: typedArgs.data_type || null,
           status: shouldActivate ? 'active' : 'inactive',
           message: `Data element ${dataElementName} updated${shouldActivate ? ' and activated' : ''} successfully`,
           data_element_details: dataElementDetails

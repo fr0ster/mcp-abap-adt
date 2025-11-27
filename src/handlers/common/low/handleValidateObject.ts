@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, parseValidationResponse, logErrorSafely } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -23,6 +23,14 @@ export const TOOL_DEFINITION = {
         type: "string",
         description: "Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'metadata_extension'",
         enum: ["class", "program", "interface", "function_group", "table", "structure", "view", "domain", "data_element", "package", "behavior_definition", "metadata_extension"]
+      },
+      package_name: {
+        type: "string",
+        description: "Optional package name for validation"
+      },
+      description: {
+        type: "string",
+        description: "Optional description for validation"
       },
       session_id: {
         type: "string",
@@ -45,6 +53,8 @@ export const TOOL_DEFINITION = {
 interface ValidateObjectArgs {
   object_name: string;
   object_type: string;
+  package_name?: string;
+  description?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -59,11 +69,13 @@ interface ValidateObjectArgs {
  * Uses validateObjectName from @mcp-abap-adt/adt-clients/core for all operations
  * Connection management handled internally
  */
-export async function handleValidateObject(args: any) {
+export async function handleValidateObject(args: ValidateObjectArgs) {
   try {
     const {
       object_name,
       object_type,
+      package_name,
+      description,
       session_id,
       session_state
     } = args as ValidateObjectArgs;
@@ -103,44 +115,123 @@ export async function handleValidateObject(args: any) {
 
       switch (object_type.toLowerCase()) {
         case 'program':
-          await validationClient.validateProgram(objectName);
-          result = validationClient.getValidationResult();
+          await validationClient.validateProgram({
+            programName: objectName,
+            packageName: package_name || undefined,
+            description: description || undefined
+          });
+          const programResponse = validationClient.getValidationResponse();
+          if (!programResponse) {
+            throw new Error('Validation did not return a result');
+          }
+          result = parseValidationResponse(programResponse);
           break;
         case 'class':
-          await validationClient.validateClass(objectName);
-          result = validationClient.getValidationResult();
+          await validationClient.validateClass({
+            className: objectName,
+            packageName: package_name || undefined,
+            description: description || undefined
+          });
+          const classResponse = validationClient.getValidationResponse();
+          if (!classResponse) {
+            throw new Error('Validation did not return a result');
+          }
+          result = parseValidationResponse(classResponse);
           break;
         case 'interface':
-          await validationClient.validateInterface(objectName);
-          result = validationClient.getValidationResult();
+          await validationClient.validateInterface({
+            interfaceName: objectName,
+            packageName: package_name || undefined,
+            description: description || undefined
+          });
+          const interfaceResponse = validationClient.getValidationResponse();
+          if (!interfaceResponse) {
+            throw new Error('Validation did not return a result');
+          }
+          result = parseValidationResponse(interfaceResponse);
           break;
         case 'function_group':
-          await validationClient.validateFunctionGroup(objectName);
-          result = validationClient.getValidationResult();
+          await validationClient.validateFunctionGroup({
+            functionGroupName: objectName,
+            description: description || undefined
+          });
+          const functionGroupResponse = validationClient.getValidationResponse();
+          if (!functionGroupResponse) {
+            throw new Error('Validation did not return a result');
+          }
+          result = parseValidationResponse(functionGroupResponse);
           break;
         case 'table':
-          await validationClient.validateTable(objectName);
-          result = validationClient.getValidationResult();
+          await validationClient.validateTable({
+            tableName: objectName,
+            packageName: package_name || undefined,
+            description: description || undefined
+          });
+          const tableResponse = validationClient.getValidationResponse();
+          if (!tableResponse) {
+            throw new Error('Validation did not return a result');
+          }
+          result = parseValidationResponse(tableResponse);
           break;
         case 'structure':
-          await validationClient.validateStructure(objectName);
-          result = validationClient.getValidationResult();
+          await validationClient.validateStructure({
+            structureName: objectName,
+            packageName: package_name || undefined,
+            description: description || undefined
+          });
+          const structureResponse = validationClient.getValidationResponse();
+          if (!structureResponse) {
+            throw new Error('Validation did not return a result');
+          }
+          result = parseValidationResponse(structureResponse);
           break;
         case 'view':
-          await validationClient.validateView(objectName);
-          result = validationClient.getValidationResult();
+          await validationClient.validateView({
+            viewName: objectName,
+            packageName: package_name || undefined,
+            description: description || undefined
+          });
+          const viewResponse = validationClient.getValidationResponse();
+          if (!viewResponse) {
+            throw new Error('Validation did not return a result');
+          }
+          result = parseValidationResponse(viewResponse);
           break;
         case 'domain':
-          await validationClient.validateDomain(objectName);
-          result = validationClient.getValidationResult();
+          await validationClient.validateDomain({
+            domainName: objectName,
+            packageName: package_name || undefined,
+            description: description || undefined
+          });
+          const domainResponse = validationClient.getValidationResponse();
+          if (!domainResponse) {
+            throw new Error('Validation did not return a result');
+          }
+          result = parseValidationResponse(domainResponse);
           break;
         case 'data_element':
-          await validationClient.validateDataElement(objectName);
-          result = validationClient.getValidationResult();
+          await validationClient.validateDataElement({
+            dataElementName: objectName,
+            packageName: package_name || undefined,
+            description: description || undefined
+          });
+          const dataElementResponse = validationClient.getValidationResponse();
+          if (!dataElementResponse) {
+            throw new Error('Validation did not return a result');
+          }
+          result = parseValidationResponse(dataElementResponse);
           break;
         case 'package':
-          await validationClient.validatePackage(objectName, ''); // package needs superPackage parameter
-          result = validationClient.getValidationResult();
+          await validationClient.validatePackage({
+            packageName: objectName,
+            superPackage: undefined, // package doesn't have superPackage in args
+            description: description || undefined
+          });
+          const packageResponse = validationClient.getValidationResponse();
+          if (!packageResponse) {
+            throw new Error('Validation did not return a result');
+          }
+          result = parseValidationResponse(packageResponse);
           break;
         case 'behavior_definition':
           // Behavior definition validation requires rootEntity and implementationType
@@ -181,7 +272,7 @@ export async function handleValidateObject(args: any) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating object ${objectName}:`, error);
+      logErrorSafely(logger, `ValidateObject ${objectName}`, error);
 
       // Parse error message
       let errorMessage = `Failed to validate object: ${error.message || String(error)}`;

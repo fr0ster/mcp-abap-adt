@@ -9,17 +9,17 @@ This document contains a complete list of all tools (functions) provided by the 
 
 ## 📊 Tool Summary
 
-- Total tools: 157
+- Total tools: 177
 - High-level tools: 23
-- Low-level tools: 97
-- Read-only tools: 37
+- Low-level tools: 116
+- Read-only tools: 38
 - Other tools: 0
 
 ## 📋 Navigation
 
 The navigation below mirrors the document structure for easier discovery.
 
-- [Programs, Classes, Functions](#programs,-classes,-functions) (39 tools – 7 high-level, 27 low-level, 5 read-only)
+- [Programs, Classes, Functions](#programs,-classes,-functions) (50 tools – 7 high-level, 38 low-level, 5 read-only)
   - [Read-Only Tools](#programs,-classes,-functions-read-only)
     - [GetClass](#getclass-readonly)
     - [GetFunction](#getfunction-readonly)
@@ -35,6 +35,11 @@ The navigation below mirrors the document structure for easier discovery.
     - [UpdateFunctionModule](#updatefunctionmodule-high)
     - [UpdateProgram](#updateprogram-high)
   - [Low-Level Tools](#programs,-classes,-functions-low-level)
+    - [ActivateClassLow](#activateclasslow-low)
+    - [ActivateClassTestClassesLow](#activateclasstestclasseslow-low)
+    - [ActivateFunctionGroupLow](#activatefunctiongrouplow-low)
+    - [ActivateFunctionModuleLow](#activatefunctionmodulelow-low)
+    - [ActivateProgramLow](#activateprogramlow-low)
     - [CheckClassLow](#checkclasslow-low)
     - [CheckFunctionGroupLow](#checkfunctiongrouplow-low)
     - [CheckFunctionModuleLow](#checkfunctionmodulelow-low)
@@ -47,25 +52,32 @@ The navigation below mirrors the document structure for easier discovery.
     - [DeleteFunctionGroupLow](#deletefunctiongrouplow-low)
     - [DeleteFunctionModuleLow](#deletefunctionmodulelow-low)
     - [DeleteProgramLow](#deleteprogramlow-low)
+    - [GetClassUnitTestResultLow](#getclassunittestresultlow-low)
+    - [GetClassUnitTestStatusLow](#getclassunitteststatuslow-low)
     - [LockClassLow](#lockclasslow-low)
+    - [LockClassTestClassesLow](#lockclasstestclasseslow-low)
     - [LockFunctionGroupLow](#lockfunctiongrouplow-low)
     - [LockFunctionModuleLow](#lockfunctionmodulelow-low)
     - [LockProgramLow](#lockprogramlow-low)
+    - [RunClassUnitTestsLow](#runclassunittestslow-low)
     - [UnlockClassLow](#unlockclasslow-low)
+    - [UnlockClassTestClassesLow](#unlockclasstestclasseslow-low)
     - [UnlockFunctionGroupLow](#unlockfunctiongrouplow-low)
     - [UnlockFunctionModuleLow](#unlockfunctionmodulelow-low)
     - [UnlockProgramLow](#unlockprogramlow-low)
     - [UpdateClassLow](#updateclasslow-low)
+    - [UpdateClassTestClassesLow](#updateclasstestclasseslow-low)
     - [UpdateFunctionModuleLow](#updatefunctionmodulelow-low)
     - [UpdateProgramLow](#updateprogramlow-low)
     - [ValidateClassLow](#validateclasslow-low)
     - [ValidateFunctionGroupLow](#validatefunctiongrouplow-low)
     - [ValidateFunctionModuleLow](#validatefunctionmodulelow-low)
     - [ValidateProgramLow](#validateprogramlow-low)
-- [Tables and Structures](#tables-and-structures) (49 tools – 8 high-level, 35 low-level, 6 read-only)
+- [Tables and Structures](#tables-and-structures) (55 tools – 8 high-level, 40 low-level, 7 read-only)
   - [Read-Only Tools](#tables-and-structures-read-only)
     - [GetDataElement](#getdataelement-readonly)
     - [GetDomain](#getdomain-readonly)
+    - [GetServiceDefinition](#getservicedefinition-readonly)
     - [GetStructure](#getstructure-readonly)
     - [GetTable](#gettable-readonly)
     - [GetTableContents](#gettablecontents-readonly)
@@ -80,6 +92,11 @@ The navigation below mirrors the document structure for easier discovery.
     - [UpdateDomain](#updatedomain-high)
     - [UpdateView](#updateview-high)
   - [Low-Level Tools](#tables-and-structures-low-level)
+    - [ActivateDataElementLow](#activatedataelementlow-low)
+    - [ActivateDomainLow](#activatedomainlow-low)
+    - [ActivateStructureLow](#activatestructurelow-low)
+    - [ActivateTableLow](#activatetablelow-low)
+    - [ActivateViewLow](#activateviewlow-low)
     - [CheckDataElementLow](#checkdataelementlow-low)
     - [CheckDomainLow](#checkdomainlow-low)
     - [CheckStructureLow](#checkstructurelow-low)
@@ -115,7 +132,7 @@ The navigation below mirrors the document structure for easier discovery.
     - [ValidateStructureLow](#validatestructurelow-low)
     - [ValidateTableLow](#validatetablelow-low)
     - [ValidateViewLow](#validateviewlow-low)
-- [Packages and Interfaces](#packages-and-interfaces) (19 tools – 3 high-level, 14 low-level, 2 read-only)
+- [Packages and Interfaces](#packages-and-interfaces) (20 tools – 3 high-level, 15 low-level, 2 read-only)
   - [Read-Only Tools](#packages-and-interfaces-read-only)
     - [GetInterface](#getinterface-readonly)
     - [GetPackage](#getpackage-readonly)
@@ -124,6 +141,7 @@ The navigation below mirrors the document structure for easier discovery.
     - [CreatePackage](#createpackage-high)
     - [UpdateInterface](#updateinterface-high)
   - [Low-Level Tools](#packages-and-interfaces-low-level)
+    - [ActivateInterfaceLow](#activateinterfacelow-low)
     - [CheckInterfaceLow](#checkinterfacelow-low)
     - [CheckPackageLow](#checkpackagelow-low)
     - [CreateInterfaceLow](#createinterfacelow-low)
@@ -168,7 +186,7 @@ The navigation below mirrors the document structure for easier discovery.
     - [CreateTransport](#createtransport-high)
   - [Low-Level Tools](#search,-sql,-transactions-low-level)
     - [CreateTransportLow](#createtransportlow-low)
-- [Enhancements](#enhancements) (22 tools – 4 high-level, 14 low-level, 4 read-only)
+- [Enhancements](#enhancements) (24 tools – 4 high-level, 16 low-level, 4 read-only)
   - [Read-Only Tools](#enhancements-read-only)
     - [GetBdef](#getbdef-readonly)
     - [GetEnhancementImpl](#getenhancementimpl-readonly)
@@ -180,6 +198,8 @@ The navigation below mirrors the document structure for easier discovery.
     - [UpdateBehaviorDefinition](#updatebehaviordefinition-high)
     - [UpdateMetadataExtension](#updatemetadataextension-high)
   - [Low-Level Tools](#enhancements-low-level)
+    - [ActivateBehaviorDefinitionLow](#activatebehaviordefinitionlow-low)
+    - [ActivateMetadataExtensionLow](#activatemetadataextensionlow-low)
     - [CheckBehaviorDefinitionLow](#checkbehaviordefinitionlow-low)
     - [CheckMetadataExtensionLow](#checkmetadataextensionlow-low)
     - [CreateBehaviorDefinitionLow](#createbehaviordefinitionlow-low)
@@ -422,6 +442,85 @@ The navigation below mirrors the document structure for easier discovery.
 
 *Low-level tools perform a single operation (one method call to CrudClient).*
 
+### ActivateClassLow {#activateclasslow-low}
+**Description:** [low-level] Activate an ABAP class. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Class name (e.g., ZCL_MY_CLASS).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### ActivateClassTestClassesLow {#activateclasstestclasseslow-low}
+**Description:** [low-level] Activate ABAP Unit test classes include for an existing class. Should be executed after updating and unlocking test classes.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Class name (e.g., ZCL_MY_CLASS).
+- `test_class_name` (string, optional) - Optional ABAP Unit test class name (e.g., LTCL_MY_CLASS). Defaults to auto-detected value.
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### ActivateFunctionGroupLow {#activatefunctiongrouplow-low}
+**Description:** [low-level] Activate an ABAP function group. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Function group name (e.g., Z_FG_TEST).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### ActivateFunctionModuleLow {#activatefunctionmodulelow-low}
+**Description:** [low-level] Activate an ABAP function module. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Function module name (e.g., Z_FM_TEST).
+- `function_group_name` (string, required) - Function group name (e.g., Z_FG_TEST).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{
+  "function_group_name": "\"ZMY_FUNCTION_GROUP_NAME\""
+}
+```
+
+---
+
+### ActivateProgramLow {#activateprogramlow-low}
+**Description:** [low-level] Activate an ABAP program. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Program name (e.g., Z_MY_PROGRAM).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{}
+```
+
+---
+
 ### CheckClassLow {#checkclasslow-low}
 **Description:** [low-level] Perform syntax check on an ABAP class. Can check existing class (active/inactive) or hypothetical source code. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -647,8 +746,56 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
+### GetClassUnitTestResultLow {#getclassunittestresultlow-low}
+**Description:** [low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Run identifier returned by RunClassUnitTestsLow.
+- `with_navigation_uris` (boolean, optional) - Optional flag to request navigation URIs in SAP response (default true).
+- `format` (string, optional) - Preferred response format. Defaults to 
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### GetClassUnitTestStatusLow {#getclassunitteststatuslow-low}
+**Description:** [low-level] Retrieve ABAP Unit run status XML for a previously started run_id.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Run identifier returned by RunClassUnitTestsLow.
+- `with_long_polling` (boolean, optional) - Optional flag to enable SAP long-polling (default true).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{}
+```
+
+---
+
 ### LockClassLow {#lockclasslow-low}
 **Description:** [low-level] Lock an ABAP class for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Class name (e.g., ZCL_MY_CLASS).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### LockClassTestClassesLow {#lockclasstestclasseslow-low}
+**Description:** [low-level] Lock ABAP Unit test classes include (CLAS/OC testclasses) for the specified class. Returns a test_classes_lock_handle for subsequent update/unlock operations using the same session.
 
 **Parameters:**
 - `inputSchema` (string, optional) - Class name (e.g., ZCL_MY_CLASS).
@@ -710,6 +857,26 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
+### RunClassUnitTestsLow {#runclassunittestslow-low}
+**Description:** [low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Class that owns the test include (e.g., ZCL_MAIN_CLASS).
+- `test_class` (string, required) - Test class name inside the include (e.g., LTCL_MAIN_CLASS).
+- `title` (string, optional) - Optional title for the ABAP Unit run.
+- `context` (string, optional) - Optional context string shown in SAP tools.
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{
+  "test_class": "\"example_value\""
+}
+```
+
+---
+
 ### UnlockClassLow {#unlockclasslow-low}
 **Description:** [low-level] Unlock an ABAP class after modification. Must use the same session_id and lock_handle from LockClass operation.
 
@@ -724,6 +891,24 @@ The navigation below mirrors the document structure for easier discovery.
 {
   "lock_handle": "\"example_value\"",
   "session_id": "\"example_value\""
+}
+```
+
+---
+
+### UnlockClassTestClassesLow {#unlockclasstestclasseslow-low}
+**Description:** [low-level] Unlock ABAP Unit test classes include for a class using the test_classes_lock_handle obtained from LockClassTestClassesLow.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Class name (e.g., ZCL_MY_CLASS).
+- `lock_handle` (string, required) - Lock handle returned by LockClassTestClassesLow.
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{
+  "lock_handle": "\"example_value\""
 }
 ```
 
@@ -802,6 +987,26 @@ The navigation below mirrors the document structure for easier discovery.
 ```json
 {
   "source_code": "\"example_value\"",
+  "lock_handle": "\"example_value\""
+}
+```
+
+---
+
+### UpdateClassTestClassesLow {#updateclasstestclasseslow-low}
+**Description:** [low-level] Upload ABAP Unit test include source code for an existing class. Requires test_classes_lock_handle from LockClassTestClassesLow.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Class name (e.g., ZCL_MY_CLASS).
+- `test_class_source` (string, required) - Complete ABAP Unit test class source code.
+- `lock_handle` (string, required) - Test classes lock handle from LockClassTestClassesLow.
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{
+  "test_class_source": "\"example_value\"",
   "lock_handle": "\"example_value\""
 }
 ```
@@ -948,6 +1153,18 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
+### GetServiceDefinition {#getservicedefinition-readonly}
+**Description:** [read-only] Retrieve ABAP CDS Service Definition metadata and source code.
+
+**Parameters:** None
+
+**Example:**
+```json
+{}
+```
+
+---
+
 ### GetStructure {#getstructure-readonly}
 **Description:** [read-only] Retrieve ABAP Structure.
 
@@ -1011,7 +1228,7 @@ The navigation below mirrors the document structure for easier discovery.
 - `description` (string, optional) - Data element description. If not provided, data_element_name will be used.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `domain_name` (string, required) - Domain name to use as type reference (e.g., ZZ_TEST_0001)
+- `domain_name` (string, optional) - Domain name to use as type reference (e.g., ZZ_TEST_0001)
 - `data_type` (string, optional (default: "CHAR")) - Data type (e.g., CHAR, NUMC). Usually inherited from domain.
 - `length` (number, optional (default: "100")) - Data type length. Usually inherited from domain.
 - `decimals` (number, optional (default: "0")) - Decimal places. Usually inherited from domain.
@@ -1019,15 +1236,16 @@ The navigation below mirrors the document structure for easier discovery.
 - `medium_label` (string, optional) - Medium field label (max 20 chars)
 - `long_label` (string, optional) - Long field label (max 40 chars)
 - `heading_label` (string, optional) - Heading field label (max 55 chars)
+- `type_kind` (string, optional (default: "domain")) - Type kind: 
 
 **Example:**
 ```json
 {
   "package_name": "\"ZMY_PACKAGE_NAME\"",
-  "domain_name": "\"ZMY_DOMAIN_NAME\"",
   "data_type": "\"PROG/P\"",
   "length": "100",
-  "decimals": "0"
+  "decimals": "0",
+  "type_kind": "\"PROG/P\""
 }
 ```
 
@@ -1228,6 +1446,81 @@ The navigation below mirrors the document structure for easier discovery.
 
 *Low-level tools perform a single operation (one method call to CrudClient).*
 
+### ActivateDataElementLow {#activatedataelementlow-low}
+**Description:** [low-level] Activate an ABAP data element. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Data element name (e.g., ZDT_MY_ELEMENT).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### ActivateDomainLow {#activatedomainlow-low}
+**Description:** [low-level] Activate an ABAP domain. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Domain name (e.g., ZDM_MY_DOMAIN).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### ActivateStructureLow {#activatestructurelow-low}
+**Description:** [low-level] Activate an ABAP structure. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Structure name (e.g., ZST_MY_STRUCTURE).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### ActivateTableLow {#activatetablelow-low}
+**Description:** [low-level] Activate an ABAP table. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Table name (e.g., ZTB_MY_TABLE).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### ActivateViewLow {#activateviewlow-low}
+**Description:** [low-level] Activate an ABAP view (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Parameters:**
+- `inputSchema` (string, optional) - View name (e.g., ZVW_MY_VIEW).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{}
+```
+
+---
+
 ### CheckDataElementLow {#checkdataelementlow-low}
 **Description:** [low-level] Perform syntax check on an ABAP data element. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -1312,6 +1605,9 @@ The navigation below mirrors the document structure for easier discovery.
 - `description` (string, required) - DataElement description.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `domain_name` (string, optional) - Domain name (required for domain-based data elements).
+- `type_kind` (string, optional) - Type kind: 
+- `type_name` (string, optional) - Type name (for predefined types).
 - `application` (string, optional (default: "*).")) - Application area (optional, default: 
 - `master_system` (string, optional) - Master system (optional).
 - `responsible` (string, optional) - User responsible for the data element (optional).
@@ -1786,12 +2082,16 @@ The navigation below mirrors the document structure for easier discovery.
 
 **Parameters:**
 - `inputSchema` (string, optional) - Domain name to validate (e.g., Z_MY_PROGRAM).
+- `description` (string, required) - Domain description (required for validation).
+- `package_name` (string, optional) - Package name (optional, for validation).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
 **Example:**
 ```json
-{}
+{
+  "description": "\"example_value\""
+}
 ```
 
 ---
@@ -1935,6 +2235,21 @@ The navigation below mirrors the document structure for easier discovery.
 
 *Low-level tools perform a single operation (one method call to CrudClient).*
 
+### ActivateInterfaceLow {#activateinterfacelow-low}
+**Description:** [low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Interface name (e.g., ZIF_MY_INTERFACE).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{}
+```
+
+---
+
 ### CheckInterfaceLow {#checkinterfacelow-low}
 **Description:** [low-level] Perform syntax check on an ABAP interface. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -1998,7 +2313,11 @@ The navigation below mirrors the document structure for easier discovery.
 - `inputSchema` (string, optional) - Package name (e.g., ZOK_TEST_0002). Must follow SAP naming conventions.
 - `super_package` (string, required) - Super package (parent package) name (e.g., ZOK_PACKAGE). Required.
 - `description` (string, required) - Package description.
+- `package_type` (string, optional) - Package type (development/structure). Defaults to development.
+- `software_component` (string, optional) - Software component (e.g., HOME, ZLOCAL).
+- `transport_layer` (string, optional) - Transport layer (e.g., ZDEV). Required for transportable packages.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `application_component` (string, optional) - Application component (e.g., BC-ABA).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -2693,6 +3012,36 @@ The navigation below mirrors the document structure for easier discovery.
 
 *Low-level tools perform a single operation (one method call to CrudClient).*
 
+### ActivateBehaviorDefinitionLow {#activatebehaviordefinitionlow-low}
+**Description:** [low-level] Activate an ABAP behavior definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Behavior definition name (root entity, e.g., ZI_MY_ENTITY).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### ActivateMetadataExtensionLow {#activatemetadataextensionlow-low}
+**Description:** [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Metadata extension name (e.g., ZC_MY_EXTENSION).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{}
+```
+
+---
+
 ### CheckBehaviorDefinitionLow {#checkbehaviordefinitionlow-low}
 **Description:** [low-level] Perform syntax check on an ABAP behavior definition. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2985,6 +3334,6 @@ All functions return MCP-compliant responses in the following format:
 
 ---
 
-*Last updated: 2025-11-24*
+*Last updated: 2025-11-26*
 *Document version: 1.0*
 *Generated automatically from TOOL_DEFINITION exports*

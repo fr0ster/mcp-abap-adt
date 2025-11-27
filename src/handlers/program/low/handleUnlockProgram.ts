@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -57,7 +57,7 @@ interface UnlockProgramArgs {
  *
  * Uses CrudClient.unlockProgram - low-level single method call
  */
-export async function handleUnlockProgram(args: any) {
+export async function handleUnlockProgram(args: UnlockProgramArgs) {
   try {
     const {
       program_name,
@@ -69,6 +69,11 @@ export async function handleUnlockProgram(args: any) {
     // Validation
     if (!program_name || !lock_handle || !session_id) {
       return return_error(new Error('program_name, lock_handle, and session_id are required'));
+    }
+
+    // Check if cloud - programs are not available on cloud systems
+    if (isCloudConnection()) {
+      return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
     }
 
     const connection = getManagedConnection();
@@ -92,7 +97,7 @@ export async function handleUnlockProgram(args: any) {
 
     try {
       // Unlock program
-      await client.unlockProgram(programName, lock_handle);
+      await client.unlockProgram({ programName: programName }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {

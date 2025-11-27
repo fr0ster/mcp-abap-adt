@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -18,6 +18,14 @@ export const TOOL_DEFINITION = {
       structure_name: {
         type: "string",
         description: "Structure name to validate (e.g., Z_MY_PROGRAM)."
+      },
+      package_name: {
+        type: "string",
+        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation."
+      },
+      description: {
+        type: "string",
+        description: "Structure description. Required for validation."
       },
       session_id: {
         type: "string",
@@ -33,12 +41,14 @@ export const TOOL_DEFINITION = {
         }
       }
     },
-    required: ["structure_name"]
+    required: ["structure_name", "package_name", "description"]
   }
 } as const;
 
 interface ValidateStructureArgs {
   structure_name: string;
+  package_name: string;
+  description: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -52,17 +62,19 @@ interface ValidateStructureArgs {
  *
  * Uses CrudClient.validateStructure - low-level single method call
  */
-export async function handleValidateStructure(args: any) {
+export async function handleValidateStructure(args: ValidateStructureArgs) {
   try {
     const {
       structure_name,
+      package_name,
+      description,
       session_id,
       session_state
     } = args as ValidateStructureArgs;
 
     // Validation
-    if (!structure_name) {
-      return return_error(new Error('structure_name is required'));
+    if (!structure_name || !package_name || !description) {
+      return return_error(new Error('structure_name, package_name, and description are required'));
     }
 
     const connection = getManagedConnection();
@@ -86,8 +98,16 @@ export async function handleValidateStructure(args: any) {
 
     try {
       // Validate structure
-      await client.validateStructure(structureName);
-      const result = client.getValidationResult();
+      await client.validateStructure({
+        structureName: structureName,
+        packageName: package_name.toUpperCase(),
+        description: description
+      });
+      const validationResponse = client.getValidationResponse();
+      if (!validationResponse) {
+        throw new Error('Validation did not return a result');
+      }
+      const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();

@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -87,7 +87,7 @@ interface CreateProgramArgs {
  *
  * Uses CrudClient.createProgram - low-level single method call
  */
-export async function handleCreateProgram(args: any) {
+export async function handleCreateProgram(args: CreateProgramArgs) {
   try {
     const {
       program_name,
@@ -105,6 +105,11 @@ export async function handleCreateProgram(args: any) {
     // Validation
     if (!program_name || !description || !package_name) {
       return return_error(new Error('program_name, description, and package_name are required'));
+    }
+
+    // Check if cloud - programs are not available on cloud systems
+    if (isCloudConnection()) {
+      return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
     }
 
     const connection = getManagedConnection();
@@ -128,18 +133,14 @@ export async function handleCreateProgram(args: any) {
 
     try {
       // Create program
-      await client.createProgram(
+      await client.createProgram({
         programName,
         description,
-        package_name,
-        transport_request,
-        {
-          programType: program_type,
-          application,
-          masterSystem: master_system,
-          responsible
-        }
-      );
+        packageName: package_name,
+        transportRequest: transport_request,
+        programType: program_type,
+        application
+      });
       const createResult = client.getCreateResult();
 
       if (!createResult) {

@@ -6,7 +6,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { handlerLogger } from '../../../lib/logger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -18,6 +19,10 @@ export const TOOL_DEFINITION = {
       function_group_name: {
         type: "string",
         description: "FunctionGroup name to validate (e.g., Z_MY_PROGRAM)."
+      },
+      description: {
+        type: "string",
+        description: "Optional description for validation"
       },
       session_id: {
         type: "string",
@@ -39,6 +44,7 @@ export const TOOL_DEFINITION = {
 
 interface ValidateFunctionGroupArgs {
   function_group_name: string;
+  description?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -52,10 +58,11 @@ interface ValidateFunctionGroupArgs {
  *
  * Uses CrudClient.validateFunctionGroup - low-level single method call
  */
-export async function handleValidateFunctionGroup(args: any) {
+export async function handleValidateFunctionGroup(args: ValidateFunctionGroupArgs) {
   try {
     const {
       function_group_name,
+      description,
       session_id,
       session_state
     } = args as ValidateFunctionGroupArgs;
@@ -82,18 +89,38 @@ export async function handleValidateFunctionGroup(args: any) {
 
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function group validation: ${functionGroupName}`);
+    handlerLogger.info('ValidateFunctionGroupLow', 'start', `Starting function group validation: ${functionGroupName}`, {
+      functionGroupName,
+      hasDescription: !!description,
+      hasSession: !!(session_id && session_state)
+    });
 
     try {
       // Validate function group
-      await client.validateFunctionGroup(functionGroupName);
-      const result = client.getValidationResult();
+      // Ensure description is not empty (required for validation)
+      const validationDescription = description || functionGroupName;
+      handlerLogger.debug('ValidateFunctionGroupLow', 'validate', `Validating function group: ${functionGroupName}`, {
+        functionGroupName,
+        description: validationDescription
+      });
+      await client.validateFunctionGroup({
+        functionGroupName: functionGroupName,
+        description: validationDescription
+      });
+      const validationResponse = client.getValidationResponse();
+      if (!validationResponse) {
+        throw new Error('Validation did not return a result');
+      }
+      const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ValidateFunctionGroup completed: ${functionGroupName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      handlerLogger.info('ValidateFunctionGroupLow', 'complete', `Function group validation completed: ${functionGroupName}`, {
+        functionGroupName,
+        valid: result.valid,
+        message: result.message
+      });
 
       return return_response({
         data: JSON.stringify({
@@ -113,6 +140,9 @@ export async function handleValidateFunctionGroup(args: any) {
       } as AxiosResponse);
 
     } catch (error: any) {
+      handlerLogger.error('ValidateFunctionGroupLow', 'error', `Error validating function group ${functionGroupName}`, {
+        error: error.message || String(error)
+      });
       logger.error(`Error validating function group ${functionGroupName}:`, error);
 
       // Parse error message

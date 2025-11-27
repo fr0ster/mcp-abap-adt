@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 
@@ -53,17 +53,22 @@ interface CheckProgramArgs {
  *
  * Uses CrudClient.checkProgram - low-level single method call
  */
-export async function handleCheckProgram(args: any) {
+export async function handleCheckProgram(args: CheckProgramArgs) {
   try {
     const {
       program_name,
       session_id,
       session_state
-    } = args as CheckProgramArgs;
+    } = args;
 
     // Validation
     if (!program_name) {
       return return_error(new Error('program_name is required'));
+    }
+
+    // Check if cloud - programs are not available on cloud systems
+    if (isCloudConnection()) {
+      return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
     }
 
     const connection = getManagedConnection();
@@ -87,7 +92,7 @@ export async function handleCheckProgram(args: any) {
 
     try {
       // Check program
-      await client.checkProgram(programName);
+      await client.checkProgram({ programName: programName });
       const response = client.getCheckResult();
 
       if (!response) {

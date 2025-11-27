@@ -67,7 +67,7 @@ interface UpdateFunctionModuleArgs {
  *
  * Uses CrudClient.updateFunctionModule - low-level single method call
  */
-export async function handleUpdateFunctionModule(args: any) {
+export async function handleUpdateFunctionModule(args: UpdateFunctionModuleArgs) {
   try {
     const {
       function_module_name,
@@ -105,7 +105,7 @@ export async function handleUpdateFunctionModule(args: any) {
 
     try {
       // Update function module with source code
-      await client.updateFunctionModule(functionModuleName, functionGroupName, source_code, lock_handle);
+      await client.updateFunctionModule({ functionModuleName: functionModuleName, functionGroupName: functionGroupName, sourceCode: source_code }, lock_handle);
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {

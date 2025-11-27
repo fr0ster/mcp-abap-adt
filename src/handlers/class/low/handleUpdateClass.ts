@@ -62,7 +62,7 @@ interface UpdateClassArgs {
  *
  * Uses CrudClient.updateClass - low-level single method call
  */
-export async function handleUpdateClass(args: any) {
+export async function handleUpdateClass(args: UpdateClassArgs) {
   try {
     const {
       class_name,
@@ -98,7 +98,7 @@ export async function handleUpdateClass(args: any) {
 
     try {
       // Update class with source code
-      await client.updateClass(className, source_code, lock_handle);
+      await client.updateClass({ className, sourceCode: source_code }, lock_handle);
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {

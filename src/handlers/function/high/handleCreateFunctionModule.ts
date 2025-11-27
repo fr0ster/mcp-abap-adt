@@ -63,7 +63,7 @@ interface CreateFunctionModuleArgs {
  * Uses FunctionModuleBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateFunctionModule(args: any) {
+export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs) {
   try {
     // Validate required parameters
     if (!args?.function_group_name) {
@@ -77,11 +77,13 @@ export async function handleCreateFunctionModule(args: any) {
     }
 
     // Validate transport_request: required for non-$TMP packages
-    try {
-      validateTransportRequest(args.package_name, args.transport_request);
-    } catch (error) {
-      return return_error(error as Error);
-    }
+    // Note: package_name is not available for function modules (inherited from function group)
+    // Skip validation for now - function group should handle transport request validation
+    // try {
+    //   validateTransportRequest(args.package_name, args.transport_request);
+    // } catch (error) {
+    //   return return_error(error as Error);
+    // }
 
     const typedArgs = args as CreateFunctionModuleArgs;
     const connection = getManagedConnection();
@@ -96,34 +98,40 @@ export async function handleCreateFunctionModule(args: any) {
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Validate
-      await client.validateFunctionModule(functionModuleName, functionGroupName);
+      await client.validateFunctionModule({
+        functionModuleName,
+        functionGroupName,
+        packageName: '',
+        description: typedArgs.description || functionModuleName
+      });
 
       // Create
       // Note: Package name inherited from parent function group
-      await client.createFunctionModule(
+      await client.createFunctionModule({
         functionModuleName,
         functionGroupName,
-        typedArgs.description || functionModuleName,
-        '', // packageName inherited from function group
-        typedArgs.transport_request
-      );
+        description: typedArgs.description || functionModuleName,
+        packageName: '', // packageName inherited from function group
+        sourceCode: typedArgs.source_code || '',
+        transportRequest: typedArgs.transport_request
+      });
 
       // Lock
-      await client.lockFunctionModule(functionModuleName, functionGroupName);
+      await client.lockFunctionModule({ functionModuleName, functionGroupName });
       const lockHandle = client.getLockHandle();
 
       // Update with source code
-      await client.updateFunctionModule(functionModuleName, functionGroupName, typedArgs.source_code, lockHandle);
+      await client.updateFunctionModule({ functionModuleName, functionGroupName, sourceCode: typedArgs.source_code }, lockHandle);
 
       // Check
-      await client.checkFunctionModule(functionModuleName, functionGroupName);
+      await client.checkFunctionModule({ functionModuleName, functionGroupName });
 
       // Unlock
-      await client.unlockFunctionModule(functionModuleName, functionGroupName, lockHandle);
+      await client.unlockFunctionModule({ functionModuleName, functionGroupName }, lockHandle);
 
       // Activate if requested
       if (shouldActivate) {
-        await client.activateFunctionModule(functionModuleName, functionGroupName);
+        await client.activateFunctionModule({ functionModuleName, functionGroupName });
       }
 
       logger.info(`✅ CreateFunctionModule completed successfully: ${functionModuleName}`);

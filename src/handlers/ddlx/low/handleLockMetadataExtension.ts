@@ -52,7 +52,7 @@ interface LockMetadataExtensionArgs {
  *
  * Uses CrudClient.lockMetadataExtension - low-level single method call
  */
-export async function handleLockMetadataExtension(args: any) {
+export async function handleLockMetadataExtension(args: LockMetadataExtensionArgs) {
   try {
     const {
       name,
@@ -86,7 +86,7 @@ export async function handleLockMetadataExtension(args: any) {
 
     try {
       // Lock metadata extension
-      await client.lockMetadataExtension(ddlxName);
+      await client.lockMetadataExtension({ name: ddlxName });
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {

@@ -38,7 +38,7 @@ interface DeleteFunctionGroupArgs {
  *
  * Uses CrudClient.deleteFunctionGroup - low-level single method call
  */
-export async function handleDeleteFunctionGroup(args: any) {
+export async function handleDeleteFunctionGroup(args: DeleteFunctionGroupArgs) {
   try {
     const {
       function_group_name,
@@ -58,7 +58,7 @@ export async function handleDeleteFunctionGroup(args: any) {
 
     try {
       // Delete function group
-      await client.deleteFunctionGroup(functionGroupName, transport_request);
+      await client.deleteFunctionGroup({ functionGroupName: functionGroupName, transportRequest: transport_request });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {

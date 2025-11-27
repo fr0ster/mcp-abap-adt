@@ -62,7 +62,7 @@ interface UpdateMetadataExtensionArgs {
  *
  * Uses CrudClient.updateMetadataExtension - low-level single method call
  */
-export async function handleUpdateMetadataExtension(args: any) {
+export async function handleUpdateMetadataExtension(args: UpdateMetadataExtensionArgs) {
   try {
     const {
       name,
@@ -98,7 +98,10 @@ export async function handleUpdateMetadataExtension(args: any) {
 
     try {
       // Update metadata extension with source code
-      await client.updateMetadataExtension(metadataExtensionName, source_code, lock_handle);
+      await client.updateMetadataExtension({
+        name: metadataExtensionName,
+        sourceCode: source_code
+      }, lock_handle);
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {

@@ -6,7 +6,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { handlerLogger } from '../../../lib/logger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -52,7 +53,7 @@ interface LockDomainArgs {
  *
  * Uses CrudClient.lockDomain - low-level single method call
  */
-export async function handleLockDomain(args: any) {
+export async function handleLockDomain(args: LockDomainArgs) {
   try {
     const {
       domain_name,
@@ -68,25 +69,52 @@ export async function handleLockDomain(args: any) {
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
+    const domainName = domain_name.toUpperCase();
+
+    handlerLogger.info('LockDomain', 'start', `Starting lock for ${domainName}`, {
+      session_id: session_id || 'none',
+      has_session_state: !!session_state,
+      session_state_cookies: session_state?.cookies?.substring(0, 50) + '...' || 'none',
+      session_state_csrf: session_state?.csrf_token?.substring(0, 20) + '...' || 'none',
+      session_state_cookie_store_keys: session_state?.cookie_store ? Object.keys(session_state.cookie_store) : []
+    });
+
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
+      handlerLogger.info('LockDomain', 'restore_session', 'Restoring session state', {
+        session_id,
+        cookies_length: session_state.cookies?.length || 0,
+        csrf_token_length: session_state.csrf_token?.length || 0,
+        cookie_store_size: session_state.cookie_store ? Object.keys(session_state.cookie_store).length : 0
+      });
+
+      // CRITICAL: Use restoreSessionInConnection to properly restore session
+      // This will set sessionId in connection and enable stateful session mode
+      await restoreSessionInConnection(connection, session_id, session_state);
+
+      // Verify session was restored
+      const restoredState = connection.getSessionState();
+      handlerLogger.info('LockDomain', 'session_restored', 'Session state restored successfully', {
+        session_id,
+        connection_session_id: connection.getSessionId(),
+        restored_cookies_length: restoredState?.cookies?.length || 0,
+        restored_csrf_token_length: restoredState?.csrfToken?.length || 0,
+        restored_cookie_store_size: restoredState?.cookieStore ? Object.keys(restoredState.cookieStore).length : 0,
+        cookies_match: restoredState?.cookies === session_state.cookies,
+        csrf_token_match: restoredState?.csrfToken === session_state.csrf_token
       });
     } else {
+      handlerLogger.info('LockDomain', 'connect', 'No session provided, creating new connection');
       // Ensure connection is established
       await connection.connect();
     }
-
-    const domainName = domain_name.toUpperCase();
 
     logger.info(`Starting domain lock: ${domainName}`);
 
     try {
       // Lock domain
-      await client.lockDomain(domainName);
+      handlerLogger.debug('LockDomain', 'lock', `Calling client.lockDomain({ domainName: ${domainName} })`);
+      await client.lockDomain({ domainName });
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {
@@ -96,6 +124,23 @@ export async function handleLockDomain(args: any) {
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
+      // Get actual session ID from connection (may be different from input if new session was created)
+      const actualSessionId = connection.getSessionId() || session_id || null;
+
+      handlerLogger.info('LockDomain', 'success', `Lock completed for ${domainName}`, {
+        lock_handle: lockHandle,
+        lock_handle_length: lockHandle.length,
+        input_session_id: session_id || 'none',
+        actual_session_id: actualSessionId || 'none',
+        updated_session_state: {
+          has_cookies: !!updatedSessionState?.cookies,
+          cookies_length: updatedSessionState?.cookies?.length || 0,
+          has_csrf_token: !!updatedSessionState?.csrfToken,
+          csrf_token_length: updatedSessionState?.csrfToken?.length || 0,
+          cookie_store_size: updatedSessionState?.cookieStore ? Object.keys(updatedSessionState.cookieStore).length : 0
+        }
+      });
+
       logger.info(`✅ LockDomain completed: ${domainName}`);
       logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
@@ -103,7 +148,7 @@ export async function handleLockDomain(args: any) {
         data: JSON.stringify({
           success: true,
           domain_name: domainName,
-          session_id: session_id || null,
+          session_id: actualSessionId,
           lock_handle: lockHandle,
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,

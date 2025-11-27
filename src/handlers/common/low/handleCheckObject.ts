@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, logErrorSafely } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
@@ -68,7 +68,7 @@ interface CheckObjectArgs {
  * Uses runCheckRun and parseCheckRunResponse from @mcp-abap-adt/adt-clients/core for all operations
  * Connection management handled internally
  */
-export async function handleCheckObject(args: any) {
+export async function handleCheckObject(args: CheckObjectArgs) {
   try {
     const {
       object_name,
@@ -117,47 +117,47 @@ export async function handleCheckObject(args: any) {
       // Call appropriate check method based on object type
       switch (object_type.toLowerCase()) {
         case 'class':
-          await client.checkClass(objectName);
+          await client.checkClass({ className: objectName }, checkVersion);
           response = client.getCheckResult();
           break;
         case 'program':
-          await client.checkProgram(objectName);
+          await client.checkProgram({ programName: objectName }, checkVersion);
           response = client.getCheckResult();
           break;
         case 'interface':
-          await client.checkInterface(objectName);
+          await client.checkInterface({ interfaceName: objectName });
           response = client.getCheckResult();
           break;
         case 'function_group':
-          await client.checkFunctionGroup(objectName);
+          await client.checkFunctionGroup({ functionGroupName: objectName });
           response = client.getCheckResult();
           break;
         case 'table':
-          await client.checkTable(objectName);
+          await client.checkTable({ tableName: objectName });
           response = client.getCheckResult();
           break;
         case 'structure':
-          await client.checkStructure(objectName);
+          await client.checkStructure({ structureName: objectName });
           response = client.getCheckResult();
           break;
         case 'view':
-          await client.checkView(objectName);
+          await client.checkView({ viewName: objectName });
           response = client.getCheckResult();
           break;
         case 'domain':
-          await client.checkDomain(objectName);
+          await client.checkDomain({ domainName: objectName });
           response = client.getCheckResult();
           break;
         case 'data_element':
-          await client.checkDataElement(objectName);
+          await client.checkDataElement({ dataElementName: objectName });
           response = client.getCheckResult();
           break;
         case 'behavior_definition':
-          await client.checkBehaviorDefinition(objectName, checkVersion);
+          await client.checkBehaviorDefinition({ name: objectName }, checkVersion);
           response = client.getCheckResult();
           break;
         case 'metadata_extension':
-          await client.checkMetadataExtension(objectName, checkVersion);
+          await client.checkMetadataExtension({ name: objectName }, checkVersion);
           response = client.getCheckResult();
           break;
         default:
@@ -198,7 +198,7 @@ export async function handleCheckObject(args: any) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking object ${objectName}:`, error);
+      logErrorSafely(logger, `CheckObject ${objectName}`, error);
 
       // Parse error message
       let errorMessage = `Failed to check object: ${error.message || String(error)}`;

@@ -57,7 +57,7 @@ interface LockPackageArgs {
  *
  * Uses CrudClient.lockPackage - low-level single method call
  */
-export async function handleLockPackage(args: any) {
+export async function handleLockPackage(args: LockPackageArgs) {
   try {
     const {
       package_name,
@@ -93,7 +93,7 @@ export async function handleLockPackage(args: any) {
 
     try {
       // Lock package
-      await client.lockPackage(packageName, superPackage);
+      await client.lockPackage({ packageName, superPackage });
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {

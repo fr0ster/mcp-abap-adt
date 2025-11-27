@@ -53,7 +53,7 @@ interface CheckStructureArgs {
  *
  * Uses CrudClient.checkStructure - low-level single method call
  */
-export async function handleCheckStructure(args: any) {
+export async function handleCheckStructure(args: CheckStructureArgs) {
   try {
     const {
       structure_name,
@@ -87,7 +87,7 @@ export async function handleCheckStructure(args: any) {
 
     try {
       // Check structure
-      await client.checkStructure(structureName);
+      await client.checkStructure({ structureName: structureName });
       const response = client.getCheckResult();
 
       if (!response) {

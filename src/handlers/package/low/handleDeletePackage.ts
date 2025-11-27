@@ -38,7 +38,7 @@ interface DeletePackageArgs {
  *
  * Uses CrudClient.deletePackage - low-level single method call
  */
-export async function handleDeletePackage(args: any) {
+export async function handleDeletePackage(args: DeletePackageArgs) {
   try {
     const {
       package_name,
@@ -58,7 +58,7 @@ export async function handleDeletePackage(args: any) {
 
     try {
       // Delete package
-      await client.deletePackage(packageName, transport_request);
+      await client.deletePackage({ packageName: packageName, transportRequest: transport_request });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {

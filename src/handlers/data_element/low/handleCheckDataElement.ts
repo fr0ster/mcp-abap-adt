@@ -53,7 +53,7 @@ interface CheckDataElementArgs {
  *
  * Uses CrudClient.checkDataElement - low-level single method call
  */
-export async function handleCheckDataElement(args: any) {
+export async function handleCheckDataElement(args: CheckDataElementArgs) {
   try {
     const {
       data_element_name,
@@ -87,7 +87,7 @@ export async function handleCheckDataElement(args: any) {
 
     try {
       // Check data element
-      await client.checkDataElement(dataElementName);
+      await client.checkDataElement({ dataElementName: dataElementName });
       const response = client.getCheckResult();
 
       if (!response) {

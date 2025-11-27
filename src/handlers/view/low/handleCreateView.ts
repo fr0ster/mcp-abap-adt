@@ -83,7 +83,7 @@ interface CreateViewArgs {
  *
  * Uses CrudClient.createView - low-level single method call
  */
-export async function handleCreateView(args: any) {
+export async function handleCreateView(args: CreateViewArgs) {
   try {
     const {
       view_name,
@@ -120,12 +120,13 @@ export async function handleCreateView(args: any) {
 
     try {
       // Create view
-      await client.createView(
+      await client.createView({
         viewName,
         description,
-        package_name,
-        transport_request
-      );
+        packageName: package_name,
+        ddlSource: '',
+        transportRequest: transport_request
+      });
       const createResult = client.getCreateResult();
 
       if (!createResult) {

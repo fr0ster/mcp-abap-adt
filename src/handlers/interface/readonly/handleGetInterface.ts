@@ -12,6 +12,11 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
+interface GetInterfaceArgs {
+  [key: string]: any;
+}
+
+
 function parseInterfaceXml(xml: string) {
     const parser = new XMLParser({
         ignoreAttributes: false,
@@ -51,7 +56,7 @@ function parseInterfaceXml(xml: string) {
     return { raw: result };
 }
 
-export async function handleGetInterface(args: any) {
+export async function handleGetInterface(args: GetInterfaceArgs) {
     try {
         if (!args?.interface_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Interface name is required');

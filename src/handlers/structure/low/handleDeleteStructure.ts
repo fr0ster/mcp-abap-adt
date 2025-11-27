@@ -38,7 +38,7 @@ interface DeleteStructureArgs {
  *
  * Uses CrudClient.deleteStructure - low-level single method call
  */
-export async function handleDeleteStructure(args: any) {
+export async function handleDeleteStructure(args: DeleteStructureArgs) {
   try {
     const {
       structure_name,
@@ -58,7 +58,7 @@ export async function handleDeleteStructure(args: any) {
 
     try {
       // Delete structure
-      await client.deleteStructure(structureName, transport_request);
+      await client.deleteStructure({ structureName: structureName, transportRequest: transport_request });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {

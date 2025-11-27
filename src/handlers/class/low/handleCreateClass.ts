@@ -97,7 +97,7 @@ interface CreateClassArgs {
  *
  * Uses CrudClient.createClass - low-level single method call
  */
-export async function handleCreateClass(args: any) {
+export async function handleCreateClass(args: CreateClassArgs) {
   try {
     const {
       class_name,
@@ -112,7 +112,7 @@ export async function handleCreateClass(args: any) {
       responsible,
       session_id,
       session_state
-    } = args as CreateClassArgs;
+    } = args;
 
     // Validation
     if (!class_name || !description || !package_name) {
@@ -120,19 +120,20 @@ export async function handleCreateClass(args: any) {
     }
 
     const connection = getManagedConnection();
+
+    // Check if connection can refresh token (for debugging)
+    const connectionWithRefresh = connection as any;
+    if (connectionWithRefresh.canRefreshToken) {
+      const canRefresh = connectionWithRefresh.canRefreshToken();
+      logger.debug(`[DEBUG] handleCreateClass - Connection can refresh token: ${canRefresh}`);
+    }
+
     const client = new CrudClient(connection);
 
-    // Restore session state if provided
-    if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
-    } else {
-      // Ensure connection is established
-      await connection.connect();
-    }
+    // NOTE: Do NOT call connection.connect() here
+    // getManagedConnection() already calls connect() when creating connection
+    // Calling connect() again can trigger unnecessary token refresh attempts
+    // Connection will be established automatically on first request if needed
 
     const className = class_name.toUpperCase();
 
@@ -140,20 +141,18 @@ export async function handleCreateClass(args: any) {
 
     try {
       // Create class
-      await client.createClass(
+      await client.createClass({
         className,
         description,
-        package_name,
-        transport_request,
-        {
-          superclass,
-          final,
-          abstract,
-          createProtected: create_protected,
-          masterSystem: master_system,
-          responsible
-        }
-      );
+        packageName: package_name,
+        transportRequest: transport_request,
+        superclass,
+        final,
+        abstract,
+        createProtected: create_protected,
+        masterSystem: master_system,
+        responsible
+      });
       const createResult = client.getCreateResult();
 
       if (!createResult) {

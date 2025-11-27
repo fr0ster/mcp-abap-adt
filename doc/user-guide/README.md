@@ -57,12 +57,14 @@ See [Installation Guide](../installation/INSTALLATION.md) for full instructions.
 
 - **[CLIENT_CONFIGURATION.md](CLIENT_CONFIGURATION.md)** - Guide for configuring MCP clients to connect to the server, including HTTP header configuration for dynamic SAP connection setup
 - **[AVAILABLE_TOOLS.md](AVAILABLE_TOOLS.md)** - Complete list of all available MCP tools with descriptions and usage examples (auto-generated from handler definitions)
+- **[scenarios/](scenarios/)** - Practical examples and workflows for using low-level handlers to create and modify ABAP objects (classes, CDS views, function groups, etc.)
 
 ## Getting Started
 
 1. **Install the server**: Choose package or source installation above
 2. **Configure your client**: See [CLIENT_CONFIGURATION.md](CLIENT_CONFIGURATION.md) for setup instructions
 3. **Explore available tools**: See [AVAILABLE_TOOLS.md](AVAILABLE_TOOLS.md) for a complete list of tools you can use
+4. **Learn workflows**: See [scenarios/](scenarios/) for step-by-step guides on creating ABAP objects using low-level handlers
 
 ## Command Reference
 

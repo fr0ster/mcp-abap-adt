@@ -83,7 +83,7 @@ interface CreateStructureArgs {
  *
  * Uses CrudClient.createStructure - low-level single method call
  */
-export async function handleCreateStructure(args: any) {
+export async function handleCreateStructure(args: CreateStructureArgs) {
   try {
     const {
       structure_name,
@@ -120,12 +120,13 @@ export async function handleCreateStructure(args: any) {
 
     try {
       // Create structure
-      await client.createStructure(
+      await client.createStructure({
         structureName,
         description,
-        package_name,
-        transport_request
-      );
+        packageName: package_name,
+        ddlCode: '',
+        transportRequest: transport_request
+      });
       const createResult = client.getCreateResult();
 
       if (!createResult) {

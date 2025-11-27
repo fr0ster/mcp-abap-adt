@@ -8,7 +8,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
@@ -89,7 +89,7 @@ ENDINTERFACE.`;
  * Uses InterfaceBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by client
  */
-export async function handleCreateInterface(args: any) {
+export async function handleCreateInterface(args: CreateInterfaceArgs) {
   try {
     // Validate required parameters
     if (!args?.interface_name) {
@@ -128,20 +128,38 @@ export async function handleCreateInterface(args: any) {
       const responsible = typedArgs.responsible;
 
       // Execute the workflow
-      await client
-        .createInterface(interfaceName, description, packageName, transportRequest, {
-          masterSystem,
-          responsible
-        })
-        .then(c => c.lockInterface(interfaceName))
-        .then(c => c.updateInterface(interfaceName, sourceCode))
-        .then(c => c.checkInterface(interfaceName))
-        .then(c => c.unlockInterface(interfaceName))
-        .then(c => shouldActivate ? c.activateInterface(interfaceName) : Promise.resolve(c))
-        .catch(error => {
-          logger.error('Interface creation chain failed:', error);
-          throw error;
+      try {
+        await client.createInterface({
+          interfaceName,
+          description,
+          packageName,
+          transportRequest
         });
+        await client.lockInterface({ interfaceName });
+        await client.updateInterface({ interfaceName, sourceCode });
+        try {
+          await safeCheckOperation(
+            () => client.checkInterface({ interfaceName }),
+            interfaceName,
+            {
+              debug: (message: string) => logger.info(`[CreateInterface] ${message}`)
+            }
+          );
+        } catch (checkError: any) {
+          // If error was marked as "already checked", continue silently
+          if (!(checkError as any).isAlreadyChecked) {
+            // Real check error - rethrow
+            throw checkError;
+          }
+        }
+        await client.unlockInterface({ interfaceName });
+        if (shouldActivate) {
+          await client.activateInterface({ interfaceName });
+        }
+      } catch (error) {
+        logger.error('Interface creation chain failed:', error);
+        throw error;
+      }
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];

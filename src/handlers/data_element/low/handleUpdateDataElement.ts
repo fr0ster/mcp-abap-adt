@@ -7,6 +7,7 @@
 
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { handlerLogger } from '../../../lib/logger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -21,7 +22,7 @@ export const TOOL_DEFINITION = {
       },
       properties: {
         type: "object",
-        description: "Data element properties object. Can include: description, type_name, type_kind, domain_name, field_label_short, field_label_medium, field_label_long, etc."
+        description: "Data element properties object. Can include: description, type_name, type_kind, data_type, field_label_short, field_label_medium, field_label_long, etc."
       },
       lock_handle: {
         type: "string",
@@ -62,7 +63,7 @@ interface UpdateDataElementArgs {
  *
  * Uses CrudClient.updateDataElement - low-level single method call
  */
-export async function handleUpdateDataElement(args: any) {
+export async function handleUpdateDataElement(args: UpdateDataElementArgs) {
   try {
     const {
       data_element_name,
@@ -94,21 +95,70 @@ export async function handleUpdateDataElement(args: any) {
 
     const dataElementName = data_element_name.toUpperCase();
 
-    logger.info(`Starting data element update: ${dataElementName}`);
+    handlerLogger.info('UpdateDataElementLow', 'start', `Starting data element update: ${dataElementName}`, {
+      dataElementName,
+      hasProperties: !!properties,
+      hasLockHandle: !!lock_handle,
+      hasSession: !!(session_id && session_state)
+    });
+
+    // Validate required properties
+    const packageName = properties.package_name || properties.packageName;
+    if (!packageName) {
+      const errorMsg = 'Package name is required in properties';
+      handlerLogger.error('UpdateDataElementLow', 'validation', errorMsg, { properties });
+      return return_error(new Error(errorMsg));
+    }
 
     try {
+      // Map properties to DataElementBuilderConfig format
+      // Convert snake_case to camelCase and handle all properties
+      const updateConfig: any = {
+        dataElementName,
+        packageName: packageName,
+        description: properties.description || properties.description || undefined,
+        typeKind: properties.type_kind || properties.typeKind,
+        typeName: properties.type_name || properties.typeName,
+        dataType: properties.data_type || properties.dataType,
+        length: properties.length,
+        decimals: properties.decimals,
+        shortLabel: properties.field_label_short || properties.short_label || properties.shortLabel,
+        mediumLabel: properties.field_label_medium || properties.medium_label || properties.mediumLabel,
+        longLabel: properties.field_label_long || properties.long_label || properties.longLabel,
+        headingLabel: properties.field_label_heading || properties.heading_label || properties.headingLabel,
+        transportRequest: properties.transport_request || properties.transportRequest
+      };
+
+      // Remove undefined values
+      Object.keys(updateConfig).forEach(key => {
+        if (updateConfig[key] === undefined || updateConfig[key] === '') {
+          delete updateConfig[key];
+        }
+      });
+
+      handlerLogger.debug('UpdateDataElementLow', 'update', `Updating data element with config`, {
+        dataElementName,
+        packageName: updateConfig.packageName,
+        typeKind: updateConfig.typeKind,
+        hasDescription: !!updateConfig.description
+      });
+
       // Update data element with properties
-      await client.updateDataElement(dataElementName, properties, lock_handle);
+      await client.updateDataElement(updateConfig, lock_handle);
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {
+        handlerLogger.error('UpdateDataElementLow', 'update', `Update did not return a response for data element ${dataElementName}`);
         throw new Error(`Update did not return a response for data element ${dataElementName}`);
       }
 
       // Get updated session state after update
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UpdateDataElement completed: ${dataElementName}`);
+      handlerLogger.info('UpdateDataElementLow', 'complete', `Data element update completed: ${dataElementName}`, {
+        dataElementName,
+        status: updateResult.status
+      });
 
       return return_response({
         data: JSON.stringify({
@@ -125,6 +175,10 @@ export async function handleUpdateDataElement(args: any) {
       } as AxiosResponse);
 
     } catch (error: any) {
+      handlerLogger.error('UpdateDataElementLow', 'error', `Failed to update data element ${dataElementName}`, {
+        error: error.message || String(error),
+        errorType: error instanceof Error ? error.constructor.name : 'Unknown'
+      });
       logger.error(`Error updating data element ${dataElementName}:`, error);
 
       // Parse error message

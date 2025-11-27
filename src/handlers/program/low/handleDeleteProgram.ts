@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -38,16 +38,21 @@ interface DeleteProgramArgs {
  *
  * Uses CrudClient.deleteProgram - low-level single method call
  */
-export async function handleDeleteProgram(args: any) {
+export async function handleDeleteProgram(args: DeleteProgramArgs) {
   try {
     const {
       program_name,
       transport_request
-    } = args as DeleteProgramArgs;
+    } = args;
 
     // Validation
     if (!program_name) {
       return return_error(new Error('program_name is required'));
+    }
+
+    // Check if cloud - programs are not available on cloud systems
+    if (isCloudConnection()) {
+      return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
     }
 
     const connection = getManagedConnection();
@@ -58,7 +63,7 @@ export async function handleDeleteProgram(args: any) {
 
     try {
       // Delete program
-      await client.deleteProgram(programName, transport_request);
+      await client.deleteProgram({ programName: programName, transportRequest: transport_request });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {

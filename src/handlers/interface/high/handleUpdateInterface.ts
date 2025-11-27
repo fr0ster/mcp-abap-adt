@@ -8,7 +8,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -53,7 +53,7 @@ interface UpdateInterfaceArgs {
  * Uses InterfaceBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleUpdateInterface(args: any) {
+export async function handleUpdateInterface(args: UpdateInterfaceArgs) {
   try {
     const {
       interface_name,
@@ -79,31 +79,59 @@ export async function handleUpdateInterface(args: any) {
       // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
       const shouldActivate = activate !== false; // Default to true if not specified
 
-      // Validate
-      await client.validateInterface(interfaceName);
+      // Validate (for update, "already exists" is expected - object must exist)
+      try {
+        await client.validateInterface({
+          interfaceName,
+          packageName: undefined,
+          description: undefined
+        });
+      } catch (validateError: any) {
+        // For update operations, "already exists" is expected - object must exist
+        if (!isAlreadyExistsError(validateError)) {
+          // Real validation error - rethrow
+          throw validateError;
+        }
+        // "Already exists" is OK for update - continue
+        logger.info(`Interface ${interfaceName} already exists - this is expected for update operation`);
+      }
 
       // Lock
-      await client.lockInterface(interfaceName);
+      await client.lockInterface({ interfaceName });
       const lockHandle = client.getLockHandle();
 
       try {
         // Update source code
-        await client.updateInterface(interfaceName, source_code, lockHandle);
+        await client.updateInterface({ interfaceName, sourceCode: source_code }, lockHandle);
 
         // Check
-        await client.checkInterface(interfaceName);
+        try {
+          await safeCheckOperation(
+            () => client.checkInterface({ interfaceName }),
+            interfaceName,
+            {
+              debug: (message: string) => logger.info(`[UpdateInterface] ${message}`)
+            }
+          );
+        } catch (checkError: any) {
+          // If error was marked as "already checked", continue silently
+          if (!(checkError as any).isAlreadyChecked) {
+            // Real check error - rethrow
+            throw checkError;
+          }
+        }
 
         // Unlock
-        await client.unlockInterface(interfaceName, lockHandle);
+        await client.unlockInterface({ interfaceName }, lockHandle);
 
         // Activate if requested
         if (shouldActivate) {
-          await client.activateInterface(interfaceName);
+          await client.activateInterface({ interfaceName });
         }
       } catch (error) {
         // Try to unlock on error
         try {
-          await client.unlockInterface(interfaceName, lockHandle);
+          await client.unlockInterface({ interfaceName: interfaceName }, lockHandle);
         } catch (unlockError) {
           logger.error('Failed to unlock interface after error:', unlockError);
         }

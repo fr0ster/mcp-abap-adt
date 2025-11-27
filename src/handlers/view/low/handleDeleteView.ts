@@ -38,7 +38,7 @@ interface DeleteViewArgs {
  *
  * Uses CrudClient.deleteView - low-level single method call
  */
-export async function handleDeleteView(args: any) {
+export async function handleDeleteView(args: DeleteViewArgs) {
   try {
     const {
       view_name,
@@ -58,7 +58,7 @@ export async function handleDeleteView(args: any) {
 
     try {
       // Delete view
-      await client.deleteView(viewName, transport_request);
+      await client.deleteView({ viewName: viewName, transportRequest: transport_request });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {

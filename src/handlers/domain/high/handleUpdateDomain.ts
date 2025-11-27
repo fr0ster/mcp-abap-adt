@@ -8,7 +8,7 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -122,7 +122,7 @@ interface DomainArgs {
  * Uses DomainBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleUpdateDomain(args: any) {
+export async function handleUpdateDomain(args: DomainArgs) {
   try {
     if (!args?.domain_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Domain name is required');
@@ -145,11 +145,21 @@ export async function handleUpdateDomain(args: any) {
       const client = new CrudClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
-      // Validate
-      await client.validateDomain(domainName);
+      // Validate (for update, "already exists" is expected - object must exist)
+      try {
+        await client.validateDomain({ domainName: domainName, packageName: undefined, description: undefined });
+      } catch (validateError: any) {
+        // For update operations, "already exists" is expected - object must exist
+        if (!isAlreadyExistsError(validateError)) {
+          // Real validation error - rethrow
+          throw validateError;
+        }
+        // "Already exists" is OK for update - continue
+        logger.info(`Domain ${domainName} already exists - this is expected for update operation`);
+      }
 
       // Lock
-      await client.lockDomain(domainName);
+      await client.lockDomain({ domainName });
       const lockHandle = client.getLockHandle();
 
       try {
@@ -158,28 +168,42 @@ export async function handleUpdateDomain(args: any) {
           datatype: typedArgs.datatype,
           length: typedArgs.length,
           decimals: typedArgs.decimals,
-          conversion_exit: typedArgs.conversion_exit,
+          conversionExit: typedArgs.conversion_exit,
           lowercase: typedArgs.lowercase,
-          sign_exists: typedArgs.sign_exists,
-          value_table: typedArgs.value_table,
-          fixed_values: typedArgs.fixed_values
+          signExists: typedArgs.sign_exists,
+          valueTable: typedArgs.value_table,
+          fixedValues: typedArgs.fixed_values
         };
-        await client.updateDomain(domainName, properties, lockHandle);
+        await client.updateDomain({ domainName, ...properties }, lockHandle);
 
         // Check
-        await client.checkDomain(domainName);
+        try {
+          await safeCheckOperation(
+            () => client.checkDomain({ domainName }),
+            domainName,
+            {
+              debug: (message: string) => logger.info(`[UpdateDomain] ${message}`)
+            }
+          );
+        } catch (checkError: any) {
+          // If error was marked as "already checked", continue silently
+          if (!(checkError as any).isAlreadyChecked) {
+            // Real check error - rethrow
+            throw checkError;
+          }
+        }
 
         // Unlock
-        await client.unlockDomain(domainName, lockHandle);
+        await client.unlockDomain({ domainName }, lockHandle);
 
         // Activate if requested
         if (shouldActivate) {
-          await client.activateDomain(domainName);
+          await client.activateDomain({ domainName });
         }
       } catch (error) {
         // Try to unlock on error
         try {
-          await client.unlockDomain(domainName, lockHandle);
+          await client.unlockDomain({ domainName }, lockHandle);
         } catch (unlockError) {
           logger.error('Failed to unlock domain after error:', unlockError);
         }

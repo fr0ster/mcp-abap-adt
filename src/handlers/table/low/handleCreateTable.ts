@@ -67,7 +67,7 @@ interface CreateTableArgs {
  *
  * Uses CrudClient.createTable - low-level single method call
  */
-export async function handleCreateTable(args: any) {
+export async function handleCreateTable(args: CreateTableArgs) {
   try {
     const {
       table_name,
@@ -103,11 +103,13 @@ export async function handleCreateTable(args: any) {
 
     try {
       // Create table
-      await client.createTable(
+      await client.createTable({
         tableName,
-        package_name,
-        transport_request
-      );
+        packageName: package_name,
+        description: '',
+        ddlCode: '',
+        transportRequest: transport_request
+      });
       const createResult = client.getCreateResult();
 
       if (!createResult) {

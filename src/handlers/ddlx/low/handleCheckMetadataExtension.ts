@@ -53,7 +53,7 @@ interface CheckMetadataExtensionArgs {
  *
  * Uses CrudClient.checkMetadataExtension - low-level single method call
  */
-export async function handleCheckMetadataExtension(args: any) {
+export async function handleCheckMetadataExtension(args: CheckMetadataExtensionArgs) {
   try {
     const {
       name,
@@ -87,7 +87,7 @@ export async function handleCheckMetadataExtension(args: any) {
 
     try {
       // Check metadata extension
-      await client.checkMetadataExtension(ddlxName);
+      await client.checkMetadataExtension({ name: ddlxName });
       const response = client.getCheckResult();
 
       if (!response) {

@@ -57,21 +57,24 @@ export async function handleUpdateMetadataExtension(params: any) {
 
         // Lock if not provided
         if (!lockHandle) {
-            await client.lockMetadataExtension(name);
+            await client.lockMetadataExtension({ name: name });
             lockHandle = client.getLockHandle();
         }
 
         // Update
-        await client.updateMetadataExtension(name, args.source_code, lockHandle);
+        await client.updateMetadataExtension({
+            name,
+            sourceCode: args.source_code
+        }, lockHandle);
 
         // Unlock if we locked it internally
         if (!args.lock_handle) {
-            await client.unlockMetadataExtension(name, lockHandle);
+            await client.unlockMetadataExtension({ name: name }, lockHandle);
         }
 
         // Activate if requested
         if (shouldActivate) {
-            await client.activateMetadataExtension(name);
+            await client.activateMetadataExtension({ name: name });
         }
 
         const result = {

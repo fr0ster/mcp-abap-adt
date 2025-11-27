@@ -52,7 +52,7 @@ interface LockStructureArgs {
  *
  * Uses CrudClient.lockStructure - low-level single method call
  */
-export async function handleLockStructure(args: any) {
+export async function handleLockStructure(args: LockStructureArgs) {
   try {
     const {
       structure_name,
@@ -86,7 +86,7 @@ export async function handleLockStructure(args: any) {
 
     try {
       // Lock structure
-      await client.lockStructure(structureName);
+      await client.lockStructure({ structureName: structureName });
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {

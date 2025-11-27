@@ -57,7 +57,7 @@ interface UnlockStructureArgs {
  *
  * Uses CrudClient.unlockStructure - low-level single method call
  */
-export async function handleUnlockStructure(args: any) {
+export async function handleUnlockStructure(args: UnlockStructureArgs) {
   try {
     const {
       structure_name,
@@ -92,7 +92,7 @@ export async function handleUnlockStructure(args: any) {
 
     try {
       // Unlock structure
-      await client.unlockStructure(structureName, lock_handle);
+      await client.unlockStructure({ structureName: structureName }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {

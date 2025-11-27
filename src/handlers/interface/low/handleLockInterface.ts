@@ -52,7 +52,7 @@ interface LockInterfaceArgs {
  *
  * Uses CrudClient.lockInterface - low-level single method call
  */
-export async function handleLockInterface(args: any) {
+export async function handleLockInterface(args: LockInterfaceArgs) {
   try {
     const {
       interface_name,
@@ -86,7 +86,7 @@ export async function handleLockInterface(args: any) {
 
     try {
       // Lock interface
-      await client.lockInterface(interfaceName);
+      await client.lockInterface({ interfaceName: interfaceName });
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {

@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -21,11 +21,11 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: "string",
-        description: "Optional package name for validation"
+        description: "Package name for validation (required)."
       },
       description: {
         type: "string",
-        description: "Optional description for validation"
+        description: "Description for validation (required)."
       },
       superclass: {
         type: "string",
@@ -45,14 +45,14 @@ export const TOOL_DEFINITION = {
         }
       }
     },
-    required: ["class_name"]
+    required: ["class_name", "package_name", "description"]
   }
 } as const;
 
 interface ValidateClassArgs {
   class_name: string;
-  package_name?: string;
-  description?: string;
+  package_name: string;
+  description: string;
   superclass?: string;
   session_id?: string;
   session_state?: {
@@ -65,7 +65,7 @@ interface ValidateClassArgs {
 /**
  * Main handler for ValidateClass MCP tool
  */
-export async function handleValidateClass(args: any) {
+export async function handleValidateClass(args: ValidateClassArgs) {
   try {
     const {
       class_name,
@@ -76,8 +76,8 @@ export async function handleValidateClass(args: any) {
       session_state
     } = args as ValidateClassArgs;
 
-    if (!class_name) {
-      return return_error(new Error('class_name is required'));
+    if (!class_name || !package_name || !description) {
+      return return_error(new Error('class_name, package_name, and description are required'));
     }
 
     const connection = getManagedConnection();
@@ -99,13 +99,18 @@ export async function handleValidateClass(args: any) {
     logger.info(`Starting class validation: ${className}`);
 
     try {
-      const builder = new CrudClient(connection,);
+      const builder = new CrudClient(connection);
 
-      await builder.validateClass(className);
-      const result = builder.getValidationResult();
-      if (!result) {
+      await builder.validateClass({
+        className,
+        packageName: package_name.toUpperCase(),
+        description: description
+      });
+      const validationResponse = builder.getValidationResponse();
+      if (!validationResponse) {
         throw new Error('Validation did not return a result');
       }
+      const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();

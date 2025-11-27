@@ -63,7 +63,7 @@ interface UnlockObjectArgs {
  *
  * Uses unlock functions from @mcp-abap-adt/adt-clients/core for all operations
  */
-export async function handleUnlockObject(args: any) {
+export async function handleUnlockObject(args: UnlockObjectArgs) {
   try {
     const {
       object_name,
@@ -107,40 +107,40 @@ export async function handleUnlockObject(args: any) {
       // Call appropriate unlock method based on object type
       switch (objectType) {
         case 'class':
-          await client.unlockClass(objectName, lock_handle);
+          await client.unlockClass({ className: objectName }, lock_handle);
           break;
         case 'program':
-          await client.unlockProgram(objectName, lock_handle);
+          await client.unlockProgram({ programName: objectName }, lock_handle);
           break;
         case 'interface':
-          await client.unlockInterface(objectName, lock_handle);
+          await client.unlockInterface({ interfaceName: objectName }, lock_handle);
           break;
         case 'function_group':
-          await client.unlockFunctionGroup(objectName, lock_handle);
+          await client.unlockFunctionGroup({ functionGroupName: objectName }, lock_handle);
           break;
         case 'function_module':
           // Function module requires function group name which is not provided in this generic handler
           return return_error(new Error('Function module unlocking via UnlockObject is not supported. Function modules require function group name.'));
         case 'table':
-          await client.unlockTable(objectName, lock_handle);
+          await client.unlockTable({ tableName: objectName }, lock_handle);
           break;
         case 'structure':
-          await client.unlockStructure(objectName, lock_handle);
+          await client.unlockStructure({ structureName: objectName }, lock_handle);
           break;
         case 'view':
-          await client.unlockView(objectName, lock_handle);
+          await client.unlockView({ viewName: objectName }, lock_handle);
           break;
         case 'domain':
-          await client.unlockDomain(objectName, lock_handle);
+          await client.unlockDomain({ domainName: objectName }, lock_handle);
           break;
         case 'data_element':
-          await client.unlockDataElement(objectName, lock_handle);
+          await client.unlockDataElement({ dataElementName: objectName }, lock_handle);
           break;
         case 'behavior_definition':
-          await client.unlockBehaviorDefinition(objectName, lock_handle);
+          await client.unlockBehaviorDefinition({ name: objectName }, lock_handle);
           break;
         case 'metadata_extension':
-          await client.unlockMetadataExtension(objectName, lock_handle);
+          await client.unlockMetadataExtension({ name: objectName }, lock_handle);
           break;
         case 'package':
           // Package requires superPackage parameter - need to fetch it or handle differently

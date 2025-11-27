@@ -81,16 +81,19 @@ export async function handleUpdateFunctionModule(args: UpdateFunctionModuleArgs)
       const shouldActivate = args.activate === true;
 
       // Execute operation chain: lock -> update -> check -> unlock -> (activate)
-      await client
-        .lockFunctionModule(functionModuleName, functionGroupName)
-        .then(c => c.updateFunctionModule(functionModuleName, functionGroupName, args.source_code))
-        .then(c => c.checkFunctionModule(functionModuleName, functionGroupName))
-        .then(c => c.unlockFunctionModule(functionModuleName, functionGroupName))
-        .then(c => shouldActivate ? c.activateFunctionModule(functionModuleName, functionGroupName) : Promise.resolve(c))
-        .catch(error => {
-          logger.error('Function module update chain failed:', error);
-          throw error;
-        });
+      try {
+        await client.lockFunctionModule({ functionModuleName, functionGroupName });
+        const lockHandle = client.getLockHandle();
+        await client.updateFunctionModule({ functionModuleName, functionGroupName, sourceCode: args.source_code }, lockHandle);
+        await client.checkFunctionModule({ functionModuleName, functionGroupName });
+        await client.unlockFunctionModule({ functionModuleName, functionGroupName }, lockHandle);
+        if (shouldActivate) {
+          await client.activateFunctionModule({ functionModuleName, functionGroupName });
+        }
+      } catch (error) {
+        logger.error('Function module update chain failed:', error);
+        throw error;
+      }
 
       logger.info(`✅ UpdateFunctionModule completed successfully: ${functionModuleName}`);
 

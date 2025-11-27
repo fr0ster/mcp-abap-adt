@@ -12,7 +12,12 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-export async function handleGetProgram(args: any) {
+interface GetProgramArgs {
+  [key: string]: any;
+}
+
+
+export async function handleGetProgram(args: GetProgramArgs) {
     try {
         if (!args?.program_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Program name is required');

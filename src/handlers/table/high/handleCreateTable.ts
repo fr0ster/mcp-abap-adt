@@ -8,7 +8,7 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -54,7 +54,7 @@ interface CreateTableArgs {
  * Uses TableBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateTable(args: any): Promise<any> {
+export async function handleCreateTable(args: CreateTableArgs): Promise<any> {
   try {
     const createTableArgs = args as CreateTableArgs;
 
@@ -83,27 +83,51 @@ export async function handleCreateTable(args: any): Promise<any> {
       const shouldActivate = true; // Default to true for tables
 
       // Validate
-      await client.validateTable(tableName);
+      await client.validateTable({
+        tableName,
+        packageName: createTableArgs.package_name,
+        description: ''
+      });
 
       // Create
-      await client.createTable(tableName, createTableArgs.package_name, createTableArgs.transport_request);
+      await client.createTable({
+        tableName,
+        packageName: createTableArgs.package_name,
+        description: '',
+        ddlCode: createTableArgs.ddl_code || '',
+        transportRequest: createTableArgs.transport_request
+      });
 
       // Lock
-      await client.lockTable(tableName);
+      await client.lockTable({ tableName });
       const lockHandle = client.getLockHandle();
 
       // Update with DDL code
-      await client.updateTable(tableName, createTableArgs.ddl_code, lockHandle);
+      await client.updateTable({ tableName, ddlCode: createTableArgs.ddl_code }, lockHandle);
 
       // Check
-      await client.checkTable(tableName);
+      try {
+        await safeCheckOperation(
+          () => client.checkTable({ tableName }),
+          tableName,
+          {
+            debug: (message: string) => logger.info(`[CreateTable] ${message}`)
+          }
+        );
+      } catch (checkError: any) {
+        // If error was marked as "already checked", continue silently
+        if (!(checkError as any).isAlreadyChecked) {
+          // Real check error - rethrow
+          throw checkError;
+        }
+      }
 
       // Unlock
-      await client.unlockTable(tableName, lockHandle);
+      await client.unlockTable({ tableName }, lockHandle);
 
       // Activate
       if (shouldActivate) {
-        await client.activateTable(tableName);
+        await client.activateTable({ tableName });
       }
 
       logger.info(`✅ CreateTable completed successfully: ${tableName}`);

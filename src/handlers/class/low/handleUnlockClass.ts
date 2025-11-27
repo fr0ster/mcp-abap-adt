@@ -57,7 +57,7 @@ interface UnlockClassArgs {
  *
  * Uses CrudClient.unlockClass - low-level single method call
  */
-export async function handleUnlockClass(args: any) {
+export async function handleUnlockClass(args: UnlockClassArgs) {
   try {
     const {
       class_name,
@@ -92,7 +92,7 @@ export async function handleUnlockClass(args: any) {
 
     try {
       // Unlock class
-      await client.unlockClass(className, lock_handle);
+      await client.unlockClass({ className }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {

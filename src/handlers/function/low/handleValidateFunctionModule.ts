@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -60,7 +60,7 @@ interface ValidateFunctionModuleArgs {
 /**
  * Main handler for ValidateFunctionModule MCP tool
  */
-export async function handleValidateFunctionModule(args: any) {
+export async function handleValidateFunctionModule(args: ValidateFunctionModuleArgs) {
   try {
     const {
       function_group_name,
@@ -96,8 +96,12 @@ export async function handleValidateFunctionModule(args: any) {
     try {
       const client = new CrudClient(connection);
 
-      await client.validateFunctionModule(functionModuleName, functionGroupName);
-      const result = client.getValidationResult();
+      await client.validateFunctionModule({ functionModuleName: functionModuleName, functionGroupName: functionGroupName, packageName: undefined, description: undefined });
+      const validationResponse = client.getValidationResponse();
+      if (!validationResponse) {
+        throw new Error('Validation did not return a result');
+      }
+      const result = parseValidationResponse(validationResponse);
       if (!result) {
         throw new Error('Validation did not return a result');
       }

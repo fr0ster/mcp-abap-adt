@@ -49,36 +49,24 @@ When using HTTP transport, you can configure the SAP connection dynamically via 
 
 ### Supported HTTP Headers
 
+The server processes the following HTTP headers (as checked in `applyAuthHeaders` method):
+
 | Header | Required | Description | Example |
 |--------|----------|-------------|---------|
 | `x-sap-url` | Yes* | SAP system URL | `https://system.abap.us10.hana.ondemand.com` |
-| `x-sap-auth-type` | Yes* | Authentication type | `jwt` or `basic` |
+| `x-sap-auth-type` | Yes* | Authentication type | `jwt`, `xsuaa`, or `basic` |
 | `x-sap-jwt-token` | Yes* (for JWT) | JWT access token | `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...` |
-| `x-sap-refresh-token` | No | Refresh token for automatic token renewal | `refresh_token_string` |
-| `Authorization` | Alternative | Bearer token (alternative to `x-sap-jwt-token`) | `Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `x-sap-refresh-token` | No | Refresh token for automatic token renewal (JWT only) | `refresh_token_string` |
+| `x-sap-login` | Yes* (for basic) | Username for basic authentication | `your_username` |
+| `x-sap-password` | Yes* (for basic) | Password for basic authentication | `your_password` |
 
 \* Required when not using `.env` file configuration. If headers are not provided, the server will use configuration from `.env` file or environment variables.
 
-### Alternative: Authorization Header
+**Notes:**
+- For **JWT authentication**: `x-sap-url`, `x-sap-auth-type`, and `x-sap-jwt-token` are required. `x-sap-refresh-token` is optional for automatic token refresh.
+- For **basic authentication**: `x-sap-url`, `x-sap-auth-type`, `x-sap-login`, and `x-sap-password` are required.
+- For automatic token refresh, you only need `x-sap-refresh-token`. Client ID and Client Secret are **not needed** for refresh - they are only required for initial token generation via `sap-abap-auth` CLI tool (part of `@mcp-abap-adt/connection` package).
 
-Instead of `x-sap-jwt-token`, you can use the standard `Authorization` header:
-
-```json
-{
-  "local-mcp-http": {
-    "disabled": false,
-    "timeout": 60,
-    "type": "streamableHttp",
-    "url": "http://localhost:3000/mcp/stream/http",
-    "headers": {
-      "Authorization": "Bearer your_jwt_token_here",
-      "x-sap-url": "https://your-sap-system.abap.us10.hana.ondemand.com",
-      "x-sap-auth-type": "jwt",
-      "x-sap-refresh-token": "your_refresh_token_here"
-    }
-  }
-}
-```
 
 ## Basic Authentication
 
@@ -92,14 +80,16 @@ For on-premise systems using basic authentication:
     "type": "streamableHttp",
     "url": "http://localhost:3000/mcp/stream/http",
     "headers": {
-      "x-sap-url": "https://your-onpremise-system.com",
-      "x-sap-auth-type": "basic"
+      "x-sap-url": "https://your-onpremise-system.com:8000",
+      "x-sap-auth-type": "basic",
+      "x-sap-login": "your_username",
+      "x-sap-password": "your_password"
     }
   }
 }
 ```
 
-**Note:** For basic authentication, username and password should be configured in the server's `.env` file or environment variables (`SAP_USERNAME`, `SAP_PASSWORD`), as they are not passed via HTTP headers for security reasons.
+**Note:** For basic authentication, you can pass username and password via HTTP headers (`x-sap-login` and `x-sap-password`) or configure them in the server's `.env` file (`SAP_USERNAME`, `SAP_PASSWORD`). Headers take priority over `.env` values.
 
 ## Server Configuration
 
@@ -113,16 +103,23 @@ node dist/index.js --transport streamable-http --http-port 3000
 
 ### Environment Variables
 
-Alternatively, you can configure the server via environment variables in a `.env` file:
+Alternatively, you can configure the server via environment variables in a `.env` file.
 
+**For JWT authentication:**
 ```env
 SAP_URL=https://your-sap-system.abap.us10.hana.ondemand.com
 SAP_AUTH_TYPE=jwt
 SAP_JWT_TOKEN=your_jwt_token_here
 SAP_REFRESH_TOKEN=your_refresh_token_here
-SAP_UAA_URL=https://your-uaa-url
-SAP_UAA_CLIENT_ID=your_client_id
-SAP_UAA_CLIENT_SECRET=your_client_secret
+```
+
+**For basic authentication:**
+```env
+SAP_URL=https://your-onpremise-system.com:8000
+SAP_AUTH_TYPE=basic
+SAP_USERNAME=your_username
+SAP_PASSWORD=your_password
+SAP_CLIENT=100
 ```
 
 When using `.env` configuration, HTTP headers in the client configuration are optional and will override the `.env` values if provided.
@@ -145,6 +142,7 @@ The server automatically updates the connection configuration when it receives H
 
 For Server-Sent Events transport, the configuration is similar:
 
+**JWT authentication:**
 ```json
 {
   "local-mcp-sse": {
@@ -162,12 +160,38 @@ For Server-Sent Events transport, the configuration is similar:
 }
 ```
 
+**Basic authentication:**
+```json
+{
+  "local-mcp-sse": {
+    "disabled": false,
+    "timeout": 60,
+    "type": "sse",
+    "url": "http://localhost:3001/mcp/events",
+    "headers": {
+      "x-sap-url": "https://your-onpremise-system.com:8000",
+      "x-sap-auth-type": "basic",
+      "x-sap-login": "your_username",
+      "x-sap-password": "your_password"
+    }
+  }
+}
+```
+
 ## Security Considerations
 
 1. **Token Storage**: Never commit tokens to version control. Use environment variables or secure secret management.
 2. **HTTPS**: Always use HTTPS for production deployments.
 3. **Token Refresh**: Use refresh tokens to automatically renew expired JWT tokens without manual intervention.
 4. **Header Validation**: The server validates header values but does not enforce HTTPS. Ensure your deployment uses HTTPS.
+5. **Connection Isolation**: Starting from version 1.1.10, each client session maintains its own isolated SAP connection. This prevents data mixing between different clients connecting to different SAP systems. Each connection is cached based on a unique combination of `sessionId` + `sapUrl` + authentication parameters.
+6. **Non-Local Connection Restrictions**:
+   - **SSE Transport**: Always restricted to localhost connections only (127.0.0.1, ::1, localhost). Remote connections are rejected with a 403 Forbidden error.
+   - **HTTP Transport**: Non-local connections are restricted when:
+     - `.env` file exists (was found at server startup)
+     - AND request does not include SAP connection headers (`x-sap-url`, `x-sap-auth-type`)
+   - Non-local connections with SAP headers are allowed (enables multi-tenant scenarios)
+   - Local connections are always allowed regardless of `.env` file presence
 
 ## Troubleshooting
 
@@ -185,11 +209,15 @@ For Server-Sent Events transport, the configuration is similar:
 
 ### Token Refresh
 
-If you provide `x-sap-refresh-token` along with UAA credentials in the server's `.env` file, the connection will automatically refresh expired tokens. The refresh happens transparently when a 401/403 error is detected.
+The server supports automatic token refresh when `x-sap-refresh-token` is provided in HTTP headers (or `SAP_REFRESH_TOKEN` in `.env`).
+
+The connection will automatically refresh expired tokens when a 401/403 error is detected. The refresh happens transparently without requiring manual intervention.
+
+**Note:** For automatic token refresh, you only need the refresh token. Client ID and Client Secret are **not needed** for refresh - they are only required for initial token generation via `sap-abap-auth` CLI tool (part of `@mcp-abap-adt/connection` package).
 
 ## Examples
 
-### Complete JWT Configuration
+### JWT Authentication (with automatic refresh)
 
 ```json
 {
@@ -206,6 +234,33 @@ If you provide `x-sap-refresh-token` along with UAA credentials in the server's 
     }
   }
 }
+```
+
+### Basic Authentication
+
+```json
+{
+  "local-mcp-http": {
+    "disabled": false,
+    "timeout": 60,
+    "type": "streamableHttp",
+    "url": "http://localhost:3000/mcp/stream/http",
+    "headers": {
+      "x-sap-url": "https://your-onpremise-system.com:8000",
+      "x-sap-auth-type": "basic",
+      "x-sap-login": "your_username",
+      "x-sap-password": "your_password"
+    }
+  }
+}
+```
+
+**Note:** For basic authentication, you can pass username and password via HTTP headers (as shown above) or configure them in the server's `.env` file. Headers take priority over `.env` values:
+
+```env
+SAP_USERNAME=your_username
+SAP_PASSWORD=your_password
+SAP_CLIENT=100
 ```
 
 ### Minimal Configuration (using .env)

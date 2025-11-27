@@ -69,26 +69,26 @@ export async function handleCreateMetadataExtension(params: any) {
         const shouldActivate = args.activate !== false;
 
         // Create
-        await client.createMetadataExtension(
+        await client.createMetadataExtension({
             name,
-            args.description || name,
-            args.package_name,
-            args.transport_request || ''
-        );
+            description: args.description || name,
+            packageName: args.package_name,
+            transportRequest: args.transport_request || ''
+        });
 
         // Lock
-        await client.lockMetadataExtension(name);
+        await client.lockMetadataExtension({ name: name });
         const lockHandle = client.getLockHandle();
 
         // Check
-        await client.checkMetadataExtension(name);
+        await client.checkMetadataExtension({ name: name });
 
         // Unlock
-        await client.unlockMetadataExtension(name, lockHandle);
+        await client.unlockMetadataExtension({ name: name }, lockHandle);
 
         // Activate if requested
         if (shouldActivate) {
-            await client.activateMetadataExtension(name);
+            await client.activateMetadataExtension({ name: name });
         }
 
         const result = {

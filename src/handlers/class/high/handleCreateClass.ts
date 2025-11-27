@@ -8,7 +8,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
+import { handlerLogger } from '../../../lib/logger';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
@@ -115,8 +116,8 @@ ENDCLASS.`;
  * Uses ClassBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateClass(params: any) {
-  const args: CreateClassArgs = params;
+export async function handleCreateClass(params: CreateClassArgs) {
+  const args = params;
 
   // Validate required parameters
   if (!args.class_name || !args.package_name) {
@@ -134,6 +135,12 @@ export async function handleCreateClass(params: any) {
   const connection = getManagedConnection();
 
   logger.info(`Starting class creation: ${className}`);
+  handlerLogger.info('CreateClass', 'start', `Starting class creation: ${className}`, {
+    className,
+    packageName: args.package_name,
+    transportRequest: args.transport_request,
+    shouldActivate: args.activate !== false
+  });
 
   try {
     // Generate source code if not provided
@@ -144,30 +151,83 @@ export async function handleCreateClass(params: any) {
     // Use CrudClient for all operations
     const client = new CrudClient(connection);
 
-    await client
-      .createClass(
+    try {
+      // Create
+      handlerLogger.debug('CreateClass', 'create', `Creating class: ${className}`, {
         className,
-        args.description || className,
-        args.package_name,
-        args.transport_request,
-        {
-          superclass: args.superclass,
-          final: args.final || false,
-          abstract: args.abstract || false,
-          createProtected: args.create_protected || false,
-          masterSystem: args.master_system,
-          responsible: args.responsible
-        }
-      )
-      .then(c => c.lockClass(className))
-      .then(c => c.updateClass(className, sourceCode))
-      .then(c => c.checkClass(className))
-      .then(c => c.unlockClass(className))
-      .then(c => shouldActivate ? c.activateClass(className) : Promise.resolve(c))
-      .catch(error => {
-        logger.error('Class creation chain failed:', error);
-        throw error;
+        packageName: args.package_name,
+        transportRequest: args.transport_request
       });
+      await client.createClass({
+        className,
+        description: args.description || className,
+        packageName: args.package_name,
+        transportRequest: args.transport_request,
+        superclass: args.superclass,
+        final: args.final || false,
+        abstract: args.abstract || false,
+        createProtected: args.create_protected || false
+      });
+      handlerLogger.debug('CreateClass', 'create', `Class created: ${className}`);
+
+      // Lock
+      handlerLogger.debug('CreateClass', 'lock', `Locking class: ${className}`);
+      await client.lockClass({ className });
+      const lockHandle = client.getLockHandle();
+      handlerLogger.debug('CreateClass', 'lock', `Class locked: ${className}`, {
+        lockHandle: lockHandle ? lockHandle.substring(0, 50) + '...' : null
+      });
+
+      // Update
+      handlerLogger.debug('CreateClass', 'update', `Updating class source code: ${className}`, {
+        className,
+        sourceCodeLength: sourceCode.length
+      });
+      await client.updateClass({ className, sourceCode }, lockHandle);
+      handlerLogger.debug('CreateClass', 'update', `Class source code updated: ${className}`);
+
+      // Check
+      handlerLogger.debug('CreateClass', 'check', `Checking class syntax: ${className}`);
+      try {
+        await safeCheckOperation(
+          () => client.checkClass({ className }),
+          className,
+          {
+            debug: (message: string) => handlerLogger.debug('CreateClass', 'check', message)
+          }
+        );
+        handlerLogger.debug('CreateClass', 'check', `Class check completed: ${className}`);
+      } catch (checkError: any) {
+        // If error was marked as "already checked", continue silently
+        if ((checkError as any).isAlreadyChecked) {
+          handlerLogger.debug('CreateClass', 'check', `Class ${className} was already checked - this is OK, continuing`);
+        } else {
+          // Real check error - rethrow
+          throw checkError;
+        }
+      }
+
+      // Unlock
+      handlerLogger.debug('CreateClass', 'unlock', `Unlocking class: ${className}`);
+      await client.unlockClass({ className }, lockHandle);
+      handlerLogger.debug('CreateClass', 'unlock', `Class unlocked: ${className}`);
+
+      // Activate if requested
+      if (shouldActivate) {
+        handlerLogger.debug('CreateClass', 'activate', `Activating class: ${className}`);
+        await client.activateClass({ className });
+        handlerLogger.debug('CreateClass', 'activate', `Class activated: ${className}`);
+      } else {
+        handlerLogger.debug('CreateClass', 'activate', `Skipping activation for: ${className}`);
+      }
+    } catch (error) {
+      handlerLogger.error('CreateClass', 'error', `Error during class creation workflow: ${className}`, {
+        error: error instanceof Error ? error.message : String(error),
+        errorType: error instanceof Error ? error.constructor.name : 'Unknown'
+      });
+      logger.error('Class creation chain failed:', error);
+      throw error;
+    }
 
     // Parse activation warnings if activation was performed
     let activationWarnings: string[] = [];
@@ -187,10 +247,17 @@ export async function handleCreateClass(params: any) {
     }
 
     // Return success result
-    const stepsCompleted = ['validate', 'create', 'lock', 'update', 'check', 'unlock'];
+    const stepsCompleted = ['create', 'lock', 'update', 'check', 'unlock'];
     if (shouldActivate) {
       stepsCompleted.push('activate');
     }
+
+    handlerLogger.info('CreateClass', 'complete', `Class creation completed: ${className}`, {
+      className,
+      stepsCompleted,
+      shouldActivate,
+      hasActivationWarnings: activationWarnings.length > 0
+    });
 
     const result = {
       success: true,

@@ -62,7 +62,7 @@ interface UpdateViewArgs {
  *
  * Uses CrudClient.updateView - low-level single method call
  */
-export async function handleUpdateView(args: any) {
+export async function handleUpdateView(args: UpdateViewArgs) {
   try {
     const {
       view_name,
@@ -98,7 +98,7 @@ export async function handleUpdateView(args: any) {
 
     try {
       // Update view with DDL source
-      await client.updateView(viewName, ddl_source, lock_handle);
+      await client.updateView({ viewName: viewName, ddlSource: ddl_source }, lock_handle);
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {

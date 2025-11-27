@@ -33,7 +33,7 @@ interface GetSessionArgs {
  *
  * Returns session ID and session state that can be reused in other handlers
  */
-export async function handleGetSession(args: any) {
+export async function handleGetSession(args: GetSessionArgs) {
   try {
     const { force_new = false } = args as GetSessionArgs;
 

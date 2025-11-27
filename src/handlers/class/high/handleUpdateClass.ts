@@ -8,7 +8,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import { handlerLogger } from '../../../lib/logger';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -48,7 +49,7 @@ interface UpdateClassArgs {
  * Uses ClassBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleUpdateClass(params: any) {
+export async function handleUpdateClass(params: UpdateClassArgs) {
   const args: UpdateClassArgs = params;
 
   // Validate required parameters
@@ -60,6 +61,11 @@ export async function handleUpdateClass(params: any) {
   const connection = getManagedConnection();
 
   logger.info(`Starting UpdateClass for ${className}`);
+  handlerLogger.info('UpdateClass', 'start', `Starting class update: ${className}`, {
+    className,
+    sourceCodeLength: args.source_code.length,
+    shouldActivate: args.activate === true
+  });
 
   try {
     // Create client
@@ -68,32 +74,89 @@ export async function handleUpdateClass(params: any) {
     // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
     const shouldActivate = args.activate === true; // Default to false if not specified
 
-    // Validate
-    await client.validateClass(className);
+    // Validate (for update, "already exists" is expected - object must exist)
+    handlerLogger.debug('UpdateClass', 'validate', `Validating class: ${className}`);
+    try {
+      await client.validateClass({ className: className, packageName: undefined, description: undefined });
+      handlerLogger.debug('UpdateClass', 'validate', `Validation completed for: ${className}`);
+    } catch (validateError: any) {
+      // For update operations, "already exists" is expected - object must exist
+      if (!isAlreadyExistsError(validateError)) {
+        // Real validation error - rethrow
+        handlerLogger.error('UpdateClass', 'validate', `Validation failed for: ${className}`, {
+          error: validateError instanceof Error ? validateError.message : String(validateError)
+        });
+        throw validateError;
+      }
+      // "Already exists" is OK for update - continue
+      handlerLogger.debug('UpdateClass', 'validate', `Class ${className} already exists - this is expected for update operation`);
+    }
 
     // Lock
-    await client.lockClass(className);
+    handlerLogger.debug('UpdateClass', 'lock', `Locking class: ${className}`);
+    await client.lockClass({ className: className });
     const lockHandle = client.getLockHandle();
+    handlerLogger.debug('UpdateClass', 'lock', `Class locked: ${className}`, {
+      lockHandle: lockHandle ? lockHandle.substring(0, 50) + '...' : null
+    });
 
     try {
       // Update source code
-      await client.updateClass(className, args.source_code, lockHandle);
+      handlerLogger.debug('UpdateClass', 'update', `Updating class source code: ${className}`, {
+        className,
+        sourceCodeLength: args.source_code.length
+      });
+      await client.updateClass({ className: className, sourceCode: args.source_code }, lockHandle);
+      handlerLogger.debug('UpdateClass', 'update', `Class source code updated: ${className}`);
 
       // Check
-      await client.checkClass(className);
+      handlerLogger.debug('UpdateClass', 'check', `Checking class syntax: ${className}`);
+      try {
+        await safeCheckOperation(
+          () => client.checkClass({ className: className }),
+          className,
+          {
+            debug: (message: string) => handlerLogger.debug('UpdateClass', 'check', message)
+          }
+        );
+        handlerLogger.debug('UpdateClass', 'check', `Class check completed: ${className}`);
+      } catch (checkError: any) {
+        // If error was marked as "already checked", continue silently
+        if ((checkError as any).isAlreadyChecked) {
+          handlerLogger.debug('UpdateClass', 'check', `Class ${className} was already checked - this is OK, continuing`);
+        } else {
+          // Real check error - rethrow
+          throw checkError;
+        }
+      }
 
       // Unlock
-      await client.unlockClass(className, lockHandle);
+      handlerLogger.debug('UpdateClass', 'unlock', `Unlocking class: ${className}`);
+      await client.unlockClass({ className: className }, lockHandle);
+      handlerLogger.debug('UpdateClass', 'unlock', `Class unlocked: ${className}`);
 
       // Activate if requested
       if (shouldActivate) {
-        await client.activateClass(className);
+        handlerLogger.debug('UpdateClass', 'activate', `Activating class: ${className}`);
+        await client.activateClass({ className: className });
+        handlerLogger.debug('UpdateClass', 'activate', `Class activated: ${className}`);
+      } else {
+        handlerLogger.debug('UpdateClass', 'activate', `Skipping activation for: ${className}`);
       }
     } catch (error) {
+      handlerLogger.error('UpdateClass', 'error', `Error during update workflow: ${className}`, {
+        error: error instanceof Error ? error.message : String(error),
+        errorType: error instanceof Error ? error.constructor.name : 'Unknown'
+      });
       // Try to unlock on error
       try {
-        await client.unlockClass(className, lockHandle);
+        handlerLogger.debug('UpdateClass', 'cleanup', `Attempting to unlock class after error: ${className}`);
+        await client.unlockClass({ className: className }, lockHandle);
+        handlerLogger.debug('UpdateClass', 'cleanup', `Successfully unlocked class after error: ${className}`);
       } catch (unlockError) {
+        handlerLogger.error('UpdateClass', 'cleanup_error', `Failed to unlock class after error: ${className}`, {
+          unlockError: unlockError instanceof Error ? unlockError.message : String(unlockError)
+        });
         logger.error('Failed to unlock class after error:', unlockError);
       }
       throw error;
@@ -121,6 +184,13 @@ export async function handleUpdateClass(params: any) {
     if (shouldActivate) {
       stepsCompleted.push('activate');
     }
+
+    handlerLogger.info('UpdateClass', 'complete', `Class update completed: ${className}`, {
+      className,
+      stepsCompleted,
+      shouldActivate,
+      hasActivationWarnings: activationWarnings.length > 0
+    });
 
     const result = {
       success: true,

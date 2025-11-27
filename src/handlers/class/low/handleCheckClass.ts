@@ -62,7 +62,7 @@ interface CheckClassArgs {
 /**
  * Main handler for CheckClass MCP tool
  */
-export async function handleCheckClass(args: any) {
+export async function handleCheckClass(args: CheckClassArgs) {
   try {
     const {
       class_name,
@@ -100,7 +100,7 @@ export async function handleCheckClass(args: any) {
 
     try {
       const client = new CrudClient(connection);
-      await client.checkClass(className);
+      await client.checkClass({ className });
       const response = client.getCheckResult();
       if (!response) {
         throw new Error('Class check did not return a response');

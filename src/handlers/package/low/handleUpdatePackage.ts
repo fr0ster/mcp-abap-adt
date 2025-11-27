@@ -67,7 +67,7 @@ interface UpdatePackageArgs {
  *
  * Uses CrudClient.updatePackage - low-level single method call
  */
-export async function handleUpdatePackage(args: any) {
+export async function handleUpdatePackage(args: UpdatePackageArgs) {
   try {
     const {
       package_name,
@@ -105,7 +105,11 @@ export async function handleUpdatePackage(args: any) {
 
     try {
       // Update package description
-      await client.updatePackage(packageName, superPackage, updated_description, lock_handle);
+      await client.updatePackage({
+        packageName,
+        superPackage,
+        updatedDescription: updated_description
+      }, lock_handle);
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {

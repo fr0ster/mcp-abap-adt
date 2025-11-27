@@ -58,7 +58,7 @@ interface CheckPackageArgs {
  *
  * Uses CrudClient.checkPackage - low-level single method call
  */
-export async function handleCheckPackage(args: any) {
+export async function handleCheckPackage(args: CheckPackageArgs) {
   try {
     const {
       package_name,
@@ -94,7 +94,7 @@ export async function handleCheckPackage(args: any) {
 
     try {
       // Check package
-      await client.checkPackage(packageName, superPackage);
+      await client.checkPackage({ packageName: packageName, superPackage: superPackage });
       const response = client.getCheckResult();
 
       if (!response) {

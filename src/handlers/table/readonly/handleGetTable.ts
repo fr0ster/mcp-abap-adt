@@ -12,6 +12,11 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
+interface GetTableArgs {
+  [key: string]: any;
+}
+
+
 function parseTableXml(xml: string) {
     const parser = new XMLParser({
         ignoreAttributes: false,
@@ -49,7 +54,7 @@ function parseTableXml(xml: string) {
     return { raw: result };
 }
 
-export async function handleGetTable(args: any) {
+export async function handleGetTable(args: GetTableArgs) {
     try {
         if (!args?.table_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Table name is required');

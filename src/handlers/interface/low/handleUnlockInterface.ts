@@ -57,7 +57,7 @@ interface UnlockInterfaceArgs {
  *
  * Uses CrudClient.unlockInterface - low-level single method call
  */
-export async function handleUnlockInterface(args: any) {
+export async function handleUnlockInterface(args: UnlockInterfaceArgs) {
   try {
     const {
       interface_name,
@@ -92,7 +92,7 @@ export async function handleUnlockInterface(args: any) {
 
     try {
       // Unlock interface
-      await client.unlockInterface(interfaceName, lock_handle);
+      await client.unlockInterface({ interfaceName: interfaceName }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {

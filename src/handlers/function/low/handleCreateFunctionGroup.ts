@@ -67,7 +67,7 @@ interface CreateFunctionGroupArgs {
  *
  * Uses CrudClient.createFunctionGroup - low-level single method call
  */
-export async function handleCreateFunctionGroup(args: any) {
+export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
   try {
     const {
       function_group_name,
@@ -104,12 +104,12 @@ export async function handleCreateFunctionGroup(args: any) {
 
     try {
       // Create function group
-      await client.createFunctionGroup(
+      await client.createFunctionGroup({
         functionGroupName,
         description,
-        package_name,
-        transport_request
-      );
+        packageName: package_name,
+        transportRequest: transport_request
+      });
       const createResult = client.getCreateResult();
 
       if (!createResult) {

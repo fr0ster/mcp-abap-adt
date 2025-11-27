@@ -7,6 +7,7 @@
 
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { handlerLogger } from '../../../lib/logger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -30,6 +31,18 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: "string",
         description: "Transport request number (e.g., E19K905635). Required for transportable packages."
+      },
+      data_type: {
+        type: "string",
+        description: "Data type (e.g., CHAR, NUMC) or domain name when type_kind is 'E' or 'domain'."
+      },
+      type_kind: {
+        type: "string",
+        description: "Type kind: 'E' for domain-based, 'P' for predefined type, etc."
+      },
+      type_name: {
+        type: "string",
+        description: "Type name (for predefined types)."
       },
       application: {
         type: "string",
@@ -66,6 +79,9 @@ interface CreateDataElementArgs {
   description: string;
   package_name: string;
   transport_request?: string;
+  data_type?: string;
+  type_kind?: string;
+  type_name?: string;
   master_system?: string;
   responsible?: string;
   session_id?: string;
@@ -81,13 +97,16 @@ interface CreateDataElementArgs {
  *
  * Uses CrudClient.createDataElement - low-level single method call
  */
-export async function handleCreateDataElement(args: any) {
+export async function handleCreateDataElement(args: CreateDataElementArgs) {
   try {
     const {
       data_element_name,
       description,
       package_name,
       transport_request,
+      data_type,
+      type_kind,
+      type_name,
       master_system,
       responsible,
       session_id,
@@ -116,26 +135,68 @@ export async function handleCreateDataElement(args: any) {
 
     const dataElementName = data_element_name.toUpperCase();
 
-    logger.info(`Starting data element creation: ${dataElementName}`);
+    handlerLogger.info('CreateDataElementLow', 'start', `Starting data element creation: ${dataElementName}`, {
+      dataElementName,
+      packageName: package_name,
+      typeKind: type_kind,
+      hasDescription: !!description,
+      hasSession: !!(session_id && session_state)
+    });
 
     try {
+      // Determine typeKind based on type_kind parameter
+      // Supports both short form ('E', 'P') and full form ('domain', 'predefinedAbapType')
+      const typeKindMap: Record<string, 'domain' | 'predefinedAbapType' | 'refToPredefinedAbapType' | 'refToDictionaryType' | 'refToClifType'> = {
+        // Short forms
+        'E': 'domain',
+        'P': 'predefinedAbapType',
+        'R': 'refToPredefinedAbapType',
+        'D': 'refToDictionaryType',
+        'C': 'refToClifType',
+        // Full forms
+        'domain': 'domain',
+        'predefinedAbapType': 'predefinedAbapType',
+        'refToPredefinedAbapType': 'refToPredefinedAbapType',
+        'refToDictionaryType': 'refToDictionaryType',
+        'refToClifType': 'refToClifType'
+      };
+      const rawTypeKind = type_kind || 'E';
+      const typeKind = typeKindMap[rawTypeKind] || 'domain';
+
       // Create data element
-      await client.createDataElement(
+      const createConfig: any = {
         dataElementName,
         description,
-        package_name,
-        transport_request
-      );
+        packageName: package_name,
+        typeKind,
+        dataType: data_type,
+        typeName: type_name,
+        transportRequest: transport_request
+      };
+
+      handlerLogger.debug('CreateDataElementLow', 'create', `Creating data element: ${dataElementName}`, {
+        dataElementName,
+        packageName: package_name,
+        typeKind,
+        dataType: createConfig.dataType,
+        typeName: createConfig.typeName
+      });
+
+      await client.createDataElement(createConfig);
       const createResult = client.getCreateResult();
 
       if (!createResult) {
+        handlerLogger.error('CreateDataElementLow', 'create', `Create did not return a response for data element ${dataElementName}`);
         throw new Error(`Create did not return a response for data element ${dataElementName}`);
       }
 
       // Get updated session state after create
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CreateDataElement completed: ${dataElementName}`);
+      handlerLogger.info('CreateDataElementLow', 'complete', `Data element created: ${dataElementName}`, {
+        dataElementName,
+        status: createResult.status
+      });
 
       return return_response({
         data: JSON.stringify({

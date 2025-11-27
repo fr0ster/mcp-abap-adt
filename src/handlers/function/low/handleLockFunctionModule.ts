@@ -57,7 +57,7 @@ interface LockFunctionModuleArgs {
  *
  * Uses CrudClient.lockFunctionModule - low-level single method call
  */
-export async function handleLockFunctionModule(args: any) {
+export async function handleLockFunctionModule(args: LockFunctionModuleArgs) {
   try {
     const {
       function_module_name,
@@ -93,7 +93,7 @@ export async function handleLockFunctionModule(args: any) {
 
     try {
       // Lock function module
-      await client.lockFunctionModule(functionModuleName, functionGroupName);
+      await client.lockFunctionModule({ functionModuleName: functionModuleName, functionGroupName: functionGroupName });
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {

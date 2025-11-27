@@ -57,7 +57,7 @@ interface CreateFunctionGroupArgs {
  * Uses FunctionGroupBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateFunctionGroup(args: any) {
+export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
   try {
     // Validate required parameters
     if (!args?.function_group_name) {
@@ -86,19 +86,22 @@ export async function handleCreateFunctionGroup(args: any) {
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Validate
-      await client.validateFunctionGroup(functionGroupName);
+      await client.validateFunctionGroup({
+        functionGroupName,
+        description: typedArgs.description || functionGroupName
+      });
 
       // Create
-      await client.createFunctionGroup(
+      await client.createFunctionGroup({
         functionGroupName,
-        typedArgs.description || functionGroupName,
-        typedArgs.package_name,
-        typedArgs.transport_request
-      );
+        description: typedArgs.description || functionGroupName,
+        packageName: typedArgs.package_name,
+        transportRequest: typedArgs.transport_request
+      });
 
       // Activate if requested
       if (shouldActivate) {
-        await client.activateFunctionGroup(functionGroupName);
+        await client.activateFunctionGroup({ functionGroupName });
       }
 
       logger.info(`✅ CreateFunctionGroup completed successfully: ${functionGroupName}`);

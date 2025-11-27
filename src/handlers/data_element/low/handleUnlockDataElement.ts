@@ -7,6 +7,7 @@
 
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { handlerLogger } from '../../../lib/logger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -57,7 +58,7 @@ interface UnlockDataElementArgs {
  *
  * Uses CrudClient.unlockDataElement - low-level single method call
  */
-export async function handleUnlockDataElement(args: any) {
+export async function handleUnlockDataElement(args: UnlockDataElementArgs) {
   try {
     const {
       data_element_name,
@@ -88,21 +89,33 @@ export async function handleUnlockDataElement(args: any) {
 
     const dataElementName = data_element_name.toUpperCase();
 
-    logger.info(`Starting data element unlock: ${dataElementName} (session: ${session_id.substring(0, 8)}...)`);
+    handlerLogger.info('UnlockDataElementLow', 'start', `Starting data element unlock: ${dataElementName}`, {
+      dataElementName,
+      sessionId: session_id.substring(0, 8) + '...',
+      hasLockHandle: !!lock_handle
+    });
 
     try {
       // Unlock data element
-      await client.unlockDataElement(dataElementName, lock_handle);
+      handlerLogger.debug('UnlockDataElementLow', 'unlock', `Unlocking data element: ${dataElementName}`, {
+        dataElementName,
+        lockHandle: lock_handle.substring(0, 20) + '...'
+      });
+      await client.unlockDataElement({ dataElementName: dataElementName }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {
+        handlerLogger.error('UnlockDataElementLow', 'unlock', `Unlock did not return a response for data element ${dataElementName}`);
         throw new Error(`Unlock did not return a response for data element ${dataElementName}`);
       }
 
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UnlockDataElement completed: ${dataElementName}`);
+      handlerLogger.info('UnlockDataElementLow', 'complete', `Data element unlocked: ${dataElementName}`, {
+        dataElementName,
+        status: unlockResult.status
+      });
 
       return return_response({
         data: JSON.stringify({

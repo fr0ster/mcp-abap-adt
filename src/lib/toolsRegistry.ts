@@ -16,10 +16,10 @@ import { TOOL_DEFINITION as SearchObject_Tool } from '../handlers/search/readonl
 import { TOOL_DEFINITION as GetEnhancements_Tool } from '../handlers/enhancement/readonly/handleGetEnhancements';
 import { TOOL_DEFINITION as GetEnhancementImpl_Tool } from '../handlers/enhancement/readonly/handleGetEnhancementImpl';
 import { TOOL_DEFINITION as GetEnhancementSpot_Tool } from '../handlers/enhancement/readonly/handleGetEnhancementSpot';
-import { TOOL_DEFINITION as GetBdef_Tool } from '../handlers/bdef/readonly/handleGetBdef';
-import { TOOL_DEFINITION as CreateBdef_Tool } from '../handlers/bdef/high/handleCreateBehaviorDefinition';
-import { TOOL_DEFINITION as UpdateBdef_Tool } from '../handlers/bdef/high/handleUpdateBehaviorDefinition';
-import { TOOL_DEFINITION as UpdateBehaviorDefinitionLow_Tool } from '../handlers/bdef/low/handleUpdateBehaviorDefinition';
+import { TOOL_DEFINITION as GetBdef_Tool } from '../handlers/behavior_definition/readonly/handleGetBdef';
+import { TOOL_DEFINITION as CreateBdef_Tool } from '../handlers/behavior_definition/high/handleCreateBehaviorDefinition';
+import { TOOL_DEFINITION as UpdateBdef_Tool } from '../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
+import { TOOL_DEFINITION as UpdateBehaviorDefinitionLow_Tool } from '../handlers/behavior_definition/low/handleUpdateBehaviorDefinition';
 import { TOOL_DEFINITION as CreateDdlx_Tool } from '../handlers/ddlx/high/handleCreateMetadataExtension';
 import { TOOL_DEFINITION as UpdateDdlx_Tool } from '../handlers/ddlx/high/handleUpdateMetadataExtension';
 import { TOOL_DEFINITION as UpdateMetadataExtensionLow_Tool } from '../handlers/ddlx/low/handleUpdateMetadataExtension';
@@ -29,6 +29,13 @@ import { TOOL_DEFINITION as DeleteClass_Tool } from '../handlers/class/low/handl
 import { TOOL_DEFINITION as LockClass_Tool } from '../handlers/class/low/handleLockClass';
 import { TOOL_DEFINITION as UnlockClass_Tool } from '../handlers/class/low/handleUnlockClass';
 import { TOOL_DEFINITION as CreateClassLow_Tool } from '../handlers/class/low/handleCreateClass';
+import { TOOL_DEFINITION as LockClassTestClasses_Tool } from '../handlers/class/low/handleLockClassTestClasses';
+import { TOOL_DEFINITION as UnlockClassTestClasses_Tool } from '../handlers/class/low/handleUnlockClassTestClasses';
+import { TOOL_DEFINITION as UpdateClassTestClasses_Tool } from '../handlers/class/low/handleUpdateClassTestClasses';
+import { TOOL_DEFINITION as ActivateClassTestClasses_Tool } from '../handlers/class/low/handleActivateClassTestClasses';
+import { TOOL_DEFINITION as RunClassUnitTests_Tool } from '../handlers/class/low/handleRunClassUnitTests';
+import { TOOL_DEFINITION as GetClassUnitTestStatus_Tool } from '../handlers/class/low/handleGetClassUnitTestStatus';
+import { TOOL_DEFINITION as GetClassUnitTestResult_Tool } from '../handlers/class/low/handleGetClassUnitTestResult';
 import { TOOL_DEFINITION as CheckProgram_Tool } from '../handlers/program/low/handleCheckProgram';
 import { TOOL_DEFINITION as DeleteProgram_Tool } from '../handlers/program/low/handleDeleteProgram';
 import { TOOL_DEFINITION as LockProgram_Tool } from '../handlers/program/low/handleLockProgram';
@@ -85,12 +92,12 @@ import { TOOL_DEFINITION as LockPackage_Tool } from '../handlers/package/low/han
 import { TOOL_DEFINITION as ValidatePackage_Tool } from '../handlers/package/low/handleValidatePackage';
 import { TOOL_DEFINITION as CreatePackageLow_Tool } from '../handlers/package/low/handleCreatePackage';
 import { TOOL_DEFINITION as CreateTransportLow_Tool } from '../handlers/transport/low/handleCreateTransport';
-import { TOOL_DEFINITION as CheckBehaviorDefinition_Tool } from '../handlers/bdef/low/handleCheckBehaviorDefinition';
-import { TOOL_DEFINITION as DeleteBehaviorDefinition_Tool } from '../handlers/bdef/low/handleDeleteBehaviorDefinition';
-import { TOOL_DEFINITION as LockBehaviorDefinition_Tool } from '../handlers/bdef/low/handleLockBehaviorDefinition';
-import { TOOL_DEFINITION as UnlockBehaviorDefinition_Tool } from '../handlers/bdef/low/handleUnlockBehaviorDefinition';
-import { TOOL_DEFINITION as ValidateBehaviorDefinition_Tool } from '../handlers/bdef/low/handleValidateBehaviorDefinition';
-import { TOOL_DEFINITION as CreateBehaviorDefinitionLow_Tool } from '../handlers/bdef/low/handleCreateBehaviorDefinition';
+import { TOOL_DEFINITION as CheckBehaviorDefinition_Tool } from '../handlers/behavior_definition/low/handleCheckBehaviorDefinition';
+import { TOOL_DEFINITION as DeleteBehaviorDefinition_Tool } from '../handlers/behavior_definition/low/handleDeleteBehaviorDefinition';
+import { TOOL_DEFINITION as LockBehaviorDefinition_Tool } from '../handlers/behavior_definition/low/handleLockBehaviorDefinition';
+import { TOOL_DEFINITION as UnlockBehaviorDefinition_Tool } from '../handlers/behavior_definition/low/handleUnlockBehaviorDefinition';
+import { TOOL_DEFINITION as ValidateBehaviorDefinition_Tool } from '../handlers/behavior_definition/low/handleValidateBehaviorDefinition';
+import { TOOL_DEFINITION as CreateBehaviorDefinitionLow_Tool } from '../handlers/behavior_definition/low/handleCreateBehaviorDefinition';
 import { TOOL_DEFINITION as CheckMetadataExtension_Tool } from '../handlers/ddlx/low/handleCheckMetadataExtension';
 import { TOOL_DEFINITION as DeleteMetadataExtension_Tool } from '../handlers/ddlx/low/handleDeleteMetadataExtension';
 import { TOOL_DEFINITION as LockMetadataExtension_Tool } from '../handlers/ddlx/low/handleLockMetadataExtension';
@@ -124,6 +131,7 @@ import { TOOL_DEFINITION as CreateTable_Tool } from '../handlers/table/high/hand
 import { TOOL_DEFINITION as CreateStructure_Tool } from '../handlers/structure/high/handleCreateStructure';
 import { TOOL_DEFINITION as CreateView_Tool } from '../handlers/view/high/handleCreateView';
 import { TOOL_DEFINITION as GetView_Tool } from '../handlers/view/readonly/handleGetView';
+import { TOOL_DEFINITION as GetServiceDefinition_Tool } from '../handlers/service_definition/readonly/handleGetServiceDefinition';
 import { TOOL_DEFINITION as CreateClass_Tool } from '../handlers/class/high/handleCreateClass';
 import { TOOL_DEFINITION as CreateProgram_Tool } from '../handlers/program/high/handleCreateProgram';
 import { TOOL_DEFINITION as CreateInterface_Tool } from '../handlers/interface/high/handleCreateInterface';
@@ -148,7 +156,7 @@ import { TOOL_DEFINITION as UpdateFunctionModule_Tool } from '../handlers/functi
 import { TOOL_DEFINITION as UpdateView_Tool } from '../handlers/view/low/handleUpdateView';
 import { TOOL_DEFINITION as UpdateDomain_Tool } from '../handlers/domain/low/handleUpdateDomain';
 import { TOOL_DEFINITION as UpdateDataElement_Tool } from '../handlers/data_element/low/handleUpdateDataElement';
-import { TOOL_DEFINITION as UpdateBehaviorDefinition_Tool } from '../handlers/bdef/low/handleUpdateBehaviorDefinition';
+import { TOOL_DEFINITION as UpdateBehaviorDefinition_Tool } from '../handlers/behavior_definition/low/handleUpdateBehaviorDefinition';
 import { TOOL_DEFINITION as UpdateMetadataExtension_Tool } from '../handlers/ddlx/low/handleUpdateMetadataExtension';
 import { TOOL_DEFINITION as GetSession_Tool } from '../handlers/system/readonly/handleGetSession';
 import { TOOL_DEFINITION as ValidateObject_Tool } from '../handlers/common/low/handleValidateObject';
@@ -160,6 +168,18 @@ import { TOOL_DEFINITION as ValidateTable_Tool } from '../handlers/table/low/han
 import { TOOL_DEFINITION as CheckTable_Tool } from '../handlers/table/low/handleCheckTable';
 import { TOOL_DEFINITION as ValidateFunctionModule_Tool } from '../handlers/function/low/handleValidateFunctionModule';
 import { TOOL_DEFINITION as CheckFunctionModule_Tool } from '../handlers/function/low/handleCheckFunctionModule';
+import { TOOL_DEFINITION as ActivateProgram_Tool } from '../handlers/program/low/handleActivateProgram';
+import { TOOL_DEFINITION as ActivateClass_Tool } from '../handlers/class/low/handleActivateClass';
+import { TOOL_DEFINITION as ActivateInterface_Tool } from '../handlers/interface/low/handleActivateInterface';
+import { TOOL_DEFINITION as ActivateFunctionModule_Tool } from '../handlers/function/low/handleActivateFunctionModule';
+import { TOOL_DEFINITION as ActivateFunctionGroup_Tool } from '../handlers/function/low/handleActivateFunctionGroup';
+import { TOOL_DEFINITION as ActivateDataElement_Tool } from '../handlers/data_element/low/handleActivateDataElement';
+import { TOOL_DEFINITION as ActivateDomain_Tool } from '../handlers/domain/low/handleActivateDomain';
+import { TOOL_DEFINITION as ActivateStructure_Tool } from '../handlers/structure/low/handleActivateStructure';
+import { TOOL_DEFINITION as ActivateTable_Tool } from '../handlers/table/low/handleActivateTable';
+import { TOOL_DEFINITION as ActivateView_Tool } from '../handlers/view/low/handleActivateView';
+import { TOOL_DEFINITION as ActivateBehaviorDefinition_Tool } from '../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
+import { TOOL_DEFINITION as ActivateMetadataExtension_Tool } from '../handlers/ddlx/low/handleActivateMetadataExtension';
 
 // Type that describes a tool entry
 // Supports both JSON Schema format and Zod schema format (object with Zod fields)
@@ -265,6 +285,13 @@ export const ALL_TOOLS: ToolDefinition[] = [
   CreateClass_Tool,
   UpdateClass_Tool,
   UpdateClassHigh_Tool,
+  LockClassTestClasses_Tool,
+  UnlockClassTestClasses_Tool,
+  UpdateClassTestClasses_Tool,
+  ActivateClassTestClasses_Tool,
+  RunClassUnitTests_Tool,
+  GetClassUnitTestStatus_Tool,
+  GetClassUnitTestResult_Tool,
 
   // Program management
   CreateProgram_Tool,
@@ -290,8 +317,23 @@ export const ALL_TOOLS: ToolDefinition[] = [
   UpdateView_Tool,
   UpdateViewHigh_Tool,
 
+  // Service Definition management
+  GetServiceDefinition_Tool,
+
   // Activation
   ActivateObject_Tool,
+  ActivateProgram_Tool,
+  ActivateClass_Tool,
+  ActivateInterface_Tool,
+  ActivateFunctionModule_Tool,
+  ActivateFunctionGroup_Tool,
+  ActivateDataElement_Tool,
+  ActivateDomain_Tool,
+  ActivateStructure_Tool,
+  ActivateTable_Tool,
+  ActivateView_Tool,
+  ActivateBehaviorDefinition_Tool,
+  ActivateMetadataExtension_Tool,
 
   // Deletion
   DeleteObject_Tool,
@@ -322,6 +364,13 @@ export const ALL_TOOLS: ToolDefinition[] = [
   LockClass_Tool,
   UnlockClass_Tool,
   CreateClassLow_Tool,
+  LockClassTestClasses_Tool,
+  UnlockClassTestClasses_Tool,
+  UpdateClassTestClasses_Tool,
+  ActivateClassTestClasses_Tool,
+  RunClassUnitTests_Tool,
+  GetClassUnitTestStatus_Tool,
+  GetClassUnitTestResult_Tool,
   CheckProgram_Tool,
   DeleteProgram_Tool,
   LockProgram_Tool,

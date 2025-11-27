@@ -62,7 +62,7 @@ interface CheckFunctionModuleArgs {
 /**
  * Main handler for CheckFunctionModule MCP tool
  */
-export async function handleCheckFunctionModule(args: any) {
+export async function handleCheckFunctionModule(args: CheckFunctionModuleArgs) {
   try {
     const {
       function_group_name,
@@ -101,7 +101,7 @@ export async function handleCheckFunctionModule(args: any) {
 
     try {
       const client = new CrudClient(connection);
-      await client.checkFunctionModule(functionModuleName, functionGroupName);
+      await client.checkFunctionModule({ functionModuleName: functionModuleName, functionGroupName: functionGroupName });
       const response = client.getCheckResult();
       if (!response) {
         throw new Error('Function module check did not return a response');

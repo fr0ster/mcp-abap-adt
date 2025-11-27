@@ -38,7 +38,7 @@ interface DeleteDomainArgs {
  *
  * Uses CrudClient.deleteDomain - low-level single method call
  */
-export async function handleDeleteDomain(args: any) {
+export async function handleDeleteDomain(args: DeleteDomainArgs) {
   try {
     const {
       domain_name,
@@ -58,7 +58,7 @@ export async function handleDeleteDomain(args: any) {
 
     try {
       // Delete domain
-      await client.deleteDomain(domainName, transport_request);
+      await client.deleteDomain({ domainName: domainName, transportRequest: transport_request });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {

@@ -38,7 +38,7 @@ interface DeleteMetadataExtensionArgs {
  *
  * Uses CrudClient.deleteMetadataExtension - low-level single method call
  */
-export async function handleDeleteMetadataExtension(args: any) {
+export async function handleDeleteMetadataExtension(args: DeleteMetadataExtensionArgs) {
   try {
     const {
       name,
@@ -58,7 +58,7 @@ export async function handleDeleteMetadataExtension(args: any) {
 
     try {
       // Delete metadata extension
-      await client.deleteMetadataExtension(ddlxName, transport_request);
+      await client.deleteMetadataExtension({ name: ddlxName, transportRequest: transport_request });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {

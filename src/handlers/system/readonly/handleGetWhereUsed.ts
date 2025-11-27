@@ -378,7 +378,7 @@ function parseWhereUsedResponse(xmlData: string): WhereUsedReference[] {
  * - enhancementspot, enhs, enho
  * - enhancementimpl, enhi
  */
-export async function handleGetWhereUsed(args: any) {
+export async function handleGetWhereUsed(args: WhereUsedArgs) {
     try {
         // Validate required parameters
         if (!args?.object_name) {

@@ -62,7 +62,7 @@ interface UpdateInterfaceArgs {
  *
  * Uses CrudClient.updateInterface - low-level single method call
  */
-export async function handleUpdateInterface(args: any) {
+export async function handleUpdateInterface(args: UpdateInterfaceArgs) {
   try {
     const {
       interface_name,
@@ -98,7 +98,7 @@ export async function handleUpdateInterface(args: any) {
 
     try {
       // Update interface with source code
-      await client.updateInterface(interfaceName, source_code, lock_handle);
+      await client.updateInterface({ interfaceName: interfaceName, sourceCode: source_code }, lock_handle);
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {

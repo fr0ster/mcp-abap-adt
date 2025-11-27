@@ -4,15 +4,15 @@ describe('MCP ABAP ADT Server', () => {
   });
 
   describe('Module Imports', () => {
-    it('should import handler modules without errors', async () => {
-      await expect(import('../handlers/program/readonly/handleGetProgram')).resolves.toBeDefined();
-      await expect(import('../handlers/class/readonly/handleGetClass')).resolves.toBeDefined();
-      await expect(import('../handlers/function/readonly/handleGetFunction')).resolves.toBeDefined();
+    it('should require handler modules without errors', () => {
+      expect(() => require('../handlers/program/readonly/handleGetProgram')).not.toThrow();
+      expect(() => require('../handlers/class/readonly/handleGetClass')).not.toThrow();
+      expect(() => require('../handlers/function/readonly/handleGetFunction')).not.toThrow();
     });
 
-    it('should import utility modules without errors', async () => {
-      await expect(import('../lib/utils')).resolves.toBeDefined();
-      await expect(import('../lib/logger')).resolves.toBeDefined();
+    it('should require utility modules without errors', () => {
+      expect(() => require('../lib/utils')).not.toThrow();
+      expect(() => require('../lib/logger')).not.toThrow();
     });
   });
 

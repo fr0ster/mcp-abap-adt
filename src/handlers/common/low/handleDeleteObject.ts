@@ -51,7 +51,7 @@ interface DeleteObjectArgs {
  * Uses deleteObject function from @mcp-abap-adt/adt-clients for all operations
  * Connection management handled internally
  */
-export async function handleDeleteObject(args: any) {
+export async function handleDeleteObject(args: DeleteObjectArgs) {
   try {
     const {
       object_name,
@@ -78,22 +78,34 @@ export async function handleDeleteObject(args: any) {
       switch (object_type.toLowerCase()) {
         case 'class':
         case 'clas/oc':
-          await crudClient.deleteClass(objectName, transport_request);
+          await crudClient.deleteClass({
+            className: objectName,
+            transportRequest: transport_request
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'program':
         case 'prog/p':
-          await crudClient.deleteProgram(objectName, transport_request);
+          await crudClient.deleteProgram({
+            programName: objectName,
+            transportRequest: transport_request
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'interface':
         case 'intf/oi':
-          await crudClient.deleteInterface(objectName, transport_request);
+          await crudClient.deleteInterface({
+            interfaceName: objectName,
+            transportRequest: transport_request
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'function_group':
         case 'fugr/f':
-          await crudClient.deleteFunctionGroup(objectName, transport_request);
+          await crudClient.deleteFunctionGroup({
+            functionGroupName: objectName,
+            transportRequest: transport_request
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'function_module':
@@ -101,47 +113,73 @@ export async function handleDeleteObject(args: any) {
           if (!function_group_name) {
             return return_error(new Error('function_group_name is required for function_module deletion'));
           }
-          await crudClient.deleteFunctionModule(objectName, function_group_name, transport_request);
+          await crudClient.deleteFunctionModule({
+            functionModuleName: objectName,
+            functionGroupName: function_group_name,
+            transportRequest: transport_request
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'table':
         case 'tabl/dt':
-          await crudClient.deleteTable(objectName, transport_request);
+          await crudClient.deleteTable({
+            tableName: objectName,
+            transportRequest: transport_request
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'structure':
         case 'ttyp/st':
-          await crudClient.deleteStructure(objectName, transport_request);
+          await crudClient.deleteStructure({
+            structureName: objectName,
+            transportRequest: transport_request
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'view':
         case 'ddls/df':
-          await crudClient.deleteView(objectName, transport_request);
+          await crudClient.deleteView({
+            viewName: objectName,
+            transportRequest: transport_request
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'domain':
         case 'doma/dm':
-          await crudClient.deleteDomain(objectName, transport_request);
+          await crudClient.deleteDomain({
+            domainName: objectName,
+            transportRequest: transport_request
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'data_element':
         case 'dtel/de':
-          await crudClient.deleteDataElement(objectName, transport_request);
+          await crudClient.deleteDataElement({
+            dataElementName: objectName,
+            transportRequest: transport_request
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'package':
         case 'devc/k':
-          await crudClient.deletePackage(objectName, transport_request);
+          await crudClient.deletePackage({
+            packageName: objectName,
+            transportRequest: transport_request
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'behavior_definition':
         case 'bdef/bd':
-          await crudClient.deleteBehaviorDefinition(objectName, transport_request);
+          await crudClient.deleteBehaviorDefinition({
+            name: objectName
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'metadata_extension':
         case 'ddlx/ex':
-          await crudClient.deleteMetadataExtension(objectName, transport_request);
+          await crudClient.deleteMetadataExtension({
+            name: objectName
+          });
           response = crudClient.getDeleteResult();
           break;
         default:

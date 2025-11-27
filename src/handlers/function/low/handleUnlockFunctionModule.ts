@@ -62,7 +62,7 @@ interface UnlockFunctionModuleArgs {
  *
  * Uses CrudClient.unlockFunctionModule - low-level single method call
  */
-export async function handleUnlockFunctionModule(args: any) {
+export async function handleUnlockFunctionModule(args: UnlockFunctionModuleArgs) {
   try {
     const {
       function_module_name,
@@ -99,7 +99,7 @@ export async function handleUnlockFunctionModule(args: any) {
 
     try {
       // Unlock function module
-      await client.unlockFunctionModule(functionModuleName, functionGroupName, lock_handle);
+      await client.unlockFunctionModule({ functionModuleName: functionModuleName, functionGroupName: functionGroupName }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {

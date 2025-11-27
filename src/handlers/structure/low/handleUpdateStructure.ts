@@ -62,7 +62,7 @@ interface UpdateStructureArgs {
  *
  * Uses CrudClient.updateStructure - low-level single method call
  */
-export async function handleUpdateStructure(args: any) {
+export async function handleUpdateStructure(args: UpdateStructureArgs) {
   try {
     const {
       structure_name,
@@ -98,7 +98,7 @@ export async function handleUpdateStructure(args: any) {
 
     try {
       // Update structure with DDL code
-      await client.updateStructure(structureName, ddl_code, lock_handle);
+      await client.updateStructure({ structureName: structureName, ddlCode: ddl_code }, lock_handle);
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {

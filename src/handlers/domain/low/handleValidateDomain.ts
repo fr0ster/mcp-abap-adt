@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -18,6 +18,14 @@ export const TOOL_DEFINITION = {
       domain_name: {
         type: "string",
         description: "Domain name to validate (e.g., Z_MY_PROGRAM)."
+      },
+      description: {
+        type: "string",
+        description: "Domain description (required for validation)."
+      },
+      package_name: {
+        type: "string",
+        description: "Package name (required for validation)."
       },
       session_id: {
         type: "string",
@@ -33,12 +41,14 @@ export const TOOL_DEFINITION = {
         }
       }
     },
-    required: ["domain_name"]
+    required: ["domain_name", "package_name", "description"]
   }
 } as const;
 
 interface ValidateDomainArgs {
   domain_name: string;
+  description: string;
+  package_name: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -52,17 +62,19 @@ interface ValidateDomainArgs {
  *
  * Uses CrudClient.validateDomain - low-level single method call
  */
-export async function handleValidateDomain(args: any) {
+export async function handleValidateDomain(args: ValidateDomainArgs) {
   try {
     const {
       domain_name,
+      description,
+      package_name,
       session_id,
       session_state
     } = args as ValidateDomainArgs;
 
     // Validation
-    if (!domain_name) {
-      return return_error(new Error('domain_name is required'));
+    if (!domain_name || !package_name || !description) {
+      return return_error(new Error('domain_name, package_name, and description are required'));
     }
 
     const connection = getManagedConnection();
@@ -85,9 +97,17 @@ export async function handleValidateDomain(args: any) {
     logger.info(`Starting domain validation: ${domainName}`);
 
     try {
-      // Validate domain
-      await client.validateDomain(domainName);
-      const result = client.getValidationResult();
+      // Validate domain using CrudClient
+      await client.validateDomain({
+        domainName,
+        description: description,
+        packageName: package_name.toUpperCase()
+      });
+      const validationResponse = client.getValidationResponse();
+      if (!validationResponse) {
+        throw new Error('Validation did not return a result');
+      }
+      const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();

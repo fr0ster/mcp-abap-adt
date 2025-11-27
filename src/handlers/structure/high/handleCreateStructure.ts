@@ -8,7 +8,7 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -137,7 +137,7 @@ interface CreateStructureArgs {
  * Uses StructureBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateStructure(args: any): Promise<any> {
+export async function handleCreateStructure(args: CreateStructureArgs): Promise<any> {
   try {
     const createStructureArgs = args as CreateStructureArgs;
 
@@ -167,18 +167,23 @@ export async function handleCreateStructure(args: any): Promise<any> {
       const shouldActivate = true; // Default to true for structures
 
       // Validate
-      await client.validateStructure(structureName);
+      await client.validateStructure({
+        structureName,
+        packageName: createStructureArgs.package_name,
+        description: createStructureArgs.description || structureName
+      });
 
       // Create
-      await client.createStructure(
+      await client.createStructure({
         structureName,
-        createStructureArgs.description || structureName,
-        createStructureArgs.package_name,
-        createStructureArgs.transport_request
-      );
+        description: createStructureArgs.description || structureName,
+        packageName: createStructureArgs.package_name,
+        ddlCode: '',
+        transportRequest: createStructureArgs.transport_request
+      });
 
       // Lock
-      await client.lockStructure(structureName);
+      await client.lockStructure({ structureName });
       const lockHandle = client.getLockHandle();
 
       // Note: StructureBuilder internally generates DDL from fields/includes
@@ -186,14 +191,28 @@ export async function handleCreateStructure(args: any): Promise<any> {
       // TODO: Implement DDL generation or enhance CrudClient to accept fields directly
 
       // Check
-      await client.checkStructure(structureName);
+      try {
+        await safeCheckOperation(
+          () => client.checkStructure({ structureName }),
+          structureName,
+          {
+            debug: (message: string) => logger.info(`[CreateStructure] ${message}`)
+          }
+        );
+      } catch (checkError: any) {
+        // If error was marked as "already checked", continue silently
+        if (!(checkError as any).isAlreadyChecked) {
+          // Real check error - rethrow
+          throw checkError;
+        }
+      }
 
       // Unlock
-      await client.unlockStructure(structureName, lockHandle);
+      await client.unlockStructure({ structureName }, lockHandle);
 
       // Activate
       if (shouldActivate) {
-        await client.activateStructure(structureName);
+        await client.activateStructure({ structureName });
       }
 
       logger.info(`✅ CreateStructure completed successfully: ${structureName}`);

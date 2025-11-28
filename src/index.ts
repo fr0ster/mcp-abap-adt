@@ -1,55 +1,6 @@
 #!/usr/bin/env node
-// CRITICAL: Suppress stdout/stderr for stdio mode BEFORE any imports that might use dotenv
-// This prevents dotenv from writing to stdout before we can suppress it
-// Auto-detect stdio mode early: if stdin is not a TTY, we're likely in stdio mode (piped by MCP Inspector)
-const isStdioEarly = process.argv.includes("--transport=stdio") ||
-                     process.argv.includes("--stdio") ||
-                     process.env.MCP_TRANSPORT === "stdio" ||
-                     !process.stdin.isTTY;
-
-if (isStdioEarly) {
-  const originalStdoutWrite = process.stdout.write.bind(process.stdout);
-  const originalStderrWrite = process.stderr.write.bind(process.stderr);
-  const originalLog = console.log;
-  const originalError = console.error;
-  const originalWarn = console.warn;
-  const originalInfo = console.info;
-
-  // Suppress ALL output immediately (will restore stdout later for MCP protocol)
-  // CRITICAL: This must happen BEFORE any imports to prevent dotenv from writing to stdout
-  process.stdout.write = () => true;
-  process.stderr.write = () => true;
-  console.log = () => {};
-  console.error = () => {};
-  console.warn = () => {};
-  console.info = () => {};
-
-  // Store restore function for later use (after .env loading and before MCP transport)
-  (global as any).__restoreStdioForMCP = () => {
-    // Restore stdout for MCP protocol (stdout is used for JSON-RPC communication)
-    process.stdout.write = originalStdoutWrite;
-    // Restore stderr for error logging (like reference implementation - stderr is safe for logging)
-    process.stderr.write = originalStderrWrite;
-    // Keep console suppressed to prevent accidental stdout pollution
-    console.log = () => {};
-    console.error = originalError; // Allow console.error to stderr (safe)
-    console.warn = originalWarn;   // Allow console.warn to stderr (safe)
-    console.info = () => {};
-  };
-
-  // Store full restore for version/help commands
-  (global as any).__restoreStdioFull = () => {
-    process.stdout.write = originalStdoutWrite;
-    process.stderr.write = originalStderrWrite;
-    console.log = originalLog;
-    console.error = originalError;
-    console.warn = originalWarn;
-    console.info = originalInfo;
-  };
-
-  // Set environment variable to signal stdio mode to connection module
-  process.env.MCP_STDIO_MODE = "true";
-}
+// Simple stdio mode detection (like reference implementation)
+// No output suppression needed - dotenv removed, manual .env parsing used
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -576,11 +527,8 @@ AUTHENTICATION:
   process.exit(0);
 }
 
-// Check for version/help flags (stdio output already suppressed if needed)
+// Check for version/help flags
 if (process.argv.includes("--version") || process.argv.includes("-v")) {
-  if ((global as any).__restoreStdioFull) {
-    (global as any).__restoreStdioFull();
-  }
   const packageJsonPath = path.join(__dirname, "..", "package.json");
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
   console.log(packageJson.version);
@@ -588,9 +536,6 @@ if (process.argv.includes("--version") || process.argv.includes("-v")) {
 }
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
-  if ((global as any).__restoreStdioFull) {
-    (global as any).__restoreStdioFull();
-  }
   showHelp();
 }
 
@@ -653,7 +598,8 @@ function parseEnvArg(): string | undefined {
 const skipEnvAutoload = process.env.MCP_SKIP_ENV_LOAD === "true";
 const explicitTransportType = getTransportType();
 // If transport not explicitly specified, default to HTTP mode
-const transportType = explicitTransportType || "streamable-http";
+// BUT: if stdin is not TTY, auto-detect stdio mode (for MCP clients like Cline)
+const transportType = explicitTransportType || (!process.stdin.isTTY ? "stdio" : "streamable-http");
 const isHttp = transportType === "http" || transportType === "streamable-http" || transportType === "server";
 const isSse = transportType === "sse";
 const isStdio = transportType === "stdio";
@@ -1969,17 +1915,10 @@ export class mcp_abap_adt_server {
    */
   async run() {
     if (this.transportConfig.type === "stdio") {
-      // Restore stdout for MCP protocol (but keep stderr and console suppressed)
-      // This MUST happen BEFORE creating StdioServerTransport to ensure clean stdout
-      if ((global as any).__restoreStdioForMCP) {
-        (global as any).__restoreStdioForMCP();
-      }
-      // Create and connect transport - this is the ONLY thing that should write to stdout
-      // Following the reference implementation pattern from sdk-stdio-server.ts
+      // Simple stdio setup like reference implementation
       const transport = new StdioServerTransport();
       await this.mcpServer.server.connect(transport);
-      // In stdio mode, we keep stderr available for error logging (like reference implementation)
-      // but stdout is reserved for MCP JSON-RPC protocol only
+      // Process stays alive waiting for messages from stdin
       return;
     }
 

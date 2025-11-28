@@ -657,11 +657,20 @@ if (!skipEnvAutoload) {
             }
             const key = trimmed.substring(0, eqIndex).trim();
             const value = trimmed.substring(eqIndex + 1).trim();
-            // Remove quotes if present
-            let unquotedValue = value.replace(/^["']|["']$/g, "");
-            // Remove any remaining control characters (especially \r on Windows)
-            unquotedValue = unquotedValue.replace(/\r/g, "").trim();
-            // Only set if not already in process.env (don't override)
+            // Aggressive cleaning for Windows compatibility (same as launcher)
+            // Step 1: Remove ALL control characters
+            let unquotedValue = String(value).replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+            // Step 2: Trim whitespace
+            unquotedValue = unquotedValue.trim();
+            // Step 3: Remove quotes (handle nested quotes)
+            unquotedValue = unquotedValue.replace(/^["']+|["']+$/g, '');
+            // Step 4: Trim again after quote removal
+            unquotedValue = unquotedValue.trim();
+            // Step 5: For URLs specifically, remove trailing slashes
+            if (key === 'SAP_URL') {
+              unquotedValue = unquotedValue.replace(/\/+$/, '').trim();
+            }
+            // Only set if not already in process.env (don't override launcher's cleaned values)
             if (key && !process.env[key]) {
               process.env[key] = unquotedValue;
             }
@@ -998,6 +1007,16 @@ export function getConfig(): SapConfig {
     return sapConfigOverride;
   }
 
+  // Log raw URL for debugging (especially on Windows)
+  const rawUrl = process.env.SAP_URL;
+  if (rawUrl) {
+    const rawUrlHex = Buffer.from(rawUrl, 'utf8').toString('hex');
+    // Only log to stderr in stdio mode (safe for MCP protocol)
+    if (!process.stdin.isTTY) {
+      process.stderr.write(`[MCP-CONFIG] Raw SAP_URL from process.env: "${rawUrl}" (length: ${rawUrl.length}, hex: ${rawUrlHex.substring(0, 60)}...)\n`);
+    }
+  }
+
   let url = process.env.SAP_URL;
   let client = process.env.SAP_CLIENT;
 
@@ -1051,6 +1070,12 @@ export function getConfig(): SapConfig {
   } catch (urlError) {
     const urlHex = Buffer.from(url, 'utf8').toString('hex');
     throw new Error(`Invalid SAP_URL: "${url}" (hex: ${urlHex.substring(0, 100)}...). Error: ${urlError instanceof Error ? urlError.message : urlError}`);
+  }
+
+  // Log cleaned URL for debugging
+  if (!process.stdin.isTTY) {
+    const cleanedUrlHex = Buffer.from(url, 'utf8').toString('hex');
+    process.stderr.write(`[MCP-CONFIG] Cleaned SAP_URL: "${url}" (length: ${url.length}, hex: ${cleanedUrlHex.substring(0, 60)}...)\n`);
   }
 
   const config: SapConfig = {

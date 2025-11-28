@@ -89,11 +89,28 @@ function loadEnvFile(envFilePath) {
     const dotenv = require('dotenv');
     // Suppress dotenv output for stdio mode (MCP protocol requires clean JSON only)
     const isStdio = !process.stdin.isTTY;
+
+    // Temporarily suppress stdout/stderr during dotenv loading to prevent any output
+    let originalStdoutWrite, originalStderrWrite;
+    if (isStdio) {
+      originalStdoutWrite = process.stdout.write;
+      originalStderrWrite = process.stderr.write;
+      process.stdout.write = () => true; // Suppress stdout
+      // Keep stderr for error messages, but suppress during dotenv.config()
+      process.stderr.write = () => true;
+    }
+
     const result = dotenv.config({
       path: envFilePath,
       debug: false, // Don't output debug info
       override: false // Don't override existing env vars
     });
+
+    // Restore stdout/stderr after dotenv loading
+    if (isStdio) {
+      process.stdout.write = originalStdoutWrite;
+      process.stderr.write = originalStderrWrite;
+    }
 
     if (result.error) {
       // Always write to stderr (safe even in stdio mode)
@@ -182,11 +199,47 @@ function main() {
       // Always write to stderr (safe even in stdio mode)
       process.stderr.write(`[MCP] ✗ ERROR: .env file is required for transport mode '${args.transport || 'stdio'}'\n`);
       process.stderr.write(`[MCP]   Use --env=/path/to/.env to specify custom location\n`);
-      process.exit(1);
+      // On Windows, wait for user input or timeout to allow error message to be visible
+      if (process.platform === 'win32' && process.stdin.isTTY) {
+        process.stderr.write(`[MCP] Press Enter to exit...\n`);
+        process.stdin.setRawMode(true);
+        process.stdin.resume();
+        process.stdin.once('data', () => {
+          process.exit(1);
+        });
+        // Also exit after 10 seconds if no input
+        setTimeout(() => process.exit(1), 10000);
+      } else {
+        // For non-TTY (stdio mode) or non-Windows, just exit
+        if (process.platform === 'win32') {
+          // On Windows but not TTY, wait 30 seconds
+          setTimeout(() => process.exit(1), 30000);
+        } else {
+          process.exit(1);
+        }
+      }
     } else if (!envLoaded && args.envFile) {
       // Always write to stderr (safe even in stdio mode)
       process.stderr.write(`[MCP] ✗ ERROR: .env file not found: ${args.envFile}\n`);
-      process.exit(1);
+      // On Windows, wait for user input or timeout to allow error message to be visible
+      if (process.platform === 'win32' && process.stdin.isTTY) {
+        process.stderr.write(`[MCP] Press Enter to exit...\n`);
+        process.stdin.setRawMode(true);
+        process.stdin.resume();
+        process.stdin.once('data', () => {
+          process.exit(1);
+        });
+        // Also exit after 10 seconds if no input
+        setTimeout(() => process.exit(1), 10000);
+      } else {
+        // For non-TTY (stdio mode) or non-Windows, just exit
+        if (process.platform === 'win32') {
+          // On Windows but not TTY, wait 30 seconds
+          setTimeout(() => process.exit(1), 30000);
+        } else {
+          process.exit(1);
+        }
+      }
     }
   } else {
     // Try to load default .env (optional)
@@ -215,7 +268,19 @@ function main() {
     if (error.stack) {
       process.stderr.write(error.stack + '\n');
     }
-    process.exit(1);
+    // On Windows, wait for user input or timeout to allow error message to be visible
+    if (process.platform === 'win32') {
+      process.stderr.write(`[MCP] Press Enter to exit...\n`);
+      process.stdin.setRawMode(true);
+      process.stdin.resume();
+      process.stdin.once('data', () => {
+        process.exit(1);
+      });
+      // Also exit after 10 seconds if no input
+      setTimeout(() => process.exit(1), 10000);
+    } else {
+      process.exit(1);
+    }
   }
 }
 

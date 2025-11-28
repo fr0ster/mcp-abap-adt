@@ -524,15 +524,27 @@ AUTHENTICATION:
   process.exit(0);
 }
 
-// Check for --help flag before anything else
+// Check for --version/-v flag before anything else
+if (process.argv.includes("--version") || process.argv.includes("-v")) {
+  // Cross-platform path resolution for package.json
+  // __dirname works in CommonJS (which TypeScript compiles to with module: "node16")
+  // path.join() handles path separators correctly on all platforms (Windows, Linux, macOS)
+  const packageJsonPath = path.join(__dirname, "..", "package.json");
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+  console.log(packageJson.version);
+  process.exit(0);
+}
+
+// Check for --help/-h flag before anything else
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
   showHelp();
 }
 
 /**
  * Helper to determine transport type early for .env loading logic
+ * Returns the transport type if explicitly specified, or null if not specified
  */
-function getTransportType(): string {
+function getTransportType(): string | null {
   const args = process.argv;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -543,9 +555,15 @@ function getTransportType(): string {
       return args[i + 1].toLowerCase();
     }
     if (arg === "--http") return "streamable-http";
+    if (arg === "--stdio") return "stdio";
     if (arg === "--sse") return "sse";
   }
-  return process.env.MCP_TRANSPORT || "streamable-http"; // Default to HTTP (can work without .env file)
+  // Check environment variable
+  if (process.env.MCP_TRANSPORT) {
+    return process.env.MCP_TRANSPORT.toLowerCase();
+  }
+  // Not explicitly specified
+  return null;
 }
 
 /**
@@ -571,60 +589,75 @@ function parseEnvArg(): string | undefined {
 
 // Find .env file path from arguments
 const skipEnvAutoload = process.env.MCP_SKIP_ENV_LOAD === "true";
-const transportType = getTransportType();
+const explicitTransportType = getTransportType();
+// If transport not explicitly specified, default to HTTP mode
+const transportType = explicitTransportType || "streamable-http";
 const isHttp = transportType === "http" || transportType === "streamable-http" || transportType === "server";
 const isSse = transportType === "sse";
 const isStdio = transportType === "stdio";
-const isEnvMandatory = isStdio || isSse;
+// .env is mandatory only if transport is explicitly set to stdio or sse
+const isEnvMandatory = explicitTransportType !== null && (isStdio || isSse);
 
 let envFilePath = parseEnvArg() ?? process.env.MCP_ENV_PATH;
 
 if (!skipEnvAutoload) {
   if (!envFilePath) {
-    // Priority order:
-    // 1. Current working directory (where user runs the command)
-    const possiblePaths = [
-      path.resolve(process.cwd(), ".env")        // User's working directory
-    ];
+    // Only search in current working directory (where user runs the command)
+    const cwdEnvPath = path.resolve(process.cwd(), ".env");
 
-    for (const possiblePath of possiblePaths) {
-      if (fs.existsSync(possiblePath)) {
-        envFilePath = possiblePath;
-        process.stderr.write(`[MCP-ENV] Found .env file: ${envFilePath}\n`);
-        break;
-      }
-    }
-
-    if (!envFilePath) {
-      // Default to current working directory if nothing found
-      envFilePath = path.resolve(process.cwd(), ".env");
-      if (isEnvMandatory) {
-        process.stderr.write(`[MCP-ENV] WARNING: No .env file found, will try: ${envFilePath}\n`);
-      }
+    if (fs.existsSync(cwdEnvPath)) {
+      envFilePath = cwdEnvPath;
+      process.stderr.write(`[MCP-ENV] Found .env file: ${envFilePath}\n`);
     }
   } else {
     process.stderr.write(`[MCP-ENV] Using .env from argument/env: ${envFilePath}\n`);
   }
 
-  if (!path.isAbsolute(envFilePath)) {
-    envFilePath = path.resolve(process.cwd(), envFilePath);
-    process.stderr.write(`[MCP-ENV] Resolved relative path to: ${envFilePath}\n`);
-  }
+  if (envFilePath) {
+    if (!path.isAbsolute(envFilePath)) {
+      envFilePath = path.resolve(process.cwd(), envFilePath);
+      process.stderr.write(`[MCP-ENV] Resolved relative path to: ${envFilePath}\n`);
+    }
 
-  if (fs.existsSync(envFilePath)) {
-    dotenv.config({ path: envFilePath });
-    process.stderr.write(`[MCP-ENV] ✓ Successfully loaded: ${envFilePath}\n`);
+    if (fs.existsSync(envFilePath)) {
+      dotenv.config({ path: envFilePath });
+      process.stderr.write(`[MCP-ENV] ✓ Successfully loaded: ${envFilePath}\n`);
+    } else {
+      // .env file specified but not found
+      if (isEnvMandatory) {
+        logger.error(".env file not found", { path: envFilePath });
+        process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n`);
+        process.stderr.write(`[MCP-ENV]   Current working directory: ${process.cwd()}\n`);
+        process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' requires .env file.\n`);
+        process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
+        process.exit(1);
+      } else {
+        process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n`);
+        process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' was explicitly specified but .env file is missing.\n`);
+        process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
+        process.exit(1);
+      }
+    }
   } else {
+    // No .env file found and none specified
     if (isEnvMandatory) {
-      logger.error(".env file not found", { path: envFilePath });
-      process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n`);
-      process.stderr.write(`[MCP-ENV]   Current working directory: ${process.cwd()}\n`);
+      // Transport explicitly set to stdio/sse but no .env found
+      const cwdEnvPath = path.resolve(process.cwd(), ".env");
+      logger.error(".env file not found", { path: cwdEnvPath });
+      process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found in current directory: ${process.cwd()}\n`);
       process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' requires .env file.\n`);
       process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
       process.exit(1);
     } else {
-      process.stderr.write(`[MCP-ENV] NOTE: .env file not found at: ${envFilePath}\n`);
-      process.stderr.write(`[MCP-ENV]   Continuing without .env (optional for ${transportType} mode)\n`);
+      // No .env found, but transport is HTTP (default) - this is OK
+      if (explicitTransportType === null) {
+        // Transport not specified, defaulting to HTTP mode
+        process.stderr.write(`[MCP-ENV] NOTE: No .env file found in current directory: ${process.cwd()}\n`);
+        process.stderr.write(`[MCP-ENV]   Starting in HTTP mode (no .env file required)\n`);
+      } else {
+        // Transport explicitly set to HTTP - this is OK
+        process.stderr.write(`[MCP-ENV] NOTE: No .env file found, continuing in ${transportType} mode\n`);
+      }
     }
   }
 } else if (envFilePath) {
@@ -740,9 +773,8 @@ function resolveListOption(argName: string, envName: string): string[] | undefin
 }
 
 function parseTransportConfig(): TransportConfig {
-  const transportInput = getArgValue("--transport") ?? process.env.MCP_TRANSPORT;
-  // Default to streamable-http if not provided (Requirement 1.2)
-  const normalized = transportInput ? transportInput.trim().toLowerCase() : "streamable-http";
+  // Use the transport type we already determined (handles explicit args, env vars, and defaults)
+  const normalized = transportType;
 
   if (
     normalized &&
@@ -752,7 +784,7 @@ function parseTransportConfig(): TransportConfig {
     normalized !== "server" &&
     normalized !== "sse"
   ) {
-    throw new Error(`Unsupported transport: ${transportInput}`);
+    throw new Error(`Unsupported transport: ${normalized}`);
   }
 
   const sseRequested =

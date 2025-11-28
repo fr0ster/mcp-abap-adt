@@ -109,12 +109,26 @@ function main() {
   // Pass all arguments to server (server handles .env parsing itself)
   const serverArgs = process.argv.slice(2);
 
+  // On Windows, use proper path handling for spawn
+  // EINVAL error on Windows often means path or argument issues
+  const nodeCmd = process.platform === 'win32' ? 'node.exe' : 'node';
+
+  // Ensure serverPath is properly resolved and quoted if needed
+  const resolvedServerPath = path.resolve(serverPath);
+
+  // Debug logging for Windows
+  if (process.platform === 'win32') {
+    process.stderr.write(`[MCP] Spawning: ${nodeCmd} ${resolvedServerPath} ${serverArgs.join(' ')}\n`);
+    process.stderr.write(`[MCP] CWD: ${process.cwd()}\n`);
+  }
+
   // Spawn the server process with inherited stdio
   // This ensures proper network handling on Windows
-  const serverProcess = spawn('node', [serverPath, ...serverArgs], {
+  const serverProcess = spawn(nodeCmd, [resolvedServerPath, ...serverArgs], {
     stdio: ['inherit', 'inherit', 'inherit'],
     env: process.env,
     cwd: process.cwd(),
+    shell: false, // Explicitly set shell to false
   });
 
   // Handle server process exit

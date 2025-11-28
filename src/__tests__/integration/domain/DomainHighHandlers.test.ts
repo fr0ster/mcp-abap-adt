@@ -132,7 +132,7 @@ describe('Domain High-Level Handlers Integration', () => {
         const errorMsg = error.message || String(error);
         // If update fails, just exit without checks
         console.log(`⏭️  High Update failed for ${domainName}: ${errorMsg}, skipping test`);
-        return;
+          return;
       }
 
       if (updateResponse.isError) {

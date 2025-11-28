@@ -1,6 +1,52 @@
 # Changelog
 
-## [1.1.11] - 2025-01-27
+## [1.1.11] - 2025-11-28
+
+### Fixed
+- **DomainHighHandlers - Update workflow detection bug** – fixed critical issue where domain update operations were incorrectly using CREATE workflow instead of UPDATE workflow:
+  - **Root cause:** `DomainBuilder.update()` method determines which workflow to use (CREATE vs UPDATE) by checking if `this.state.createResult` exists. When `CrudClient.getDomainBuilder()` reuses a builder instance from a previous `createDomain()` call, the builder still has `createResult` in its state, causing `update()` to incorrectly use CREATE workflow (`upload()` function) instead of UPDATE workflow (`updateDomain()` function).
+  - **Solution:** Modified `handleUpdateDomain` to pass `packageName` directly to `lockDomain()` call, ensuring the builder is created with correct configuration from the start. This prevents builder reuse issues and ensures proper workflow detection.
+  - **Additional fix:** Removed redundant validation step from `handleUpdateDomain` handler. The validation was checking if domain exists, but `lockDomain()` will fail if domain doesn't exist anyway, making the validation step unnecessary and potentially causing confusion.
+  - **Impact:** Domain update operations now correctly use UPDATE workflow for existing domains, preventing "Domain already exists" errors that were occurring when the system tried to create an already-existing domain.
+
+### Changed
+- **DomainHighHandlers test logging** – completely refactored test logging system for better information density and clarity:
+  - **Removed verbose `debugLog()` system** – eliminated all `debugLog()` calls that were cluttering test output with verbose JSON structures and nested data objects
+  - **Introduced concise logging** – replaced with simple, informative `console.log()` statements that provide clear, actionable information:
+    - Clear operation names (e.g., "High Create: Creating domain...", "High Update: Updating domain...")
+    - Success/failure status with object names
+    - Skip reasons when tests are skipped
+    - Visual infographics (emojis) for quick visual scanning of test output
+  - **Simplified error handling** – removed redundant try-catch blocks and verbose error logging, now relies on Jest's native error handling which provides better stack traces
+  - **More informative output** – each log statement now provides essential information (operation type, object name, status) without JSON noise
+  - **Consistent with other tests** – matches logging patterns used in BehaviorDefinitionHighHandlers, PackageHighHandlers, and other high-level handler tests
+  - **Better maintainability** – removed ~50 lines of verbose debug logging code, making tests easier to read and maintain
+  - **Improved debugging** – concise logs make it easier to identify which operation failed and why, without scrolling through JSON dumps
+
+### Dependencies
+- **Updated `@mcp-abap-adt/adt-clients` to `^0.1.25`** – upgraded to latest version which includes:
+  - Improved `DomainBuilder.update()` workflow detection logic
+  - Better handling of CREATE vs UPDATE workflow selection based on builder state
+  - Enhanced error messages for domain operations
+
+### Documentation
+- **Test Issues Roadmap** – comprehensive update to development roadmap:
+  - **Issue #10 (DomainHighHandlers)** – changed status from "Expected Skip" to "Fixed" with detailed explanation
+  - **Updated statistics:** 8 fixed issues (was 7), 1 expected skip (was 3)
+  - **Added detailed problem analysis:** Documented root cause, solution approach, and code changes
+  - **Improved issue tracking:** Better categorization of issues vs expected skips vs cloud limitations
+
+### Development Process
+- **Issue Roadmap System** – introduced systematic problem analysis and resolution tracking:
+  - **New workflow:** Test failures are now systematically analyzed and documented in `doc/development/TEST_ISSUES_ROADMAP_*.md`
+  - **Issue classification:** Problems are categorized as Simple (⚡) or Complex (🔍), with clear distinction between real issues and expected skips
+  - **Problem analysis:** Each issue includes detailed error messages, root cause analysis, solution approach, and code references
+  - **Progress tracking:** Roadmap maintains statistics on fixed vs pending vs expected issues, providing clear visibility into test suite health
+  - **Solution documentation:** All fixes are documented with code references, making it easier to understand what was changed and why
+  - **Continuous improvement:** Roadmap is updated after each test run, ensuring it reflects current state and helps prioritize future work
+  - **Benefits:** Enables faster problem resolution, prevents duplicate work, and provides historical context for similar issues
+
+## [1.1.10] - 2025-11-27
 
 ### Added
 - **Behavior Implementation integration tests** – added comprehensive integration tests for Behavior Implementation handlers:

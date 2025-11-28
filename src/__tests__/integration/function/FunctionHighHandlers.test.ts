@@ -143,12 +143,12 @@ describe('Function High-Level Handlers Integration', () => {
       // Step 3: UpdateFunctionModule (High-Level)
       console.log(`📝 High Update: Updating function module ${functionModuleName}...`);
       const updateFMResponse = await handleUpdateFunctionModule({
-        function_group_name: functionGroupName,
-        function_module_name: functionModuleName,
-        source_code: updatedSourceCode,
-        transport_request: transportRequest,
-        activate: true
-      });
+          function_group_name: functionGroupName,
+          function_module_name: functionModuleName,
+          source_code: updatedSourceCode,
+          transport_request: transportRequest,
+          activate: true
+        });
 
       if (updateFMResponse.isError) {
         throw new Error(`UpdateFunctionModule failed: ${updateFMResponse.content[0]?.text || 'Unknown error'}`);

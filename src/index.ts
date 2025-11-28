@@ -657,7 +657,9 @@ if (!skipEnvAutoload) {
             const key = trimmed.substring(0, eqIndex).trim();
             const value = trimmed.substring(eqIndex + 1).trim();
             // Remove quotes if present
-            const unquotedValue = value.replace(/^["']|["']$/g, "");
+            let unquotedValue = value.replace(/^["']|["']$/g, "");
+            // Remove any remaining control characters (especially \r on Windows)
+            unquotedValue = unquotedValue.replace(/\r/g, "").trim();
             // Only set if not already in process.env (don't override)
             if (key && !process.env[key]) {
               process.env[key] = unquotedValue;
@@ -683,14 +685,25 @@ if (!skipEnvAutoload) {
             }
             const key = trimmed.substring(0, eqIndex).trim();
             const value = trimmed.substring(eqIndex + 1).trim();
-            const unquotedValue = value.replace(/^["']|["']$/g, "");
+            let unquotedValue = value.replace(/^["']|["']$/g, "");
+            // Remove any remaining control characters (especially \r on Windows)
+            unquotedValue = unquotedValue.replace(/\r/g, "").trim();
             if (key && !process.env[key]) {
               process.env[key] = unquotedValue;
             }
           }
           process.stderr.write(`[MCP-ENV] ✓ Successfully loaded: ${envFilePath}\n`);
+          // Debug: log SAP_URL if loaded (for troubleshooting on Windows)
+          if (process.env.SAP_URL) {
+            process.stderr.write(`[MCP-ENV] SAP_URL loaded: ${process.env.SAP_URL}\n`);
+          } else {
+            process.stderr.write(`[MCP-ENV] ⚠ WARNING: SAP_URL not found in .env file\n`);
+          }
         } catch (error) {
           process.stderr.write(`[MCP-ENV] ✗ Failed to load: ${envFilePath}\n`);
+          if (error instanceof Error) {
+            process.stderr.write(`[MCP-ENV] Error: ${error.message}\n`);
+          }
         }
       }
     } else {
@@ -996,12 +1009,19 @@ export function getConfig(): SapConfig {
     authType = rawAuthType === 'xsuaa' ? 'jwt' : (rawAuthType as SapConfig["authType"]);
   }
 
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
+  if (!url) {
+    throw new Error(`Missing SAP_URL in environment variables. Please check your .env file.`);
+  }
+
+  // Remove any remaining control characters (especially \r on Windows)
+  const cleanUrl = url.replace(/\r/g, "").trim();
+
+  if (!/^https?:\/\//.test(cleanUrl)) {
+    throw new Error(`Invalid SAP_URL format: "${cleanUrl}". Expected format: https://your-system.sap.com`);
   }
 
   const config: SapConfig = {
-    url,
+    url: cleanUrl,
     authType,
   };
 

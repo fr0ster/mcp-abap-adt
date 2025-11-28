@@ -656,7 +656,18 @@ if (!skipEnvAutoload) {
               continue;
             }
             const key = trimmed.substring(0, eqIndex).trim();
-            const value = trimmed.substring(eqIndex + 1).trim();
+            let value = trimmed.substring(eqIndex + 1);
+
+            // Remove inline comments (everything after #)
+            // This handles cases like: KEY=value # comment
+            // For .env files, # after value is always a comment
+            const commentIndex = value.indexOf('#');
+            if (commentIndex !== -1) {
+              value = value.substring(0, commentIndex);
+            }
+
+            value = value.trim();
+
             // Aggressive cleaning for Windows compatibility (same as launcher)
             // Step 1: Remove ALL control characters
             let unquotedValue = String(value).replace(/[\x00-\x1F\x7F-\x9F]/g, '');
@@ -694,7 +705,18 @@ if (!skipEnvAutoload) {
               continue;
             }
             const key = trimmed.substring(0, eqIndex).trim();
-            const value = trimmed.substring(eqIndex + 1).trim();
+            let value = trimmed.substring(eqIndex + 1);
+
+            // Remove inline comments (everything after #)
+            // This handles cases like: KEY=value # comment
+            // For .env files, # after value is always a comment
+            const commentIndex = value.indexOf('#');
+            if (commentIndex !== -1) {
+              value = value.substring(0, commentIndex);
+            }
+
+            value = value.trim();
+
             // Aggressive cleaning for Windows compatibility (same as launcher)
             // Step 1: Remove ALL control characters
             let unquotedValue = String(value).replace(/[\x00-\x1F\x7F-\x9F]/g, '');

@@ -1,4 +1,56 @@
 #!/usr/bin/env node
+// CRITICAL: Suppress stdout/stderr for stdio mode BEFORE any imports that might use dotenv
+// This prevents dotenv from writing to stdout before we can suppress it
+// Auto-detect stdio mode early: if stdin is not a TTY, we're likely in stdio mode (piped by MCP Inspector)
+const isStdioEarly = process.argv.includes("--transport=stdio") ||
+                     process.argv.includes("--stdio") ||
+                     process.env.MCP_TRANSPORT === "stdio" ||
+                     !process.stdin.isTTY;
+
+if (isStdioEarly) {
+  const originalStdoutWrite = process.stdout.write.bind(process.stdout);
+  const originalStderrWrite = process.stderr.write.bind(process.stderr);
+  const originalLog = console.log;
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  const originalInfo = console.info;
+
+  // Suppress ALL output immediately (will restore stdout later for MCP protocol)
+  // CRITICAL: This must happen BEFORE any imports to prevent dotenv from writing to stdout
+  process.stdout.write = () => true;
+  process.stderr.write = () => true;
+  console.log = () => {};
+  console.error = () => {};
+  console.warn = () => {};
+  console.info = () => {};
+
+  // Store restore function for later use (after .env loading and before MCP transport)
+  (global as any).__restoreStdioForMCP = () => {
+    // Restore stdout for MCP protocol (stdout is used for JSON-RPC communication)
+    process.stdout.write = originalStdoutWrite;
+    // Restore stderr for error logging (like reference implementation - stderr is safe for logging)
+    process.stderr.write = originalStderrWrite;
+    // Keep console suppressed to prevent accidental stdout pollution
+    console.log = () => {};
+    console.error = originalError; // Allow console.error to stderr (safe)
+    console.warn = originalWarn;   // Allow console.warn to stderr (safe)
+    console.info = () => {};
+  };
+
+  // Store full restore for version/help commands
+  (global as any).__restoreStdioFull = () => {
+    process.stdout.write = originalStdoutWrite;
+    process.stderr.write = originalStderrWrite;
+    console.log = originalLog;
+    console.error = originalError;
+    console.warn = originalWarn;
+    console.info = originalInfo;
+  };
+
+  // Set environment variable to signal stdio mode to connection module
+  process.env.MCP_STDIO_MODE = "true";
+}
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -9,7 +61,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import * as z from "zod";
 import path from "path";
-import dotenv from "dotenv";
+// dotenv removed - using manual .env parsing for all modes to avoid stdout pollution
 import { createServer, Server as HttpServer, IncomingHttpHeaders } from "http";
 import { randomUUID } from "crypto";
 
@@ -194,7 +246,7 @@ import {
   removeConnectionForSession,
   setConnectionOverride,
 } from "./lib/utils";
-import { SapConfig, AbapConnection, getConfigFromEnv } from "@mcp-abap-adt/connection";
+import { SapConfig, AbapConnection } from "@mcp-abap-adt/connection";
 
 // Import logger
 import { logger } from "./lib/logger";
@@ -524,25 +576,31 @@ AUTHENTICATION:
   process.exit(0);
 }
 
-// Check for --version/-v flag before anything else
+// Check for version/help flags (stdio output already suppressed if needed)
 if (process.argv.includes("--version") || process.argv.includes("-v")) {
-  // Cross-platform path resolution for package.json
-  // __dirname works in CommonJS (which TypeScript compiles to with module: "node16")
-  // path.join() handles path separators correctly on all platforms (Windows, Linux, macOS)
+  if ((global as any).__restoreStdioFull) {
+    (global as any).__restoreStdioFull();
+  }
   const packageJsonPath = path.join(__dirname, "..", "package.json");
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
   console.log(packageJson.version);
   process.exit(0);
 }
 
-// Check for --help/-h flag before anything else
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
+  if ((global as any).__restoreStdioFull) {
+    (global as any).__restoreStdioFull();
+  }
   showHelp();
 }
 
 /**
  * Helper to determine transport type early for .env loading logic
  * Returns the transport type if explicitly specified, or null if not specified
+ *
+ * Auto-detects stdio mode if:
+ * - stdin is not a TTY (piped/redirected, e.g., by MCP Inspector)
+ * - and no explicit transport was specified
  */
 function getTransportType(): string | null {
   const args = process.argv;
@@ -561,6 +619,10 @@ function getTransportType(): string | null {
   // Check environment variable
   if (process.env.MCP_TRANSPORT) {
     return process.env.MCP_TRANSPORT.toLowerCase();
+  }
+  // Auto-detect stdio mode: if stdin is not a TTY, we're likely in stdio mode (piped by MCP Inspector)
+  if (!process.stdin.isTTY) {
+    return "stdio";
   }
   // Not explicitly specified
   return null;
@@ -607,34 +669,105 @@ if (!skipEnvAutoload) {
 
     if (fs.existsSync(cwdEnvPath)) {
       envFilePath = cwdEnvPath;
-      process.stderr.write(`[MCP-ENV] Found .env file: ${envFilePath}\n`);
+      // Only write to stderr if not in stdio mode (stdio mode requires clean JSON only)
+      if (!isStdio) {
+        process.stderr.write(`[MCP-ENV] Found .env file: ${envFilePath}\n`);
+      }
     }
   } else {
-    process.stderr.write(`[MCP-ENV] Using .env from argument/env: ${envFilePath}\n`);
+    // Only write to stderr if not in stdio mode
+    if (!isStdio) {
+      process.stderr.write(`[MCP-ENV] Using .env from argument/env: ${envFilePath}\n`);
+    }
   }
 
   if (envFilePath) {
     if (!path.isAbsolute(envFilePath)) {
       envFilePath = path.resolve(process.cwd(), envFilePath);
-      process.stderr.write(`[MCP-ENV] Resolved relative path to: ${envFilePath}\n`);
+      // Only write to stderr if not in stdio mode
+      if (!isStdio) {
+        process.stderr.write(`[MCP-ENV] Resolved relative path to: ${envFilePath}\n`);
+      }
     }
 
     if (fs.existsSync(envFilePath)) {
-      dotenv.config({ path: envFilePath });
-      process.stderr.write(`[MCP-ENV] ✓ Successfully loaded: ${envFilePath}\n`);
+      // For stdio mode, load .env manually to avoid any output from dotenv library
+      if (isStdio) {
+        // Manual .env parsing for stdio mode (no library output)
+        try {
+          const envContent = fs.readFileSync(envFilePath, "utf8");
+          const lines = envContent.split(/\r?\n/);
+          for (const line of lines) {
+            const trimmed = line.trim();
+            // Skip empty lines and comments
+            if (!trimmed || trimmed.startsWith("#")) {
+              continue;
+            }
+            // Parse KEY=VALUE format
+            const eqIndex = trimmed.indexOf("=");
+            if (eqIndex === -1) {
+              continue;
+            }
+            const key = trimmed.substring(0, eqIndex).trim();
+            const value = trimmed.substring(eqIndex + 1).trim();
+            // Remove quotes if present
+            const unquotedValue = value.replace(/^["']|["']$/g, "");
+            // Only set if not already in process.env (don't override)
+            if (key && !process.env[key]) {
+              process.env[key] = unquotedValue;
+            }
+          }
+        } catch (error) {
+          // Silent fail for stdio mode - just exit
+          process.exit(1);
+        }
+      } else {
+        // For non-stdio modes, use manual parsing (dotenv removed to avoid stdout pollution)
+        try {
+          const envContent = fs.readFileSync(envFilePath, "utf8");
+          const lines = envContent.split(/\r?\n/);
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith("#")) {
+              continue;
+            }
+            const eqIndex = trimmed.indexOf("=");
+            if (eqIndex === -1) {
+              continue;
+            }
+            const key = trimmed.substring(0, eqIndex).trim();
+            const value = trimmed.substring(eqIndex + 1).trim();
+            const unquotedValue = value.replace(/^["']|["']$/g, "");
+            if (key && !process.env[key]) {
+              process.env[key] = unquotedValue;
+            }
+          }
+          process.stderr.write(`[MCP-ENV] ✓ Successfully loaded: ${envFilePath}\n`);
+        } catch (error) {
+          process.stderr.write(`[MCP-ENV] ✗ Failed to load: ${envFilePath}\n`);
+        }
+      }
     } else {
       // .env file specified but not found
       if (isEnvMandatory) {
-        logger.error(".env file not found", { path: envFilePath });
-        process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n`);
-        process.stderr.write(`[MCP-ENV]   Current working directory: ${process.cwd()}\n`);
-        process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' requires .env file.\n`);
-        process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
+        // For stdio mode, don't log or write to stderr (MCP protocol expects clean JSON)
+        if (!isStdio) {
+          logger.error(".env file not found", { path: envFilePath });
+        }
+        if (!isStdio) {
+          process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n`);
+          process.stderr.write(`[MCP-ENV]   Current working directory: ${process.cwd()}\n`);
+          process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' requires .env file.\n`);
+          process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
+        }
         process.exit(1);
       } else {
-        process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n`);
-        process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' was explicitly specified but .env file is missing.\n`);
-        process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
+        // For stdio mode, don't write to stderr
+        if (!isStdio) {
+          process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n`);
+          process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' was explicitly specified but .env file is missing.\n`);
+          process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
+        }
         process.exit(1);
       }
     }
@@ -643,20 +776,31 @@ if (!skipEnvAutoload) {
     if (isEnvMandatory) {
       // Transport explicitly set to stdio/sse but no .env found
       const cwdEnvPath = path.resolve(process.cwd(), ".env");
-      logger.error(".env file not found", { path: cwdEnvPath });
-      process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found in current directory: ${process.cwd()}\n`);
-      process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' requires .env file.\n`);
-      process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
+      // For stdio mode, don't log or write to stderr (MCP protocol expects clean JSON)
+      if (!isStdio) {
+        logger.error(".env file not found", { path: cwdEnvPath });
+      }
+      if (!isStdio) {
+        process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found in current directory: ${process.cwd()}\n`);
+        process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' requires .env file.\n`);
+        process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
+      }
       process.exit(1);
     } else {
       // No .env found, but transport is HTTP (default) - this is OK
       if (explicitTransportType === null) {
         // Transport not specified, defaulting to HTTP mode
-        process.stderr.write(`[MCP-ENV] NOTE: No .env file found in current directory: ${process.cwd()}\n`);
-        process.stderr.write(`[MCP-ENV]   Starting in HTTP mode (no .env file required)\n`);
+        // For stdio mode, don't write to stderr
+        if (!isStdio) {
+          process.stderr.write(`[MCP-ENV] NOTE: No .env file found in current directory: ${process.cwd()}\n`);
+          process.stderr.write(`[MCP-ENV]   Starting in HTTP mode (no .env file required)\n`);
+        }
       } else {
         // Transport explicitly set to HTTP - this is OK
-        process.stderr.write(`[MCP-ENV] NOTE: No .env file found, continuing in ${transportType} mode\n`);
+        // For stdio mode, don't write to stderr
+        if (!isStdio) {
+          process.stderr.write(`[MCP-ENV] NOTE: No .env file found, continuing in ${transportType} mode\n`);
+        }
       }
     }
   }
@@ -664,26 +808,34 @@ if (!skipEnvAutoload) {
   if (!path.isAbsolute(envFilePath)) {
     envFilePath = path.resolve(process.cwd(), envFilePath);
   }
-  process.stderr.write(`[MCP-ENV] Environment autoload skipped; using provided path reference: ${envFilePath}\n`);
+  // For stdio mode, don't write to stderr
+  if (!isStdio) {
+    process.stderr.write(`[MCP-ENV] Environment autoload skipped; using provided path reference: ${envFilePath}\n`);
+  }
 } else {
-  process.stderr.write(`[MCP-ENV] Environment autoload skipped (MCP_SKIP_ENV_LOAD=true).\n`);
+  // For stdio mode, don't write to stderr
+  if (!isStdio) {
+    process.stderr.write(`[MCP-ENV] Environment autoload skipped (MCP_SKIP_ENV_LOAD=true).\n`);
+  }
 }
 // --- END ENV FILE LOADING LOGIC ---
 
 // Debug: Log loaded SAP_URL and SAP_CLIENT using the MCP-compatible logger
-const envLogPath = envFilePath ?? "(skipped)";
-
-logger.info("SAP configuration loaded", {
-  type: "CONFIG_INFO",
-  SAP_URL: process.env.SAP_URL,
-  SAP_CLIENT: process.env.SAP_CLIENT || "(not set)",
-  SAP_AUTH_TYPE: process.env.SAP_AUTH_TYPE || "(not set)",
-  SAP_JWT_TOKEN: process.env.SAP_JWT_TOKEN ? "[set]" : "(not set)",
-  ENV_PATH: envLogPath,
-  CWD: process.cwd(),
-  DIRNAME: __dirname,
-  TRANSPORT: transportType
-});
+// Skip logging in stdio mode (MCP protocol requires clean JSON only)
+if (!isStdio) {
+  const envLogPath = envFilePath ?? "(skipped)";
+  logger.info("SAP configuration loaded", {
+    type: "CONFIG_INFO",
+    SAP_URL: process.env.SAP_URL,
+    SAP_CLIENT: process.env.SAP_CLIENT || "(not set)",
+    SAP_AUTH_TYPE: process.env.SAP_AUTH_TYPE || "(not set)",
+    SAP_JWT_TOKEN: process.env.SAP_JWT_TOKEN ? "[set]" : "(not set)",
+    ENV_PATH: envLogPath,
+    CWD: process.cwd(),
+    DIRNAME: __dirname,
+    TRANSPORT: transportType
+  });
+}
 
 type TransportConfig =
   | { type: "stdio" }
@@ -871,7 +1023,7 @@ export function setAbapConnectionOverride(connection?: AbapConnection) {
 
 /**
  * Retrieves SAP configuration from environment variables.
- * Uses getConfigFromEnv from @mcp-abap-adt/connection package.
+ * Reads configuration from process.env (caller is responsible for loading .env file if needed).
  *
  * @returns {SapConfig} The SAP configuration object.
  * @throws {Error} If any required environment variable is missing.
@@ -880,7 +1032,59 @@ export function getConfig(): SapConfig {
   if (sapConfigOverride) {
     return sapConfigOverride;
   }
-  return getConfigFromEnv();
+
+  const url = process.env.SAP_URL?.trim();
+  const client = process.env.SAP_CLIENT?.trim();
+
+  // Auto-detect auth type: if JWT token is present, use JWT; otherwise check SAP_AUTH_TYPE or default to basic
+  let authType: SapConfig["authType"] = 'basic';
+  if (process.env.SAP_JWT_TOKEN) {
+    authType = 'jwt';
+  } else if (process.env.SAP_AUTH_TYPE) {
+    const rawAuthType = process.env.SAP_AUTH_TYPE.trim();
+    authType = rawAuthType === 'xsuaa' ? 'jwt' : (rawAuthType as SapConfig["authType"]);
+  }
+
+  if (!url || !/^https?:\/\//.test(url)) {
+    throw new Error(`Missing or invalid SAP_URL: ${url}`);
+  }
+
+  const config: SapConfig = {
+    url,
+    authType,
+  };
+
+  if (client) {
+    config.client = client;
+  }
+
+  if (authType === 'jwt') {
+    const jwtToken = process.env.SAP_JWT_TOKEN;
+    if (!jwtToken) {
+      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
+    }
+    config.jwtToken = jwtToken;
+    const refreshToken = process.env.SAP_REFRESH_TOKEN;
+    if (refreshToken) {
+      config.refreshToken = refreshToken;
+    }
+    const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
+    const uaaClientId = process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
+    const uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
+    if (uaaUrl) config.uaaUrl = uaaUrl;
+    if (uaaClientId) config.uaaClientId = uaaClientId;
+    if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret;
+  } else {
+    const username = process.env.SAP_USERNAME;
+    const password = process.env.SAP_PASSWORD;
+    if (!username || !password) {
+      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
+    }
+    config.username = username;
+    config.password = password;
+  }
+
+  return config;
 }
 
 /**
@@ -1188,11 +1392,18 @@ export class mcp_abap_adt_server {
       this.transportConfig = options?.transportConfig ?? parseTransportConfig();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.error("Failed to parse transport configuration", {
-        type: "TRANSPORT_CONFIG_ERROR",
-        error: message,
-      });
-      process.stderr.write(`ERROR: ${message}\n`);
+      // For stdio mode, don't log or write to stderr (MCP protocol expects clean JSON)
+      const isStdioMode = transportType === "stdio" ||
+                          process.env.MCP_TRANSPORT === "stdio" ||
+                          process.argv.includes("--transport=stdio") ||
+                          process.argv.includes("--stdio");
+      if (!isStdioMode) {
+        logger.error("Failed to parse transport configuration", {
+          type: "TRANSPORT_CONFIG_ERROR",
+          error: message,
+        });
+        process.stderr.write(`ERROR: ${message}\n`);
+      }
       if (this.allowProcessExit) {
         process.exit(1);
       }
@@ -1754,12 +1965,17 @@ export class mcp_abap_adt_server {
    */
   async run() {
     if (this.transportConfig.type === "stdio") {
+      // Restore stdout for MCP protocol (but keep stderr and console suppressed)
+      // This MUST happen BEFORE creating StdioServerTransport to ensure clean stdout
+      if ((global as any).__restoreStdioForMCP) {
+        (global as any).__restoreStdioForMCP();
+      }
+      // Create and connect transport - this is the ONLY thing that should write to stdout
+      // Following the reference implementation pattern from sdk-stdio-server.ts
       const transport = new StdioServerTransport();
       await this.mcpServer.server.connect(transport);
-      logger.info("Server connected", {
-        type: "SERVER_READY",
-        transport: "stdio",
-      });
+      // In stdio mode, we keep stderr available for error logging (like reference implementation)
+      // but stdout is reserved for MCP JSON-RPC protocol only
       return;
     }
 

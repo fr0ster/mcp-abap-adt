@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.1.16] - 2025-01-XX
+
+### Removed
+- **dotenv dependency** – completely removed `dotenv` package from dependencies:
+  - Eliminated `dotenv` as a dependency to prevent stdout pollution in stdio mode
+  - Resolved `"[dotenv@17."... is not valid JSON` error that was breaking stdio transport
+  - Server now uses manual `.env` file parsing for all transport modes
+
+### Changed
+- **.env file parsing** – replaced `dotenv` library with manual parsing:
+  - Manual `.env` file parsing for all transport modes (stdio, http, sse)
+  - Supports both Unix (`\n`) and Windows (`\r\n`) line endings
+  - Handles comments, quoted values, and empty lines correctly
+  - Cross-platform compatible (works on Linux, Windows, macOS)
+  - No external dependencies for environment variable loading
+
+- **stdio mode auto-detection** – improved stdio mode detection:
+  - Auto-detects stdio mode when `stdin` is not a TTY (piped by MCP Inspector or other tools)
+  - Checks `!process.stdin.isTTY` in addition to command-line arguments and environment variables
+  - Allows seamless connection from MCP Inspector and other stdio-based clients without explicit `--transport=stdio` flag
+
+- **stderr handling in stdio mode** – restored stderr for error logging:
+  - Following reference implementation pattern, stderr is now available for error logging in stdio mode
+  - stdout remains reserved exclusively for MCP JSON-RPC protocol
+  - console.error() and console.warn() now work correctly in stdio mode (write to stderr)
+
+### Fixed
+- **stdio transport connection** – fixed issue where server was not connecting properly in stdio mode:
+  - Server now correctly detects stdio mode when launched by MCP Inspector
+  - Tools are properly registered and available when connecting via stdio
+  - Resolved connection issues that prevented tools from being listed
+
+### Dependencies
+- Updated `@mcp-abap-adt/connection` to `^0.1.12`:
+  - Connection package no longer reads `.env` files or depends on `dotenv`
+  - Consumers must pass `SapConfig` directly to connection constructors
+- Updated `@mcp-abap-adt/adt-clients` to `^0.1.27`:
+  - Updated to work with connection@0.1.12
+  - Fixed example scripts to use manual `.env` parsing
+
 ## [1.1.15] - 2025-01-27
 
 ### Fixed

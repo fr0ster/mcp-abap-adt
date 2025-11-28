@@ -29,6 +29,13 @@ function safeStringify(obj: any): string {
 // Logger functions for different log levels
 function createLogFn(level: string) {
   return (message: string, data?: any) => {
+    // Never log in stdio mode (MCP protocol requires clean JSON only)
+    const isStdio = process.env.MCP_TRANSPORT === "stdio" ||
+                    process.argv.includes("--transport=stdio") ||
+                    process.argv.includes("--stdio");
+    if (isStdio) {
+      return; // Suppress all logging in stdio mode
+    }
     const debugEnabled = process.env.DEBUG_CONNECTORS === "true";
     if (debugEnabled) {
       // In debug mode with MCP Inspector, use process.stderr instead of console.log
@@ -66,6 +73,13 @@ export const logger = {
 
   // Special handler for TLS config
   tlsConfig: (rejectUnauthorized: boolean) => {
+    // Never log in stdio mode
+    const isStdio = process.env.MCP_TRANSPORT === "stdio" ||
+                    process.argv.includes("--transport=stdio") ||
+                    process.argv.includes("--stdio");
+    if (isStdio) {
+      return; // Suppress all logging in stdio mode
+    }
     const debugEnabled = process.env.DEBUG_CONNECTORS === "true";
     if (debugEnabled) {
       const message = `TLS certificate validation is ${
@@ -89,6 +103,13 @@ export const logger = {
     message: string,
     data?: any
   ) => {
+    // Never log in stdio mode
+    const isStdio = process.env.MCP_TRANSPORT === "stdio" ||
+                    process.argv.includes("--transport=stdio") ||
+                    process.argv.includes("--stdio");
+    if (isStdio) {
+      return; // Suppress all logging in stdio mode
+    }
     const debugEnabled = process.env.DEBUG_CONNECTORS === "true";
     if (debugEnabled) {
       process.stderr.write(
@@ -110,6 +131,13 @@ export const logger = {
  */
 function createHandlerLogFn(level: string) {
   return (handlerName: string, step: string, message: string, data?: any) => {
+    // Never log in stdio mode
+    const isStdio = process.env.MCP_TRANSPORT === "stdio" ||
+                    process.argv.includes("--transport=stdio") ||
+                    process.argv.includes("--stdio");
+    if (isStdio) {
+      return; // Suppress all logging in stdio mode
+    }
     const debugEnabled = process.env.DEBUG_HANDLERS === "true";
     if (debugEnabled) {
       const logObject = {
@@ -158,6 +186,13 @@ export const handlerLogger = {
  */
 function createConnectionManagerLogFn(level: string) {
   return (message: string, data?: any) => {
+    // Never log in stdio mode
+    const isStdio = process.env.MCP_TRANSPORT === "stdio" ||
+                    process.argv.includes("--transport=stdio") ||
+                    process.argv.includes("--stdio");
+    if (isStdio) {
+      return; // Suppress all logging in stdio mode
+    }
     const debugEnabled = process.env.DEBUG_CONNECTION_MANAGER === "true";
     if (debugEnabled) {
       const logObject = {

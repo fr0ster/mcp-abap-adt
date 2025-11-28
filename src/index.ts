@@ -998,15 +998,28 @@ export function getConfig(): SapConfig {
     return sapConfigOverride;
   }
 
-  const url = process.env.SAP_URL?.trim();
-  const client = process.env.SAP_CLIENT?.trim();
+  let url = process.env.SAP_URL;
+  let client = process.env.SAP_CLIENT;
+
+  // Aggressive cleaning for Windows compatibility
+  // Remove all control characters (including \r, \n, \t, etc.)
+  if (url) {
+    url = url.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+    // Remove quotes if present
+    url = url.replace(/^["']|["']$/g, '');
+  }
+
+  if (client) {
+    client = client.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+    client = client.replace(/^["']|["']$/g, '');
+  }
 
   // Auto-detect auth type: if JWT token is present, use JWT; otherwise check SAP_AUTH_TYPE or default to basic
   let authType: SapConfig["authType"] = 'basic';
   if (process.env.SAP_JWT_TOKEN) {
     authType = 'jwt';
   } else if (process.env.SAP_AUTH_TYPE) {
-    const rawAuthType = process.env.SAP_AUTH_TYPE.trim();
+    const rawAuthType = process.env.SAP_AUTH_TYPE.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
     authType = rawAuthType === 'xsuaa' ? 'jwt' : (rawAuthType as SapConfig["authType"]);
   }
 
@@ -1014,15 +1027,13 @@ export function getConfig(): SapConfig {
     throw new Error(`Missing SAP_URL in environment variables. Please check your .env file.`);
   }
 
-  // Remove any remaining control characters (especially \r on Windows)
-  const cleanUrl = url.replace(/\r/g, "").trim();
-
-  if (!/^https?:\/\//.test(cleanUrl)) {
-    throw new Error(`Invalid SAP_URL format: "${cleanUrl}". Expected format: https://your-system.sap.com`);
+  // Final validation - URL should be clean now
+  if (!/^https?:\/\//.test(url)) {
+    throw new Error(`Invalid SAP_URL format: "${url}". Expected format: https://your-system.sap.com`);
   }
 
   const config: SapConfig = {
-    url: cleanUrl,
+    url, // Already cleaned above
     authType,
   };
 
@@ -1035,25 +1046,27 @@ export function getConfig(): SapConfig {
     if (!jwtToken) {
       throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
     }
-    config.jwtToken = jwtToken;
+    // Clean JWT token (remove control characters)
+    config.jwtToken = jwtToken.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
     const refreshToken = process.env.SAP_REFRESH_TOKEN;
     if (refreshToken) {
-      config.refreshToken = refreshToken;
+      config.refreshToken = refreshToken.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
     }
     const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
     const uaaClientId = process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
     const uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
-    if (uaaUrl) config.uaaUrl = uaaUrl;
-    if (uaaClientId) config.uaaClientId = uaaClientId;
-    if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret;
+    if (uaaUrl) config.uaaUrl = uaaUrl.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+    if (uaaClientId) config.uaaClientId = uaaClientId.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+    if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
   } else {
     const username = process.env.SAP_USERNAME;
     const password = process.env.SAP_PASSWORD;
     if (!username || !password) {
       throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
     }
-    config.username = username;
-    config.password = password;
+    // Clean username and password (remove control characters)
+    config.username = username.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+    config.password = password.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
   }
 
   return config;

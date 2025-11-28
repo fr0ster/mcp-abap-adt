@@ -128,14 +128,15 @@ function loadEnvFile(envFilePath) {
         if (result.parsed.hasOwnProperty(key)) {
           // Get the value that dotenv already set in process.env
           let value = process.env[key] || result.parsed[key];
-          // Remove \r characters (Windows line endings)
-          value = String(value).replace(/\r/g, '');
+          // Aggressive cleaning for Windows compatibility
+          // Remove ALL control characters (including \r, \n, \t, etc.)
+          value = String(value).replace(/[\x00-\x1F\x7F-\x9F]/g, '');
           // Trim whitespace
           value = value.trim();
           // Remove quotes if present (both single and double)
           value = value.replace(/^["']|["']$/g, '');
-          // Remove any remaining control characters
-          value = value.replace(/[\x00-\x1F\x7F]/g, '');
+          // Final trim after quote removal
+          value = value.trim();
           // Update process.env with cleaned value (override what dotenv set)
           process.env[key] = value;
         }

@@ -102,6 +102,7 @@ function loadEnvFile(envFilePath) {
 
     const result = dotenv.config({
       path: envFilePath,
+      encoding: 'utf8', // Explicitly specify UTF-8 encoding for cross-platform compatibility
       debug: false, // Don't output debug info
       override: false // Don't override existing env vars
     });
@@ -119,10 +120,45 @@ function loadEnvFile(envFilePath) {
       return false;
     }
 
+    // Clean loaded environment variables (remove \r and trim whitespace)
+    // This is especially important on Windows where .env files may have \r\n line endings
+    if (result.parsed) {
+      for (const key in result.parsed) {
+        if (result.parsed.hasOwnProperty(key)) {
+          let value = result.parsed[key];
+          // Remove \r characters (Windows line endings)
+          value = value.replace(/\r/g, '');
+          // Trim whitespace
+          value = value.trim();
+          // Remove quotes if present
+          value = value.replace(/^["']|["']$/g, '');
+          // Update process.env with cleaned value
+          if (!process.env[key]) {
+            process.env[key] = value;
+          }
+        }
+      }
+    }
+
+    // Verify that key variables were loaded
+    const sapUrl = process.env.SAP_URL;
+    const sapClient = process.env.SAP_CLIENT;
+
     // Only write to stderr if not in stdio mode (stdio mode requires clean JSON only)
     if (!isStdio) {
       process.stderr.write(`[MCP] ✓ Loaded .env file: ${envFilePath}\n`);
+      if (sapUrl) {
+        process.stderr.write(`[MCP] SAP_URL: ${sapUrl}\n`);
+      } else {
+        process.stderr.write(`[MCP] ⚠ WARNING: SAP_URL not found in .env file\n`);
+      }
+      if (sapClient) {
+        process.stderr.write(`[MCP] SAP_CLIENT: ${sapClient}\n`);
+      } else {
+        process.stderr.write(`[MCP] ⚠ WARNING: SAP_CLIENT not found in .env file\n`);
+      }
     }
+
     return true;
   } catch (error) {
     // Always write to stderr (safe even in stdio mode)
@@ -196,50 +232,51 @@ function main() {
     const envLoaded = loadEnvFile(args.envFile);
 
     if (!envLoaded && isEnvRequired) {
-      // Always write to stderr (safe even in stdio mode)
+      // Always write to stderr (safe even in stdio mode - stderr doesn't interfere with JSON-RPC)
       process.stderr.write(`[MCP] ✗ ERROR: .env file is required for transport mode '${args.transport || 'stdio'}'\n`);
       process.stderr.write(`[MCP]   Use --env=/path/to/.env to specify custom location\n`);
-      // On Windows, wait for user input or timeout to allow error message to be visible
-      if (process.platform === 'win32' && process.stdin.isTTY) {
-        process.stderr.write(`[MCP] Press Enter to exit...\n`);
-        process.stdin.setRawMode(true);
-        process.stdin.resume();
-        process.stdin.once('data', () => {
-          process.exit(1);
-        });
-        // Also exit after 10 seconds if no input
-        setTimeout(() => process.exit(1), 10000);
-      } else {
-        // For non-TTY (stdio mode) or non-Windows, just exit
-        if (process.platform === 'win32') {
-          // On Windows but not TTY, wait 30 seconds
+
+      // In stdio mode (Cline), don't exit - let the server start and show error through MCP protocol
+      // The server will fail to initialize and show the error to the client
+      if (!isStdio) {
+        // For non-stdio modes, exit with delay on Windows
+        if (process.platform === 'win32' && process.stdin.isTTY) {
+          process.stderr.write(`[MCP] Press Enter to exit...\n`);
+          process.stdin.setRawMode(true);
+          process.stdin.resume();
+          process.stdin.once('data', () => {
+            process.exit(1);
+          });
+          setTimeout(() => process.exit(1), 10000);
+        } else if (process.platform === 'win32') {
           setTimeout(() => process.exit(1), 30000);
         } else {
           process.exit(1);
         }
       }
+      // For stdio mode, continue - server will show error through MCP protocol when getConfig() is called
     } else if (!envLoaded && args.envFile) {
       // Always write to stderr (safe even in stdio mode)
       process.stderr.write(`[MCP] ✗ ERROR: .env file not found: ${args.envFile}\n`);
-      // On Windows, wait for user input or timeout to allow error message to be visible
-      if (process.platform === 'win32' && process.stdin.isTTY) {
-        process.stderr.write(`[MCP] Press Enter to exit...\n`);
-        process.stdin.setRawMode(true);
-        process.stdin.resume();
-        process.stdin.once('data', () => {
-          process.exit(1);
-        });
-        // Also exit after 10 seconds if no input
-        setTimeout(() => process.exit(1), 10000);
-      } else {
-        // For non-TTY (stdio mode) or non-Windows, just exit
-        if (process.platform === 'win32') {
-          // On Windows but not TTY, wait 30 seconds
+
+      // In stdio mode (Cline), don't exit - let the server start and show error through MCP protocol
+      if (!isStdio) {
+        // For non-stdio modes, exit with delay on Windows
+        if (process.platform === 'win32' && process.stdin.isTTY) {
+          process.stderr.write(`[MCP] Press Enter to exit...\n`);
+          process.stdin.setRawMode(true);
+          process.stdin.resume();
+          process.stdin.once('data', () => {
+            process.exit(1);
+          });
+          setTimeout(() => process.exit(1), 10000);
+        } else if (process.platform === 'win32') {
           setTimeout(() => process.exit(1), 30000);
         } else {
           process.exit(1);
         }
       }
+      // For stdio mode, continue - server will show error through MCP protocol when getConfig() is called
     }
   } else {
     // Try to load default .env (optional)

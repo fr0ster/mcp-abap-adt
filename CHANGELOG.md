@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.15] - 2025-01-27
+
+### Fixed
+- **Git tag management** – fixed issues with release tag creation and management:
+  - Corrected tag placement on the latest commit with CHANGELOG updates
+  - Ensured proper tag synchronization between local and remote repositories
+  - Fixed tag deletion and recreation workflow for release management
+
 ## [1.1.14] - 2025-01-27
 
 ### Added

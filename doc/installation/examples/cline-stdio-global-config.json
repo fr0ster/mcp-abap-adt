@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "mcp-abap-adt": {
+      "command": "mcp-abap-adt",
+      "args": [
+        "--transport=stdio",
+        "--env=/REPLACE/WITH/PATH/TO/.env"
+      ],
+      "env": {},
+      "disabled": false
+    }
+  }
+}

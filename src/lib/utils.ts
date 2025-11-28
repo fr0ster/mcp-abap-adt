@@ -16,6 +16,8 @@ import { logger, connectionManagerLogger } from "./logger";
 import { notifyConnectionResetListeners, registerConnectionResetHook } from "./connectionEvents";
 import { AsyncLocalStorage } from "async_hooks";
 import * as crypto from "crypto";
+import * as path from "path";
+import * as os from "os";
 
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
@@ -41,11 +43,21 @@ export const sessionContext = new AsyncLocalStorage<{
 }>();
 
 // Session storage for stateful sessions (persists cookies and CSRF tokens)
-const sessionStorage = new FileSessionStorage({
-  sessionDir: '.sessions',
-  createDir: true,
-  prettyPrint: false
-});
+// Only enabled if MCP_ENABLE_SESSION_STORAGE=true or MCP_SESSION_DIR is set
+// When disabled, each request creates a fresh connection (stateless mode)
+let sessionStorage: FileSessionStorage | undefined;
+
+if (process.env.MCP_ENABLE_SESSION_STORAGE === 'true' || process.env.MCP_SESSION_DIR) {
+  const sessionDir = process.env.MCP_SESSION_DIR || path.join(os.tmpdir(), 'mcp-abap-adt-sessions');
+  sessionStorage = new FileSessionStorage({
+    sessionDir: sessionDir,
+    createDir: true,
+    prettyPrint: false
+  });
+  logger.info(`Session storage enabled: ${sessionDir}`);
+} else {
+  logger.info('Session storage disabled (stateless mode)');
+}
 
 // Fixed session ID for server connection (allows session persistence across requests)
 const SERVER_SESSION_ID = 'mcp-abap-adt-session';

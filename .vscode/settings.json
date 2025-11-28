@@ -137,6 +137,7 @@
     "resourcealreadyexists",
     "Roadmaps",
     "SABP",
+    "saoudrizwan",
     "SAPL",
     "SAPLSETT",
     "SAPLSLVC",
@@ -184,7 +185,8 @@
     "ZPKG",
     "ztable",
     "ZTEST",
-    "ztst"
+    "ztst",
+    "oleksiikyslytsia"
   ],
   "git.autoRepositoryDetection": true,
   "git.scanRepositories": [

@@ -1,5 +1,57 @@
 # Changelog
 
+## [1.1.17] - 2025-11-28
+
+### Added
+- **Cross-platform session storage** – optional persistent session management:
+  - Session storage now disabled by default (stateless mode)
+  - Enable via `MCP_ENABLE_SESSION_STORAGE=true` environment variable
+  - Custom session directory via `MCP_SESSION_DIR=/path/to/sessions`
+  - Platform-specific defaults: Windows temp dir, `/tmp` on Linux, `/var/folders` on macOS
+  - Prevents `ENOENT` errors when running from different working directories
+
+- **Cline configuration documentation** – comprehensive setup guide:
+  - Created `doc/installation/CLINE_CONFIGURATION.md` with detailed configuration for all transport types
+  - Added example configs in `doc/installation/examples/` for NPX, global install, and local development
+  - Platform-specific notes for macOS, Linux, and Windows
+  - Session storage configuration examples and best practices
+  - Troubleshooting guide for common connection issues
+
+- **Cross-platform fixes documentation** – created `doc/development/CROSS_PLATFORM_FIXES.md`:
+  - Documented dotenv removal and stdio transport fixes
+  - Cross-platform path handling with `os.tmpdir()` and `path.join()`
+  - Platform-specific session storage locations
+  - Testing instructions for all three transports (stdio, HTTP, SSE)
+
+### Changed
+- **Session storage architecture** – improved reliability and cross-platform support:
+  - Moved from relative `.sessions` path to absolute paths using `os.tmpdir()`
+  - Session storage now optional and controlled by environment variables
+  - Removed `FileSessionStorage` usage from individual handlers (e.g., `handleDeletePackage`)
+  - All session management now centralized in connection manager (`utils.ts`)
+
+- **Environment variable documentation** – comprehensive env var reference:
+  - Added table of all available environment variables in Cline configuration docs
+  - Documented `MCP_ENABLE_SESSION_STORAGE` and `MCP_SESSION_DIR` usage
+  - Platform-specific default values and examples
+  - Guidance on when to enable/disable session storage
+
+### Fixed
+- **Session directory creation errors** – fixed `ENOENT: no such file or directory, mkdir '/.sessions'`:
+  - Replaced relative `.sessions` path with absolute paths
+  - Session directory now uses OS-specific temp directory by default
+  - Works correctly when running as global npm package or via npx
+  - No longer depends on current working directory
+
+- **Handler session management** – simplified connection handling:
+  - Removed custom `FileSessionStorage` creation in `handleDeletePackage`
+  - Deprecated `force_new_connection` parameter (now ignored)
+  - All connections use centralized session management
+  - Restart server to force new session instead of per-handler sessions
+
+### Dependencies
+- No dependency changes in this release
+
 ## [1.1.16] - 2025-01-XX
 
 ### Removed

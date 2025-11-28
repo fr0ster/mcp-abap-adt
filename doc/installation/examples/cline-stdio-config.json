@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "mcp-abap-adt": {
+      "command": "node",
+      "args": [
+        "/REPLACE/WITH/YOUR/PATH/mcp-abap-adt/bin/mcp-abap-adt.js",
+        "--transport=stdio",
+        "--env=/REPLACE/WITH/YOUR/PATH/mcp-abap-adt/.env"
+      ],
+      "env": {},
+      "disabled": false
+    }
+  }
+}

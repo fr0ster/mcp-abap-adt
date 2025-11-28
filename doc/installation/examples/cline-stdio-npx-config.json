@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "mcp-abap-adt": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@fr0ster/mcp-abap-adt",
+        "--transport=stdio",
+        "--env=/REPLACE/WITH/PATH/TO/.env"
+      ],
+      "env": {},
+      "disabled": false
+    }
+  }
+}

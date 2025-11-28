@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mcp-abap-adt": {
+      "url": "http://localhost:3000",
+      "transport": "http",
+      "disabled": false
+    }
+  }
+}

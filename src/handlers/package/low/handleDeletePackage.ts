@@ -10,7 +10,6 @@ import { return_error, return_response, logger, getManagedConnection } from '../
 import { getConfig } from '../../../index';
 import { loggerAdapter } from '../../../lib/loggerAdapter';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { createAbapConnection, FileSessionStorage } from '@mcp-abap-adt/connection';
 
 export const TOOL_DEFINITION = {
   name: "DeletePackageLow",
@@ -61,22 +60,10 @@ export async function handleDeletePackage(args: DeletePackageArgs) {
 
     const packageName = package_name.toUpperCase();
 
-    let connection;
-    if (force_new_connection) {
-      // Create a new connection bypassing cache (useful when package was locked/unlocked)
-      // This ensures we're using a fresh session without any lock state
-      const config = getConfig();
-      const sessionStorage = new FileSessionStorage({
-        sessionDir: '.sessions',
-        createDir: true,
-        prettyPrint: false
-      });
-      const uniqueSessionId = `delete-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      connection = createAbapConnection(config, loggerAdapter, sessionStorage, uniqueSessionId);
-      logger.info(`Creating new connection for package deletion (bypassing cache): ${packageName}`);
-    } else {
-      connection = getManagedConnection();
-    }
+    // Note: force_new_connection parameter is deprecated and ignored
+    // All connections now use the same session management
+    // To force a new session, restart the MCP server
+    const connection = getManagedConnection();
 
     const client = new CrudClient(connection);
     await connection.connect();

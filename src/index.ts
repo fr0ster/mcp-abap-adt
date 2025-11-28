@@ -1004,9 +1004,18 @@ export function getConfig(): SapConfig {
   // Aggressive cleaning for Windows compatibility
   // Remove all control characters (including \r, \n, \t, etc.)
   if (url) {
-    url = url.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
-    // Remove quotes if present
-    url = url.replace(/^["']|["']$/g, '');
+    // Step 1: Remove ALL control characters
+    url = String(url).replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+    // Step 2: Trim whitespace
+    url = url.trim();
+    // Step 3: Remove quotes (handle nested quotes)
+    url = url.replace(/^["']+|["']+$/g, '');
+    // Step 4: Trim again after quote removal
+    url = url.trim();
+    // Step 5: Remove trailing slashes (but keep the protocol slashes)
+    url = url.replace(/\/+$/, '');
+    // Step 6: Final trim
+    url = url.trim();
   }
 
   if (client) {
@@ -1029,11 +1038,23 @@ export function getConfig(): SapConfig {
 
   // Final validation - URL should be clean now
   if (!/^https?:\/\//.test(url)) {
-    throw new Error(`Invalid SAP_URL format: "${url}". Expected format: https://your-system.sap.com`);
+    // Log URL in hex for debugging
+    const urlHex = Buffer.from(url, 'utf8').toString('hex');
+    throw new Error(`Invalid SAP_URL format: "${url}" (hex: ${urlHex.substring(0, 100)}...). Expected format: https://your-system.sap.com`);
+  }
+
+  // Additional validation: try to create URL object to catch any remaining issues
+  try {
+    const testUrl = new URL(url);
+    // If URL object creation succeeds, use the normalized URL
+    url = testUrl.href.replace(/\/$/, ''); // Remove trailing slash if present
+  } catch (urlError) {
+    const urlHex = Buffer.from(url, 'utf8').toString('hex');
+    throw new Error(`Invalid SAP_URL: "${url}" (hex: ${urlHex.substring(0, 100)}...). Error: ${urlError instanceof Error ? urlError.message : urlError}`);
   }
 
   const config: SapConfig = {
-    url, // Already cleaned above
+    url, // Already cleaned and validated above
     authType,
   };
 

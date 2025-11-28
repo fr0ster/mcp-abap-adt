@@ -128,18 +128,41 @@ function loadEnvFile(envFilePath) {
         if (result.parsed.hasOwnProperty(key)) {
           // Get the value that dotenv already set in process.env
           let value = process.env[key] || result.parsed[key];
+
           // Aggressive cleaning for Windows compatibility
-          // Remove ALL control characters (including \r, \n, \t, etc.)
+          // Step 1: Convert to string and remove ALL control characters (including \r, \n, \t, etc.)
           value = String(value).replace(/[\x00-\x1F\x7F-\x9F]/g, '');
-          // Trim whitespace
+          // Step 2: Trim whitespace from both ends
           value = value.trim();
-          // Remove quotes if present (both single and double)
-          value = value.replace(/^["']|["']$/g, '');
-          // Final trim after quote removal
+          // Step 3: Remove quotes if present (both single and double) - handle nested quotes
+          value = value.replace(/^["']+|["']+$/g, '');
+          // Step 4: Final trim after quote removal
           value = value.trim();
+          // Step 5: For URLs specifically, ensure no trailing slashes or spaces
+          if (key === 'SAP_URL') {
+            value = value.replace(/\/+$/, ''); // Remove trailing slashes
+            value = value.trim();
+          }
+
           // Update process.env with cleaned value (override what dotenv set)
           process.env[key] = value;
         }
+      }
+    }
+
+    // Double-check critical SAP variables after cleaning
+    // This ensures they are truly clean before the server starts
+    const criticalVars = ['SAP_URL', 'SAP_CLIENT', 'SAP_USERNAME', 'SAP_PASSWORD', 'SAP_JWT_TOKEN'];
+    for (const varName of criticalVars) {
+      if (process.env[varName]) {
+        let value = process.env[varName];
+        // Final aggressive clean
+        value = String(value).replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+        value = value.replace(/^["']+|["']+$/g, '').trim();
+        if (varName === 'SAP_URL') {
+          value = value.replace(/\/+$/, '').trim();
+        }
+        process.env[varName] = value;
       }
     }
 

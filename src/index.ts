@@ -659,17 +659,16 @@ if (!skipEnvAutoload) {
             let value = trimmed.substring(eqIndex + 1);
 
             // Remove inline comments (everything after #)
-            // This handles cases like: KEY=value # comment
-            // For .env files, # after value is always a comment
+            // This handles cases like: KEY=value # comment or KEY=value#comment
+            // Find first # and remove everything after it (including the #)
             const commentIndex = value.indexOf('#');
             if (commentIndex !== -1) {
-              value = value.substring(0, commentIndex);
+              // Remove everything from # onwards, then trim trailing whitespace
+              value = value.substring(0, commentIndex).trim();
             }
 
-            value = value.trim();
-
             // Aggressive cleaning for Windows compatibility (same as launcher)
-            // Step 1: Remove ALL control characters
+            // Step 1: Remove ALL control characters (including \r from Windows line endings)
             let unquotedValue = String(value).replace(/[\x00-\x1F\x7F-\x9F]/g, '');
             // Step 2: Trim whitespace
             unquotedValue = unquotedValue.trim();
@@ -708,17 +707,16 @@ if (!skipEnvAutoload) {
             let value = trimmed.substring(eqIndex + 1);
 
             // Remove inline comments (everything after #)
-            // This handles cases like: KEY=value # comment
-            // For .env files, # after value is always a comment
+            // This handles cases like: KEY=value # comment or KEY=value#comment
+            // Find first # and remove everything after it (including the #)
             const commentIndex = value.indexOf('#');
             if (commentIndex !== -1) {
-              value = value.substring(0, commentIndex);
+              // Remove everything from # onwards, then trim trailing whitespace
+              value = value.substring(0, commentIndex).trim();
             }
 
-            value = value.trim();
-
             // Aggressive cleaning for Windows compatibility (same as launcher)
-            // Step 1: Remove ALL control characters
+            // Step 1: Remove ALL control characters (including \r from Windows line endings)
             let unquotedValue = String(value).replace(/[\x00-\x1F\x7F-\x9F]/g, '');
             // Step 2: Trim whitespace
             unquotedValue = unquotedValue.trim();
@@ -1056,6 +1054,13 @@ export function getConfig(): SapConfig {
   // Aggressive cleaning for Windows compatibility
   // Remove all control characters (including \r, \n, \t, etc.)
   if (url) {
+    // Step 0: Remove inline comments (everything after #)
+    // This handles cases where comments weren't removed during .env parsing
+    const commentIndex = url.indexOf('#');
+    if (commentIndex !== -1) {
+      url = url.substring(0, commentIndex);
+    }
+
     // Step 1: Remove ALL control characters
     url = String(url).replace(/[\x00-\x1F\x7F-\x9F]/g, '');
     // Step 2: Trim whitespace

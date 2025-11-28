@@ -354,16 +354,40 @@ export function getManagedConnection(): AbapConnection {
   // Fallback to global config (for backward compatibility with non-HTTP transports)
   const config = overrideConfig ?? getConfig();
 
-  // Debug logging for Windows - verify URL is clean before creating connection
-  if (process.platform === 'win32' && config.url) {
+  // Helper function for Windows-compatible logging
+  const debugLog = (message: string): void => {
+    // Try stderr first
+    try {
+      process.stderr.write(message);
+    } catch (e) {
+      // Fallback to console.error for Windows
+      console.error(message.trim());
+    }
+    // Also try to write to a debug file on Windows
+    if (process.platform === 'win32') {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const debugFile = path.join(process.cwd(), 'mcp-debug.log');
+        fs.appendFileSync(debugFile, `${new Date().toISOString()} ${message}`, 'utf8');
+      } catch (e) {
+        // Ignore file write errors
+      }
+    }
+  };
+
+  // Debug logging - verify URL is clean before creating connection (always)
+  if (config.url) {
     const urlHex = Buffer.from(config.url, 'utf8').toString('hex');
-    process.stderr.write(`[MCP-UTILS] Creating connection with URL: "${config.url}" (length: ${config.url.length}, hex: ${urlHex.substring(0, 60)}...)\n`);
+    debugLog(`[MCP-UTILS] Creating connection with URL: "${config.url}" (length: ${config.url.length}, hex: ${urlHex.substring(0, 60)}...)\n`);
     if (config.url.includes('#')) {
-      process.stderr.write(`[MCP-UTILS] ✗ ERROR: URL contains # character in config object!\n`);
+      debugLog(`[MCP-UTILS] ✗ ERROR: URL contains # character in config object!\n`);
     }
     if (/[\x00-\x1F\x7F-\x9F]/.test(config.url)) {
-      process.stderr.write(`[MCP-UTILS] ✗ ERROR: URL contains control characters in config object!\n`);
+      debugLog(`[MCP-UTILS] ✗ ERROR: URL contains control characters in config object!\n`);
     }
+  } else {
+    debugLog(`[MCP-UTILS] ✗ ERROR: config.url is missing!\n`);
   }
 
   const signature = sapConfigSignature(config);

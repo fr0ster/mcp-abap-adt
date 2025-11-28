@@ -1055,8 +1055,33 @@ export function setAbapConnectionOverride(connection?: AbapConnection) {
  * @returns {SapConfig} The SAP configuration object.
  * @throws {Error} If any required environment variable is missing.
  */
+// Helper function for Windows-compatible logging
+function debugLog(message: string): void {
+  // Try stderr first
+  try {
+    process.stderr.write(message);
+  } catch (e) {
+    // Fallback to console.error for Windows
+    console.error(message.trim());
+  }
+  // Also try to write to a debug file on Windows
+  if (process.platform === 'win32') {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const debugFile = path.join(process.cwd(), 'mcp-debug.log');
+      fs.appendFileSync(debugFile, `${new Date().toISOString()} ${message}`, 'utf8');
+    } catch (e) {
+      // Ignore file write errors
+    }
+  }
+}
+
 export function getConfig(): SapConfig {
+  debugLog(`[MCP-CONFIG] getConfig() called\n`);
+
   if (sapConfigOverride) {
+    debugLog(`[MCP-CONFIG] Using override config\n`);
     return sapConfigOverride;
   }
 
@@ -1064,6 +1089,8 @@ export function getConfig(): SapConfig {
   // No need to reload .env here - it's already in process.env
   let url = process.env.SAP_URL;
   let client = process.env.SAP_CLIENT;
+
+  debugLog(`[MCP-CONFIG] Raw process.env.SAP_URL: "${url}" (type: ${typeof url}, length: ${url?.length || 0})\n`);
 
   // Final cleaning for Windows compatibility (in case values weren't cleaned properly)
   // This is a safety net, not a reload
@@ -1075,9 +1102,7 @@ export function getConfig(): SapConfig {
     if (commentIndex !== -1) {
       url = url.substring(0, commentIndex).trim();
       // Log if comment was found (indicates .env parsing issue)
-      if (process.platform === 'win32') {
-        process.stderr.write(`[MCP-CONFIG] ⚠ Found comment in URL, removed: "${originalUrl}" → "${url}"\n`);
-      }
+      debugLog(`[MCP-CONFIG] ⚠ Found comment in URL, removed: "${originalUrl}" → "${url}"\n`);
     }
 
     // Remove ALL control characters (safety net)
@@ -1090,17 +1115,15 @@ export function getConfig(): SapConfig {
     url = url.replace(/\/+$/, '');
     url = url.trim();
 
-    // Log cleaned URL for debugging on Windows
-    if (process.platform === 'win32' && url !== originalUrl) {
+    // Log cleaned URL for debugging (always, not just Windows)
+    if (url !== originalUrl) {
       const urlHex = Buffer.from(url, 'utf8').toString('hex');
-      process.stderr.write(`[MCP-CONFIG] Cleaned URL: "${url}" (length: ${url.length}, hex: ${urlHex.substring(0, 60)}...)\n`);
+      debugLog(`[MCP-CONFIG] Cleaned URL: "${url}" (length: ${url.length}, hex: ${urlHex.substring(0, 60)}...)\n`);
     }
   } else {
     // Log if URL is missing
-    if (process.platform === 'win32') {
-      process.stderr.write(`[MCP-CONFIG] ✗ SAP_URL is missing from process.env\n`);
-      process.stderr.write(`[MCP-CONFIG] Available env vars: ${Object.keys(process.env).filter(k => k.startsWith('SAP_')).join(', ')}\n`);
-    }
+    debugLog(`[MCP-CONFIG] ✗ SAP_URL is missing from process.env\n`);
+    debugLog(`[MCP-CONFIG] Available env vars: ${Object.keys(process.env).filter(k => k.startsWith('SAP_')).join(', ')}\n`);
   }
 
   if (client) {
@@ -1138,17 +1161,15 @@ export function getConfig(): SapConfig {
     throw new Error(`Invalid SAP_URL: "${url}" (hex: ${urlHex.substring(0, 100)}...). Error: ${urlError instanceof Error ? urlError.message : urlError}`);
   }
 
-  // Log cleaned URL for debugging (always log on Windows for troubleshooting)
-  if (process.platform === 'win32' || !process.stdin.isTTY) {
-    const cleanedUrlHex = Buffer.from(url, 'utf8').toString('hex');
-    process.stderr.write(`[MCP-CONFIG] Final SAP_URL: "${url}" (length: ${url.length}, hex: ${cleanedUrlHex.substring(0, 60)}...)\n`);
-    // Verify URL is clean
-    if (url.includes('#')) {
-      process.stderr.write(`[MCP-CONFIG] ✗ ERROR: URL still contains # character!\n`);
-    }
-    if (/[\x00-\x1F\x7F-\x9F]/.test(url)) {
-      process.stderr.write(`[MCP-CONFIG] ✗ ERROR: URL still contains control characters!\n`);
-    }
+  // Log cleaned URL for debugging (always)
+  const cleanedUrlHex = Buffer.from(url, 'utf8').toString('hex');
+  debugLog(`[MCP-CONFIG] Final SAP_URL: "${url}" (length: ${url.length}, hex: ${cleanedUrlHex.substring(0, 60)}...)\n`);
+  // Verify URL is clean
+  if (url.includes('#')) {
+    debugLog(`[MCP-CONFIG] ✗ ERROR: URL still contains # character!\n`);
+  }
+  if (/[\x00-\x1F\x7F-\x9F]/.test(url)) {
+    debugLog(`[MCP-CONFIG] ✗ ERROR: URL still contains control characters!\n`);
   }
 
   const config: SapConfig = {

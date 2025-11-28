@@ -49,21 +49,34 @@ Usage:
 Options:
   --env=<file>              Path to .env file (default: .env in current directory)
   --transport=<type>       Transport type: stdio, http, streamable-http, sse, server
+  --http-port=<port>       HTTP server port (default: 3000)
+  --sse-port=<port>        SSE server port (default: 3001)
+  --http-host=<host>       HTTP server host (default: 0.0.0.0)
+  --sse-host=<host>        SSE server host (default: 0.0.0.0)
   --skip-auto-start        Skip automatic server start (for testing)
   --help, -h               Show this help message
   --version, -v            Show version number
 
+Environment Variables:
+  MCP_HTTP_PORT            HTTP server port (default: 3000)
+  MCP_SSE_PORT             SSE server port (default: 3001)
+  MCP_HTTP_HOST            HTTP server host (default: 0.0.0.0)
+  MCP_SSE_HOST             SSE server host (default: 0.0.0.0)
+  MCP_ENV_PATH             Path to .env file
+  MCP_TRANSPORT            Transport type (stdio|http|sse)
+
 Examples:
-  mcp-abap-adt                                    # Use default .env
+  mcp-abap-adt                                    # Use default .env, HTTP on port 3000
   mcp-abap-adt --env=e19.env                      # Use specific .env file
   mcp-abap-adt --env=e19.env --transport=stdio    # Use .env and stdio transport
-  mcp-abap-adt --transport=http                   # HTTP mode (no .env required)
+  mcp-abap-adt --transport=http                   # HTTP mode (no .env required, port 3000)
+  mcp-abap-adt --transport=http --http-port=8080  # HTTP mode on custom port 8080
+  mcp-abap-adt --transport=sse --sse-port=3001    # SSE mode on port 3001
 
 Transport Modes:
   - stdio (default if stdin is not TTY): For MCP clients like Cline/Cursor
-  - http / streamable-http: HTTP server (default if stdin is TTY)
-  - sse: Server-Sent Events server
-  - server: HTTP server with custom configuration
+  - http / streamable-http: HTTP server (default if stdin is TTY, port 3000)
+  - sse: Server-Sent Events server (port 3001)
 
 For more information, see: https://github.com/fr0ster/mcp-abap-adt
 `);

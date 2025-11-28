@@ -595,7 +595,8 @@ function parseEnvArg(): string | undefined {
 }
 
 // Find .env file path from arguments
-const skipEnvAutoload = process.env.MCP_SKIP_ENV_LOAD === "true";
+// Skip .env loading if launcher already loaded it
+const skipEnvAutoload = process.env.MCP_SKIP_ENV_LOAD === "true" || process.env.MCP_ENV_LOADED_BY_LAUNCHER === "true";
 const explicitTransportType = getTransportType();
 // If transport not explicitly specified, default to HTTP mode
 // BUT: if stdin is not TTY, auto-detect stdio mode (for MCP clients like Cline)

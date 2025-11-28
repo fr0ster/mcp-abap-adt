@@ -599,8 +599,8 @@ function parseEnvArg(): string | undefined {
 const skipEnvAutoload = process.env.MCP_SKIP_ENV_LOAD === "true" || process.env.MCP_ENV_LOADED_BY_LAUNCHER === "true";
 const explicitTransportType = getTransportType();
 // If transport not explicitly specified, default to HTTP mode
-// BUT: if stdin is not TTY, auto-detect stdio mode (for MCP clients like Cline)
-const transportType = explicitTransportType || (!process.stdin.isTTY ? "stdio" : "streamable-http");
+// Stdio mode is only used if explicitly specified via --transport=stdio
+const transportType = explicitTransportType || "streamable-http";
 const isHttp = transportType === "http" || transportType === "streamable-http" || transportType === "server";
 const isSse = transportType === "sse";
 const isStdio = transportType === "stdio";

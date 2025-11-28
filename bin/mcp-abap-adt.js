@@ -223,7 +223,8 @@ function main() {
   }
 
   // Determine if .env is required
-  const isStdio = args.transport === 'stdio' || (!args.transport && !process.stdin.isTTY);
+  // Default is HTTP mode, stdio only if explicitly specified
+  const isStdio = args.transport === 'stdio';
   const isSse = args.transport === 'sse';
   const isEnvRequired = (isStdio || isSse) && args.transport !== null;
 

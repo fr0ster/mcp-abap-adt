@@ -750,25 +750,29 @@ if (!skipEnvAutoload) {
     } else {
       // .env file specified but not found
       if (isEnvMandatory) {
-        // For stdio mode, don't log or write to stderr (MCP protocol expects clean JSON)
-        if (!isStdio) {
-          logger.error(".env file not found", { path: envFilePath });
+        // Always write error to stderr (stderr is safe even in stdio mode, unlike stdout)
+        logger.error(".env file not found", { path: envFilePath });
+        process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n`);
+        process.stderr.write(`[MCP-ENV]   Current working directory: ${process.cwd()}\n`);
+        process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' requires .env file.\n`);
+        process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
+        // On Windows, add a small delay before exit to allow error message to be visible
+        if (process.platform === 'win32') {
+          setTimeout(() => process.exit(1), 100);
+        } else {
+          process.exit(1);
         }
-        if (!isStdio) {
-          process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n`);
-          process.stderr.write(`[MCP-ENV]   Current working directory: ${process.cwd()}\n`);
-          process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' requires .env file.\n`);
-          process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
-        }
-        process.exit(1);
       } else {
-        // For stdio mode, don't write to stderr
-        if (!isStdio) {
-          process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n`);
-          process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' was explicitly specified but .env file is missing.\n`);
-          process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
+        // Always write error to stderr (stderr is safe even in stdio mode)
+        process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n`);
+        process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' was explicitly specified but .env file is missing.\n`);
+        process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
+        // On Windows, add a small delay before exit to allow error message to be visible
+        if (process.platform === 'win32') {
+          setTimeout(() => process.exit(1), 100);
+        } else {
+          process.exit(1);
         }
-        process.exit(1);
       }
     }
   } else {
@@ -776,16 +780,17 @@ if (!skipEnvAutoload) {
     if (isEnvMandatory) {
       // Transport explicitly set to stdio/sse but no .env found
       const cwdEnvPath = path.resolve(process.cwd(), ".env");
-      // For stdio mode, don't log or write to stderr (MCP protocol expects clean JSON)
-      if (!isStdio) {
-        logger.error(".env file not found", { path: cwdEnvPath });
+      // Always write error to stderr (stderr is safe even in stdio mode)
+      logger.error(".env file not found", { path: cwdEnvPath });
+      process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found in current directory: ${process.cwd()}\n`);
+      process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' requires .env file.\n`);
+      process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
+      // On Windows, add a small delay before exit to allow error message to be visible
+      if (process.platform === 'win32') {
+        setTimeout(() => process.exit(1), 100);
+      } else {
+        process.exit(1);
       }
-      if (!isStdio) {
-        process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found in current directory: ${process.cwd()}\n`);
-        process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' requires .env file.\n`);
-        process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
-      }
-      process.exit(1);
     } else {
       // No .env found, but transport is HTTP (default) - this is OK
       if (explicitTransportType === null) {
@@ -1392,20 +1397,19 @@ export class mcp_abap_adt_server {
       this.transportConfig = options?.transportConfig ?? parseTransportConfig();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      // For stdio mode, don't log or write to stderr (MCP protocol expects clean JSON)
-      const isStdioMode = transportType === "stdio" ||
-                          process.env.MCP_TRANSPORT === "stdio" ||
-                          process.argv.includes("--transport=stdio") ||
-                          process.argv.includes("--stdio");
-      if (!isStdioMode) {
-        logger.error("Failed to parse transport configuration", {
-          type: "TRANSPORT_CONFIG_ERROR",
-          error: message,
-        });
-        process.stderr.write(`ERROR: ${message}\n`);
-      }
+      // Always write error to stderr (stderr is safe even in stdio mode)
+      logger.error("Failed to parse transport configuration", {
+        type: "TRANSPORT_CONFIG_ERROR",
+        error: message,
+      });
+      process.stderr.write(`[MCP] ✗ ERROR: Failed to parse transport configuration: ${message}\n`);
       if (this.allowProcessExit) {
-        process.exit(1);
+        // On Windows, add a small delay before exit to allow error message to be visible
+        if (process.platform === 'win32') {
+          setTimeout(() => process.exit(1), 100);
+        } else {
+          process.exit(1);
+        }
       }
       throw error instanceof Error ? error : new Error(message);
     }
@@ -2455,6 +2459,13 @@ if (process.env.MCP_SKIP_AUTO_START !== "true") {
       type: "SERVER_FATAL_ERROR",
       error: error instanceof Error ? error.message : String(error),
     });
-    process.exit(1);
+    // Always write to stderr (safe even in stdio mode)
+    process.stderr.write(`[MCP] ✗ Fatal error: ${error instanceof Error ? error.message : String(error)}\n`);
+    // On Windows, add a small delay before exit to allow error message to be visible
+    if (process.platform === 'win32') {
+      setTimeout(() => process.exit(1), 100);
+    } else {
+      process.exit(1);
+    }
   });
 }

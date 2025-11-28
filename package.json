@@ -43,7 +43,10 @@
     "open": "^11.0.0",
     "ts-jest": "^29.2.0",
     "typescript": "^5.9.2",
-    "yaml": "^2.8.1"
+    "yaml": "^2.8.1",
+    "@modelcontextprotocol/inspector": "^0.17.2",
+    "cors": "^2.8.5",
+    "serve-handler": "^6.1.6"
   },
   "dependencies": {
     "@mcp-abap-adt/adt-clients": "^0.1.27",

@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.1.14] - 2025-01-27
+
+### Added
+- **Command-line flags --version/-v and --help/-h** – added support for standard command-line flags:
+  - `--version` or `-v` – displays package version and exits
+  - `--help` or `-h` – displays help message and exits
+  - Flags are processed before any other initialization, allowing quick version/help checks
+
+### Changed
+- **.env file search logic** – improved .env file discovery and loading:
+  - **Search location:** Now searches for `.env` file only in the current working directory (where the command is executed)
+  - **No recursive search:** Removed fallback searches in parent directories or project root
+  - **Explicit path support:** Still supports `--env=/path/to/.env` or `MCP_ENV_PATH` environment variable for custom locations
+  - **Cross-platform paths:** Uses `path.resolve()` and `path.join()` for proper path handling on Windows, Linux, and macOS
+
+- **Transport mode and .env file relationship** – refined logic for transport mode selection and .env file requirements:
+  - **Default behavior:** If transport is not explicitly specified and no `.env` file is found, server starts in HTTP mode (no .env required)
+  - **Explicit transport with .env:** If transport is explicitly set to `stdio` or `sse` but `.env` file is missing, server exits with clear error message
+  - **Explicit transport without .env:** If transport is explicitly set to `http` or `streamable-http`, server starts without .env file (as expected)
+  - **Error messages:** Improved error messages that clearly indicate what transport mode requires .env file and how to specify custom .env location
+
+### Fixed
+- **Cross-platform compatibility** – ensured all file path operations work correctly on Windows, Linux, and macOS:
+  - All path operations use Node.js `path` module methods (`path.join()`, `path.resolve()`, `path.isAbsolute()`)
+  - Proper handling of Windows path separators (`\`) vs Unix path separators (`/`)
+  - Version reading from `package.json` uses cross-platform path resolution
+
 ## [1.1.13] - 2025-01-27
 
 ### Fixed

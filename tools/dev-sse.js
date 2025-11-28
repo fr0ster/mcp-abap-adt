@@ -53,9 +53,22 @@ function spawnServer(entryPath, cliArgs) {
   const child = spawn(process.execPath, serverArgs, {
     stdio: 'inherit',
     env: serverEnv,
+    cwd: process.cwd(),
+    shell: false, // Explicitly set shell to false
   });
 
   registerChild(child);
+
+  // Handle spawn errors (especially important on Windows)
+  child.on('error', (error) => {
+    process.stderr.write(`[dev-sse] ✗ Failed to spawn server: ${error.message}\n`);
+    if (error.code === 'EINVAL') {
+      process.stderr.write(`[dev-sse] EINVAL error - check paths and arguments\n`);
+      process.stderr.write(`[dev-sse] Entry path: ${entryPath}\n`);
+      process.stderr.write(`[dev-sse] Node exec path: ${process.execPath}\n`);
+    }
+    process.exit(1);
+  });
 
   child.on('exit', (code, signal) => {
     const reason = code !== null ? `code ${code}` : `signal ${signal}`;
@@ -76,12 +89,26 @@ function spawnInspector(port) {
     `http://localhost:${port}/sse`,
   ];
 
-  const child = spawn(inspectorCmd, args, {
+  // On Windows, .cmd files require shell: true for proper execution
+  const spawnOptions = {
     stdio: 'inherit',
     env: process.env,
-  });
+    cwd: process.cwd(),
+    ...(process.platform === 'win32' ? { shell: true } : {}),
+  };
+
+  const child = spawn(inspectorCmd, args, spawnOptions);
 
   registerChild(child);
+
+  // Handle spawn errors (especially important on Windows)
+  child.on('error', (error) => {
+    process.stderr.write(`[dev-sse] ✗ Failed to spawn inspector: ${error.message}\n`);
+    if (error.code === 'EINVAL') {
+      process.stderr.write(`[dev-sse] EINVAL error - check npx installation and PATH\n`);
+      process.stderr.write(`[dev-sse] Inspector command: ${inspectorCmd}\n`);
+    }
+  });
 
   child.on('exit', (code, signal) => {
     if (code !== null && code !== 0) {

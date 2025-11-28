@@ -581,16 +581,47 @@ function getTransportType(): string | null {
  */
 function parseEnvArg(): string | undefined {
   const args = process.argv;
+  
+  // Always log on Windows for debugging (not just when DEBUG is set)
+  if (process.platform === 'win32') {
+    process.stderr.write(`[MCP-ENV] parseEnvArg: process.argv = ${JSON.stringify(args)}\n`);
+    process.stderr.write(`[MCP-ENV] parseEnvArg: process.argv.length = ${args.length}\n`);
+  }
+  
+  // Skip first two args (node executable and script path), search from index 2
+  // But also check all args in case spawn passes them differently
   for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    
     // Format: --env=/path/to/.env
-    if (args[i].startsWith("--env=")) {
-      return args[i].slice("--env=".length);
+    if (arg.startsWith("--env=")) {
+      const envPath = arg.slice("--env=".length);
+      if (process.platform === 'win32') {
+        process.stderr.write(`[MCP-ENV] parseEnvArg: Found --env= format at index ${i}: ${envPath}\n`);
+      }
+      return envPath;
     }
     // Format: --env /path/to/.env
-    else if (args[i] === "--env" && i + 1 < args.length) {
-      return args[i + 1];
+    else if (arg === "--env" && i + 1 < args.length) {
+      let envPath = args[i + 1];
+      
+      // On Windows, handle backslashes in paths (.\mdd.env)
+      // path.resolve will handle this correctly, but we need to preserve the path as-is
+      // The path will be normalized later in the code
+      
+      if (process.platform === 'win32') {
+        process.stderr.write(`[MCP-ENV] parseEnvArg: Found --env space format at index ${i}: ${envPath}\n`);
+        process.stderr.write(`[MCP-ENV] parseEnvArg: envPath type: ${typeof envPath}, length: ${envPath.length}\n`);
+      }
+      return envPath;
     }
   }
+  
+  if (process.platform === 'win32') {
+    process.stderr.write(`[MCP-ENV] parseEnvArg: No --env argument found in process.argv\n`);
+    process.stderr.write(`[MCP-ENV] parseEnvArg: Searched ${args.length} arguments\n`);
+  }
+  
   return undefined;
 }
 
@@ -609,6 +640,13 @@ const isEnvMandatory = explicitTransportType !== null && (isStdio || isSse);
 
 let envFilePath = parseEnvArg() ?? process.env.MCP_ENV_PATH;
 
+// Debug: Always log on Windows to help diagnose issues
+if (process.platform === 'win32' && !isStdio) {
+  process.stderr.write(`[MCP-ENV] parseEnvArg() returned: ${envFilePath || '(undefined)'}\n`);
+  process.stderr.write(`[MCP-ENV] MCP_ENV_PATH: ${process.env.MCP_ENV_PATH || '(not set)'}\n`);
+  process.stderr.write(`[MCP-ENV] Final envFilePath: ${envFilePath || '(will search for .env)'}\n`);
+}
+
 if (!skipEnvAutoload) {
   if (!envFilePath) {
     // Only search in current working directory (where user runs the command)
@@ -625,15 +663,48 @@ if (!skipEnvAutoload) {
     // Only write to stderr if not in stdio mode
     if (!isStdio) {
       process.stderr.write(`[MCP-ENV] Using .env from argument/env: ${envFilePath}\n`);
+      // On Windows, also log the resolved path for debugging
+      if (process.platform === 'win32') {
+        const resolvedPath = path.isAbsolute(envFilePath) 
+          ? envFilePath 
+          : path.resolve(process.cwd(), envFilePath);
+        process.stderr.write(`[MCP-ENV] Will resolve to: ${resolvedPath}\n`);
+      }
     }
   }
 
   if (envFilePath) {
-    if (!path.isAbsolute(envFilePath)) {
-      envFilePath = path.resolve(process.cwd(), envFilePath);
+    // Normalize path separators for Windows compatibility
+    // On Windows, backslashes in paths need special handling
+    // path.resolve() and path.normalize() should handle this, but let's be explicit
+    
+    // First, normalize all backslashes to forward slashes for consistent processing
+    // Then use path methods which handle platform-specific separators correctly
+    const normalizedPath = envFilePath.replace(/\\/g, '/');
+    
+    if (!path.isAbsolute(normalizedPath)) {
+      // For relative paths, use path.resolve which handles .\ and ./ correctly on all platforms
+      // path.resolve automatically handles both .\mdd.env and ./mdd.env formats
+      envFilePath = path.resolve(process.cwd(), normalizedPath);
       // Only write to stderr if not in stdio mode
       if (!isStdio) {
         process.stderr.write(`[MCP-ENV] Resolved relative path to: ${envFilePath}\n`);
+      }
+    } else {
+      // For absolute paths, normalize using path.normalize
+      envFilePath = path.normalize(envFilePath);
+    }
+
+    // Verify file exists before attempting to load
+    if (!fs.existsSync(envFilePath)) {
+      const errorMsg = `[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n` +
+                      `[MCP-ENV]   Current working directory: ${process.cwd()}\n` +
+                      `[MCP-ENV]   Please check the path and try again.\n`;
+      process.stderr.write(errorMsg);
+      if (process.platform === 'win32') {
+        setTimeout(() => process.exit(1), 100);
+      } else {
+        process.exit(1);
       }
     }
 

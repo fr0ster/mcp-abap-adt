@@ -7,6 +7,55 @@ const children = new Set();
 
 const args = process.argv.slice(2);
 
+// Debug: log received arguments (especially important on Windows)
+if (process.platform === 'win32') {
+  process.stderr.write(`[dev-http] Received arguments: ${JSON.stringify(args)}\n`);
+  process.stderr.write(`[dev-http] Full process.argv: ${JSON.stringify(process.argv)}\n`);
+}
+
+// Normalize arguments: handle cases where npm passes arguments incorrectly
+// When running: npm run dev:http -- --env .\mdd.env
+// npm might pass: .\mdd.env (without --env prefix)
+// We need to detect this and add --env prefix
+const normalizedArgs = [];
+let i = 0;
+while (i < args.length) {
+  const arg = args[i];
+  
+  // If we see --env, keep it and the next argument
+  if (arg === '--env' || arg.startsWith('--env=')) {
+    if (arg.startsWith('--env=')) {
+      // Format: --env=path
+      normalizedArgs.push(arg);
+      i++;
+    } else {
+      // Format: --env path
+      normalizedArgs.push(arg);
+      i++;
+      if (i < args.length) {
+        normalizedArgs.push(args[i]);
+        i++;
+      }
+    }
+  } else if (!arg.startsWith('--') && (arg.includes('.env') || arg.endsWith('.env'))) {
+    // If argument looks like an .env file path and doesn't start with --,
+    // treat it as --env argument value
+    normalizedArgs.push('--env', arg);
+    i++;
+  } else {
+    // Regular argument, pass through
+    normalizedArgs.push(arg);
+    i++;
+  }
+}
+
+// Debug: log normalized arguments
+if (process.platform === 'win32') {
+  if (normalizedArgs.length !== args.length || JSON.stringify(normalizedArgs) !== JSON.stringify(args)) {
+    process.stderr.write(`[dev-http] Normalized arguments: ${JSON.stringify(normalizedArgs)}\n`);
+  }
+}
+
 function parseHttpPort(cliArgs) {
   let port;
   for (let i = 0; i < cliArgs.length; i += 1) {
@@ -55,13 +104,40 @@ function spawnServer(entryPath, cliArgs) {
   if (process.platform === 'win32') {
     process.stderr.write(`[dev-http] Starting server\n`);
     process.stderr.write(`[dev-http] Working directory: ${process.cwd()}\n`);
-    const envFile = cliArgs.find(arg => arg.startsWith('--env=')) ||
-                    (cliArgs.includes('--env') && cliArgs[cliArgs.indexOf('--env') + 1]) ||
-                    require('path').resolve(process.cwd(), '.env');
-    process.stderr.write(`[dev-http] .env file: ${envFile}\n`);
+    process.stderr.write(`[dev-http] CLI args received: ${JSON.stringify(cliArgs)}\n`);
+    process.stderr.write(`[dev-http] Server args to spawn: ${JSON.stringify(serverArgs)}\n`);
+    
+    // Find --env argument
+    let envFile = null;
+    const envArgIndex = cliArgs.findIndex(arg => arg === '--env' || arg.startsWith('--env='));
+    if (envArgIndex !== -1) {
+      const envArg = cliArgs[envArgIndex];
+      if (envArg.startsWith('--env=')) {
+        envFile = envArg.slice('--env='.length);
+      } else if (envArgIndex + 1 < cliArgs.length) {
+        envFile = cliArgs[envArgIndex + 1];
+      }
+    }
+    
+    if (envFile) {
+      const resolvedEnvFile = require('path').isAbsolute(envFile) 
+        ? envFile 
+        : require('path').resolve(process.cwd(), envFile);
+      process.stderr.write(`[dev-http] Detected .env file from --env arg: ${resolvedEnvFile}\n`);
+    } else {
+      const defaultEnvFile = require('path').resolve(process.cwd(), '.env');
+      process.stderr.write(`[dev-http] No --env arg found, will use default: ${defaultEnvFile}\n`);
+    }
   }
 
   // Use process.execPath to avoid path resolution issues on Windows
+  // Debug: log what we're about to spawn
+  if (process.platform === 'win32') {
+    process.stderr.write(`[dev-http] About to spawn: ${process.execPath}\n`);
+    process.stderr.write(`[dev-http] With args: ${JSON.stringify(serverArgs)}\n`);
+    process.stderr.write(`[dev-http] Args count: ${serverArgs.length}\n`);
+  }
+  
   const child = spawn(process.execPath, serverArgs, {
     stdio: 'inherit',
     env: serverEnv,
@@ -101,12 +177,26 @@ function spawnInspector(port) {
     `http://localhost:${port}`,
   ];
 
-  const child = spawn(inspectorCmd, args, {
+  // On Windows, .cmd files require shell: true for proper execution
+  const spawnOptions = {
     stdio: 'inherit',
     env: process.env,
-  });
+    cwd: process.cwd(),
+    ...(process.platform === 'win32' ? { shell: true } : {}),
+  };
+
+  const child = spawn(inspectorCmd, args, spawnOptions);
 
   registerChild(child);
+
+  // Handle spawn errors (especially important on Windows)
+  child.on('error', (error) => {
+    process.stderr.write(`[dev-http] ✗ Failed to spawn inspector: ${error.message}\n`);
+    if (error.code === 'EINVAL') {
+      process.stderr.write(`[dev-http] EINVAL error - check npx installation and PATH\n`);
+      process.stderr.write(`[dev-http] Inspector command: ${inspectorCmd}\n`);
+    }
+  });
 
   child.on('exit', (code, signal) => {
     if (code !== null && code !== 0) {
@@ -122,8 +212,8 @@ function spawnInspector(port) {
   const entryPath = path.resolve(__dirname, '../dist/index.js');
   ensureDistExists(entryPath);
 
-  const port = parseHttpPort(args);
-  const server = spawnServer(entryPath, args);
+  const port = parseHttpPort(normalizedArgs);
+  const server = spawnServer(entryPath, normalizedArgs);
 
   const inspectorDelay = parseInt(process.env.MCP_DEV_HTTP_INSPECTOR_DELAY || '1200', 10);
   let inspector;

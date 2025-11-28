@@ -131,14 +131,35 @@ Code already has built-in .env parser that:
 - Removes comments (#)
 - Handles quotes
 
+## Windows Spawn Issues (Fixed)
+
+### Problem
+When running `npm run dev:http` or `npm run dev:sse` on Windows, the following error occurred:
+```
+Error: spawn EINVAL
+    at ChildProcess.spawn (node:internal/child_process:420:11)
+    at spawnInspector (tools/dev-http.js:104:17)
+```
+
+### Root Cause
+On Windows, `.cmd` files (like `npx.cmd`) require `shell: true` option when using `spawn()`. Without it, Windows cannot properly interpret the `.cmd` file, resulting in `EINVAL` error.
+
+### Solution
+- Added `shell: true` for Windows in `spawnInspector()` functions in both `dev-http.js` and `dev-sse.js`
+- Added proper error handling with detailed error messages
+- Added `cwd: process.cwd()` for consistency across platforms
+- See `WINDOWS_SPAWN_FIX.md` for detailed documentation
+
 ## Future Improvements
 
 1. ✅ Remove dotenv - **Done**
-2. ⏳ Add Windows tests via GitHub Actions
-3. ⏳ Add Linux tests via GitHub Actions
-4. ⏳ Create cross-platform integration tests
+2. ✅ Fixed Windows spawn issues - **Done**
+3. ⏳ Add Windows tests via GitHub Actions
+4. ⏳ Add Linux tests via GitHub Actions
+5. ⏳ Create cross-platform integration tests
 
 ## Changelog
 
 - **2025-11-28**: Removed dotenv, fixed stdio transport for MCP Inspector
 - **2025-11-28**: Created cross-platform compatibility documentation
+- **2025-01-XX**: Fixed `spawn EINVAL` error on Windows for `dev-http.js` and `dev-sse.js`

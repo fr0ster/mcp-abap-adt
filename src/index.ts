@@ -695,9 +695,20 @@ if (!skipEnvAutoload) {
             }
             const key = trimmed.substring(0, eqIndex).trim();
             const value = trimmed.substring(eqIndex + 1).trim();
-            let unquotedValue = value.replace(/^["']|["']$/g, "");
-            // Remove any remaining control characters (especially \r on Windows)
-            unquotedValue = unquotedValue.replace(/\r/g, "").trim();
+            // Aggressive cleaning for Windows compatibility (same as launcher)
+            // Step 1: Remove ALL control characters
+            let unquotedValue = String(value).replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+            // Step 2: Trim whitespace
+            unquotedValue = unquotedValue.trim();
+            // Step 3: Remove quotes (handle nested quotes)
+            unquotedValue = unquotedValue.replace(/^["']+|["']+$/g, '');
+            // Step 4: Trim again after quote removal
+            unquotedValue = unquotedValue.trim();
+            // Step 5: For URLs specifically, remove trailing slashes
+            if (key === 'SAP_URL') {
+              unquotedValue = unquotedValue.replace(/\/+$/, '').trim();
+            }
+            // Only set if not already in process.env (don't override launcher's cleaned values)
             if (key && !process.env[key]) {
               process.env[key] = unquotedValue;
             }

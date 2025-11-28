@@ -18,8 +18,7 @@
       "./node_modules/@modelcontextprotocol/sdk/types"
     ],
     "types": [
-      "node",
-      "jest"
+      "node"
     ],
     "outDir": "./dist",
     "noImplicitAny": false

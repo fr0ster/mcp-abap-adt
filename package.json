@@ -71,7 +71,8 @@
     "CHANGELOG.md"
   ],
   "bin": {
-    "mcp-abap-adt": "./bin/mcp-abap-adt.js"
+    "mcp-abap-adt": "./bin/mcp-abap-adt.js",
+    "mcp-abap-adt-launcher": "./bin/launcher.js"
   },
   "private": true
 }

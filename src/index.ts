@@ -1346,7 +1346,29 @@ export class mcp_abap_adt_server {
       if (options?.sapConfig) {
         this.sapConfig = options.sapConfig;
       } else if (!options?.connection) {
-        this.sapConfig = getConfig();
+        // Try to get config, but don't fail if it's invalid - server should still initialize
+        // Invalid config will be caught when handlers try to use it
+        try {
+          this.sapConfig = getConfig();
+        } catch (configError) {
+          // For stdio mode, we want the server to initialize even with invalid config
+          // The error will be shown when user tries to use a tool
+          // Check stdio mode using environment variable or stdin check (transportConfig not set yet)
+          const isStdioMode = process.env.MCP_TRANSPORT === "stdio" || !process.stdin.isTTY;
+
+          if (isStdioMode) {
+            // In stdio mode, write error to stderr (safe for MCP protocol)
+            process.stderr.write(`[MCP] ⚠ WARNING: Invalid SAP configuration: ${configError instanceof Error ? configError.message : String(configError)}\n`);
+            process.stderr.write(`[MCP]   Server will start, but tools will fail until configuration is fixed.\n`);
+          }
+
+          logger.warn("SAP config invalid at initialization, will use placeholder", {
+            type: "CONFIG_INVALID",
+            error: configError instanceof Error ? configError.message : String(configError),
+          });
+          // Set a placeholder that will be replaced when valid config is provided
+          this.sapConfig = { url: "http://placeholder", authType: "jwt", jwtToken: "placeholder" };
+        }
       } else {
         this.sapConfig = { url: "http://injected-connection", authType: "jwt", jwtToken: "injected" };
       }

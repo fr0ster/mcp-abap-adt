@@ -210,24 +210,58 @@ MCP ABAP ADT Server supports two transport protocols:
 
 ### Cline (VS Code Extension)
 
-Uses **stdio** mode (default).
+Uses **stdio** mode (must be explicitly specified).
+
+**⚠️ IMPORTANT:** After global installation (`npm install -g @fr0ster/mcp-abap-adt`), use the `mcp-abap-adt` command with `--transport=stdio` and `--env` arguments.
 
 1. Install Cline extension in VS Code
 2. Open Cline settings (JSON): `Cmd+Shift+P` → "Preferences: Open User Settings (JSON)"
 3. Add MCP server configuration:
+
+**For globally installed package (recommended):**
+
+```json
+{
+  "mcpServers": {
+    "mcp-abap-adt": {
+      "command": "mcp-abap-adt",
+      "args": [
+        "--transport=stdio",
+        "--env=/path/to/your/e19.env"
+      ]
+    }
+  }
+}
+```
+
+**Important notes:**
+- `--transport=stdio` is **required** (default is HTTP mode)
+- `--env` argument is **required** if `.env` file is not in the current working directory
+- If `.env` file is in the current directory, you can omit `--env` argument:
+
+```json
+{
+  "mcpServers": {
+    "mcp-abap-adt": {
+      "command": "mcp-abap-adt",
+      "args": ["--transport=stdio"]
+    }
+  }
+}
+```
+
+**Alternative: Using node with full path (if global command not in PATH):**
 
 ```json
 {
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "node",
-      "args": ["/Users/your-username/mcp-abap-adt/dist/index.js"],
-      "env": {
-        "SAP_URL": "https://your-sap-system.com:8000",
-        "SAP_CLIENT": "100",
-        "SAP_USERNAME": "your_username",
-        "SAP_PASSWORD": "your_password"
-      }
+      "args": [
+        "/usr/local/lib/node_modules/@fr0ster/mcp-abap-adt/bin/mcp-abap-adt.js",
+        "--transport=stdio",
+        "--env=/path/to/your/e19.env"
+      ]
     }
   }
 }
@@ -235,7 +269,9 @@ Uses **stdio** mode (default).
 
 ### Cursor
 
-Uses **stdio** mode (default).
+Uses **stdio** mode (must be explicitly specified).
+
+**⚠️ IMPORTANT:** After global installation, use the `mcp-abap-adt` command with `--transport=stdio` and `--env` arguments.
 
 Add to Cursor settings (`~/.cursor/config.json`):
 
@@ -243,41 +279,117 @@ Add to Cursor settings (`~/.cursor/config.json`):
 {
   "mcpServers": {
     "mcp-abap-adt": {
-      "command": "node",
-      "args": ["/Users/your-username/mcp-abap-adt/dist/index.js"]
+      "command": "mcp-abap-adt",
+      "args": [
+        "--transport=stdio",
+        "--env=/path/to/your/e19.env"
+      ]
     }
   }
 }
 ```
 
-### SSE/HTTP Mode (Web Interfaces)
+**Note:** If `.env` file is in the current directory, you can omit `--env` argument.
 
-For web-based clients or custom integrations:
+### HTTP Mode (Streamable HTTP)
+
+**⚠️ IMPORTANT:** HTTP mode is the **default** mode. No `.env` file is required for HTTP mode (connection can be configured via HTTP headers).
+
+**Starting HTTP Server:**
 
 ```bash
-# Start server in SSE mode
-npm run start:sse
+# Start server in HTTP mode (default, no arguments needed)
+mcp-abap-adt
+
+# Or explicitly specify HTTP mode
+mcp-abap-adt --transport=streamable-http
 
 # Or with custom port
-node dist/index.js --transport sse --sse-port 3001
+mcp-abap-adt --transport=streamable-http --http-port=8080
+```
 
-# Or streamable HTTP mode
-npm run start:http
-node dist/index.js --transport streamable-http
+**HTTP Server Options:**
+- `--transport=streamable-http` or `--transport=http` - Use HTTP transport (default)
+- `--http-port PORT` - Port number (default: 3000)
+- `--http-host HOST` - Host address (default: 0.0.0.0)
+
+**Example with custom port:**
+```bash
+mcp-abap-adt --transport=streamable-http --http-port=8080
+```
+
+Server will be available at: `http://localhost:8080/mcp/stream/http`
+
+**Configuration for HTTP clients:**
+
+```json
+{
+  "local-mcp-http": {
+    "disabled": false,
+    "timeout": 60,
+    "type": "streamableHttp",
+    "url": "http://localhost:3000/mcp/stream/http",
+    "headers": {
+      "x-sap-url": "https://your-sap-system.com:8000",
+      "x-sap-auth-type": "basic",
+      "x-sap-login": "your_username",
+      "x-sap-password": "your_password",
+      "x-sap-client": "100"
+    }
+  }
+}
+```
+
+**⚠️ NOTE:** For HTTP mode, you can configure SAP connection via HTTP headers (as shown above) OR use `.env` file:
+
+```bash
+# Using .env file with HTTP mode
+mcp-abap-adt --transport=streamable-http --env=/path/to/your/e19.env
+```
+
+### SSE Mode (Server-Sent Events)
+
+**⚠️ IMPORTANT:** SSE mode requires `.env` file or HTTP headers for SAP connection configuration.
+
+**Starting SSE Server:**
+
+```bash
+# Start server in SSE mode (requires .env file)
+mcp-abap-adt --transport=sse --env=/path/to/your/e19.env
+
+# Or with custom port
+mcp-abap-adt --transport=sse --sse-port=3001 --env=/path/to/your/e19.env
 ```
 
 **SSE Server Options:**
+- `--transport=sse` - Use SSE transport
 - `--sse-port PORT` - Port number (default: 3001)
 - `--sse-host HOST` - Host address (default: 0.0.0.0)
 - `--sse-allowed-origins LIST` - Comma-separated allowed origins
 - `--sse-enable-dns-protection` - Enable DNS rebinding protection
+- `--env=PATH` - Path to `.env` file (required for SSE mode)
 
-**Example:**
+**Example with custom port and host:**
 ```bash
-node dist/index.js --transport sse --sse-port 4100 --sse-host 127.0.0.1
+mcp-abap-adt --transport=sse --sse-port=4100 --sse-host=127.0.0.1 --env=/path/to/your/e19.env
 ```
 
 Server will be available at: `http://127.0.0.1:4100/sse`
+
+**Configuration for SSE clients:**
+
+```json
+{
+  "local-mcp-sse": {
+    "disabled": false,
+    "timeout": 60,
+    "type": "sse",
+    "url": "http://localhost:3001/sse"
+  }
+}
+```
+
+**⚠️ NOTE:** SSE mode requires `.env` file to be specified. The server will not start without it.
 
 ## ✅ Step 7: Test Installation
 

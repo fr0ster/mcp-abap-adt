@@ -6,10 +6,10 @@
   "scripts": {
     "test": "jest --passWithNoTests",
     "build": "npx tsc -p tsconfig.json",
-    "start": "node ./bin/launcher.js",
-    "start:http": "node ./bin/launcher.js --transport streamable-http",
-    "start:sse": "node ./bin/launcher.js --transport sse",
-    "dev": "npx @modelcontextprotocol/inspector node ./bin/launcher.js",
+    "start": "node ./bin/mcp-abap-adt.js",
+    "start:http": "node ./bin/mcp-abap-adt.js --transport streamable-http",
+    "start:sse": "node ./bin/mcp-abap-adt.js --transport sse",
+    "dev": "npx @modelcontextprotocol/inspector node ./bin/mcp-abap-adt.js",
     "dev:http": "node ./tools/dev-http.js",
     "dev:sse": "node ./tools/dev-sse.js",
     "auth": "npx sap-abap-auth auth",
@@ -71,8 +71,7 @@
     "CHANGELOG.md"
   ],
   "bin": {
-    "mcp-abap-adt": "./bin/mcp-abap-adt.js",
-    "mcp-abap-adt-launcher": "./bin/launcher.js"
+    "mcp-abap-adt": "./bin/mcp-abap-adt.js"
   },
   "private": true
 }

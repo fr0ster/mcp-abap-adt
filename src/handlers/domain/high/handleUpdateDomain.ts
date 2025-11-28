@@ -5,10 +5,11 @@
  * Session and lock management handled internally by builder.
  *
  * Workflow: lock -> update -> check -> unlock -> (activate)
+ * Note: No validation step - lock will fail if domain doesn't exist
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import { return_error, return_response, logger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -145,26 +146,17 @@ export async function handleUpdateDomain(args: DomainArgs) {
       const client = new CrudClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
-      // Validate (for update, "already exists" is expected - object must exist)
-      try {
-        await client.validateDomain({ domainName: domainName, packageName: undefined, description: undefined });
-      } catch (validateError: any) {
-        // For update operations, "already exists" is expected - object must exist
-        if (!isAlreadyExistsError(validateError)) {
-          // Real validation error - rethrow
-          throw validateError;
-        }
-        // "Already exists" is OK for update - continue
-        logger.info(`Domain ${domainName} already exists - this is expected for update operation`);
-      }
-
-      // Lock
-      await client.lockDomain({ domainName });
+      // Lock domain (will fail if domain doesn't exist)
+      // Pass packageName to lockDomain so builder is created with correct config from the start
+      await client.lockDomain({ domainName, packageName: typedArgs.package_name } as any);
       const lockHandle = client.getLockHandle();
 
       try {
-        // Update with properties
+        // Update with properties (packageName and description are required)
         const properties = {
+          domainName: domainName,
+          packageName: typedArgs.package_name,
+          description: typedArgs.description || domainName,
           datatype: typedArgs.datatype,
           length: typedArgs.length,
           decimals: typedArgs.decimals,
@@ -174,7 +166,7 @@ export async function handleUpdateDomain(args: DomainArgs) {
           valueTable: typedArgs.value_table,
           fixedValues: typedArgs.fixed_values
         };
-        await client.updateDomain({ domainName, ...properties }, lockHandle);
+        await client.updateDomain(properties, lockHandle);
 
         // Check
         try {

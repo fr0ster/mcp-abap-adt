@@ -46,7 +46,7 @@
     "yaml": "^2.8.1"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^0.1.24",
+    "@mcp-abap-adt/adt-clients": "^0.1.25",
     "@mcp-abap-adt/connection": "^0.1.11",
     "@modelcontextprotocol/sdk": "^1.23.0",
     "axios": "^1.11.0",

@@ -353,6 +353,19 @@ export function getManagedConnection(): AbapConnection {
 
   // Fallback to global config (for backward compatibility with non-HTTP transports)
   const config = overrideConfig ?? getConfig();
+
+  // Debug logging for Windows - verify URL is clean before creating connection
+  if (process.platform === 'win32' && config.url) {
+    const urlHex = Buffer.from(config.url, 'utf8').toString('hex');
+    process.stderr.write(`[MCP-UTILS] Creating connection with URL: "${config.url}" (length: ${config.url.length}, hex: ${urlHex.substring(0, 60)}...)\n`);
+    if (config.url.includes('#')) {
+      process.stderr.write(`[MCP-UTILS] ✗ ERROR: URL contains # character in config object!\n`);
+    }
+    if (/[\x00-\x1F\x7F-\x9F]/.test(config.url)) {
+      process.stderr.write(`[MCP-UTILS] ✗ ERROR: URL contains control characters in config object!\n`);
+    }
+  }
+
   const signature = sapConfigSignature(config);
 
   if (!cachedConnection || cachedConfigSignature !== signature) {

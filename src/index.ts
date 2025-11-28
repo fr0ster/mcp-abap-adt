@@ -750,7 +750,15 @@ if (!skipEnvAutoload) {
           process.stderr.write(`[MCP-ENV] ✓ Successfully loaded: ${envFilePath}\n`);
           // Debug: log SAP_URL if loaded (for troubleshooting on Windows)
           if (process.env.SAP_URL) {
-            process.stderr.write(`[MCP-ENV] SAP_URL loaded: ${process.env.SAP_URL}\n`);
+            const urlHex = Buffer.from(process.env.SAP_URL, 'utf8').toString('hex');
+            process.stderr.write(`[MCP-ENV] SAP_URL loaded: "${process.env.SAP_URL}" (length: ${process.env.SAP_URL.length})\n`);
+            if (process.platform === 'win32') {
+              process.stderr.write(`[MCP-ENV] SAP_URL (hex): ${urlHex.substring(0, 60)}...\n`);
+              // Check for comments
+              if (process.env.SAP_URL.includes('#')) {
+                process.stderr.write(`[MCP-ENV] ⚠ WARNING: SAP_URL contains # character (comment not removed?)\n`);
+              }
+            }
           } else {
             process.stderr.write(`[MCP-ENV] ⚠ WARNING: SAP_URL not found in .env file\n`);
           }
@@ -1060,10 +1068,16 @@ export function getConfig(): SapConfig {
   // Final cleaning for Windows compatibility (in case values weren't cleaned properly)
   // This is a safety net, not a reload
   if (url) {
+    const originalUrl = url;
+
     // Remove inline comments (safety net - should already be removed)
     const commentIndex = url.indexOf('#');
     if (commentIndex !== -1) {
       url = url.substring(0, commentIndex).trim();
+      // Log if comment was found (indicates .env parsing issue)
+      if (process.platform === 'win32') {
+        process.stderr.write(`[MCP-CONFIG] ⚠ Found comment in URL, removed: "${originalUrl}" → "${url}"\n`);
+      }
     }
 
     // Remove ALL control characters (safety net)
@@ -1075,6 +1089,18 @@ export function getConfig(): SapConfig {
     // Remove trailing slashes
     url = url.replace(/\/+$/, '');
     url = url.trim();
+
+    // Log cleaned URL for debugging on Windows
+    if (process.platform === 'win32' && url !== originalUrl) {
+      const urlHex = Buffer.from(url, 'utf8').toString('hex');
+      process.stderr.write(`[MCP-CONFIG] Cleaned URL: "${url}" (length: ${url.length}, hex: ${urlHex.substring(0, 60)}...)\n`);
+    }
+  } else {
+    // Log if URL is missing
+    if (process.platform === 'win32') {
+      process.stderr.write(`[MCP-CONFIG] ✗ SAP_URL is missing from process.env\n`);
+      process.stderr.write(`[MCP-CONFIG] Available env vars: ${Object.keys(process.env).filter(k => k.startsWith('SAP_')).join(', ')}\n`);
+    }
   }
 
   if (client) {
@@ -1112,10 +1138,17 @@ export function getConfig(): SapConfig {
     throw new Error(`Invalid SAP_URL: "${url}" (hex: ${urlHex.substring(0, 100)}...). Error: ${urlError instanceof Error ? urlError.message : urlError}`);
   }
 
-  // Log cleaned URL for debugging
-  if (!process.stdin.isTTY) {
+  // Log cleaned URL for debugging (always log on Windows for troubleshooting)
+  if (process.platform === 'win32' || !process.stdin.isTTY) {
     const cleanedUrlHex = Buffer.from(url, 'utf8').toString('hex');
-    process.stderr.write(`[MCP-CONFIG] Cleaned SAP_URL: "${url}" (length: ${url.length}, hex: ${cleanedUrlHex.substring(0, 60)}...)\n`);
+    process.stderr.write(`[MCP-CONFIG] Final SAP_URL: "${url}" (length: ${url.length}, hex: ${cleanedUrlHex.substring(0, 60)}...)\n`);
+    // Verify URL is clean
+    if (url.includes('#')) {
+      process.stderr.write(`[MCP-CONFIG] ✗ ERROR: URL still contains # character!\n`);
+    }
+    if (/[\x00-\x1F\x7F-\x9F]/.test(url)) {
+      process.stderr.write(`[MCP-CONFIG] ✗ ERROR: URL still contains control characters!\n`);
+    }
   }
 
   const config: SapConfig = {

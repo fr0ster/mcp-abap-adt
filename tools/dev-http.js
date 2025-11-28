@@ -44,6 +44,7 @@ function registerChild(child) {
 }
 
 function spawnServer(entryPath, cliArgs) {
+  // Build server arguments: entry path, transport, and all passed arguments
   const serverArgs = [entryPath, '--transport', 'streamable-http', ...cliArgs];
   const serverEnv = { ...process.env };
   if (!serverEnv.DEBUG) {
@@ -54,16 +55,32 @@ function spawnServer(entryPath, cliArgs) {
   if (process.platform === 'win32') {
     process.stderr.write(`[dev-http] Starting server\n`);
     process.stderr.write(`[dev-http] Working directory: ${process.cwd()}\n`);
-    process.stderr.write(`[dev-http] .env file: ${require('path').resolve(process.cwd(), '.env')}\n`);
+    const envFile = cliArgs.find(arg => arg.startsWith('--env=')) ||
+                    (cliArgs.includes('--env') && cliArgs[cliArgs.indexOf('--env') + 1]) ||
+                    require('path').resolve(process.cwd(), '.env');
+    process.stderr.write(`[dev-http] .env file: ${envFile}\n`);
   }
 
+  // Use process.execPath to avoid path resolution issues on Windows
   const child = spawn(process.execPath, serverArgs, {
     stdio: 'inherit',
     env: serverEnv,
     cwd: process.cwd(),
+    shell: false, // Explicitly set shell to false
   });
 
   registerChild(child);
+
+  // Handle spawn errors (especially important on Windows)
+  child.on('error', (error) => {
+    process.stderr.write(`[dev-http] ✗ Failed to spawn server: ${error.message}\n`);
+    if (error.code === 'EINVAL') {
+      process.stderr.write(`[dev-http] EINVAL error - check paths and arguments\n`);
+      process.stderr.write(`[dev-http] Entry path: ${entryPath}\n`);
+      process.stderr.write(`[dev-http] Node exec path: ${process.execPath}\n`);
+    }
+    process.exit(1);
+  });
 
   child.on('exit', (code, signal) => {
     const reason = code !== null ? `code ${code}` : `signal ${signal}`;

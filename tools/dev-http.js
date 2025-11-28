@@ -50,9 +50,9 @@ function spawnServer(entryPath, cliArgs) {
     serverEnv.DEBUG = 'true';
   }
 
-  // On Windows, ensure proper error handling
+  // On Windows, ensure proper error handling (don't log args to avoid exposing credentials)
   if (process.platform === 'win32') {
-    process.stderr.write(`[dev-http] Starting server: ${process.execPath} ${serverArgs.join(' ')}\n`);
+    process.stderr.write(`[dev-http] Starting server\n`);
     process.stderr.write(`[dev-http] Working directory: ${process.cwd()}\n`);
     process.stderr.write(`[dev-http] .env file: ${require('path').resolve(process.cwd(), '.env')}\n`);
   }

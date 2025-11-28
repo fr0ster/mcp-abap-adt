@@ -1052,45 +1052,28 @@ export function getConfig(): SapConfig {
     return sapConfigOverride;
   }
 
-  // Log raw URL for debugging (especially on Windows)
-  const rawUrl = process.env.SAP_URL;
-  if (rawUrl) {
-    const rawUrlHex = Buffer.from(rawUrl, 'utf8').toString('hex');
-    // Only log to stderr in stdio mode (safe for MCP protocol)
-    if (!process.stdin.isTTY) {
-      process.stderr.write(`[MCP-CONFIG] Raw SAP_URL from process.env: "${rawUrl}" (length: ${rawUrl.length}, hex: ${rawUrlHex.substring(0, 60)}...)\n`);
-    }
-  }
-
+  // Read from process.env (already loaded and cleaned by launcher or at startup)
+  // No need to reload .env here - it's already in process.env
   let url = process.env.SAP_URL;
   let client = process.env.SAP_CLIENT;
 
-  // Aggressive cleaning for Windows compatibility
-  // Remove all control characters (including \r, \n, \t, etc.)
+  // Final cleaning for Windows compatibility (in case values weren't cleaned properly)
+  // This is a safety net, not a reload
   if (url) {
-    // Step 0: Remove inline comments (everything after #)
-    // This handles cases where comments weren't removed during .env parsing
+    // Remove inline comments (safety net - should already be removed)
     const commentIndex = url.indexOf('#');
     if (commentIndex !== -1) {
-      const beforeComment = url.substring(0, commentIndex);
-      url = beforeComment.trim();
-      // Debug logging for Windows
-      if (process.platform === 'win32' && !process.stdin.isTTY) {
-        process.stderr.write(`[MCP-CONFIG] Removed comment from URL, before: "${rawUrl}", after: "${url}"\n`);
-      }
+      url = url.substring(0, commentIndex).trim();
     }
 
-    // Step 1: Remove ALL control characters
+    // Remove ALL control characters (safety net)
     url = String(url).replace(/[\x00-\x1F\x7F-\x9F]/g, '');
-    // Step 2: Trim whitespace
     url = url.trim();
-    // Step 3: Remove quotes (handle nested quotes)
+    // Remove quotes (safety net)
     url = url.replace(/^["']+|["']+$/g, '');
-    // Step 4: Trim again after quote removal
     url = url.trim();
-    // Step 5: Remove trailing slashes (but keep the protocol slashes)
+    // Remove trailing slashes
     url = url.replace(/\/+$/, '');
-    // Step 6: Final trim
     url = url.trim();
   }
 

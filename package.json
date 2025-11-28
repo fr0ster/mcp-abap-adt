@@ -9,7 +9,7 @@
     "start": "node ./bin/mcp-abap-adt.js",
     "start:http": "node ./bin/mcp-abap-adt.js --transport streamable-http",
     "start:sse": "node ./bin/mcp-abap-adt.js --transport sse",
-    "dev": "npx @modelcontextprotocol/inspector node ./bin/mcp-abap-adt.js",
+    "dev": "npx @modelcontextprotocol/inspector node ./dist/index.js",
     "dev:http": "node ./tools/dev-http.js",
     "dev:sse": "node ./tools/dev-sse.js",
     "auth": "npx sap-abap-auth auth",

@@ -109,24 +109,44 @@ function main() {
   // Pass all arguments to server (server handles .env parsing itself)
   const serverArgs = process.argv.slice(2);
 
-  // On Windows, use proper path handling for spawn
-  // EINVAL error on Windows often means path or argument issues
-  const nodeCmd = process.platform === 'win32' ? 'node.exe' : 'node';
+  // Use process.execPath (same Node.js that's running launcher) instead of 'node'
+  // This avoids path issues on Windows
+  const nodeExecPath = process.execPath;
 
-  // Ensure serverPath is properly resolved and quoted if needed
+  // Ensure serverPath is properly resolved
   const resolvedServerPath = path.resolve(serverPath);
 
-  // Debug logging for Windows
+  // Verify server file exists
+  if (!fs.existsSync(resolvedServerPath)) {
+    process.stderr.write(`[MCP] ✗ Server file not found: ${resolvedServerPath}\n`);
+    if (process.platform === 'win32') {
+      setTimeout(() => process.exit(1), 30000);
+    } else {
+      process.exit(1);
+    }
+    return;
+  }
+
+  // Mark that launcher is running (server should skip .env loading)
+  // Server will parse .env itself if needed, but launcher ensures proper spawn on Windows
+  const serverEnv = {
+    ...process.env,
+    MCP_ENV_LOADED_BY_LAUNCHER: 'false', // Server will load .env itself
+    MCP_SKIP_ENV_LOAD: 'false', // Allow server to load .env
+  };
+
+  // Debug logging for Windows (don't log args to avoid exposing credentials)
   if (process.platform === 'win32') {
-    process.stderr.write(`[MCP] Spawning: ${nodeCmd} ${resolvedServerPath} ${serverArgs.join(' ')}\n`);
+    process.stderr.write(`[MCP] Spawning server: ${nodeExecPath} ${resolvedServerPath}\n`);
     process.stderr.write(`[MCP] CWD: ${process.cwd()}\n`);
   }
 
   // Spawn the server process with inherited stdio
   // This ensures proper network handling on Windows
-  const serverProcess = spawn(nodeCmd, [resolvedServerPath, ...serverArgs], {
+  // Use process.execPath to avoid path resolution issues
+  const serverProcess = spawn(nodeExecPath, [resolvedServerPath, ...serverArgs], {
     stdio: ['inherit', 'inherit', 'inherit'],
-    env: process.env,
+    env: serverEnv,
     cwd: process.cwd(),
     shell: false, // Explicitly set shell to false
   });

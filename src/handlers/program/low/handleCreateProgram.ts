@@ -39,14 +39,6 @@ export const TOOL_DEFINITION = {
         type: "string",
         description: "Application area (optional, default: '*')."
       },
-      master_system: {
-        type: "string",
-        description: "Master system (optional)."
-      },
-      responsible: {
-        type: "string",
-        description: "User responsible for the program (optional)."
-      },
       session_id: {
         type: "string",
         description: "Session ID from GetSession. If not provided, a new session will be created."
@@ -72,8 +64,6 @@ interface CreateProgramArgs {
   transport_request?: string;
   program_type?: string;
   application?: string;
-  master_system?: string;
-  responsible?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -96,8 +86,6 @@ export async function handleCreateProgram(args: CreateProgramArgs) {
       transport_request,
       program_type,
       application,
-      master_system,
-      responsible,
       session_id,
       session_state
     } = args as CreateProgramArgs;

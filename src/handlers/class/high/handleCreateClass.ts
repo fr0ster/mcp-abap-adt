@@ -59,14 +59,6 @@ export const TOOL_DEFINITION = {
       activate: {
         type: "boolean",
         description: "Activate class after creation. Default: true. Set to false for batch operations (activate multiple objects later)."
-      },
-      master_system: {
-        type: "string",
-        description: "Master system ID (e.g., 'TRL' for cloud trial). Optional - will be retrieved from system if not provided."
-      },
-      responsible: {
-        type: "string",
-        description: "User responsible for the object (e.g., 'CB9980002377'). Optional - will be retrieved from system if not provided."
       }
     },
     required: ["class_name", "package_name"]
@@ -78,8 +70,6 @@ interface CreateClassArgs {
   description?: string;
   package_name: string;
   transport_request?: string;
-  master_system?: string;
-  responsible?: string;
   superclass?: string;
   final?: boolean;
   abstract?: boolean;

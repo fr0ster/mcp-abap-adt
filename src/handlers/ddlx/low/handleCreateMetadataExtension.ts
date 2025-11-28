@@ -35,14 +35,6 @@ export const TOOL_DEFINITION = {
         type: "string",
         description: "Master language (optional, e.g., 'EN')."
       },
-      master_system: {
-        type: "string",
-        description: "Master system (optional)."
-      },
-      responsible: {
-        type: "string",
-        description: "User responsible for the metadata extension (optional)."
-      },
       session_id: {
         type: "string",
         description: "Session ID from GetSession. If not provided, a new session will be created."
@@ -67,8 +59,6 @@ interface CreateMetadataExtensionArgs {
   package_name: string;
   transport_request?: string;
   master_language?: string;
-  master_system?: string;
-  responsible?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -90,8 +80,6 @@ export async function handleCreateMetadataExtension(args: CreateMetadataExtensio
       package_name,
       transport_request,
       master_language,
-      master_system,
-      responsible,
       session_id,
       session_state
     } = args as CreateMetadataExtensionArgs;

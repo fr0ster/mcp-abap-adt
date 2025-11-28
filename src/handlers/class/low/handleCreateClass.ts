@@ -47,14 +47,6 @@ export const TOOL_DEFINITION = {
         type: "boolean",
         description: "Create protected section (optional, default: false)."
       },
-      master_system: {
-        type: "string",
-        description: "Master system (optional)."
-      },
-      responsible: {
-        type: "string",
-        description: "User responsible for the class (optional)."
-      },
       session_id: {
         type: "string",
         description: "Session ID from GetSession. If not provided, a new session will be created."
@@ -82,8 +74,6 @@ interface CreateClassArgs {
   final?: boolean;
   abstract?: boolean;
   create_protected?: boolean;
-  master_system?: string;
-  responsible?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -108,8 +98,6 @@ export async function handleCreateClass(args: CreateClassArgs) {
       final,
       abstract,
       create_protected,
-      master_system,
-      responsible,
       session_id,
       session_state
     } = args;
@@ -149,9 +137,7 @@ export async function handleCreateClass(args: CreateClassArgs) {
         superclass,
         final,
         abstract,
-        createProtected: create_protected,
-        masterSystem: master_system,
-        responsible
+        createProtected: create_protected
       });
       const createResult = client.getCreateResult();
 

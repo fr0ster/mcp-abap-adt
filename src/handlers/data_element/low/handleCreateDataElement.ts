@@ -42,19 +42,15 @@ export const TOOL_DEFINITION = {
       },
       type_name: {
         type: "string",
-        description: "Type name (for predefined types)."
+        description: "Type name: domain name (when type_kind is 'domain'), data element name (when type_kind is 'refToDictionaryType'), or class name (when type_kind is 'refToClifType')"
       },
-      application: {
-        type: "string",
-        description: "Application area (optional, default: '*')."
+      length: {
+        type: "number",
+        description: "Data type length (for predefinedAbapType or refToPredefinedAbapType)"
       },
-      master_system: {
-        type: "string",
-        description: "Master system (optional)."
-      },
-      responsible: {
-        type: "string",
-        description: "User responsible for the data element (optional)."
+      decimals: {
+        type: "number",
+        description: "Decimal places (for predefinedAbapType or refToPredefinedAbapType)"
       },
       session_id: {
         type: "string",
@@ -82,8 +78,8 @@ interface CreateDataElementArgs {
   data_type?: string;
   type_kind?: string;
   type_name?: string;
-  master_system?: string;
-  responsible?: string;
+  length?: number;
+  decimals?: number;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -107,8 +103,8 @@ export async function handleCreateDataElement(args: CreateDataElementArgs) {
       data_type,
       type_kind,
       type_name,
-      master_system,
-      responsible,
+      length,
+      decimals,
       session_id,
       session_state
     } = args as CreateDataElementArgs;
@@ -171,6 +167,8 @@ export async function handleCreateDataElement(args: CreateDataElementArgs) {
         typeKind,
         dataType: data_type,
         typeName: type_name,
+        length: length,
+        decimals: decimals,
         transportRequest: transport_request
       };
 

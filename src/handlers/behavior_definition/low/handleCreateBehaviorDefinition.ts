@@ -41,14 +41,6 @@ export const TOOL_DEFINITION = {
         description: "Implementation type: 'Managed', 'Unmanaged', 'Abstract', or 'Projection'.",
         enum: ["Managed", "Unmanaged", "Abstract", "Projection"]
       },
-      master_system: {
-        type: "string",
-        description: "Master system (optional)."
-      },
-      responsible: {
-        type: "string",
-        description: "User responsible for the behavior definition (optional)."
-      },
       session_id: {
         type: "string",
         description: "Session ID from GetSession. If not provided, a new session will be created."
@@ -74,8 +66,6 @@ interface CreateBehaviorDefinitionArgs {
   transport_request?: string; // Optional for local packages ($TMP)
   root_entity: string;
   implementation_type: BehaviorDefinitionImplementationType;
-  master_system?: string;
-  responsible?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -98,8 +88,6 @@ export async function handleCreateBehaviorDefinition(args: CreateBehaviorDefinit
       transport_request,
       root_entity,
       implementation_type,
-      master_system,
-      responsible,
       session_id,
       session_state
     } = args as CreateBehaviorDefinitionArgs;

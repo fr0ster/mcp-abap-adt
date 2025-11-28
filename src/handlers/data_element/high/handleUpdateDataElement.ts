@@ -101,30 +101,6 @@ Note: All provided parameters completely replace existing values. Field labels a
         type: "string",
         description: "Set/Get parameter ID"
       },
-      default_component_name: {
-        type: "string",
-        description: "Default component name"
-      },
-      deactivate_input_history: {
-        type: "boolean",
-        description: "Deactivate input history",
-        default: false
-      },
-      change_document: {
-        type: "boolean",
-        description: "Change document",
-        default: false
-      },
-      left_to_right_direction: {
-        type: "boolean",
-        description: "Left to right direction",
-        default: false
-      },
-      deactivate_bidi_filtering: {
-        type: "boolean",
-        description: "Deactivate BiDi filtering",
-        default: false
-      },
       activate: {
         type: "boolean",
         description: "Activate data element after update (default: true)",
@@ -152,11 +128,6 @@ interface DataElementArgs {
   search_help?: string;
   search_help_parameter?: string;
   set_get_parameter?: string;
-  default_component_name?: string;
-  deactivate_input_history?: boolean;
-  change_document?: boolean;
-  left_to_right_direction?: boolean;
-  deactivate_bidi_filtering?: boolean;
   activate?: boolean;
 }
 
@@ -238,7 +209,10 @@ export async function handleUpdateDataElement(args: DataElementArgs) {
           longLabel: typedArgs.field_label_long,
           headingLabel: typedArgs.field_label_heading,
           typeKind: typeKind,
-          typeName: typedArgs.type_name?.toUpperCase()
+          typeName: typedArgs.type_name?.toUpperCase(),
+          searchHelp: typedArgs.search_help,
+          searchHelpParameter: typedArgs.search_help_parameter,
+          setGetParameter: typedArgs.set_get_parameter
         };
         await client.updateDataElement({
           dataElementName,

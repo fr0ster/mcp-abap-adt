@@ -39,14 +39,6 @@ export const TOOL_DEFINITION = {
         type: "string",
         description: "Application area (optional, default: '*')."
       },
-      master_system: {
-        type: "string",
-        description: "Master system (optional)."
-      },
-      responsible: {
-        type: "string",
-        description: "User responsible for the structure (optional)."
-      },
       session_id: {
         type: "string",
         description: "Session ID from GetSession. If not provided, a new session will be created."

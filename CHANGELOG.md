@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.1.13] - 2025-01-27
+
+### Fixed
+- **Handler parameter schemas alignment with CrudClient** – comprehensive fix to ensure all handler input schemas match actual CrudClient method parameters:
+  - **Data Element handlers:**
+    - Added `type_name` parameter to `handleCreateDataElement` schema (was missing but used in code)
+    - Added `search_help`, `search_help_parameter`, `set_get_parameter` to `handleUpdateDataElement` schema (now properly passed to builder)
+    - Updated field label descriptions to clarify they are applied during update step after creation
+  - **Domain handlers:**
+    - Removed unsupported parameters from `handleCreateDomain` low-level handler: `domain_type`, `application`, `master_system`, `responsible`
+  - **Program handlers:**
+    - Removed `master_system` and `responsible` from both high and low-level handlers (these are set automatically by system)
+  - **Class handlers:**
+    - Removed `master_system` and `responsible` from high-level handler schema (set automatically by system)
+    - Removed `master_system` and `responsible` from low-level handler schema and code
+  - **Interface handlers:**
+    - Removed `master_system` and `responsible` from both high and low-level handlers (set automatically by system)
+  - **Structure, View, Table handlers:**
+    - Removed `master_system` and `responsible` from low-level create handlers (set automatically by system)
+  - **Behavior Definition, Metadata Extension handlers:**
+    - Removed `master_system` and `responsible` from low-level create handlers (set automatically by system)
+  - **Impact:** All handler schemas now accurately reflect what parameters are actually supported and used by CrudClient methods, preventing confusion and ensuring correct API usage
+
+### Changed
+- **Data Element handlers – search help support** – enhanced data element handlers to support search help configuration:
+  - `handleCreateDataElement` now accepts `search_help`, `search_help_parameter`, `set_get_parameter` parameters
+  - `handleUpdateDataElement` now accepts `search_help`, `search_help_parameter`, `set_get_parameter` parameters
+  - These parameters are properly passed through to `DataElementBuilder` and included in update operations
+  - Enables full configuration of search help and parameter settings for data elements
+
+### Dependencies
+- **Updated `@mcp-abap-adt/adt-clients` to `^0.1.26`** – upgraded to latest version which includes:
+  - Added `searchHelp`, `searchHelpParameter`, `setGetParameter` to `DataElementBuilderConfig`
+  - Updated `DataElementBuilder.update()` to pass search help parameters to `UpdateDataElementParams`
+  - Full support for search help configuration in data element operations
+
 ## [1.1.11] - 2025-11-28
 
 ### Fixed

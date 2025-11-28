@@ -53,8 +53,6 @@ interface CreateTableArgs extends Pick<TableBuilderConfig, 'tableName' | 'packag
   transport_request?: string;
   table_type?: string;
   application?: string;
-  master_system?: string;
-  responsible?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;

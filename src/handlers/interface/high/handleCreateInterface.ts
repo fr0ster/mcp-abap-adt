@@ -42,14 +42,6 @@ export const TOOL_DEFINITION = {
       activate: {
         type: "boolean",
         description: "Activate interface after creation. Default: true. Set to false for batch operations (activate multiple objects later)."
-      },
-      master_system: {
-        type: "string",
-        description: "Master system ID (e.g., 'TRL' for cloud trial). Optional - will be retrieved from system if not provided."
-      },
-      responsible: {
-        type: "string",
-        description: "User responsible for the object (e.g., 'CB9980002377'). Optional - will be retrieved from system if not provided."
       }
     },
     required: ["interface_name", "package_name"]
@@ -61,8 +53,6 @@ interface CreateInterfaceArgs {
   description?: string;
   package_name: string;
   transport_request?: string;
-  master_system?: string;
-  responsible?: string;
   source_code?: string;
   activate?: boolean;
 }
@@ -122,10 +112,6 @@ export async function handleCreateInterface(args: CreateInterfaceArgs) {
       const packageName = typedArgs.package_name;
       const transportRequest = typedArgs.transport_request || '';
       const shouldActivate = typedArgs.activate !== false;
-
-      // Extract options
-      const masterSystem = typedArgs.master_system;
-      const responsible = typedArgs.responsible;
 
       // Execute the workflow
       try {

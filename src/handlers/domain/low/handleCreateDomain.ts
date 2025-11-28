@@ -31,22 +31,6 @@ export const TOOL_DEFINITION = {
         type: "string",
         description: "Transport request number (e.g., E19K905635). Required for transportable packages."
       },
-      domain_type: {
-        type: "string",
-        description: "Domain type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional)."
-      },
-      application: {
-        type: "string",
-        description: "Application area (optional, default: '*')."
-      },
-      master_system: {
-        type: "string",
-        description: "Master system (optional)."
-      },
-      responsible: {
-        type: "string",
-        description: "User responsible for the domain (optional)."
-      },
       session_id: {
         type: "string",
         description: "Session ID from GetSession. If not provided, a new session will be created."
@@ -70,10 +54,6 @@ interface CreateDomainArgs {
   description: string;
   package_name: string;
   transport_request?: string;
-  domain_type?: string;
-  application?: string;
-  master_system?: string;
-  responsible?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;

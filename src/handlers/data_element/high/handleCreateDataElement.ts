@@ -51,25 +51,41 @@ export const TOOL_DEFINITION = {
       },
       short_label: {
         type: "string",
-        description: "Short field label (max 10 chars)"
+        description: "Short field label (max 10 chars). Applied during update step after creation."
       },
       medium_label: {
         type: "string",
-        description: "Medium field label (max 20 chars)"
+        description: "Medium field label (max 20 chars). Applied during update step after creation."
       },
       long_label: {
         type: "string",
-        description: "Long field label (max 40 chars)"
+        description: "Long field label (max 40 chars). Applied during update step after creation."
       },
       heading_label: {
         type: "string",
-        description: "Heading field label (max 55 chars)"
+        description: "Heading field label (max 55 chars). Applied during update step after creation."
       },
       type_kind: {
         type: "string",
         description: "Type kind: 'domain' (default), 'predefinedAbapType', 'refToPredefinedAbapType', 'refToDictionaryType', 'refToClifType'. If not specified, defaults to 'domain'.",
         enum: ["domain", "predefinedAbapType", "refToPredefinedAbapType", "refToDictionaryType", "refToClifType"],
         default: "domain"
+      },
+      type_name: {
+        type: "string",
+        description: "Type name: domain name (when type_kind is 'domain'), data element name (when type_kind is 'refToDictionaryType'), or class name (when type_kind is 'refToClifType')"
+      },
+      search_help: {
+        type: "string",
+        description: "Search help name. Applied during update step after creation."
+      },
+      search_help_parameter: {
+        type: "string",
+        description: "Search help parameter. Applied during update step after creation."
+      },
+      set_get_parameter: {
+        type: "string",
+        description: "Set/Get parameter ID. Applied during update step after creation."
       }
     },
     required: ["data_element_name", "package_name"]
@@ -89,6 +105,10 @@ interface DataElementArgs {
   long_label?: string;
   heading_label?: string;
   type_kind?: 'domain' | 'predefinedAbapType' | 'refToPredefinedAbapType' | 'refToDictionaryType' | 'refToClifType';
+  type_name?: string;
+  search_help?: string;
+  search_help_parameter?: string;
+  set_get_parameter?: string;
   activate?: boolean;
 }
 
@@ -142,7 +162,7 @@ export async function handleCreateDataElement(args: DataElementArgs) {
         packageName: typedArgs.package_name,
         typeKind: typeKind,
         dataType: typedArgs.data_type,
-        typeName: typedArgs.type_kind !== 'domain' ? typedArgs.data_type : undefined,
+        typeName: typedArgs.type_name,
         length: typedArgs.length,
         decimals: typedArgs.decimals,
         transportRequest: typedArgs.transport_request
@@ -164,7 +184,11 @@ export async function handleCreateDataElement(args: DataElementArgs) {
         mediumLabel: typedArgs.medium_label,
         longLabel: typedArgs.long_label,
         headingLabel: typedArgs.heading_label,
-        typeKind: typeKind
+        typeKind: typeKind,
+        typeName: typedArgs.type_name,
+        searchHelp: typedArgs.search_help,
+        searchHelpParameter: typedArgs.search_help_parameter,
+        setGetParameter: typedArgs.set_get_parameter
       };
 
       await client.updateDataElement(updateConfig, lockHandle);

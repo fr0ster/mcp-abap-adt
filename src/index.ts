@@ -664,7 +664,10 @@ if (!skipEnvAutoload) {
             const commentIndex = value.indexOf('#');
             if (commentIndex !== -1) {
               // Remove everything from # onwards, then trim trailing whitespace
-              value = value.substring(0, commentIndex).trim();
+              const beforeComment = value.substring(0, commentIndex);
+              value = beforeComment.trim();
+            } else {
+              value = value.trim();
             }
 
             // Aggressive cleaning for Windows compatibility (same as launcher)
@@ -679,6 +682,10 @@ if (!skipEnvAutoload) {
             // Step 5: For URLs specifically, remove trailing slashes
             if (key === 'SAP_URL') {
               unquotedValue = unquotedValue.replace(/\/+$/, '').trim();
+              // Debug logging for Windows
+              if (process.platform === 'win32' && !isStdio) {
+                process.stderr.write(`[MCP-ENV] Parsed SAP_URL: "${unquotedValue}" (length: ${unquotedValue.length})\n`);
+              }
             }
             // Only set if not already in process.env (don't override launcher's cleaned values)
             if (key && !process.env[key]) {
@@ -712,7 +719,10 @@ if (!skipEnvAutoload) {
             const commentIndex = value.indexOf('#');
             if (commentIndex !== -1) {
               // Remove everything from # onwards, then trim trailing whitespace
-              value = value.substring(0, commentIndex).trim();
+              const beforeComment = value.substring(0, commentIndex);
+              value = beforeComment.trim();
+            } else {
+              value = value.trim();
             }
 
             // Aggressive cleaning for Windows compatibility (same as launcher)
@@ -727,6 +737,10 @@ if (!skipEnvAutoload) {
             // Step 5: For URLs specifically, remove trailing slashes
             if (key === 'SAP_URL') {
               unquotedValue = unquotedValue.replace(/\/+$/, '').trim();
+              // Debug logging for Windows
+              if (process.platform === 'win32' && !isStdio) {
+                process.stderr.write(`[MCP-ENV] Parsed SAP_URL: "${unquotedValue}" (length: ${unquotedValue.length})\n`);
+              }
             }
             // Only set if not already in process.env (don't override launcher's cleaned values)
             if (key && !process.env[key]) {
@@ -1058,7 +1072,12 @@ export function getConfig(): SapConfig {
     // This handles cases where comments weren't removed during .env parsing
     const commentIndex = url.indexOf('#');
     if (commentIndex !== -1) {
-      url = url.substring(0, commentIndex);
+      const beforeComment = url.substring(0, commentIndex);
+      url = beforeComment.trim();
+      // Debug logging for Windows
+      if (process.platform === 'win32' && !process.stdin.isTTY) {
+        process.stderr.write(`[MCP-CONFIG] Removed comment from URL, before: "${rawUrl}", after: "${url}"\n`);
+      }
     }
 
     // Step 1: Remove ALL control characters

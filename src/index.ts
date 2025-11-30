@@ -842,18 +842,14 @@ if (!skipEnvAutoload) {
               value = value.trim();
             }
 
-            // Aggressive cleaning for Windows compatibility (same as launcher)
-            // Step 1: Remove ALL control characters (including \r from Windows line endings)
-            let unquotedValue = String(value).replace(/[\x00-\x1F\x7F-\x9F]/g, '');
-            // Step 2: Trim whitespace
-            unquotedValue = unquotedValue.trim();
-            // Step 3: Remove quotes (handle nested quotes)
-            unquotedValue = unquotedValue.replace(/^["']+|["']+$/g, '');
-            // Step 4: Trim again after quote removal
-            unquotedValue = unquotedValue.trim();
-            // Step 5: For URLs specifically, remove trailing slashes
+            // Parse value: remove quotes and trim
+            let unquotedValue = value.trim();
+            unquotedValue = unquotedValue.replace(/^["']+|["']+$/g, '').trim();
+
+            // URLs from .env files are expected to be clean - just use as-is
             if (key === 'SAP_URL') {
-              unquotedValue = unquotedValue.replace(/\/+$/, '').trim();
+              // No special processing needed
+
               // Debug logging for Windows
               if (process.platform === 'win32' && !isStdio) {
                 process.stderr.write(`[MCP-ENV] Parsed SAP_URL: "${unquotedValue}" (length: ${unquotedValue.length})\n`);
@@ -897,18 +893,14 @@ if (!skipEnvAutoload) {
               value = value.trim();
             }
 
-            // Aggressive cleaning for Windows compatibility (same as launcher)
-            // Step 1: Remove ALL control characters (including \r from Windows line endings)
-            let unquotedValue = String(value).replace(/[\x00-\x1F\x7F-\x9F]/g, '');
-            // Step 2: Trim whitespace
-            unquotedValue = unquotedValue.trim();
-            // Step 3: Remove quotes (handle nested quotes)
-            unquotedValue = unquotedValue.replace(/^["']+|["']+$/g, '');
-            // Step 4: Trim again after quote removal
-            unquotedValue = unquotedValue.trim();
-            // Step 5: For URLs specifically, remove trailing slashes
+            // Parse value: remove quotes and trim
+            let unquotedValue = value.trim();
+            unquotedValue = unquotedValue.replace(/^["']+|["']+$/g, '').trim();
+
+            // URLs from .env files are expected to be clean - just use as-is
             if (key === 'SAP_URL') {
-              unquotedValue = unquotedValue.replace(/\/+$/, '').trim();
+              // No special processing needed
+
               // Debug logging for Windows
               if (process.platform === 'win32' && !isStdio) {
                 process.stderr.write(`[MCP-ENV] Parsed SAP_URL: "${unquotedValue}" (length: ${unquotedValue.length})\n`);
@@ -1228,6 +1220,7 @@ export function setAbapConnectionOverride(connection?: AbapConnection) {
  * @throws {Error} If any required environment variable is missing.
  */
 // Helper function for Windows-compatible logging
+
 function debugLog(message: string): void {
   // Try stderr first
   try {
@@ -1264,34 +1257,9 @@ export function getConfig(): SapConfig {
 
   debugLog(`[MCP-CONFIG] Raw process.env.SAP_URL: "${url}" (type: ${typeof url}, length: ${url?.length || 0})\n`);
 
-  // Final cleaning for Windows compatibility (in case values weren't cleaned properly)
-  // This is a safety net, not a reload
+  // URLs from .env files are expected to be clean - just trim
   if (url) {
-    const originalUrl = url;
-
-    // Remove inline comments (safety net - should already be removed)
-    const commentIndex = url.indexOf('#');
-    if (commentIndex !== -1) {
-      url = url.substring(0, commentIndex).trim();
-      // Log if comment was found (indicates .env parsing issue)
-      debugLog(`[MCP-CONFIG] ⚠ Found comment in URL, removed: "${originalUrl}" → "${url}"\n`);
-    }
-
-    // Remove ALL control characters (safety net)
-    url = String(url).replace(/[\x00-\x1F\x7F-\x9F]/g, '');
     url = url.trim();
-    // Remove quotes (safety net)
-    url = url.replace(/^["']+|["']+$/g, '');
-    url = url.trim();
-    // Remove trailing slashes
-    url = url.replace(/\/+$/, '');
-    url = url.trim();
-
-    // Log cleaned URL for debugging (always, not just Windows)
-    if (url !== originalUrl) {
-      const urlHex = Buffer.from(url, 'utf8').toString('hex');
-      debugLog(`[MCP-CONFIG] Cleaned URL: "${url}" (length: ${url.length}, hex: ${urlHex.substring(0, 60)}...)\n`);
-    }
   } else {
     // Log if URL is missing
     debugLog(`[MCP-CONFIG] ✗ SAP_URL is missing from process.env\n`);
@@ -1299,8 +1267,7 @@ export function getConfig(): SapConfig {
   }
 
   if (client) {
-    client = client.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
-    client = client.replace(/^["']|["']$/g, '');
+    client = client.trim();
   }
 
   // Auto-detect auth type: if JWT token is present, use JWT; otherwise check SAP_AUTH_TYPE or default to basic
@@ -1308,7 +1275,7 @@ export function getConfig(): SapConfig {
   if (process.env.SAP_JWT_TOKEN) {
     authType = 'jwt';
   } else if (process.env.SAP_AUTH_TYPE) {
-    const rawAuthType = process.env.SAP_AUTH_TYPE.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+    const rawAuthType = process.env.SAP_AUTH_TYPE.trim();
     authType = rawAuthType === 'xsuaa' ? 'jwt' : (rawAuthType as SapConfig["authType"]);
   }
 
@@ -1333,16 +1300,8 @@ export function getConfig(): SapConfig {
     throw new Error(`Invalid SAP_URL: "${url}" (hex: ${urlHex.substring(0, 100)}...). Error: ${urlError instanceof Error ? urlError.message : urlError}`);
   }
 
-  // Log cleaned URL for debugging (always)
-  const cleanedUrlHex = Buffer.from(url, 'utf8').toString('hex');
-  debugLog(`[MCP-CONFIG] Final SAP_URL: "${url}" (length: ${url.length}, hex: ${cleanedUrlHex.substring(0, 60)}...)\n`);
-  // Verify URL is clean
-  if (url.includes('#')) {
-    debugLog(`[MCP-CONFIG] ✗ ERROR: URL still contains # character!\n`);
-  }
-  if (/[\x00-\x1F\x7F-\x9F]/.test(url)) {
-    debugLog(`[MCP-CONFIG] ✗ ERROR: URL still contains control characters!\n`);
-  }
+  // Log URL for debugging
+  debugLog(`[MCP-CONFIG] Final SAP_URL: "${url}" (length: ${url.length})\n`);
 
   const config: SapConfig = {
     url, // Already cleaned and validated above
@@ -1358,27 +1317,26 @@ export function getConfig(): SapConfig {
     if (!jwtToken) {
       throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
     }
-    // Clean JWT token (remove control characters)
-    config.jwtToken = jwtToken.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+    // Values from .env are expected to be clean
+    config.jwtToken = jwtToken.trim();
     const refreshToken = process.env.SAP_REFRESH_TOKEN;
     if (refreshToken) {
-      config.refreshToken = refreshToken.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+      config.refreshToken = refreshToken.trim();
     }
     const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
     const uaaClientId = process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
     const uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
-    if (uaaUrl) config.uaaUrl = uaaUrl.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
-    if (uaaClientId) config.uaaClientId = uaaClientId.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
-    if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+    if (uaaUrl) config.uaaUrl = uaaUrl.trim();
+    if (uaaClientId) config.uaaClientId = uaaClientId.trim();
+    if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret.trim();
   } else {
     const username = process.env.SAP_USERNAME;
     const password = process.env.SAP_PASSWORD;
     if (!username || !password) {
       throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
     }
-    // Clean username and password (remove control characters)
-    config.username = username.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
-    config.password = password.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+    config.username = username.trim();
+    config.password = password.trim();
   }
 
   return config;
@@ -1531,20 +1489,21 @@ export class mcp_abap_adt_server {
       });
     }
 
-    // If validation failed, log errors and return
+    // If validation failed, log info (not error) and return
+    // This is not an error - user may be using .env file or base config
     if (!validationResult.isValid || !validationResult.config) {
       if (validationResult.errors.length > 0) {
-        logger.error("Header validation failed", {
+        logger.debug("Header validation failed - will use .env file or base config", {
           type: "HEADER_VALIDATION_FAILED",
           errors: validationResult.errors,
           sessionId: sessionId?.substring(0, 8),
-          hint: "Check that required headers are provided. For destination-based auth, use x-sap-destination or x-mcp-destination. For direct auth, use x-sap-url and x-sap-auth-type.",
+          hint: "No valid headers found. Will use .env file or base config if available.",
         });
       } else {
-        logger.info("No valid authentication headers found", {
+        logger.debug("No valid authentication headers found - will use .env file or base config", {
           type: "NO_VALID_AUTH_HEADERS",
           sessionId: sessionId?.substring(0, 8),
-          hint: "Provide one of: x-sap-destination, x-mcp-destination, or x-sap-url + x-sap-auth-type headers",
+          hint: "No headers provided. Will use .env file or base config if available.",
         });
       }
       return;
@@ -1731,6 +1690,38 @@ export class mcp_abap_adt_server {
   private processJwtConfigUpdate(sapUrl: string, jwtToken: string, refreshToken?: string, sessionId?: string) {
     const sanitizeToken = (token: string) =>
       token.length <= 10 ? token : `${token.substring(0, 6)}…${token.substring(token.length - 4)}`;
+
+    // URL from auth-broker/service key is already clean and correct, no need to clean it
+    // Only validate format
+    let cleanedUrl = sapUrl.trim();
+
+    // Ensure URL has protocol
+    if (!/^https?:\/\//.test(cleanedUrl)) {
+      logger.error("Invalid URL format in processJwtConfigUpdate", {
+        type: "INVALID_URL_FORMAT",
+        originalUrl: sapUrl,
+        cleanedUrl: cleanedUrl,
+        sessionId: sessionId?.substring(0, 8),
+      });
+      throw new Error(`Invalid URL format: "${sapUrl}". Expected format: https://your-system.sap.com`);
+    }
+
+    // Normalize URL using URL object
+    try {
+      const urlObj = new URL(cleanedUrl);
+      cleanedUrl = urlObj.href.replace(/\/$/, ''); // Remove trailing slash
+    } catch (urlError) {
+      logger.error("Failed to parse URL in processJwtConfigUpdate", {
+        type: "URL_PARSE_ERROR",
+        url: cleanedUrl,
+        error: urlError instanceof Error ? urlError.message : String(urlError),
+        sessionId: sessionId?.substring(0, 8),
+      });
+      throw new Error(`Invalid URL: "${sapUrl}". Error: ${urlError instanceof Error ? urlError.message : urlError}`);
+    }
+
+    // Use cleaned URL
+    sapUrl = cleanedUrl;
 
     let baseConfig: SapConfig | undefined = this.sapConfig;
     if (!baseConfig || baseConfig.url === "http://placeholder") {
@@ -1943,6 +1934,11 @@ export class mcp_abap_adt_server {
     if (!headers) {
       return false;
     }
+    // Check for destination-based auth headers
+    if (headers["x-sap-destination"] || headers["x-mcp-destination"]) {
+      return true;
+    }
+    // Check for direct auth headers
     const sapUrl = headers["x-sap-url"];
     const sapAuthType = headers["x-sap-auth-type"];
     return !!(sapUrl && sapAuthType);
@@ -2039,9 +2035,12 @@ export class mcp_abap_adt_server {
     });
 
     // AuthBroker will be initialized lazily when needed (per destination)
-    // Only for HTTP/streamable-http transport
+    // Only for HTTP/streamable-http transport (not for stdio or SSE)
     const isHttpTransport = this.transportConfig.type === "streamable-http";
-    if (isHttpTransport) {
+    if (isHttpTransport && !useAuthBroker) {
+      // Only initialize if --auth-broker flag is NOT set (for stdio/SSE, ignore the flag)
+      // For stdio/SSE, --auth-broker flag is ignored
+    } else if (isHttpTransport && useAuthBroker) {
       // Support DEBUG_AUTH_BROKER as alias for DEBUG_AUTH_LOG
       // If DEBUG_AUTH_BROKER is set, ensure DEBUG_AUTH_LOG is also set for auth-broker package
       if (process.env.DEBUG_AUTH_BROKER === "true" && !process.env.DEBUG_AUTH_LOG) {
@@ -2804,15 +2803,56 @@ export class mcp_abap_adt_server {
           const requiresSapConfig = methodName === 'tools/call';
 
           // Apply auth headers before processing and store config in session
-          // Only apply headers if this request requires SAP config
-          if (requiresSapConfig) {
+          // Only apply headers if:
+          // 1. This request requires SAP config (tools/call)
+          // 2. AND auth headers are present (destination or direct auth)
+          // If no headers are present, fall back to .env file or base config
+          if (requiresSapConfig && this.hasSapHeaders(req.headers)) {
             await this.applyAuthHeaders(req.headers, session.sessionId);
           }
 
           // Get SAP config for this session (from headers or existing session)
           // Re-read session config after applyAuthHeaders (it may have been updated)
           const updatedSession = this.streamableHttpSessions.get(clientID);
-          const sessionSapConfig = updatedSession?.sapConfig || session.sapConfig || this.sapConfig;
+          let sessionSapConfig = updatedSession?.sapConfig || session.sapConfig || this.sapConfig;
+
+          // If no headers provided and no session config, try to reload from .env file
+          // This handles the case when .env file exists but config wasn't loaded properly
+          if (requiresSapConfig && !this.hasSapHeaders(req.headers) && (!sessionSapConfig || sessionSapConfig.url === "http://placeholder" || sessionSapConfig.url === "http://injected-connection")) {
+            try {
+              // Try to reload config from .env file
+              const envConfig = getConfig();
+              if (envConfig && envConfig.url && envConfig.url !== "http://placeholder" && envConfig.url !== "http://injected-connection") {
+                // URL from getConfig() is already cleaned (it uses cleanUrl internally)
+                // Just use it as-is
+                const cleanedUrl = envConfig.url;
+
+                // Validate URL format
+                if (/^https?:\/\//.test(cleanedUrl)) {
+                  // Update config with cleaned URL
+                  const cleanedConfig = { ...envConfig, url: cleanedUrl };
+                  this.sapConfig = cleanedConfig;
+                  sessionSapConfig = cleanedConfig;
+                  logger.debug("Reloaded SAP config from .env file for HTTP request", {
+                    type: "SAP_CONFIG_RELOADED_FROM_ENV",
+                    sessionId: session.sessionId,
+                    url: cleanedUrl,
+                  });
+                } else {
+                  logger.warn("Invalid URL format after cleaning", {
+                    type: "INVALID_URL_AFTER_CLEANING",
+                    url: cleanedUrl,
+                  });
+                }
+              }
+            } catch (configError) {
+              // Config reload failed, continue with existing config
+              logger.debug("Failed to reload config from .env file", {
+                type: "SAP_CONFIG_RELOAD_FAILED",
+                error: configError instanceof Error ? configError.message : String(configError),
+              });
+            }
+          }
 
           // Validate that we have a real config (not placeholder) only for requests that need it
           if (requiresSapConfig && (!sessionSapConfig || sessionSapConfig.url === "http://placeholder" || sessionSapConfig.url === "http://injected-connection")) {

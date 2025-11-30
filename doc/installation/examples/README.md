@@ -70,7 +70,7 @@ Use `cline-http-service-key-npx-config.json` for destination-based authenticatio
    EOF
    ```
 
-2. **Start server with auth-broker** (IMPORTANT: --auth-broker flag is required):
+2. **Start server with auth-broker**:
    ```bash
    # With NPX (recommended)
    npx @fr0ster/mcp-abap-adt --transport=http --http-port=3000 --auth-broker
@@ -79,7 +79,10 @@ Use `cline-http-service-key-npx-config.json` for destination-based authenticatio
    mcp-abap-adt --transport=http --http-port=3000 --auth-broker
    ```
    
-   **Note**: The `--auth-broker` flag is required even if a `.env` file exists in the current directory. Without it, the server will use `.env` instead of service keys.
+   **Note**: 
+   - The `--auth-broker` flag forces use of auth-broker (service keys), ignoring any `.env` file
+   - By default (without `--env` or `--auth-broker`), the server uses `.env` from current directory if it exists, otherwise uses auth-broker
+   - Auth-broker is only available for HTTP/streamable-http transport (not for stdio/SSE)
 
 3. **Use config** with destination header:
    ```json

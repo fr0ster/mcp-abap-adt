@@ -179,13 +179,13 @@ export function return_error(error: any) {
       // Check for DNS/network errors first
       const errorCode = (error as any).code;
       const errorMessage = error.message || '';
-      
+
       // Handle DNS resolution errors (common on Windows)
       if (errorCode === 'ENOTFOUND' || errorMessage.includes('getaddrinfo ENOTFOUND')) {
-        const hostnameMatch = errorMessage.match(/ENOTFOUND\s+([^\s]+)/) || 
+        const hostnameMatch = errorMessage.match(/ENOTFOUND\s+([^\s]+)/) ||
                              errorMessage.match(/getaddrinfo ENOTFOUND\s+([^\s]+)/);
         const hostname = hostnameMatch ? hostnameMatch[1] : 'unknown host';
-        
+
         errorText = `DNS resolution failed: Cannot resolve hostname "${hostname}". ` +
                    `Please check:\n` +
                    `1. Your network connection\n` +
@@ -234,10 +234,10 @@ export function return_error(error: any) {
       // Check for DNS errors in regular Error objects too
       const errorMessage = error.message || '';
       if (errorMessage.includes('getaddrinfo ENOTFOUND') || errorMessage.includes('ENOTFOUND')) {
-        const hostnameMatch = errorMessage.match(/ENOTFOUND\s+([^\s]+)/) || 
+        const hostnameMatch = errorMessage.match(/ENOTFOUND\s+([^\s]+)/) ||
                              errorMessage.match(/getaddrinfo ENOTFOUND\s+([^\s]+)/);
         const hostname = hostnameMatch ? hostnameMatch[1] : 'unknown host';
-        
+
         errorText = `DNS resolution failed: Cannot resolve hostname "${hostname}". ` +
                    `Please check:\n` +
                    `1. Your network connection\n` +
@@ -434,13 +434,7 @@ export function getManagedConnection(): AbapConnection {
   // Debug logging - verify URL is clean before creating connection (always)
   if (config.url) {
     const urlHex = Buffer.from(config.url, 'utf8').toString('hex');
-    debugLog(`[MCP-UTILS] Creating connection with URL: "${config.url}" (length: ${config.url.length}, hex: ${urlHex.substring(0, 60)}...)\n`);
-    if (config.url.includes('#')) {
-      debugLog(`[MCP-UTILS] ✗ ERROR: URL contains # character in config object!\n`);
-    }
-    if (/[\x00-\x1F\x7F-\x9F]/.test(config.url)) {
-      debugLog(`[MCP-UTILS] ✗ ERROR: URL contains control characters in config object!\n`);
-    }
+    debugLog(`[MCP-UTILS] Creating connection with URL: "${config.url}" (length: ${config.url.length})\n`);
   } else {
     debugLog(`[MCP-UTILS] ✗ ERROR: config.url is missing!\n`);
   }

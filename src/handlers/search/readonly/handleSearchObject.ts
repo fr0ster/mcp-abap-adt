@@ -1,6 +1,8 @@
-import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../../../lib/utils';
+import { McpError, ErrorCode } from '../../../lib/utils';
+import { return_response, getManagedConnection } from '../../../lib/utils';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
+import { SharedBuilder } from '@mcp-abap-adt/adt-clients';
+import type { SearchObjectsParams } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "SearchObject",
@@ -38,20 +40,33 @@ export async function handleSearchObject(args: any) {
     if (!object_name) {
       throw new McpError(ErrorCode.InvalidParams, 'object_name is required');
     }
-    const query = object_name;
-  let url = `${await getBaseUrl()}/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${encodeSapObjectName(query)}&maxResults=${maxResults || 100}`;
-  // Append object_type as a filter when provided
+
+    // Use SharedBuilder from @mcp-abap-adt/adt-clients
+    const connection = getManagedConnection();
+    const sharedBuilder = new SharedBuilder(connection);
+
+    const searchParams: SearchObjectsParams = {
+      query: object_name,
+      maxResults: maxResults || 100
+    };
+
     if (object_type) {
-      url += `&objectType=${encodeSapObjectName(object_type)}`;
+      searchParams.objectType = object_type;
     }
-    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+
+    await sharedBuilder.search(searchParams);
+    const response = sharedBuilder.getSearchResult();
+
+    if (!response) {
+      throw new Error('Search failed: no response received');
+    }
 
     // --- Error handling using new function ---
     const adtError = detectAdtSearchError(response);
     if (adtError) return adtError;
 
-let result = return_response(response);
-const { isError, ...rest } = result;
+    let result = return_response(response);
+    const { isError, ...rest } = result;
 
   // Detect empty XML (<adtcore:objectReferences/>) results
   const xmlText = rest.content?.[0]?.text || "";

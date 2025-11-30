@@ -1,9 +1,11 @@
 # Auth Broker Roadmap
 
-**Status:** 🔴 Not Started  
+**Status:** ✅ Completed  
 **Priority:** High  
 **Created:** 2025-01-27  
-**Last Updated:** 2025-01-27
+**Last Updated:** 2025-11-30
+
+**Note:** This roadmap has been completed. The `@mcp-abap-adt/auth-broker` package is now published and integrated into `mcp-abap-adt` server. See [Client Configuration Guide](../user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication) for usage details.
 
 ## Goal
 

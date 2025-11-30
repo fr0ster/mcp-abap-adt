@@ -53,7 +53,7 @@
     "@mcp-abap-adt/adt-clients": "^0.1.32",
     "@mcp-abap-adt/auth-broker": "^0.1.2",
     "@mcp-abap-adt/connection": "^0.1.12",
-    "@mcp-abap-adt/header-validator": "^0.1.1",
+    "@mcp-abap-adt/header-validator": "^0.1.2",
     "@modelcontextprotocol/sdk": "^1.23.0",
     "axios": "^1.11.0",
     "fast-xml-parser": "^5.2.5",

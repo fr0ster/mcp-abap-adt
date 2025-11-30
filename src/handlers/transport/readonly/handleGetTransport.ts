@@ -1,6 +1,6 @@
 /**
  * GetTransport Handler - Retrieve ABAP transport request information via ADT API
- * 
+ *
  * Retrieves transport request details including:
  * - Transport metadata (number, description, type, status)
  * - Owner and target system information
@@ -18,9 +18,9 @@ export const TOOL_DEFINITION = {
   inputSchema: {
     type: "object",
     properties: {
-      transport_number: { 
-        type: "string", 
-        description: "Transport request number (e.g., E19K905635, DEVK905123)" 
+      transport_number: {
+        type: "string",
+        description: "Transport request number (e.g., E19K905635, DEVK905123)"
       },
       include_objects: {
         type: "boolean",
@@ -28,7 +28,7 @@ export const TOOL_DEFINITION = {
         default: true
       },
       include_tasks: {
-        type: "boolean", 
+        type: "boolean",
         description: "Include list of tasks in transport (default: true)",
         default: true
       }
@@ -60,14 +60,14 @@ function parseTransportXml(xmlData: string, includeObjects: boolean = true, incl
 
   const result = parser.parse(xmlData);
   const root = result['tm:root'] || result['root'];
-  
+
   if (!root) {
     throw new McpError(ErrorCode.InternalError, 'Invalid transport XML structure - no tm:root found');
   }
 
   // Get detailed transport info from tm:request inside tm:root
   const request = root['tm:request'] || {};
-  
+
   // Extract basic transport information from both root attributes and request details
   const transportInfo = {
     number: root['adtcore:name'] || request['tm:number'] || root['name'],
@@ -159,7 +159,7 @@ export async function handleGetTransport(args: GetTransportArgs) {
 
     const baseUrl = await getBaseUrl();
     let url = `${baseUrl}/sap/bc/adt/cts/transportrequests/${typedArgs.transport_number}`;
-    
+
     // Add query parameters for additional information
     const params: string[] = [];
     if (includeObjects) params.push('includeObjects=true');

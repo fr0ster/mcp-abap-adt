@@ -1,5 +1,64 @@
 # Changelog
 
+## [1.1.19] - 2025-11-30
+
+### Changed
+- **Handler refactoring** – migrated handlers to use `CrudClient` and `SharedBuilder` from `@mcp-abap-adt/adt-clients`:
+  - `handleSearchObject` now uses `SharedBuilder.search()` instead of manual URL construction
+  - Eliminates redundant URL concatenation and potential duplication errors
+  - Better code reuse and consistency across handlers
+
+- **URL handling simplification** – removed unnecessary URL cleaning logic:
+  - URLs from `.env` files and service keys are expected to be clean
+  - Removed aggressive URL cleaning that was causing issues
+  - Only basic trimming is performed where needed
+
+- **Transport-specific auth-broker handling** – `auth-broker` is now ignored for `stdio` and `sse` transports:
+  - AuthBroker initialization is skipped for non-HTTP transports
+  - Prevents unnecessary errors and resource usage
+  - `.env` file is used directly for `stdio` and `sse` transports
+
+### Fixed
+- **URL duplication in stdio transport** – fixed incorrect URL formation when using `stdio` transport:
+  - Resolved `getaddrinfo ENOTFOUND ...comhttps` errors
+  - Proper URL handling in connection initialization
+  - Correct `.env` file parsing for `stdio` mode
+
+### Added
+- **Lazy AuthBroker initialization** – AuthBroker instances are now created on-demand per destination:
+  - AuthBroker is only created when a destination is actually needed (not at server startup)
+  - Each destination gets its own AuthBroker instance, cached in a map for reuse
+  - Reduces memory usage and startup time when auth-broker is not needed
+  - Default AuthBroker instance for non-destination requests
+
+- **Improved method filtering** – only `tools/call` requires SAP configuration:
+  - All other MCP methods (`tools/list`, `tools/get`, `initialize`, `ping`, `notifications/initialized`, etc.) work without SAP config
+  - Prevents unnecessary authentication errors for metadata requests
+  - Better separation between metadata operations and actual tool execution
+
+### Changed
+- **AuthBroker instance management** – switched from single instance to per-destination map:
+  - `authBrokers` map stores AuthBroker instances keyed by destination name
+  - `defaultAuthBroker` for requests without specific destination
+  - Lazy initialization via `getOrCreateAuthBroker()` method
+  - Better isolation between different destinations
+
+- **Platform store imports** – fixed ES module compatibility:
+  - Replaced `require()` with static imports in `getPlatformStores()`
+  - Fixes "UnixFileSessionStore is not a constructor" error
+  - Proper ES module support for platform-specific stores
+
+### Fixed
+- **ES module compatibility** – fixed "UnixFileSessionStore is not a constructor" error:
+  - Changed `getPlatformStores()` to use static imports instead of `require()`
+  - Properly handles ES module exports for Unix/Windows store implementations
+  - AuthBroker now correctly initializes on Unix systems
+
+- **Request processing logic** – improved handling of requests that don't require SAP connection:
+  - Only `tools/call` method triggers SAP configuration validation
+  - All other methods bypass authentication checks
+  - Prevents false errors for metadata and initialization requests
+
 ## [1.1.17] - 2025-11-28
 
 ### Added

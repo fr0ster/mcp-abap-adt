@@ -11,6 +11,18 @@ The `mcp-abap-adt` server supports multiple transport modes:
 
 For HTTP-based transports (streamable-http and sse), you can configure SAP connection parameters via HTTP headers, allowing dynamic connection configuration per request.
 
+### Methods That Require SAP Configuration
+
+**Only `tools/call` requires SAP configuration** - all other MCP methods work without SAP connection:
+- `tools/list` - List available tools (no SAP config needed)
+- `tools/get` - Get tool metadata (no SAP config needed)
+- `initialize` - Initialize MCP session (no SAP config needed)
+- `ping` - Health check (no SAP config needed)
+- `notifications/initialized` - Notification (no SAP config needed)
+- `tools/call` - **Execute a tool** (requires SAP configuration)
+
+This means you can query available tools, get tool descriptions, and initialize the connection without providing SAP credentials. Only when you actually call a tool (e.g., `GetProgram`, `CreateClass`) does the server require SAP authentication.
+
 ## Streamable HTTP Configuration
 
 ### Basic Configuration
@@ -130,8 +142,16 @@ mcp-abap-adt --env=/path/to/.env
 ### How It Works
 
 1. **Service Keys**: Store SAP BTP service keys as JSON files
-2. **Sessions**: The server automatically manages JWT tokens and refresh tokens in `.env` files
-3. **Automatic Token Management**: Tokens are validated, refreshed, and cached automatically
+2. **Lazy Initialization**: AuthBroker instances are created on-demand when a destination is first used (not at server startup)
+3. **Per-Destination Instances**: Each destination gets its own AuthBroker instance, cached in a map for reuse
+4. **Sessions**: The server automatically manages JWT tokens and refresh tokens in `.env` files
+5. **Automatic Token Management**: Tokens are validated, refreshed, and cached automatically
+
+**Important:** AuthBroker is only initialized when needed:
+- AuthBroker instances are created lazily when a request with destination header arrives
+- Each destination (e.g., "TRIAL", "sk") gets its own AuthBroker instance
+- Instances are cached and reused for subsequent requests to the same destination
+- This reduces memory usage and startup time
 
 ### Service Key Storage
 

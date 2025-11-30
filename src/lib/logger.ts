@@ -36,8 +36,13 @@ function createLogFn(level: string) {
     if (isStdio) {
       return; // Suppress all logging in stdio mode
     }
+
+    // ERROR and INFO levels should always be shown (not just when DEBUG_CONNECTORS is enabled)
+    // DEBUG and WARN require DEBUG_CONNECTORS to be enabled
     const debugEnabled = process.env.DEBUG_CONNECTORS === "true";
-    if (debugEnabled) {
+    const shouldLog = level === "ERROR" || level === "INFO" || debugEnabled;
+
+    if (shouldLog) {
       // In debug mode with MCP Inspector, use process.stderr instead of console.log
       // This avoids interfering with MCP's JSON-RPC protocol
       const logObject = {

@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'yaml';
 import * as dotenv from 'dotenv';
+import { invalidateConnectionCache } from '../../../lib/utils';
 
 let cachedConfig: any = null;
 
@@ -19,59 +20,71 @@ let cachedConfig: any = null;
  * 4. Fallback to project root (for tests run from project root)
  */
 export function loadTestEnv(): void {
-  // Check if .env is already loaded (e.g., by src/index.ts)
-  if (process.env.SAP_URL) {
-    if (process.env.DEBUG_TESTS === 'true') {
-      console.log(`[DEBUG] loadTestEnv - .env already loaded (SAP_URL exists), skipping`);
-    }
-    return;
-  }
+  // Always try to load .env file, even if SAP_URL is already set
+  // This ensures all variables (including refresh tokens) are loaded correctly
+
+  let envPath: string | null = null;
 
   // Priority 1: Use MCP_ENV_PATH if explicitly set
   if (process.env.MCP_ENV_PATH) {
-    const envPath = path.resolve(process.env.MCP_ENV_PATH);
-    if (fs.existsSync(envPath)) {
-      const result = dotenv.config({ path: envPath, quiet: true });
-      if (result.error) {
-        console.warn(`⚠️ Failed to load .env file: ${result.error.message}`);
-      } else {
-        logEnvLoaded(envPath);
-      }
-      return;
+    const resolvedPath = path.resolve(process.env.MCP_ENV_PATH);
+    if (fs.existsSync(resolvedPath)) {
+      envPath = resolvedPath;
     }
   }
 
   // Priority 2: Try current working directory (where test was run from)
-  const cwdEnvPath = path.resolve(process.cwd(), '.env');
-  if (fs.existsSync(cwdEnvPath)) {
-    const result = dotenv.config({ path: cwdEnvPath, quiet: true });
-    if (result.error) {
-      console.warn(`⚠️ Failed to load .env file: ${result.error.message}`);
-    } else {
-      logEnvLoaded(cwdEnvPath);
-      return;
+  if (!envPath) {
+    const cwdEnvPath = path.resolve(process.cwd(), '.env');
+    if (fs.existsSync(cwdEnvPath)) {
+      envPath = cwdEnvPath;
     }
   }
 
   // Priority 3: Fallback to project root (for tests run from project root)
-  const projectRootEnvPath = path.resolve(__dirname, '../../../../.env');
-  if (fs.existsSync(projectRootEnvPath)) {
-    const result = dotenv.config({ path: projectRootEnvPath, quiet: true });
-    if (result.error) {
-      console.warn(`⚠️ Failed to load .env file: ${result.error.message}`);
-    } else {
-      logEnvLoaded(projectRootEnvPath);
-      return;
+  if (!envPath) {
+    const projectRootEnvPath = path.resolve(__dirname, '../../../../.env');
+    if (fs.existsSync(projectRootEnvPath)) {
+      envPath = projectRootEnvPath;
     }
   }
 
-  // No .env file found
-  if (process.env.DEBUG_TESTS === 'true') {
-    console.warn(`⚠️ .env file not found. Tried:`, {
-      MCP_ENV_PATH: process.env.MCP_ENV_PATH || '(not set)',
-      cwd: cwdEnvPath,
-      projectRoot: projectRootEnvPath
-    });
+  // Load .env file if found
+  if (envPath) {
+    // CRITICAL: Use override: true for tests to ensure .env values always take precedence
+    // This is necessary because tests may run in environments where process.env already has
+    // empty or stale values that would prevent .env from being loaded with override: false
+    const result = dotenv.config({ path: envPath, quiet: true, override: true });
+    if (result.error) {
+      console.warn(`⚠️ Failed to load .env file: ${result.error.message}`);
+    } else {
+      logEnvLoaded(envPath);
+      // CRITICAL: Invalidate connection cache after loading .env
+      // This ensures getManagedConnection() will recreate connection with new config
+      // (including refresh token that might have been missing before)
+      try {
+        invalidateConnectionCache();
+        if (process.env.DEBUG_TESTS === 'true') {
+          console.log(`[DEBUG] loadTestEnv - Invalidated connection cache to force recreation with updated .env values`);
+        }
+      } catch (error: any) {
+        // If invalidateConnectionCache fails, log but don't fail
+        if (process.env.DEBUG_TESTS === 'true') {
+          console.warn(`[DEBUG] loadTestEnv - Failed to invalidate connection cache: ${error?.message || String(error)}`);
+        }
+      }
+    }
+  } else {
+    // No .env file found
+    if (process.env.DEBUG_TESTS === 'true') {
+      const cwdEnvPath = path.resolve(process.cwd(), '.env');
+      const projectRootEnvPath = path.resolve(__dirname, '../../../../.env');
+      console.warn(`⚠️ .env file not found. Tried:`, {
+        MCP_ENV_PATH: process.env.MCP_ENV_PATH || '(not set)',
+        cwd: cwdEnvPath,
+        projectRoot: projectRootEnvPath
+      });
+    }
   }
 }
 

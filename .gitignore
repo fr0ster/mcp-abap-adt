@@ -50,6 +50,9 @@ Thumbs.db
 .sessions/
 *.sessions.json
 
+# Data directory (created by Docker containers)
+data/
+
 # Optional npm cache directory
 .npm
 
@@ -66,3 +69,17 @@ Thumbs.db
 src/generated/
 tools/antlr/
 fr0ster-mcp-abap-adt-*.tgz
+
+# SSL certificates and keys
+certs/*.pem
+certs/*.key
+certs/*.crt
+certs/*.csr
+!certs/.gitkeep
+
+# Certbot webroot
+certbot-webroot/
+!certbot-webroot/.gitkeep
+
+# Docker nginx configuration (user-specific)
+docker/nginx.conf

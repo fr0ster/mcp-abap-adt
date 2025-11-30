@@ -1,9 +1,15 @@
 /**
  * Session management helpers for low-level handler integration tests
+ *
+ * Uses the same approach as adt-clients tests:
+ * - Create connection via getManagedConnection()
+ * - Call connect() once
+ * - Extract session state directly from connection
  */
 
-import { handleGetSession } from '../../../handlers/system/readonly/handleGetSession';
-import { parseHandlerResponse, extractSessionState } from './testHelpers';
+import { extractSessionState } from './testHelpers';
+import { getManagedConnection } from '../../../lib/utils';
+import { generateSessionId } from '../../../lib/sessionUtils';
 
 export interface SessionInfo {
   session_id: string;
@@ -16,19 +22,79 @@ export interface SessionInfo {
 
 /**
  * Get a new session for testing
+ * Uses the same approach as adt-clients tests - connect once, extract session state
  */
 export async function getTestSession(): Promise<SessionInfo> {
-  const response = await handleGetSession({ force_new: false });
-  const data = parseHandlerResponse(response);
+  try {
+    // Get connection (same as adt-clients tests)
+    const connection = getManagedConnection();
 
-  if (!data.session_id || !data.session_state) {
-    throw new Error('GetSession did not return session_id and session_state');
+    // Log token info from connection (what's actually used in session)
+    if (process.env.DEBUG_TESTS === 'true') {
+      let connectionConfig: any = undefined;
+      try {
+        connectionConfig = connection.getConfig();
+      } catch (error: any) {
+        console.warn('[getTestSession] Failed to get connection config:', error?.message);
+      }
+
+      const connectionConfigJwtToken = connectionConfig?.jwtToken;
+      const connectionConfigRefreshToken = connectionConfig?.refreshToken;
+
+      // For refresh token, show only first 10 and last 10 chars (it's shorter than JWT)
+      const refreshTokenPreview = connectionConfigRefreshToken
+        ? connectionConfigRefreshToken.length > 20
+          ? `${connectionConfigRefreshToken.substring(0, 10)}...${connectionConfigRefreshToken.substring(connectionConfigRefreshToken.length - 10)}`
+          : connectionConfigRefreshToken.substring(0, 10) + '...' // If too short, show only first 10
+        : 'empty';
+
+      console.log('[getTestSession] Connection tokens:', {
+        hasJwtToken: !!connectionConfigJwtToken,
+        jwtTokenStart: connectionConfigJwtToken ? `${connectionConfigJwtToken.substring(0, 20)}...` : 'empty',
+        jwtTokenEnd: connectionConfigJwtToken && connectionConfigJwtToken.length > 20 ? `...${connectionConfigJwtToken.substring(connectionConfigJwtToken.length - 20)}` : 'empty',
+        jwtTokenLength: connectionConfigJwtToken?.length || 0,
+        hasRefreshToken: !!connectionConfigRefreshToken,
+        refreshTokenPreview: refreshTokenPreview,
+        refreshTokenLength: connectionConfigRefreshToken?.length || 0,
+        // Also check UAA config
+        hasUaaUrl: !!(connectionConfig?.uaaUrl),
+        hasUaaClientId: !!(connectionConfig?.uaaClientId),
+        hasUaaClientSecret: !!(connectionConfig?.uaaClientSecret),
+        canRefresh: !!(connectionConfigRefreshToken && connectionConfig?.uaaUrl && connectionConfig?.uaaClientId && connectionConfig?.uaaClientSecret)
+      });
+    }
+
+    // Connect once (same as adt-clients tests - no double connect)
+    await connection.connect();
+
+    // Generate session ID
+    const sessionId = generateSessionId();
+
+    // Get session state directly from connection (same as adt-clients tests)
+    const sessionState = connection.getSessionState();
+
+    if (!sessionState) {
+      throw new Error('Failed to get session state. Connection may not be properly initialized.');
+    }
+
+    return {
+      session_id: sessionId,
+      session_state: {
+        cookies: sessionState.cookies || '',
+        csrf_token: sessionState.csrfToken || '',
+        cookie_store: sessionState.cookieStore || {}
+      }
+    };
+  } catch (error: any) {
+    if (process.env.DEBUG_TESTS === 'true') {
+      console.error('[getTestSession] Error caught:', {
+        message: error?.message,
+        stack: error?.stack,
+        error: error
+      });
+    }
+    throw error;
   }
-
-  return {
-    session_id: data.session_id,
-    session_state: data.session_state
-  };
 }
 
 /**

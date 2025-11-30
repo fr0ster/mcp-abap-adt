@@ -24,7 +24,7 @@ docker run -d \
 ### 2. Using Docker Compose (Recommended)
 
 ```bash
-# Create .env file with SAP credentials
+# Create .env file with SAP credentials (in project root)
 cat > .env << EOF
 SAP_URL=https://your-sap-system.com
 SAP_CLIENT=100
@@ -32,7 +32,8 @@ SAP_AUTH_TYPE=jwt
 SAP_JWT_TOKEN=your-token
 EOF
 
-# Start service
+# Start service (from docker/ directory)
+cd docker
 docker-compose up -d
 
 # View logs
@@ -40,6 +41,7 @@ docker-compose logs -f
 
 # Stop service
 docker-compose down
+cd ..
 ```
 
 ## Configuration
@@ -80,7 +82,9 @@ Enable nginx proxy:
 
 ```bash
 # Start with nginx profile
+cd docker
 docker-compose --profile with-nginx up -d
+cd ..
 ```
 
 Create `nginx.conf`:

@@ -27,12 +27,16 @@ Quick configuration files for connecting Cline to MCP ABAP ADT server.
 **Files**: 
 - `cline-http-npx-config.json` - for NPX/NPM package
 - `cline-http-config.json` - for local development
+- `cline-http-service-key-npx-config.json` - **for Service Keys (auth-broker)**
 
 **Setup**:
 1. Start server in separate terminal:
    ```bash
-   # With NPX (recommended)
+   # With NPX (recommended) - uses auth-broker by default
    npx @fr0ster/mcp-abap-adt --transport=http --http-port=3000
+   
+   # Or force auth-broker (ignores .env)
+   npx @fr0ster/mcp-abap-adt --transport=http --http-port=3000 --auth-broker
    
    # Or with global install
    mcp-abap-adt --transport=http --http-port=3000
@@ -47,6 +51,53 @@ Quick configuration files for connecting Cline to MCP ABAP ADT server.
 - ✅ No `.env` path in Cline config
 - ✅ Multiple clients can connect
 - ✅ Server stays running
+
+**Service Key Configuration**:
+Use `cline-http-service-key-npx-config.json` for destination-based authentication:
+
+1. **Create service key** (Unix):
+   ```bash
+   mkdir -p ~/.config/mcp-abap-adt/service-keys
+   cat > ~/.config/mcp-abap-adt/service-keys/TRIAL.json << 'EOF'
+   {
+     "uaa": {
+       "url": "https://your-uaa-url.com",
+       "clientid": "your-client-id",
+       "clientsecret": "your-client-secret"
+     },
+     "url": "https://your-sap-url.com"
+   }
+   EOF
+   ```
+
+2. **Start server with auth-broker** (IMPORTANT: --auth-broker flag is required):
+   ```bash
+   # With NPX (recommended)
+   npx @fr0ster/mcp-abap-adt --transport=http --http-port=3000 --auth-broker
+   
+   # Or with global install
+   mcp-abap-adt --transport=http --http-port=3000 --auth-broker
+   ```
+   
+   **Note**: The `--auth-broker` flag is required even if a `.env` file exists in the current directory. Without it, the server will use `.env` instead of service keys.
+
+3. **Use config** with destination header:
+   ```json
+   {
+     "mcpServers": {
+       "mcp-abap-adt-service-key": {
+         "url": "http://localhost:3000",
+         "transport": "http",
+         "headers": {
+           "x-sap-destination": "TRIAL"
+         },
+         "disabled": false
+       }
+     }
+   }
+   ```
+
+**First-time authentication**: Browser will open for OAuth2 login. Tokens are saved automatically.
 
 ### SSE Transport  
 **Files**:

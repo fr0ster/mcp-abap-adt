@@ -97,7 +97,8 @@ mcp-abap-adt --help
 ```
 
 **Available commands after installation:**
-- `mcp-abap-adt` - stdio transport (default, for MCP clients)
+- `mcp-abap-adt` - HTTP transport (default)
+- `mcp-abap-adt --transport=stdio` - stdio transport (for MCP clients)
 - `mcp-abap-adt --transport=http` - HTTP server transport
 - `mcp-abap-adt --transport=sse` - SSE server transport
 
@@ -194,7 +195,8 @@ notepad .env
 
 MCP ABAP ADT Server supports two transport protocols:
 
-1. **stdio** (default) - Standard input/output, used by Cline/Cursor
+1. **http** (default) - HTTP StreamableHTTP transport, works without .env file
+2. **stdio** - Standard input/output, used by Cline/Cursor (requires .env file)
 2. **SSE/HTTP** - Server-Sent Events over HTTP, for web interfaces
 
 ### Cline (VS Code Extension)

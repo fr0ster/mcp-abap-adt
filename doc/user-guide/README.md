@@ -17,8 +17,8 @@ Install from a pre-built `.tgz` package:
 npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
 
 # Available commands:
-mcp-abap-adt          # stdio transport (default)
-mcp-abap-adt --transport=http     # HTTP server
+mcp-abap-adt          # HTTP transport (default)
+mcp-abap-adt --transport=stdio    # stdio transport (for MCP clients)
 mcp-abap-adt --transport=sse      # SSE server
 ```
 
@@ -70,7 +70,7 @@ See [Installation Guide](../installation/INSTALLATION.md) for full instructions.
 
 After installing from package, these commands are available:
 
-### `mcp-abap-adt` - Default stdio transport
+### `mcp-abap-adt` - Default HTTP transport
 ```bash
 mcp-abap-adt [--env /path/to/.env]
 ```

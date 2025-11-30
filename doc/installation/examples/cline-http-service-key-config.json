@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "mcp-abap-adt-service-key": {
+      "url": "http://localhost:3000",
+      "transport": "http",
+      "headers": {
+        "x-sap-destination": "sk"
+      },
+      "disabled": false
+    }
+  }
+}
+

@@ -15,6 +15,9 @@ import path from "path";
 // dotenv removed - using manual .env parsing for all modes to avoid stdout pollution
 import { createServer, Server as HttpServer, IncomingHttpHeaders } from "http";
 import { randomUUID } from "crypto";
+import { AuthBroker } from "@mcp-abap-adt/auth-broker";
+import { validateAuthHeaders, AuthMethodPriority } from "@mcp-abap-adt/header-validator";
+import { getPlatformStores } from "./lib/stores";
 
 // Import handler functions
 // Import handler functions
@@ -403,8 +406,11 @@ OPTIONS:
   --help                           Show this help message
 
 ENVIRONMENT FILE:
-  --env=<path>                     Path to .env file (default: ./.env)
+  --env=<path>                     Path to .env file (uses .env instead of auth-broker)
   --env <path>                     Alternative syntax for --env
+  --auth-broker                    Force use of auth-broker (service keys) instead of .env file
+                                   Ignores .env file even if present in current directory
+                                   By default, .env in current directory is used automatically (if exists)
 
 TRANSPORT SELECTION:
   --transport=<type>               Transport type: stdio|http|streamable-http|sse
@@ -434,7 +440,8 @@ ENVIRONMENT VARIABLES:
   MCP_ENV_PATH                     Path to .env file
   MCP_SKIP_ENV_LOAD                Skip automatic .env loading (true|false)
   MCP_SKIP_AUTO_START              Skip automatic server start (true|false)
-  MCP_TRANSPORT                    Default transport type (stdio|http|sse)
+  MCP_TRANSPORT                    Transport type (stdio|http|sse)
+                                   Default: http (streamable-http) if not specified
   MCP_HTTP_PORT                    Default HTTP port (default: 3000)
   MCP_HTTP_HOST                    Default HTTP host (default: 0.0.0.0)
   MCP_HTTP_ENABLE_JSON_RESPONSE   Enable JSON responses (true|false)
@@ -446,6 +453,35 @@ ENVIRONMENT VARIABLES:
   MCP_SSE_ALLOWED_ORIGINS          Allowed CORS origins for SSE (comma-separated)
   MCP_SSE_ALLOWED_HOSTS            Allowed hosts for SSE (comma-separated)
   MCP_SSE_ENABLE_DNS_PROTECTION    Enable DNS protection for SSE (true|false)
+  AUTH_BROKER_PATH                 Custom paths for service keys and sessions
+                                   Unix: colon-separated (e.g., /path1:/path2)
+                                   Windows: semicolon-separated (e.g., C:\\path1;C:\\path2)
+                                   If not set, uses platform defaults:
+                                   Unix: ~/.config/mcp-abap-adt/service-keys
+                                   Windows: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys
+  DEBUG_AUTH_LOG                   Enable debug logging for auth-broker (true|false)
+                                   Default: false (only info messages shown)
+                                   When true: shows detailed debug messages
+  DEBUG_AUTH_BROKER                Alias for DEBUG_AUTH_LOG (true|false)
+                                   Same as DEBUG_AUTH_LOG - enables debug logging for auth-broker
+                                   When true: automatically sets DEBUG_AUTH_LOG=true
+  DEBUG_HTTP_REQUESTS              Enable logging of HTTP requests and MCP calls (true|false)
+                                   Default: false
+                                   When true: logs all incoming HTTP requests, methods, URLs,
+                                   headers (sensitive data redacted), and MCP JSON-RPC calls
+                                   Also enabled by DEBUG_CONNECTORS=true
+  DEBUG_CONNECTORS                  Enable debug logging for connection layer (true|false)
+                                   Default: false
+                                   When true: shows HTTP requests, CSRF tokens, cookies,
+                                   session management, and connection details
+                                   Also enables DEBUG_HTTP_REQUESTS automatically
+  DEBUG_HANDLERS                    Enable debug logging for MCP handlers (true|false)
+                                   Default: false
+                                   When true: shows handler entry/exit, session state,
+                                   lock handles, property validation
+  DEBUG_CONNECTION_MANAGER          Enable debug logging for connection manager (true|false)
+                                   Default: false
+                                   When true: shows connection cache operations
 
 SAP CONNECTION (.env file):
   SAP_URL                          SAP system URL (required)
@@ -479,7 +515,13 @@ EXAMPLES:
   # Use stdio mode (for MCP clients, requires .env file)
   mcp-abap-adt --transport=stdio
 
-  # Use custom .env file
+  # Default: uses .env from current directory if exists, otherwise auth-broker
+  mcp-abap-adt
+
+  # Force use of auth-broker (service keys), ignore .env file even if exists
+  mcp-abap-adt --auth-broker
+
+  # Use .env file from custom path
   mcp-abap-adt --env=/path/to/my.env
 
   # Start HTTP server with CORS enabled
@@ -521,6 +563,62 @@ AUTHENTICATION:
   1. Install: npm install -g @mcp-abap-adt/connection
   2. Run:     sap-abap-auth auth -k path/to/service-key.json
   3. This generates .env file with JWT tokens automatically
+
+SERVICE KEYS (Destination-Based Authentication):
+  The server supports destination-based authentication using service keys stored locally.
+  This allows you to configure authentication once per destination and reuse it.
+
+  IMPORTANT: Auth-broker (service keys) is only available for HTTP/streamable-http transport.
+  For stdio and SSE transports, use .env file instead.
+
+  Service Key Storage:
+    Unix (Linux/macOS):
+      Service keys: ~/.config/mcp-abap-adt/service-keys/{destination}.json
+      Sessions:     ~/.config/mcp-abap-adt/sessions/{destination}.env
+
+    Windows:
+      Service keys: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\{destination}.json
+      Sessions:     %USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\{destination}.env
+
+    Fallback: Also searches in current working directory (where server is launched)
+
+  Service Key Format:
+    Create {destination}.json file (e.g., TRIAL.json) with:
+    {
+      "uaa": {
+        "url": "https://your-uaa-url.com",
+        "clientid": "your-client-id",
+        "clientsecret": "your-client-secret"
+      },
+      "url": "https://your-sap-url.com",
+      "abap": {
+        "url": "https://your-sap-url.com"
+      }
+    }
+
+  Using Destinations:
+    In HTTP headers, use:
+      x-sap-destination: TRIAL    (for SAP Cloud, URL derived from service key)
+      x-mcp-destination: TRIAL    (for MCP destinations, requires x-sap-url header)
+
+  First-Time Authentication:
+    - Server reads service key from {destination}.json
+    - Opens browser for OAuth2 authentication (if no valid session exists)
+    - Saves tokens to {destination}.env for future use
+    - Subsequent requests use cached tokens automatically
+
+  Automatic Token Management:
+    - Validates tokens before use
+    - Refreshes expired tokens using refresh tokens
+    - Caches valid tokens for performance
+    - Falls back to browser authentication if refresh fails
+
+  Custom Paths:
+    Set AUTH_BROKER_PATH environment variable to override default paths:
+      Unix:   export AUTH_BROKER_PATH="/custom/path:/another/path"
+      Windows: set AUTH_BROKER_PATH=C:\\custom\\path;C:\\another\\path
+
+  For more details, see: doc/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication
 
 `;
   console.log(help);
@@ -581,18 +679,18 @@ function getTransportType(): string | null {
  */
 function parseEnvArg(): string | undefined {
   const args = process.argv;
-  
+
   // Always log on Windows for debugging (not just when DEBUG is set)
   if (process.platform === 'win32') {
     process.stderr.write(`[MCP-ENV] parseEnvArg: process.argv = ${JSON.stringify(args)}\n`);
     process.stderr.write(`[MCP-ENV] parseEnvArg: process.argv.length = ${args.length}\n`);
   }
-  
+
   // Skip first two args (node executable and script path), search from index 2
   // But also check all args in case spawn passes them differently
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    
+
     // Format: --env=/path/to/.env
     if (arg.startsWith("--env=")) {
       const envPath = arg.slice("--env=".length);
@@ -604,11 +702,11 @@ function parseEnvArg(): string | undefined {
     // Format: --env /path/to/.env
     else if (arg === "--env" && i + 1 < args.length) {
       let envPath = args[i + 1];
-      
+
       // On Windows, handle backslashes in paths (.\mdd.env)
       // path.resolve will handle this correctly, but we need to preserve the path as-is
       // The path will be normalized later in the code
-      
+
       if (process.platform === 'win32') {
         process.stderr.write(`[MCP-ENV] parseEnvArg: Found --env space format at index ${i}: ${envPath}\n`);
         process.stderr.write(`[MCP-ENV] parseEnvArg: envPath type: ${typeof envPath}, length: ${envPath.length}\n`);
@@ -616,18 +714,20 @@ function parseEnvArg(): string | undefined {
       return envPath;
     }
   }
-  
+
   if (process.platform === 'win32') {
     process.stderr.write(`[MCP-ENV] parseEnvArg: No --env argument found in process.argv\n`);
     process.stderr.write(`[MCP-ENV] parseEnvArg: Searched ${args.length} arguments\n`);
   }
-  
+
   return undefined;
 }
 
 // Find .env file path from arguments
-// Skip .env loading if launcher already loaded it
-const skipEnvAutoload = process.env.MCP_SKIP_ENV_LOAD === "true" || process.env.MCP_ENV_LOADED_BY_LAUNCHER === "true";
+// Check for --auth-broker flag (forces use of auth-broker, ignores .env)
+const useAuthBroker = process.argv.includes("--auth-broker");
+// Skip .env loading if launcher already loaded it OR if --auth-broker is specified
+const skipEnvAutoload = process.env.MCP_SKIP_ENV_LOAD === "true" || process.env.MCP_ENV_LOADED_BY_LAUNCHER === "true" || useAuthBroker;
 const explicitTransportType = getTransportType();
 // If transport not explicitly specified, default to HTTP mode
 // Stdio mode is only used if explicitly specified via --transport=stdio
@@ -649,7 +749,8 @@ if (process.platform === 'win32' && !isStdio) {
 
 if (!skipEnvAutoload) {
   if (!envFilePath) {
-    // Only search in current working directory (where user runs the command)
+    // Default behavior: search in current working directory (where user runs the command)
+    // If .env exists, use it; otherwise will use auth-broker
     const cwdEnvPath = path.resolve(process.cwd(), ".env");
 
     if (fs.existsSync(cwdEnvPath)) {
@@ -665,8 +766,8 @@ if (!skipEnvAutoload) {
       process.stderr.write(`[MCP-ENV] Using .env from argument/env: ${envFilePath}\n`);
       // On Windows, also log the resolved path for debugging
       if (process.platform === 'win32') {
-        const resolvedPath = path.isAbsolute(envFilePath) 
-          ? envFilePath 
+        const resolvedPath = path.isAbsolute(envFilePath)
+          ? envFilePath
           : path.resolve(process.cwd(), envFilePath);
         process.stderr.write(`[MCP-ENV] Will resolve to: ${resolvedPath}\n`);
       }
@@ -677,11 +778,11 @@ if (!skipEnvAutoload) {
     // Normalize path separators for Windows compatibility
     // On Windows, backslashes in paths need special handling
     // path.resolve() and path.normalize() should handle this, but let's be explicit
-    
+
     // First, normalize all backslashes to forward slashes for consistent processing
     // Then use path methods which handle platform-specific separators correctly
     const normalizedPath = envFilePath.replace(/\\/g, '/');
-    
+
     if (!path.isAbsolute(normalizedPath)) {
       // For relative paths, use path.resolve which handles .\ and ./ correctly on all platforms
       // path.resolve automatically handles both .\mdd.env and ./mdd.env formats
@@ -1310,59 +1411,320 @@ export class mcp_abap_adt_server {
     server: McpServer;
     transport: SSEServerTransport;
   }>();
-  private applyAuthHeaders(headers?: IncomingHttpHeaders, sessionId?: string) {
-    if (!headers) {
-      return;
+
+  // AuthBroker instances map for destination-based authentication (lazy initialization)
+  // Key: destination name, Value: AuthBroker instance
+  private authBrokers = new Map<string, AuthBroker>();
+
+  // Default AuthBroker (for backward compatibility and non-destination requests)
+  private defaultAuthBroker?: AuthBroker;
+
+  /**
+   * Get or create AuthBroker for a specific destination (lazy initialization)
+   */
+  private async getOrCreateAuthBroker(destination?: string): Promise<AuthBroker | undefined> {
+    // Only for HTTP/streamable-http transport
+    const isHttpTransport = this.transportConfig.type === "streamable-http";
+    if (!isHttpTransport) {
+      return undefined;
     }
 
-    const getHeaderValue = (value?: string | string[]) => {
-      if (!value) {
+    // If no destination specified, use default auth broker
+    if (!destination) {
+      if (!this.defaultAuthBroker) {
+        try {
+          const { serviceKeyStore, sessionStore } = getPlatformStores();
+          this.defaultAuthBroker = new AuthBroker(
+            {
+              serviceKeyStore,
+              sessionStore,
+            },
+            'system'
+          );
+          logger.debug("Default AuthBroker created", {
+            type: "AUTH_BROKER_CREATED",
+            destination: "default",
+          });
+        } catch (error) {
+          logger.warn("Failed to create default AuthBroker", {
+            type: "AUTH_BROKER_CREATE_FAILED",
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return undefined;
+        }
+      }
+      return this.defaultAuthBroker;
+    }
+
+    // Get or create AuthBroker for specific destination
+    if (!this.authBrokers.has(destination)) {
+      try {
+        const { serviceKeyStore, sessionStore } = await getPlatformStores();
+        const authBroker = new AuthBroker(
+          {
+            serviceKeyStore,
+            sessionStore,
+          },
+          'system'
+        );
+        this.authBrokers.set(destination, authBroker);
+        logger.info("AuthBroker created for destination", {
+          type: "AUTH_BROKER_CREATED",
+          destination: destination,
+        });
+      } catch (error) {
+        logger.error("Failed to create AuthBroker for destination", {
+          type: "AUTH_BROKER_CREATE_FAILED",
+          destination: destination,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
         return undefined;
       }
-      return Array.isArray(value) ? value[0] : value;
+    }
+    const authBroker = this.authBrokers.get(destination);
+    if (!authBroker) {
+      logger.error("AuthBroker not found in map after creation", {
+        type: "AUTH_BROKER_NOT_FOUND",
+        destination: destination,
+        mapSize: this.authBrokers.size,
+        mapKeys: Array.from(this.authBrokers.keys()),
+      });
+    }
+    return authBroker;
+  }
+
+  private async applyAuthHeaders(headers?: IncomingHttpHeaders, sessionId?: string) {
+    if (!headers) {
+      logger.info("No headers provided in request", {
+        type: "NO_HEADERS_PROVIDED",
+        sessionId: sessionId?.substring(0, 8),
+        hint: "Provide authentication headers (x-sap-destination, x-sap-url, x-sap-auth-type, etc.)",
+      });
+      return;
+    }
+
+    // Log which auth headers are present (for debugging)
+    const authHeaders = {
+      'x-sap-destination': headers['x-sap-destination'],
+      'x-mcp-destination': headers['x-mcp-destination'],
+      'x-sap-url': headers['x-sap-url'] ? '[present]' : undefined,
+      'x-sap-auth-type': headers['x-sap-auth-type'],
+      'x-sap-jwt-token': headers['x-sap-jwt-token'] ? '[present]' : undefined,
+      'x-sap-login': headers['x-sap-login'] ? '[present]' : undefined,
     };
+    logger.info("Processing authentication headers", {
+      type: "AUTH_HEADERS_PROCESSING",
+      headers: authHeaders,
+      sessionId: sessionId?.substring(0, 8),
+    });
 
-    // Extract SAP URL and auth type from headers
-    const sapUrl = getHeaderValue(headers["x-sap-url"])?.trim();
-    const sapAuthType = getHeaderValue(headers["x-sap-auth-type"])?.trim();
+    // Use header validator to validate and prioritize authentication methods
+    const validationResult = validateAuthHeaders(headers);
 
-    // If no URL or auth type, skip processing
-    if (!sapUrl || !sapAuthType) {
+    // Log warnings if any
+    if (validationResult.warnings.length > 0) {
+      logger.debug("Header validation warnings", {
+        type: "HEADER_VALIDATION_WARNINGS",
+        warnings: validationResult.warnings,
+        sessionId: sessionId?.substring(0, 8),
+      });
+    }
+
+    // If validation failed, log errors and return
+    if (!validationResult.isValid || !validationResult.config) {
+      if (validationResult.errors.length > 0) {
+        logger.error("Header validation failed", {
+          type: "HEADER_VALIDATION_FAILED",
+          errors: validationResult.errors,
+          sessionId: sessionId?.substring(0, 8),
+          hint: "Check that required headers are provided. For destination-based auth, use x-sap-destination or x-mcp-destination. For direct auth, use x-sap-url and x-sap-auth-type.",
+        });
+      } else {
+        logger.info("No valid authentication headers found", {
+          type: "NO_VALID_AUTH_HEADERS",
+          sessionId: sessionId?.substring(0, 8),
+          hint: "Provide one of: x-sap-destination, x-mcp-destination, or x-sap-url + x-sap-auth-type headers",
+        });
+      }
       return;
     }
 
-    const isJwtAuth = sapAuthType === "jwt" || sapAuthType === "xsuaa";
-    const isBasicAuth = sapAuthType === "basic";
+    const config = validationResult.config;
 
-    // Process JWT authentication
-    if (isJwtAuth) {
-      // Extract JWT token - required for JWT auth
-      const jwtToken = getHeaderValue(headers["x-sap-jwt-token"])?.trim();
-      if (!jwtToken) {
-        return; // JWT token is required for JWT authentication
+    // Process based on priority (highest to lowest)
+    switch (config.priority) {
+      case AuthMethodPriority.SAP_DESTINATION: {
+        // Priority 4: x-sap-destination (uses AuthBroker, URL from destination)
+        if (!config.destination) {
+          logger.warn("SAP destination auth requires destination name", {
+            type: "SAP_DESTINATION_AUTH_MISSING",
+            destination: config.destination,
+            sessionId: sessionId?.substring(0, 8),
+          });
+          return;
+        }
+
+        // Get or create AuthBroker for this destination (lazy initialization)
+        const authBroker = await this.getOrCreateAuthBroker(config.destination);
+        if (!authBroker) {
+          const errorMessage = `Failed to initialize AuthBroker for destination "${config.destination}". Auth-broker is only available for HTTP/streamable-http transport.`;
+          logger.error(errorMessage, {
+            type: "AUTH_BROKER_NOT_INITIALIZED",
+            destination: config.destination,
+            sessionId: sessionId?.substring(0, 8),
+            transport: this.transportConfig.type,
+          });
+          return;
+        }
+
+        try {
+          // Get URL from AuthBroker (loads from .env or service key)
+          // Note: destination name must exactly match service key filename (case-sensitive)
+          // Example: if file is "sk.json", destination must be "sk" (not "SK")
+          const sapUrl = await authBroker.getSapUrl(config.destination);
+          if (!sapUrl) {
+            logger.error("Failed to get SAP URL from destination", {
+              type: "SAP_DESTINATION_URL_NOT_FOUND",
+              destination: config.destination,
+              sessionId: sessionId?.substring(0, 8),
+              hint: `Service key file "${config.destination}.json" not found or missing URL. Check file name matches destination exactly (case-sensitive).`,
+            });
+            return;
+          }
+
+          logger.info("SAP URL retrieved from destination", {
+            type: "SAP_URL_RETRIEVED",
+            destination: config.destination,
+            url: sapUrl,
+            sessionId: sessionId?.substring(0, 8),
+          });
+
+          // Get token from AuthBroker
+          const jwtToken = await authBroker.getToken(config.destination);
+
+          this.processJwtConfigUpdate(sapUrl, jwtToken, undefined, sessionId);
+
+          logger.info("Updated SAP configuration using SAP destination (AuthBroker)", {
+            type: "SAP_CONFIG_UPDATED_SAP_DESTINATION",
+            destination: config.destination,
+            url: sapUrl,
+            sessionId: sessionId?.substring(0, 8),
+          });
+        } catch (error) {
+          logger.error("Failed to get token from AuthBroker for SAP destination", {
+            type: "AUTH_BROKER_ERROR_SAP_DESTINATION",
+            destination: config.destination,
+            error: error instanceof Error ? error.message : String(error),
+            sessionId: sessionId?.substring(0, 8),
+          });
+        }
+        return;
       }
 
-      // Extract refresh token - optional for JWT auth
-      const refreshToken = getHeaderValue(headers["x-sap-refresh-token"]);
+      case AuthMethodPriority.MCP_DESTINATION: {
+        // Priority 3: x-mcp-destination (uses AuthBroker, URL from x-sap-url header)
+        if (!config.destination || !config.sapUrl) {
+          logger.warn("MCP destination auth requires destination and URL", {
+            type: "MCP_DESTINATION_AUTH_MISSING",
+            destination: config.destination,
+            sapUrl: config.sapUrl,
+            sessionId: sessionId?.substring(0, 8),
+          });
+          return;
+        }
 
-      // Process JWT config update
-      this.processJwtConfigUpdate(sapUrl, jwtToken, refreshToken, sessionId);
-      return;
-    }
+        // Get or create AuthBroker for this destination (lazy initialization)
+        const authBroker = await this.getOrCreateAuthBroker(config.destination);
+        if (!authBroker) {
+          logger.error("Failed to initialize AuthBroker for MCP destination", {
+            type: "AUTH_BROKER_NOT_INITIALIZED",
+            destination: config.destination,
+            sessionId: sessionId?.substring(0, 8),
+            transport: this.transportConfig.type,
+          });
+          return;
+        }
 
-    // Process basic authentication
-    if (isBasicAuth) {
-      // Extract username and password - required for basic auth
-      const username = getHeaderValue(headers["x-sap-login"])?.trim();
-      const password = getHeaderValue(headers["x-sap-password"])?.trim();
+        try {
+          const jwtToken = await authBroker.getToken(config.destination);
+          this.processJwtConfigUpdate(config.sapUrl, jwtToken, undefined, sessionId);
 
-      if (!username || !password) {
-        return; // Username and password are required for basic authentication
+          logger.info("Updated SAP configuration using MCP destination (AuthBroker)", {
+            type: "SAP_CONFIG_UPDATED_MCP_DESTINATION",
+            destination: config.destination,
+            url: config.sapUrl,
+            sessionId: sessionId?.substring(0, 8),
+          });
+        } catch (error) {
+          logger.error("Failed to get token from AuthBroker for MCP destination", {
+            type: "AUTH_BROKER_ERROR_MCP_DESTINATION",
+            destination: config.destination,
+            error: error instanceof Error ? error.message : String(error),
+            sessionId: sessionId?.substring(0, 8),
+          });
+        }
+        return;
       }
 
-      // Process basic auth config update
-      this.processBasicAuthConfigUpdate(sapUrl, username, password, sessionId);
-      return;
+      case AuthMethodPriority.DIRECT_JWT: {
+        // Priority 2: x-sap-jwt-token (direct JWT token)
+        if (!config.sapUrl || !config.jwtToken) {
+          logger.warn("Direct JWT auth requires URL and token", {
+            type: "DIRECT_JWT_AUTH_MISSING",
+            sapUrl: config.sapUrl,
+            hasToken: !!config.jwtToken,
+            sessionId: sessionId?.substring(0, 8),
+          });
+          return;
+        }
+
+        this.processJwtConfigUpdate(
+          config.sapUrl,
+          config.jwtToken,
+          config.refreshToken,
+          sessionId
+        );
+
+        logger.info("Updated SAP configuration using direct JWT token", {
+          type: "SAP_CONFIG_UPDATED_DIRECT_JWT",
+          url: config.sapUrl,
+          sessionId: sessionId?.substring(0, 8),
+        });
+        return;
+      }
+
+      case AuthMethodPriority.BASIC: {
+        // Priority 1: x-sap-login + x-sap-password (basic auth)
+        if (!config.sapUrl || !config.username || !config.password) {
+          logger.warn("Basic auth requires URL, username, and password", {
+            type: "BASIC_AUTH_MISSING",
+            sapUrl: config.sapUrl,
+            hasUsername: !!config.username,
+            hasPassword: !!config.password,
+            sessionId: sessionId?.substring(0, 8),
+          });
+          return;
+        }
+
+        this.processBasicAuthConfigUpdate(config.sapUrl, config.username, config.password, sessionId);
+
+        logger.info("Updated SAP configuration using basic auth", {
+          type: "SAP_CONFIG_UPDATED_BASIC",
+          url: config.sapUrl,
+          sessionId: sessionId?.substring(0, 8),
+        });
+        return;
+      }
+
+      default: {
+        logger.warn("Unknown authentication method priority", {
+          type: "UNKNOWN_AUTH_PRIORITY",
+          priority: config.priority,
+          sessionId: sessionId?.substring(0, 8),
+        });
+        return;
+      }
     }
   }
 
@@ -1439,6 +1801,49 @@ export class mcp_abap_adt_server {
       jwtPreview: sanitizeToken(jwtToken),
       sessionId: sessionId?.substring(0, 8),
     });
+  }
+
+  /**
+   * Process JWT config update using AuthBroker for destination-based authentication
+   * @private
+   */
+  private async processJwtConfigUpdateWithAuthBroker(sapUrl: string, destination: string, sessionId?: string) {
+    // Get or create AuthBroker for this destination (lazy initialization)
+    const authBroker = await this.getOrCreateAuthBroker(destination);
+    if (!authBroker) {
+      logger.warn("AuthBroker not available, falling back to direct token", {
+        type: "AUTH_BROKER_NOT_AVAILABLE",
+        destination,
+        transport: this.transportConfig.type,
+      });
+      return;
+    }
+
+    try {
+      // Get token from AuthBroker (will load from .env, validate, and refresh if needed)
+      const jwtToken = await authBroker.getToken(destination);
+
+      // Load refresh token from .env if available (AuthBroker doesn't return it, but we can load it)
+      // For now, we'll just use the access token - refresh will be handled by AuthBroker automatically
+      const refreshToken = undefined; // AuthBroker handles refresh internally
+
+      // Process JWT config update with the token from AuthBroker
+      this.processJwtConfigUpdate(sapUrl, jwtToken, refreshToken, sessionId);
+
+      logger.info("Updated SAP configuration using AuthBroker (destination-based)", {
+        type: "SAP_CONFIG_UPDATED_AUTH_BROKER",
+        destination,
+        url: sapUrl,
+        sessionId: sessionId?.substring(0, 8),
+      });
+    } catch (error) {
+      logger.error("Failed to get token from AuthBroker", {
+        type: "AUTH_BROKER_ERROR",
+        destination,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Don't throw - let the request continue with existing config or fail later
+    }
   }
 
   private processBasicAuthConfigUpdate(sapUrl: string, username: string, password: string, sessionId?: string) {
@@ -1632,6 +2037,30 @@ export class mcp_abap_adt_server {
       name: "mcp-abap-adt",
       version: "0.1.0"
     });
+
+    // AuthBroker will be initialized lazily when needed (per destination)
+    // Only for HTTP/streamable-http transport
+    const isHttpTransport = this.transportConfig.type === "streamable-http";
+    if (isHttpTransport) {
+      // Support DEBUG_AUTH_BROKER as alias for DEBUG_AUTH_LOG
+      // If DEBUG_AUTH_BROKER is set, ensure DEBUG_AUTH_LOG is also set for auth-broker package
+      if (process.env.DEBUG_AUTH_BROKER === "true" && !process.env.DEBUG_AUTH_LOG) {
+        process.env.DEBUG_AUTH_LOG = "true";
+      }
+
+      logger.info("AuthBroker will be initialized lazily when destination is needed", {
+        type: "AUTH_BROKER_LAZY_INIT",
+        transport: this.transportConfig.type,
+        useAuthBrokerFlag: useAuthBroker,
+        hasEnvFile: !!envFilePath,
+      });
+    } else {
+      logger.info("AuthBroker not available - not needed for this transport type", {
+        type: "AUTH_BROKER_SKIPPED",
+        transport: this.transportConfig.type,
+        reason: "AuthBroker is only used for HTTP/streamable-http transport. For stdio/SSE, use .env file instead.",
+      });
+    }
 
     this.setupMcpServerHandlers(); // Setup handlers for McpServer
     if (this.registerSignalHandlers) {
@@ -2194,8 +2623,37 @@ export class mcp_abap_adt_server {
 
       // HTTP Server wrapper for StreamableHTTP transport (like the SDK example)
       const httpServer = createServer(async (req, res) => {
+        // Log incoming HTTP request (if debug enabled)
+        const debugHttpEnabled = process.env.DEBUG_HTTP_REQUESTS === "true" || process.env.DEBUG_CONNECTORS === "true";
+        if (debugHttpEnabled) {
+          const sanitizedHeaders: Record<string, string> = {};
+          const sensitiveKeys = ['authorization', 'x-sap-jwt-token', 'x-sap-refresh-token', 'x-sap-password', 'x-sap-uaa-client-secret'];
+          for (const [key, value] of Object.entries(req.headers)) {
+            if (sensitiveKeys.includes(key.toLowerCase())) {
+              sanitizedHeaders[key] = '[REDACTED]';
+            } else {
+              sanitizedHeaders[key] = Array.isArray(value) ? value.join(', ') : (value || '');
+            }
+          }
+          logger.info("HTTP Request received", {
+            type: "HTTP_REQUEST",
+            method: req.method,
+            url: req.url,
+            headers: sanitizedHeaders,
+            remoteAddress: req.socket.remoteAddress,
+            remotePort: req.socket.remotePort,
+          });
+        }
+
         // Only handle POST requests (like the example)
         if (req.method !== "POST") {
+          if (debugHttpEnabled) {
+            logger.warn("HTTP Method not allowed", {
+              type: "HTTP_METHOD_NOT_ALLOWED",
+              method: req.method,
+              url: req.url,
+            });
+          }
           res.writeHead(405, { "Content-Type": "text/plain" });
           res.end("Method not allowed");
           return;
@@ -2292,13 +2750,7 @@ export class mcp_abap_adt_server {
         });
 
         try {
-          // Apply auth headers before processing and store config in session
-          this.applyAuthHeaders(req.headers, session.sessionId);
-
-          // Get SAP config for this session (from headers or existing session)
-          const sessionSapConfig = session.sapConfig || this.sapConfig;
-
-          // Read request body (like the SDK example with Express)
+          // Read request body first to check if this request requires SAP config
           let body: any = null;
           const chunks: Buffer[] = [];
           for await (const chunk of req) {
@@ -2308,10 +2760,99 @@ export class mcp_abap_adt_server {
             const bodyString = Buffer.concat(chunks).toString('utf-8');
             try {
               body = JSON.parse(bodyString);
+              // Log MCP request (if debug enabled)
+              const debugHttpEnabled = process.env.DEBUG_HTTP_REQUESTS === "true" || process.env.DEBUG_CONNECTORS === "true";
+              if (debugHttpEnabled && body && typeof body === 'object') {
+                const mcpMethod = body.method || body.jsonrpc ? 'JSON-RPC' : 'Unknown';
+                const sanitizedParams: any = {};
+                if (body.params && typeof body.params === 'object') {
+                  // Sanitize sensitive params
+                  for (const [key, value] of Object.entries(body.params)) {
+                    const lowerKey = key.toLowerCase();
+                    if (lowerKey.includes('password') || lowerKey.includes('token') || lowerKey.includes('secret')) {
+                      sanitizedParams[key] = '[REDACTED]';
+                    } else {
+                      sanitizedParams[key] = value;
+                    }
+                  }
+                }
+                logger.info("MCP Request", {
+                  type: "MCP_REQUEST",
+                  method: mcpMethod,
+                  jsonrpc: body.jsonrpc,
+                  id: body.id,
+                  params: sanitizedParams,
+                  sessionId: session.sessionId,
+                });
+              }
             } catch (parseError) {
               // If body is not JSON, pass as string or null
               body = bodyString || null;
+              if (debugHttpEnabled) {
+                logger.warn("Failed to parse request body as JSON", {
+                  type: "HTTP_BODY_PARSE_ERROR",
+                  error: parseError instanceof Error ? parseError.message : String(parseError),
+                });
+              }
             }
+          }
+
+          // Check if this is a request that requires SAP connection
+          // Only tools/call requires SAP config - all other methods (tools/list, tools/get, initialize, ping, etc.) don't
+          const isMethodRequest = body && typeof body === 'object' && body.method;
+          const methodName = isMethodRequest ? String(body.method) : '';
+          const requiresSapConfig = methodName === 'tools/call';
+
+          // Apply auth headers before processing and store config in session
+          // Only apply headers if this request requires SAP config
+          if (requiresSapConfig) {
+            await this.applyAuthHeaders(req.headers, session.sessionId);
+          }
+
+          // Get SAP config for this session (from headers or existing session)
+          // Re-read session config after applyAuthHeaders (it may have been updated)
+          const updatedSession = this.streamableHttpSessions.get(clientID);
+          const sessionSapConfig = updatedSession?.sapConfig || session.sapConfig || this.sapConfig;
+
+          // Validate that we have a real config (not placeholder) only for requests that need it
+          if (requiresSapConfig && (!sessionSapConfig || sessionSapConfig.url === "http://placeholder" || sessionSapConfig.url === "http://injected-connection")) {
+            // Check what headers were provided
+            const providedHeaders: Record<string, string> = {};
+            if (req.headers['x-sap-destination']) providedHeaders['x-sap-destination'] = String(req.headers['x-sap-destination']);
+            if (req.headers['x-mcp-destination']) providedHeaders['x-mcp-destination'] = String(req.headers['x-mcp-destination']);
+            if (req.headers['x-sap-url']) providedHeaders['x-sap-url'] = '[present]';
+            if (req.headers['x-sap-auth-type']) providedHeaders['x-sap-auth-type'] = String(req.headers['x-sap-auth-type']);
+
+            const errorMessage = "No valid SAP configuration available. Please provide authentication headers (x-sap-url, x-sap-auth-type, etc.) or ensure destination is configured correctly.";
+            logger.error("No valid SAP configuration available for request", {
+              type: "NO_VALID_SAP_CONFIG",
+              sessionId: session.sessionId,
+              method: methodName,
+              hasSessionConfig: !!updatedSession?.sapConfig,
+              hasBaseConfig: !!this.sapConfig,
+              baseConfigUrl: this.sapConfig?.url,
+              providedHeaders: Object.keys(providedHeaders).length > 0 ? providedHeaders : 'none',
+              hasAuthBroker: this.transportConfig.type === "streamable-http",
+              hint: "For destination-based auth, ensure service key file exists and destination name matches exactly (case-sensitive). For direct auth, provide x-sap-url and x-sap-auth-type headers.",
+            });
+
+            // Return error response to client
+            if (!res.headersSent) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({
+                jsonrpc: "2.0",
+                id: null,
+                error: {
+                  code: -32603,
+                  message: errorMessage,
+                  data: {
+                    type: "NO_VALID_SAP_CONFIG",
+                    hint: "Provide authentication headers or configure destination correctly",
+                  },
+                },
+              }));
+            }
+            return;
           }
 
           // KEY MOMENT: Create new StreamableHTTP transport for each request (like the SDK example)
@@ -2440,7 +2981,7 @@ export class mcp_abap_adt_server {
         pathname = pathname.slice(0, -1);
       }
 
-      this.applyAuthHeaders(req.headers);
+      await this.applyAuthHeaders(req.headers);
 
       logger.debug("SSE request received", {
         type: "SSE_HTTP_REQUEST",

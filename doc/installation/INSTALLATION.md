@@ -87,13 +87,19 @@ sap-abap-auth auth -k path/to/service-key.json
 
 **Run the server:**
 ```bash
-# Default HTTP mode (works without .env file)
+# Default HTTP mode (uses auth-broker by default, even if .env exists)
+# Note: auth-broker is only available for HTTP/streamable-http transport
 mcp-abap-adt
 
+# Force use of auth-broker (service keys), ignore .env file
+# Note: Only works with HTTP/streamable-http transport
+mcp-abap-adt --auth-broker
+
 # stdio mode (for MCP clients, requires .env file)
+# Note: auth-broker is NOT used in stdio mode, only .env file
 mcp-abap-adt --transport=stdio
 
-# Or specify custom .env location
+# Or specify custom .env location (uses .env instead of auth-broker)
 mcp-abap-adt --env=/path/to/my.env
 mcp-abap-adt --env ~/configs/sap-dev.env
 
@@ -253,11 +259,17 @@ mcp-abap-adt --transport=sse --help
 **Available commands after global installation:**
 
 ```bash
-# Default HTTP mode (works without .env file)
+# Default HTTP mode (uses auth-broker by default)
 mcp-abap-adt
 
-# stdio mode (for MCP clients, requires .env file)
+# Force use of auth-broker (service keys), ignore .env file
+mcp-abap-adt --auth-broker
+
+# stdio mode (for MCP clients, requires .env file or auth-broker)
 mcp-abap-adt --transport=stdio
+
+# Use .env file instead of auth-broker
+mcp-abap-adt --env=/path/to/.env
 
 # HTTP server transport
 mcp-abap-adt --transport=http --http-port=3000
@@ -288,6 +300,54 @@ npx mcp-abap-adt --transport=http --port 3000
 ```
 
 #### Configuration
+
+The server supports two authentication methods:
+
+1. **Service Keys (Auth-Broker)** - Recommended for multi-destination scenarios
+2. **.env File** - Traditional single-configuration approach
+
+##### Option 1: Service Keys (Auth-Broker) - Default
+
+By default, the server uses auth-broker (service keys) for authentication. This is the recommended approach when working with multiple destinations.
+
+**Setup:**
+```bash
+# Create service key directory (Unix)
+mkdir -p ~/.config/mcp-abap-adt/service-keys
+
+# Create service key file (e.g., TRIAL.json)
+cat > ~/.config/mcp-abap-adt/service-keys/TRIAL.json << 'EOF'
+{
+  "uaa": {
+    "url": "https://your-uaa-url.com",
+    "clientid": "your-client-id",
+    "clientsecret": "your-client-secret"
+  },
+  "url": "https://your-sap-url.com"
+}
+EOF
+
+# Run server (uses auth-broker by default)
+mcp-abap-adt
+
+# Or explicitly force auth-broker
+mcp-abap-adt --auth-broker
+```
+
+**Using destinations in HTTP headers:**
+```json
+{
+  "headers": {
+    "x-sap-destination": "TRIAL"
+  }
+}
+```
+
+See [Client Configuration Guide](../user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication) for details.
+
+##### Option 2: .env File
+
+For single-configuration scenarios, you can use a `.env` file:
 
 After installation, create a `.env` file with your SAP connection details:
 
@@ -340,8 +400,11 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 
 **General Options:**
 - `--help` - Show complete help message with all available options
-- `--env=<path>` - Path to .env file (default: ./.env in current directory)
+- `--auth-broker` - Force use of auth-broker (service keys), ignore .env file
+- `--env=<path>` - Path to .env file (uses .env instead of auth-broker)
 - `--env <path>` - Alternative syntax for specifying .env path
+
+**Note:** By default (when no flags are specified), the server checks for `.env` in the current directory first. If `.env` exists, it is used automatically. If not, auth-broker is used. Use `--auth-broker` to force auth-broker even when `.env` exists.
 
 **Transport Selection:**
 - `--transport=<type>` - Transport type: `stdio`, `http`, `streamable-http`, or `sse`

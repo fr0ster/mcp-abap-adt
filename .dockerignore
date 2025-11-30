@@ -73,7 +73,5 @@ smithery.yaml
 .npmrc
 jest.config.js
 jest.setup.js
-tsconfig.json
-
-# TypeScript source (only need compiled dist/)
-src/
+# tsconfig.json is needed for build, so don't ignore it
+# src/ is needed for build, so don't ignore it (tests are excluded via __tests__/)

@@ -27,6 +27,7 @@ This project provides a server that allows you to interact with SAP ABAP systems
 - **📋 Include Management**: `GetIncludesList` - Recursive include discovery
 - **🔍 System Tools**: `GetInactiveObjects` - Monitor inactive objects waiting for activation
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
+- **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](doc/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication))
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
 
 > ℹ️ **ABAP Cloud limitation**: Direct ADT data preview of database tables is blocked by SAP BTP backend policies. The server returns a descriptive error when attempting such operations. On-premise systems continue to support data preview.

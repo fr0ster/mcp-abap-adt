@@ -290,3 +290,180 @@ With `DEBUG_TESTS=true` and `DEBUG_HANDLERS=true`:
 4. **Check package name** is included in Update properties
 5. **Use DEBUG_HANDLERS** to see exactly what handlers receive and return
 
+---
+
+# Debugging Server HTTP Requests
+
+This section explains how to debug HTTP requests and MCP calls when running the server.
+
+## Environment Variables for Server Debugging
+
+### DEBUG_HTTP_REQUESTS=true
+
+Enables logging of all incoming HTTP requests and MCP JSON-RPC calls. Shows:
+- HTTP method, URL, headers (sensitive data is redacted)
+- MCP JSON-RPC method, params (sensitive params are redacted)
+- Session information
+- Request/response flow
+
+**Usage:**
+```bash
+DEBUG_HTTP_REQUESTS=true mcp-abap-adt --auth-broker
+```
+
+**Example output:**
+```json
+{
+  "level": "INFO",
+  "timestamp": "2025-01-25T10:30:00.000Z",
+  "type": "HTTP_REQUEST",
+  "message": "HTTP Request received",
+  "method": "POST",
+  "url": "/",
+  "headers": {
+    "content-type": "application/json",
+    "x-sap-destination": "TRIAL",
+    "authorization": "[REDACTED]"
+  },
+  "remoteAddress": "::1",
+  "remotePort": 54321
+}
+{
+  "level": "INFO",
+  "timestamp": "2025-01-25T10:30:01.000Z",
+  "type": "MCP_REQUEST",
+  "message": "MCP Request",
+  "method": "JSON-RPC",
+  "jsonrpc": "2.0",
+  "id": 1,
+  "params": {
+    "name": "tools/call",
+    "arguments": {
+      "tool": "get_class",
+      "class_name": "ZCL_TEST"
+    }
+  },
+  "sessionId": "abc123..."
+}
+```
+
+### DEBUG_CONNECTORS=true
+
+Enables all connection-level debugging, including:
+- HTTP requests (same as `DEBUG_HTTP_REQUESTS=true`)
+- CSRF token management
+- Cookie handling
+- Session state management
+- Connection details
+
+**Usage:**
+```bash
+DEBUG_CONNECTORS=true mcp-abap-adt --auth-broker
+```
+
+**Note:** `DEBUG_CONNECTORS=true` automatically enables `DEBUG_HTTP_REQUESTS=true`.
+
+### DEBUG_AUTH_LOG=true or DEBUG_AUTH_BROKER=true
+
+Enables debug logging for `auth-broker` package. Shows:
+- Service key loading
+- Token validation and refresh
+- Browser authentication flow
+- Session management
+
+**Usage:**
+```bash
+# Using DEBUG_AUTH_LOG (original)
+DEBUG_AUTH_LOG=true mcp-abap-adt --auth-broker
+
+# Using DEBUG_AUTH_BROKER (alias, recommended)
+DEBUG_AUTH_BROKER=true mcp-abap-adt --auth-broker
+```
+
+**Note:** `DEBUG_AUTH_BROKER=true` automatically sets `DEBUG_AUTH_LOG=true` for the auth-broker package.
+
+### DEBUG_HANDLERS=true
+
+Enables detailed logging in MCP handler functions. Shows:
+- Handler entry/exit points
+- Session state restoration
+- Lock handle usage
+- Property validation
+- Error details
+
+**Usage:**
+```bash
+DEBUG_HANDLERS=true mcp-abap-adt --auth-broker
+```
+
+### DEBUG_CONNECTION_MANAGER=true
+
+Enables logging for connection manager (`getManagedConnection`). Shows:
+- Connection cache operations (creation, reuse, cleanup)
+- Connection signature matching
+- Refresh token configuration
+- Session-specific connection management
+
+**Usage:**
+```bash
+DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --auth-broker
+```
+
+## Combined Debugging
+
+Enable all debug flags for maximum visibility:
+
+```bash
+DEBUG_HTTP_REQUESTS=true DEBUG_AUTH_LOG=true DEBUG_HANDLERS=true DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --auth-broker
+```
+
+**Common combinations:**
+
+```bash
+# HTTP requests and MCP calls only
+DEBUG_HTTP_REQUESTS=true mcp-abap-adt --auth-broker
+
+# Connection-level debugging (HTTP, sessions, connection management)
+DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --auth-broker
+
+# Authentication debugging
+DEBUG_AUTH_BROKER=true mcp-abap-adt --auth-broker
+# or
+DEBUG_AUTH_LOG=true mcp-abap-adt --auth-broker
+
+# Handler debugging
+DEBUG_HANDLERS=true mcp-abap-adt --auth-broker
+
+# Full visibility (everything)
+DEBUG_HTTP_REQUESTS=true DEBUG_AUTH_BROKER=true DEBUG_HANDLERS=true DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --auth-broker
+```
+
+## Security Note
+
+Sensitive data is automatically redacted in logs:
+- `authorization` header → `[REDACTED]`
+- `x-sap-jwt-token` → `[REDACTED]`
+- `x-sap-refresh-token` → `[REDACTED]`
+- `x-sap-password` → `[REDACTED]`
+- `x-sap-uaa-client-secret` → `[REDACTED]`
+- Any param containing `password`, `token`, or `secret` → `[REDACTED]`
+
+## Output Format
+
+All debug logs are written to `stderr` in JSON format to avoid interfering with MCP JSON-RPC protocol. This allows you to:
+
+1. **View logs in terminal:**
+   ```bash
+   DEBUG_HTTP_REQUESTS=true mcp-abap-adt --auth-broker 2>&1 | jq
+   ```
+
+2. **Save logs to file:**
+   ```bash
+   DEBUG_HTTP_REQUESTS=true mcp-abap-adt --auth-broker 2>debug.log
+   ```
+
+3. **Filter specific log types:**
+   ```bash
+   DEBUG_HTTP_REQUESTS=true mcp-abap-adt --auth-broker 2>&1 | grep "HTTP_REQUEST"
+   ```
+

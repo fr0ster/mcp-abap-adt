@@ -76,12 +76,15 @@ mcp-abap-adt --env=/tmp/test.env
 Specify which transport protocol to use.
 
 Valid values:
-- `stdio` - Standard input/output (default, for MCP protocol)
-- `http` or `streamable-http` - HTTP server
+- `http` or `streamable-http` - HTTP server (default)
+- `stdio` - Standard input/output (for MCP protocol)
 - `sse` - Server-Sent Events
 
 ```bash
-# Explicit stdio (same as default)
+# Default HTTP mode (no flag needed)
+mcp-abap-adt
+
+# Explicit stdio (for MCP clients like Cline, Cursor)
 mcp-abap-adt --transport=stdio
 
 # HTTP transport

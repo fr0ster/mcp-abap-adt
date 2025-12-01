@@ -44,12 +44,21 @@ npx @fr0ster/mcp-abap-adt --transport=http --http-port=3000 --auth-broker
 
 # Or with global install
 mcp-abap-adt --transport=http --http-port=3000 --auth-broker
+
+# With custom path for service keys and sessions
+mcp-abap-adt --transport=http --http-port=3000 --auth-broker --auth-broker-path=~/prj/tmp/
 ```
 
 **Why --auth-broker is required:**
 - By default, the server checks for `.env` in current directory first
 - If `.env` exists, it uses it instead of service keys
 - `--auth-broker` forces use of service keys, ignoring `.env` file
+
+**Using --auth-broker-path:**
+- `--auth-broker-path=<path>` specifies custom location for service keys and sessions
+- Creates `service-keys` and `sessions` subdirectories automatically
+- Example: `--auth-broker-path=~/prj/tmp/` uses `~/prj/tmp/service-keys/` and `~/prj/tmp/sessions/`
+- Directories are created automatically if they don't exist
 
 ### Step 3: Configure Cline
 

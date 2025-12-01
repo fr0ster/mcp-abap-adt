@@ -79,7 +79,7 @@ The server processes the following HTTP headers (as checked in `applyAuthHeaders
 **Notes:**
 - For **JWT authentication**: `x-sap-url`, `x-sap-auth-type`, and `x-sap-jwt-token` are required. `x-sap-refresh-token` is optional for automatic token refresh.
 - For **basic authentication**: `x-sap-url`, `x-sap-auth-type`, `x-sap-login`, and `x-sap-password` are required.
-- For **destination-based authentication**: Use `x-sap-destination` or `x-mcp-destination` header. Service keys must be stored in platform-specific locations (see [Destination-Based Authentication](#destination-based-authentication) section).
+- For **destination-based authentication**: Use `x-sap-destination` or `x-mcp-destination` header. URL is automatically derived from the service key, so `x-sap-url` is not required (and will be ignored if provided). Service keys must be stored in platform-specific locations (see [Destination-Based Authentication](#destination-based-authentication) section).
 - For automatic token refresh, you only need `x-sap-refresh-token`. Client ID and Client Secret are **not needed** for refresh - they are only required for initial token generation via `sap-abap-auth` CLI tool (part of `@mcp-abap-adt/connection` package) or service keys.
 
 
@@ -214,18 +214,18 @@ For MCP-specific destinations, use `x-mcp-destination`:
     "type": "streamableHttp",
     "url": "http://localhost:3000/mcp/stream/http",
     "headers": {
-      "x-mcp-destination": "TRIAL",
-      "x-sap-url": "https://your-sap-url.com"
+      "x-mcp-destination": "TRIAL"
     }
   }
 }
 ```
 
 **Features:**
-- Requires `x-sap-url` header
+- URL is automatically derived from the service key
 - Optional: `x-sap-client` for client number
 - Automatically uses JWT authentication
 - Tokens are retrieved from the service key
+- Note: If `x-sap-url` is provided, it will be ignored (URL comes from destination)
 
 ### First-Time Authentication
 
@@ -282,8 +282,9 @@ EOF
 
 ### Custom Paths
 
-You can override default paths using the `AUTH_BROKER_PATH` environment variable:
+You can override default paths using the `AUTH_BROKER_PATH` environment variable or the `--auth-broker-path` command-line option:
 
+**Using Environment Variable:**
 ```bash
 # Unix (colon-separated)
 export AUTH_BROKER_PATH="/custom/path:/another/path"
@@ -291,6 +292,21 @@ export AUTH_BROKER_PATH="/custom/path:/another/path"
 # Windows (semicolon-separated)
 set AUTH_BROKER_PATH=C:\custom\path;C:\another\path
 ```
+
+**Using Command-Line Option:**
+```bash
+# Unix/Linux/macOS
+mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
+
+# Windows
+mcp-abap-adt --auth-broker --auth-broker-path=C:\prj\tmp\
+```
+
+**Note:** When using `--auth-broker-path`, the server automatically creates `service-keys` and `sessions` subdirectories in the specified path. For example, `--auth-broker-path=~/prj/tmp/` will use:
+- `~/prj/tmp/service-keys/` for service key files
+- `~/prj/tmp/sessions/` for session files
+
+The directories are created automatically if they don't exist.
 
 ### Server Command-Line Options
 
@@ -302,6 +318,9 @@ mcp-abap-adt
 
 # Forces use of auth-broker, ignores .env file
 mcp-abap-adt --auth-broker
+
+# Forces use of auth-broker with custom path (creates service-keys and sessions subdirectories)
+mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
 
 # Uses .env file from current directory (must be explicitly specified)
 mcp-abap-adt --env=.env
@@ -315,6 +334,11 @@ mcp-abap-adt --env /path/to/.env
 **Behavior:**
 - **Default (no flags)**: Checks for `.env` in current directory first; if exists, uses it; otherwise uses auth-broker
 - **`--auth-broker`**: Forces use of auth-broker, completely ignores `.env` file (even if exists in current directory)
+- **`--auth-broker-path=<path>`**: Specifies custom path for auth-broker service keys and sessions
+  - Creates `service-keys` and `sessions` subdirectories in the specified path
+  - Directories are created automatically if they don't exist
+  - Example: `--auth-broker-path=~/prj/tmp/` uses `~/prj/tmp/service-keys/` and `~/prj/tmp/sessions/`
+  - Can be used together with `--auth-broker` flag
 - **`--env=<path>` or `--env <path>`**: Uses specified `.env` file, auth-broker is not used
   - Relative paths are resolved from current working directory
   - Absolute paths are used as-is

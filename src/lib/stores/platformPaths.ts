@@ -31,9 +31,15 @@ export function getPlatformPaths(customPath?: string | string[], subfolder?: 'se
   // Priority 1: Custom path from constructor
   if (customPath) {
     if (Array.isArray(customPath)) {
-      paths.push(...customPath.map(p => path.resolve(p)));
+      // For arrays, add subfolder to each path if subfolder is specified
+      paths.push(...customPath.map(p => {
+        const resolved = path.resolve(p);
+        return subfolder ? path.join(resolved, subfolder) : resolved;
+      }));
     } else {
-      paths.push(path.resolve(customPath));
+      // For single path, add subfolder if specified
+      const resolved = path.resolve(customPath);
+      paths.push(subfolder ? path.join(resolved, subfolder) : resolved);
     }
   }
 

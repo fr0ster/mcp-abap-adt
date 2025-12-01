@@ -12,12 +12,14 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import * as z from "zod";
 import path from "path";
+import * as os from "os";
 // dotenv removed - using manual .env parsing for all modes to avoid stdout pollution
 import { createServer, Server as HttpServer, IncomingHttpHeaders } from "http";
 import { randomUUID } from "crypto";
 import { AuthBroker } from "@mcp-abap-adt/auth-broker";
 import { validateAuthHeaders, AuthMethodPriority } from "@mcp-abap-adt/header-validator";
 import { getPlatformStores } from "./lib/stores";
+import { getPlatformPaths } from "./lib/stores/platformPaths";
 
 // Import handler functions
 // Import handler functions
@@ -411,6 +413,10 @@ ENVIRONMENT FILE:
   --auth-broker                    Force use of auth-broker (service keys) instead of .env file
                                    Ignores .env file even if present in current directory
                                    By default, .env in current directory is used automatically (if exists)
+  --auth-broker-path=<path>        Custom path for auth-broker service keys and sessions
+                                   Creates service-keys and sessions subdirectories in this path
+                                   Example: --auth-broker-path=~/prj/tmp/
+                                   This will use ~/prj/tmp/service-keys and ~/prj/tmp/sessions
 
 TRANSPORT SELECTION:
   --transport=<type>               Transport type: stdio|http|streamable-http|sse
@@ -521,6 +527,9 @@ EXAMPLES:
   # Force use of auth-broker (service keys), ignore .env file even if exists
   mcp-abap-adt --auth-broker
 
+  # Use custom path for auth-broker (creates service-keys and sessions subdirectories)
+  mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
+
   # Use .env file from custom path
   mcp-abap-adt --env=/path/to/my.env
 
@@ -623,9 +632,23 @@ SERVICE KEYS (Destination-Based Authentication):
   Using Destinations:
     In HTTP headers, use:
       x-sap-destination: TRIAL    (for SAP Cloud, URL derived from service key)
-      x-mcp-destination: TRIAL    (for MCP destinations, requires x-sap-url header)
+      x-mcp-destination: TRIAL    (for MCP destinations, URL derived from service key)
 
     The destination name must exactly match the service key filename (without .json extension, case-sensitive).
+
+    Example Cline configuration (~/.cline/mcp.json):
+      {
+        "mcpServers": {
+          "mcp-abap-adt": {
+            "command": "npx",
+            "args": ["-y", "@mcp-abap-adt/server", "--transport=http", "--http-port=3000"],
+            "env": {}
+          }
+        }
+      }
+
+      Then in Cline, use destination in requests:
+        Headers: x-sap-destination: TRIAL
 
   First-Time Authentication:
     - Server reads service key from {destination}.json
@@ -643,6 +666,10 @@ SERVICE KEYS (Destination-Based Authentication):
     Set AUTH_BROKER_PATH environment variable to override default paths:
       Linux/macOS: export AUTH_BROKER_PATH="/custom/path:/another/path"
       Windows:     set AUTH_BROKER_PATH=C:\\custom\\path;C:\\another\\path
+
+    Or use --auth-broker-path command-line option:
+      mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
+      This creates service-keys and sessions subdirectories in the specified path.
 
   For more details, see: doc/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication
 
@@ -749,9 +776,32 @@ function parseEnvArg(): string | undefined {
   return undefined;
 }
 
+/**
+ * Parse --auth-broker-path argument from command line
+ * Supports both formats: --auth-broker-path=/path and --auth-broker-path /path
+ */
+function parseAuthBrokerPathArg(): string | undefined {
+  const args = process.argv;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+
+    // Format: --auth-broker-path=/path
+    if (arg.startsWith("--auth-broker-path=")) {
+      return arg.slice("--auth-broker-path=".length);
+    }
+    // Format: --auth-broker-path /path
+    else if (arg === "--auth-broker-path" && i + 1 < args.length) {
+      return args[i + 1];
+    }
+  }
+
+  return undefined;
+}
+
 // Find .env file path from arguments
 // Check for --auth-broker flag (forces use of auth-broker, ignores .env)
 const useAuthBroker = process.argv.includes("--auth-broker");
+const authBrokerPath = parseAuthBrokerPathArg();
 // Skip .env loading if launcher already loaded it OR if --auth-broker is specified
 const skipEnvAutoload = process.env.MCP_SKIP_ENV_LOAD === "true" || process.env.MCP_ENV_LOADED_BY_LAUNCHER === "true" || useAuthBroker;
 const explicitTransportType = getTransportType();
@@ -1413,11 +1463,14 @@ export class mcp_abap_adt_server {
       return undefined;
     }
 
+    // Get custom path from command line argument or environment variable
+    const customPath = authBrokerPath ? path.resolve(authBrokerPath) : undefined;
+
     // If no destination specified, use default auth broker
     if (!destination) {
       if (!this.defaultAuthBroker) {
         try {
-          const { serviceKeyStore, sessionStore } = getPlatformStores();
+          const { serviceKeyStore, sessionStore } = getPlatformStores(customPath);
           this.defaultAuthBroker = new AuthBroker(
             {
               serviceKeyStore,
@@ -1443,7 +1496,19 @@ export class mcp_abap_adt_server {
     // Get or create AuthBroker for specific destination
     if (!this.authBrokers.has(destination)) {
       try {
-        const { serviceKeyStore, sessionStore } = await getPlatformStores();
+        logger.debug("Creating AuthBroker for destination", {
+          type: "AUTH_BROKER_CREATE_START",
+          destination: destination,
+          platform: process.platform,
+        });
+        const { serviceKeyStore, sessionStore } = getPlatformStores(customPath);
+        logger.debug("Platform stores created", {
+          type: "PLATFORM_STORES_CREATED",
+          destination: destination,
+          platform: process.platform,
+          serviceKeyStorePaths: serviceKeyStore.getSearchPaths(),
+          sessionStorePaths: sessionStore.getSearchPaths(),
+        });
         const authBroker = new AuthBroker(
           {
             serviceKeyStore,
@@ -1455,11 +1520,13 @@ export class mcp_abap_adt_server {
         logger.info("AuthBroker created for destination", {
           type: "AUTH_BROKER_CREATED",
           destination: destination,
+          platform: process.platform,
         });
       } catch (error) {
         logger.error("Failed to create AuthBroker for destination", {
           type: "AUTH_BROKER_CREATE_FAILED",
           destination: destination,
+          platform: process.platform,
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
         });
@@ -1489,18 +1556,21 @@ export class mcp_abap_adt_server {
     }
 
     // Log which auth headers are present (for debugging)
+    // Check headers in both cases (Node.js normalizes to lowercase, but check both for safety)
     const authHeaders = {
-      'x-sap-destination': headers['x-sap-destination'],
-      'x-mcp-destination': headers['x-mcp-destination'],
-      'x-sap-url': headers['x-sap-url'] ? '[present]' : undefined,
-      'x-sap-auth-type': headers['x-sap-auth-type'],
-      'x-sap-jwt-token': headers['x-sap-jwt-token'] ? '[present]' : undefined,
-      'x-sap-login': headers['x-sap-login'] ? '[present]' : undefined,
+      'x-sap-destination': headers['x-sap-destination'] || headers['X-SAP-Destination'],
+      'x-mcp-destination': headers['x-mcp-destination'] || headers['X-MCP-Destination'],
+      'x-sap-url': (headers['x-sap-url'] || headers['X-SAP-URL']) ? '[present]' : undefined,
+      'x-sap-auth-type': headers['x-sap-auth-type'] || headers['X-SAP-Auth-Type'],
+      'x-sap-jwt-token': (headers['x-sap-jwt-token'] || headers['X-SAP-JWT-Token']) ? '[present]' : undefined,
+      'x-sap-login': (headers['x-sap-login'] || headers['X-SAP-Login']) ? '[present]' : undefined,
     };
     logger.info("Processing authentication headers", {
       type: "AUTH_HEADERS_PROCESSING",
       headers: authHeaders,
+      platform: process.platform,
       sessionId: sessionId?.substring(0, 8),
+      allHeaderKeys: Object.keys(headers).filter(k => k.toLowerCase().startsWith('x-sap') || k.toLowerCase().startsWith('x-mcp')),
     });
 
     // Use header validator to validate and prioritize authentication methods
@@ -1608,12 +1678,11 @@ export class mcp_abap_adt_server {
       }
 
       case AuthMethodPriority.MCP_DESTINATION: {
-        // Priority 3: x-mcp-destination (uses AuthBroker, URL from x-sap-url header)
-        if (!config.destination || !config.sapUrl) {
-          logger.warn("MCP destination auth requires destination and URL", {
+        // Priority 3: x-mcp-destination (uses AuthBroker, URL from destination or x-sap-url header)
+        if (!config.destination) {
+          logger.warn("MCP destination auth requires destination", {
             type: "MCP_DESTINATION_AUTH_MISSING",
             destination: config.destination,
-            sapUrl: config.sapUrl,
             sessionId: sessionId?.substring(0, 8),
           });
           return;
@@ -1632,13 +1701,35 @@ export class mcp_abap_adt_server {
         }
 
         try {
+          // Get URL from AuthBroker (loads from .env or service key)
+          // If x-sap-url was provided in headers, it will be ignored (warning already issued by validator)
+          // Note: destination name must exactly match service key filename (case-sensitive)
+          const sapUrl = await authBroker.getSapUrl(config.destination);
+          if (!sapUrl) {
+            logger.error("Failed to get SAP URL from destination", {
+              type: "MCP_DESTINATION_URL_NOT_FOUND",
+              destination: config.destination,
+              sessionId: sessionId?.substring(0, 8),
+              hint: `Service key file "${config.destination}.json" not found or missing URL. Check file name matches destination exactly (case-sensitive).`,
+            });
+            return;
+          }
+
+          logger.info("SAP URL retrieved from destination", {
+            type: "SAP_URL_RETRIEVED",
+            destination: config.destination,
+            url: sapUrl,
+            sessionId: sessionId?.substring(0, 8),
+          });
+
+          // Get token from AuthBroker
           const jwtToken = await authBroker.getToken(config.destination);
-          this.processJwtConfigUpdate(config.sapUrl, jwtToken, undefined, sessionId);
+          this.processJwtConfigUpdate(sapUrl, jwtToken, undefined, sessionId);
 
           logger.info("Updated SAP configuration using MCP destination (AuthBroker)", {
             type: "SAP_CONFIG_UPDATED_MCP_DESTINATION",
             destination: config.destination,
-            url: config.sapUrl,
+            url: sapUrl,
             sessionId: sessionId?.substring(0, 8),
           });
         } catch (error) {
@@ -2073,12 +2164,58 @@ export class mcp_abap_adt_server {
         process.env.DEBUG_AUTH_LOG = "true";
       }
 
+      // Get paths for service keys and sessions
+      // Use authBrokerPath if provided, otherwise use default platform paths
+      // If authBrokerPath is provided, it's the base path - service-keys and sessions will be subdirectories
+      const customPath = authBrokerPath ? path.resolve(authBrokerPath.replace(/^~/, os.homedir())) : undefined;
+      const serviceKeysPaths = getPlatformPaths(customPath, 'service-keys');
+      const sessionsPaths = getPlatformPaths(customPath, 'sessions');
+
+      // Create directories if they don't exist
+      const fs = require('fs');
+      const serviceKeysDir = serviceKeysPaths[0]; // First path is where we save
+      const sessionsDir = sessionsPaths[0]; // First path is where we save
+
+      if (!fs.existsSync(serviceKeysDir)) {
+        fs.mkdirSync(serviceKeysDir, { recursive: true });
+        logger.info("Created service keys directory", {
+          type: "SERVICE_KEYS_DIR_CREATED",
+          path: serviceKeysDir,
+        });
+      }
+
+      if (!fs.existsSync(sessionsDir)) {
+        fs.mkdirSync(sessionsDir, { recursive: true });
+        logger.info("Created sessions directory", {
+          type: "SESSIONS_DIR_CREATED",
+          path: sessionsDir,
+        });
+      }
+
       logger.info("AuthBroker will be initialized lazily when destination is needed", {
         type: "AUTH_BROKER_LAZY_INIT",
         transport: this.transportConfig.type,
         useAuthBrokerFlag: useAuthBroker,
         hasEnvFile: !!envFilePath,
+        authBrokerPath: customPath || 'default',
       });
+
+      // Print paths information with stars and empty lines
+      console.log('');
+      console.log('********************************************************************************');
+      console.log('* AuthBroker Storage Paths:');
+      console.log('*');
+      console.log('* Service Keys (searched in order):');
+      serviceKeysPaths.forEach((p, i) => {
+        console.log(`*   ${i + 1}. ${p}`);
+      });
+      console.log('*');
+      console.log('* Sessions (saved to):');
+      sessionsPaths.forEach((p, i) => {
+        console.log(`*   ${i + 1}. ${p}`);
+      });
+      console.log('********************************************************************************');
+      console.log('');
     } else {
       logger.info("AuthBroker not available - not needed for this transport type", {
         type: "AUTH_BROKER_SKIPPED",

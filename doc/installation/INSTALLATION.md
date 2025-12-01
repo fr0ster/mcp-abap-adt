@@ -401,6 +401,11 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 **General Options:**
 - `--help` - Show complete help message with all available options
 - `--auth-broker` - Force use of auth-broker (service keys), ignore .env file
+- `--auth-broker-path=<path>` - Custom path for auth-broker service keys and sessions
+  - Creates `service-keys` and `sessions` subdirectories in the specified path
+  - Directories are created automatically if they don't exist
+  - Example: `--auth-broker-path=~/prj/tmp/` uses `~/prj/tmp/service-keys/` and `~/prj/tmp/sessions/`
+  - Can be used together with `--auth-broker` flag
 - `--env=<path>` - Path to .env file (uses .env instead of auth-broker)
 - `--env <path>` - Alternative syntax for specifying .env path
 

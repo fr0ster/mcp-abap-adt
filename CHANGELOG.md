@@ -1,5 +1,56 @@
 # Changelog
 
+## [1.1.21] - 2025-12-01
+
+### Fixed
+- **x-mcp-destination validation** – fixed issue where `x-mcp-destination` header was incorrectly requiring `x-sap-url`:
+  - `x-mcp-destination` now works identically to `x-sap-destination` - URL is automatically derived from service key
+  - `x-sap-url` is now optional for `x-mcp-destination` (and will be ignored with a warning if provided)
+  - Fixed issue on Windows where `x-mcp-destination` was being ignored
+  - Updated header validator to check headers in both lowercase and original case for better compatibility
+
+### Added
+- **Custom auth-broker path** – added `--auth-broker-path` command-line option:
+  - Allows specifying custom base path for service keys and sessions
+  - Automatically creates `service-keys` and `sessions` subdirectories in the specified path
+  - Example: `--auth-broker-path=~/prj/tmp/` uses `~/prj/tmp/service-keys/` and `~/prj/tmp/sessions/`
+  - Directories are created automatically if they don't exist
+  - Can be used together with `--auth-broker` flag
+
+- **Automatic directory creation** – service keys and sessions directories are now created automatically:
+  - Directories are created at server startup if they don't exist
+  - Prevents errors when saving sessions for the first time
+  - Works for both default platform paths and custom `--auth-broker-path`
+
+- **Enhanced startup information** – improved auth-broker path display at server startup:
+  - Shows all search paths for service keys (in order of priority)
+  - Shows all save paths for sessions
+  - Formatted with clear visual separators for better readability
+  - Only displayed when `--auth-broker` flag is used
+
+- **Diagnostic logging** – added platform-aware logging for better debugging:
+  - Logs platform information when processing authentication headers
+  - Logs all header keys that start with `x-sap` or `x-mcp`
+  - Logs search paths when creating AuthBroker instances
+  - Helps diagnose issues on different platforms (especially Windows)
+
+### Changed
+- **Header validation logic** – improved validation order and case handling:
+  - `x-mcp-destination` is now checked immediately after `x-sap-destination`, regardless of `x-sap-url` presence
+  - Added case-insensitive header checking for better compatibility
+  - Both `x-sap-destination` and `x-mcp-destination` now check headers in both lowercase and original case
+
+- **Documentation updates** – comprehensive documentation improvements:
+  - Added `--auth-broker-path` parameter documentation in help text
+  - Updated `CLIENT_CONFIGURATION.md` with custom path examples
+  - Updated `INSTALLATION.md` with new command-line option
+  - Updated `SERVICE_KEY_SETUP.md` with custom path usage examples
+  - Added Cline configuration example in help text
+
+### Dependencies
+- **Updated `@mcp-abap-adt/auth-broker` to `^0.1.3`** – upgraded to latest version
+- **Updated `@mcp-abap-adt/header-validator` to `^0.1.3`** – upgraded to latest version
+
 ## [1.1.20] - 2025-12-01
 
 ### Changed

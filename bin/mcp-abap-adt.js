@@ -48,6 +48,8 @@ Usage:
 
 Options:
   --env=<file>              Path to .env file (default: .env in current directory)
+  --auth-broker             Force use of auth-broker (service keys) instead of .env file
+                            Ignores .env file even if present in current directory
   --transport=<type>       Transport type: stdio, http, streamable-http, sse, server
   --http-port=<port>       HTTP server port (default: 3000)
   --sse-port=<port>        SSE server port (default: 3001)
@@ -64,6 +66,9 @@ Environment Variables:
   MCP_SSE_HOST             SSE server host (default: 0.0.0.0)
   MCP_ENV_PATH             Path to .env file
   MCP_TRANSPORT            Transport type (stdio|http|sse)
+  AUTH_BROKER_PATH         Custom paths for service keys and sessions
+                           Unix: colon-separated (e.g., /path1:/path2)
+                           Windows: semicolon-separated (e.g., C:\\path1;C:\\path2)
 
 Examples:
   mcp-abap-adt                                    # Use default .env, HTTP on port 3000
@@ -72,11 +77,75 @@ Examples:
   mcp-abap-adt --transport=http                   # HTTP mode (no .env required, port 3000)
   mcp-abap-adt --transport=http --http-port=8080  # HTTP mode on custom port 8080
   mcp-abap-adt --transport=sse --sse-port=3001    # SSE mode on port 3001
+  mcp-abap-adt --auth-broker                      # Use service keys instead of .env file
 
 Transport Modes:
   - stdio (default if stdin is not TTY): For MCP clients like Cline/Cursor
   - http / streamable-http: HTTP server (default if stdin is TTY, port 3000)
   - sse: Server-Sent Events server (port 3001)
+
+Service Keys (Auth-Broker):
+  The server supports destination-based authentication using service keys stored locally.
+  This allows you to configure authentication once per destination and reuse it.
+
+  IMPORTANT: Auth-broker (service keys) is only available for HTTP/streamable-http transport.
+  For stdio and SSE transports, use .env file instead.
+
+  How to Save Service Keys:
+
+  Linux:
+    1. Create service keys directory:
+       mkdir -p ~/.config/mcp-abap-adt/service-keys
+
+    2. Download service key from SAP BTP (from the corresponding service instance)
+       and copy it to: ~/.config/mcp-abap-adt/service-keys/{destination}.json
+       (e.g., TRIAL.json - the filename without .json extension becomes the destination name)
+
+    Storage: ~/.config/mcp-abap-adt/service-keys/{destination}.json
+
+  macOS:
+    1. Create service keys directory:
+       mkdir -p ~/.config/mcp-abap-adt/service-keys
+
+    2. Download service key from SAP BTP (from the corresponding service instance)
+       and copy it to: ~/.config/mcp-abap-adt/service-keys/{destination}.json
+       (e.g., TRIAL.json - the filename without .json extension becomes the destination name)
+
+    Storage: ~/.config/mcp-abap-adt/service-keys/{destination}.json
+
+  Windows:
+    1. Create service keys directory (PowerShell):
+       New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\\Documents\\mcp-abap-adt\\service-keys"
+
+    2. Download service key from SAP BTP (from the corresponding service instance)
+       and copy it to: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\{destination}.json
+       (e.g., TRIAL.json - the filename without .json extension becomes the destination name)
+
+    Or using Command Prompt (cmd):
+       mkdir "%USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys"
+       (Then copy the downloaded service key file to this directory)
+
+    Storage: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\{destination}.json
+
+  Fallback: Server also searches in current working directory (where server is launched)
+
+  Using Service Keys:
+    1. Start server with --auth-broker flag:
+       mcp-abap-adt --transport=http --auth-broker
+
+    2. Use destination in HTTP headers:
+       x-sap-destination: TRIAL    (for SAP Cloud, URL derived from service key)
+       x-mcp-destination: TRIAL    (for MCP destinations, requires x-sap-url header)
+
+    The destination name must exactly match the service key filename (without .json extension, case-sensitive).
+
+  First-Time Authentication:
+    - Server reads service key from {destination}.json
+    - Opens browser for OAuth2 authentication (if no valid session exists)
+    - Saves tokens to {destination}.env for future use
+    - Subsequent requests use cached tokens automatically
+
+  For more details, see: doc/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication
 
 For more information, see: https://github.com/fr0ster/mcp-abap-adt
 `);

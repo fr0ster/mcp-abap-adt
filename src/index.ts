@@ -571,35 +571,61 @@ SERVICE KEYS (Destination-Based Authentication):
   IMPORTANT: Auth-broker (service keys) is only available for HTTP/streamable-http transport.
   For stdio and SSE transports, use .env file instead.
 
-  Service Key Storage:
-    Unix (Linux/macOS):
+  How to Save Service Keys:
+
+  Linux:
+    1. Create service keys directory:
+       mkdir -p ~/.config/mcp-abap-adt/service-keys
+
+    2. Download service key from SAP BTP (from the corresponding service instance)
+       and copy it to: ~/.config/mcp-abap-adt/service-keys/{destination}.json
+       (e.g., TRIAL.json - the filename without .json extension becomes the destination name)
+
+    Storage locations:
       Service keys: ~/.config/mcp-abap-adt/service-keys/{destination}.json
       Sessions:     ~/.config/mcp-abap-adt/sessions/{destination}.env
 
-    Windows:
+  macOS:
+    1. Create service keys directory:
+       mkdir -p ~/.config/mcp-abap-adt/service-keys
+
+    2. Download service key from SAP BTP (from the corresponding service instance)
+       and copy it to: ~/.config/mcp-abap-adt/service-keys/{destination}.json
+       (e.g., TRIAL.json - the filename without .json extension becomes the destination name)
+
+    Storage locations:
+      Service keys: ~/.config/mcp-abap-adt/service-keys/{destination}.json
+      Sessions:     ~/.config/mcp-abap-adt/sessions/{destination}.env
+
+  Windows:
+    1. Create service keys directory (PowerShell):
+       New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\\Documents\\mcp-abap-adt\\service-keys"
+
+    2. Download service key from SAP BTP (from the corresponding service instance)
+       and copy it to: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\{destination}.json
+       (e.g., TRIAL.json - the filename without .json extension becomes the destination name)
+
+    Or using Command Prompt (cmd):
+       mkdir "%USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys"
+       (Then copy the downloaded service key file to this directory)
+
+    Storage locations:
       Service keys: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\{destination}.json
       Sessions:     %USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\{destination}.env
 
-    Fallback: Also searches in current working directory (where server is launched)
+  Fallback: Server also searches in current working directory (where server is launched)
 
-  Service Key Format:
-    Create {destination}.json file (e.g., TRIAL.json) with:
-    {
-      "uaa": {
-        "url": "https://your-uaa-url.com",
-        "clientid": "your-client-id",
-        "clientsecret": "your-client-secret"
-      },
-      "url": "https://your-sap-url.com",
-      "abap": {
-        "url": "https://your-sap-url.com"
-      }
-    }
+  Service Key:
+    Download the service key JSON file from SAP BTP (from the corresponding service instance)
+    and save it as {destination}.json (e.g., TRIAL.json).
+    The filename without .json extension becomes the destination name (case-sensitive).
 
   Using Destinations:
     In HTTP headers, use:
       x-sap-destination: TRIAL    (for SAP Cloud, URL derived from service key)
       x-mcp-destination: TRIAL    (for MCP destinations, requires x-sap-url header)
+
+    The destination name must exactly match the service key filename (without .json extension, case-sensitive).
 
   First-Time Authentication:
     - Server reads service key from {destination}.json
@@ -615,8 +641,8 @@ SERVICE KEYS (Destination-Based Authentication):
 
   Custom Paths:
     Set AUTH_BROKER_PATH environment variable to override default paths:
-      Unix:   export AUTH_BROKER_PATH="/custom/path:/another/path"
-      Windows: set AUTH_BROKER_PATH=C:\\custom\\path;C:\\another\\path
+      Linux/macOS: export AUTH_BROKER_PATH="/custom/path:/another/path"
+      Windows:     set AUTH_BROKER_PATH=C:\\custom\\path;C:\\another\\path
 
   For more details, see: doc/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication
 

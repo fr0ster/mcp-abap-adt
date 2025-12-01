@@ -2,43 +2,37 @@
 
 ## Quick Setup Guide
 
-### Step 1: Create Service Key File
+### Step 1: Save Service Key File
 
-**Unix (Linux/macOS):**
+**Linux:**
 ```bash
 mkdir -p ~/.config/mcp-abap-adt/service-keys
-cat > ~/.config/mcp-abap-adt/service-keys/TRIAL.json << 'EOF'
-{
-  "uaa": {
-    "url": "https://your-uaa-url.com",
-    "clientid": "your-client-id",
-    "clientsecret": "your-client-secret"
-  },
-  "url": "https://your-sap-url.com",
-  "abap": {
-    "url": "https://your-sap-url.com"
-  }
-}
-EOF
+# Download service key from SAP BTP (from the corresponding service instance)
+# and copy it to: ~/.config/mcp-abap-adt/service-keys/TRIAL.json
 ```
 
-**Windows:**
+**macOS:**
+```bash
+mkdir -p ~/.config/mcp-abap-adt/service-keys
+# Download service key from SAP BTP (from the corresponding service instance)
+# and copy it to: ~/.config/mcp-abap-adt/service-keys/TRIAL.json
+```
+
+**Windows (PowerShell):**
 ```powershell
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\Documents\mcp-abap-adt\service-keys"
-@"
-{
-  "uaa": {
-    "url": "https://your-uaa-url.com",
-    "clientid": "your-client-id",
-    "clientsecret": "your-client-secret"
-  },
-  "url": "https://your-sap-url.com",
-  "abap": {
-    "url": "https://your-sap-url.com"
-  }
-}
-"@ | Out-File -FilePath "$env:USERPROFILE\Documents\mcp-abap-adt\service-keys\TRIAL.json" -Encoding utf8
+# Download service key from SAP BTP (from the corresponding service instance)
+# and copy it to: %USERPROFILE%\Documents\mcp-abap-adt\service-keys\TRIAL.json
 ```
+
+**Windows (Command Prompt):**
+```cmd
+mkdir "%USERPROFILE%\Documents\mcp-abap-adt\service-keys"
+# Download service key from SAP BTP (from the corresponding service instance)
+# and copy it to: %USERPROFILE%\Documents\mcp-abap-adt\service-keys\TRIAL.json
+```
+
+**Important:** Download the service key JSON file from SAP BTP (from the corresponding service instance) and save it with the destination name (e.g., `TRIAL.json`). The filename without `.json` extension becomes the destination name (case-sensitive).
 
 ### Step 2: Start Server with --auth-broker
 

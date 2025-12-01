@@ -169,21 +169,12 @@ Service keys are stored in platform-specific locations:
 
 ### Service Key Format
 
-Create a service key file named `{destination}.json` (e.g., `TRIAL.json`) with the following structure:
+Download the service key JSON file from SAP BTP (from the corresponding service instance) and save it as `{destination}.json` (e.g., `TRIAL.json`). The filename without `.json` extension becomes the destination name (case-sensitive).
 
-```json
-{
-  "uaa": {
-    "url": "https://your-uaa-url.com",
-    "clientid": "your-client-id",
-    "clientsecret": "your-client-secret"
-  },
-  "url": "https://your-sap-url.com",
-  "abap": {
-    "url": "https://your-sap-url.com"
-  }
-}
-```
+**Storage locations:**
+- **Linux/macOS:** `~/.config/mcp-abap-adt/service-keys/{destination}.json`
+- **Windows:** `%USERPROFILE%\Documents\mcp-abap-adt\service-keys\{destination}.json`
+- **Fallback:** Server also searches in current working directory (where server is launched)
 
 ### Using Destination Headers
 

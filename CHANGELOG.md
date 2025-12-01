@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.20] - 2025-12-01
+
+### Changed
+- **Help documentation improvements** – updated help messages with detailed instructions for saving service keys:
+  - Added platform-specific instructions for Linux, macOS, and Windows
+  - Replaced example JSON structure with instructions to copy service key from SAP BTP
+  - Fixed backslash escaping in Windows PowerShell commands
+  - Updated both launcher help (`bin/mcp-abap-adt.js`) and server help (`src/index.ts`)
+  - Updated documentation files: `SERVICE_KEY_SETUP.md` and `CLIENT_CONFIGURATION.md`
+
 ## [1.1.19] - 2025-11-30
 
 ### Changed

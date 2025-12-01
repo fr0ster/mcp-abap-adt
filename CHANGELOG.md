@@ -399,6 +399,16 @@
 
 ## [Unreleased]
 
+## [1.1.22] - 2025-12-01
+
+### Dependencies
+- Updated `@mcp-abap-adt/adt-clients` to `^0.1.33`:
+  - Benefits from optimized CSRF token endpoint (`/sap/bc/adt/core/discovery`)
+  - Faster connection initialization for all CRUD operations
+- Updated `@mcp-abap-adt/auth-broker` to `^0.1.4`:
+  - Benefits from optimized CSRF token endpoint in connection layer
+  - Faster authentication flows when managing JWT tokens
+
 ### Added
 - **ABAP Unit class test tools**: Added `[low-level]` handlers to cover the new CrudClient APIs for class test includes and ABAP Unit orchestration:
   - `LockClassTestClassesLow`, `UpdateClassTestClassesLow`, `UnlockClassTestClassesLow`, `ActivateClassTestClassesLow`

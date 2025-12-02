@@ -50,6 +50,13 @@ Options:
   --env=<file>              Path to .env file (default: .env in current directory)
   --auth-broker             Force use of auth-broker (service keys) instead of .env file
                             Ignores .env file even if present in current directory
+  --mcp=<destination>       Default MCP destination name (overrides x-mcp-destination header)
+                            If specified, this destination will be used when x-mcp-destination
+                            header is not provided in the request
+                            Example: --mcp=TRIAL
+                            This allows using auth-broker with stdio and SSE transports
+                            When --mcp is specified, .env file is not loaded automatically
+                            (even if it exists in current directory)
   --transport=<type>       Transport type: stdio, http, streamable-http, sse, server
   --http-port=<port>       HTTP server port (default: 3000)
   --sse-port=<port>        SSE server port (default: 3001)
@@ -74,9 +81,11 @@ Examples:
   mcp-abap-adt                                    # Use default .env, HTTP on port 3000
   mcp-abap-adt --env=e19.env                      # Use specific .env file
   mcp-abap-adt --env=e19.env --transport=stdio    # Use .env and stdio transport
+  mcp-abap-adt --transport=stdio --mcp=TRIAL       # Use stdio with auth-broker (--mcp parameter)
   mcp-abap-adt --transport=http                   # HTTP mode (no .env required, port 3000)
-  mcp-abap-adt --transport=http --http-port=8080  # HTTP mode on custom port 8080
+  mcp-abap-adt --transport=http --http-port=8080   # HTTP mode on custom port 8080
   mcp-abap-adt --transport=sse --sse-port=3001    # SSE mode on port 3001
+  mcp-abap-adt --transport=sse --mcp=TRIAL        # SSE mode with auth-broker (--mcp parameter)
   mcp-abap-adt --auth-broker                      # Use service keys instead of .env file
 
 Transport Modes:
@@ -88,8 +97,8 @@ Service Keys (Auth-Broker):
   The server supports destination-based authentication using service keys stored locally.
   This allows you to configure authentication once per destination and reuse it.
 
-  IMPORTANT: Auth-broker (service keys) is only available for HTTP/streamable-http transport.
-  For stdio and SSE transports, use .env file instead.
+  IMPORTANT: Auth-broker (service keys) is available for HTTP/streamable-http transport by default.
+  For stdio and SSE transports, use .env file or specify --mcp parameter to use auth-broker.
 
   How to Save Service Keys:
 

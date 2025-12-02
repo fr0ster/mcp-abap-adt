@@ -95,8 +95,9 @@ mcp-abap-adt
 # Note: Only works with HTTP/streamable-http transport
 mcp-abap-adt --auth-broker
 
-# stdio mode (for MCP clients, requires .env file)
-# Note: auth-broker is NOT used in stdio mode, only .env file
+# stdio mode (for MCP clients, requires .env file or --mcp parameter)
+# Use --mcp parameter to enable auth-broker with stdio transport
+# Example: mcp-abap-adt --transport=stdio --mcp=TRIAL
 mcp-abap-adt --transport=stdio
 
 # Or specify custom .env location (uses .env instead of auth-broker)
@@ -265,7 +266,7 @@ mcp-abap-adt
 # Force use of auth-broker (service keys), ignore .env file
 mcp-abap-adt --auth-broker
 
-# stdio mode (for MCP clients, requires .env file or auth-broker)
+# stdio mode (for MCP clients, requires .env file or --mcp parameter for auth-broker)
 mcp-abap-adt --transport=stdio
 
 # Use .env file instead of auth-broker

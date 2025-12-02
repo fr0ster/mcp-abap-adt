@@ -417,6 +417,13 @@ ENVIRONMENT FILE:
                                    Creates service-keys and sessions subdirectories in this path
                                    Example: --auth-broker-path=~/prj/tmp/
                                    This will use ~/prj/tmp/service-keys and ~/prj/tmp/sessions
+  --mcp=<destination>              Default MCP destination name (overrides x-mcp-destination header)
+                                   If specified, this destination will be used when x-mcp-destination
+                                   header is not provided in the request
+                                   Example: --mcp=TRIAL
+                                   This allows using auth-broker with stdio and SSE transports
+                                   When --mcp is specified, .env file is not loaded automatically
+                                   (even if it exists in current directory)
 
 TRANSPORT SELECTION:
   --transport=<type>               Transport type: stdio|http|streamable-http|sse
@@ -518,8 +525,11 @@ EXAMPLES:
   # HTTP server on custom port
   mcp-abap-adt --http-port=8080
 
-  # Use stdio mode (for MCP clients, requires .env file)
+  # Use stdio mode (for MCP clients, requires .env file or --mcp parameter)
   mcp-abap-adt --transport=stdio
+
+  # Use stdio mode with --mcp parameter (uses auth-broker, skips .env file)
+  mcp-abap-adt --transport=stdio --mcp=TRIAL
 
   # Default: uses .env from current directory if exists, otherwise auth-broker
   mcp-abap-adt
@@ -529,6 +539,9 @@ EXAMPLES:
 
   # Use custom path for auth-broker (creates service-keys and sessions subdirectories)
   mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
+
+  # Use SSE transport with --mcp parameter (allows auth-broker with SSE transport)
+  mcp-abap-adt --transport=sse --mcp=TRIAL
 
   # Use .env file from custom path
   mcp-abap-adt --env=/path/to/my.env
@@ -553,13 +566,15 @@ QUICK REFERENCE:
   Transport types:
     http            - HTTP StreamableHTTP transport (default)
     streamable-http - Same as http
-    stdio           - Standard input/output (for MCP clients, requires .env file)
+    stdio           - Standard input/output (for MCP clients, requires .env file or --mcp parameter)
     sse             - Server-Sent Events transport
 
   Common use cases:
     Web interfaces (HTTP):        mcp-abap-adt (default, no .env needed)
     MCP clients (Cline, Cursor):  mcp-abap-adt --transport=stdio
+    MCP clients with auth-broker: mcp-abap-adt --transport=stdio --mcp=TRIAL (skips .env)
     Web interfaces (SSE):         mcp-abap-adt --transport=sse --sse-port=3001
+    SSE with auth-broker:         mcp-abap-adt --transport=sse --mcp=TRIAL (skips .env)
 
 DOCUMENTATION:
   https://github.com/fr0ster/mcp-abap-adt
@@ -798,14 +813,38 @@ function parseAuthBrokerPathArg(): string | undefined {
   return undefined;
 }
 
+/**
+ * Parse --mcp argument from command line
+ * Supports both formats: --mcp=<destination> and --mcp <destination>
+ */
+function parseMcpDestinationArg(): string | undefined {
+  const args = process.argv;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+
+    // Format: --mcp=<destination>
+    if (arg.startsWith("--mcp=")) {
+      return arg.slice("--mcp=".length);
+    }
+    // Format: --mcp <destination>
+    else if (arg === "--mcp" && i + 1 < args.length) {
+      return args[i + 1];
+    }
+  }
+
+  return undefined;
+}
+
 // Find .env file path from arguments
 // Check for --auth-broker flag (forces use of auth-broker, ignores .env)
 const useAuthBroker = process.argv.includes("--auth-broker");
 const authBrokerPath = parseAuthBrokerPathArg();
+// Parse --mcp parameter for default MCP destination
+const defaultMcpDestination = parseMcpDestinationArg();
 // Check for --unsafe flag (uses FileSessionStore instead of SafeSessionStore)
 const unsafe = process.argv.includes("--unsafe") || process.env.MCP_UNSAFE === "true";
-// Skip .env loading if launcher already loaded it OR if --auth-broker is specified
-const skipEnvAutoload = process.env.MCP_SKIP_ENV_LOAD === "true" || process.env.MCP_ENV_LOADED_BY_LAUNCHER === "true" || useAuthBroker;
+// Skip .env loading if launcher already loaded it OR if --auth-broker is specified OR if --mcp is specified
+const skipEnvAutoload = process.env.MCP_SKIP_ENV_LOAD === "true" || process.env.MCP_ENV_LOADED_BY_LAUNCHER === "true" || useAuthBroker || !!defaultMcpDestination;
 const explicitTransportType = getTransportType();
 // If transport not explicitly specified, default to HTTP mode
 // Stdio mode is only used if explicitly specified via --transport=stdio
@@ -813,8 +852,9 @@ const transportType = explicitTransportType || "streamable-http";
 const isHttp = transportType === "http" || transportType === "streamable-http" || transportType === "server";
 const isSse = transportType === "sse";
 const isStdio = transportType === "stdio";
-// .env is mandatory only if transport is explicitly set to stdio or sse
-const isEnvMandatory = explicitTransportType !== null && (isStdio || isSse);
+// .env is mandatory only if transport is explicitly set to stdio or sse AND --mcp is not specified
+// If --mcp is specified, auth-broker will be used instead of .env file
+const isEnvMandatory = explicitTransportType !== null && (isStdio || isSse) && !defaultMcpDestination;
 
 let envFilePath = parseEnvArg() ?? process.env.MCP_ENV_PATH;
 
@@ -1432,6 +1472,7 @@ export class mcp_abap_adt_server {
   private transportConfig: TransportConfig;
   private httpServer?: HttpServer;
   private shuttingDown = false;
+  private readonly defaultMcpDestination?: string; // Default MCP destination from --mcp parameter
 
   // Client session tracking for StreamableHTTP (like the example)
   private streamableHttpSessions = new Map<string, {
@@ -1459,9 +1500,11 @@ export class mcp_abap_adt_server {
    * Get or create AuthBroker for a specific destination (lazy initialization)
    */
   private async getOrCreateAuthBroker(destination?: string): Promise<AuthBroker | undefined> {
-    // Only for HTTP/streamable-http transport
+    // Only for HTTP/streamable-http, stdio, and SSE transports
     const isHttpTransport = this.transportConfig.type === "streamable-http";
-    if (!isHttpTransport) {
+    const isStdioTransport = this.transportConfig.type === "stdio";
+    const isSseTransport = this.transportConfig.type === "sse";
+    if (!isHttpTransport && !isStdioTransport && !isSseTransport) {
       return undefined;
     }
 
@@ -1550,35 +1593,57 @@ export class mcp_abap_adt_server {
   }
 
   private async applyAuthHeaders(headers?: IncomingHttpHeaders, sessionId?: string) {
-    if (!headers) {
-      logger.info("No headers provided in request", {
-        type: "NO_HEADERS_PROVIDED",
+    // If no headers but defaultMcpDestination is set, use it
+    if (!headers || Object.keys(headers).length === 0) {
+      if (this.defaultMcpDestination) {
+        // Create headers object with default MCP destination
+        headers = { 'x-mcp-destination': this.defaultMcpDestination };
+        logger.info("No headers provided, using default MCP destination from --mcp parameter", {
+          type: "NO_HEADERS_DEFAULT_MCP_USED",
+          destination: this.defaultMcpDestination,
+          sessionId: sessionId?.substring(0, 8),
+        });
+      } else {
+        logger.info("No headers provided in request", {
+          type: "NO_HEADERS_PROVIDED",
+          sessionId: sessionId?.substring(0, 8),
+          hint: "Provide authentication headers (x-sap-destination, x-sap-url, x-sap-auth-type, etc.) or use --mcp parameter",
+        });
+        return;
+      }
+    }
+
+    // Apply default MCP destination from --mcp parameter if not provided in headers
+    const headersWithDefault = { ...headers };
+    if (this.defaultMcpDestination && !headers['x-mcp-destination'] && !headers['X-MCP-Destination']) {
+      headersWithDefault['x-mcp-destination'] = this.defaultMcpDestination;
+      logger.info("Using default MCP destination from --mcp parameter", {
+        type: "DEFAULT_MCP_DESTINATION_APPLIED",
+        destination: this.defaultMcpDestination,
         sessionId: sessionId?.substring(0, 8),
-        hint: "Provide authentication headers (x-sap-destination, x-sap-url, x-sap-auth-type, etc.)",
       });
-      return;
     }
 
     // Log which auth headers are present (for debugging)
     // Check headers in both cases (Node.js normalizes to lowercase, but check both for safety)
     const authHeaders = {
-      'x-sap-destination': headers['x-sap-destination'] || headers['X-SAP-Destination'],
-      'x-mcp-destination': headers['x-mcp-destination'] || headers['X-MCP-Destination'],
-      'x-sap-url': (headers['x-sap-url'] || headers['X-SAP-URL']) ? '[present]' : undefined,
-      'x-sap-auth-type': headers['x-sap-auth-type'] || headers['X-SAP-Auth-Type'],
-      'x-sap-jwt-token': (headers['x-sap-jwt-token'] || headers['X-SAP-JWT-Token']) ? '[present]' : undefined,
-      'x-sap-login': (headers['x-sap-login'] || headers['X-SAP-Login']) ? '[present]' : undefined,
+      'x-sap-destination': headersWithDefault['x-sap-destination'] || headersWithDefault['X-SAP-Destination'],
+      'x-mcp-destination': headersWithDefault['x-mcp-destination'] || headersWithDefault['X-MCP-Destination'],
+      'x-sap-url': (headersWithDefault['x-sap-url'] || headersWithDefault['X-SAP-URL']) ? '[present]' : undefined,
+      'x-sap-auth-type': headersWithDefault['x-sap-auth-type'] || headersWithDefault['X-SAP-Auth-Type'],
+      'x-sap-jwt-token': (headersWithDefault['x-sap-jwt-token'] || headersWithDefault['X-SAP-JWT-Token']) ? '[present]' : undefined,
+      'x-sap-login': (headersWithDefault['x-sap-login'] || headersWithDefault['X-SAP-Login']) ? '[present]' : undefined,
     };
     logger.info("Processing authentication headers", {
       type: "AUTH_HEADERS_PROCESSING",
       headers: authHeaders,
       platform: process.platform,
       sessionId: sessionId?.substring(0, 8),
-      allHeaderKeys: Object.keys(headers).filter(k => k.toLowerCase().startsWith('x-sap') || k.toLowerCase().startsWith('x-mcp')),
+      allHeaderKeys: Object.keys(headersWithDefault).filter(k => k.toLowerCase().startsWith('x-sap') || k.toLowerCase().startsWith('x-mcp')),
     });
 
     // Use header validator to validate and prioritize authentication methods
-    const validationResult = validateAuthHeaders(headers);
+    const validationResult = validateAuthHeaders(headersWithDefault);
 
     // Log warnings if any
     if (validationResult.warnings.length > 0) {
@@ -2071,6 +2136,7 @@ export class mcp_abap_adt_server {
   constructor(options?: ServerOptions) {
     this.allowProcessExit = options?.allowProcessExit ?? true;
     this.registerSignalHandlers = options?.registerSignalHandlers ?? true;
+    this.defaultMcpDestination = defaultMcpDestination;
 
     // Check if .env file exists (was loaded at startup)
     // This is used to determine if we should restrict non-local connections
@@ -2777,6 +2843,32 @@ export class mcp_abap_adt_server {
    */
   async run() {
     if (this.transportConfig.type === "stdio") {
+      // If --mcp parameter is provided, initialize auth-broker with default destination
+      if (this.defaultMcpDestination) {
+        try {
+          const authBroker = await this.getOrCreateAuthBroker(this.defaultMcpDestination);
+          if (authBroker) {
+            const sapUrl = await authBroker.getSapUrl(this.defaultMcpDestination);
+            if (sapUrl) {
+              const jwtToken = await authBroker.getToken(this.defaultMcpDestination);
+              if (jwtToken) {
+                this.processJwtConfigUpdate(sapUrl, jwtToken, undefined);
+                logger.info("SAP configuration initialized from --mcp parameter for stdio transport", {
+                  type: "STDIO_MCP_DESTINATION_INIT",
+                  destination: this.defaultMcpDestination,
+                  url: sapUrl,
+                });
+              }
+            }
+          }
+        } catch (error) {
+          logger.warn("Failed to initialize auth-broker with --mcp parameter for stdio transport", {
+            type: "STDIO_MCP_DESTINATION_INIT_FAILED",
+            destination: this.defaultMcpDestination,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
       // Simple stdio setup like reference implementation
       const transport = new StdioServerTransport();
       await this.mcpServer.server.connect(transport);
@@ -2970,11 +3062,11 @@ export class mcp_abap_adt_server {
           const requiresSapConfig = methodName === 'tools/call';
 
           // Apply auth headers before processing and store config in session
-          // Only apply headers if:
+          // Apply headers if:
           // 1. This request requires SAP config (tools/call)
-          // 2. AND auth headers are present (destination or direct auth)
-          // If no headers are present, fall back to .env file or base config
-          if (requiresSapConfig && this.hasSapHeaders(req.headers)) {
+          // 2. AND (auth headers are present OR defaultMcpDestination is set)
+          // If no headers are present and no defaultMcpDestination, fall back to .env file or base config
+          if (requiresSapConfig && (this.hasSapHeaders(req.headers) || this.defaultMcpDestination)) {
             await this.applyAuthHeaders(req.headers, session.sessionId);
           }
 
@@ -2985,7 +3077,8 @@ export class mcp_abap_adt_server {
 
           // If no headers provided and no session config, try to reload from .env file
           // This handles the case when .env file exists but config wasn't loaded properly
-          if (requiresSapConfig && !this.hasSapHeaders(req.headers) && (!sessionSapConfig || sessionSapConfig.url === "http://placeholder" || sessionSapConfig.url === "http://injected-connection")) {
+          // Skip .env reload if defaultMcpDestination is set (use auth-broker instead)
+          if (requiresSapConfig && !this.hasSapHeaders(req.headers) && !this.defaultMcpDestination && (!sessionSapConfig || sessionSapConfig.url === "http://placeholder" || sessionSapConfig.url === "http://injected-connection")) {
             try {
               // Try to reload config from .env file
               const envConfig = getConfig();
@@ -3159,6 +3252,34 @@ export class mcp_abap_adt_server {
     }
 
     const sseConfig = this.transportConfig;
+
+    // If --mcp parameter is provided, initialize auth-broker with default destination
+    if (this.defaultMcpDestination) {
+      try {
+        const authBroker = await this.getOrCreateAuthBroker(this.defaultMcpDestination);
+        if (authBroker) {
+          const sapUrl = await authBroker.getSapUrl(this.defaultMcpDestination);
+          if (sapUrl) {
+            const jwtToken = await authBroker.getToken(this.defaultMcpDestination);
+            if (jwtToken) {
+              this.processJwtConfigUpdate(sapUrl, jwtToken, undefined);
+              logger.info("SAP configuration initialized from --mcp parameter for SSE transport", {
+                type: "SSE_MCP_DESTINATION_INIT",
+                destination: this.defaultMcpDestination,
+                url: sapUrl,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        logger.warn("Failed to initialize auth-broker with --mcp parameter for SSE transport", {
+          type: "SSE_MCP_DESTINATION_INIT_FAILED",
+          destination: this.defaultMcpDestination,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     const streamPathMap = new Map<string, string>([
       ["/", "/messages"],
       ["/mcp/events", "/mcp/messages"],

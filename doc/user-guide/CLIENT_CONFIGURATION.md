@@ -108,8 +108,14 @@ For on-premise systems using basic authentication:
 
 ## Destination-Based Authentication
 
-> **Note:** Destination-based authentication (auth-broker) is only available for **HTTP/streamable-http** transport.
-> For **stdio** and **SSE** transports, use `.env` file configuration instead.
+> **Note:** Destination-based authentication (auth-broker) is available for all transport types:
+> - **HTTP/streamable-http**: Use `x-sap-destination` or `x-mcp-destination` headers (default behavior)
+> - **stdio**: Use `--mcp=<destination>` command-line parameter
+> - **SSE**: Use `x-mcp-destination` header or `--mcp=<destination>` command-line parameter
+> 
+> For **stdio** and **SSE** transports without `--mcp` parameter, use `.env` file configuration instead.
+> 
+> **Important:** When `--mcp` parameter is specified, `.env` file is **not loaded automatically** (even if it exists in current directory). This ensures that auth-broker configuration takes precedence over `.env` file settings.
 
 The server supports destination-based authentication using service keys stored locally. This allows you to configure authentication once per destination and reuse it across multiple requests.
 
@@ -119,13 +125,15 @@ The server uses auth-broker (service keys) in the following cases:
 
 1. **By default** (when `--env` is not specified AND no `.env` file exists in current directory): Auth-broker is used automatically
 2. **When `--auth-broker` flag is specified**: Forces use of auth-broker, ignoring any `.env` file (even if it exists in current directory)
-3. **When `--env` is specified**: Uses the specified `.env` file instead of auth-broker
+3. **When `--mcp` parameter is specified**: Uses auth-broker with the specified destination, `.env` file is not loaded automatically
+4. **When `--env` is specified**: Uses the specified `.env` file instead of auth-broker
 
 **Priority:**
 1. `--env=<path>` - explicit .env file (highest priority)
-2. `.env` in current directory - used automatically if exists (default behavior)
-3. `--auth-broker` - force auth-broker, ignore .env
-4. Auth-broker - used if no .env found (fallback)
+2. `--mcp=<destination>` - uses auth-broker, skips .env file loading
+3. `.env` in current directory - used automatically if exists (default behavior)
+4. `--auth-broker` - force auth-broker, ignore .env
+5. Auth-broker - used if no .env found (fallback)
 
 **Examples:**
 ```bash
@@ -134,6 +142,9 @@ mcp-abap-adt
 
 # Forces auth-broker, ignores .env file even if exists
 mcp-abap-adt --auth-broker
+
+# Uses auth-broker with --mcp parameter (skips .env file)
+mcp-abap-adt --transport=stdio --mcp=TRIAL
 
 # Uses .env file from custom path
 mcp-abap-adt --env=/path/to/.env
@@ -304,6 +315,72 @@ EOF
 
 3. **First request:** Browser opens for authentication
 4. **Subsequent requests:** Uses cached tokens automatically
+
+### Using --mcp Parameter for stdio and SSE Transports
+
+The `--mcp` parameter allows you to use auth-broker (service keys) with stdio and SSE transports, which previously required `.env` file configuration.
+
+**For stdio transport:**
+```bash
+# Start server with --mcp parameter
+mcp-abap-adt --transport=stdio --mcp=TRIAL
+```
+
+The server will:
+1. Initialize auth-broker with the specified destination at startup
+2. Load service key from `{destination}.json` (e.g., `TRIAL.json`)
+3. Authenticate using OAuth2 if needed
+4. Use the destination for all MCP tool calls
+
+**For SSE transport:**
+```bash
+# Start server with --mcp parameter
+mcp-abap-adt --transport=sse --mcp=TRIAL
+```
+
+The server will:
+1. Use the specified destination when `x-mcp-destination` header is not provided in requests
+2. Allow clients to override by providing `x-mcp-destination` header
+3. Fall back to the `--mcp` destination if header is missing
+
+**Example Cline configuration with stdio:**
+```json
+{
+  "mcpServers": {
+    "mcp-abap-adt": {
+      "command": "mcp-abap-adt",
+      "args": ["--transport=stdio", "--mcp=TRIAL"]
+    }
+  }
+}
+```
+
+**Example SSE client configuration:**
+```json
+{
+  "local-mcp-sse": {
+    "disabled": false,
+    "timeout": 60,
+    "type": "sse",
+    "url": "http://localhost:3001/sse"
+  }
+}
+```
+
+The server will use `TRIAL` destination automatically (from `--mcp=TRIAL`), or you can override it per request:
+```json
+{
+  "local-mcp-sse": {
+    "disabled": false,
+    "timeout": 60,
+    "type": "sse",
+    "url": "http://localhost:3001/sse",
+    "headers": {
+      "x-mcp-destination": "DEV"  // Overrides --mcp parameter
+    }
+  }
+}
+```
 
 ### Custom Paths
 

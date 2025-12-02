@@ -71,14 +71,20 @@ mcp-abap-adt
 # HTTP mode on custom port
 mcp-abap-adt --http-port=8080
 
-# Use stdio mode (for MCP clients, requires .env file)
+# Use stdio mode (for MCP clients, requires .env file or --mcp parameter)
 mcp-abap-adt --transport=stdio
+
+# Use stdio mode with auth-broker (--mcp parameter)
+mcp-abap-adt --transport=stdio --mcp=TRIAL
 
 # Use custom .env file
 mcp-abap-adt --env=/path/to/my.env
 
-# SSE mode  
+# SSE mode (requires .env file or --mcp parameter)
 mcp-abap-adt --transport=sse --sse-port=3001
+
+# SSE mode with auth-broker (--mcp parameter)
+mcp-abap-adt --transport=sse --mcp=TRIAL
 ```
 
 ### Development Mode

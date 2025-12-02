@@ -96,6 +96,52 @@ mcp-abap-adt --transport=sse
 
 **Note:** You can use shortcuts `--http` or `--sse` instead of `--transport=http` or `--transport=sse`.
 
+## Auth-Broker Options
+
+**--mcp=\<destination\>**
+
+Default MCP destination name. When specified, this destination will be used when `x-mcp-destination` header is not provided in the request. This allows using auth-broker (service keys) with stdio and SSE transports.
+
+```bash
+# Use stdio with auth-broker (--mcp parameter)
+mcp-abap-adt --transport=stdio --mcp=TRIAL
+
+# Use SSE with auth-broker (--mcp parameter)
+mcp-abap-adt --transport=sse --mcp=TRIAL
+
+# Use HTTP with default destination (overrides x-mcp-destination header if not provided)
+mcp-abap-adt --transport=http --mcp=TRIAL
+```
+
+**Important:** The `--mcp` parameter enables auth-broker usage with stdio and SSE transports, which previously required `.env` file configuration. When `--mcp` is specified:
+- For **stdio transport**: The server initializes auth-broker with the specified destination at startup
+- For **SSE transport**: The server uses the specified destination when `x-mcp-destination` header is not provided
+- For **HTTP transport**: The server uses the specified destination as a fallback when `x-mcp-destination` header is not provided
+- **`.env` file is not loaded automatically** when `--mcp` is specified (even if it exists in current directory)
+- **`.env` file is not considered mandatory** for stdio and SSE transports when `--mcp` is specified
+
+**--auth-broker**
+
+Force use of auth-broker (service keys) instead of `.env` file. Ignores `.env` file even if present in current directory.
+
+```bash
+# Force auth-broker usage
+mcp-abap-adt --auth-broker
+
+# Use auth-broker with custom path
+mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
+```
+
+**--auth-broker-path=\<path\>**
+
+Custom path for auth-broker service keys and sessions. Creates `service-keys` and `sessions` subdirectories in the specified path.
+
+```bash
+# Use custom path for auth-broker
+mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
+# This will use ~/prj/tmp/service-keys and ~/prj/tmp/sessions
+```
+
 ## HTTP Server Options
 
 Used with `--transport=http` or `--transport=streamable-http`.

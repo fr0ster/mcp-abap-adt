@@ -2,6 +2,42 @@
 
 ## [Unreleased]
 
+## [1.1.25] - 2025-12-12
+
+### Added
+- **`--mcp=<destination>` parameter** – Default MCP destination name for auth-broker:
+  - Allows using auth-broker (service keys) with stdio and SSE transports
+  - When specified, this destination is used when `x-mcp-destination` header is not provided in requests
+  - For stdio transport: Server initializes auth-broker with the specified destination at startup
+  - For SSE transport: Server uses the specified destination as fallback when header is missing
+  - For HTTP transport: Server uses the specified destination as fallback when header is missing
+  - Example: `mcp-abap-adt --transport=stdio --mcp=TRIAL`
+  - This enables auth-broker usage with stdio and SSE transports, which previously required `.env` file configuration
+
+### Changed
+- **Auth-broker support for stdio and SSE transports** – Extended `getOrCreateAuthBroker()` to support stdio and SSE transports:
+  - Previously, auth-broker was only available for HTTP/streamable-http transport
+  - Now works with all transport types when `--mcp` parameter is specified
+  - For stdio: Auth-broker is initialized at server startup with the destination from `--mcp` parameter
+  - For SSE: Auth-broker works the same way as HTTP transport (via headers or `--mcp` fallback)
+
+### Fixed
+- **`--mcp` parameter now skips `.env` file loading** – When `--mcp` is specified:
+  - `.env` file is not automatically loaded (even if it exists in current directory)
+  - `.env` file is not considered mandatory for stdio and SSE transports
+  - Auth-broker configuration takes precedence over `.env` file
+  - This ensures that `--mcp` parameter works correctly without conflicts from `.env` file settings
+- **SSE transport with `--mcp` parameter** – Fixed issue where SSE transport was using `.env` configuration instead of auth-broker when `--mcp` was specified:
+  - Server now initializes auth-broker at startup for SSE transport when `--mcp` is provided
+  - `applyAuthHeaders()` now handles empty headers correctly when `defaultMcpDestination` is set
+  - Configuration from auth-broker takes precedence over `.env` file
+
+### Documentation
+- Updated `CLI_OPTIONS.md` with `--mcp` parameter documentation and examples
+- Updated `CLIENT_CONFIGURATION.md` with information about using `--mcp` parameter for stdio and SSE transports
+- Added examples for Cline configuration with stdio transport and `--mcp` parameter
+- Updated help text in both `src/index.ts` and `bin/mcp-abap-adt.js` with `--mcp` parameter information
+
 ## [1.1.24] - 2025-12-02
 
 ### Changed

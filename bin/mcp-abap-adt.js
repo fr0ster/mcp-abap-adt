@@ -135,7 +135,7 @@ Service Keys (Auth-Broker):
 
     2. Use destination in HTTP headers:
        x-sap-destination: TRIAL    (for SAP Cloud, URL derived from service key)
-       x-mcp-destination: TRIAL    (for MCP destinations, requires x-sap-url header)
+       x-mcp-destination: TRIAL    (for MCP destinations, URL derived from service key)
 
     The destination name must exactly match the service key filename (without .json extension, case-sensitive).
 

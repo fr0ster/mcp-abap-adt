@@ -1,5 +1,32 @@
 # Changelog
 
+## [Unreleased]
+
+## [1.1.23] - 2025-12-02
+
+### Fixed
+- **Help text correction** – fixed incorrect help message for `x-mcp-destination` header:
+  - Removed incorrect statement that `x-mcp-destination` requires `x-sap-url` header
+  - Updated help text to correctly state that URL is automatically derived from service key (same as `x-sap-destination`)
+  - Help text now accurately reflects that `x-sap-url` is not required and will be ignored if provided
+
+## [1.1.22] - 2025-12-01
+
+### Dependencies
+- Updated `@mcp-abap-adt/adt-clients` to `^0.1.33`:
+  - Benefits from optimized CSRF token endpoint (`/sap/bc/adt/core/discovery`)
+  - Faster connection initialization for all CRUD operations
+- Updated `@mcp-abap-adt/auth-broker` to `^0.1.4`:
+  - Benefits from optimized CSRF token endpoint in connection layer
+  - Faster authentication flows when managing JWT tokens
+
+### Added
+- **ABAP Unit class test tools**: Added `[low-level]` handlers to cover the new CrudClient APIs for class test includes and ABAP Unit orchestration:
+  - `LockClassTestClassesLow`, `UpdateClassTestClassesLow`, `UnlockClassTestClassesLow`, `ActivateClassTestClassesLow`
+  - `RunClassUnitTestsLow`, `GetClassUnitTestStatusLow`, `GetClassUnitTestResultLow`
+  - All new tools live in `class/low/` and are registered with the server and documentation generator.
+- **Package creation options**: `CreatePackage` (high- and low-level) now accepts optional `package_type`, `software_component`, `transport_layer`, `application_component`, and `responsible` parameters and forwards them directly to `CrudClient`, enabling Cloud systems to pass values such as `ZLOCAL` while keeping the transport layer empty.
+
 ## [1.1.21] - 2025-12-01
 
 ### Fixed
@@ -396,25 +423,6 @@
 ### Security
 - **Connection Isolation**: Prevents one client from receiving another client's data when multiple clients connect to different SAP systems
 - **Access Control**: Restricts non-local access when `.env` file is present, requiring explicit SAP headers for remote connections
-
-## [Unreleased]
-
-## [1.1.22] - 2025-12-01
-
-### Dependencies
-- Updated `@mcp-abap-adt/adt-clients` to `^0.1.33`:
-  - Benefits from optimized CSRF token endpoint (`/sap/bc/adt/core/discovery`)
-  - Faster connection initialization for all CRUD operations
-- Updated `@mcp-abap-adt/auth-broker` to `^0.1.4`:
-  - Benefits from optimized CSRF token endpoint in connection layer
-  - Faster authentication flows when managing JWT tokens
-
-### Added
-- **ABAP Unit class test tools**: Added `[low-level]` handlers to cover the new CrudClient APIs for class test includes and ABAP Unit orchestration:
-  - `LockClassTestClassesLow`, `UpdateClassTestClassesLow`, `UnlockClassTestClassesLow`, `ActivateClassTestClassesLow`
-  - `RunClassUnitTestsLow`, `GetClassUnitTestStatusLow`, `GetClassUnitTestResultLow`
-  - All new tools live in `class/low/` and are registered with the server and documentation generator.
-- **Package creation options**: `CreatePackage` (high- and low-level) now accepts optional `package_type`, `software_component`, `transport_layer`, `application_component`, and `responsible` parameters and forwards them directly to `CrudClient`, enabling Cloud systems to pass values such as `ZLOCAL` while keeping the transport layer empty.
 
 ## [1.1.9] - 2025-11-24
 

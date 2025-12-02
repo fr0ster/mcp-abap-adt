@@ -159,13 +159,38 @@ Service keys are stored in platform-specific locations:
 
 **Unix (Linux/macOS):**
 - Service keys: `~/.config/mcp-abap-adt/service-keys/{destination}.json`
-- Sessions: `~/.config/mcp-abap-adt/sessions/{destination}.env`
+- Sessions: `~/.config/mcp-abap-adt/sessions/{destination}.env` (only when `--unsafe` is used)
 
 **Windows:**
 - Service keys: `%USERPROFILE%\Documents\mcp-abap-adt\service-keys\{destination}.json`
-- Sessions: `%USERPROFILE%\Documents\mcp-abap-adt\sessions\{destination}.env`
+- Sessions: `%USERPROFILE%\Documents\mcp-abap-adt\sessions\{destination}.env` (only when `--unsafe` is used)
 
 **Fallback:** The server also searches in the current working directory (where the server is launched from).
+
+### Session Storage
+
+By default, session data (JWT tokens and refresh tokens) is stored **in-memory** using `SafeSessionStore`:
+- **Secure by default**: Session data is not persisted to disk
+- **Data loss on restart**: Session data is lost when the server restarts (requires re-authentication)
+- **No file I/O**: No `.env` files are created for sessions
+
+To enable **file-based session storage** (persists tokens to disk), use the `--unsafe` flag:
+
+```bash
+# Enable file-based session storage (persists tokens to disk)
+mcp-abap-adt --auth-broker --unsafe
+
+# Or via environment variable
+MCP_UNSAFE=true mcp-abap-adt --auth-broker
+```
+
+**When `--unsafe` is used:**
+- Session data is saved to platform-specific locations (see Service Key Storage above)
+- Tokens persist across server restarts
+- `.env` files are created/updated in the sessions directory
+- **Security consideration**: Tokens are stored in plain text files on disk
+
+**Recommendation**: Use `--unsafe` only if you need session persistence across server restarts. For production environments, consider using the default in-memory storage for better security.
 
 ### Service Key Format
 
@@ -339,6 +364,11 @@ mcp-abap-adt --env /path/to/.env
   - Directories are created automatically if they don't exist
   - Example: `--auth-broker-path=~/prj/tmp/` uses `~/prj/tmp/service-keys/` and `~/prj/tmp/sessions/`
   - Can be used together with `--auth-broker` flag
+- **`--unsafe`**: Enables file-based session storage (persists tokens to disk)
+  - By default, session data is stored in-memory (secure, lost on restart)
+  - With `--unsafe`, session tokens are saved to `.env` files in the sessions directory
+  - Can be set via environment variable: `MCP_UNSAFE=true`
+  - Use only if you need session persistence across server restarts
 - **`--env=<path>` or `--env <path>`**: Uses specified `.env` file, auth-broker is not used
   - Relative paths are resolved from current working directory
   - Absolute paths are used as-is

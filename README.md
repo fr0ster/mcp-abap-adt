@@ -129,6 +129,25 @@ sap-abap-auth auth -k path/to/service-key.json
 
 This will automatically create/update `.env` file with JWT tokens and connection details.
 
+### Command-Line Options
+
+**Authentication:**
+- `--auth-broker` - Force use of auth-broker (service keys), ignore .env file
+- `--auth-broker-path=<path>` - Custom path for auth-broker service keys and sessions
+- `--unsafe` - Enable file-based session storage (persists tokens to disk). By default, sessions are stored in-memory (secure, lost on restart)
+
+**Examples:**
+```bash
+# Use auth-broker with file-based session storage (persists tokens)
+mcp-abap-adt --auth-broker --unsafe
+
+# Use auth-broker with in-memory session storage (default, secure)
+mcp-abap-adt --auth-broker
+
+# Custom path for service keys and sessions
+mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/ --unsafe
+```
+
 See [Client Configuration](doc/user-guide/CLIENT_CONFIGURATION.md) for complete configuration options.
 
 ## Development

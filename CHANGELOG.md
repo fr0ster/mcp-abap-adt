@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [1.1.24] - 2025-12-02
+
+### Changed
+- **Safe session storage by default** – Session data is now stored in-memory using `SafeSessionStore` by default:
+  - Session tokens are no longer persisted to disk by default (secure by default)
+  - Session data is lost after server restart (requires re-authentication)
+  - Use `--unsafe` flag to enable file-based session storage (legacy behavior)
+  - File-based storage (`UnixFileSessionStore`/`WindowsFileSessionStore`) is only used when `--unsafe` is specified
+
+### Added
+- **`--unsafe` flag** – Enables file-based session storage (persists tokens to disk):
+  - When specified, session data is saved to platform-specific locations:
+    - Unix: `~/.config/mcp-abap-adt/sessions/{destination}.env`
+    - Windows: `%USERPROFILE%\Documents\mcp-abap-adt\sessions\{destination}.env`
+  - Can be set via environment variable: `MCP_UNSAFE=true`
+  - Use this flag if you need session persistence across server restarts
+
+### Dependencies
+- Updated `@mcp-abap-adt/auth-broker` to `^0.1.5`:
+  - Benefits from new `SafeSessionStore` implementation (in-memory, secure)
+  - Updated to use new `ISessionStore` interface (replaces `SessionStore`)
+
 ## [1.1.23] - 2025-12-02
 
 ### Fixed

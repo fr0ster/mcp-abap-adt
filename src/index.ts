@@ -802,6 +802,8 @@ function parseAuthBrokerPathArg(): string | undefined {
 // Check for --auth-broker flag (forces use of auth-broker, ignores .env)
 const useAuthBroker = process.argv.includes("--auth-broker");
 const authBrokerPath = parseAuthBrokerPathArg();
+// Check for --unsafe flag (uses FileSessionStore instead of SafeSessionStore)
+const unsafe = process.argv.includes("--unsafe") || process.env.MCP_UNSAFE === "true";
 // Skip .env loading if launcher already loaded it OR if --auth-broker is specified
 const skipEnvAutoload = process.env.MCP_SKIP_ENV_LOAD === "true" || process.env.MCP_ENV_LOADED_BY_LAUNCHER === "true" || useAuthBroker;
 const explicitTransportType = getTransportType();
@@ -1470,7 +1472,7 @@ export class mcp_abap_adt_server {
     if (!destination) {
       if (!this.defaultAuthBroker) {
         try {
-          const { serviceKeyStore, sessionStore } = getPlatformStores(customPath);
+          const { serviceKeyStore, sessionStore } = getPlatformStores(customPath, unsafe);
           this.defaultAuthBroker = new AuthBroker(
             {
               serviceKeyStore,
@@ -1500,14 +1502,16 @@ export class mcp_abap_adt_server {
           type: "AUTH_BROKER_CREATE_START",
           destination: destination,
           platform: process.platform,
+          unsafe: unsafe,
         });
-        const { serviceKeyStore, sessionStore } = getPlatformStores(customPath);
+        const { serviceKeyStore, sessionStore } = getPlatformStores(customPath, unsafe);
         logger.debug("Platform stores created", {
           type: "PLATFORM_STORES_CREATED",
           destination: destination,
           platform: process.platform,
+          unsafe: unsafe,
           serviceKeyStorePaths: serviceKeyStore.getSearchPaths(),
-          sessionStorePaths: sessionStore.getSearchPaths(),
+          sessionStoreType: unsafe ? 'FileSessionStore' : 'SafeSessionStore (in-memory)',
         });
         const authBroker = new AuthBroker(
           {

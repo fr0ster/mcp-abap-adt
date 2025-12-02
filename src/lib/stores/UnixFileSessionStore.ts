@@ -10,7 +10,7 @@
  * Reads/writes session data from/to {destination}.env files in resolved paths.
  */
 
-import { SessionStore, FileSessionStore } from '@mcp-abap-adt/auth-broker';
+import { ISessionStore, FileSessionStore } from '@mcp-abap-adt/auth-broker';
 import { EnvConfig } from '@mcp-abap-adt/auth-broker';
 import { getPlatformPaths } from './platformPaths';
 
@@ -22,7 +22,7 @@ import { getPlatformPaths } from './platformPaths';
  *
  * This is a wrapper around FileSessionStore with platform-specific paths.
  */
-export class UnixFileSessionStore implements SessionStore {
+export class UnixFileSessionStore implements ISessionStore {
   private delegate: FileSessionStore;
 
   /**

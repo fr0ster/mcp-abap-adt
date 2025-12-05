@@ -169,12 +169,22 @@ create_class_low:
 ```bash
 # Run all integration tests
 npm test -- --testPathPattern=integration
+# or use shortcut:
+npm run test:integration
+
+# Run only high-level handler tests
+npm run test:high
+
+# Run only low-level handler tests
+npm run test:low
 
 # Run specific object type tests
 npm test -- --testPathPattern=integration/class
 
 # Run with debug logs
-DEBUG_ADT_TESTS=true npm test -- --testPathPattern=integration/class
+DEBUG_TESTS=true npm test -- --testPathPattern=integration/class
+DEBUG_HANDLERS=true npm test -- --testPathPattern=integration/class
+DEBUG_ADT_LIBS=true npm test -- --testPathPattern=integration/class
 ```
 
 ## Test Helpers

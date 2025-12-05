@@ -5,6 +5,9 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "test": "jest --passWithNoTests",
+    "test:integration": "jest --testPathPattern=integration --passWithNoTests",
+    "test:high": "jest --testPathPattern=integration.*HighHandlers --passWithNoTests",
+    "test:low": "jest --testPathPattern=integration.*LowHandlers --passWithNoTests",
     "build": "npx tsc -p tsconfig.json",
     "start": "node ./bin/mcp-abap-adt.js",
     "start:http": "node ./bin/mcp-abap-adt.js --transport streamable-http",

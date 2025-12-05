@@ -3,6 +3,7 @@
  *
  * Tests all high-level handlers for Function module:
  * - CreateFunctionGroup (high-level) - handles validate, create, activate
+ * - UpdateFunctionGroup (high-level) - handles lock, get current, update metadata, unlock
  * - CreateFunctionModule (high-level) - handles validate, create, lock, update, check, unlock, activate
  * - UpdateFunctionModule (high-level) - handles lock, update, check, unlock, activate
  *
@@ -17,6 +18,7 @@
 
 import { handleGetSession } from '../../../handlers/system/readonly/handleGetSession';
 import { handleCreateFunctionGroup } from '../../../handlers/function/high/handleCreateFunctionGroup';
+import { handleUpdateFunctionGroup } from '../../../handlers/function/high/handleUpdateFunctionGroup';
 import { handleCreateFunctionModule } from '../../../handlers/function/high/handleCreateFunctionModule';
 import { handleUpdateFunctionModule } from '../../../handlers/function/high/handleUpdateFunctionModule';
 import { handleDeleteFunctionModule } from '../../../handlers/function/low/handleDeleteFunctionModule';
@@ -121,7 +123,25 @@ describe('Function High-Level Handlers Integration', () => {
 
       await delay(getOperationDelay('create', functionGroupCase));
 
-      // Step 2: CreateFunctionModule (High-Level)
+      // Step 2: UpdateFunctionGroup (High-Level)
+      if (functionGroupCase.params.update_description) {
+        console.log(`📝 High Update: Updating function group ${functionGroupName}...`);
+        const updateFGResponse = await handleUpdateFunctionGroup({
+          function_group_name: functionGroupName,
+          description: functionGroupCase.params.update_description,
+          transport_request: transportRequest
+        });
+
+        if (updateFGResponse.isError) {
+          throw new Error(`UpdateFunctionGroup failed: ${updateFGResponse.content[0]?.text || 'Unknown error'}`);
+        }
+
+        const updateFGData = parseHandlerResponse(updateFGResponse);
+        console.log(`✅ High Update: Updated function group ${functionGroupName} successfully`);
+        await delay(getOperationDelay('update', functionGroupCase));
+      }
+
+      // Step 3: CreateFunctionModule (High-Level)
       console.log(`📦 High Create: Creating function module ${functionModuleName}...`);
       const createFMResponse = await handleCreateFunctionModule({
           function_group_name: functionGroupName,
@@ -141,7 +161,7 @@ describe('Function High-Level Handlers Integration', () => {
 
       await delay(getOperationDelay('create', functionModuleCase));
 
-      // Step 3: UpdateFunctionModule (High-Level)
+      // Step 4: UpdateFunctionModule (High-Level)
       console.log(`📝 High Update: Updating function module ${functionModuleName}...`);
       const updateFMResponse = await handleUpdateFunctionModule({
           function_group_name: functionGroupName,

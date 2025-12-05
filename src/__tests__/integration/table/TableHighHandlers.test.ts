@@ -3,6 +3,7 @@
  *
  * Tests all high-level handlers for Table module:
  * - CreateTable (high-level) - handles validate, create, lock, update, check, unlock, activate
+ * - UpdateTable (high-level) - handles validate, lock, update, check, unlock, activate
  *
  * Enable debug logs:
  *   DEBUG_TESTS=true         - Test execution logs
@@ -15,6 +16,7 @@
 
 import { handleGetSession } from '../../../handlers/system/readonly/handleGetSession';
 import { handleCreateTable } from '../../../handlers/table/high/handleCreateTable';
+import { handleUpdateTable } from '../../../handlers/table/high/handleUpdateTable';
 import { handleDeleteTable } from '../../../handlers/table/low/handleDeleteTable';
 
 import {
@@ -121,6 +123,37 @@ define table ${tableName.toLowerCase()} {
 
       await delay(getOperationDelay('create', testCase));
       console.log(`✅ High-level table creation completed successfully for ${tableName}`);
+
+      // Step 2: Test UpdateTable (High-Level)
+      if (testCase.params.update_ddl_code) {
+        debugLog('UPDATE', `Starting high-level table update for ${tableName}`, {
+          session_id: session.session_id
+        });
+
+        const updateResponse = await handleUpdateTable({
+          table_name: tableName,
+          ddl_code: testCase.params.update_ddl_code,
+          transport_request: transportRequest,
+          activate: true
+        });
+
+        if (updateResponse.isError) {
+          const errorMsg = updateResponse.content[0]?.text || 'Unknown error';
+          throw new Error(`Update failed: ${errorMsg}`);
+        }
+
+        const updateData = parseHandlerResponse(updateResponse);
+        expect(updateData.success).toBe(true);
+        expect(updateData.table_name).toBe(tableName);
+
+        debugLog('UPDATE', 'High-level table update completed successfully', {
+          table_name: updateData.table_name,
+          success: updateData.success
+        });
+
+        await delay(getOperationDelay('update', testCase));
+        console.log(`✅ High-level table update completed successfully for ${tableName}`);
+      }
 
     } catch (error: any) {
       console.error(`❌ Test failed: ${error.message}`);

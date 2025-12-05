@@ -3,6 +3,7 @@
  *
  * Tests all high-level handlers for Structure module:
  * - CreateStructure (high-level) - handles validate, create, lock, check, unlock, activate
+ * - UpdateStructure (high-level) - handles validate, lock, update, check, unlock, activate
  *
  * Enable debug logs:
  *   DEBUG_TESTS=true         - Test execution logs
@@ -15,6 +16,7 @@
 
 import { handleGetSession } from '../../../handlers/system/readonly/handleGetSession';
 import { handleCreateStructure } from '../../../handlers/structure/high/handleCreateStructure';
+import { handleUpdateStructure } from '../../../handlers/structure/high/handleUpdateStructure';
 import { handleDeleteStructure } from '../../../handlers/structure/low/handleDeleteStructure';
 
 import {
@@ -121,6 +123,37 @@ describe('Structure High-Level Handlers Integration', () => {
 
       await delay(getOperationDelay('create', testCase));
       console.log(`✅ High-level structure creation completed successfully for ${structureName}`);
+
+      // Step 2: Test UpdateStructure (High-Level)
+      if (testCase.params.update_ddl_code) {
+        debugLog('UPDATE', `Starting high-level structure update for ${structureName}`, {
+          session_id: session.session_id
+        });
+
+        const updateResponse = await handleUpdateStructure({
+          structure_name: structureName,
+          ddl_code: testCase.params.update_ddl_code,
+          transport_request: transportRequest,
+          activate: true
+        });
+
+        if (updateResponse.isError) {
+          const errorMsg = updateResponse.content[0]?.text || 'Unknown error';
+          throw new Error(`Update failed: ${errorMsg}`);
+        }
+
+        const updateData = parseHandlerResponse(updateResponse);
+        expect(updateData.success).toBe(true);
+        expect(updateData.structure_name).toBe(structureName);
+
+        debugLog('UPDATE', 'High-level structure update completed successfully', {
+          structure_name: updateData.structure_name,
+          success: updateData.success
+        });
+
+        await delay(getOperationDelay('update', testCase));
+        console.log(`✅ High-level structure update completed successfully for ${structureName}`);
+      }
 
     } catch (error: any) {
       console.error(`❌ Test failed: ${error.message}`);

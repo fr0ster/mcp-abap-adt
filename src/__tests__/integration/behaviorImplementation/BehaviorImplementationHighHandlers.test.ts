@@ -2,8 +2,8 @@
  * Integration tests for BehaviorImplementation High-Level Handlers
  *
  * Tests all high-level handlers for BehaviorImplementation module:
- * - CreateClass (high-level) - handles create, lock, update, check, unlock, activate
- * - UpdateClass (high-level) - handles lock, update, check, unlock, activate
+ * - CreateBehaviorImplementation (high-level) - handles create, lock, update main source, update implementations, unlock, activate
+ * - UpdateBehaviorImplementation (high-level) - handles validate, lock, update main source, update implementations, check, unlock, activate
  * - DeleteClass (low-level) - handles delete
  *
  * Enable debug logs:
@@ -15,10 +15,9 @@
  * Run: npm test -- --testPathPattern=integration/behaviorImplementation
  */
 
-import { handleCreateClass } from '../../../handlers/class/high/handleCreateClass';
+import { handleCreateBehaviorImplementation } from '../../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
+import { handleUpdateBehaviorImplementation } from '../../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
 import { handleDeleteClass } from '../../../handlers/class/low/handleDeleteClass';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getManagedConnection } from '../../../lib/utils';
 
 import {
   parseHandlerResponse,
@@ -64,8 +63,8 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
       return;
     }
 
-    // Get test case configuration - use low-level test case as template
-    const testCase = getEnabledTestCase('create_behavior_implementation_low', 'full_workflow');
+    // Get test case configuration - use high-level test case
+    const testCase = getEnabledTestCase('create_behavior_implementation', 'full_workflow');
     if (!testCase) {
       console.log('⏭️  Skipping test: No test case configuration');
       return;
@@ -85,18 +84,22 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
     }
     const description = testCase.params.description;
 
-    if (!testCase.params.source_code) {
-      throw new Error('source_code is required in test configuration');
+    // implementation_code is optional for create (will be used if provided)
+    const sourceCode = testCase.params.implementation_code;
+
+    if (!testCase.params.behavior_definition) {
+      throw new Error('behavior_definition is required in test configuration');
     }
-    const sourceCode = testCase.params.source_code;
+    const behaviorDefinition = testCase.params.behavior_definition;
 
     try {
-      // Step 1: Test CreateClass (High-Level)
-      console.log(`📦 High Create: Creating ${className}...`);
+      // Step 1: Test CreateBehaviorImplementation (High-Level)
+      console.log(`📦 High Create: Creating behavior implementation ${className}...`);
       let createResponse;
       try {
         const createArgs: any = {
           class_name: className,
+          behavior_definition: behaviorDefinition,
           description,
           package_name: packageName,
           activate: true
@@ -104,7 +107,10 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
         if (transportRequest) {
           createArgs.transport_request = transportRequest;
         }
-        createResponse = await handleCreateClass(createArgs);
+        if (sourceCode) {
+          createArgs.implementation_code = sourceCode;
+        }
+        createResponse = await handleCreateBehaviorImplementation(createArgs);
       } catch (error: any) {
         const errorMsg = error.message || String(error);
         // If behavior implementation already exists or validation error, skip test
@@ -121,54 +127,43 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
       const createData = parseHandlerResponse(createResponse);
       expect(createData.success).toBe(true);
       expect(createData.class_name).toBe(className);
-      console.log(`✅ High Create: Created ${className} successfully`);
+      expect(createData.behavior_definition).toBe(behaviorDefinition);
+      console.log(`✅ High Create: Created behavior implementation ${className} successfully`);
 
       await delay(getOperationDelay('create', testCase));
 
-      // Step 2: Test Update Behavior Implementation (High-Level workflow using CrudClient)
-      // CrudClient manages session and lock/unlock internally
-      console.log(`📝 High Update: Updating ${className}...`);
-      if (!testCase.params.update_source_code) {
-        throw new Error('update_source_code is required in test configuration for update step');
-      }
-      const updatedImplementationCode = testCase.params.update_source_code;
+      // Step 2: Test UpdateBehaviorImplementation (High-Level)
+      if (testCase.params.update_source_code) {
+        console.log(`📝 High Update: Updating behavior implementation ${className}...`);
+        const updatedImplementationCode = testCase.params.update_source_code;
 
-      if (!testCase.params.behavior_definition) {
-        throw new Error('behavior_definition is required in test configuration for update step');
-      }
-      const behaviorDefinition = testCase.params.behavior_definition;
-
-      try {
-        const connection = getManagedConnection();
-        const client = new CrudClient(connection);
-
-        // Lock (CrudClient manages session internally)
-        await client.lockClass({ className: className });
-        const lockHandle = client.getLockHandle();
-        if (!lockHandle) {
-          throw new Error('Failed to get lock handle');
+        let updateResponse;
+        try {
+          updateResponse = await handleUpdateBehaviorImplementation({
+            class_name: className,
+            behavior_definition: behaviorDefinition,
+            implementation_code: updatedImplementationCode,
+            transport_request: transportRequest,
+            activate: true
+          });
+        } catch (error: any) {
+          const errorMsg = error.message || String(error);
+          console.log(`⏭️  High Update failed for ${className}: ${errorMsg}, skipping update test`);
+          return;
         }
 
-        // Update only implementations include (local handler class)
-        // NOTE: Main class source is NOT updated - it remains as created
-        await client.updateBehaviorImplementation({
-          className: className,
-          behaviorDefinition: behaviorDefinition,
-          implementationCode: updatedImplementationCode
-        }, lockHandle);
+        if (updateResponse.isError) {
+          const errorMsg = updateResponse.content[0]?.text || 'Unknown error';
+          console.log(`⏭️  High Update failed for ${className}: ${errorMsg}, skipping update test`);
+          return;
+        }
 
-        // Unlock (CrudClient manages session internally)
-        await client.unlockClass({ className: className }, lockHandle);
-
-        // Activate (CrudClient manages session internally)
-        await client.activateClass({ className: className });
-      } catch (error: any) {
-        const errorMsg = error.message || String(error);
-        console.log(`⏭️  High Update failed for ${className}: ${errorMsg}, skipping test`);
-        return;
+        const updateData = parseHandlerResponse(updateResponse);
+        expect(updateData.success).toBe(true);
+        expect(updateData.class_name).toBe(className);
+        console.log(`✅ High Update: Updated behavior implementation ${className} successfully`);
+        await delay(getOperationDelay('update', testCase));
       }
-
-      console.log(`✅ High Update: Updated ${className} successfully`);
 
       await delay(getOperationDelay('update', testCase));
       console.log(`✅ Full high-level workflow completed successfully for ${className}`);

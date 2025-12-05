@@ -35,6 +35,40 @@ environment:
   default_client: "<YOUR_CLIENT>"  # ⚠️ UPDATE WITH YOUR CLIENT (e.g., 100)
 
 # ============================================================================
+# AUTHENTICATION BROKER CONFIGURATION
+# ============================================================================
+# Configuration for AuthBroker-based token refresh before integration tests
+# This allows tests to automatically refresh expired tokens using AuthBroker
+# instead of relying solely on refresh tokens from .env file
+
+auth_broker:
+  # Paths configuration (applies to both ABAP and BTP/XSUAA)
+  paths:
+    # Directory where service key JSON files are stored
+    # Service key files: <destination>.json (e.g., TRIAL.json, mcp.json)
+    # Supports ~ (home directory) expansion on Unix
+    # Default values:
+    #   Unix: ~/.config/mcp-abap-adt/service-keys
+    #   Windows: %USERPROFILE%\Documents\mcp-abap-adt\service-keys
+    service_keys_dir: <SERVICE_KEYS_DIR>  # ⚠️ UPDATE: Replace with your service keys directory path
+
+    # Directory where session ENV files are stored
+    # Session files: <destination>.env (e.g., TRIAL.env, mcp.env)
+    # Supports ~ (home directory) expansion on Unix
+    # Default values:
+    #   Unix: ~/.config/mcp-abap-adt/sessions
+    #   Windows: %USERPROFILE%\Documents\mcp-abap-adt\sessions
+    sessions_dir: <SESSIONS_DIR>  # ⚠️ UPDATE: Replace with your sessions directory path
+
+  # ABAP destination configuration (for on-premise or cloud ABAP systems)
+  abap:
+    # ABAP destination name (used for service key file: <destination>.json and session file: <destination>.env)
+    # Example: "TRIAL" -> looks for TRIAL.json in service-keys directory and TRIAL.env in sessions directory
+    # This destination is used by refreshTokensForTests() to automatically refresh tokens before integration tests
+    # If not specified, token refresh will be skipped and tests will use tokens from .env file
+    destination: <TEST_ABAP_DESTINATION>  # ⚠️ UPDATE: Replace with your ABAP destination name (e.g., "TRIAL", "mcp")
+
+# ============================================================================
 # OBJECT TESTS (High-Level, then Low-Level for each object)
 # ============================================================================
 

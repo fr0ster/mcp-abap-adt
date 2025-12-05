@@ -18,8 +18,10 @@ import { createServer, Server as HttpServer, IncomingHttpHeaders } from "http";
 import { randomUUID } from "crypto";
 import { AuthBroker } from "@mcp-abap-adt/auth-broker";
 import { validateAuthHeaders, AuthMethodPriority } from "@mcp-abap-adt/header-validator";
-import { getPlatformStores } from "./lib/stores";
+import { getPlatformStores, getPlatformStoresAsync } from "./lib/stores";
 import { getPlatformPaths } from "./lib/stores/platformPaths";
+import { BtpTokenProvider } from "@mcp-abap-adt/auth-providers";
+import { defaultLogger } from "@mcp-abap-adt/logger";
 
 // Import handler functions
 // Import handler functions
@@ -1481,6 +1483,7 @@ export class mcp_abap_adt_server {
     connectedAt: Date;
     requestCount: number;
     sapConfig?: SapConfig; // Store SAP config per session
+    destination?: string; // Store destination for AuthBroker-based token refresh
   }>();
 
   // SSE session tracking (McpServer + SSEServerTransport per session)
@@ -1516,12 +1519,16 @@ export class mcp_abap_adt_server {
       if (!this.defaultAuthBroker) {
         try {
           const { serviceKeyStore, sessionStore } = getPlatformStores(customPath, unsafe);
+          // Default to BtpTokenProvider for backward compatibility (most common case)
+          const tokenProvider = new BtpTokenProvider();
           this.defaultAuthBroker = new AuthBroker(
             {
               serviceKeyStore,
               sessionStore,
+              tokenProvider,
             },
-            'system'
+            'system',
+            defaultLogger
           );
           logger.debug("Default AuthBroker created", {
             type: "AUTH_BROKER_CREATED",
@@ -1547,21 +1554,30 @@ export class mcp_abap_adt_server {
           platform: process.platform,
           unsafe: unsafe,
         });
-        const { serviceKeyStore, sessionStore } = getPlatformStores(customPath, unsafe);
+        // Use async version to auto-detect store type based on service key format
+        const { serviceKeyStore, sessionStore, storeType } = await getPlatformStoresAsync(customPath, unsafe, destination);
         logger.debug("Platform stores created", {
           type: "PLATFORM_STORES_CREATED",
           destination: destination,
           platform: process.platform,
           unsafe: unsafe,
-          serviceKeyStorePaths: serviceKeyStore.getSearchPaths(),
+          storeType: storeType,
           sessionStoreType: unsafe ? 'FileSessionStore' : 'SafeSessionStore (in-memory)',
         });
+
+        // Determine token provider based on store type
+        // ABAP and BTP use BtpTokenProvider (browser-based OAuth2)
+        // For now, always use BtpTokenProvider (XSUAA format can use BTP stores)
+        const tokenProvider = new BtpTokenProvider();
+
         const authBroker = new AuthBroker(
           {
             serviceKeyStore,
             sessionStore,
+            tokenProvider,
           },
-          'system'
+          'system',
+          defaultLogger
         );
         this.authBrokers.set(destination, authBroker);
         logger.info("AuthBroker created for destination", {
@@ -1703,11 +1719,11 @@ export class mcp_abap_adt_server {
         }
 
         try {
-          // Get URL from AuthBroker (loads from .env or service key)
+          // Get connection config from AuthBroker (loads from .env or service key)
           // Note: destination name must exactly match service key filename (case-sensitive)
           // Example: if file is "sk.json", destination must be "sk" (not "SK")
-          const sapUrl = await authBroker.getSapUrl(config.destination);
-          if (!sapUrl) {
+          const connConfig = await authBroker.getConnectionConfig(config.destination);
+          if (!connConfig || !connConfig.serviceUrl) {
             logger.error("Failed to get SAP URL from destination", {
               type: "SAP_DESTINATION_URL_NOT_FOUND",
               destination: config.destination,
@@ -1716,6 +1732,7 @@ export class mcp_abap_adt_server {
             });
             return;
           }
+          const sapUrl = connConfig.serviceUrl;
 
           logger.info("SAP URL retrieved from destination", {
             type: "SAP_URL_RETRIEVED",
@@ -1727,7 +1744,11 @@ export class mcp_abap_adt_server {
           // Get token from AuthBroker
           const jwtToken = await authBroker.getToken(config.destination);
 
-          this.processJwtConfigUpdate(sapUrl, jwtToken, undefined, sessionId);
+          // Register AuthBroker in global registry for connection to use during token refresh
+          const { registerAuthBroker } = require('./lib/utils');
+          registerAuthBroker(config.destination, authBroker);
+
+          this.processJwtConfigUpdate(sapUrl, jwtToken, undefined, config.destination, sessionId);
 
           logger.info("Updated SAP configuration using SAP destination (AuthBroker)", {
             type: "SAP_CONFIG_UPDATED_SAP_DESTINATION",
@@ -1770,11 +1791,11 @@ export class mcp_abap_adt_server {
         }
 
         try {
-          // Get URL from AuthBroker (loads from .env or service key)
+          // Get connection config from AuthBroker (loads from .env or service key)
           // If x-sap-url was provided in headers, it will be ignored (warning already issued by validator)
           // Note: destination name must exactly match service key filename (case-sensitive)
-          const sapUrl = await authBroker.getSapUrl(config.destination);
-          if (!sapUrl) {
+          const connConfig = await authBroker.getConnectionConfig(config.destination);
+          if (!connConfig || !connConfig.serviceUrl) {
             logger.error("Failed to get SAP URL from destination", {
               type: "MCP_DESTINATION_URL_NOT_FOUND",
               destination: config.destination,
@@ -1783,6 +1804,7 @@ export class mcp_abap_adt_server {
             });
             return;
           }
+          const sapUrl = connConfig.serviceUrl;
 
           logger.info("SAP URL retrieved from destination", {
             type: "SAP_URL_RETRIEVED",
@@ -1793,7 +1815,12 @@ export class mcp_abap_adt_server {
 
           // Get token from AuthBroker
           const jwtToken = await authBroker.getToken(config.destination);
-          this.processJwtConfigUpdate(sapUrl, jwtToken, undefined, sessionId);
+
+          // Register AuthBroker in global registry for connection to use during token refresh
+          const { registerAuthBroker } = require('./lib/utils');
+          registerAuthBroker(config.destination, authBroker);
+
+          this.processJwtConfigUpdate(sapUrl, jwtToken, undefined, config.destination, sessionId);
 
           logger.info("Updated SAP configuration using MCP destination (AuthBroker)", {
             type: "SAP_CONFIG_UPDATED_MCP_DESTINATION",
@@ -1873,7 +1900,7 @@ export class mcp_abap_adt_server {
     }
   }
 
-  private processJwtConfigUpdate(sapUrl: string, jwtToken: string, refreshToken?: string, sessionId?: string) {
+  private processJwtConfigUpdate(sapUrl: string, jwtToken: string, refreshToken?: string, destination?: string, sessionId?: string) {
     const sanitizeToken = (token: string) =>
       token.length <= 10 ? token : `${token.substring(0, 6)}…${token.substring(token.length - 4)}`;
 
@@ -1950,11 +1977,14 @@ export class mcp_abap_adt_server {
     setSapConfigOverride(newConfig);
     this.sapConfig = newConfig;
 
-    // Store config in session if sessionId is provided
+    // Store config and destination in session if sessionId is provided
     if (sessionId) {
       const session = this.streamableHttpSessions.get(sessionId);
       if (session) {
         session.sapConfig = newConfig;
+        if (destination) {
+          session.destination = destination;
+        }
       }
     }
 
@@ -2005,7 +2035,7 @@ export class mcp_abap_adt_server {
       const refreshToken = undefined; // AuthBroker handles refresh internally
 
       // Process JWT config update with the token from AuthBroker
-      this.processJwtConfigUpdate(sapUrl, jwtToken, refreshToken, sessionId);
+      this.processJwtConfigUpdate(sapUrl, jwtToken, refreshToken, destination, sessionId);
 
       logger.info("Updated SAP configuration using AuthBroker (destination-based)", {
         type: "SAP_CONFIG_UPDATED_AUTH_BROKER",
@@ -2848,15 +2878,18 @@ export class mcp_abap_adt_server {
         try {
           const authBroker = await this.getOrCreateAuthBroker(this.defaultMcpDestination);
           if (authBroker) {
-            const sapUrl = await authBroker.getSapUrl(this.defaultMcpDestination);
-            if (sapUrl) {
+            const connConfig = await authBroker.getConnectionConfig(this.defaultMcpDestination);
+            if (connConfig?.serviceUrl) {
               const jwtToken = await authBroker.getToken(this.defaultMcpDestination);
               if (jwtToken) {
-                this.processJwtConfigUpdate(sapUrl, jwtToken, undefined);
+                // Register AuthBroker in global registry for connection to use during token refresh
+                const { registerAuthBroker } = require('./lib/utils');
+                registerAuthBroker(this.defaultMcpDestination, authBroker);
+                this.processJwtConfigUpdate(connConfig.serviceUrl, jwtToken, undefined, this.defaultMcpDestination);
                 logger.info("SAP configuration initialized from --mcp parameter for stdio transport", {
                   type: "STDIO_MCP_DESTINATION_INIT",
                   destination: this.defaultMcpDestination,
-                  url: sapUrl,
+                  url: connConfig.serviceUrl,
                 });
               }
             }
@@ -3183,11 +3216,13 @@ export class mcp_abap_adt_server {
           });
 
           // Run handlers in AsyncLocalStorage context with session info
-          // This allows getManagedConnection() to access sessionId and config
+          // This allows getManagedConnection() to access sessionId, config, and destination
+          const sessionDestination = updatedSession?.destination;
           await sessionContext.run(
             {
               sessionId: session.sessionId,
               sapConfig: sessionSapConfig,
+              destination: sessionDestination,
             },
             async () => {
               // Handle HTTP request through transport (like the SDK example)
@@ -3258,15 +3293,18 @@ export class mcp_abap_adt_server {
       try {
         const authBroker = await this.getOrCreateAuthBroker(this.defaultMcpDestination);
         if (authBroker) {
-          const sapUrl = await authBroker.getSapUrl(this.defaultMcpDestination);
-          if (sapUrl) {
+          const connConfig = await authBroker.getConnectionConfig(this.defaultMcpDestination);
+          if (connConfig?.serviceUrl) {
             const jwtToken = await authBroker.getToken(this.defaultMcpDestination);
             if (jwtToken) {
-              this.processJwtConfigUpdate(sapUrl, jwtToken, undefined);
+              // Register AuthBroker in global registry for connection to use during token refresh
+              const { registerAuthBroker } = require('./lib/utils');
+              registerAuthBroker(this.defaultMcpDestination, authBroker);
+              this.processJwtConfigUpdate(connConfig.serviceUrl, jwtToken, undefined, this.defaultMcpDestination);
               logger.info("SAP configuration initialized from --mcp parameter for SSE transport", {
                 type: "SSE_MCP_DESTINATION_INIT",
                 destination: this.defaultMcpDestination,
-                url: sapUrl,
+                url: connConfig.serviceUrl,
               });
             }
           }

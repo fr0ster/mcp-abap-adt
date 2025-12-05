@@ -39,7 +39,7 @@ import {
 } from '../helpers/configHelpers';
 
 // Load environment variables
-loadTestEnv();
+// loadTestEnv will be called in beforeAll
 
 
 describe('BehaviorDefinition High-Level Handlers Integration', () => {

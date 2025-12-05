@@ -28,7 +28,7 @@ import {
 import { debugLog, delay } from '../helpers/testHelpers';
 
 // Load environment variables
-loadTestEnv();
+// loadTestEnv will be called in beforeAll
 
 describe('Class CrudClient Direct (Reference Implementation)', () => {
   let connection: AbapConnection;

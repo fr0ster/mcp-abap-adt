@@ -45,15 +45,15 @@ import {
   loadTestEnv
 } from '../helpers/configHelpers';
 
-// Load environment variables
-loadTestEnv();
-
 describe('Class Low-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;
   let hasConfig = false;
 
   beforeAll(async () => {
     try {
+      // Load environment variables and refresh tokens if needed
+      await loadTestEnv();
+
       // Get initial session
       session = await getTestSession();
       hasConfig = true;

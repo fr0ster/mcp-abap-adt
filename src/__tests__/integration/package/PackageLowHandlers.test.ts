@@ -44,7 +44,7 @@ import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getManagedConnection } from '../../../lib/utils';
 
 // Load environment variables
-loadTestEnv();
+// loadTestEnv will be called in beforeAll
 
 describe('Package Low-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;

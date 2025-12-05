@@ -1,12 +1,16 @@
 /**
  * Logger adapter that wraps the server logger to implement ILogger interface
- * from @mcp-abap-adt/connection package
+ * from @mcp-abap-adt/interfaces package
  */
-import { ILogger } from "@mcp-abap-adt/connection";
+import type { ILogger } from "@mcp-abap-adt/interfaces";
 import { logger } from "./logger";
 
 /**
  * Adapter that implements ILogger interface using the server's logger
+ *
+ * Note: The ILogger interface only includes basic logging methods (info, error, warn, debug).
+ * Additional methods like csrfToken and tlsConfig are handled by the server logger directly
+ * and are not part of the ILogger interface.
  */
 export const loggerAdapter: ILogger = {
   info: (message: string, meta?: any) => {
@@ -20,14 +24,6 @@ export const loggerAdapter: ILogger = {
   },
   debug: (message: string, meta?: any) => {
     logger.debug(message, meta);
-  },
-  csrfToken: (action: "fetch" | "retry" | "success" | "error", message: string, meta?: any) => {
-    // Map action to type for server logger
-    const type = action === "retry" ? "retry" : action;
-    logger.csrfToken(type, message, meta);
-  },
-  tlsConfig: (rejectUnauthorized: boolean) => {
-    logger.tlsConfig(rejectUnauthorized);
   },
 };
 

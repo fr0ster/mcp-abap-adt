@@ -18,6 +18,7 @@ import { AsyncLocalStorage } from "async_hooks";
 import * as crypto from "crypto";
 import * as path from "path";
 import * as os from "os";
+import { AuthBroker } from "@mcp-abap-adt/auth-broker";
 
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
@@ -40,6 +41,7 @@ const connectionCache = new Map<string, ConnectionCacheEntry>();
 export const sessionContext = new AsyncLocalStorage<{
   sessionId?: string;
   sapConfig?: SapConfig;
+  destination?: string; // Store destination for AuthBroker-based token refresh
 }>();
 
 // Session storage for stateful sessions (persists cookies and CSRF tokens)
@@ -61,6 +63,38 @@ if (process.env.MCP_ENABLE_SESSION_STORAGE === 'true' || process.env.MCP_SESSION
 
 // Fixed session ID for server connection (allows session persistence across requests)
 const SERVER_SESSION_ID = 'mcp-abap-adt-session';
+
+// Global AuthBroker registry for destination-based authentication
+// This allows JwtAbapConnection to access AuthBroker instances for token refresh
+// Store in global object so it can be accessed from @mcp-abap-adt/connection package
+declare global {
+  // eslint-disable-next-line no-var
+  var __mcpAbapAdtAuthBrokerRegistry: Map<string, any> | undefined;
+}
+
+if (!global.__mcpAbapAdtAuthBrokerRegistry) {
+  global.__mcpAbapAdtAuthBrokerRegistry = new Map<string, any>();
+}
+
+const authBrokerRegistry = global.__mcpAbapAdtAuthBrokerRegistry;
+
+/**
+ * Register AuthBroker instance for a destination
+ * This allows JwtAbapConnection to use AuthBroker for token refresh when destination is set
+ */
+export function registerAuthBroker(destination: string, authBroker: any): void {
+  authBrokerRegistry.set(destination, authBroker);
+  connectionManagerLogger.debug(`[DEBUG] registerAuthBroker - Registered AuthBroker for destination "${destination}"`);
+}
+
+/**
+ * Get AuthBroker instance for a destination
+ * Returns undefined if not registered
+ * This function can be called from @mcp-abap-adt/connection package via global registry
+ */
+export function getAuthBroker(destination: string): any | undefined {
+  return authBrokerRegistry.get(destination);
+}
 
 export { McpError, ErrorCode, getTimeout, getTimeoutConfig, logger };
 export type { AxiosResponse };
@@ -322,9 +356,58 @@ function cleanupConnectionCache() {
 }
 
 /**
+ * Create a wrapper connection that intercepts refreshToken() for destination-based authentication
+ * If destination is provided, uses AuthBroker for token refresh instead of direct refresh
+ */
+function createDestinationAwareConnection(connection: AbapConnection, destination?: string): AbapConnection {
+  if (!destination) {
+    return connection;
+  }
+
+  // Create a proxy that intercepts refreshToken() method
+  const connectionWithRefresh = connection as any;
+  if (connectionWithRefresh.refreshToken) {
+    const originalRefreshToken = connectionWithRefresh.refreshToken.bind(connection);
+    connectionWithRefresh.refreshToken = async function() {
+      // Check if AuthBroker is available for this destination
+      const authBroker = getAuthBroker(destination);
+      if (authBroker) {
+        try {
+          connectionManagerLogger.debug(`[DEBUG] Using AuthBroker for token refresh (destination: ${destination})`);
+          // Get fresh token from AuthBroker (will refresh if needed)
+          const jwtToken = await authBroker.getToken(destination);
+          const config = connectionWithRefresh.getConfig();
+          if (config) {
+            // Update config with new token
+            config.jwtToken = jwtToken;
+            // Get refresh token from session store if available
+            const { authorizationConfig } = await authBroker.getConnectionConfig(destination);
+            if (authorizationConfig?.refreshToken) {
+              config.refreshToken = authorizationConfig.refreshToken;
+            }
+            // Clear CSRF token and cookies to force new session with new token
+            connectionWithRefresh.reset();
+            connectionManagerLogger.debug(`[DEBUG] Token refreshed via AuthBroker (destination: ${destination})`);
+          }
+        } catch (error) {
+          connectionManagerLogger.debug(`[DEBUG] AuthBroker token refresh failed, falling back to direct refresh: ${error instanceof Error ? error.message : String(error)}`);
+          // Fall back to original refreshToken() if AuthBroker fails
+          return originalRefreshToken();
+        }
+      } else {
+        // No AuthBroker available, use original refreshToken()
+        return originalRefreshToken();
+      }
+    };
+  }
+
+  return connection;
+}
+
+/**
  * Get or create connection for a specific session and config
  */
-function getConnectionForSession(sessionId: string, config: SapConfig): AbapConnection {
+function getConnectionForSession(sessionId: string, config: SapConfig, destination?: string): AbapConnection {
   const configSignature = sapConfigSignature(config);
   const cacheKey = generateConnectionCacheKey(sessionId, configSignature);
 
@@ -345,7 +428,10 @@ function getConnectionForSession(sessionId: string, config: SapConfig): AbapConn
 
     // Create new connection with unique session ID per client session
     const connectionSessionId = `mcp-abap-adt-session-${sessionId}`;
-    const connection = createAbapConnection(config, loggerAdapter, sessionStorage, connectionSessionId);
+    let connection = createAbapConnection(config, loggerAdapter, sessionStorage, connectionSessionId);
+
+    // Wrap connection to intercept refreshToken() for destination-based authentication
+    connection = createDestinationAwareConnection(connection, destination);
 
     // Enable stateful session mode
     const connectionWithStateful = connection as any;
@@ -402,8 +488,8 @@ export function getManagedConnection(): AbapConnection {
   const context = sessionContext.getStore();
 
   if (context?.sessionId && context?.sapConfig) {
-    // Use session-specific connection
-    return getConnectionForSession(context.sessionId, context.sapConfig);
+    // Use session-specific connection with destination for AuthBroker-based token refresh
+    return getConnectionForSession(context.sessionId, context.sapConfig, context.destination);
   }
 
   // Fallback to global config (for backward compatibility with non-HTTP transports)

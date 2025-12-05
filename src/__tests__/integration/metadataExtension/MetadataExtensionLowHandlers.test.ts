@@ -44,7 +44,7 @@ import {
 } from '../helpers/configHelpers';
 
 // Load environment variables
-loadTestEnv();
+// loadTestEnv will be called in beforeAll
 
 describe('MetadataExtension Low-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;

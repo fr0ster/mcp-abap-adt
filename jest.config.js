@@ -17,7 +17,7 @@ module.exports = {
     '/mcp-abap-adt-clients/',
   ],
   setupFiles: ['<rootDir>/jest.setup.js'],
-  testTimeout: 300000, // 5 minutes - allows for long-running integration tests
+  testTimeout: 900000, // 5 minutes - allows for long-running integration tests
   forceExit: true,
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',

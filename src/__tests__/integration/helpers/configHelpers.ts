@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as yaml from 'yaml';
 import * as dotenv from 'dotenv';
 import { invalidateConnectionCache } from '../../../lib/utils';
+import { refreshTokensForTests } from './authHelpers';
 
 let cachedConfig: any = null;
 
@@ -18,8 +19,10 @@ let cachedConfig: any = null;
  * 2. Use MCP_ENV_PATH if set
  * 3. Try current working directory (where test was run from)
  * 4. Fallback to project root (for tests run from project root)
+ *
+ * Also attempts to refresh tokens using AuthBroker if destination is available
  */
-export function loadTestEnv(): void {
+export async function loadTestEnv(): Promise<void> {
   // Always try to load .env file, even if SAP_URL is already set
   // This ensures all variables (including refresh tokens) are loaded correctly
 
@@ -71,6 +74,17 @@ export function loadTestEnv(): void {
         // If invalidateConnectionCache fails, log but don't fail
         if (process.env.DEBUG_TESTS === 'true') {
           console.warn(`[DEBUG] loadTestEnv - Failed to invalidate connection cache: ${error?.message || String(error)}`);
+        }
+      }
+
+      // Try to refresh tokens using AuthBroker if destination is available
+      // This ensures tests have valid tokens even if refresh token in .env has expired
+      try {
+        await refreshTokensForTests();
+      } catch (error: any) {
+        // If token refresh fails, log but don't fail - tests will use existing .env tokens
+        if (process.env.DEBUG_TESTS === 'true') {
+          console.warn(`[DEBUG] loadTestEnv - Failed to refresh tokens: ${error?.message || String(error)}`);
         }
       }
     }

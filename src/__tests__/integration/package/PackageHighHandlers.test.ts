@@ -34,7 +34,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -141,26 +142,33 @@ describe('Package High-Level Handlers Integration', () => {
       console.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
-      // Cleanup: Delete test package
+      // Cleanup: Optionally delete test package
       // For packages, delete must use a new connection (force_new_connection: true)
       // because package may still be locked in the same session after create
       if (packageName) {
         try {
-          // Wait before delete to ensure package is unlocked after create
-          await delay(getOperationDelay('delete', testCase));
+          const shouldCleanup = getCleanupAfter(testCase);
 
-          console.log(`🧹 Cleanup: Deleting test package ${packageName}...`);
-          const deleteResponse = await handleDeletePackage({
-            package_name: packageName,
-            transport_request: transportRequest,
-            force_new_connection: true
-          });
+          // Delete only if cleanup_after is true
+          if (shouldCleanup) {
+            // Wait before delete to ensure package is unlocked after create
+            await delay(getOperationDelay('delete', testCase));
 
-          if (deleteResponse.isError) {
-            const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-            console.warn(`⚠️  Failed to cleanup test package ${packageName}: ${errorMsg}`);
+            console.log(`🧹 Cleanup: Deleting test package ${packageName}...`);
+            const deleteResponse = await handleDeletePackage({
+              package_name: packageName,
+              transport_request: transportRequest,
+              force_new_connection: true
+            });
+
+            if (deleteResponse.isError) {
+              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+              console.warn(`⚠️  Failed to cleanup test package ${packageName}: ${errorMsg}`);
+            } else {
+              console.log(`✅ Cleanup: Deleted test package ${packageName} successfully`);
+            }
           } else {
-            console.log(`✅ Cleanup: Deleted test package ${packageName} successfully`);
+            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${packageName}`);
           }
         } catch (cleanupError: any) {
           const errorMsg = cleanupError.message || String(cleanupError);

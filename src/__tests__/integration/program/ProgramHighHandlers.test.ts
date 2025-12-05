@@ -36,7 +36,8 @@ import {
   resolvePackageName,
   resolveTransportRequest,
   loadTestEnv,
-  isCloudConnection
+  isCloudConnection,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -178,18 +179,26 @@ WRITE: / 'Additional line'.`;
       console.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
-      // Cleanup: Delete test program
+      // Cleanup: Optionally delete test program
       if (session && programName) {
         try {
-          const deleteResponse = await handleDeleteProgram({
-            program_name: programName,
-            transport_request: transportRequest,
-            session_id: session.session_id,
-            session_state: session.session_state
-          });
+          const shouldCleanup = getCleanupAfter(testCase);
 
-          if (!deleteResponse.isError) {
-            console.log(`🧹 Cleaned up test program: ${programName}`);
+          // Delete only if cleanup_after is true
+          if (shouldCleanup) {
+            const deleteResponse = await handleDeleteProgram({
+              program_name: programName,
+              transport_request: transportRequest
+            });
+
+            if (!deleteResponse.isError) {
+              console.log(`🧹 Cleaned up test program: ${programName}`);
+            } else {
+              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+              console.warn(`⚠️  Failed to delete program ${programName}: ${errorMsg}`);
+            }
+          } else {
+            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${programName}`);
           }
         } catch (cleanupError) {
           console.warn(`⚠️  Failed to cleanup test program ${programName}: ${cleanupError}`);

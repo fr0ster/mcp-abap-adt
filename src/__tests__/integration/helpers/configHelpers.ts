@@ -289,6 +289,26 @@ export function resolveTransportRequest(testCase?: any): string | undefined {
 }
 
 /**
+ * Get cleanup_after setting from configuration
+ * Checks test case specific setting first, then falls back to global environment.cleanup_after
+ * @param testCase - Optional test case object (may have params.cleanup_after)
+ * @returns true if cleanup should be performed, false otherwise
+ */
+export function getCleanupAfter(testCase?: any): boolean {
+  // Check test case specific setting first (overrides global)
+  if (testCase?.params?.cleanup_after !== undefined) {
+    return testCase.params.cleanup_after === true;
+  }
+
+  // Fallback to global environment.cleanup_after
+  const config = loadTestConfig();
+  const globalCleanupAfter = config.environment?.cleanup_after;
+
+  // Default to true if not specified (backward compatibility)
+  return globalCleanupAfter !== false;
+}
+
+/**
  * Check if current connection is cloud (JWT auth) or on-premise (basic auth)
  * Programs are not available on cloud, so tests should be skipped
  */

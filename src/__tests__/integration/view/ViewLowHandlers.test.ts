@@ -42,7 +42,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -175,7 +176,6 @@ define view entity ${viewName} as select from dummy {
           view_name: viewName,
           description,
           package_name: packageName,
-          ddl_source: ddlSource,
           transport_request: transportRequest,
           session_id: session.session_id,
           session_state: session.session_state
@@ -354,14 +354,16 @@ define view entity ${viewName} as select from dummy {
         console.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
-        // Cleanup: Delete test view
+        // Cleanup: Unlock and optionally delete test view
         debugLog('CLEANUP', `Starting cleanup for ${viewName}`, {
           viewName,
           hasSession: !!session
         });
         if (session && viewName) {
           try {
-            // Try to unlock first if still locked
+            const shouldCleanup = getCleanupAfter(testCase);
+
+            // Always unlock (unlock is always performed)
             try {
               const lockResponse = await handleLockView({
                 view_name: viewName,
@@ -384,16 +386,24 @@ define view entity ${viewName} as select from dummy {
               // Ignore unlock errors during cleanup
             }
 
-            // Delete view
-            const deleteResponse = await handleDeleteView({
-              view_name: viewName,
-              session_id: session.session_id,
-              session_state: session.session_state
-            });
+            // Delete view only if cleanup_after is true
+            if (shouldCleanup) {
+              const deleteResponse = await handleDeleteView({
+                view_name: viewName,
+                transport_request: transportRequest
+              });
 
-            if (!deleteResponse.isError) {
-              debugLog('CLEANUP', `Successfully deleted test view: ${viewName}`);
-              console.log(`🧹 Cleaned up test view: ${viewName}`);
+              if (!deleteResponse.isError) {
+                debugLog('CLEANUP', `Successfully deleted test view: ${viewName}`);
+                console.log(`🧹 Cleaned up test view: ${viewName}`);
+              } else {
+                debugLog('CLEANUP', `Failed to delete test view: ${viewName}`, {
+                  error: deleteResponse.content[0]?.text || 'Unknown error'
+                });
+              }
+            } else {
+              debugLog('CLEANUP', `Cleanup skipped (cleanup_after=false) - object left for analysis: ${viewName}`);
+              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${viewName}`);
             }
           } catch (cleanupError) {
             debugLog('CLEANUP_ERROR', `Failed to cleanup test view ${viewName}`, {

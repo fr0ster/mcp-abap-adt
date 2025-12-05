@@ -38,7 +38,8 @@ import {
   resolvePackageName,
   resolveTransportRequest,
   loadTestEnv,
-  loadTestConfig
+  loadTestConfig,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getManagedConnection } from '../../../lib/utils';
@@ -302,9 +303,12 @@ describe('Package Low-Level Handlers Integration', () => {
         }
         throw error;
       } finally {
-        // Cleanup
+        // Cleanup: Unlock and optionally delete
         if (session && packageName) {
           try {
+            const shouldCleanup = getCleanupAfter(testCase);
+
+            // Always unlock (unlock is always performed)
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
                 await handleUnlockPackage({
@@ -319,20 +323,27 @@ describe('Package Low-Level Handlers Integration', () => {
               }
             }
 
-            await delay(1000);
+            // Delete only if cleanup_after is true
+            if (shouldCleanup) {
+              await delay(1000);
 
-            // For delete, force a new connection to bypass cache
-            // Even if package was unlocked, it may still be locked in the cached connection
-            console.log(`🧹 Cleanup: Deleting package ${packageName}...`);
-            const deleteResponse = await handleDeletePackage({
-              package_name: packageName,
-              transport_request: transportRequest,
-              force_new_connection: true
-            });
+              // For delete, force a new connection to bypass cache
+              // Even if package was unlocked, it may still be locked in the cached connection
+              console.log(`🧹 Cleanup: Deleting package ${packageName}...`);
+              const deleteResponse = await handleDeletePackage({
+                package_name: packageName,
+                transport_request: transportRequest,
+                force_new_connection: true
+              });
 
-            if (deleteResponse.isError) {
-              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-              console.warn(`⚠️  Failed to delete package ${packageName}: ${errorMsg}`);
+              if (deleteResponse.isError) {
+                const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+                console.warn(`⚠️  Failed to delete package ${packageName}: ${errorMsg}`);
+              } else {
+                console.log(`✅ Cleanup: Deleted test package ${packageName} successfully`);
+              }
+            } else {
+              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${packageName}`);
             }
           } catch (cleanupError: any) {
             console.warn(`⚠️  Failed to cleanup test package ${packageName}: ${cleanupError.message || cleanupError}`);

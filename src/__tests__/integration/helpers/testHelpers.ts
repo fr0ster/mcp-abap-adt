@@ -95,13 +95,13 @@ export function safeStringify(obj: any): string {
 
 /**
  * Debug logging helper for integration tests
- * Enabled via DEBUG_TESTS=true environment variable
+ * Enabled via DEBUG_TESTS=true or DEBUG_ADT_TESTS=true environment variable
  *
  * Usage:
  *   import { debugLog } from '../helpers/testHelpers';
  *   debugLog('STEP', 'Message', { data: 'value' });
  */
-export const DEBUG_TESTS = process.env.DEBUG_TESTS === 'true';
+export const DEBUG_TESTS = process.env.DEBUG_TESTS === 'true' || process.env.DEBUG_ADT_TESTS === 'true';
 
 export function debugLog(step: string, message: string, data?: any): void {
   if (DEBUG_TESTS) {
@@ -114,7 +114,7 @@ export function debugLog(step: string, message: string, data?: any): void {
 
 /**
  * Log test step in simple format (like adt-clients tests)
- * Enabled via DEBUG_TESTS=true environment variable
+ * Enabled via DEBUG_TESTS=true or DEBUG_ADT_TESTS=true environment variable
  *
  * Usage:
  *   import { logTestStep } from '../helpers/testHelpers';

@@ -38,7 +38,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -159,17 +160,27 @@ describe('Function High-Level Handlers Integration', () => {
 
       await delay(getOperationDelay('update', functionModuleCase));
     } finally {
-      // Cleanup: Delete test function module first, then function group
+      // Cleanup: Optionally delete test function module first, then function group
+      const shouldCleanup = getCleanupAfter(functionModuleCase) || getCleanupAfter(functionGroupCase);
+
       if (session && functionModuleName && functionGroupName) {
         try {
-          const deleteFMResponse = await handleDeleteFunctionModule({
-            function_module_name: functionModuleName,
-            function_group_name: functionGroupName,
-            transport_request: transportRequest
-          });
+          // Delete function module only if cleanup_after is true
+          if (shouldCleanup) {
+            const deleteFMResponse = await handleDeleteFunctionModule({
+              function_module_name: functionModuleName,
+              function_group_name: functionGroupName,
+              transport_request: transportRequest
+            });
 
-          if (!deleteFMResponse.isError) {
-            console.log(`🧹 Cleaned up test function module: ${functionModuleName}`);
+            if (!deleteFMResponse.isError) {
+              console.log(`🧹 Cleaned up test function module: ${functionModuleName}`);
+            } else {
+              const errorMsg = deleteFMResponse.content[0]?.text || 'Unknown error';
+              console.warn(`⚠️  Failed to delete function module ${functionModuleName}: ${errorMsg}`);
+            }
+          } else {
+            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${functionModuleName}`);
           }
         } catch (cleanupError) {
           console.warn(`⚠️  Failed to cleanup test function module ${functionModuleName}: ${cleanupError}`);
@@ -178,13 +189,21 @@ describe('Function High-Level Handlers Integration', () => {
 
       if (session && functionGroupName) {
         try {
-          const deleteFGResponse = await handleDeleteFunctionGroup({
-            function_group_name: functionGroupName,
-            transport_request: transportRequest
-          });
+          // Delete function group only if cleanup_after is true
+          if (shouldCleanup) {
+            const deleteFGResponse = await handleDeleteFunctionGroup({
+              function_group_name: functionGroupName,
+              transport_request: transportRequest
+            });
 
-          if (!deleteFGResponse.isError) {
-            console.log(`🧹 Cleaned up test function group: ${functionGroupName}`);
+            if (!deleteFGResponse.isError) {
+              console.log(`🧹 Cleaned up test function group: ${functionGroupName}`);
+            } else {
+              const errorMsg = deleteFGResponse.content[0]?.text || 'Unknown error';
+              console.warn(`⚠️  Failed to delete function group ${functionGroupName}: ${errorMsg}`);
+            }
+          } else {
+            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${functionGroupName}`);
           }
         } catch (cleanupError) {
           console.warn(`⚠️  Failed to cleanup test function group ${functionGroupName}: ${cleanupError}`);

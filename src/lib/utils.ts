@@ -496,7 +496,16 @@ export function getManagedConnection(): AbapConnection {
   const config = overrideConfig ?? getConfig();
 
   // Helper function for Windows-compatible logging
+  // Only logs when DEBUG_CONNECTORS, DEBUG_TESTS, or DEBUG_ADT_TESTS is enabled
   const debugLog = (message: string): void => {
+    const debugEnabled = process.env.DEBUG_CONNECTORS === 'true' ||
+                         process.env.DEBUG_TESTS === 'true' ||
+                         process.env.DEBUG_ADT_TESTS === 'true';
+
+    if (!debugEnabled) {
+      return; // Suppress debug logs when not in debug mode
+    }
+
     // Try stderr first
     try {
       process.stderr.write(message);
@@ -517,7 +526,7 @@ export function getManagedConnection(): AbapConnection {
     }
   };
 
-  // Debug logging - verify URL is clean before creating connection (always)
+  // Debug logging - verify URL is clean before creating connection (only in debug mode)
   if (config.url) {
     const urlHex = Buffer.from(config.url, 'utf8').toString('hex');
     debugLog(`[MCP-UTILS] Creating connection with URL: "${config.url}" (length: ${config.url.length})\n`);

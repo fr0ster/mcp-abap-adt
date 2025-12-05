@@ -42,7 +42,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -382,14 +383,16 @@ describe('Domain Low-Level Handlers Integration', () => {
         console.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
-        // Cleanup: Unlock and delete test domain
+        // Cleanup: Unlock and optionally delete test domain
         debugLog('CLEANUP', `Starting cleanup for ${domainName}`, {
           domainName,
           hasSession: !!session
         });
         if (session && domainName) {
           try {
-            // Try to unlock first if we have lock handle from the test
+            const shouldCleanup = getCleanupAfter(testCase);
+
+            // Always unlock (unlock is always performed)
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
                 debugLog('CLEANUP', `Unlocking domain ${domainName} before deletion`, {
@@ -455,25 +458,31 @@ describe('Domain Low-Level Handlers Integration', () => {
               }
             }
 
-            // Wait a bit before deletion
-            await delay(1000);
+            // Delete only if cleanup_after is true
+            if (shouldCleanup) {
+              // Wait a bit before deletion
+              await delay(1000);
 
-            // Delete domain
-            debugLog('CLEANUP', `Deleting domain ${domainName}`);
-            const deleteResponse = await handleDeleteDomain({
-              domain_name: domainName,
-              transport_request: transportRequest
-            });
-
-            if (!deleteResponse.isError) {
-              debugLog('CLEANUP', `Successfully deleted test domain: ${domainName}`);
-              console.log(`🧹 Cleaned up test domain: ${domainName}`);
-            } else {
-              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-              debugLog('CLEANUP_ERROR', `Failed to delete domain ${domainName}`, {
-                error: errorMsg
+              // Delete domain
+              debugLog('CLEANUP', `Deleting domain ${domainName}`);
+              const deleteResponse = await handleDeleteDomain({
+                domain_name: domainName,
+                transport_request: transportRequest
               });
-              console.warn(`⚠️  Failed to delete domain ${domainName}: ${errorMsg}`);
+
+              if (!deleteResponse.isError) {
+                debugLog('CLEANUP', `Successfully deleted test domain: ${domainName}`);
+                console.log(`🧹 Cleaned up test domain: ${domainName}`);
+              } else {
+                const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+                debugLog('CLEANUP_ERROR', `Failed to delete domain ${domainName}`, {
+                  error: errorMsg
+                });
+                console.warn(`⚠️  Failed to delete domain ${domainName}: ${errorMsg}`);
+              }
+            } else {
+              debugLog('CLEANUP', `Cleanup skipped (cleanup_after=false) - object left for analysis: ${domainName}`);
+              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${domainName}`);
             }
           } catch (cleanupError: any) {
             debugLog('CLEANUP_ERROR', `Failed to cleanup test domain ${domainName}`, {

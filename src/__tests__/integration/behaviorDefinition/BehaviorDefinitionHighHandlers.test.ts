@@ -35,7 +35,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -169,16 +170,26 @@ describe('BehaviorDefinition High-Level Handlers Integration', () => {
       console.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
-      // Cleanup: Delete test behavior definition
+      // Cleanup: Optionally delete test behavior definition
       if (session && bdefName) {
         try {
-          const deleteResponse = await handleDeleteBehaviorDefinition({
-            name: bdefName,
-            transport_request: transportRequest
-          });
+          const shouldCleanup = getCleanupAfter(testCase);
 
-          if (!deleteResponse.isError) {
-            console.log(`🧹 Cleaned up test behavior definition: ${bdefName}`);
+          // Delete only if cleanup_after is true
+          if (shouldCleanup) {
+            const deleteResponse = await handleDeleteBehaviorDefinition({
+              name: bdefName,
+              transport_request: transportRequest
+            });
+
+            if (!deleteResponse.isError) {
+              console.log(`🧹 Cleaned up test behavior definition: ${bdefName}`);
+            } else {
+              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+              console.warn(`⚠️  Failed to delete behavior definition ${bdefName}: ${errorMsg}`);
+            }
+          } else {
+            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${bdefName}`);
           }
         } catch (cleanupError) {
           console.warn(`⚠️  Failed to cleanup test behavior definition ${bdefName}: ${cleanupError}`);

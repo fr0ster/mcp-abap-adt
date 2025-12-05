@@ -35,7 +35,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -250,28 +251,35 @@ ENDCLASS.`;
       console.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
-      // Cleanup: Delete test class
+      // Cleanup: Optionally delete test class
       if (session && className) {
         try {
-          debugLog('CLEANUP', `Starting cleanup: deleting test class ${className}`, {
-            class_name: className,
-            session_id: session.session_id
-          });
+          const shouldCleanup = getCleanupAfter(testCase);
 
-          const deleteResponse = await handleDeleteClass({
+          debugLog('CLEANUP', `Starting cleanup for ${className}`, {
             class_name: className,
-            transport_request: transportRequest,
             session_id: session.session_id,
-            session_state: session.session_state
+            cleanup_after: shouldCleanup
           });
 
-          if (!deleteResponse.isError) {
-            debugLog('CLEANUP', `Successfully deleted test class: ${className}`);
-            console.log(`🧹 Cleaned up test class: ${className}`);
-          } else {
-            debugLog('CLEANUP', `Failed to delete test class: ${className}`, {
-              error: deleteResponse.content[0]?.text || 'Unknown error'
+          // Delete only if cleanup_after is true
+          if (shouldCleanup) {
+            const deleteResponse = await handleDeleteClass({
+              class_name: className,
+              transport_request: transportRequest
             });
+
+            if (!deleteResponse.isError) {
+              debugLog('CLEANUP', `Successfully deleted test class: ${className}`);
+              console.log(`🧹 Cleaned up test class: ${className}`);
+            } else {
+              debugLog('CLEANUP', `Failed to delete test class: ${className}`, {
+                error: deleteResponse.content[0]?.text || 'Unknown error'
+              });
+            }
+          } else {
+            debugLog('CLEANUP', `Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
+            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
           }
         } catch (cleanupError) {
           debugLog('CLEANUP_ERROR', `Exception during cleanup: ${cleanupError}`, {

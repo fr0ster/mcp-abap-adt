@@ -119,17 +119,18 @@ export async function refreshTokensForTests(): Promise<void> {
 
     // Determine token provider based on store type (same as in getOrCreateAuthBroker)
     // ABAP and BTP use BtpTokenProvider (browser-based OAuth2)
-    const tokenProvider = new BtpTokenProvider(defaultLogger);
+    const tokenProvider = new BtpTokenProvider();
 
     // Create AuthBroker (same as in getOrCreateAuthBroker)
-    // Use 'system' browser to open browser for authentication in tests
+    // Use 'none' browser in tests to avoid opening browser automatically
+    // If refresh token is expired, tests will fail gracefully instead of opening browser
     const authBroker = new AuthBroker(
       {
         serviceKeyStore,
         sessionStore,
         tokenProvider,
       },
-      'system', // Open system browser for authentication
+      'none', // Don't open browser automatically in tests
       defaultLogger
     );
 

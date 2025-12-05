@@ -23,7 +23,8 @@ import {
   resolveTransportRequest,
   loadTestEnv,
   isCloudConnection,
-  preCheckTestParameters
+  preCheckTestParameters,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 import { debugLog, delay } from '../helpers/testHelpers';
 
@@ -257,14 +258,22 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       console.error(`❌ CrudClient direct test failed: ${errorMessage}`);
       throw error;
     } finally {
-      // Cleanup: Delete test class
+      // Cleanup: Optionally delete test class
       if (className) {
         try {
-          debugLog('CLEANUP', `Starting cleanup: deleting test class ${className}`);
-          await client.deleteClass({
-            className
-          });
-          console.log(`🧹 Cleaned up test class: ${className}`);
+          const shouldCleanup = getCleanupAfter(testCase);
+
+          // Delete only if cleanup_after is true
+          if (shouldCleanup) {
+            debugLog('CLEANUP', `Starting cleanup: deleting test class ${className}`);
+            await client.deleteClass({
+              className
+            });
+            console.log(`🧹 Cleaned up test class: ${className}`);
+          } else {
+            debugLog('CLEANUP', `Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
+            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
+          }
         } catch (cleanupError: any) {
           console.warn(`⚠️  Failed to cleanup test class ${className}: ${cleanupError.message}`);
         }

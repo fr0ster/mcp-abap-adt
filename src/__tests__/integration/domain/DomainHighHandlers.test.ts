@@ -35,7 +35,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -153,17 +154,26 @@ describe('Domain High-Level Handlers Integration', () => {
       console.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
-      // Cleanup: Delete test domain
+      // Cleanup: Optionally delete test domain
       if (session && domainName) {
         try {
-          const deleteResponse = await handleDeleteDomain({
-            domain_name: domainName,
-            session_id: session.session_id,
-            session_state: session.session_state
-          });
+          const shouldCleanup = getCleanupAfter(testCase);
 
-          if (!deleteResponse.isError) {
-            console.log(`🧹 Cleaned up test domain: ${domainName}`);
+          // Delete only if cleanup_after is true
+          if (shouldCleanup) {
+            const deleteResponse = await handleDeleteDomain({
+              domain_name: domainName,
+              transport_request: transportRequest
+            });
+
+            if (!deleteResponse.isError) {
+              console.log(`🧹 Cleaned up test domain: ${domainName}`);
+            } else {
+              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+              console.warn(`⚠️  Failed to delete domain ${domainName}: ${errorMsg}`);
+            }
+          } else {
+            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${domainName}`);
           }
         } catch (cleanupError) {
           console.warn(`⚠️  Failed to cleanup test domain ${domainName}: ${cleanupError}`);

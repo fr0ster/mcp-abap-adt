@@ -33,7 +33,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -125,16 +126,26 @@ define table ${tableName.toLowerCase()} {
       console.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
-      // Cleanup: Delete test table
+      // Cleanup: Optionally delete test table
       if (session && tableName) {
         try {
-          const deleteResponse = await handleDeleteTable({
-            table_name: tableName,
-            transport_request: transportRequest
-          });
+          const shouldCleanup = getCleanupAfter(testCase);
 
-          if (!deleteResponse.isError) {
-            console.log(`🧹 Cleaned up test table: ${tableName}`);
+          // Delete only if cleanup_after is true
+          if (shouldCleanup) {
+            const deleteResponse = await handleDeleteTable({
+              table_name: tableName,
+              transport_request: transportRequest
+            });
+
+            if (!deleteResponse.isError) {
+              console.log(`🧹 Cleaned up test table: ${tableName}`);
+            } else {
+              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+              console.warn(`⚠️  Failed to delete table ${tableName}: ${errorMsg}`);
+            }
+          } else {
+            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${tableName}`);
           }
         } catch (cleanupError) {
           console.warn(`⚠️  Failed to cleanup test table ${tableName}: ${cleanupError}`);

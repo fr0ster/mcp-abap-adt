@@ -39,7 +39,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -255,9 +256,12 @@ define structure ${structureName} {
         console.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
-        // Cleanup
+        // Cleanup: Unlock and optionally delete
         if (session && structureName) {
           try {
+            const shouldCleanup = getCleanupAfter(testCase);
+
+            // Always unlock (unlock is always performed)
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
                 await handleUnlockStructure({
@@ -271,16 +275,23 @@ define structure ${structureName} {
               }
             }
 
-            await delay(1000);
+            // Delete only if cleanup_after is true
+            if (shouldCleanup) {
+              await delay(1000);
 
-            const deleteResponse = await handleDeleteStructure({
-              structure_name: structureName,
-              transport_request: transportRequest
-            });
+              const deleteResponse = await handleDeleteStructure({
+                structure_name: structureName,
+                transport_request: transportRequest
+              });
 
-            if (deleteResponse.isError) {
-              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-              console.warn(`⚠️  Failed to delete structure ${structureName}: ${errorMsg}`);
+              if (deleteResponse.isError) {
+                const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+                console.warn(`⚠️  Failed to delete structure ${structureName}: ${errorMsg}`);
+              } else {
+                console.log(`🧹 Cleaned up test structure: ${structureName}`);
+              }
+            } else {
+              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${structureName}`);
             }
           } catch (cleanupError: any) {
             console.warn(`⚠️  Failed to cleanup test structure ${structureName}: ${cleanupError.message || cleanupError}`);

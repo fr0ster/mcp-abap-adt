@@ -2,18 +2,18 @@
 
 ## [Unreleased]
 
+## [1.1.26] - 2025-12-05
+
 ### Changed
 - **Updated dependencies to latest versions**:
-  - `@mcp-abap-adt/adt-clients`: `^0.1.33` → `^0.1.35`
-  - `@mcp-abap-adt/auth-broker`: `0.1.7` → `^0.1.8`
-  - `@mcp-abap-adt/auth-providers`: `0.1.0` → `^0.1.1`
-  - `@mcp-abap-adt/auth-stores`: `0.1.2` → `^0.1.3`
-  - `@mcp-abap-adt/connection`: `^0.1.13` → `^0.1.14`
-  - Added `@mcp-abap-adt/interfaces`: `^0.1.1` (new dependency)
-- **Updated interface imports**: Migrated from `@mcp-abap-adt/auth-broker` and `@mcp-abap-adt/connection` to `@mcp-abap-adt/interfaces` for shared interface definitions
-  - `IServiceKeyStore`, `ISessionStore` now imported from `@mcp-abap-adt/interfaces`
-  - `ILogger` now imported from `@mcp-abap-adt/interfaces` in `loggerAdapter.ts`
-- **Logger adapter simplification**: Removed `csrfToken` and `tlsConfig` methods from `loggerAdapter` as they are not part of the base `ILogger` interface
+  - `@mcp-abap-adt/adt-clients`: `^0.1.35` → `^0.1.36`
+  - `@mcp-abap-adt/auth-broker`: `^0.1.8` → `^0.1.9`
+  - `@mcp-abap-adt/auth-providers`: `^0.1.1` → `^0.1.2`
+  - `@mcp-abap-adt/auth-stores`: `^0.1.3` → `^0.1.4`
+  - `@mcp-abap-adt/connection`: `^0.1.14` → `^0.1.15`
+  - `@mcp-abap-adt/header-validator`: `^0.1.4` → `^0.1.6`
+  - `@mcp-abap-adt/interfaces`: `^0.1.1` (unchanged)
+  - `@mcp-abap-adt/logger`: `^0.1.0` → `^0.1.1`
 
 ## [1.1.25] - 2025-12-12
 

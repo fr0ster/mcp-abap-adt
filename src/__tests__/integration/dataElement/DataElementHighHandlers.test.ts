@@ -35,7 +35,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -177,16 +178,26 @@ describe('DataElement High-Level Handlers Integration', () => {
       console.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
-      // Cleanup: Delete test data element
+      // Cleanup: Optionally delete test data element
       if (session && dataElementName) {
         try {
-          const deleteResponse = await handleDeleteDataElement({
-            data_element_name: dataElementName,
-            transport_request: transportRequest
-          });
+          const shouldCleanup = getCleanupAfter(testCase);
 
-          if (!deleteResponse.isError) {
-            console.log(`🧹 Cleaned up test data element: ${dataElementName}`);
+          // Delete only if cleanup_after is true
+          if (shouldCleanup) {
+            const deleteResponse = await handleDeleteDataElement({
+              data_element_name: dataElementName,
+              transport_request: transportRequest
+            });
+
+            if (!deleteResponse.isError) {
+              console.log(`🧹 Cleaned up test data element: ${dataElementName}`);
+            } else {
+              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+              console.warn(`⚠️  Failed to delete data element ${dataElementName}: ${errorMsg}`);
+            }
+          } else {
+            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${dataElementName}`);
           }
         } catch (cleanupError) {
           console.warn(`⚠️  Failed to cleanup test data element ${dataElementName}: ${cleanupError}`);

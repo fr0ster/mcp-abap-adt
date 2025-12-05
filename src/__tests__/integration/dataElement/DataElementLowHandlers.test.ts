@@ -42,7 +42,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -373,14 +374,16 @@ describe('DataElement Low-Level Handlers Integration', () => {
         console.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
-        // Cleanup: Delete test data element
+        // Cleanup: Unlock and optionally delete test data element
         debugLog('CLEANUP', `Starting cleanup for ${dataElementName}`, {
           dataElementName,
           hasSession: !!session
         });
         if (session && dataElementName) {
           try {
-            // Try to unlock first if still locked
+            const shouldCleanup = getCleanupAfter(testCase);
+
+            // Always unlock (unlock is always performed)
             try {
               const lockResponse = await handleLockDataElement({
                 data_element_name: dataElementName,
@@ -403,15 +406,25 @@ describe('DataElement Low-Level Handlers Integration', () => {
               // Ignore unlock errors during cleanup
             }
 
-            // Delete data element
-            const deleteResponse = await handleDeleteDataElement({
-              data_element_name: dataElementName,
-              transport_request: transportRequest
-            });
+            // Delete data element only if cleanup_after is true
+            if (shouldCleanup) {
+              const deleteResponse = await handleDeleteDataElement({
+                data_element_name: dataElementName,
+                transport_request: transportRequest
+              });
 
-            if (!deleteResponse.isError) {
-              debugLog('CLEANUP', `Successfully deleted test data element: ${dataElementName}`);
-              console.log(`🧹 Cleaned up test data element: ${dataElementName}`);
+              if (!deleteResponse.isError) {
+                debugLog('CLEANUP', `Successfully deleted test data element: ${dataElementName}`);
+                console.log(`🧹 Cleaned up test data element: ${dataElementName}`);
+              } else {
+                const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+                debugLog('CLEANUP', `Failed to delete test data element: ${dataElementName}`, {
+                  error: errorMsg
+                });
+              }
+            } else {
+              debugLog('CLEANUP', `Cleanup skipped (cleanup_after=false) - object left for analysis: ${dataElementName}`);
+              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${dataElementName}`);
             }
           } catch (cleanupError) {
             debugLog('CLEANUP_ERROR', `Failed to cleanup test data element ${dataElementName}`, {

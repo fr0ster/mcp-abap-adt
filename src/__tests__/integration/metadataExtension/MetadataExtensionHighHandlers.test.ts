@@ -35,7 +35,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -183,16 +184,26 @@ annotate view ZI_TEST_ENTITY with {
       console.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
-      // Cleanup: Delete test metadata extension
+      // Cleanup: Optionally delete test metadata extension
       if (session && ddlxName) {
         try {
-          const deleteResponse = await handleDeleteMetadataExtension({
-            name: ddlxName,
-            transport_request: transportRequest
-          });
+          const shouldCleanup = getCleanupAfter(testCase);
 
-          if (!deleteResponse.isError) {
-            console.log(`🧹 Cleaned up test metadata extension: ${ddlxName}`);
+          // Delete only if cleanup_after is true
+          if (shouldCleanup) {
+            const deleteResponse = await handleDeleteMetadataExtension({
+              name: ddlxName,
+              transport_request: transportRequest
+            });
+
+            if (!deleteResponse.isError) {
+              console.log(`🧹 Cleaned up test metadata extension: ${ddlxName}`);
+            } else {
+              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+              console.warn(`⚠️  Failed to delete metadata extension ${ddlxName}: ${errorMsg}`);
+            }
+          } else {
+            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${ddlxName}`);
           }
         } catch (cleanupError) {
           console.warn(`⚠️  Failed to cleanup test metadata extension ${ddlxName}: ${cleanupError}`);

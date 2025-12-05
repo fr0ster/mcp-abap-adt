@@ -40,7 +40,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -256,6 +257,9 @@ annotate view ${testCase.params.view_name || 'ZI_VIEW'} with {
         // Only proceed with cleanup if object was successfully created
         if (session && ddlxName) {
           try {
+            const shouldCleanup = getCleanupAfter(testCase);
+
+            // Always unlock (unlock is always performed)
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
                 await handleUnlockMetadataExtension({
@@ -268,22 +272,28 @@ annotate view ${testCase.params.view_name || 'ZI_VIEW'} with {
                 // Ignore unlock errors during cleanup
               }
             }
-            await delay(1000);
-            const deleteResponse = await handleDeleteMetadataExtension({
-              name: ddlxName,
-              transport_request: transportRequest
-            });
-            if (!deleteResponse.isError) {
-              console.log(`🧹 Cleaned up test metadata extension: ${ddlxName}`);
-            } else {
-              // Check if object doesn't exist (404) - that's okay, it may have been deleted already
-              const errorMsg = deleteResponse.content[0]?.text || '';
-              if (errorMsg.includes('not found') || errorMsg.includes('already be deleted')) {
-                // Object doesn't exist - that's fine, no need to log error
+
+            // Delete only if cleanup_after is true
+            if (shouldCleanup) {
+              await delay(1000);
+              const deleteResponse = await handleDeleteMetadataExtension({
+                name: ddlxName,
+                transport_request: transportRequest
+              });
+              if (!deleteResponse.isError) {
+                console.log(`🧹 Cleaned up test metadata extension: ${ddlxName}`);
               } else {
-                // Other error - log but don't fail test
-                console.warn(`⚠️  Failed to delete metadata extension ${ddlxName}: ${errorMsg}`);
+                // Check if object doesn't exist (404) - that's okay, it may have been deleted already
+                const errorMsg = deleteResponse.content[0]?.text || '';
+                if (errorMsg.includes('not found') || errorMsg.includes('already be deleted')) {
+                  // Object doesn't exist - that's fine, no need to log error
+                } else {
+                  // Other error - log but don't fail test
+                  console.warn(`⚠️  Failed to delete metadata extension ${ddlxName}: ${errorMsg}`);
+                }
               }
+            } else {
+              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${ddlxName}`);
             }
           } catch (cleanupError: any) {
             // Ignore cleanup errors - object may not exist or may have been deleted already

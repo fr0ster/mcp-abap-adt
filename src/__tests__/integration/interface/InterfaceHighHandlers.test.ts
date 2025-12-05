@@ -35,7 +35,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -177,18 +178,26 @@ ENDINTERFACE.`;
       console.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
-      // Cleanup: Delete test interface
+      // Cleanup: Optionally delete test interface
       if (session && interfaceName) {
         try {
-          const deleteResponse = await handleDeleteInterface({
-            interface_name: interfaceName,
-            transport_request: transportRequest,
-            session_id: session.session_id,
-            session_state: session.session_state
-          });
+          const shouldCleanup = getCleanupAfter(testCase);
 
-          if (!deleteResponse.isError) {
-            console.log(`🧹 Cleaned up test interface: ${interfaceName}`);
+          // Delete only if cleanup_after is true
+          if (shouldCleanup) {
+            const deleteResponse = await handleDeleteInterface({
+              interface_name: interfaceName,
+              transport_request: transportRequest
+            });
+
+            if (!deleteResponse.isError) {
+              console.log(`🧹 Cleaned up test interface: ${interfaceName}`);
+            } else {
+              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+              console.warn(`⚠️  Failed to delete interface ${interfaceName}: ${errorMsg}`);
+            }
+          } else {
+            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${interfaceName}`);
           }
         } catch (cleanupError) {
           console.warn(`⚠️  Failed to cleanup test interface ${interfaceName}: ${cleanupError}`);

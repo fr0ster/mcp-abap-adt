@@ -21,7 +21,8 @@ import { handleDeleteView } from '../../../handlers/view/low/handleDeleteView';
 
 import {
   parseHandlerResponse,
-  delay
+  delay,
+  debugLog
 } from '../helpers/testHelpers';
 import {
   getTestSession,
@@ -34,7 +35,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -176,18 +178,26 @@ as select from dummy
       console.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
-      // Cleanup: Delete test view
+      // Cleanup: Optionally delete test view
       if (session && viewName) {
         try {
-          const deleteResponse = await handleDeleteView({
-            view_name: viewName,
-            transport_request: transportRequest,
-            session_id: session.session_id,
-            session_state: session.session_state
-          });
+          const shouldCleanup = getCleanupAfter(testCase);
 
-          if (!deleteResponse.isError) {
-            console.log(`🧹 Cleaned up test view: ${viewName}`);
+          // Delete only if cleanup_after is true
+          if (shouldCleanup) {
+            const deleteResponse = await handleDeleteView({
+              view_name: viewName,
+              transport_request: transportRequest
+            });
+
+            if (!deleteResponse.isError) {
+              console.log(`🧹 Cleaned up test view: ${viewName}`);
+            } else {
+              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+              console.warn(`⚠️  Failed to delete view ${viewName}: ${errorMsg}`);
+            }
+          } else {
+            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${viewName}`);
           }
         } catch (cleanupError) {
           console.warn(`⚠️  Failed to cleanup test view ${viewName}: ${cleanupError}`);

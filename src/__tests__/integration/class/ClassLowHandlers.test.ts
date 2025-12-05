@@ -42,7 +42,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 describe('Class Low-Level Handlers Integration', () => {
@@ -361,15 +362,18 @@ ENDCLASS.`;
         console.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
-        // Cleanup: Delete test class
+        // Cleanup: Unlock and optionally delete test class
         if (session && className) {
           try {
-            debugLog('CLEANUP', `Starting cleanup: deleting test class ${className}`, {
+            const shouldCleanup = getCleanupAfter(testCase);
+
+            debugLog('CLEANUP', `Starting cleanup for ${className}`, {
               class_name: className,
-              session_id: session.session_id
+              session_id: session.session_id,
+              cleanup_after: shouldCleanup
             });
 
-            // Try to unlock first if still locked
+            // Always try to unlock first if still locked (unlock is always performed)
             try {
               debugLog('CLEANUP', `Attempting to unlock class ${className} before deletion`);
               const lockResponse = await handleLockClass({
@@ -388,7 +392,7 @@ ENDCLASS.`;
                   session_id: lockSession.session_id,
                   session_state: lockSession.session_state
                 });
-                debugLog('CLEANUP', `Successfully unlocked class ${className} before deletion`);
+                debugLog('CLEANUP', `Successfully unlocked class ${className}`);
               }
             } catch (e) {
               debugLog('CLEANUP', `Could not unlock class ${className} (may not be locked)`, {
@@ -397,20 +401,24 @@ ENDCLASS.`;
               // Ignore unlock errors during cleanup
             }
 
-            // Delete class
-            const deleteResponse = await handleDeleteClass({
-              class_name: className,
-              session_id: session.session_id,
-              session_state: session.session_state
-            });
-
-            if (!deleteResponse.isError) {
-              debugLog('CLEANUP', `Successfully deleted test class: ${className}`);
-              console.log(`🧹 Cleaned up test class: ${className}`);
-            } else {
-              debugLog('CLEANUP', `Failed to delete test class: ${className}`, {
-                error: deleteResponse.content[0]?.text || 'Unknown error'
+            // Delete class only if cleanup_after is true
+            if (shouldCleanup) {
+              const deleteResponse = await handleDeleteClass({
+                class_name: className,
+                transport_request: transportRequest
               });
+
+              if (!deleteResponse.isError) {
+                debugLog('CLEANUP', `Successfully deleted test class: ${className}`);
+                console.log(`🧹 Cleaned up test class: ${className}`);
+              } else {
+                debugLog('CLEANUP', `Failed to delete test class: ${className}`, {
+                  error: deleteResponse.content[0]?.text || 'Unknown error'
+                });
+              }
+            } else {
+              debugLog('CLEANUP', `Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
+              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
             }
           } catch (cleanupError) {
             debugLog('CLEANUP_ERROR', `Exception during cleanup: ${cleanupError}`, {

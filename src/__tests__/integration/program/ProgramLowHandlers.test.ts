@@ -43,7 +43,8 @@ import {
   resolvePackageName,
   resolveTransportRequest,
   loadTestEnv,
-  isCloudConnection
+  isCloudConnection,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -370,14 +371,16 @@ describe('Program Low-Level Handlers Integration', () => {
         console.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
-        // Cleanup: Unlock and delete test program
+        // Cleanup: Unlock and optionally delete test program
         debugLog('CLEANUP', `Starting cleanup for ${programName}`, {
           programName,
           hasSession: !!session
         });
         if (session && programName) {
           try {
-            // Try to unlock first if we have lock handle
+            const shouldCleanup = getCleanupAfter(testCase);
+
+            // Always unlock (unlock is always performed)
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
                 await handleUnlockProgram({
@@ -412,24 +415,29 @@ describe('Program Low-Level Handlers Integration', () => {
               }
             }
 
-            // Wait a bit before deletion
-            await delay(1000);
+            // Delete program only if cleanup_after is true
+            if (shouldCleanup) {
+              // Wait a bit before deletion
+              await delay(1000);
 
-            // Delete program
-            const deleteResponse = await handleDeleteProgram({
-              program_name: programName,
-              transport_request: transportRequest
-            });
-
-            if (!deleteResponse.isError) {
-              debugLog('CLEANUP', `Successfully deleted test program: ${programName}`);
-              console.log(`🧹 Cleaned up test program: ${programName}`);
-            } else {
-              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-              debugLog('CLEANUP_ERROR', `Failed to delete program ${programName}`, {
-                error: errorMsg
+              const deleteResponse = await handleDeleteProgram({
+                program_name: programName,
+                transport_request: transportRequest
               });
-              console.warn(`⚠️  Failed to delete program ${programName}: ${errorMsg}`);
+
+              if (!deleteResponse.isError) {
+                debugLog('CLEANUP', `Successfully deleted test program: ${programName}`);
+                console.log(`🧹 Cleaned up test program: ${programName}`);
+              } else {
+                const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+                debugLog('CLEANUP_ERROR', `Failed to delete program ${programName}`, {
+                  error: errorMsg
+                });
+                console.warn(`⚠️  Failed to delete program ${programName}: ${errorMsg}`);
+              }
+            } else {
+              debugLog('CLEANUP', `Cleanup skipped (cleanup_after=false) - object left for analysis: ${programName}`);
+              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${programName}`);
             }
           } catch (cleanupError: any) {
             debugLog('CLEANUP_ERROR', `Failed to cleanup test program ${programName}`, {

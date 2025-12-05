@@ -45,7 +45,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -313,13 +314,16 @@ describe('Interface Low-Level Handlers Integration', () => {
         console.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
-        // Cleanup
+        // Cleanup: Unlock and optionally delete
         debugLog('CLEANUP', `Starting cleanup for ${interfaceName}`, {
           interfaceName,
           hasSession: !!session
         });
         if (session && interfaceName) {
           try {
+            const shouldCleanup = getCleanupAfter(testCase);
+
+            // Always unlock (unlock is always performed)
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
                 await handleUnlockInterface({
@@ -333,22 +337,28 @@ describe('Interface Low-Level Handlers Integration', () => {
               }
             }
 
-            await delay(1000);
+            // Delete only if cleanup_after is true
+            if (shouldCleanup) {
+              await delay(1000);
 
-            const deleteResponse = await handleDeleteInterface({
-              interface_name: interfaceName,
-              transport_request: transportRequest
-            });
-
-            if (!deleteResponse.isError) {
-              debugLog('CLEANUP', `Successfully deleted test interface: ${interfaceName}`);
-              console.log(`🧹 Cleaned up test interface: ${interfaceName}`);
-            } else {
-              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-              debugLog('CLEANUP_ERROR', `Failed to delete interface ${interfaceName}`, {
-                error: errorMsg
+              const deleteResponse = await handleDeleteInterface({
+                interface_name: interfaceName,
+                transport_request: transportRequest
               });
-              console.warn(`⚠️  Failed to delete interface ${interfaceName}: ${errorMsg}`);
+
+              if (!deleteResponse.isError) {
+                debugLog('CLEANUP', `Successfully deleted test interface: ${interfaceName}`);
+                console.log(`🧹 Cleaned up test interface: ${interfaceName}`);
+              } else {
+                const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+                debugLog('CLEANUP_ERROR', `Failed to delete interface ${interfaceName}`, {
+                  error: errorMsg
+                });
+                console.warn(`⚠️  Failed to delete interface ${interfaceName}: ${errorMsg}`);
+              }
+            } else {
+              debugLog('CLEANUP', `Cleanup skipped (cleanup_after=false) - object left for analysis: ${interfaceName}`);
+              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${interfaceName}`);
             }
           } catch (cleanupError: any) {
             debugLog('CLEANUP_ERROR', `Failed to cleanup test interface ${interfaceName}`, {

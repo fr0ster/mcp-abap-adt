@@ -1340,8 +1340,16 @@ export function setAbapConnectionOverride(connection?: AbapConnection) {
  * @throws {Error} If any required environment variable is missing.
  */
 // Helper function for Windows-compatible logging
-
+// Only logs when DEBUG_CONNECTORS, DEBUG_TESTS, or DEBUG_ADT_TESTS is enabled
 function debugLog(message: string): void {
+  const debugEnabled = process.env.DEBUG_CONNECTORS === 'true' ||
+                       process.env.DEBUG_TESTS === 'true' ||
+                       process.env.DEBUG_ADT_TESTS === 'true';
+
+  if (!debugEnabled) {
+    return; // Suppress debug logs when not in debug mode
+  }
+
   // Try stderr first
   try {
     process.stderr.write(message);

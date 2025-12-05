@@ -42,7 +42,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -117,7 +118,9 @@ describe('Table Low-Level Handlers Integration', () => {
         });
         const validateResponse = await handleValidateTable({
           table_name: tableName,
+          tableName: tableName,
           package_name: packageName,
+          packageName: packageName,
           description,
           session_id: session.session_id,
           session_state: session.session_state
@@ -153,9 +156,12 @@ define view entity ${tableName} as select from dummy {
 
         const createResponse = await handleCreateTable({
           table_name: tableName,
+          tableName: tableName,
           description,
           package_name: packageName,
+          packageName: packageName,
           transport_request: transportRequest,
+          transportRequest: transportRequest,
           session_id: session.session_id,
           session_state: session.session_state
         });
@@ -264,10 +270,12 @@ define view entity ${tableName} as select from dummy {
         console.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
-        // Cleanup: Delete test table
+        // Cleanup: Unlock and optionally delete test table
         if (session && tableName) {
           try {
-            // Try to unlock first if still locked
+            const shouldCleanup = getCleanupAfter(testCase);
+
+            // Always unlock (unlock is always performed)
             try {
               const lockResponse = await handleLockTable({
                 table_name: tableName,
@@ -290,14 +298,21 @@ define view entity ${tableName} as select from dummy {
               // Ignore unlock errors during cleanup
             }
 
-            // Delete table
-            const deleteResponse = await handleDeleteTable({
-              table_name: tableName,
-              transport_request: transportRequest
-            });
+            // Delete table only if cleanup_after is true
+            if (shouldCleanup) {
+              const deleteResponse = await handleDeleteTable({
+                table_name: tableName,
+                transport_request: transportRequest
+              });
 
-            if (!deleteResponse.isError) {
-              console.log(`🧹 Cleaned up test table: ${tableName}`);
+              if (!deleteResponse.isError) {
+                console.log(`🧹 Cleaned up test table: ${tableName}`);
+              } else {
+                const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+                console.warn(`⚠️  Failed to delete table ${tableName}: ${errorMsg}`);
+              }
+            } else {
+              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${tableName}`);
             }
           } catch (cleanupError) {
             console.warn(`⚠️  Failed to cleanup test table ${tableName}: ${cleanupError}`);

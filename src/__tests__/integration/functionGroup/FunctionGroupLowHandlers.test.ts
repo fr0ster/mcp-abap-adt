@@ -38,7 +38,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -374,13 +375,16 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
         console.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
-        // Cleanup
+        // Cleanup: Unlock and optionally delete
         debugLog('CLEANUP', `Starting cleanup for ${functionGroupName}`, {
           functionGroupName,
           hasSession: !!session
         });
         if (session && functionGroupName) {
           try {
+            const shouldCleanup = getCleanupAfter(testCase);
+
+            // Always unlock (unlock is always performed)
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
                 await handleUnlockFunctionGroup({
@@ -394,22 +398,28 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
               }
             }
 
-            await delay(1000);
+            // Delete only if cleanup_after is true
+            if (shouldCleanup) {
+              await delay(1000);
 
-            const deleteResponse = await handleDeleteFunctionGroup({
-              function_group_name: functionGroupName,
-              transport_request: transportRequest
-            });
-
-            if (!deleteResponse.isError) {
-              debugLog('CLEANUP', `Successfully deleted test function group: ${functionGroupName}`);
-              console.log(`🧹 Cleaned up test function group: ${functionGroupName}`);
-            } else {
-              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-              debugLog('CLEANUP_ERROR', `Failed to delete function group ${functionGroupName}`, {
-                error: errorMsg
+              const deleteResponse = await handleDeleteFunctionGroup({
+                function_group_name: functionGroupName,
+                transport_request: transportRequest
               });
-              console.warn(`⚠️  Failed to delete function group ${functionGroupName}: ${errorMsg}`);
+
+              if (!deleteResponse.isError) {
+                debugLog('CLEANUP', `Successfully deleted test function group: ${functionGroupName}`);
+                console.log(`🧹 Cleaned up test function group: ${functionGroupName}`);
+              } else {
+                const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+                debugLog('CLEANUP_ERROR', `Failed to delete function group ${functionGroupName}`, {
+                  error: errorMsg
+                });
+                console.warn(`⚠️  Failed to delete function group ${functionGroupName}: ${errorMsg}`);
+              }
+            } else {
+              debugLog('CLEANUP', `Cleanup skipped (cleanup_after=false) - object left for analysis: ${functionGroupName}`);
+              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${functionGroupName}`);
             }
           } catch (cleanupError: any) {
             debugLog('CLEANUP_ERROR', `Failed to cleanup test function group ${functionGroupName}`, {

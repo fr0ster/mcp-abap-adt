@@ -61,7 +61,7 @@ export async function handleCreatePackage(args: CreatePackageArgs) {
     const packageName = typedArgs.package_name.toUpperCase();
 
     logger.info(`Starting package creation: ${packageName}`);
-    logger.info(`Received args:`, JSON.stringify({
+    logger.info(`Received args:`, {
       package_name: typedArgs.package_name,
       super_package: typedArgs.super_package,
       description: typedArgs.description,
@@ -70,7 +70,7 @@ export async function handleCreatePackage(args: CreatePackageArgs) {
       transport_layer: typedArgs.transport_layer,
       transport_request: typedArgs.transport_request,
       application_component: typedArgs.application_component
-    }, null, 2));
+    });
 
     try {
       const client = new CrudClient(connection);

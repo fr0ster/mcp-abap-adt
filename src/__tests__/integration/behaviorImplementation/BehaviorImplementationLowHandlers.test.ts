@@ -41,7 +41,8 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv
+  loadTestEnv,
+  getCleanupAfter
 } from '../helpers/configHelpers';
 
 // Load environment variables
@@ -302,6 +303,9 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
         // Only proceed with cleanup if object was successfully created
         if (session && className) {
           try {
+            const shouldCleanup = getCleanupAfter(testCase);
+
+            // Always unlock (unlock is always performed)
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
                 await handleUnlockClass({
@@ -314,22 +318,28 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
                 // Ignore unlock errors during cleanup
               }
             }
-            await delay(1000);
-            const deleteResponse = await handleDeleteClass({
-              class_name: className,
-              transport_request: transportRequest
-            });
-            if (!deleteResponse.isError) {
-              console.log(`🧹 Cleaned up test behavior implementation: ${className}`);
-            } else {
-              // Check if object doesn't exist (404) - that's okay, it may have been deleted already
-              const errorMsg = deleteResponse.content[0]?.text || '';
-              if (errorMsg.includes('not found') || errorMsg.includes('already be deleted')) {
-                // Object doesn't exist - that's fine, no need to log error
+
+            // Delete only if cleanup_after is true
+            if (shouldCleanup) {
+              await delay(1000);
+              const deleteResponse = await handleDeleteClass({
+                class_name: className,
+                transport_request: transportRequest
+              });
+              if (!deleteResponse.isError) {
+                console.log(`🧹 Cleaned up test behavior implementation: ${className}`);
               } else {
-                // Other error - log but don't fail test
-                console.warn(`⚠️  Failed to delete behavior implementation ${className}: ${errorMsg}`);
+                // Check if object doesn't exist (404) - that's okay, it may have been deleted already
+                const errorMsg = deleteResponse.content[0]?.text || '';
+                if (errorMsg.includes('not found') || errorMsg.includes('already be deleted')) {
+                  // Object doesn't exist - that's fine, no need to log error
+                } else {
+                  // Other error - log but don't fail test
+                  console.warn(`⚠️  Failed to delete behavior implementation ${className}: ${errorMsg}`);
+                }
               }
+            } else {
+              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
             }
           } catch (cleanupError: any) {
             // Ignore cleanup errors - object may not exist or may have been deleted already

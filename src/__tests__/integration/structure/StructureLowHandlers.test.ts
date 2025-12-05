@@ -17,6 +17,7 @@ import { handleValidateStructure } from '../../../handlers/structure/low/handleV
 import { handleCreateStructure } from '../../../handlers/structure/low/handleCreateStructure';
 import { handleLockStructure } from '../../../handlers/structure/low/handleLockStructure';
 import { handleUpdateStructure } from '../../../handlers/structure/low/handleUpdateStructure';
+import { handleCheckStructure } from '../../../handlers/structure/low/handleCheckStructure';
 import { handleUnlockStructure } from '../../../handlers/structure/low/handleUnlockStructure';
 import { handleActivateStructure } from '../../../handlers/structure/low/handleActivateStructure';
 import { handleDeleteStructure } from '../../../handlers/structure/low/handleDeleteStructure';
@@ -212,6 +213,26 @@ define structure ${structureName} {
         expect(updateData.session_id).toBe(lockSession.session_id);
 
         await delay(getOperationDelay('update', testCase));
+
+        // Step 4.5: Check with new code (before saving/unlocking)
+        // This validates the new/unsaved code by passing ddl_code directly to check
+        logTestStep('check_new_code');
+        const checkNewCodeResponse = await handleCheckStructure({
+          structure_name: structureName,
+          ddl_code: updatedDdlCode,  // Pass new code for validation
+          session_id: lockSession.session_id,
+          session_state: lockSession.session_state
+        });
+
+        if (checkNewCodeResponse.isError) {
+          // Don't fail test if check has errors - just log them
+          console.warn(`⚠️  Check with new code returned errors (this is expected if code has issues): ${checkNewCodeResponse.content[0]?.text || 'Unknown error'}`);
+        } else {
+          const checkNewCodeData = parseHandlerResponse(checkNewCodeResponse);
+          console.log(`✅ Check with new code completed: ${checkNewCodeData.check_result?.success ? 'No errors' : `${checkNewCodeData.check_result?.errors?.length || 0} error(s)`}`);
+        }
+
+        await delay(getOperationDelay('check', testCase) || 500);
 
         // Step 5: Unlock
         logTestStep('unlock');

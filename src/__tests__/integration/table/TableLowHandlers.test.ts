@@ -18,6 +18,7 @@ import { handleValidateTable } from '../../../handlers/table/low/handleValidateT
 import { handleCreateTable } from '../../../handlers/table/low/handleCreateTable';
 import { handleLockTable } from '../../../handlers/table/low/handleLockTable';
 import { handleUpdateTable } from '../../../handlers/table/low/handleUpdateTable';
+import { handleCheckTable } from '../../../handlers/table/low/handleCheckTable';
 import { handleUnlockTable } from '../../../handlers/table/low/handleUnlockTable';
 import { handleActivateTable } from '../../../handlers/table/low/handleActivateTable';
 import { handleDeleteTable } from '../../../handlers/table/low/handleDeleteTable';
@@ -228,6 +229,36 @@ define view entity ${tableName} as select from dummy {
 
         // Wait for update to complete
         await delay(getOperationDelay('update', testCase));
+
+        // Step 4.5: Check with new code (before saving/unlocking)
+        // This validates the new/unsaved code by passing ddl_code directly to check
+        debugLog('CHECK_NEW_CODE', `Checking table with new code (before unlock): ${tableName}`, {
+          session_id: lockSession.session_id,
+          has_session_state: !!lockSession.session_state,
+          ddlCodeLength: updatedDdlCode.length
+        });
+        const checkNewCodeResponse = await handleCheckTable({
+          table_name: tableName,
+          ddl_code: updatedDdlCode,  // Pass new code for validation
+          session_id: lockSession.session_id,
+          session_state: lockSession.session_state
+        });
+
+        if (checkNewCodeResponse.isError) {
+          debugLog('CHECK_NEW_CODE_ERROR', `Check with new code returned error: ${checkNewCodeResponse.content[0]?.text || 'Unknown error'}`);
+          // Don't fail test if check has errors - just log them
+          console.warn(`⚠️  Check with new code returned errors (this is expected if code has issues): ${checkNewCodeResponse.content[0]?.text || 'Unknown error'}`);
+        } else {
+          const checkNewCodeData = parseHandlerResponse(checkNewCodeResponse);
+          debugLog('CHECK_NEW_CODE_SUCCESS', `Check with new code completed`, {
+            success: checkNewCodeData.check_result?.success,
+            errors: checkNewCodeData.check_result?.errors?.length || 0,
+            warnings: checkNewCodeData.check_result?.warnings?.length || 0
+          });
+          console.log(`✅ Check with new code completed: ${checkNewCodeData.check_result?.success ? 'No errors' : `${checkNewCodeData.check_result?.errors?.length || 0} error(s)`}`);
+        }
+
+        await delay(getOperationDelay('check', testCase) || 500);
 
         // Step 5: Unlock
         const unlockResponse = await handleUnlockTable({

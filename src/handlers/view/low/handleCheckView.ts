@@ -12,13 +12,17 @@ import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 
 export const TOOL_DEFINITION = {
   name: "CheckViewLow",
-  description: "[low-level] Perform syntax check on an ABAP view. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.",
+  description: "[low-level] Perform syntax check on an ABAP view. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).",
   inputSchema: {
     type: "object",
     properties: {
       view_name: {
         type: "string",
         description: "View name (e.g., Z_MY_PROGRAM)."
+      },
+      ddl_source: {
+        type: "string",
+        description: "Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body."
       },
       session_id: {
         type: "string",
@@ -40,6 +44,7 @@ export const TOOL_DEFINITION = {
 
 interface CheckViewArgs {
   view_name: string;
+  ddl_source?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -57,6 +62,7 @@ export async function handleCheckView(args: CheckViewArgs) {
   try {
     const {
       view_name,
+      ddl_source,
       session_id,
       session_state
     } = args as CheckViewArgs;
@@ -83,11 +89,12 @@ export async function handleCheckView(args: CheckViewArgs) {
 
     const viewName = view_name.toUpperCase();
 
-    logger.info(`Starting view check: ${viewName}`);
+    logger.info(`Starting view check: ${viewName} ${ddl_source ? '(with new code)' : '(saved version)'}`);
 
     try {
-      // Check view
-      await client.checkView({ viewName: viewName });
+      // Check view with optional source code (for validating new/unsaved code)
+      // If ddl_source is provided, it will be base64 encoded in the request body
+      await client.checkView({ viewName: viewName }, ddl_source, 'inactive');
       const response = client.getCheckResult();
 
       if (!response) {

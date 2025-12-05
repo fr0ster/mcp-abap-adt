@@ -12,13 +12,17 @@ import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 
 export const TOOL_DEFINITION = {
   name: "CheckStructureLow",
-  description: "[low-level] Perform syntax check on an ABAP structure. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.",
+  description: "[low-level] Perform syntax check on an ABAP structure. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_code is provided, validates new/unsaved code (will be base64 encoded in request).",
   inputSchema: {
     type: "object",
     properties: {
       structure_name: {
         type: "string",
         description: "Structure name (e.g., Z_MY_PROGRAM)."
+      },
+      ddl_code: {
+        type: "string",
+        description: "Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body."
       },
       session_id: {
         type: "string",
@@ -40,6 +44,7 @@ export const TOOL_DEFINITION = {
 
 interface CheckStructureArgs {
   structure_name: string;
+  ddl_code?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -57,6 +62,7 @@ export async function handleCheckStructure(args: CheckStructureArgs) {
   try {
     const {
       structure_name,
+      ddl_code,
       session_id,
       session_state
     } = args as CheckStructureArgs;
@@ -83,11 +89,12 @@ export async function handleCheckStructure(args: CheckStructureArgs) {
 
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure check: ${structureName}`);
+    logger.info(`Starting structure check: ${structureName} ${ddl_code ? '(with new code)' : '(saved version)'}`);
 
     try {
-      // Check structure
-      await client.checkStructure({ structureName: structureName });
+      // Check structure with optional source code (for validating new/unsaved code)
+      // If ddl_code is provided, it will be base64 encoded in the request body
+      await client.checkStructure({ structureName: structureName }, ddl_code, 'inactive');
       const response = client.getCheckResult();
 
       if (!response) {

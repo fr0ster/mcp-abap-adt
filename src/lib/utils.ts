@@ -16,6 +16,7 @@ import { logger, connectionManagerLogger } from "./logger";
 import { notifyConnectionResetListeners, registerConnectionResetHook } from "./connectionEvents";
 import { AsyncLocalStorage } from "async_hooks";
 import * as crypto from "crypto";
+import { randomUUID } from "crypto";
 import * as path from "path";
 import * as os from "os";
 import { AuthBroker } from "@mcp-abap-adt/auth-broker";
@@ -558,7 +559,14 @@ export function getManagedConnection(): AbapConnection {
     });
 
     disposeConnection(cachedConnection);
-    cachedConnection = createAbapConnection(config, loggerAdapter, sessionStorage, SERVER_SESSION_ID);
+
+    // Generate unique session ID for fallback connections to prevent session sharing
+    // When sessionContext is not available, each connection should have its own isolated session
+    // This prevents cookies/CSRF tokens from being shared between different connections
+    const fallbackSessionId = `mcp-abap-adt-fallback-${randomUUID()}`;
+    connectionManagerLogger.debug(`[DEBUG] getManagedConnection - Creating fallback connection with unique session ID: ${fallbackSessionId.substring(0, 32)}...`);
+
+    cachedConnection = createAbapConnection(config, loggerAdapter, sessionStorage, fallbackSessionId);
 
     // Verify connection has access to refresh token
     const connectionWithRefresh = cachedConnection as any;
@@ -578,10 +586,11 @@ export function getManagedConnection(): AbapConnection {
     // Note: enableStatefulSession is available in AbstractAbapConnection but not in AbapConnection interface
     // If sessionStorage and sessionId are provided to createAbapConnection, stateful session should be enabled automatically
     // But we call it explicitly to ensure it's enabled
+    // Use the same fallbackSessionId to ensure session isolation
     const connectionWithStateful = cachedConnection as any;
     if (connectionWithStateful.enableStatefulSession) {
       try {
-        const statefulResult = connectionWithStateful.enableStatefulSession(SERVER_SESSION_ID, sessionStorage);
+        const statefulResult = connectionWithStateful.enableStatefulSession(fallbackSessionId, sessionStorage);
         if (statefulResult && typeof statefulResult.catch === 'function') {
           statefulResult.catch((error: any) => {
             logger.warn("Failed to enable stateful session", {

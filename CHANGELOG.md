@@ -2,7 +2,25 @@
 
 ## [Unreleased]
 
-## [1.1.26] - 2025-12-05
+## [1.1.26] - 2025-12-06
+
+### Added
+- **Comprehensive usage documentation** – Added complete MCP function call documentation:
+  - Created `doc/user-guide/usage/` directory with structured documentation
+  - **Simple Objects** (22 files): High-level and low-level handlers for 11 object types:
+    - Classes, Interfaces, Programs, Function Groups, Function Modules
+    - Tables, Structures, CDS Views, Domains, Data Elements, Service Definitions
+    - Each object has separate `-high.md` and `-low.md` files with exact MCP call examples
+  - **RAP Business Objects** documentation:
+    - Complete workflow for creating RAP BO with all components
+    - Deferred group activation guide
+    - Step-by-step examples with exact MCP function calls
+  - All documentation uses compact, laconic format with only exact MCP calls and parameters
+  - No unnecessary descriptions, maximum clarity
+- **Test syntax checking** – Added `npm run test:check` command:
+  - Performs TypeScript syntax check on test files without running tests
+  - Uses `tsc --noEmit -p tsconfig.test.json`
+  - Helps catch type errors before running tests
 
 ### Changed
 - **Updated dependencies to latest versions**:
@@ -14,6 +32,11 @@
   - `@mcp-abap-adt/header-validator`: `^0.1.4` → `^0.1.6`
   - `@mcp-abap-adt/interfaces`: `^0.1.1` (unchanged)
   - `@mcp-abap-adt/logger`: `^0.1.0` → `^0.1.1`
+
+### Fixed
+- **TypeScript type errors in TableLowHandlers.test.ts** – Fixed type inference issues:
+  - Corrected `lockSessionForCleanup` variable declaration and usage
+  - Fixed type narrowing in catch and finally blocks
 
 ## [1.1.25] - 2025-12-12
 

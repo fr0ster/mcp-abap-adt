@@ -24,6 +24,11 @@ export const TOOL_DEFINITION = {
         type: "string",
         description: "Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body."
       },
+      version: {
+        type: "string",
+        description: "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: inactive",
+        enum: ["active", "inactive"]
+      },
       session_id: {
         type: "string",
         description: "Session ID from GetSession. If not provided, a new session will be created."
@@ -45,6 +50,7 @@ export const TOOL_DEFINITION = {
 interface CheckViewArgs {
   view_name: string;
   ddl_source?: string;
+  version?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -63,6 +69,7 @@ export async function handleCheckView(args: CheckViewArgs) {
     const {
       view_name,
       ddl_source,
+      version = 'inactive',
       session_id,
       session_state
     } = args as CheckViewArgs;
@@ -89,12 +96,17 @@ export async function handleCheckView(args: CheckViewArgs) {
 
     const viewName = view_name.toUpperCase();
 
-    logger.info(`Starting view check: ${viewName} ${ddl_source ? '(with new code)' : '(saved version)'}`);
+    const validVersions = ['active', 'inactive'];
+    const checkVersion = (version && validVersions.includes(version.toLowerCase()))
+      ? version.toLowerCase() as 'active' | 'inactive'
+      : 'inactive';
+
+    logger.info(`Starting view check: ${viewName} (version: ${checkVersion}) ${ddl_source ? '(with new code)' : '(saved version)'}`);
 
     try {
       // Check view with optional source code (for validating new/unsaved code)
       // If ddl_source is provided, it will be base64 encoded in the request body
-      await client.checkView({ viewName: viewName }, ddl_source, 'inactive');
+      await client.checkView({ viewName: viewName }, ddl_source, checkVersion);
       const response = client.getCheckResult();
 
       if (!response) {
@@ -115,6 +127,7 @@ export async function handleCheckView(args: CheckViewArgs) {
         data: JSON.stringify({
           success: checkResult.success,
           view_name: viewName,
+          version: checkVersion,
           check_result: checkResult,
           session_id: session_id || null,
           session_state: updatedSessionState ? {

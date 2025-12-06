@@ -27,6 +27,10 @@ export const TOOL_DEFINITION = {
         type: "string",
         description: "Lock handle from LockObject. Required for update operation."
       },
+      transport_request: {
+        type: "string",
+        description: "Transport request number (e.g., E19K905635). Optional if object is local or already in transport."
+      },
       session_id: {
         type: "string",
         description: "Session ID from GetSession. If not provided, a new session will be created."
@@ -49,6 +53,7 @@ interface UpdateTableArgs {
   table_name: string;
   ddl_code: string;
   lock_handle: string;
+  transport_request?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -68,6 +73,7 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
       table_name,
       ddl_code,
       lock_handle,
+      transport_request,
       session_id,
       session_state
     } = args as UpdateTableArgs;
@@ -98,7 +104,7 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
 
     try {
       // Update table with DDL code
-      await client.updateTable({ tableName: tableName, ddlCode: ddl_code }, lock_handle);
+      await client.updateTable({ tableName: tableName, ddlCode: ddl_code, transportRequest: transport_request }, lock_handle);
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {

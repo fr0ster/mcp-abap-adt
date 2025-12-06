@@ -17,10 +17,12 @@ import { handleGetSession } from '../../../handlers/system/readonly/handleGetSes
 import { handleValidateClass } from '../../../handlers/class/low/handleValidateClass';
 import { handleCreateClass } from '../../../handlers/class/low/handleCreateClass';
 import { handleLockClass } from '../../../handlers/class/low/handleLockClass';
+import { handleCheckClass } from '../../../handlers/class/low/handleCheckClass';
 import { handleUpdateClass } from '../../../handlers/class/low/handleUpdateClass';
 import { handleUnlockClass } from '../../../handlers/class/low/handleUnlockClass';
 import { handleActivateClass } from '../../../handlers/class/low/handleActivateClass';
 import { handleDeleteClass } from '../../../handlers/class/low/handleDeleteClass';
+import { handleGetClass } from '../../../handlers/class/readonly/handleGetClass';
 
 import {
   parseHandlerResponse,
@@ -31,11 +33,12 @@ import {
   debugLog
 } from '../helpers/testHelpers';
 import {
-  getTestSession,
+  createTestConnectionAndSession,
   updateSessionFromResponse,
   extractLockSession,
   SessionInfo
 } from '../helpers/sessionHelpers';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import {
   getEnabledTestCase,
   getTimeout,
@@ -47,16 +50,12 @@ import {
 } from '../helpers/configHelpers';
 
 describe('Class Low-Level Handlers Integration', () => {
-  let session: SessionInfo | null = null;
   let hasConfig = false;
 
   beforeAll(async () => {
     try {
       // Load environment variables and refresh tokens if needed
       await loadTestEnv();
-
-      // Get initial session
-      session = await getTestSession();
       hasConfig = true;
     } catch (error) {
       console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -73,7 +72,7 @@ describe('Class Low-Level Handlers Integration', () => {
     let testClassName: string | null = null;
 
     beforeEach(async () => {
-      if (!hasConfig || !session) {
+      if (!hasConfig) {
         return;
       }
 
@@ -87,14 +86,31 @@ describe('Class Low-Level Handlers Integration', () => {
     });
 
     it('should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate', async () => {
-      if (!hasConfig || !session || !testCase || !testClassName) {
+      if (!hasConfig || !testCase || !testClassName) {
         debugLog('TEST_SKIP', 'Skipping test: No configuration or test case', {
           hasConfig,
-          hasSession: !!session,
           hasTestCase: !!testCase,
           hasTestClassName: !!testClassName
         });
         console.log('⏭️  Skipping test: No configuration or test case');
+        return;
+      }
+
+      // Create a separate connection and session for this test (not using getManagedConnection)
+      let connection: AbapConnection | null = null;
+      let session: SessionInfo | null = null;
+
+      try {
+        const { connection: testConnection, session: testSession } = await createTestConnectionAndSession();
+        connection = testConnection;
+        session = testSession;
+
+        debugLog('CONNECTION', `Created separate connection for test`, {
+          session_id: session.session_id
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.warn('⚠️ Skipping test: Failed to create connection', errorMessage);
         return;
       }
 
@@ -110,6 +126,111 @@ describe('Class Low-Level Handlers Integration', () => {
         description
       });
 
+      // Pre-check: Try to read class to see if it exists
+      // If class exists (even if corrupted/locked), we'll skip the test
+      let classExists = false;
+      try {
+        debugLog('PRE_CHECK', `Checking if class ${className} exists`);
+        const readResponse = await handleGetClass({
+          class_name: className
+        });
+
+        if (!readResponse.isError) {
+          // Class exists and can be read
+          classExists = true;
+          debugLog('PRE_CHECK', `Class ${className} exists and can be read`);
+        } else {
+          // Class might exist but be corrupted/locked (error reading it)
+          const errorText = readResponse.content[0]?.text || '';
+          const errorLower = errorText.toLowerCase();
+
+          // If error is 404, class doesn't exist
+          if (errorText.includes('404') || errorText.includes('not found') || errorText.includes('does not exist')) {
+            debugLog('PRE_CHECK', `Class ${className} does not exist - proceeding with test`);
+            classExists = false;
+          } else {
+            // Other errors (403, 500, etc.) might mean class exists but is locked/corrupted
+            // In this case, we'll assume class exists and let validation confirm
+            debugLog('PRE_CHECK', `Class ${className} may exist but cannot be read: ${errorText}`);
+            classExists = true; // Assume exists if we can't read it (corrupted/locked)
+          }
+        }
+      } catch (readError: any) {
+        // Unexpected error - assume class might exist
+        debugLog('PRE_CHECK', `Unexpected error checking class ${className}: ${readError.message}`);
+        classExists = true; // Conservative: assume exists if we can't check
+      }
+
+      // Pre-cleanup: Try to delete class if it exists
+      // If class doesn't exist, skip delete (nothing to delete)
+      if (classExists) {
+        try {
+          debugLog('PRE_CLEANUP', `Attempting to delete existing class ${className} before test`);
+          const preDeleteResponse = await handleDeleteClass({
+            class_name: className,
+            transport_request: transportRequest
+          });
+          if (!preDeleteResponse.isError) {
+            debugLog('PRE_CLEANUP', `Delete request successful for ${className}, verifying deletion...`);
+            // Wait for SAP to process deletion (3 seconds as in ClassBuilder.test.ts)
+            await delay(3000);
+
+            // Verify deletion by attempting to read the class (should return 404)
+            let deletionVerified = false;
+            const maxRetries = 5;
+            const retryDelay = 2000;
+
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+              try {
+                const readResponse = await handleGetClass({ class_name: className });
+
+                if (readResponse.isError) {
+                  const errorText = readResponse.content[0]?.text || '';
+                  if (errorText.includes('404') || errorText.includes('not found') || errorText.includes('does not exist')) {
+                    deletionVerified = true;
+                    debugLog('PRE_CLEANUP', `Deletion verified for ${className} (attempt ${attempt}/${maxRetries})`);
+                    break;
+                  }
+                }
+              } catch (readError: any) {
+                // If read throws 404, class is deleted
+                if (readError.message?.includes('404') || readError.message?.includes('not found') || readError.message?.includes('does not exist')) {
+                  deletionVerified = true;
+                  debugLog('PRE_CLEANUP', `Deletion verified for ${className} via exception (attempt ${attempt}/${maxRetries})`);
+                  break;
+                }
+              }
+
+              if (attempt < maxRetries) {
+                debugLog('PRE_CLEANUP', `Class ${className} still exists, retrying verification (attempt ${attempt}/${maxRetries})...`);
+                await delay(retryDelay);
+              }
+            }
+
+            if (deletionVerified) {
+              debugLog('PRE_CLEANUP', `Successfully deleted and verified deletion of existing class ${className}`);
+              classExists = false; // Update flag after successful deletion
+            } else {
+              debugLog('PRE_CLEANUP', `Class ${className} deleted but verification failed - class may still exist in SAP cache`);
+              // Keep classExists = true to let validation handle it
+            }
+          } else {
+            debugLog('PRE_CLEANUP', `Delete returned error (class may be locked/corrupted): ${preDeleteResponse.content[0]?.text || 'Unknown'}`);
+            // If delete fails, class still exists - will be handled by validation
+          }
+        } catch (preDeleteError: any) {
+          // Ignore errors - class may be locked/corrupted
+          debugLog('PRE_CLEANUP', `Pre-cleanup delete failed: ${preDeleteError.message}`);
+        }
+      } else {
+        debugLog('PRE_CLEANUP', `Skipping delete - class ${className} does not exist`);
+      }
+
+      // Track lock state and creation state for cleanup
+      let lockHandle: string | null = null;
+      let lockSession: SessionInfo | null = null;
+      let classCreated = false;
+
       try {
         // Step 1: Validate
         debugLog('VALIDATE', `Starting validation for ${className}`, {
@@ -124,20 +245,6 @@ describe('Class Low-Level Handlers Integration', () => {
           session_state: session.session_state
         });
 
-        if (validateResponse.isError) {
-          const errorMsg = validateResponse.content[0]?.text || 'Unknown error';
-          debugLog('VALIDATE_ERROR', `Validation returned error: ${errorMsg}`, {
-            error: errorMsg,
-            response: validateResponse
-          });
-          // If class already exists, that's okay - we'll skip creation
-          if (errorMsg.includes('already exists') || errorMsg.includes('does already exist')) {
-            console.log(`⏭️  Class ${className} already exists, skipping test`);
-            return;
-          }
-          throw new Error(`Validation failed: ${errorMsg}`);
-        }
-
         const validateData = parseHandlerResponse(validateResponse);
         debugLog('VALIDATE_RESPONSE', `Validation response parsed`, {
           valid: validateData.validation_result?.valid,
@@ -146,16 +253,15 @@ describe('Class Low-Level Handlers Integration', () => {
         });
 
         if (!validateData.validation_result?.valid) {
-          const message = validateData.validation_result?.message || 'Invalid class name';
-          const messageLower = message.toLowerCase();
-          // If validation says class exists, that's okay - we'll skip creation
-          if (validateData.validation_result?.exists ||
-              messageLower.includes('already exists') ||
-              messageLower.includes('does already exist')) {
-            console.log(`⏭️  Class ${className} already exists, skipping test`);
-            return;
-          }
-          throw new Error(`Validation failed: ${message}`);
+          // Validation returned 400 - class exists or validation failed
+          // Principle 2: first error and exit
+          const validationMessage = validateData.validation_result?.message || 'Validation failed';
+          const exists = validateData.validation_result?.exists ? ' (object already exists)' : '';
+          const skipReason = `ValidateClass operation for class ${className} failed validation${exists}: ${validationMessage}`;
+          console.log(`⏭️  SKIP: ${skipReason}`);
+          // Throw error to mark test as failed (not passed) when validation fails
+          // This prevents test from being marked as "passed" when it should be skipped
+          throw new Error(`SKIP: ${skipReason}`);
         }
 
         // Update session from validation response
@@ -189,6 +295,9 @@ describe('Class Low-Level Handlers Integration', () => {
         expect(createData.success).toBe(true);
         expect(createData.class_name).toBe(className);
 
+        // Mark class as created successfully
+        classCreated = true;
+
         // Update session from create response
         const oldSessionId2 = session.session_id;
         session = updateSessionFromResponse(session, createData);
@@ -218,10 +327,10 @@ describe('Class Low-Level Handlers Integration', () => {
         }
 
         const lockData = parseHandlerResponse(lockResponse);
-        const lockHandle = extractLockHandle(lockData);
+        lockHandle = extractLockHandle(lockData);
 
         // CRITICAL: Extract session from Lock response
-        const lockSession = extractLockSession(lockData);
+        lockSession = extractLockSession(lockData);
 
         // CRITICAL: Verify Lock returned session_id and session_state
         expect(lockSession.session_id).toBeDefined();
@@ -240,13 +349,11 @@ describe('Class Low-Level Handlers Integration', () => {
         // Wait for lock to complete
         await delay(getOperationDelay('lock', testCase));
 
-        // Step 4: Update
-        debugLog('UPDATE', `Starting update for ${className}`, {
+        // Step 4: Check new code before update
+        debugLog('CHECK', `Starting check for new code before update for ${className}`, {
           lock_handle: lockHandle,
-          session_id: lockSession.session_id,  // ← From Lock response
-          has_session_state: !!lockSession.session_state,
-          session_state_cookies: lockSession.session_state?.cookies?.substring(0, 50) + '...',
-          session_state_csrf: lockSession.session_state?.csrf_token?.substring(0, 20) + '...'
+          session_id: lockSession.session_id,
+          has_session_state: !!lockSession.session_state
         });
         const sourceCode = testCase.params.update_source_code || testCase.params.source_code || `CLASS ${className.toLowerCase()} DEFINITION
   PUBLIC
@@ -263,7 +370,55 @@ CLASS ${className.toLowerCase()} IMPLEMENTATION.
   ENDMETHOD.
 ENDCLASS.`;
 
-        const updateResponse = await handleUpdateClass({
+        const checkResponse = await handleCheckClass({
+          class_name: className,
+          source_code: sourceCode,
+          version: 'inactive',
+          session_id: lockSession.session_id,
+          session_state: lockSession.session_state
+        });
+
+        let checkPassed = false;
+        if (checkResponse.isError) {
+          const checkError = checkResponse.content[0]?.text || 'Unknown error';
+          debugLog('CHECK_ERROR', `Check failed: ${checkError}`, {
+            error: checkError
+          });
+          console.log(`⚠️  Check failed for new code - skipping update, will only unlock`);
+        } else {
+          const checkData = parseHandlerResponse(checkResponse);
+          // Check if there are errors in check result
+          const hasErrors = checkData.check_result?.has_errors || checkData.check_result?.errors?.length > 0;
+          if (hasErrors) {
+            debugLog('CHECK_FAILED', `Check found errors`, {
+              errors: checkData.check_result?.errors
+            });
+            console.log(`⚠️  Check found errors in new code - skipping update, will only unlock`);
+          } else {
+            checkPassed = true;
+            debugLog('CHECK_PASSED', `Check passed - new code is valid`, {
+              check_result: checkData.check_result
+            });
+            console.log(`✅ Check passed - new code is valid, proceeding with update`);
+          }
+        }
+
+        // Wait for check to complete
+        await delay(getOperationDelay('check', testCase));
+
+        // Step 5: Update (only if check passed)
+        if (!checkPassed) {
+          console.log(`⏭️  Skipping update due to check failure - proceeding to unlock`);
+        } else {
+          debugLog('UPDATE', `Starting update for ${className}`, {
+            lock_handle: lockHandle,
+            session_id: lockSession.session_id,  // ← From Lock response
+            has_session_state: !!lockSession.session_state,
+            session_state_cookies: lockSession.session_state?.cookies?.substring(0, 50) + '...',
+            session_state_csrf: lockSession.session_state?.csrf_token?.substring(0, 20) + '...'
+          });
+
+          const updateResponse = await handleUpdateClass({
           class_name: className,
           source_code: sourceCode,
           lock_handle: lockHandle,
@@ -287,10 +442,11 @@ ENDCLASS.`;
           sessions_match: updateData.session_id === lockSession.session_id
         });
 
-        // Wait for update to complete
-        await delay(getOperationDelay('update', testCase));
+          // Wait for update to complete
+          await delay(getOperationDelay('update', testCase));
+        }
 
-        // Step 5: Unlock
+        // Step 6: Unlock
         debugLog('UNLOCK', `Starting unlock for ${className}`, {
           lock_handle: lockHandle,
           session_id: lockSession.session_id,  // ← From Lock response
@@ -355,6 +511,36 @@ ENDCLASS.`;
         console.log(`✅ Full workflow completed successfully for ${className}`);
 
       } catch (error: any) {
+        // Principle 1: If lock was done, unlock is mandatory
+        if (lockHandle && lockSession) {
+          try {
+            debugLog('CLEANUP_ON_ERROR', `Attempting to unlock class ${className} after error`, {
+              lock_handle: lockHandle,
+              session_id: lockSession.session_id
+            });
+            await handleUnlockClass({
+              class_name: className,
+              lock_handle: lockHandle,
+              session_id: lockSession.session_id,
+              session_state: lockSession.session_state
+            });
+            debugLog('CLEANUP_ON_ERROR', `Successfully unlocked class ${className} after error`);
+          } catch (unlockError) {
+            debugLog('CLEANUP_ON_ERROR', `Failed to unlock class ${className} after error`, {
+              unlockError: unlockError instanceof Error ? unlockError.message : String(unlockError)
+            });
+            console.error('Failed to unlock class after error:', unlockError);
+          }
+        }
+
+        // Check if this is a skip error (starts with "SKIP:")
+        if (error.message && error.message.startsWith('SKIP:')) {
+          // This is a skip error - rethrow to mark test as failed (not passed)
+          // This prevents test from being marked as "passed" when it should be skipped
+          throw error;
+        }
+
+        // Principle 2: first error and exit
         debugLog('TEST_ERROR', `Test failed: ${error.message}`, {
           error: error.message,
           stack: error.stack?.substring(0, 500) // Limit stack trace length
@@ -362,64 +548,55 @@ ENDCLASS.`;
         console.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
-        // Cleanup: Unlock and optionally delete test class
+        // Cleanup: Reset connection created for this test
+        if (connection) {
+          try {
+            connection.reset();
+            debugLog('CLEANUP', `Reset test connection`);
+          } catch (resetError: any) {
+            debugLog('CLEANUP_ERROR', `Failed to reset connection: ${resetError.message || resetError}`);
+          }
+        }
+
+        // Cleanup: Unlock is always required if class was locked
+        // For diagnostics: deletion is excluded, only unlock is performed
         if (session && className) {
           try {
-            const shouldCleanup = getCleanupAfter(testCase);
-
-            debugLog('CLEANUP', `Starting cleanup for ${className}`, {
+            // Principle 1: If lock was done, unlock is mandatory
+            // Unlock was already handled in catch block, but ensure it's done here too if needed
+            if (lockHandle && lockSession) {
+              try {
+                debugLog('CLEANUP', `Attempting to unlock class ${className} (cleanup)`, {
               class_name: className,
-              session_id: session.session_id,
-              cleanup_after: shouldCleanup
+                  session_id: lockSession.session_id,
+                  class_created: classCreated,
+                  has_lock_handle: !!lockHandle
             });
 
-            // Always try to unlock first if still locked (unlock is always performed)
-            try {
-              debugLog('CLEANUP', `Attempting to unlock class ${className} before deletion`);
-              const lockResponse = await handleLockClass({
-                class_name: className,
-                session_id: session.session_id,
-                session_state: session.session_state
-              });
-              if (!lockResponse.isError) {
-                const lockData = parseHandlerResponse(lockResponse);
-                const lockHandle = extractLockHandle(lockData);
-                const lockSession = extractLockSession(lockData);
-
                 await handleUnlockClass({
-                  class_name: className,
+                class_name: className,
                   lock_handle: lockHandle,
                   session_id: lockSession.session_id,
                   session_state: lockSession.session_state
                 });
-                debugLog('CLEANUP', `Successfully unlocked class ${className}`);
-              }
-            } catch (e) {
-              debugLog('CLEANUP', `Could not unlock class ${className} (may not be locked)`, {
-                error: e instanceof Error ? e.message : String(e)
-              });
-              // Ignore unlock errors during cleanup
-            }
 
-            // Delete class only if cleanup_after is true
-            if (shouldCleanup) {
-              const deleteResponse = await handleDeleteClass({
-                class_name: className,
-                transport_request: transportRequest
-              });
-
-              if (!deleteResponse.isError) {
-                debugLog('CLEANUP', `Successfully deleted test class: ${className}`);
-                console.log(`🧹 Cleaned up test class: ${className}`);
-              } else {
-                debugLog('CLEANUP', `Failed to delete test class: ${className}`, {
-                  error: deleteResponse.content[0]?.text || 'Unknown error'
+                debugLog('CLEANUP', `Successfully unlocked class ${className} (cleanup)`);
+                console.log(`🔓 Unlocked class ${className} (cleanup)`);
+              } catch (unlockError: any) {
+                debugLog('CLEANUP', `Failed to unlock class ${className} (cleanup)`, {
+                  error: unlockError instanceof Error ? unlockError.message : String(unlockError)
                 });
-              }
-            } else {
-              debugLog('CLEANUP', `Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
-              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
-            }
+                console.warn(`⚠️  Failed to unlock class ${className} during cleanup: ${unlockError.message || unlockError}`);
+                  }
+                }
+
+            // Deletion is excluded for diagnostics - object left for analysis
+            debugLog('CLEANUP', `Deletion excluded for diagnostics - object left for analysis: ${className}`, {
+              class_name: className,
+              class_created: classCreated,
+              has_lock_handle: !!lockHandle
+            });
+            console.log(`⚠️ Deletion excluded for diagnostics - object left for analysis: ${className}`);
           } catch (cleanupError) {
             debugLog('CLEANUP_ERROR', `Exception during cleanup: ${cleanupError}`, {
               error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)

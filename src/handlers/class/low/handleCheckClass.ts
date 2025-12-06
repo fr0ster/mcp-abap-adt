@@ -27,7 +27,7 @@ export const TOOL_DEFINITION = {
       },
       source_code: {
         type: "string",
-        description: "Optional: source code to validate. If provided, validates hypothetical code without creating object."
+        description: "Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections."
       },
       session_id: {
         type: "string",
@@ -100,7 +100,7 @@ export async function handleCheckClass(args: CheckClassArgs) {
 
     try {
       const client = new CrudClient(connection);
-      await client.checkClass({ className });
+      await client.checkClass({ className }, checkVersion, source_code);
       const response = client.getCheckResult();
       if (!response) {
         throw new Error('Class check did not return a response');

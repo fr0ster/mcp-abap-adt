@@ -295,8 +295,6 @@ The navigation below mirrors the document structure for easier discovery.
 - `create_protected` (boolean, optional) - Constructor visibility is protected. Default: false (public)
 - `source_code` (string, optional) - Complete ABAP class source code including CLASS DEFINITION and IMPLEMENTATION sections. If not provided, generates minimal template.
 - `activate` (boolean, optional) - Activate class after creation. Default: true. Set to false for batch operations (activate multiple objects later).
-- `master_system` (string, optional) - Master system ID (e.g., 
-- `responsible` (string, optional) - User responsible for the object (e.g., 
 
 **Example:**
 ```json
@@ -360,8 +358,6 @@ The navigation below mirrors the document structure for easier discovery.
 - `application` (string, optional) - Application area (e.g., 
 - `source_code` (string, optional) - Complete ABAP program source code. If not provided, generates minimal template based on program_type.
 - `activate` (boolean, optional) - Activate program after creation. Default: true. Set to false for batch operations (activate multiple objects later).
-- `master_system` (string, optional) - Master system ID (e.g., 
-- `responsible` (string, optional) - User responsible for the object (e.g., 
 
 **Example:**
 ```json
@@ -588,8 +584,6 @@ The navigation below mirrors the document structure for easier discovery.
 - `final` (boolean, optional (default: "false).")) - Mark class as final (optional, default: false).
 - `abstract` (boolean, optional (default: "false).")) - Mark class as abstract (optional, default: false).
 - `create_protected` (boolean, optional (default: "false).")) - Create protected section (optional, default: false).
-- `master_system` (string, optional) - Master system (optional).
-- `responsible` (string, optional) - User responsible for the class (optional).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -660,8 +654,6 @@ The navigation below mirrors the document structure for easier discovery.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 - `program_type` (string, optional) - Program type: 
 - `application` (string, optional (default: "*).")) - Application area (optional, default: 
-- `master_system` (string, optional) - Master system (optional).
-- `responsible` (string, optional) - User responsible for the program (optional).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1229,11 +1221,15 @@ The navigation below mirrors the document structure for easier discovery.
 - `data_type` (string, optional (default: "CHAR")) - Data type (e.g., CHAR, NUMC) or domain name when type_kind is 
 - `length` (number, optional (default: "100")) - Data type length. Usually inherited from domain.
 - `decimals` (number, optional (default: "0")) - Decimal places. Usually inherited from domain.
-- `short_label` (string, optional) - Short field label (max 10 chars)
-- `medium_label` (string, optional) - Medium field label (max 20 chars)
-- `long_label` (string, optional) - Long field label (max 40 chars)
-- `heading_label` (string, optional) - Heading field label (max 55 chars)
+- `short_label` (string, optional) - Short field label (max 10 chars). Applied during update step after creation.
+- `medium_label` (string, optional) - Medium field label (max 20 chars). Applied during update step after creation.
+- `long_label` (string, optional) - Long field label (max 40 chars). Applied during update step after creation.
+- `heading_label` (string, optional) - Heading field label (max 55 chars). Applied during update step after creation.
 - `type_kind` (string, optional (default: "domain")) - Type kind: 
+- `type_name` (string, optional) - Type name: domain name (when type_kind is 
+- `search_help` (string, optional) - Search help name. Applied during update step after creation.
+- `search_help_parameter` (string, optional) - Search help parameter. Applied during update step after creation.
+- `set_get_parameter` (string, optional) - Set/Get parameter ID. Applied during update step after creation.
 
 **Example:**
 ```json
@@ -1300,6 +1296,7 @@ The navigation below mirrors the document structure for easier discovery.
 - `table_ref` (string, optional) - Reference to table type (optional)
 - `includes` (string, optional) - Include structure name
 - `suffix` (string, optional) - Optional suffix for include fields
+- `activate` (boolean, optional) - Activate structure after creation. Default: true. Set to false for batch operations (activate multiple objects later).
 
 **Example:**
 ```json
@@ -1318,6 +1315,7 @@ The navigation below mirrors the document structure for easier discovery.
 - `ddl_code` (string, required) - Complete DDL code for table creation. Example: 
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `activate` (boolean, optional) - Activate table after creation. Default: true. Set to false for batch operations (activate multiple objects later).
 
 **Example:**
 ```json
@@ -1338,6 +1336,7 @@ The navigation below mirrors the document structure for easier discovery.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 - `description` (string, optional) - Optional description. If not provided, view_name will be used.
+- `activate` (boolean, optional) - Activate view after creation. Default: true. Set to false for batch operations (activate multiple objects later).
 
 **Example:**
 ```json
@@ -1369,11 +1368,6 @@ The navigation below mirrors the document structure for easier discovery.
 - `search_help` (string, optional) - Search help name
 - `search_help_parameter` (string, optional) - Search help parameter
 - `set_get_parameter` (string, optional) - Set/Get parameter ID
-- `default_component_name` (string, optional) - Default component name
-- `deactivate_input_history` (boolean, optional (default: "false")) - Deactivate input history
-- `change_document` (boolean, optional (default: "false")) - Change document
-- `left_to_right_direction` (boolean, optional (default: "false")) - Left to right direction
-- `deactivate_bidi_filtering` (boolean, optional (default: "false")) - Deactivate BiDi filtering
 - `activate` (boolean, optional (default: "true)")) - Activate data element after update (default: true)
 
 **Example:**
@@ -1381,10 +1375,6 @@ The navigation below mirrors the document structure for easier discovery.
 {
   "package_name": "\"ZMY_PACKAGE_NAME\"",
   "type_kind": "\"PROG/P\"",
-  "deactivate_input_history": "false",
-  "change_document": "false",
-  "left_to_right_direction": "false",
-  "deactivate_bidi_filtering": "false",
   "activate": "true)"
 }
 ```
@@ -1548,10 +1538,12 @@ The navigation below mirrors the document structure for easier discovery.
 ---
 
 ### CheckStructureLow {#checkstructurelow-low}
-**Description:** [low-level] Perform syntax check on an ABAP structure. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Perform syntax check on an ABAP structure. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_code is provided, validates new/unsaved code (will be base64 encoded in request).
 
 **Parameters:**
 - `inputSchema` (string, optional) - Structure name (e.g., Z_MY_PROGRAM).
+- `ddl_code` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
+- `version` (string, optional) - Version to check: 
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1563,10 +1555,12 @@ The navigation below mirrors the document structure for easier discovery.
 ---
 
 ### CheckTableLow {#checktablelow-low}
-**Description:** [low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Requires session_id for stateful operations. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Requires session_id for stateful operations. Can use session_id and session_state from GetSession to maintain the same session. If ddl_code is provided, validates new/unsaved code (will be base64 encoded in request).
 
 **Parameters:**
 - `inputSchema` (string, optional) - Table name (e.g., Z_MY_TABLE)
+- `ddl_code` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
+- `version` (string, optional) - Version to check: 
 - `reporter` (string, optional) - Check reporter: 
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1579,10 +1573,12 @@ The navigation below mirrors the document structure for easier discovery.
 ---
 
 ### CheckViewLow {#checkviewlow-low}
-**Description:** [low-level] Perform syntax check on an ABAP view. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Perform syntax check on an ABAP view. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).
 
 **Parameters:**
 - `inputSchema` (string, optional) - View name (e.g., Z_MY_PROGRAM).
+- `ddl_source` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
+- `version` (string, optional) - Version to check: 
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1603,10 +1599,9 @@ The navigation below mirrors the document structure for easier discovery.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 - `data_type` (string, optional) - Data type (e.g., CHAR, NUMC) or domain name when type_kind is 
 - `type_kind` (string, optional) - Type kind: 
-- `type_name` (string, optional) - Type name (for predefined types).
-- `application` (string, optional (default: "*).")) - Application area (optional, default: 
-- `master_system` (string, optional) - Master system (optional).
-- `responsible` (string, optional) - User responsible for the data element (optional).
+- `type_name` (string, optional) - Type name: domain name (when type_kind is 
+- `length` (number, optional) - Data type length (for predefinedAbapType or refToPredefinedAbapType)
+- `decimals` (number, optional) - Decimal places (for predefinedAbapType or refToPredefinedAbapType)
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1614,8 +1609,7 @@ The navigation below mirrors the document structure for easier discovery.
 ```json
 {
   "description": "\"example_value\"",
-  "package_name": "\"ZMY_PACKAGE_NAME\"",
-  "application": "\"example_value\""
+  "package_name": "\"ZMY_PACKAGE_NAME\""
 }
 ```
 
@@ -1629,10 +1623,6 @@ The navigation below mirrors the document structure for easier discovery.
 - `description` (string, required) - Domain description.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `domain_type` (string, optional) - Domain type: 
-- `application` (string, optional (default: "*).")) - Application area (optional, default: 
-- `master_system` (string, optional) - Master system (optional).
-- `responsible` (string, optional) - User responsible for the domain (optional).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1640,8 +1630,7 @@ The navigation below mirrors the document structure for easier discovery.
 ```json
 {
   "description": "\"example_value\"",
-  "package_name": "\"ZMY_PACKAGE_NAME\"",
-  "application": "\"example_value\""
+  "package_name": "\"ZMY_PACKAGE_NAME\""
 }
 ```
 
@@ -1657,8 +1646,6 @@ The navigation below mirrors the document structure for easier discovery.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 - `structure_type` (string, optional) - Structure type: 
 - `application` (string, optional (default: "*).")) - Application area (optional, default: 
-- `master_system` (string, optional) - Master system (optional).
-- `responsible` (string, optional) - User responsible for the structure (optional).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1702,8 +1689,6 @@ The navigation below mirrors the document structure for easier discovery.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 - `view_type` (string, optional) - View type: 
 - `application` (string, optional (default: "*).")) - Application area (optional, default: 
-- `master_system` (string, optional) - Master system (optional).
-- `responsible` (string, optional) - User responsible for the view (optional).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -2025,6 +2010,7 @@ The navigation below mirrors the document structure for easier discovery.
 - `inputSchema` (string, optional) - Table name (e.g., ZOK_T_TEST_0001). Table must already exist.
 - `ddl_code` (string, required) - Complete DDL source code for the table definition.
 - `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -2204,8 +2190,6 @@ The navigation below mirrors the document structure for easier discovery.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 - `source_code` (string, optional) - Complete ABAP interface source code with INTERFACE...ENDINTERFACE section. If not provided, generates minimal template.
 - `activate` (boolean, optional) - Activate interface after creation. Default: true. Set to false for batch operations (activate multiple objects later).
-- `master_system` (string, optional) - Master system ID (e.g., 
-- `responsible` (string, optional) - User responsible for the object (e.g., 
 
 **Example:**
 ```json
@@ -2307,8 +2291,6 @@ The navigation below mirrors the document structure for easier discovery.
 - `description` (string, required) - Interface description.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `master_system` (string, optional) - Master system (optional).
-- `responsible` (string, optional) - User responsible for the interface (optional).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -2367,6 +2349,7 @@ The navigation below mirrors the document structure for easier discovery.
 **Parameters:**
 - `inputSchema` (string, optional) - Package name (e.g., Z_MY_PROGRAM).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+- `force_new_connection` (boolean, optional) - Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.
 
 **Example:**
 ```json
@@ -3019,8 +3002,6 @@ The navigation below mirrors the document structure for easier discovery.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional for local objects.
 - `master_language` (string, optional) - Master language (optional, e.g., 
-- `master_system` (string, optional) - Master system (optional).
-- `responsible` (string, optional) - User responsible for the metadata extension (optional).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -3156,6 +3137,6 @@ All functions return MCP-compliant responses in the following format:
 
 ---
 
-*Last updated: 2025-11-27*
+*Last updated: 2025-12-05*
 *Document version: 1.0*
 *Generated automatically from TOOL_DEFINITION exports*

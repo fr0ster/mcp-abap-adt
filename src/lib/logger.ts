@@ -22,6 +22,46 @@ function safeStringify(obj: any): string {
     if (key === 'socket' || key === '_httpMessage' || key === 'res' || key === 'req') {
       return '[HTTP Object]';
     }
+    // Remove sensitive headers (Authorization, Cookie, etc.)
+    if (key === 'Authorization' || key === 'authorization') {
+      return '[REDACTED]';
+    }
+    // Remove sensitive data from config.headers
+    if (key === 'headers' && value && typeof value === 'object') {
+      const sanitizedHeaders: any = {};
+      for (const [headerKey, headerValue] of Object.entries(value)) {
+        if (headerKey.toLowerCase() === 'authorization' ||
+            headerKey.toLowerCase() === 'cookie' ||
+            headerKey.toLowerCase() === 'x-csrf-token') {
+          sanitizedHeaders[headerKey] = '[REDACTED]';
+        } else {
+          sanitizedHeaders[headerKey] = headerValue;
+        }
+      }
+      return sanitizedHeaders;
+    }
+    // Remove sensitive data from config object (AxiosError.config)
+    if (key === 'config' && value && typeof value === 'object') {
+      const sanitizedConfig: any = {};
+      for (const [configKey, configValue] of Object.entries(value)) {
+        if (configKey === 'headers' && configValue && typeof configValue === 'object') {
+          const sanitizedHeaders: any = {};
+          for (const [headerKey, headerValue] of Object.entries(configValue as any)) {
+            if (headerKey.toLowerCase() === 'authorization' ||
+                headerKey.toLowerCase() === 'cookie' ||
+                headerKey.toLowerCase() === 'x-csrf-token') {
+              sanitizedHeaders[headerKey] = '[REDACTED]';
+            } else {
+              sanitizedHeaders[headerKey] = headerValue;
+            }
+          }
+          sanitizedConfig[configKey] = sanitizedHeaders;
+        } else {
+          sanitizedConfig[configKey] = configValue;
+        }
+      }
+      return sanitizedConfig;
+    }
     return value;
   });
 }
@@ -37,12 +77,63 @@ function createLogFn(level: string) {
       return; // Suppress all logging in stdio mode
     }
 
-    // ERROR level should always be shown
-    // INFO, DEBUG, and WARN require DEBUG_CONNECTORS, DEBUG_TESTS, or DEBUG_ADT_TESTS to be enabled
+    // Check if this is an expected validation/creation error (should be suppressed)
+    if (level === "ERROR" && data?.status === 400) {
+      // Check if it's an expected error type (validation or resource already exists)
+      const url = data?.url || '';
+      const dataStr = typeof data?.data === 'string' ? data?.data : (data?.data ? JSON.stringify(data.data) : '');
+      const responseData = data?.response?.data || '';
+      const allData = dataStr + responseData;
+
+      // Check if it's a validation endpoint OR an expected error type
+      const isValidationEndpoint = url.includes('/validation/objectname') || url.includes('/validation/');
+      const isExpectedError = allData.includes('InvalidClifName') ||
+                              allData.includes('ExceptionResourceAlreadyExists') ||
+                              allData.includes('ResourceAlreadyExists') ||
+                              allData.includes('InvalidObjName') ||
+                              allData.includes('does already exist');
+
+      if (isValidationEndpoint || isExpectedError) {
+        // Suppress expected errors - only log if debug is enabled
+        const debugEnabled = process.env.DEBUG_CONNECTORS === "true" ||
+                             process.env.DEBUG_TESTS === "true" ||
+                             process.env.DEBUG_ADT_TESTS === "true";
+        if (!debugEnabled) {
+          return; // Suppress expected errors
+        }
+      }
+    }
+
+    // Also check AxiosError format (second ERROR log format)
+    if (level === "ERROR" && data?.name === "AxiosError" && data?.status === 400) {
+      const responseData = data?.response?.data || '';
+      const configUrl = data?.config?.url || '';
+      const allData = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
+
+      // Check if it's an expected error type
+      const isExpectedError = allData.includes('InvalidClifName') ||
+                              allData.includes('ExceptionResourceAlreadyExists') ||
+                              allData.includes('ResourceAlreadyExists') ||
+                              allData.includes('InvalidObjName') ||
+                              allData.includes('does already exist');
+
+      if (isExpectedError) {
+        // Suppress expected errors - only log if debug is enabled
+        const debugEnabled = process.env.DEBUG_CONNECTORS === "true" ||
+                             process.env.DEBUG_TESTS === "true" ||
+                             process.env.DEBUG_ADT_TESTS === "true";
+        if (!debugEnabled) {
+          return; // Suppress expected errors
+        }
+      }
+    }
+
+    // All log levels (including ERROR) require DEBUG_CONNECTORS, DEBUG_TESTS, or DEBUG_ADT_TESTS to be enabled
+    // This prevents verbose error logs from appearing in test output when debug is not enabled
     const debugEnabled = process.env.DEBUG_CONNECTORS === "true" ||
                          process.env.DEBUG_TESTS === "true" ||
                          process.env.DEBUG_ADT_TESTS === "true";
-    const shouldLog = level === "ERROR" || debugEnabled;
+    const shouldLog = debugEnabled;
 
     if (shouldLog) {
       // In debug mode with MCP Inspector, use process.stderr instead of console.log

@@ -13,8 +13,8 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { getManagedConnection } from '../../../lib/utils';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 import {
   getEnabledTestCase,
   getTimeout,
@@ -32,44 +32,18 @@ import { debugLog, delay } from '../helpers/testHelpers';
 // loadTestEnv will be called in beforeAll
 
 describe('Class CrudClient Direct (Reference Implementation)', () => {
-  let connection: AbapConnection;
-  let client: CrudClient;
   let hasConfig = false;
   let isCloud = false;
 
   beforeAll(async () => {
     try {
-      // Create connection exactly as in adt-clients tests
-      // Use getManagedConnection helper to get connection with proper config
-      connection = getManagedConnection();
-
-      // Check refresh token availability before connecting
-      const connectionWithRefresh = connection as any;
-      if (connectionWithRefresh.getConfig && connectionWithRefresh.canRefreshToken) {
-        const config = connectionWithRefresh.getConfig();
-        const canRefresh = connectionWithRefresh.canRefreshToken();
-        console.log(`[DEBUG] beforeAll - Connection refresh token check:`, {
-          canRefresh,
-          hasRefreshToken: !!(config?.refreshToken),
-          hasUaaUrl: !!(config?.uaaUrl),
-          hasUaaClientId: !!(config?.uaaClientId),
-          hasUaaClientSecret: !!(config?.uaaClientSecret)
-        });
-      }
-
-      await connection.connect();
-      client = new CrudClient(connection);
+      // Load environment variables before creating connection
+      await loadTestEnv();
       hasConfig = true;
-      isCloud = isCloudConnection();
     } catch (error) {
-      console.warn('⚠️ Skipping tests: Failed to connect to SAP system', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn('⚠️ Skipping tests: Failed to load test environment', errorMessage);
       hasConfig = false;
-    }
-  });
-
-  afterAll(async () => {
-    if (connection) {
-      connection.reset();
     }
   });
 
@@ -79,9 +53,63 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase('create_class', 'builder_class');
+    // Create a separate connection for this test (not using getManagedConnection)
+    let connection: AbapConnection | null = null;
+    let client: CrudClient | null = null;
+
+    try {
+      // Get configuration from environment variables
+      const config = getConfig();
+
+      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
+      const connectionLogger = {
+        debug: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {},
+        info: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {},
+        warn: process.env.DEBUG_CONNECTORS === 'true' ? console.warn : () => {},
+        error: process.env.DEBUG_CONNECTORS === 'true' ? console.error : () => {},
+        csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {}
+      };
+
+      // Create connection directly (same as in adt-clients tests)
+      connection = createAbapConnection(config, connectionLogger);
+
+      // Check refresh token availability before connecting
+      const connectionWithRefresh = connection as any;
+      if (connectionWithRefresh.getConfig && connectionWithRefresh.canRefreshToken) {
+        const connConfig = connectionWithRefresh.getConfig();
+        const canRefresh = connectionWithRefresh.canRefreshToken();
+        if (process.env.DEBUG_TESTS === 'true') {
+          console.log(`[DEBUG] Test connection - Connection refresh token check:`, {
+            canRefresh,
+            hasRefreshToken: !!(connConfig?.refreshToken),
+            hasUaaUrl: !!(connConfig?.uaaUrl),
+            hasUaaClientId: !!(connConfig?.uaaClientId),
+            hasUaaClientSecret: !!(connConfig?.uaaClientSecret)
+          });
+        }
+      }
+
+      await connection.connect();
+      client = new CrudClient(connection);
+      isCloud = isCloudConnection(); // Uses getManagedConnection internally, but we have separate connection
+
+      debugLog('CONNECTION', `Created separate connection for test`, {
+        url: config.url,
+        authType: config.authType,
+        hasClient: !!config.client
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn('⚠️ Skipping test: Failed to create connection', errorMessage);
+      return;
+    }
+
+    const testCase = getEnabledTestCase('create_class_direct', 'crud_direct');
     if (!testCase) {
       console.log('⏭️  Skipping test: Test case not enabled');
+      if (connection) {
+        connection.reset();
+      }
       return;
     }
 
@@ -92,6 +120,9 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
     const packageName = resolvePackageName(testCase);
     if (!packageName) {
       console.log('⏭️  Skipping test: package_name not configured');
+      if (connection) {
+        connection.reset();
+      }
       return;
     }
     // Resolve transport request exactly as in adt-clients tests
@@ -100,23 +131,33 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
     const transportRequest = resolveTransportRequest(testCase);
     const description = (testCase.params.description || `Test class ${className}`).trim();
 
-    // Log parameters read from test case
-    console.log(`[DEBUG] Test case parameters read:`, {
-      class_name: testCase.params.class_name,
-      className,
-      package_name: testCase.params.package_name,
-      packageName,
-      description: testCase.params.description,
-      resolvedDescription: description,
-      transport_request: testCase.params.transport_request,
-      resolvedTransportRequest: transportRequest,
-      superclass: testCase.params.superclass,
-      final: testCase.params.final,
-      abstract: testCase.params.abstract,
-      create_protected: testCase.params.create_protected
-    });
+    // Log parameters read from test case (only if DEBUG_TESTS is enabled)
+    if (process.env.DEBUG_TESTS === 'true') {
+      console.log(`[DEBUG] Test case parameters read:`, {
+        class_name: testCase.params.class_name,
+        className,
+        package_name: testCase.params.package_name,
+        packageName,
+        description: testCase.params.description,
+        resolvedDescription: description,
+        transport_request: testCase.params.transport_request,
+        resolvedTransportRequest: transportRequest,
+        superclass: testCase.params.superclass,
+        final: testCase.params.final,
+        abstract: testCase.params.abstract,
+        create_protected: testCase.params.create_protected
+      });
+    }
 
     // Pre-check: Verify test parameters
+    if (!client) {
+      console.log('⏭️  Skipping test: Client not initialized');
+      if (connection) {
+        connection.reset();
+      }
+      return;
+    }
+
     const preCheckResult = await preCheckTestParameters(
       client,
       packageName,
@@ -125,6 +166,9 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
     );
     if (!preCheckResult.success) {
       console.log(`⏭️  Skipping test: ${preCheckResult.reason}`);
+      if (connection) {
+        connection.reset();
+      }
       return;
     }
 
@@ -134,6 +178,9 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       description,
       transportRequest: transportRequest || '(not set)'
     });
+
+    // Track creation state for cleanup
+    let classCreated = false;
 
     try {
       // Step 1: Validate (exactly as in adt-clients)
@@ -148,8 +195,13 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
         packageName,
         description
       };
-      console.log(`[DEBUG] CrudClient.validateClass - Parameters:`, JSON.stringify(validateParams, null, 2));
+      if (process.env.DEBUG_TESTS === 'true') {
+        console.log(`[DEBUG] CrudClient.validateClass - Parameters:`, JSON.stringify(validateParams, null, 2));
+      }
 
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
       const validateResponse = await client.validateClass(validateParams);
 
       debugLog('VALIDATE_RESPONSE', `Validation completed`, {
@@ -175,17 +227,21 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       });
 
       // Check connection refresh token before create
+      if (connection) {
       const connectionWithRefresh = connection as any;
       if (connectionWithRefresh.getConfig && connectionWithRefresh.canRefreshToken) {
-        const config = connectionWithRefresh.getConfig();
+          const connConfig = connectionWithRefresh.getConfig();
         const canRefresh = connectionWithRefresh.canRefreshToken();
-        console.log(`[DEBUG] Before createClass - Connection refresh check:`, {
-          canRefresh,
-          hasRefreshToken: !!(config?.refreshToken),
-          hasUaaUrl: !!(config?.uaaUrl),
-          hasUaaClientId: !!(config?.uaaClientId),
-          hasUaaClientSecret: !!(config?.uaaClientSecret)
-        });
+        if (process.env.DEBUG_TESTS === 'true') {
+          console.log(`[DEBUG] Before createClass - Connection refresh check:`, {
+            canRefresh,
+              hasRefreshToken: !!(connConfig?.refreshToken),
+              hasUaaUrl: !!(connConfig?.uaaUrl),
+              hasUaaClientId: !!(connConfig?.uaaClientId),
+              hasUaaClientSecret: !!(connConfig?.uaaClientSecret)
+          });
+          }
+        }
       }
 
       const createParams = {
@@ -198,25 +254,32 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
         abstract: testCase.params.abstract as boolean | undefined,
         createProtected: testCase.params.create_protected as boolean | undefined
       };
-      console.log(`[DEBUG] CrudClient.createClass - Parameters:`, JSON.stringify(createParams, null, 2));
-      console.log(`[DEBUG] CrudClient.createClass - Test case params:`, {
-        superclass: testCase.params.superclass,
-        final: testCase.params.final,
-        abstract: testCase.params.abstract,
-        create_protected: testCase.params.create_protected,
-        transport_request: testCase.params.transport_request
-      });
+      if (process.env.DEBUG_TESTS === 'true') {
+        console.log(`[DEBUG] CrudClient.createClass - Parameters:`, JSON.stringify(createParams, null, 2));
+        console.log(`[DEBUG] CrudClient.createClass - Test case params:`, {
+          superclass: testCase.params.superclass,
+          final: testCase.params.final,
+          abstract: testCase.params.abstract,
+          create_protected: testCase.params.create_protected,
+          transport_request: testCase.params.transport_request
+        });
+      }
 
       try {
+        if (!client) {
+          throw new Error('Client not initialized');
+        }
         await client.createClass(createParams);
       } catch (createError: any) {
-        // Log error details for debugging
-        console.error(`[DEBUG] createClass error:`, {
-          message: createError.message,
-          status: createError.response?.status,
-          statusText: createError.response?.statusText,
-          data: createError.response?.data
-        });
+        // Log error details for debugging (only if DEBUG_TESTS is enabled)
+        if (process.env.DEBUG_TESTS === 'true') {
+          console.error(`[DEBUG] createClass error:`, {
+            message: createError.message,
+            status: createError.response?.status,
+            statusText: createError.response?.statusText,
+            data: createError.response?.data
+          });
+        }
         throw createError;
       }
 
@@ -224,6 +287,9 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       const createDelay = getOperationDelay('create', testCase);
       await new Promise(resolve => setTimeout(resolve, createDelay));
 
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
       const createResult = client.getCreateResult();
       debugLog('CREATE_RESPONSE', `Creation completed`, {
         status: createResult?.status,
@@ -234,12 +300,20 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       // Accept both 201 (Created) and 200 (OK - object already exists)
       expect([200, 201]).toContain(createResult?.status);
 
+      // Mark class as created successfully
+      classCreated = true;
+
       // Step 3: Check (exactly as in adt-clients)
       debugLog('CHECK', `Starting check for ${className}`);
       const checkParams = {
         className
       };
-      console.log(`[DEBUG] CrudClient.checkClass - Parameters:`, JSON.stringify(checkParams, null, 2));
+      if (process.env.DEBUG_TESTS === 'true') {
+        console.log(`[DEBUG] CrudClient.checkClass - Parameters:`, JSON.stringify(checkParams, null, 2));
+      }
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
       const checkResponse = await client.checkClass(checkParams);
       debugLog('CHECK_RESPONSE', `Check completed`, {
         status: checkResponse?.status,
@@ -258,23 +332,29 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       console.error(`❌ CrudClient direct test failed: ${errorMessage}`);
       throw error;
     } finally {
-      // Cleanup: Optionally delete test class
+      // Cleanup: Reset connection created for this test
+      if (connection) {
+        try {
+          connection.reset();
+          debugLog('CLEANUP', `Reset test connection`);
+        } catch (resetError: any) {
+          debugLog('CLEANUP_ERROR', `Failed to reset connection: ${resetError.message || resetError}`);
+        }
+      }
+
+      // Cleanup: For diagnostics, deletion is excluded - object left for analysis
+      // This test doesn't use lock, so no unlock needed
       if (className) {
         try {
-          const shouldCleanup = getCleanupAfter(testCase);
-
-          // Delete only if cleanup_after is true
-          if (shouldCleanup) {
-            debugLog('CLEANUP', `Starting cleanup: deleting test class ${className}`);
-            await client.deleteClass({
-              className
-            });
-            console.log(`🧹 Cleaned up test class: ${className}`);
-          } else {
-            debugLog('CLEANUP', `Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
-            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
-          }
+          debugLog('CLEANUP', `Deletion excluded for diagnostics - object left for analysis: ${className}`, {
+            class_name: className,
+            class_created: classCreated
+          });
+          console.log(`⚠️ Deletion excluded for diagnostics - object left for analysis: ${className}`);
         } catch (cleanupError: any) {
+          debugLog('CLEANUP_ERROR', `Exception during cleanup: ${cleanupError}`, {
+            error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+          });
           console.warn(`⚠️  Failed to cleanup test class ${className}: ${cleanupError.message}`);
         }
       }

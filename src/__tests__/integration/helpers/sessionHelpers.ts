@@ -2,13 +2,14 @@
  * Session management helpers for low-level handler integration tests
  *
  * Uses the same approach as adt-clients tests:
- * - Create connection via getManagedConnection()
+ * - Create connection directly (not via getManagedConnection)
  * - Call connect() once
  * - Extract session state directly from connection
  */
 
 import { extractSessionState } from './testHelpers';
-import { getManagedConnection } from '../../../lib/utils';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 import { generateSessionId } from '../../../lib/sessionUtils';
 
 export interface SessionInfo {
@@ -21,13 +22,28 @@ export interface SessionInfo {
 }
 
 /**
- * Get a new session for testing
- * Uses the same approach as adt-clients tests - connect once, extract session state
+ * Create a separate connection and session for testing
+ * Creates a new connection for each test to avoid shared state
  */
-export async function getTestSession(): Promise<SessionInfo> {
+export async function createTestConnectionAndSession(): Promise<{
+  connection: AbapConnection;
+  session: SessionInfo;
+}> {
   try {
-    // Get connection (same as adt-clients tests)
-    const connection = getManagedConnection();
+    // Get configuration from environment variables
+    const config = getConfig();
+
+    // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
+    const connectionLogger = {
+      debug: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {},
+      info: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {},
+      warn: process.env.DEBUG_CONNECTORS === 'true' ? console.warn : () => {},
+      error: process.env.DEBUG_CONNECTORS === 'true' ? console.error : () => {},
+      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {}
+    };
+
+    // Create connection directly (same as in adt-clients tests)
+    const connection = createAbapConnection(config, connectionLogger);
 
     // Log token info from connection (what's actually used in session)
     if (process.env.DEBUG_TESTS === 'true') {
@@ -77,7 +93,7 @@ export async function getTestSession(): Promise<SessionInfo> {
       throw new Error('Failed to get session state. Connection may not be properly initialized.');
     }
 
-    return {
+    const session: SessionInfo = {
       session_id: sessionId,
       session_state: {
         cookies: sessionState.cookies || '',
@@ -85,9 +101,14 @@ export async function getTestSession(): Promise<SessionInfo> {
         cookie_store: sessionState.cookieStore || {}
       }
     };
+
+    return {
+      connection,
+      session
+    };
   } catch (error: any) {
     if (process.env.DEBUG_TESTS === 'true') {
-      console.error('[getTestSession] Error caught:', {
+      console.error('[createTestConnectionAndSession] Error caught:', {
         message: error?.message,
         stack: error?.stack,
         error: error
@@ -95,6 +116,16 @@ export async function getTestSession(): Promise<SessionInfo> {
     }
     throw error;
   }
+}
+
+/**
+ * Get a new session for testing (backward compatibility)
+ * Creates a separate connection for each call to avoid shared state
+ * @deprecated Consider using createTestConnectionAndSession() for better control
+ */
+export async function getTestSession(): Promise<SessionInfo> {
+  const { session } = await createTestConnectionAndSession();
+  return session;
 }
 
 /**

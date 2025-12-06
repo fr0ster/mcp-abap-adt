@@ -4,7 +4,7 @@
  * Uses ProgramBuilder from @mcp-abap-adt/adt-clients for all operations.
  * Session and lock management handled internally by builder.
  *
- * Workflow: validate -> lock -> update -> check -> unlock -> (activate)
+ * Workflow: lock -> update -> check -> unlock -> (activate)
  */
 
 import { AxiosResponse } from '../../../lib/utils';
@@ -71,26 +71,11 @@ export async function handleUpdateProgram(params: any) {
       // Create builder with configuration
       const builder = new CrudClient(connection);
 
-      // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
+      // Build operation chain: lock -> update -> check -> unlock -> (activate)
+      // Note: No validation needed for update - program must already exist
       const shouldActivate = args.activate === true; // Default to false if not specified
 
       try {
-        // Validate (for update, "already exists" is expected - object must exist)
-        try {
-          await builder.validateProgram({
-            programName,
-            description: undefined,
-            packageName: undefined
-          });
-        } catch (validateError: any) {
-          // For update operations, "already exists" is expected - object must exist
-          if (!isAlreadyExistsError(validateError)) {
-            // Real validation error - rethrow
-            throw validateError;
-          }
-          // "Already exists" is OK for update - continue
-          logger.info(`Program ${programName} already exists - this is expected for update operation`);
-        }
         await builder.lockProgram({ programName });
         const lockHandle = builder.getLockHandle();
         await builder.updateProgram({ programName, sourceCode: args.source_code }, lockHandle);
@@ -138,7 +123,7 @@ export async function handleUpdateProgram(params: any) {
       logger.info(`✅ UpdateProgram completed successfully: ${programName}`);
 
       // Return success result
-      const stepsCompleted = ['validate', 'lock', 'update', 'check', 'unlock'];
+      const stepsCompleted = ['lock', 'update', 'check', 'unlock'];
       if (shouldActivate) {
         stepsCompleted.push('activate');
       }

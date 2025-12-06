@@ -68,9 +68,8 @@ export async function handleUpdateFunctionGroup(args: UpdateFunctionGroupArgs) {
     logger.info(`Starting function group metadata update: ${functionGroupName}`);
 
     try {
-      // Use CrudClient for lock/unlock and ReadOnlyClient for read
+      // Use CrudClient for lock/unlock
       const crudClient = new CrudClient(connection);
-      const readClient = new ReadOnlyClient(connection);
 
       // Lock function group
       await crudClient.lockFunctionGroup({ functionGroupName });
@@ -79,10 +78,14 @@ export async function handleUpdateFunctionGroup(args: UpdateFunctionGroupArgs) {
         throw new Error('Failed to acquire lock handle');
       }
 
+      // Small delay to ensure lock is fully established
+      await new Promise(resolve => setTimeout(resolve, 200));
+
       try {
-        // Get current XML
-        await readClient.readFunctionGroup(functionGroupName);
-        const currentResponse = readClient.getReadResult();
+        // Get current XML using CrudClient (same connection, same session as lock)
+        // This ensures we use the same session that was used for locking
+        await crudClient.readFunctionGroup(functionGroupName);
+        const currentResponse = crudClient.getReadResult();
         if (!currentResponse) {
           throw new Error('Failed to get current function group data');
         }
@@ -90,8 +93,8 @@ export async function handleUpdateFunctionGroup(args: UpdateFunctionGroupArgs) {
           ? currentResponse.data
           : JSON.stringify(currentResponse.data);
 
-        // Update description in XML (limit to 60 characters)
-        const limitedDescription = description.length > 60 ? description.substring(0, 60) : description;
+        // Update description in XML (limit to 40 characters - SAP requirement)
+        const limitedDescription = description.length > 40 ? description.substring(0, 40) : description;
         const updatedXml = currentXml.replace(
           /adtcore:description="[^"]*"/,
           `adtcore:description="${limitedDescription.replace(/"/g, '&quot;')}"`
@@ -136,11 +139,13 @@ export async function handleUpdateFunctionGroup(args: UpdateFunctionGroupArgs) {
           config: {} as any
         });
       } catch (error) {
-        // Try to unlock on error
-        try {
-          await crudClient.unlockFunctionGroup({ functionGroupName }, lockHandle);
-        } catch (unlockError) {
-          logger.error('Failed to unlock function group after error:', unlockError);
+        // Try to unlock on error (only if lock was successful)
+        if (lockHandle) {
+          try {
+            await crudClient.unlockFunctionGroup({ functionGroupName }, lockHandle);
+          } catch (unlockError) {
+            logger.error('Failed to unlock function group after error:', unlockError);
+          }
         }
         throw error;
       }

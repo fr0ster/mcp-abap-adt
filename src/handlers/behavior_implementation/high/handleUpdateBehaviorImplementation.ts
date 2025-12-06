@@ -4,7 +4,7 @@
  * Uses CrudClient from @mcp-abap-adt/adt-clients for all operations.
  * Session and lock management handled internally by client.
  *
- * Workflow: validate -> lock -> update main source -> update implementations -> check -> unlock -> (activate)
+ * Workflow: lock -> update main source -> update implementations -> check -> unlock -> (activate)
  */
 
 import { AxiosResponse } from '../../../lib/utils';
@@ -83,25 +83,9 @@ export async function handleUpdateBehaviorImplementation(args: UpdateBehaviorImp
       // Create client
       const client = new CrudClient(connection);
 
-      // Build operation chain: validate -> lock -> update main source -> update implementations -> check -> unlock -> (activate)
+      // Build operation chain: lock -> update main source -> update implementations -> check -> unlock -> (activate)
+      // Note: No validation needed for update - behavior implementation must already exist
       const shouldActivate = activate !== false; // Default to true if not specified
-
-      // Validate (for update, "already exists" is expected - object must exist)
-      try {
-        await client.validateClass({
-          className,
-          packageName: undefined,
-          description: undefined
-        });
-      } catch (validateError: any) {
-        // For update operations, "already exists" is expected - object must exist
-        if (!isAlreadyExistsError(validateError)) {
-          // Real validation error - rethrow
-          throw validateError;
-        }
-        // "Already exists" is OK for update - continue
-        logger.info(`Behavior Implementation ${className} already exists - this is expected for update operation`);
-      }
 
       // Lock
       await client.lockClass({ className });
@@ -174,7 +158,7 @@ export async function handleUpdateBehaviorImplementation(args: UpdateBehaviorImp
       logger.info(`✅ UpdateBehaviorImplementation completed successfully: ${className}`);
 
       // Return success result
-      const stepsCompleted = ['validate', 'lock', 'update_main_source', 'update_implementations', 'check', 'unlock'];
+      const stepsCompleted = ['lock', 'update_main_source', 'update_implementations', 'check', 'unlock'];
       if (shouldActivate) {
         stepsCompleted.push('activate');
       }

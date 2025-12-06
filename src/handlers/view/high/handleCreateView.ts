@@ -38,6 +38,10 @@ export const TOOL_DEFINITION = {
       description: {
         type: "string",
         description: "Optional description. If not provided, view_name will be used."
+      },
+      activate: {
+        type: "boolean",
+        description: "Activate view after creation. Default: true. Set to false for batch operations (activate multiple objects later)."
       }
     },
     required: ["view_name", "ddl_source", "package_name"]
@@ -50,6 +54,7 @@ interface CreateViewArgs {
   package_name: string;
   transport_request?: string;
   description?: string;
+  activate?: boolean;
 }
 
 
@@ -82,7 +87,7 @@ export async function handleCreateView(params: any) {
     try {
       // Create client
       const client = new CrudClient(connection);
-      const shouldActivate = true; // Default to true for views
+      const shouldActivate = args.activate !== false; // Default to true if not specified
 
       // Validate
       await client.validateView({
@@ -104,32 +109,43 @@ export async function handleCreateView(params: any) {
       await client.lockView({ viewName });
       const lockHandle = client.getLockHandle();
 
-      // Update with DDL source
-      await client.updateView({ viewName, ddlSource: args.ddl_source }, lockHandle);
-
-      // Check
       try {
-        await safeCheckOperation(
-          () => client.checkView({ viewName }),
-          viewName,
-          {
-            debug: (message: string) => logger.info(`[CreateView] ${message}`)
+        // Update with DDL source
+        await client.updateView({ viewName, ddlSource: args.ddl_source }, lockHandle);
+
+        // Check
+        try {
+          await safeCheckOperation(
+            () => client.checkView({ viewName }),
+            viewName,
+            {
+              debug: (message: string) => logger.info(`[CreateView] ${message}`)
+            }
+          );
+        } catch (checkError: any) {
+          // If error was marked as "already checked", continue silently
+          if (!(checkError as any).isAlreadyChecked) {
+            // Real check error - rethrow
+            throw checkError;
           }
-        );
-      } catch (checkError: any) {
-        // If error was marked as "already checked", continue silently
-        if (!(checkError as any).isAlreadyChecked) {
-          // Real check error - rethrow
-          throw checkError;
         }
-      }
 
-      // Unlock
-      await client.unlockView({ viewName }, lockHandle);
+        // Unlock
+        await client.unlockView({ viewName }, lockHandle);
 
-      // Activate
-      if (shouldActivate) {
-        await client.activateView({ viewName });
+        // Activate
+        if (shouldActivate) {
+          await client.activateView({ viewName });
+        }
+      } catch (error) {
+        // Unlock on error (principle 1: if lock was done, unlock is mandatory)
+        try {
+          await client.unlockView({ viewName }, lockHandle);
+        } catch (unlockError) {
+          logger.error('Failed to unlock view after error:', unlockError);
+        }
+        // Principle 2: first error and exit
+        throw error;
       }
 
       // Parse activation warnings if activation was performed

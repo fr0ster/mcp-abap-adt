@@ -329,13 +329,20 @@ function disposeConnection(connection?: AbapConnection) {
 }
 
 /**
- * Generate cache key for connection based on sessionId and config signature
- * This ensures each client session with different SAP config gets its own connection
+ * Generate cache key for connection based on sessionId, config signature, and destination
+ * This ensures each client session with different SAP config or destination gets its own connection
+ *
+ * Example scenarios:
+ * - 4 clients, each with 2 destinations = up to 8 different connections
+ * - Each combination of (sessionId, config, destination) gets its own isolated connection
  */
-function generateConnectionCacheKey(sessionId: string, configSignature: string): string {
+function generateConnectionCacheKey(sessionId: string, configSignature: string, destination?: string): string {
   const hash = crypto.createHash('sha256');
   hash.update(sessionId);
   hash.update(configSignature);
+  // Include destination in cache key to ensure different destinations get different connections
+  // This is critical for multi-tenant scenarios where same sessionId might use different destinations
+  hash.update(destination || '');
   return hash.digest('hex');
 }
 
@@ -410,7 +417,7 @@ function createDestinationAwareConnection(connection: AbapConnection, destinatio
  */
 function getConnectionForSession(sessionId: string, config: SapConfig, destination?: string): AbapConnection {
   const configSignature = sapConfigSignature(config);
-  const cacheKey = generateConnectionCacheKey(sessionId, configSignature);
+  const cacheKey = generateConnectionCacheKey(sessionId, configSignature, destination);
 
   // Clean up old entries periodically
   if (connectionCache.size > 100) {
@@ -434,34 +441,14 @@ function getConnectionForSession(sessionId: string, config: SapConfig, destinati
     // Wrap connection to intercept refreshToken() for destination-based authentication
     connection = createDestinationAwareConnection(connection, destination);
 
-    // Enable stateful session mode
-    const connectionWithStateful = connection as any;
-    if (connectionWithStateful.enableStatefulSession) {
-      try {
-        const statefulResult = connectionWithStateful.enableStatefulSession(connectionSessionId, sessionStorage);
-        if (statefulResult && typeof statefulResult.catch === 'function') {
-          statefulResult.catch((error: any) => {
-            logger.warn("Failed to enable stateful session", {
-              type: "STATEFUL_SESSION_ENABLE_FAILED",
-              error: error instanceof Error ? error.message : String(error),
-            });
-          });
-        }
-      } catch (error: any) {
-        logger.warn("Failed to enable stateful session", {
-          type: "STATEFUL_SESSION_ENABLE_FAILED",
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
+    // Don't call enableStatefulSession during module import - it may trigger connection attempts
+    // Session ID and storage are already set via createAbapConnection() constructor
+    // enableStatefulSession() will be called lazily when first request is made (if needed)
+    // The connection is already in stateful mode if sessionStorage is provided to constructor
 
-    // Connect and verify session state
-    connection.connect().catch((error) => {
-      logger.warn("Failed to connect after creating new connection", {
-        type: "CONNECTION_INIT_FAILED",
-        error: error instanceof Error ? error.message : String(error),
-      });
-    });
+    // Don't call connect() here - it will be called lazily on first request
+    // This prevents unnecessary connection attempts during module import (e.g., in Jest tests)
+    // The retry logic in makeAdtRequest will handle connection establishment automatically
 
     entry = {
       connection,
@@ -528,6 +515,8 @@ export function getManagedConnection(): AbapConnection {
   };
 
   // Debug logging - verify URL is clean before creating connection (only in debug mode)
+  // NOTE: This debug logging should NOT trigger connection attempts
+  // Only log if explicitly enabled via DEBUG_CONNECTORS, DEBUG_TESTS, or DEBUG_ADT_TESTS
   if (config.url) {
     const urlHex = Buffer.from(config.url, 'utf8').toString('hex');
     debugLog(`[MCP-UTILS] Creating connection with URL: "${config.url}" (length: ${config.url.length})\n`);
@@ -582,40 +571,14 @@ export function getManagedConnection(): AbapConnection {
     }
     cachedConfigSignature = signature;
 
-    // Enable stateful session mode to allow session persistence
-    // Note: enableStatefulSession is available in AbstractAbapConnection but not in AbapConnection interface
-    // If sessionStorage and sessionId are provided to createAbapConnection, stateful session should be enabled automatically
-    // But we call it explicitly to ensure it's enabled
-    // Use the same fallbackSessionId to ensure session isolation
-    const connectionWithStateful = cachedConnection as any;
-    if (connectionWithStateful.enableStatefulSession) {
-      try {
-        const statefulResult = connectionWithStateful.enableStatefulSession(fallbackSessionId, sessionStorage);
-        if (statefulResult && typeof statefulResult.catch === 'function') {
-          statefulResult.catch((error: any) => {
-            logger.warn("Failed to enable stateful session", {
-              type: "STATEFUL_SESSION_ENABLE_FAILED",
-              error: error instanceof Error ? error.message : String(error),
-            });
-          });
-        }
-      } catch (error: any) {
-        logger.warn("Failed to enable stateful session", {
-          type: "STATEFUL_SESSION_ENABLE_FAILED",
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
+    // Don't call enableStatefulSession during module import - it may trigger connection attempts
+    // Session ID and storage are already set via createAbapConnection() constructor
+    // enableStatefulSession() will be called lazily when first request is made (if needed)
+    // The connection is already in stateful mode if sessionStorage is provided to constructor
 
-    // Connect and verify session state (will save if changed)
-    // The connect() method in JwtAbapConnection now compares session state and saves only if changed
-    cachedConnection.connect().catch((error) => {
-      logger.warn("Failed to connect after creating new connection", {
-        type: "CONNECTION_INIT_FAILED",
-        error: error instanceof Error ? error.message : String(error),
-      });
-      // Don't throw - connection will be established on first use
-    });
+    // Don't call connect() here - it will be called lazily on first request
+    // This prevents unnecessary connection attempts during module import (e.g., in Jest tests)
+    // The retry logic in makeAdtRequest will handle connection establishment automatically
   } else {
     connectionManagerLogger.debug(`[DEBUG] getManagedConnection - Reusing cached connection (signature matches)`);
   }
@@ -626,19 +589,22 @@ export function getManagedConnection(): AbapConnection {
 /**
  * Remove connection from cache for a specific session
  * Called when session is closed
+ *
+ * If destination is provided, removes only the connection for that specific destination.
+ * If destination is not provided, removes all connections for the session (all destinations).
  */
-export function removeConnectionForSession(sessionId: string, config?: SapConfig) {
+export function removeConnectionForSession(sessionId: string, config?: SapConfig, destination?: string) {
   if (config) {
     const configSignature = sapConfigSignature(config);
-    const cacheKey = generateConnectionCacheKey(sessionId, configSignature);
+    const cacheKey = generateConnectionCacheKey(sessionId, configSignature, destination);
     const entry = connectionCache.get(cacheKey);
     if (entry) {
-      connectionManagerLogger.debug(`[DEBUG] Removing connection cache entry for session ${sessionId.substring(0, 8)}...`);
+      connectionManagerLogger.debug(`[DEBUG] Removing connection cache entry for session ${sessionId.substring(0, 8)}... (destination: ${destination || 'none'})`);
       disposeConnection(entry.connection);
       connectionCache.delete(cacheKey);
     }
   } else {
-    // Remove all entries for this sessionId
+    // Remove all entries for this sessionId (all destinations and configs)
     for (const [key, entry] of connectionCache.entries()) {
       if (entry.sessionId === sessionId) {
         connectionManagerLogger.debug(`[DEBUG] Removing connection cache entry for session ${sessionId.substring(0, 8)}...`);
@@ -679,13 +645,22 @@ export async function restoreSessionInConnection(
   });
 
   // Then enable stateful session - this will:
-  // 1. Set sessionId in connection
-  // 2. Try to load from storage (if exists, will override our setSessionState)
-  // 3. Save current state to storage
+  // 1. Set sessionId in connection (via setSessionId or constructor)
+  // 2. Set session storage (via setSessionStorage)
+  // 3. Load from storage (if exists, will override our setSessionState)
+  // 4. Enable stateful mode
   try {
-    const result = await connectionWithStateful.enableStatefulSession(sessionId, sessionStorage);
-    if (result && typeof result.catch === 'function') {
-      await result; // Wait for promise if it returns one
+    // Set session ID first (if not already set via constructor)
+    if (connectionWithStateful.setSessionId) {
+      connectionWithStateful.setSessionId(sessionId);
+    }
+    // Set session storage (this will load existing state if available)
+    if (sessionStorage && connectionWithStateful.setSessionStorage) {
+      await connectionWithStateful.setSessionStorage(sessionStorage);
+    }
+    // Enable stateful session mode
+    if (connectionWithStateful.enableStatefulSession) {
+      connectionWithStateful.enableStatefulSession();
     }
   } catch (error: any) {
     logger.warn("Failed to enable stateful session during restore", {

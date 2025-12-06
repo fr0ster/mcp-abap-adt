@@ -4,14 +4,16 @@
  * Uses ClassBuilder from @mcp-abap-adt/adt-clients for all operations.
  * Session and lock management handled internally by builder.
  *
- * Workflow: lock -> update -> check -> unlock -> (activate)
+ * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { handlerLogger } from '../../../lib/logger';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 export const TOOL_DEFINITION = {
   name: "UpdateClass",
@@ -58,7 +60,6 @@ export async function handleUpdateClass(params: UpdateClassArgs) {
   }
 
   const className = args.class_name.toUpperCase();
-  const connection = getManagedConnection();
 
   logger.info(`Starting UpdateClass for ${className}`);
   handlerLogger.info('UpdateClass', 'start', `Starting class update: ${className}`, {
@@ -67,30 +68,39 @@ export async function handleUpdateClass(params: UpdateClassArgs) {
     shouldActivate: args.activate === true
   });
 
+  // Create a separate connection for this handler call (not using getManagedConnection)
+  let connection: any = null;
+  try {
+    // Get configuration from environment variables
+    const config = getConfig();
+
+    // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
+    const connectionLogger = {
+      debug: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {},
+      info: process.env.DEBUG_CONNECTORS === 'true' ? logger.info.bind(logger) : () => {},
+      warn: process.env.DEBUG_CONNECTORS === 'true' ? logger.warn.bind(logger) : () => {},
+      error: process.env.DEBUG_CONNECTORS === 'true' ? logger.error.bind(logger) : () => {},
+      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {}
+    };
+
+    // Create connection directly for this handler call
+    connection = createAbapConnection(config, connectionLogger);
+    await connection.connect();
+
+    handlerLogger.debug('UpdateClass', 'connection', `Created separate connection for handler call: ${className}`);
+  } catch (connectionError: any) {
+    const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
+    handlerLogger.error('UpdateClass', 'connection_error', `Failed to create connection: ${errorMessage}`);
+    return return_error(new Error(`Failed to create connection: ${errorMessage}`));
+  }
+
   try {
     // Create client
     const client = new CrudClient(connection);
 
-    // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
+    // Build operation chain: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
+    // Note: No validation needed for update - class must already exist
     const shouldActivate = args.activate === true; // Default to false if not specified
-
-    // Validate (for update, "already exists" is expected - object must exist)
-    handlerLogger.debug('UpdateClass', 'validate', `Validating class: ${className}`);
-    try {
-      await client.validateClass({ className: className, packageName: undefined, description: undefined });
-      handlerLogger.debug('UpdateClass', 'validate', `Validation completed for: ${className}`);
-    } catch (validateError: any) {
-      // For update operations, "already exists" is expected - object must exist
-      if (!isAlreadyExistsError(validateError)) {
-        // Real validation error - rethrow
-        handlerLogger.error('UpdateClass', 'validate', `Validation failed for: ${className}`, {
-          error: validateError instanceof Error ? validateError.message : String(validateError)
-        });
-        throw validateError;
-      }
-      // "Already exists" is OK for update - continue
-      handlerLogger.debug('UpdateClass', 'validate', `Class ${className} already exists - this is expected for update operation`);
-    }
 
     // Lock
     handlerLogger.debug('UpdateClass', 'lock', `Locking class: ${className}`);
@@ -101,41 +111,77 @@ export async function handleUpdateClass(params: UpdateClassArgs) {
     });
 
     try {
-      // Update source code
-      handlerLogger.debug('UpdateClass', 'update', `Updating class source code: ${className}`, {
+      // Step 1: Check new code BEFORE update (with sourceCode and version='inactive')
+      handlerLogger.debug('UpdateClass', 'check_new_code', `Checking new code before update: ${className}`, {
         className,
         sourceCodeLength: args.source_code.length
       });
-      await client.updateClass({ className: className, sourceCode: args.source_code }, lockHandle);
-      handlerLogger.debug('UpdateClass', 'update', `Class source code updated: ${className}`);
-
-      // Check
-      handlerLogger.debug('UpdateClass', 'check', `Checking class syntax: ${className}`);
+      let checkNewCodePassed = false;
       try {
         await safeCheckOperation(
-          () => client.checkClass({ className: className }),
+          () => client.checkClass({ className: className }, 'inactive', args.source_code),
           className,
           {
-            debug: (message: string) => handlerLogger.debug('UpdateClass', 'check', message)
+            debug: (message: string) => handlerLogger.debug('UpdateClass', 'check_new_code', message)
           }
         );
-        handlerLogger.debug('UpdateClass', 'check', `Class check completed: ${className}`);
+        checkNewCodePassed = true;
+        handlerLogger.debug('UpdateClass', 'check_new_code', `New code check passed: ${className}`);
       } catch (checkError: any) {
         // If error was marked as "already checked", continue silently
         if ((checkError as any).isAlreadyChecked) {
-          handlerLogger.debug('UpdateClass', 'check', `Class ${className} was already checked - this is OK, continuing`);
+          handlerLogger.debug('UpdateClass', 'check_new_code', `Class ${className} was already checked - this is OK, continuing`);
+          checkNewCodePassed = true;
         } else {
-          // Real check error - rethrow
-          throw checkError;
+          // Real check error - don't update if check failed
+          handlerLogger.error('UpdateClass', 'check_new_code', `New code check failed: ${className}`, {
+            error: checkError instanceof Error ? checkError.message : String(checkError)
+          });
+          throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
         }
       }
 
-      // Unlock
+      // Step 2: Update (only if check passed)
+      if (checkNewCodePassed) {
+        handlerLogger.debug('UpdateClass', 'update', `Updating class source code: ${className}`, {
+          className,
+          sourceCodeLength: args.source_code.length
+        });
+        await client.updateClass({ className: className, sourceCode: args.source_code }, lockHandle);
+        handlerLogger.debug('UpdateClass', 'update', `Class source code updated: ${className}`);
+      } else {
+        handlerLogger.debug('UpdateClass', 'update', `Skipping update - new code check failed: ${className}`);
+      }
+
+      // Step 3: Unlock (MANDATORY after lock)
       handlerLogger.debug('UpdateClass', 'unlock', `Unlocking class: ${className}`);
       await client.unlockClass({ className: className }, lockHandle);
       handlerLogger.debug('UpdateClass', 'unlock', `Class unlocked: ${className}`);
 
-      // Activate if requested
+      // Step 4: Check inactive version (after unlock)
+      handlerLogger.debug('UpdateClass', 'check_inactive', `Checking inactive version: ${className}`);
+      try {
+        await safeCheckOperation(
+          () => client.checkClass({ className: className }, 'inactive'),
+          className,
+          {
+            debug: (message: string) => handlerLogger.debug('UpdateClass', 'check_inactive', message)
+          }
+        );
+        handlerLogger.debug('UpdateClass', 'check_inactive', `Inactive version check completed: ${className}`);
+      } catch (checkError: any) {
+        // If error was marked as "already checked", continue silently
+        if ((checkError as any).isAlreadyChecked) {
+          handlerLogger.debug('UpdateClass', 'check_inactive', `Class ${className} was already checked - this is OK, continuing`);
+        } else {
+          // Log warning but don't fail - inactive check is informational
+          handlerLogger.warn('UpdateClass', 'check_inactive', `Inactive version check had issues: ${className}`, {
+            error: checkError instanceof Error ? checkError.message : String(checkError)
+          });
+        }
+      }
+
+      // Step 5: Activate if requested
       if (shouldActivate) {
         handlerLogger.debug('UpdateClass', 'activate', `Activating class: ${className}`);
         await client.activateClass({ className: className });
@@ -180,7 +226,7 @@ export async function handleUpdateClass(params: UpdateClassArgs) {
     }
 
     // Return success result
-    const stepsCompleted = ['lock', 'update', 'check', 'unlock'];
+    const stepsCompleted = ['lock', 'check_new_code', 'update', 'unlock', 'check_inactive'];
     if (shouldActivate) {
       stepsCompleted.push('activate');
     }
@@ -220,5 +266,15 @@ export async function handleUpdateClass(params: UpdateClassArgs) {
       : error.message || String(error);
 
     return return_error(new Error(`Failed to update class ${className}: ${errorMessage}`));
+  } finally {
+    // Cleanup: Reset connection created for this handler call
+    if (connection) {
+      try {
+        connection.reset();
+        handlerLogger.debug('UpdateClass', 'cleanup', `Reset connection for handler call: ${className}`);
+      } catch (resetError: any) {
+        handlerLogger.error('UpdateClass', 'cleanup_error', `Failed to reset connection: ${resetError.message || resetError}`);
+      }
+    }
   }
 }

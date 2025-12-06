@@ -28,6 +28,15 @@ import * as fs from 'fs';
  */
 export async function refreshTokensForTests(): Promise<void> {
   try {
+    // Skip token refresh if we already have valid tokens in .env
+    // This prevents unnecessary AuthBroker calls that might try to open browser
+    if (process.env.SAP_JWT_TOKEN && process.env.SAP_URL) {
+      if (process.env.DEBUG_TESTS === 'true') {
+        console.log('[refreshTokensForTests] Skipping token refresh - tokens already available in .env');
+      }
+      return;
+    }
+
     const config = loadTestConfig();
 
     // Check if test config has destination for auth-broker
@@ -122,20 +131,49 @@ export async function refreshTokensForTests(): Promise<void> {
     const tokenProvider = new BtpTokenProvider();
 
     // Create AuthBroker (same as in getOrCreateAuthBroker)
-    // Use 'none' browser in tests to avoid opening browser automatically
-    // If refresh token is expired, tests will fail gracefully instead of opening browser
+    // Use 'system' browser to allow browser authentication if refresh token fails
+    // This allows tests to refresh tokens even if refresh token in .env has expired
     const authBroker = new AuthBroker(
       {
         serviceKeyStore,
         sessionStore,
         tokenProvider,
       },
-      'none', // Don't open browser automatically in tests
+      'system', // Allow browser authentication if refresh token fails
       defaultLogger
     );
 
-    // Try to get fresh token
+    // Try to get fresh token using auth-broker
+    // This will try:
+    // 1. Session store (if token exists and is valid)
+    // 2. Refresh token (if available in session store or .env)
+    // 3. UAA client_credentials (if UAA credentials available)
+    // 4. Browser authentication (if all above fail and browser is set to 'system')
     try {
+      // Check if we already have a valid token in session store (without triggering authentication)
+      let existingConnConfig;
+      try {
+        existingConnConfig = await authBroker.getConnectionConfig(destination);
+      } catch (error) {
+        // If getConnectionConfig fails, continue to try getToken
+        existingConnConfig = null;
+      }
+
+      if (existingConnConfig?.authorizationToken) {
+        if (process.env.DEBUG_TESTS === 'true') {
+          console.log('[refreshTokensForTests] Using existing token from session store');
+        }
+        // Update process.env with existing token
+        process.env.SAP_URL = existingConnConfig.serviceUrl;
+        process.env.SAP_JWT_TOKEN = existingConnConfig.authorizationToken;
+        return;
+      }
+
+      // Try to get new token using auth-broker
+      // This will try refresh token first, then UAA, then browser if needed
+      if (process.env.DEBUG_TESTS === 'true') {
+        console.log('[refreshTokensForTests] Attempting to get token via auth-broker (will try refresh token, UAA, then browser if needed)');
+      }
       const token = await authBroker.getToken(destination);
       const connConfig = await authBroker.getConnectionConfig(destination);
 

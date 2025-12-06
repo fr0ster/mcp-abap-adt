@@ -26,7 +26,8 @@ import {
   parseHandlerResponse,
   extractLockHandle,
   delay,
-  logTestStep
+  logTestStep,
+  debugLog
 } from '../helpers/testHelpers';
 import {
   getTestSession,
@@ -91,6 +92,7 @@ describe('Structure Low-Level Handlers Integration', () => {
 
       let lockHandleForCleanup: string | null = null;
       let lockSessionForCleanup: SessionInfo | null = null;
+      let structureCreated = false;
 
       try {
         // Step 1: Validate
@@ -154,6 +156,9 @@ describe('Structure Low-Level Handlers Integration', () => {
         const createData = parseHandlerResponse(createResponse);
         expect(createData.success).toBe(true);
         expect(createData.structure_name).toBe(structureName);
+
+        // Mark structure as created successfully
+        structureCreated = true;
 
         session = updateSessionFromResponse(session, createData);
         await delay(getOperationDelay('create', testCase));
@@ -274,47 +279,61 @@ define structure ${structureName} {
         expect(activateData.success).toBe(true);
 
       } catch (error: any) {
+        // Principle 1: If lock was done, unlock is mandatory
+        if (lockHandleForCleanup && lockSessionForCleanup) {
+          try {
+            await handleUnlockStructure({
+              structure_name: structureName,
+              lock_handle: lockHandleForCleanup,
+              session_id: lockSessionForCleanup.session_id,
+              session_state: lockSessionForCleanup.session_state
+            });
+          } catch (unlockError) {
+            console.error('Failed to unlock structure after error:', unlockError);
+          }
+        }
+
+        // Principle 2: first error and exit
         console.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
-        // Cleanup: Unlock and optionally delete
+        // Cleanup: Unlock is always required if structure was locked
+        // For diagnostics: deletion is excluded, only unlock is performed
         if (session && structureName) {
           try {
-            const shouldCleanup = getCleanupAfter(testCase);
-
-            // Always unlock (unlock is always performed)
+            // Principle 1: If lock was done, unlock is mandatory
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
-                await handleUnlockStructure({
+                debugLog('CLEANUP', `Attempting to unlock structure ${structureName} (cleanup)`, {
                   structure_name: structureName,
+                  has_lock_handle: !!lockHandleForCleanup
+                });
+                await handleUnlockStructure({
+                structure_name: structureName,
                   lock_handle: lockHandleForCleanup,
                   session_id: lockSessionForCleanup.session_id,
                   session_state: lockSessionForCleanup.session_state
                 });
+                debugLog('CLEANUP', `Successfully unlocked structure ${structureName} (cleanup)`);
+                console.log(`🔓 Unlocked structure ${structureName} (cleanup)`);
               } catch (unlockError: any) {
-                // Silent cleanup failure
+                debugLog('CLEANUP', `Failed to unlock structure ${structureName} (cleanup)`, {
+                  error: unlockError instanceof Error ? unlockError.message : String(unlockError)
+                });
+                console.warn(`⚠️  Failed to unlock structure ${structureName} during cleanup: ${unlockError.message || unlockError}`);
               }
             }
 
-            // Delete only if cleanup_after is true
-            if (shouldCleanup) {
-              await delay(1000);
-
-              const deleteResponse = await handleDeleteStructure({
-                structure_name: structureName,
-                transport_request: transportRequest
-              });
-
-              if (deleteResponse.isError) {
-                const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-                console.warn(`⚠️  Failed to delete structure ${structureName}: ${errorMsg}`);
-              } else {
-                console.log(`🧹 Cleaned up test structure: ${structureName}`);
-              }
-            } else {
-              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${structureName}`);
-            }
+            // Deletion is excluded for diagnostics - object left for analysis
+            debugLog('CLEANUP', `Deletion excluded for diagnostics - object left for analysis: ${structureName}`, {
+              structure_name: structureName,
+              structure_created: structureCreated
+            });
+            console.log(`⚠️ Deletion excluded for diagnostics - object left for analysis: ${structureName}`);
           } catch (cleanupError: any) {
+            debugLog('CLEANUP_ERROR', `Exception during cleanup: ${cleanupError}`, {
+              error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+            });
             console.warn(`⚠️  Failed to cleanup test structure ${structureName}: ${cleanupError.message || cleanupError}`);
           }
         }

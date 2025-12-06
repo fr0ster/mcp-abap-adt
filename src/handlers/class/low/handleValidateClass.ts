@@ -101,15 +101,37 @@ export async function handleValidateClass(args: ValidateClassArgs) {
     try {
       const builder = new CrudClient(connection);
 
-      await builder.validateClass({
-        className,
-        packageName: package_name.toUpperCase(),
-        description: description
-      });
-      const validationResponse = builder.getValidationResponse();
+      // validateClass may throw for non-400 errors, but returns response for 400
+      let validationResponse: AxiosResponse | undefined;
+      try {
+        await builder.validateClass({
+          className,
+          packageName: package_name.toUpperCase(),
+          description: description,
+          superclass: superclass
+        });
+        validationResponse = builder.getValidationResponse();
+      } catch (error: any) {
+        // For 400 errors, ClassBuilder.validate() returns error.response instead of throwing
+        // But if it still throws, try to get response from builder state
+        if (error.response && error.response.status === 400) {
+          validationResponse = error.response;
+        } else {
+          // For non-400 errors, re-throw to be handled below
+          throw error;
+        }
+      }
+
+      // If no response, try to get it from builder (should not happen, but safety check)
+      if (!validationResponse) {
+        validationResponse = builder.getValidationResponse();
+      }
+
       if (!validationResponse) {
         throw new Error('Validation did not return a result');
       }
+
+      // Parse validation response (works for both 200 and 400 responses)
       const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
@@ -118,6 +140,8 @@ export async function handleValidateClass(args: ValidateClassArgs) {
       logger.info(`✅ ValidateClass completed: ${className}`);
       logger.info(`   Valid: ${result.valid}, Message: ${result.message || 'N/A'}`);
 
+      // Always return structured response, even if validation failed
+      // This allows tests to check validation_result.valid and skip if needed
       return return_response({
         data: JSON.stringify({
           success: result.valid,
@@ -139,7 +163,20 @@ export async function handleValidateClass(args: ValidateClassArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating class ${className}:`, error);
+      // For validation, 400 errors are expected (object exists or validation failed)
+      // Only log as error if it's not a 400, or if debug is enabled
+      const isValidationError = error.response?.status === 400;
+      const debugEnabled = process.env.DEBUG_TESTS === 'true' ||
+                          process.env.DEBUG_CONNECTORS === 'true' ||
+                          process.env.DEBUG_ADT_TESTS === 'true';
+
+      if (!isValidationError || debugEnabled) {
+        if (isValidationError) {
+          logger.debug(`Validation returned 400 for class ${className} (expected behavior):`, error);
+        } else {
+          logger.error(`Error validating class ${className}:`, error);
+        }
+      }
 
       let errorMessage = `Failed to validate class: ${error.message || String(error)}`;
 

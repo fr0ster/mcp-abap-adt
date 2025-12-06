@@ -4,13 +4,15 @@
  * Uses StructureBuilder from @mcp-abap-adt/adt-clients for all operations.
  * Session and lock management handled internally by builder.
  *
- * Workflow: validate -> create -> lock -> update -> check -> unlock -> (activate)
+ * Workflow: validate -> create -> lock -> check (inactive version) -> unlock -> (activate)
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
+import { return_error, return_response, logger, safeCheckOperation } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 export const TOOL_DEFINITION = {
   name: "CreateStructure",
@@ -98,6 +100,10 @@ export const TOOL_DEFINITION = {
           },
           required: ["name"]
         }
+      },
+      activate: {
+        type: "boolean",
+        description: "Activate structure after creation. Default: true. Set to false for batch operations (activate multiple objects later)."
       }
     },
     required: ["structure_name", "package_name", "fields"]
@@ -128,6 +134,7 @@ interface CreateStructureArgs {
   transport_request?: string;
   fields: StructureField[];
   includes?: StructureInclude[];
+  activate?: boolean;
 }
 
 
@@ -156,15 +163,39 @@ export async function handleCreateStructure(args: CreateStructureArgs): Promise<
       throw new McpError(ErrorCode.InvalidParams, 'At least one field is required');
     }
 
-    const connection = getManagedConnection();
     const structureName = createStructureArgs.structure_name.toUpperCase();
 
     logger.info(`Starting structure creation: ${structureName}`);
 
+    // Create a separate connection for this handler call (not using getManagedConnection)
+    let connection: any = null;
+    try {
+      // Get configuration from environment variables
+      const config = getConfig();
+
+      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
+      const connectionLogger = {
+        debug: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {},
+        info: process.env.DEBUG_CONNECTORS === 'true' ? logger.info.bind(logger) : () => {},
+        warn: process.env.DEBUG_CONNECTORS === 'true' ? logger.warn.bind(logger) : () => {},
+        error: process.env.DEBUG_CONNECTORS === 'true' ? logger.error.bind(logger) : () => {},
+        csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {}
+      };
+
+      // Create connection directly for this handler call
+      connection = createAbapConnection(config, connectionLogger);
+      await connection.connect();
+
+      logger.debug(`[CreateStructure] Created separate connection for handler call: ${structureName}`);
+    } catch (connectionError: any) {
+      const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
+      throw new McpError(ErrorCode.InternalError, `Failed to create connection: ${errorMessage}`);
+    }
+
     try {
       // Create client
       const client = new CrudClient(connection);
-      const shouldActivate = true; // Default to true for structures
+      const shouldActivate = createStructureArgs.activate !== false; // Default to true if not specified
 
       // Validate
       await client.validateStructure({
@@ -186,33 +217,51 @@ export async function handleCreateStructure(args: CreateStructureArgs): Promise<
       await client.lockStructure({ structureName });
       const lockHandle = client.getLockHandle();
 
-      // Note: StructureBuilder internally generates DDL from fields/includes
-      // For now, skip update as structure creation already includes field definitions
-      // TODO: Implement DDL generation or enhance CrudClient to accept fields directly
-
-      // Check
       try {
-        await safeCheckOperation(
-          () => client.checkStructure({ structureName }),
-          structureName,
-          {
-            debug: (message: string) => logger.info(`[CreateStructure] ${message}`)
+        // Note: StructureBuilder internally generates DDL from fields/includes
+        // For now, skip update as structure creation already includes field definitions
+        // TODO: Implement DDL generation or enhance CrudClient to accept fields directly
+
+        // Unlock (MANDATORY after lock)
+        await client.unlockStructure({ structureName }, lockHandle);
+        logger.info(`[CreateStructure] Structure unlocked: ${structureName}`);
+
+        // Check inactive version (after unlock)
+        logger.info(`[CreateStructure] Checking inactive version: ${structureName}`);
+        try {
+          await safeCheckOperation(
+            () => client.checkStructure({ structureName }, undefined, 'inactive'),
+            structureName,
+            {
+              debug: (message: string) => logger.info(`[CreateStructure] ${message}`)
+            }
+          );
+          logger.info(`[CreateStructure] Inactive version check completed: ${structureName}`);
+        } catch (checkError: any) {
+          // If error was marked as "already checked", continue silently
+          if ((checkError as any).isAlreadyChecked) {
+            logger.info(`[CreateStructure] Structure ${structureName} was already checked - this is OK, continuing`);
+          } else {
+            // Log warning but don't fail - inactive check is informational
+            logger.warn(`[CreateStructure] Inactive version check had issues: ${structureName}`, {
+              error: checkError instanceof Error ? checkError.message : String(checkError)
+            });
           }
-        );
-      } catch (checkError: any) {
-        // If error was marked as "already checked", continue silently
-        if (!(checkError as any).isAlreadyChecked) {
-          // Real check error - rethrow
-          throw checkError;
         }
-      }
 
-      // Unlock
-      await client.unlockStructure({ structureName }, lockHandle);
-
-      // Activate
-      if (shouldActivate) {
-        await client.activateStructure({ structureName });
+        // Activate
+        if (shouldActivate) {
+          await client.activateStructure({ structureName });
+        }
+      } catch (error) {
+        // Unlock on error (principle 1: if lock was done, unlock is mandatory)
+        try {
+          await client.unlockStructure({ structureName }, lockHandle);
+        } catch (unlockError) {
+          logger.error('Failed to unlock structure after error:', unlockError);
+        }
+        // Principle 2: first error and exit
+        throw error;
       }
 
       logger.info(`✅ CreateStructure completed successfully: ${structureName}`);
@@ -247,6 +296,16 @@ export async function handleCreateStructure(args: CreateStructureArgs): Promise<
         ErrorCode.InternalError,
         `Failed to create structure ${structureName}: ${errorMessage}`
       );
+    } finally {
+      // Cleanup: Reset connection created for this handler call
+      if (connection) {
+        try {
+          connection.reset();
+          logger.debug(`[CreateStructure] Reset connection`);
+        } catch (resetError: any) {
+          logger.error(`[CreateStructure] Failed to reset connection: ${resetError.message || resetError}`);
+        }
+      }
     }
 
   } catch (error: any) {

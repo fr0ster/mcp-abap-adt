@@ -4,13 +4,15 @@
  * Uses TableBuilder from @mcp-abap-adt/adt-clients for all operations.
  * Session and lock management handled internally by builder.
  *
- * Workflow: validate -> create -> lock -> update -> check -> unlock -> (activate)
+ * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
+import { return_error, return_response, logger, safeCheckOperation } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 
 export const TOOL_DEFINITION = {
@@ -34,6 +36,10 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: "string",
         description: "Transport request number (e.g., E19K905635). Required for transportable packages."
+      },
+      activate: {
+        type: "boolean",
+        description: "Activate table after creation. Default: true. Set to false for batch operations (activate multiple objects later)."
       }
     },
     required: ["table_name", "ddl_code", "package_name"]
@@ -45,6 +51,7 @@ interface CreateTableArgs {
   ddl_code: string;
   package_name: string;
   transport_request?: string;
+  activate?: boolean;
 }
 
 
@@ -72,15 +79,37 @@ export async function handleCreateTable(args: CreateTableArgs): Promise<any> {
     // Validate transport_request: required for non-$TMP packages
     validateTransportRequest(createTableArgs.package_name, createTableArgs.transport_request);
 
-    const connection = getManagedConnection();
     const tableName = createTableArgs.table_name.toUpperCase();
 
     logger.info(`Starting table creation: ${tableName}`);
 
+    // Create a separate connection for this handler call (not using getManagedConnection)
+    let connection: any = null;
+    try {
+      // Get configuration from environment variables
+      const config = getConfig();
+
+      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
+      const connectionLogger = {
+        debug: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {},
+        info: process.env.DEBUG_CONNECTORS === 'true' ? logger.info.bind(logger) : () => {},
+        warn: process.env.DEBUG_CONNECTORS === 'true' ? logger.warn.bind(logger) : () => {},
+        error: process.env.DEBUG_CONNECTORS === 'true' ? logger.error.bind(logger) : () => {},
+        csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {}
+      };
+
+      // Create connection directly for this handler call
+      connection = createAbapConnection(config, connectionLogger);
+      await connection.connect();
+    } catch (connectionError: any) {
+      const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
+      throw new McpError(ErrorCode.InternalError, `Failed to create connection: ${errorMessage}`);
+    }
+
     try {
       // Create client
       const client = new CrudClient(connection);
-      const shouldActivate = true; // Default to true for tables
+      const shouldActivate = createTableArgs.activate !== false; // Default to true if not specified
 
       // Validate
       await client.validateTable({
@@ -102,32 +131,83 @@ export async function handleCreateTable(args: CreateTableArgs): Promise<any> {
       await client.lockTable({ tableName });
       const lockHandle = client.getLockHandle();
 
-      // Update with DDL code
-      await client.updateTable({ tableName, ddlCode: createTableArgs.ddl_code }, lockHandle);
-
-      // Check
       try {
-        await safeCheckOperation(
-          () => client.checkTable({ tableName }),
-          tableName,
-          {
-            debug: (message: string) => logger.info(`[CreateTable] ${message}`)
+        // Step 1: Check new code BEFORE update (with ddlCode and version='inactive')
+        logger.info(`[CreateTable] Checking new DDL code before update: ${tableName}`);
+        let checkNewCodePassed = false;
+        try {
+          await safeCheckOperation(
+            () => client.checkTable({ tableName }, createTableArgs.ddl_code, 'inactive'),
+            tableName,
+            {
+              debug: (message: string) => logger.info(`[CreateTable] ${message}`)
+            }
+          );
+          checkNewCodePassed = true;
+          logger.info(`[CreateTable] New code check passed: ${tableName}`);
+        } catch (checkError: any) {
+          // If error was marked as "already checked", continue silently
+          if ((checkError as any).isAlreadyChecked) {
+            logger.info(`[CreateTable] Table ${tableName} was already checked - this is OK, continuing`);
+            checkNewCodePassed = true;
+          } else {
+            // Real check error - don't update if check failed
+            logger.error(`[CreateTable] New code check failed: ${tableName}`, {
+              error: checkError instanceof Error ? checkError.message : String(checkError)
+            });
+            throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
           }
-        );
-      } catch (checkError: any) {
-        // If error was marked as "already checked", continue silently
-        if (!(checkError as any).isAlreadyChecked) {
-          // Real check error - rethrow
-          throw checkError;
         }
-      }
 
-      // Unlock
-      await client.unlockTable({ tableName }, lockHandle);
+        // Step 2: Update (only if check passed)
+        if (checkNewCodePassed) {
+          logger.info(`[CreateTable] Updating table with DDL code: ${tableName}`);
+          await client.updateTable({ tableName, ddlCode: createTableArgs.ddl_code }, lockHandle);
+          logger.info(`[CreateTable] Table source code updated: ${tableName}`);
+        } else {
+          logger.info(`[CreateTable] Skipping update - new code check failed: ${tableName}`);
+        }
 
-      // Activate
-      if (shouldActivate) {
-        await client.activateTable({ tableName });
+        // Step 3: Unlock (MANDATORY after lock)
+        await client.unlockTable({ tableName }, lockHandle);
+        logger.info(`[CreateTable] Table unlocked: ${tableName}`);
+
+        // Step 4: Check inactive version (after unlock)
+        logger.info(`[CreateTable] Checking inactive version: ${tableName}`);
+        try {
+          await safeCheckOperation(
+            () => client.checkTable({ tableName }, undefined, 'inactive'),
+            tableName,
+            {
+              debug: (message: string) => logger.info(`[CreateTable] ${message}`)
+            }
+          );
+          logger.info(`[CreateTable] Inactive version check completed: ${tableName}`);
+        } catch (checkError: any) {
+          // If error was marked as "already checked", continue silently
+          if ((checkError as any).isAlreadyChecked) {
+            logger.info(`[CreateTable] Table ${tableName} was already checked - this is OK, continuing`);
+          } else {
+            // Log warning but don't fail - inactive check is informational
+            logger.warn(`[CreateTable] Inactive version check had issues: ${tableName}`, {
+              error: checkError instanceof Error ? checkError.message : String(checkError)
+            });
+          }
+        }
+
+        // Activate
+        if (shouldActivate) {
+          await client.activateTable({ tableName });
+        }
+      } catch (error) {
+        // Unlock on error (principle 1: if lock was done, unlock is mandatory)
+        try {
+          await client.unlockTable({ tableName }, lockHandle);
+        } catch (unlockError) {
+          logger.error('Failed to unlock table after error:', unlockError);
+        }
+        // Principle 2: first error and exit
+        throw error;
       }
 
       logger.info(`✅ CreateTable completed successfully: ${tableName}`);
@@ -162,6 +242,15 @@ export async function handleCreateTable(args: CreateTableArgs): Promise<any> {
         ErrorCode.InternalError,
         `Failed to create table ${tableName}: ${errorMessage}`
       );
+    } finally {
+      // Cleanup: Reset connection created for this handler call
+      if (connection) {
+        try {
+          connection.reset();
+        } catch (resetError: any) {
+          logger.error(`Failed to reset connection: ${resetError.message || resetError}`);
+        }
+      }
     }
 
   } catch (error: any) {

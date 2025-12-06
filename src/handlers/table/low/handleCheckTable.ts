@@ -25,6 +25,11 @@ export const TOOL_DEFINITION = {
         type: "string",
         description: "Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body."
       },
+      version: {
+        type: "string",
+        description: "Version to check: 'active' (last activated), 'inactive' (current unsaved), or 'new' (for new code validation). Default: new",
+        enum: ["active", "inactive", "new"]
+      },
       reporter: {
         type: "string",
         description: "Check reporter: 'tableStatusCheck' or 'abapCheckRun'. Default: abapCheckRun",
@@ -51,6 +56,7 @@ export const TOOL_DEFINITION = {
 interface CheckTableArgs {
   table_name: string;
   ddl_code?: string;
+  version?: string;
   reporter?: string;
   session_id?: string;
   session_state?: {
@@ -68,6 +74,7 @@ export async function handleCheckTable(args: CheckTableArgs) {
     const {
       table_name,
       ddl_code,
+      version = 'new',
       reporter = 'abapCheckRun',
       session_id,
       session_state
@@ -81,6 +88,11 @@ export async function handleCheckTable(args: CheckTableArgs) {
     const checkReporter = (reporter && validReporters.includes(reporter))
       ? reporter as 'tableStatusCheck' | 'abapCheckRun'
       : 'abapCheckRun';
+
+    const validVersions = ['active', 'inactive', 'new'];
+    const checkVersion = (version && validVersions.includes(version.toLowerCase()))
+      ? version.toLowerCase() as 'active' | 'inactive' | 'new'
+      : 'new';
 
     const connection = getManagedConnection();
 
@@ -100,14 +112,14 @@ export async function handleCheckTable(args: CheckTableArgs) {
     const sessionId = session_id || generateSessionId();
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table check: ${tableName} (reporter: ${checkReporter}, session: ${sessionId.substring(0, 8)}..., ${ddl_code ? 'with new code' : 'saved version'})`);
+    logger.info(`Starting table check: ${tableName} (reporter: ${checkReporter}, version: ${checkVersion}, session: ${sessionId.substring(0, 8)}..., ${ddl_code ? 'with new code' : 'saved version'})`);
 
     try {
       const builder = new CrudClient(connection);
 
       // Check table with optional source code (for validating new/unsaved code)
       // If ddl_code is provided, it will be base64 encoded in the request body
-      await builder.checkTable({ tableName }, ddl_code, 'new');
+      await builder.checkTable({ tableName }, ddl_code, checkVersion);
       const response = builder.getCheckResult();
       if (!response) {
         throw new Error('Table check did not return a response');
@@ -127,6 +139,7 @@ export async function handleCheckTable(args: CheckTableArgs) {
         data: JSON.stringify({
           success: checkResult.success,
           table_name: tableName,
+          version: checkVersion,
           reporter: checkReporter,
           check_result: checkResult,
           session_id: sessionId,

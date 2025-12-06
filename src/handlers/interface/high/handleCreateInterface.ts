@@ -4,14 +4,16 @@
  * Uses InterfaceBuilder from @mcp-abap-adt/adt-clients for all operations.
  * Session and lock management handled internally by client.
  *
- * Workflow: validate -> create -> lock -> update -> check -> unlock -> (activate)
+ * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger, safeCheckOperation } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 export const TOOL_DEFINITION = {
   name: "CreateInterface",
@@ -97,10 +99,35 @@ export async function handleCreateInterface(args: CreateInterfaceArgs) {
     }
 
     const typedArgs = args as CreateInterfaceArgs;
-    const connection = getManagedConnection();
     const interfaceName = typedArgs.interface_name.toUpperCase();
 
     logger.info(`Starting interface creation: ${interfaceName}`);
+
+    // Create a separate connection for this handler call (not using getManagedConnection)
+    let connection: any = null;
+    try {
+      // Get configuration from environment variables
+      const config = getConfig();
+
+      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
+      const connectionLogger = {
+        debug: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {},
+        info: process.env.DEBUG_CONNECTORS === 'true' ? logger.info.bind(logger) : () => {},
+        warn: process.env.DEBUG_CONNECTORS === 'true' ? logger.warn.bind(logger) : () => {},
+        error: process.env.DEBUG_CONNECTORS === 'true' ? logger.error.bind(logger) : () => {},
+        csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {}
+      };
+
+      // Create connection directly for this handler call
+      connection = createAbapConnection(config, connectionLogger);
+      await connection.connect();
+
+      logger.debug(`[CreateInterface] Created separate connection for handler call: ${interfaceName}`);
+    } catch (connectionError: any) {
+      const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
+      logger.error(`[CreateInterface] Failed to create connection: ${errorMessage}`);
+      return return_error(new Error(`Failed to create connection: ${errorMessage}`));
+    }
 
     try {
       // Generate source code if not provided
@@ -122,25 +149,85 @@ export async function handleCreateInterface(args: CreateInterfaceArgs) {
           transportRequest
         });
         await client.lockInterface({ interfaceName });
-        await client.updateInterface({ interfaceName, sourceCode });
+        const lockHandle = client.getLockHandle();
+
         try {
-          await safeCheckOperation(
-            () => client.checkInterface({ interfaceName }),
-            interfaceName,
-            {
-              debug: (message: string) => logger.info(`[CreateInterface] ${message}`)
+          // Step 1: Check new code BEFORE update (with sourceCode and version='inactive')
+          logger.info(`[CreateInterface] Checking new code before update: ${interfaceName}`);
+          let checkNewCodePassed = false;
+          try {
+            await safeCheckOperation(
+              () => client.checkInterface({ interfaceName }, sourceCode, 'inactive'),
+              interfaceName,
+              {
+                debug: (message: string) => logger.info(`[CreateInterface] ${message}`)
+              }
+            );
+            checkNewCodePassed = true;
+            logger.info(`[CreateInterface] New code check passed: ${interfaceName}`);
+          } catch (checkError: any) {
+            // If error was marked as "already checked", continue silently
+            if ((checkError as any).isAlreadyChecked) {
+              logger.info(`[CreateInterface] Interface ${interfaceName} was already checked - this is OK, continuing`);
+              checkNewCodePassed = true;
+            } else {
+              // Real check error - don't update if check failed
+              logger.error(`[CreateInterface] New code check failed: ${interfaceName}`, {
+                error: checkError instanceof Error ? checkError.message : String(checkError)
+              });
+              throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
             }
-          );
-        } catch (checkError: any) {
-          // If error was marked as "already checked", continue silently
-          if (!(checkError as any).isAlreadyChecked) {
-            // Real check error - rethrow
-            throw checkError;
           }
-        }
-        await client.unlockInterface({ interfaceName });
-        if (shouldActivate) {
-          await client.activateInterface({ interfaceName });
+
+          // Step 2: Update (only if check passed)
+          if (checkNewCodePassed) {
+            logger.info(`[CreateInterface] Updating interface source code: ${interfaceName}`);
+            await client.updateInterface({ interfaceName, sourceCode }, lockHandle);
+            logger.info(`[CreateInterface] Interface source code updated: ${interfaceName}`);
+          } else {
+            logger.info(`[CreateInterface] Skipping update - new code check failed: ${interfaceName}`);
+          }
+
+          // Step 3: Unlock (MANDATORY after lock)
+          await client.unlockInterface({ interfaceName }, lockHandle);
+          logger.info(`[CreateInterface] Interface unlocked: ${interfaceName}`);
+
+          // Step 4: Check inactive version (after unlock)
+          logger.info(`[CreateInterface] Checking inactive version: ${interfaceName}`);
+          try {
+            await safeCheckOperation(
+              () => client.checkInterface({ interfaceName }, undefined, 'inactive'),
+              interfaceName,
+              {
+                debug: (message: string) => logger.info(`[CreateInterface] ${message}`)
+              }
+            );
+            logger.info(`[CreateInterface] Inactive version check completed: ${interfaceName}`);
+          } catch (checkError: any) {
+            // If error was marked as "already checked", continue silently
+            if ((checkError as any).isAlreadyChecked) {
+              logger.info(`[CreateInterface] Interface ${interfaceName} was already checked - this is OK, continuing`);
+            } else {
+              // Log warning but don't fail - inactive check is informational
+              logger.warn(`[CreateInterface] Inactive version check had issues: ${interfaceName}`, {
+                error: checkError instanceof Error ? checkError.message : String(checkError)
+              });
+            }
+          }
+
+          // Step 5: Activate
+          if (shouldActivate) {
+            await client.activateInterface({ interfaceName });
+          }
+        } catch (error) {
+          // Unlock on error (principle 1: if lock was done, unlock is mandatory)
+          try {
+            await client.unlockInterface({ interfaceName }, lockHandle);
+          } catch (unlockError) {
+            logger.error('Failed to unlock interface after error:', unlockError);
+          }
+          // Principle 2: first error and exit
+          throw error;
         }
       } catch (error) {
         logger.error('Interface creation chain failed:', error);
@@ -165,7 +252,7 @@ export async function handleCreateInterface(args: CreateInterfaceArgs) {
       }
 
       // Return success result
-      const stepsCompleted = ['validate', 'create', 'lock', 'update', 'check', 'unlock'];
+      const stepsCompleted = ['validate', 'create', 'lock', 'check_new_code', 'update', 'unlock', 'check_inactive'];
       if (shouldActivate) {
         stepsCompleted.push('activate');
       }
@@ -195,6 +282,16 @@ export async function handleCreateInterface(args: CreateInterfaceArgs) {
     } catch (error: any) {
       logger.error('Interface creation failed:', error);
       return return_error(error);
+    } finally {
+      // Cleanup: Reset connection created for this handler call
+      if (connection) {
+        try {
+          connection.reset();
+          logger.debug(`[CreateInterface] Reset connection`);
+        } catch (resetError: any) {
+          logger.error(`[CreateInterface] Failed to reset connection: ${resetError.message || resetError}`);
+        }
+      }
     }
   } catch (error: any) {
     logger.error('CreateInterface handler error:', error);

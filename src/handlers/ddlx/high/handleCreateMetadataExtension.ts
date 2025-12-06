@@ -80,15 +80,26 @@ export async function handleCreateMetadataExtension(params: any) {
         await client.lockMetadataExtension({ name: name });
         const lockHandle = client.getLockHandle();
 
-        // Check
-        await client.checkMetadataExtension({ name: name });
+        try {
+          // Check
+          await client.checkMetadataExtension({ name: name });
 
-        // Unlock
-        await client.unlockMetadataExtension({ name: name }, lockHandle);
+          // Unlock
+          await client.unlockMetadataExtension({ name: name }, lockHandle);
 
-        // Activate if requested
-        if (shouldActivate) {
-            await client.activateMetadataExtension({ name: name });
+          // Activate if requested
+          if (shouldActivate) {
+              await client.activateMetadataExtension({ name: name });
+          }
+        } catch (error) {
+          // Unlock on error (principle 1: if lock was done, unlock is mandatory)
+          try {
+            await client.unlockMetadataExtension({ name: name }, lockHandle);
+          } catch (unlockError) {
+            logger.error('Failed to unlock metadata extension after error:', unlockError);
+          }
+          // Principle 2: first error and exit
+          throw error;
         }
 
         const result = {

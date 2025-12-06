@@ -4,13 +4,15 @@
  * Uses InterfaceBuilder from @mcp-abap-adt/adt-clients for all operations.
  * Session and lock management handled internally by builder.
  *
- * Workflow: validate -> lock -> update -> check -> unlock -> (activate)
+ * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import { return_error, return_response, logger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 export const TOOL_DEFINITION = {
   name: "UpdateInterface",
@@ -67,62 +69,111 @@ export async function handleUpdateInterface(args: UpdateInterfaceArgs) {
       return return_error(new Error('interface_name and source_code are required'));
     }
 
-    const connection = getManagedConnection();
     const interfaceName = interface_name.toUpperCase();
 
     logger.info(`Starting interface source update: ${interfaceName}`);
+
+    // Create a separate connection for this handler call (not using getManagedConnection)
+    let connection: any = null;
+    try {
+      // Get configuration from environment variables
+      const config = getConfig();
+
+      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
+      const connectionLogger = {
+        debug: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {},
+        info: process.env.DEBUG_CONNECTORS === 'true' ? logger.info.bind(logger) : () => {},
+        warn: process.env.DEBUG_CONNECTORS === 'true' ? logger.warn.bind(logger) : () => {},
+        error: process.env.DEBUG_CONNECTORS === 'true' ? logger.error.bind(logger) : () => {},
+        csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {}
+      };
+
+      // Create connection directly for this handler call
+      connection = createAbapConnection(config, connectionLogger);
+      await connection.connect();
+
+      logger.debug(`[UpdateInterface] Created separate connection for handler call: ${interfaceName}`);
+    } catch (connectionError: any) {
+      const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
+      logger.error(`[UpdateInterface] Failed to create connection: ${errorMessage}`);
+      return return_error(new Error(`Failed to create connection: ${errorMessage}`));
+    }
 
     try {
       // Create client
       const client = new CrudClient(connection);
 
-      // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
+      // Build operation chain: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
+      // Note: No validation needed for update - interface must already exist
       const shouldActivate = activate !== false; // Default to true if not specified
-
-      // Validate (for update, "already exists" is expected - object must exist)
-      try {
-        await client.validateInterface({
-          interfaceName,
-          packageName: undefined,
-          description: undefined
-        });
-      } catch (validateError: any) {
-        // For update operations, "already exists" is expected - object must exist
-        if (!isAlreadyExistsError(validateError)) {
-          // Real validation error - rethrow
-          throw validateError;
-        }
-        // "Already exists" is OK for update - continue
-        logger.info(`Interface ${interfaceName} already exists - this is expected for update operation`);
-      }
 
       // Lock
       await client.lockInterface({ interfaceName });
       const lockHandle = client.getLockHandle();
 
       try {
-        // Update source code
-        await client.updateInterface({ interfaceName, sourceCode: source_code }, lockHandle);
-
-        // Check
+        // Step 1: Check new code BEFORE update (with sourceCode and version='inactive')
+        logger.info(`[UpdateInterface] Checking new code before update: ${interfaceName}`);
+        let checkNewCodePassed = false;
         try {
           await safeCheckOperation(
-            () => client.checkInterface({ interfaceName }),
+            () => client.checkInterface({ interfaceName }, source_code, 'inactive'),
             interfaceName,
             {
               debug: (message: string) => logger.info(`[UpdateInterface] ${message}`)
             }
           );
+          checkNewCodePassed = true;
+          logger.info(`[UpdateInterface] New code check passed: ${interfaceName}`);
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
-          if (!(checkError as any).isAlreadyChecked) {
-            // Real check error - rethrow
-            throw checkError;
+          if ((checkError as any).isAlreadyChecked) {
+            logger.info(`[UpdateInterface] Interface ${interfaceName} was already checked - this is OK, continuing`);
+            checkNewCodePassed = true;
+          } else {
+            // Real check error - don't update if check failed
+            logger.error(`[UpdateInterface] New code check failed: ${interfaceName}`, {
+              error: checkError instanceof Error ? checkError.message : String(checkError)
+            });
+            throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
           }
         }
 
-        // Unlock
+        // Step 2: Update (only if check passed)
+        if (checkNewCodePassed) {
+          logger.info(`[UpdateInterface] Updating interface source code: ${interfaceName}`);
+          await client.updateInterface({ interfaceName, sourceCode: source_code }, lockHandle);
+          logger.info(`[UpdateInterface] Interface source code updated: ${interfaceName}`);
+        } else {
+          logger.info(`[UpdateInterface] Skipping update - new code check failed: ${interfaceName}`);
+        }
+
+        // Step 3: Unlock (MANDATORY after lock)
         await client.unlockInterface({ interfaceName }, lockHandle);
+        logger.info(`[UpdateInterface] Interface unlocked: ${interfaceName}`);
+
+        // Step 4: Check inactive version (after unlock)
+        logger.info(`[UpdateInterface] Checking inactive version: ${interfaceName}`);
+        try {
+          await safeCheckOperation(
+            () => client.checkInterface({ interfaceName }, undefined, 'inactive'),
+            interfaceName,
+            {
+              debug: (message: string) => logger.info(`[UpdateInterface] ${message}`)
+            }
+          );
+          logger.info(`[UpdateInterface] Inactive version check completed: ${interfaceName}`);
+        } catch (checkError: any) {
+          // If error was marked as "already checked", continue silently
+          if ((checkError as any).isAlreadyChecked) {
+            logger.info(`[UpdateInterface] Interface ${interfaceName} was already checked - this is OK, continuing`);
+          } else {
+            // Log warning but don't fail - inactive check is informational
+            logger.warn(`[UpdateInterface] Inactive version check had issues: ${interfaceName}`, {
+              error: checkError instanceof Error ? checkError.message : String(checkError)
+            });
+          }
+        }
 
         // Activate if requested
         if (shouldActivate) {
@@ -157,6 +208,12 @@ export async function handleUpdateInterface(args: UpdateInterfaceArgs) {
 
       logger.info(`✅ UpdateInterface completed successfully: ${interfaceName}`);
 
+      // Return success result
+      const stepsCompleted = ['lock', 'check_new_code', 'update', 'unlock', 'check_inactive'];
+      if (shouldActivate) {
+        stepsCompleted.push('activate');
+      }
+
       return return_response({
         data: JSON.stringify({
           success: true,
@@ -164,7 +221,8 @@ export async function handleUpdateInterface(args: UpdateInterfaceArgs) {
           transport_request: transport_request || 'local',
           activated: shouldActivate,
           message: `Interface ${interfaceName} updated successfully${shouldActivate ? ' and activated' : ''}`,
-          activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined
+          activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined,
+          steps_completed: stepsCompleted
         })
       } as AxiosResponse);
 
@@ -176,6 +234,16 @@ export async function handleUpdateInterface(args: UpdateInterfaceArgs) {
         : error.message || String(error);
 
       return return_error(new Error(`Failed to update interface: ${errorMessage}`));
+    } finally {
+      // Cleanup: Reset connection created for this handler call
+      if (connection) {
+        try {
+          connection.reset();
+          logger.debug(`[UpdateInterface] Reset connection`);
+        } catch (resetError: any) {
+          logger.error(`[UpdateInterface] Failed to reset connection: ${resetError.message || resetError}`);
+        }
+      }
     }
 
   } catch (error: any) {

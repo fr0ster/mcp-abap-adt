@@ -3056,8 +3056,9 @@ export class mcp_abap_adt_server {
           const closedSession = this.streamableHttpSessions.get(clientID);
           if (closedSession) {
             // Clean up connection cache for this session
+            // Include destination to ensure correct connection is removed
             if (closedSession.sapConfig) {
-              removeConnectionForSession(closedSession.sessionId, closedSession.sapConfig);
+              removeConnectionForSession(closedSession.sessionId, closedSession.sapConfig, closedSession.destination);
             }
             this.streamableHttpSessions.delete(clientID);
             logger.debug("Session closed", {

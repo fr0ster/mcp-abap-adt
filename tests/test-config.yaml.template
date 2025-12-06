@@ -24,7 +24,7 @@ test_settings:
   timeout: 30000
   retry_on_failure: false
   max_retries: 1
-  cleanup_after_test: false  # Set to true to auto-delete objects after tests
+  # Note: cleanup_after_test was removed - use environment.cleanup_after instead
 
 
 
@@ -33,6 +33,10 @@ environment:
   default_transport: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
   default_system: "<YOUR_SYSTEM>"  # ⚠️ UPDATE WITH YOUR SYSTEM (e.g., E19)
   default_client: "<YOUR_CLIENT>"  # ⚠️ UPDATE WITH YOUR CLIENT (e.g., 100)
+  # Cleanup configuration (applies to all tests)
+  cleanup_after: false    # Clean up objects after test (default: false)
+                          # Set to true to auto-delete objects after tests
+                          # Note: cleanup_before was removed - not used in code
 
 # ============================================================================
 # AUTHENTICATION BROKER CONFIGURATION
@@ -297,6 +301,42 @@ create_class:
         # Delete step (will be executed after update)
         delete_after_test: true
         delete_object_type: "CLAS/OC"
+
+# Step 1.5: CrudClient Direct test (reference implementation - uses CrudClient without handlers)
+
+# Class (Class - CrudClient Direct)
+create_class_direct:
+  test_cases:
+    - name: "crud_direct"
+      enabled: false
+      description: "Class CrudClient direct test (reference implementation)"
+      params:
+        class_name: "<YOUR_CLASS_NAME>_DIRECT"
+        description: "Class CrudClient direct test"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        superclass: ""
+        final: true
+        source_code: |
+          CLASS <YOUR_CLASS_NAME>_DIRECT DEFINITION
+            PUBLIC
+            FINAL
+            CREATE PUBLIC .
+
+            PUBLIC SECTION.
+              METHODS:
+                get_text RETURNING VALUE(rv_text) TYPE string.
+            PROTECTED SECTION.
+            PRIVATE SECTION.
+          ENDCLASS.
+
+          CLASS <YOUR_CLASS_NAME>_DIRECT IMPLEMENTATION.
+            METHOD get_text.
+              rv_text = 'Hello from <YOUR_CLASS_NAME>_DIRECT'.
+            ENDMETHOD.
+          ENDCLASS.
+
+        cleanup_after: true
 
 # Step 2: Low-level flow test (create → update → delete through low-level handlers)
 

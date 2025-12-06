@@ -4,15 +4,17 @@
  * Uses CrudClient from @mcp-abap-adt/adt-clients for all operations.
  * Session and lock management handled internally.
  *
- * Workflow: create -> lock -> update -> check -> unlock -> (activate)
+ * Workflow: create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger, safeCheckOperation } from '../../../lib/utils';
 import { handlerLogger } from '../../../lib/logger';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 export const TOOL_DEFINITION = {
   name: "CreateClass",
@@ -122,7 +124,6 @@ export async function handleCreateClass(params: CreateClassArgs) {
   }
 
   const className = args.class_name.toUpperCase();
-  const connection = getManagedConnection();
 
   logger.info(`Starting class creation: ${className}`);
   handlerLogger.info('CreateClass', 'start', `Starting class creation: ${className}`, {
@@ -131,6 +132,32 @@ export async function handleCreateClass(params: CreateClassArgs) {
     transportRequest: args.transport_request,
     shouldActivate: args.activate !== false
   });
+
+  // Create a separate connection for this handler call (not using getManagedConnection)
+  let connection: any = null;
+  try {
+    // Get configuration from environment variables
+    const config = getConfig();
+
+    // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
+    const connectionLogger = {
+      debug: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {},
+      info: process.env.DEBUG_CONNECTORS === 'true' ? logger.info.bind(logger) : () => {},
+      warn: process.env.DEBUG_CONNECTORS === 'true' ? logger.warn.bind(logger) : () => {},
+      error: process.env.DEBUG_CONNECTORS === 'true' ? logger.error.bind(logger) : () => {},
+      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {}
+    };
+
+    // Create connection directly for this handler call
+    connection = createAbapConnection(config, connectionLogger);
+    await connection.connect();
+
+    handlerLogger.debug('CreateClass', 'connection', `Created separate connection for handler call: ${className}`);
+  } catch (connectionError: any) {
+    const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
+    handlerLogger.error('CreateClass', 'connection_error', `Failed to create connection: ${errorMessage}`);
+    return return_error(new Error(`Failed to create connection: ${errorMessage}`));
+  }
 
   try {
     // Generate source code if not provided
@@ -142,7 +169,28 @@ export async function handleCreateClass(params: CreateClassArgs) {
     const client = new CrudClient(connection);
 
     try {
-      // Create
+      // Step 1: Validate
+      handlerLogger.debug('CreateClass', 'validate', `Validating class: ${className}`, {
+        className,
+        packageName: args.package_name,
+        description: args.description || className
+      });
+      try {
+        await client.validateClass({
+          className,
+          packageName: args.package_name,
+          description: args.description || className
+        });
+        handlerLogger.debug('CreateClass', 'validate', `Class validation passed: ${className}`);
+      } catch (validateError: any) {
+        const errorMessage = validateError instanceof Error ? validateError.message : String(validateError);
+        handlerLogger.error('CreateClass', 'validate', `Class validation failed: ${className}`, {
+          error: errorMessage
+        });
+        throw new Error(`Class validation failed: ${errorMessage}`);
+      }
+
+      // Step 2: Create
       handlerLogger.debug('CreateClass', 'create', `Creating class: ${className}`, {
         className,
         packageName: args.package_name,
@@ -158,9 +206,24 @@ export async function handleCreateClass(params: CreateClassArgs) {
         abstract: args.abstract || false,
         createProtected: args.create_protected || false
       });
-      handlerLogger.debug('CreateClass', 'create', `Class created: ${className}`);
 
-      // Lock
+      // Verify creation was successful
+      const createResult = client.getCreateResult();
+      if (!createResult || (createResult.status !== 201 && createResult.status !== 200)) {
+        const errorData = createResult?.data
+          ? (typeof createResult.data === 'string' ? createResult.data.substring(0, 500) : JSON.stringify(createResult.data).substring(0, 500))
+          : 'Unknown error';
+        throw new Error(`Class creation failed with status ${createResult?.status || 'unknown'}: ${errorData}`);
+      }
+
+      handlerLogger.debug('CreateClass', 'create', `Class created: ${className}`, {
+        status: createResult.status
+      });
+
+      // Small delay to ensure class is available for lock (SAP may need a moment to make it available)
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Step 3: Lock
       handlerLogger.debug('CreateClass', 'lock', `Locking class: ${className}`);
       await client.lockClass({ className });
       const lockHandle = client.getLockHandle();
@@ -168,47 +231,99 @@ export async function handleCreateClass(params: CreateClassArgs) {
         lockHandle: lockHandle ? lockHandle.substring(0, 50) + '...' : null
       });
 
-      // Update
-      handlerLogger.debug('CreateClass', 'update', `Updating class source code: ${className}`, {
-        className,
-        sourceCodeLength: sourceCode.length
-      });
-      await client.updateClass({ className, sourceCode }, lockHandle);
-      handlerLogger.debug('CreateClass', 'update', `Class source code updated: ${className}`);
-
-      // Check
-      handlerLogger.debug('CreateClass', 'check', `Checking class syntax: ${className}`);
       try {
-        await safeCheckOperation(
-          () => client.checkClass({ className }),
+        // Step 4: Check new code BEFORE update (with sourceCode and version='inactive')
+        handlerLogger.debug('CreateClass', 'check_new_code', `Checking new code before update: ${className}`, {
           className,
-          {
-            debug: (message: string) => handlerLogger.debug('CreateClass', 'check', message)
+          sourceCodeLength: sourceCode.length
+        });
+        let checkNewCodePassed = false;
+        try {
+          await safeCheckOperation(
+            () => client.checkClass({ className }, 'inactive', sourceCode),
+            className,
+            {
+              debug: (message: string) => handlerLogger.debug('CreateClass', 'check_new_code', message)
+            }
+          );
+          checkNewCodePassed = true;
+          handlerLogger.debug('CreateClass', 'check_new_code', `New code check passed: ${className}`);
+        } catch (checkError: any) {
+          // If error was marked as "already checked", continue silently
+          if ((checkError as any).isAlreadyChecked) {
+            handlerLogger.debug('CreateClass', 'check_new_code', `Class ${className} was already checked - this is OK, continuing`);
+            checkNewCodePassed = true;
+          } else {
+            // Real check error - don't update if check failed
+            handlerLogger.error('CreateClass', 'check_new_code', `New code check failed: ${className}`, {
+              error: checkError instanceof Error ? checkError.message : String(checkError)
+            });
+            throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
           }
-        );
-        handlerLogger.debug('CreateClass', 'check', `Class check completed: ${className}`);
-      } catch (checkError: any) {
-        // If error was marked as "already checked", continue silently
-        if ((checkError as any).isAlreadyChecked) {
-          handlerLogger.debug('CreateClass', 'check', `Class ${className} was already checked - this is OK, continuing`);
-        } else {
-          // Real check error - rethrow
-          throw checkError;
         }
-      }
 
-      // Unlock
-      handlerLogger.debug('CreateClass', 'unlock', `Unlocking class: ${className}`);
-      await client.unlockClass({ className }, lockHandle);
-      handlerLogger.debug('CreateClass', 'unlock', `Class unlocked: ${className}`);
+        // Step 2: Update (only if check passed)
+        if (checkNewCodePassed) {
+          handlerLogger.debug('CreateClass', 'update', `Updating class source code: ${className}`, {
+            className,
+            sourceCodeLength: sourceCode.length
+          });
+          await client.updateClass({ className, sourceCode }, lockHandle);
+          handlerLogger.debug('CreateClass', 'update', `Class source code updated: ${className}`);
+        } else {
+          handlerLogger.debug('CreateClass', 'update', `Skipping update - new code check failed: ${className}`);
+        }
 
-      // Activate if requested
-      if (shouldActivate) {
-        handlerLogger.debug('CreateClass', 'activate', `Activating class: ${className}`);
-        await client.activateClass({ className });
-        handlerLogger.debug('CreateClass', 'activate', `Class activated: ${className}`);
-      } else {
-        handlerLogger.debug('CreateClass', 'activate', `Skipping activation for: ${className}`);
+        // Step 3: Unlock (MANDATORY after lock)
+        handlerLogger.debug('CreateClass', 'unlock', `Unlocking class: ${className}`);
+        await client.unlockClass({ className }, lockHandle);
+        handlerLogger.debug('CreateClass', 'unlock', `Class unlocked: ${className}`);
+
+        // Step 4: Check inactive version (after unlock)
+        handlerLogger.debug('CreateClass', 'check_inactive', `Checking inactive version: ${className}`);
+        try {
+          await safeCheckOperation(
+            () => client.checkClass({ className }, 'inactive'),
+            className,
+            {
+              debug: (message: string) => handlerLogger.debug('CreateClass', 'check_inactive', message)
+            }
+          );
+          handlerLogger.debug('CreateClass', 'check_inactive', `Inactive version check completed: ${className}`);
+        } catch (checkError: any) {
+          // If error was marked as "already checked", continue silently
+          if ((checkError as any).isAlreadyChecked) {
+            handlerLogger.debug('CreateClass', 'check_inactive', `Class ${className} was already checked - this is OK, continuing`);
+          } else {
+            // Log warning but don't fail - inactive check is informational
+            handlerLogger.warn('CreateClass', 'check_inactive', `Inactive version check had issues: ${className}`, {
+              error: checkError instanceof Error ? checkError.message : String(checkError)
+            });
+          }
+        }
+
+        // Step 5: Activate if requested
+        if (shouldActivate) {
+          handlerLogger.debug('CreateClass', 'activate', `Activating class: ${className}`);
+          await client.activateClass({ className });
+          handlerLogger.debug('CreateClass', 'activate', `Class activated: ${className}`);
+        } else {
+          handlerLogger.debug('CreateClass', 'activate', `Skipping activation for: ${className}`);
+        }
+      } catch (error) {
+        // Unlock on error (principle 1: if lock was done, unlock is mandatory)
+        try {
+          handlerLogger.debug('CreateClass', 'cleanup', `Attempting to unlock class after error: ${className}`);
+          await client.unlockClass({ className }, lockHandle);
+          handlerLogger.debug('CreateClass', 'cleanup', `Successfully unlocked class after error: ${className}`);
+        } catch (unlockError) {
+          handlerLogger.error('CreateClass', 'cleanup_error', `Failed to unlock class after error: ${className}`, {
+            unlockError: unlockError instanceof Error ? unlockError.message : String(unlockError)
+          });
+          logger.error('Failed to unlock class after error:', unlockError);
+        }
+        // Principle 2: first error and exit
+        throw error;
       }
     } catch (error) {
       handlerLogger.error('CreateClass', 'error', `Error during class creation workflow: ${className}`, {
@@ -237,7 +352,7 @@ export async function handleCreateClass(params: CreateClassArgs) {
     }
 
     // Return success result
-    const stepsCompleted = ['create', 'lock', 'update', 'check', 'unlock'];
+    const stepsCompleted = ['validate', 'create', 'lock', 'check_new_code', 'update', 'unlock', 'check_inactive'];
     if (shouldActivate) {
       stepsCompleted.push('activate');
     }
@@ -281,5 +396,15 @@ export async function handleCreateClass(params: CreateClassArgs) {
       : error.message || String(error);
 
     return return_error(new Error(`Failed to create class ${className}: ${errorMessage}`));
+  } finally {
+    // Cleanup: Reset connection created for this handler call
+    if (connection) {
+      try {
+        connection.reset();
+        handlerLogger.debug('CreateClass', 'cleanup', `Reset connection for handler call: ${className}`);
+      } catch (resetError: any) {
+        handlerLogger.error('CreateClass', 'cleanup_error', `Failed to reset connection: ${resetError.message || resetError}`);
+      }
+    }
   }
 }

@@ -111,6 +111,11 @@ describe('Table Low-Level Handlers Integration', () => {
         description
       });
 
+      // Track lock state and creation state for cleanup
+      let lockHandleForCleanup: string | null = null;
+      let lockSessionForCleanup: SessionInfo | null = null;
+      let tableCreated = false;
+
       try {
         // Step 1: Validate
         debugLog('VALIDATE', `Starting validation for ${tableName}`, {
@@ -175,6 +180,9 @@ define view entity ${tableName} as select from dummy {
         expect(createData.success).toBe(true);
         expect(createData.table_name).toBe(tableName);
 
+        // Mark table as created successfully
+        tableCreated = true;
+
         // Update session from create response
         session = updateSessionFromResponse(session, createData);
 
@@ -197,6 +205,10 @@ define view entity ${tableName} as select from dummy {
 
         // CRITICAL: Extract session from Lock response
         const lockSession = extractLockSession(lockData);
+
+        // Track lock state for cleanup (principle 1: if lock was done, unlock is mandatory)
+        lockHandleForCleanup = lockHandle;
+        lockSessionForCleanup = lockSession;
 
         // Wait for lock to complete
         await delay(getOperationDelay('lock', testCase));
@@ -298,54 +310,61 @@ define view entity ${tableName} as select from dummy {
         console.log(`✅ Full workflow completed successfully for ${tableName}`);
 
       } catch (error: any) {
+        // Principle 1: If lock was done, unlock is mandatory
+        if (lockHandleForCleanup && lockSessionForCleanup) {
+          try {
+            await handleUnlockTable({
+              table_name: tableName,
+              lock_handle: lockHandleForCleanup,
+              session_id: lockSessionForCleanup!.session_id,
+              session_state: lockSessionForCleanup!.session_state
+            });
+          } catch (unlockError) {
+            console.error('Failed to unlock table after error:', unlockError);
+          }
+        }
+
+        // Principle 2: first error and exit
         console.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
-        // Cleanup: Unlock and optionally delete test table
+        // Cleanup: Unlock is always required if table was locked
+        // For diagnostics: deletion is excluded, only unlock is performed
         if (session && tableName) {
           try {
-            const shouldCleanup = getCleanupAfter(testCase);
-
-            // Always unlock (unlock is always performed)
-            try {
-              const lockResponse = await handleLockTable({
-                table_name: tableName,
-                session_id: session.session_id,
-                session_state: session.session_state
-              });
-              if (!lockResponse.isError) {
-                const lockData = parseHandlerResponse(lockResponse);
-                const lockHandle = extractLockHandle(lockData);
-                const lockSession = extractLockSession(lockData);
-
-                await handleUnlockTable({
+            // Principle 1: If lock was done, unlock is mandatory
+            if (lockHandleForCleanup && lockSessionForCleanup) {
+              try {
+                debugLog('CLEANUP', `Attempting to unlock table ${tableName} (cleanup)`, {
                   table_name: tableName,
-                  lock_handle: lockHandle,
-                  session_id: lockSession.session_id,
-                  session_state: lockSession.session_state
+                  has_lock_handle: !!lockHandleForCleanup
                 });
-              }
-            } catch (e) {
-              // Ignore unlock errors during cleanup
-            }
-
-            // Delete table only if cleanup_after is true
-            if (shouldCleanup) {
-              const deleteResponse = await handleDeleteTable({
+                await handleUnlockTable({
                 table_name: tableName,
-                transport_request: transportRequest
-              });
-
-              if (!deleteResponse.isError) {
-                console.log(`🧹 Cleaned up test table: ${tableName}`);
-              } else {
-                const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-                console.warn(`⚠️  Failed to delete table ${tableName}: ${errorMsg}`);
+                  lock_handle: lockHandleForCleanup,
+                  session_id: lockSessionForCleanup!.session_id,
+                  session_state: lockSessionForCleanup!.session_state
+                });
+                debugLog('CLEANUP', `Successfully unlocked table ${tableName} (cleanup)`);
+                console.log(`🔓 Unlocked table ${tableName} (cleanup)`);
+              } catch (unlockError: any) {
+                debugLog('CLEANUP', `Failed to unlock table ${tableName} (cleanup)`, {
+                  error: unlockError instanceof Error ? unlockError.message : String(unlockError)
+                });
+                console.warn(`⚠️  Failed to unlock table ${tableName} during cleanup: ${unlockError.message || unlockError}`);
               }
-            } else {
-              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${tableName}`);
             }
+
+            // Deletion is excluded for diagnostics - object left for analysis
+            debugLog('CLEANUP', `Deletion excluded for diagnostics - object left for analysis: ${tableName}`, {
+              table_name: tableName,
+              table_created: tableCreated
+            });
+            console.log(`⚠️ Deletion excluded for diagnostics - object left for analysis: ${tableName}`);
           } catch (cleanupError) {
+            debugLog('CLEANUP_ERROR', `Exception during cleanup: ${cleanupError}`, {
+              error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+            });
             console.warn(`⚠️  Failed to cleanup test table ${tableName}: ${cleanupError}`);
           }
         }

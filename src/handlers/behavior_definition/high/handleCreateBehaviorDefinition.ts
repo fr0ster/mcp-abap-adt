@@ -95,18 +95,30 @@ export async function handleCreateBehaviorDefinition(params: any) {
         await client.lockBehaviorDefinition(lockConfig);
         const lockHandle = client.getLockHandle();
 
-        // Check (optional, but good practice) - using types from adt-clients
-        const checkConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
-        await client.checkBehaviorDefinition(checkConfig);
+        try {
+          // Check (optional, but good practice) - using types from adt-clients
+          const checkConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
+          await client.checkBehaviorDefinition(checkConfig);
 
-        // Unlock - using types from adt-clients
-        const unlockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
-        await client.unlockBehaviorDefinition(unlockConfig, lockHandle);
+          // Unlock - using types from adt-clients
+          const unlockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
+          await client.unlockBehaviorDefinition(unlockConfig, lockHandle);
 
-        // Activate if requested - using types from adt-clients
-        if (shouldActivate) {
-            const activateConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
-            await client.activateBehaviorDefinition(activateConfig);
+          // Activate if requested - using types from adt-clients
+          if (shouldActivate) {
+              const activateConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
+              await client.activateBehaviorDefinition(activateConfig);
+          }
+        } catch (error) {
+          // Unlock on error (principle 1: if lock was done, unlock is mandatory)
+          try {
+            const unlockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
+            await client.unlockBehaviorDefinition(unlockConfig, lockHandle);
+          } catch (unlockError) {
+            logger.error('Failed to unlock behavior definition after error:', unlockError);
+          }
+          // Principle 2: first error and exit
+          throw error;
         }
 
         const result = {

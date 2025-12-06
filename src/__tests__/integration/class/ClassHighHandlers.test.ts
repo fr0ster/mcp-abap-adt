@@ -18,6 +18,9 @@ import { handleGetSession } from '../../../handlers/system/readonly/handleGetSes
 import { handleCreateClass } from '../../../handlers/class/high/handleCreateClass';
 import { handleUpdateClass } from '../../../handlers/class/high/handleUpdateClass';
 import { handleDeleteClass } from '../../../handlers/class/low/handleDeleteClass';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
+import { generateSessionId } from '../../../lib/sessionUtils';
 
 import {
   parseHandlerResponse,
@@ -25,7 +28,6 @@ import {
   debugLog
 } from '../helpers/testHelpers';
 import {
-  getTestSession,
   updateSessionFromResponse,
   SessionInfo
 } from '../helpers/sessionHelpers';
@@ -43,13 +45,12 @@ import {
 // loadTestEnv will be called in beforeAll
 
 describe('Class High-Level Handlers Integration', () => {
-  let session: SessionInfo | null = null;
   let hasConfig = false;
 
   beforeAll(async () => {
     try {
-      // Get initial session
-      session = await getTestSession();
+      // Load environment variables before creating connections
+      await loadTestEnv();
       hasConfig = true;
     } catch (error) {
       console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -58,8 +59,62 @@ describe('Class High-Level Handlers Integration', () => {
   });
 
   it('should test all Class high-level handlers', async () => {
-    if (!hasConfig || !session) {
-      console.log('⏭️  Skipping test: No configuration or session');
+    if (!hasConfig) {
+      console.log('⏭️  Skipping test: No SAP configuration');
+      return;
+    }
+
+    // Create a separate connection for this test (not using getManagedConnection)
+    let connection: AbapConnection | null = null;
+    let session: SessionInfo | null = null;
+
+    try {
+      // Get configuration from environment variables
+      const config = getConfig();
+
+      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
+      const connectionLogger = {
+        debug: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {},
+        info: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {},
+        warn: process.env.DEBUG_CONNECTORS === 'true' ? console.warn : () => {},
+        error: process.env.DEBUG_CONNECTORS === 'true' ? console.error : () => {},
+        csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {}
+      };
+
+      // Create connection directly (same as in adt-clients tests)
+      connection = createAbapConnection(config, connectionLogger);
+
+      // Connect to get session state
+      await connection.connect();
+
+      // Generate session ID
+      const sessionId = generateSessionId();
+
+      // Get session state directly from connection
+      const sessionState = connection.getSessionState();
+
+      if (!sessionState) {
+        throw new Error('Failed to get session state. Connection may not be properly initialized.');
+      }
+
+      session = {
+        session_id: sessionId,
+        session_state: {
+          cookies: sessionState.cookies || '',
+          csrf_token: sessionState.csrfToken || '',
+          cookie_store: sessionState.cookieStore || {}
+        }
+      };
+
+      debugLog('CONNECTION', `Created separate connection for test`, {
+        url: config.url,
+        authType: config.authType,
+        hasClient: !!config.client,
+        session_id: session.session_id
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn('⚠️ Skipping test: Failed to create connection', errorMessage);
       return;
     }
 
@@ -88,6 +143,11 @@ CLASS ${className} IMPLEMENTATION.
     WRITE: / 'Hello from ${className}'.
   ENDMETHOD.
 ENDCLASS.`;
+
+    // Track creation state for cleanup
+    let classCreated = false;
+    let classLocked = false;
+    let lockHandle: string | null = null;
 
     try {
       // Step 1: Test CreateClass (High-Level)
@@ -136,21 +196,47 @@ ENDCLASS.`;
         });
         // If class already exists, that's okay - we'll skip test
         if (errorMsg.includes('already exists') || errorMsg.includes('InvalidObjName')) {
-          console.log(`⏭️  Class ${className} already exists, skipping test`);
-          return;
+          const reason = errorMsg.includes('already exists') ? ' (object already exists)' : ' (validation failed)';
+          const skipReason = `CreateClass operation for class ${className} failed validation${reason}: ${errorMsg}`;
+          console.log(`⏭️  SKIP: ${skipReason}`);
+          // Throw error to mark test as failed (not passed) when validation fails
+          // This prevents test from being marked as "passed" when it should be skipped
+          throw new Error(`SKIP: ${skipReason}`);
         }
         throw error;
       }
 
       if (createResponse.isError) {
         const errorMsg = createResponse.content[0]?.text || 'Unknown error';
-        debugLog('CREATE_FAILED', `Create failed: ${errorMsg}`);
+        // If validation fails (class already exists or invalid), skip test
+        if (errorMsg.includes('already exists') ||
+            errorMsg.includes('ExceptionResourceAlreadyExists') ||
+            errorMsg.includes('ResourceAlreadyExists') ||
+            errorMsg.includes('InvalidClifName') ||
+            errorMsg.includes('InvalidObjName')) {
+          const reason = errorMsg.includes('already exists') ||
+                       errorMsg.includes('ExceptionResourceAlreadyExists') ||
+                       errorMsg.includes('ResourceAlreadyExists')
+            ? ' (object already exists)'
+            : ' (validation failed)';
+          const skipReason = `CreateClass operation for class ${className} failed validation${reason}: ${errorMsg}`;
+          console.log(`⏭️  SKIP: ${skipReason}`);
+          // Throw error to mark test as failed (not passed) when validation fails
+          // This prevents test from being marked as "passed" when it should be skipped
+          throw new Error(`SKIP: ${skipReason}`);
+        }
+        // For other errors, throw
         throw new Error(`Create failed: ${errorMsg}`);
       }
 
       const createData = parseHandlerResponse(createResponse);
       expect(createData.success).toBe(true);
       expect(createData.class_name).toBe(className);
+
+      // Mark class as created successfully
+      classCreated = true;
+      // High-level handler does lock internally, so mark as locked
+      classLocked = true;
 
       debugLog('CREATE_COMPLETE', 'High-level class creation completed successfully', {
         class_name: createData.class_name,
@@ -217,8 +303,12 @@ ENDCLASS.`;
         });
         // If class doesn't exist or other validation error, skip test
         if (errorMsg.includes('already exists') || errorMsg.includes('InvalidObjName') || errorMsg.includes('not found')) {
-          console.log(`⏭️  Cannot update class ${className}: ${errorMsg}, skipping test`);
-          return;
+          const reason = errorMsg.includes('not found') ? ' (class does not exist)' : ' (validation failed)';
+          const skipReason = `UpdateClass operation for class ${className} failed${reason}: ${errorMsg}`;
+          console.log(`⏭️  SKIP: ${skipReason}`);
+          // Throw error to mark test as failed (not passed) when validation fails
+          // This prevents test from being marked as "passed" when it should be skipped
+          throw new Error(`SKIP: ${skipReason}`);
         }
         throw new Error(`Update failed: ${errorMsg}`);
       }
@@ -226,6 +316,12 @@ ENDCLASS.`;
       if (updateResponse.isError) {
         const errorMsg = updateResponse.content[0]?.text || 'Unknown error';
         debugLog('UPDATE_FAILED', `Update failed: ${errorMsg}`);
+        // If class doesn't exist (500 error with "does not exist" message), skip test
+        if (errorMsg.includes('does not exist') || errorMsg.includes('not found')) {
+          const skipReason = `UpdateClass operation for class ${className} failed (class does not exist): ${errorMsg}`;
+          console.log(`⏭️  SKIP: ${skipReason}`);
+          throw new Error(`SKIP: ${skipReason}`);
+        }
         throw new Error(`Update failed: ${errorMsg}`);
       }
 
@@ -244,6 +340,13 @@ ENDCLASS.`;
       console.log(`✅ High-level class update completed successfully for ${className}`);
 
     } catch (error: any) {
+      // Check if this is a skip error (starts with "SKIP:")
+      if (error.message && error.message.startsWith('SKIP:')) {
+        // This is a skip error - rethrow to mark test as failed (not passed)
+        // This prevents test from being marked as "passed" when it should be skipped
+        throw error;
+      }
+
       debugLog('TEST_ERROR', `Test failed: ${error.message}`, {
         error: error.message,
         stack: error.stack?.substring(0, 500) // Limit stack trace length
@@ -251,36 +354,72 @@ ENDCLASS.`;
       console.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
-      // Cleanup: Optionally delete test class
+      // Cleanup: Reset connection created for this test
+      if (connection) {
+        try {
+          connection.reset();
+          debugLog('CLEANUP', `Reset test connection`);
+        } catch (resetError: any) {
+          debugLog('CLEANUP_ERROR', `Failed to reset connection: ${resetError.message || resetError}`);
+        }
+      }
+
+      // Cleanup: Unlock is always required if class was locked
+      // For diagnostics: deletion is excluded, only unlock is performed
       if (session && className) {
         try {
-          const shouldCleanup = getCleanupAfter(testCase);
-
-          debugLog('CLEANUP', `Starting cleanup for ${className}`, {
+          // Principle 1: If lock was done, unlock is mandatory
+          // High-level handler handles unlock internally in case of errors,
+          // but we try unlock here as a safety net for diagnostics
+          if (classLocked) {
+            try {
+              debugLog('CLEANUP', `Attempting to unlock class ${className} (cleanup safety net)`, {
             class_name: className,
             session_id: session.session_id,
-            cleanup_after: shouldCleanup
+                class_created: classCreated,
+                class_locked: classLocked
           });
 
-          // Delete only if cleanup_after is true
-          if (shouldCleanup) {
-            const deleteResponse = await handleDeleteClass({
-              class_name: className,
-              transport_request: transportRequest
-            });
+              // Try to unlock using CrudClient directly
+              // Note: High-level handler already handles unlock on error, but we try here as safety net
+              if (!connection) {
+                debugLog('CLEANUP', `Cannot unlock: connection not available`);
+                return;
+              }
+              const { CrudClient } = await import('@mcp-abap-adt/adt-clients');
+              const client = new CrudClient(connection);
 
-            if (!deleteResponse.isError) {
-              debugLog('CLEANUP', `Successfully deleted test class: ${className}`);
-              console.log(`🧹 Cleaned up test class: ${className}`);
-            } else {
-              debugLog('CLEANUP', `Failed to delete test class: ${className}`, {
-                error: deleteResponse.content[0]?.text || 'Unknown error'
+              // Try unlock without lockHandle (CrudClient may have it stored internally)
+              // If lockHandle was available, try with it first
+              try {
+                if (lockHandle) {
+                  await client.unlockClass({ className }, lockHandle);
+                } else {
+                  await client.unlockClass({ className });
+                }
+                debugLog('CLEANUP', `Successfully unlocked class ${className} (cleanup safety net)`);
+                console.log(`🔓 Unlocked class ${className} (cleanup safety net)`);
+              } catch (unlockErr: any) {
+                // If unlock fails, it might be already unlocked - this is OK
+                debugLog('CLEANUP', `Unlock attempt completed (may already be unlocked): ${className}`, {
+                  error: unlockErr instanceof Error ? unlockErr.message : String(unlockErr)
+                });
+              }
+            } catch (unlockError: any) {
+              debugLog('CLEANUP', `Failed to unlock class ${className} (cleanup)`, {
+                error: unlockError instanceof Error ? unlockError.message : String(unlockError)
               });
+              // Don't warn - unlock may fail if class is already unlocked or doesn't exist
             }
-          } else {
-            debugLog('CLEANUP', `Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
-            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
           }
+
+          // Deletion is excluded for diagnostics - object left for analysis
+          debugLog('CLEANUP', `Deletion excluded for diagnostics - object left for analysis: ${className}`, {
+            class_name: className,
+            class_created: classCreated,
+            class_locked: classLocked
+          });
+          console.log(`⚠️ Deletion excluded for diagnostics - object left for analysis: ${className}`);
         } catch (cleanupError) {
           debugLog('CLEANUP_ERROR', `Exception during cleanup: ${cleanupError}`, {
             error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)

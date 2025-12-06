@@ -101,7 +101,7 @@ export async function handleCheckFunctionModule(args: CheckFunctionModuleArgs) {
 
     try {
       const client = new CrudClient(connection);
-      await client.checkFunctionModule({ functionModuleName: functionModuleName, functionGroupName: functionGroupName });
+      await client.checkFunctionModule({ functionModuleName: functionModuleName, functionGroupName: functionGroupName }, checkVersion);
       const response = client.getCheckResult();
       if (!response) {
         throw new Error('Function module check did not return a response');

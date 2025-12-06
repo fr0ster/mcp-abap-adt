@@ -4,7 +4,7 @@
  * Uses CrudClient from @mcp-abap-adt/adt-clients for all operations.
  * Session and lock management handled internally by client.
  *
- * Workflow: validate -> lock -> update -> check -> unlock -> (activate)
+ * Workflow: lock -> update -> check -> unlock -> (activate)
  */
 
 import { AxiosResponse } from '../../../lib/utils';
@@ -75,24 +75,9 @@ export async function handleUpdateServiceDefinition(args: UpdateServiceDefinitio
       // Create client
       const client = new CrudClient(connection);
 
-      // Build operation chain: validate -> lock -> update -> check -> unlock -> (activate)
+      // Build operation chain: lock -> update -> check -> unlock -> (activate)
+      // Note: No validation needed for update - service definition must already exist
       const shouldActivate = activate !== false; // Default to true if not specified
-
-      // Validate (for update, "already exists" is expected - object must exist)
-      try {
-        await client.validateServiceDefinition({
-          serviceDefinitionName,
-          description: serviceDefinitionName
-        });
-      } catch (validateError: any) {
-        // For update operations, "already exists" is expected - object must exist
-        if (!isAlreadyExistsError(validateError)) {
-          // Real validation error - rethrow
-          throw validateError;
-        }
-        // "Already exists" is OK for update - continue
-        logger.info(`Service Definition ${serviceDefinitionName} already exists - this is expected for update operation`);
-      }
 
       // Lock
       await client.lockServiceDefinition({ serviceDefinitionName });
@@ -159,7 +144,7 @@ export async function handleUpdateServiceDefinition(args: UpdateServiceDefinitio
       logger.info(`✅ UpdateServiceDefinition completed successfully: ${serviceDefinitionName}`);
 
       // Return success result
-      const stepsCompleted = ['validate', 'lock', 'update', 'check', 'unlock'];
+      const stepsCompleted = ['lock', 'update', 'check', 'unlock'];
       if (shouldActivate) {
         stepsCompleted.push('activate');
       }

@@ -4,7 +4,7 @@
  * Uses ViewBuilder from @mcp-abap-adt/adt-clients for all operations.
  * Session and lock management handled internally by builder.
  *
- * Workflow: validate -> lock -> update -> check -> unlock -> (activate)
+ * Workflow: lock -> update -> check -> unlock -> (activate)
  */
 
 import { AxiosResponse } from '../../../lib/utils';
@@ -67,22 +67,7 @@ export async function handleUpdateView(params: any) {
       const client = new CrudClient(connection);
       const shouldActivate = args.activate === true; // Default to false if not specified
 
-      // Validate (for update, "already exists" is expected - object must exist)
-      try {
-        await client.validateView({
-          viewName,
-          packageName: undefined,
-          description: viewName
-        });
-      } catch (validateError: any) {
-        // For update operations, "already exists" is expected - object must exist
-        if (!isAlreadyExistsError(validateError)) {
-          // Real validation error - rethrow
-          throw validateError;
-        }
-        // "Already exists" is OK for update - continue
-        logger.info(`View ${viewName} already exists - this is expected for update operation`);
-      }
+      // Note: No validation needed for update - view must already exist
 
       // Lock
       await client.lockView({ viewName });
@@ -146,7 +131,7 @@ export async function handleUpdateView(params: any) {
       logger.info(`✅ UpdateView completed successfully: ${viewName}`);
 
       // Return success result
-      const stepsCompleted = ['validate', 'lock', 'update', 'check', 'unlock'];
+      const stepsCompleted = ['lock', 'update', 'check', 'unlock'];
       if (shouldActivate) {
         stepsCompleted.push('activate');
       }

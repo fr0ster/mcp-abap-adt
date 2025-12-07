@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [1.1.27] - 2025-12-07
+
+### Changed
+- **Updated dependencies**:
+  - `@mcp-abap-adt/auth-broker`: `^0.1.9` → `^0.1.10`
+    - Added constructor validation for stores and tokenProvider parameters
+    - Ensures required dependencies are present upon AuthBroker instantiation
+
 ## [1.1.26] - 2025-12-06
 
 ### Added

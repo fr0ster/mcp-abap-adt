@@ -55,7 +55,7 @@
   },
   "dependencies": {
     "@mcp-abap-adt/adt-clients": "^0.1.39",
-    "@mcp-abap-adt/auth-broker": "^0.1.9",
+    "@mcp-abap-adt/auth-broker": "^0.1.10",
     "@mcp-abap-adt/auth-providers": "^0.1.2",
     "@mcp-abap-adt/auth-stores": "^0.1.4",
     "@mcp-abap-adt/connection": "^0.1.15",

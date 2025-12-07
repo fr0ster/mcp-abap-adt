@@ -18,6 +18,18 @@ import { createServer, Server as HttpServer, IncomingHttpHeaders } from "http";
 import { randomUUID } from "crypto";
 import { AuthBroker } from "@mcp-abap-adt/auth-broker";
 import { validateAuthHeaders, AuthMethodPriority } from "@mcp-abap-adt/header-validator";
+import {
+  HEADER_MCP_DESTINATION,
+  HEADER_SAP_DESTINATION_SERVICE,
+  HEADER_SAP_URL,
+  HEADER_SAP_AUTH_TYPE,
+  HEADER_SAP_JWT_TOKEN,
+  HEADER_SAP_LOGIN,
+  HEADER_SAP_PASSWORD,
+  HEADER_SAP_REFRESH_TOKEN,
+  HEADER_SAP_UAA_CLIENT_SECRET,
+  HEADER_AUTHORIZATION,
+} from "@mcp-abap-adt/interfaces";
 import { getPlatformStores, getPlatformStoresAsync } from "./lib/stores";
 import { getPlatformPaths } from "./lib/stores/platformPaths";
 import { BtpTokenProvider } from "@mcp-abap-adt/auth-providers";
@@ -1384,6 +1396,9 @@ function debugLog(message: string): void {
   }
 }
 
+// Re-export header constants from interfaces package
+export * from "@mcp-abap-adt/interfaces";
+
 export function getConfig(): SapConfig {
   debugLog(`[MCP-CONFIG] getConfig() called\n`);
 
@@ -1635,7 +1650,7 @@ export class mcp_abap_adt_server {
     if (!headers || Object.keys(headers).length === 0) {
       if (this.defaultMcpDestination) {
         // Create headers object with default MCP destination
-        headers = { 'x-mcp-destination': this.defaultMcpDestination };
+        headers = { [HEADER_MCP_DESTINATION]: this.defaultMcpDestination };
         logger.info("No headers provided, using default MCP destination from --mcp parameter", {
           type: "NO_HEADERS_DEFAULT_MCP_USED",
           destination: this.defaultMcpDestination,
@@ -1645,7 +1660,7 @@ export class mcp_abap_adt_server {
         logger.info("No headers provided in request", {
           type: "NO_HEADERS_PROVIDED",
           sessionId: sessionId?.substring(0, 8),
-          hint: "Provide authentication headers (x-sap-destination, x-sap-url, x-sap-auth-type, etc.) or use --mcp parameter",
+          hint: `Provide authentication headers (${HEADER_SAP_DESTINATION_SERVICE}, ${HEADER_SAP_URL}, ${HEADER_SAP_AUTH_TYPE}, etc.) or use --mcp parameter`,
         });
         return;
       }
@@ -1653,8 +1668,8 @@ export class mcp_abap_adt_server {
 
     // Apply default MCP destination from --mcp parameter if not provided in headers
     const headersWithDefault = { ...headers };
-    if (this.defaultMcpDestination && !headers['x-mcp-destination'] && !headers['X-MCP-Destination']) {
-      headersWithDefault['x-mcp-destination'] = this.defaultMcpDestination;
+    if (this.defaultMcpDestination && !headers[HEADER_MCP_DESTINATION] && !headers['X-MCP-Destination']) {
+      headersWithDefault[HEADER_MCP_DESTINATION] = this.defaultMcpDestination;
       logger.info("Using default MCP destination from --mcp parameter", {
         type: "DEFAULT_MCP_DESTINATION_APPLIED",
         destination: this.defaultMcpDestination,
@@ -1665,19 +1680,22 @@ export class mcp_abap_adt_server {
     // Log which auth headers are present (for debugging)
     // Check headers in both cases (Node.js normalizes to lowercase, but check both for safety)
     const authHeaders = {
-      'x-sap-destination': headersWithDefault['x-sap-destination'] || headersWithDefault['X-SAP-Destination'],
-      'x-mcp-destination': headersWithDefault['x-mcp-destination'] || headersWithDefault['X-MCP-Destination'],
-      'x-sap-url': (headersWithDefault['x-sap-url'] || headersWithDefault['X-SAP-URL']) ? '[present]' : undefined,
-      'x-sap-auth-type': headersWithDefault['x-sap-auth-type'] || headersWithDefault['X-SAP-Auth-Type'],
-      'x-sap-jwt-token': (headersWithDefault['x-sap-jwt-token'] || headersWithDefault['X-SAP-JWT-Token']) ? '[present]' : undefined,
-      'x-sap-login': (headersWithDefault['x-sap-login'] || headersWithDefault['X-SAP-Login']) ? '[present]' : undefined,
+      [HEADER_SAP_DESTINATION_SERVICE]: headersWithDefault[HEADER_SAP_DESTINATION_SERVICE] || headersWithDefault['X-SAP-Destination'],
+      [HEADER_MCP_DESTINATION]: headersWithDefault[HEADER_MCP_DESTINATION] || headersWithDefault['X-MCP-Destination'],
+      [HEADER_SAP_URL]: (headersWithDefault[HEADER_SAP_URL] || headersWithDefault['X-SAP-URL']) ? '[present]' : undefined,
+      [HEADER_SAP_AUTH_TYPE]: headersWithDefault[HEADER_SAP_AUTH_TYPE] || headersWithDefault['X-SAP-Auth-Type'],
+      [HEADER_SAP_JWT_TOKEN]: (headersWithDefault[HEADER_SAP_JWT_TOKEN] || headersWithDefault['X-SAP-JWT-Token']) ? '[present]' : undefined,
+      [HEADER_SAP_LOGIN]: (headersWithDefault[HEADER_SAP_LOGIN] || headersWithDefault['X-SAP-Login']) ? '[present]' : undefined,
     };
     logger.info("Processing authentication headers", {
       type: "AUTH_HEADERS_PROCESSING",
       headers: authHeaders,
       platform: process.platform,
       sessionId: sessionId?.substring(0, 8),
-      allHeaderKeys: Object.keys(headersWithDefault).filter(k => k.toLowerCase().startsWith('x-sap') || k.toLowerCase().startsWith('x-mcp')),
+      allHeaderKeys: Object.keys(headersWithDefault).filter(k => {
+        const lowerKey = k.toLowerCase();
+        return lowerKey.startsWith('x-sap') || lowerKey.startsWith('x-mcp');
+      }),
     });
 
     // Use header validator to validate and prioritize authentication methods
@@ -2173,12 +2191,12 @@ export class mcp_abap_adt_server {
       return false;
     }
     // Check for destination-based auth headers
-    if (headers["x-sap-destination"] || headers["x-mcp-destination"]) {
+    if (headers[HEADER_SAP_DESTINATION_SERVICE] || headers[HEADER_MCP_DESTINATION]) {
       return true;
     }
     // Check for direct auth headers
-    const sapUrl = headers["x-sap-url"];
-    const sapAuthType = headers["x-sap-auth-type"];
+    const sapUrl = headers[HEADER_SAP_URL];
+    const sapAuthType = headers[HEADER_SAP_AUTH_TYPE];
     return !!(sapUrl && sapAuthType);
   }
 
@@ -2947,7 +2965,7 @@ export class mcp_abap_adt_server {
         const debugHttpEnabled = process.env.DEBUG_HTTP_REQUESTS === "true" || process.env.DEBUG_CONNECTORS === "true";
         if (debugHttpEnabled) {
           const sanitizedHeaders: Record<string, string> = {};
-          const sensitiveKeys = ['authorization', 'x-sap-jwt-token', 'x-sap-refresh-token', 'x-sap-password', 'x-sap-uaa-client-secret'];
+          const sensitiveKeys = [HEADER_AUTHORIZATION, HEADER_SAP_JWT_TOKEN, HEADER_SAP_REFRESH_TOKEN, HEADER_SAP_PASSWORD, HEADER_SAP_UAA_CLIENT_SECRET];
           for (const [key, value] of Object.entries(req.headers)) {
             if (sensitiveKeys.includes(key.toLowerCase())) {
               sanitizedHeaders[key] = '[REDACTED]';
@@ -2989,7 +3007,7 @@ export class mcp_abap_adt_server {
               hasEnvFile: this.hasEnvFile,
             });
             res.writeHead(403, { "Content-Type": "text/plain" });
-            res.end("Forbidden: Non-local connections require SAP connection headers (x-sap-url, x-sap-auth-type)");
+            res.end(`Forbidden: Non-local connections require SAP connection headers (${HEADER_SAP_URL}, ${HEADER_SAP_AUTH_TYPE})`);
             return;
           }
         }
@@ -3181,12 +3199,12 @@ export class mcp_abap_adt_server {
           if (requiresSapConfig && (!sessionSapConfig || sessionSapConfig.url === "http://placeholder" || sessionSapConfig.url === "http://injected-connection")) {
             // Check what headers were provided
             const providedHeaders: Record<string, string> = {};
-            if (req.headers['x-sap-destination']) providedHeaders['x-sap-destination'] = String(req.headers['x-sap-destination']);
-            if (req.headers['x-mcp-destination']) providedHeaders['x-mcp-destination'] = String(req.headers['x-mcp-destination']);
-            if (req.headers['x-sap-url']) providedHeaders['x-sap-url'] = '[present]';
-            if (req.headers['x-sap-auth-type']) providedHeaders['x-sap-auth-type'] = String(req.headers['x-sap-auth-type']);
+            if (req.headers[HEADER_SAP_DESTINATION_SERVICE]) providedHeaders[HEADER_SAP_DESTINATION_SERVICE] = String(req.headers[HEADER_SAP_DESTINATION_SERVICE]);
+            if (req.headers[HEADER_MCP_DESTINATION]) providedHeaders[HEADER_MCP_DESTINATION] = String(req.headers[HEADER_MCP_DESTINATION]);
+            if (req.headers[HEADER_SAP_URL]) providedHeaders[HEADER_SAP_URL] = '[present]';
+            if (req.headers[HEADER_SAP_AUTH_TYPE]) providedHeaders[HEADER_SAP_AUTH_TYPE] = String(req.headers[HEADER_SAP_AUTH_TYPE]);
 
-            const errorMessage = "No valid SAP configuration available. Please provide authentication headers (x-sap-url, x-sap-auth-type, etc.) or ensure destination is configured correctly.";
+            const errorMessage = `No valid SAP configuration available. Please provide authentication headers (${HEADER_SAP_URL}, ${HEADER_SAP_AUTH_TYPE}, etc.) or ensure destination is configured correctly.`;
             logger.error("No valid SAP configuration available for request", {
               type: "NO_VALID_SAP_CONFIG",
               sessionId: session.sessionId,

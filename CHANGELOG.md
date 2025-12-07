@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [1.1.28] - 2025-01-XX
+
+### Changed
+- **Header Constants Migration**: Replaced all hardcoded header strings with constants from `@mcp-abap-adt/interfaces`
+  - All header references now use constants (e.g., `HEADER_SAP_URL`, `HEADER_SAP_AUTH_TYPE`, `HEADER_MCP_DESTINATION`, etc.)
+  - Improved type safety and consistency across packages
+  - Updated error messages and hints to use header constants
+- **Updated dependencies**:
+  - `@mcp-abap-adt/header-validator`: `^0.1.6` → `^0.1.7`
+    - Added comprehensive header sets documentation
+    - Enhanced validation for Basic Auth and UAA refresh token sets
+    - All header references migrated to constants from `@mcp-abap-adt/interfaces`
+  - `@mcp-abap-adt/interfaces`: `^0.1.1` → `^0.1.2`
+    - Added HTTP header constants for all headers used across packages
+    - Added header groups and authentication type constants
+
+### Technical
+- **Code Quality**: Improved maintainability by centralizing header name definitions
+- **Type Safety**: Better compile-time checking for header names
+
 ## [1.1.27] - 2025-12-07
 
 ### Changed

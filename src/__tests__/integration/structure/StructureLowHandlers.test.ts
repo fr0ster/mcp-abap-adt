@@ -58,7 +58,9 @@ describe('Structure Low-Level Handlers Integration', () => {
       session = await getTestSession();
       hasConfig = true;
     } catch (error) {
-      console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+      if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
+        console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+      }
       hasConfig = false;
     }
   });

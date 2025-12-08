@@ -9,8 +9,40 @@ import * as yaml from 'yaml';
 import * as dotenv from 'dotenv';
 import { invalidateConnectionCache } from '../../../lib/utils';
 import { refreshTokensForTests } from './authHelpers';
+import type { SapConfig } from '@mcp-abap-adt/connection';
 
 let cachedConfig: any = null;
+let envLoaded = false;
+let envLoadError: Error | null = null;
+let brokerAttempted = false;
+let brokerSucceeded = false;
+
+function resolveUseAuthBrokerFlag(): boolean {
+  try {
+    const cfg = loadTestConfig();
+    return (
+      process.env.MCP_USE_AUTH_BROKER === 'true' ||
+      cfg?.auth_broker?.use_auth_broker === true ||
+      cfg?.environment?.use_auth_broker === true ||
+      !!cfg?.auth_broker // prefer auth-broker if config section exists
+    );
+  } catch {
+    return process.env.MCP_USE_AUTH_BROKER === 'true';
+  }
+}
+
+function resolveUnsafeFlag(): boolean {
+  try {
+    const cfg = loadTestConfig();
+    return (
+      process.env.MCP_UNSAFE === 'true' ||
+      cfg?.auth_broker?.unsafe === true ||
+      cfg?.auth_broker?.unsafe_session_store === true
+    );
+  } catch {
+    return process.env.MCP_UNSAFE === 'true';
+  }
+}
 
 /**
  * Load environment variables from .env file
@@ -23,6 +55,25 @@ let cachedConfig: any = null;
  * Also attempts to refresh tokens using AuthBroker if destination is available
  */
 export async function loadTestEnv(): Promise<void> {
+  if (envLoaded) {
+    return;
+  }
+  if (envLoadError) {
+    throw envLoadError;
+  }
+
+  // Prevent index.ts env auto-load / HTTP-mode logs during tests
+  process.env.MCP_SKIP_ENV_LOAD = 'true';
+
+  const useAuthBroker = resolveUseAuthBrokerFlag();
+  const useUnsafe = resolveUnsafeFlag();
+
+  if (useUnsafe) {
+    process.env.MCP_UNSAFE = 'true';
+  }
+
+  let brokerOk = brokerSucceeded;
+
   // Always try to load .env file, even if SAP_URL is already set
   // This ensures all variables (including refresh tokens) are loaded correctly
 
@@ -62,6 +113,25 @@ export async function loadTestEnv(): Promise<void> {
       console.warn(`⚠️ Failed to load .env file: ${result.error.message}`);
     } else {
       logEnvLoaded(envPath);
+
+      // Apply auth-broker preference from test-config.yaml (if set)
+      try {
+        const useAuthBroker = resolveUseAuthBrokerFlag();
+        if (useAuthBroker) {
+          process.env.MCP_USE_AUTH_BROKER = 'true';
+          if (useUnsafe) {
+            process.env.MCP_UNSAFE = 'true';
+          }
+          if (process.env.DEBUG_TESTS === 'true') {
+            console.log('[DEBUG] loadTestEnv - Using auth-broker as primary token source (MCP_USE_AUTH_BROKER=true)');
+            if (useUnsafe) {
+              console.log('[DEBUG] loadTestEnv - Using unsafe session store for auth-broker (MCP_UNSAFE=true)');
+            }
+          }
+        }
+      } catch {
+        // ignore config load issues here; tests will proceed with existing env
+      }
       // CRITICAL: Invalidate connection cache after loading .env
       // This ensures getManagedConnection() will recreate connection with new config
       // (including refresh token that might have been missing before)
@@ -79,18 +149,23 @@ export async function loadTestEnv(): Promise<void> {
 
       // Try to refresh tokens using AuthBroker if destination is available
       // This ensures tests have valid tokens even if refresh token in .env has expired
-      try {
-        await refreshTokensForTests();
-      } catch (error: any) {
-        // If token refresh fails, log but don't fail - tests will use existing .env tokens
-        if (process.env.DEBUG_TESTS === 'true') {
-          console.warn(`[DEBUG] loadTestEnv - Failed to refresh tokens: ${error?.message || String(error)}`);
+      if (useAuthBroker && !brokerAttempted) {
+        try {
+          brokerAttempted = true;
+          await refreshTokensForTests({ force: true });
+          brokerOk = !!process.env.SAP_URL;
+          brokerSucceeded = brokerOk;
+        } catch (error: any) {
+          // If token refresh fails, log but don't fail - tests will use existing .env tokens
+          if (process.env.DEBUG_TESTS === 'true') {
+            console.warn(`[DEBUG] loadTestEnv - Failed to refresh tokens via auth-broker: ${error?.message || String(error)}`);
+          }
         }
       }
     }
   } else {
     // No .env file found
-    if (process.env.DEBUG_TESTS === 'true') {
+    if (!useAuthBroker && process.env.DEBUG_TESTS === 'true') {
       const cwdEnvPath = path.resolve(process.cwd(), '.env');
       const projectRootEnvPath = path.resolve(__dirname, '../../../../.env');
       console.warn(`⚠️ .env file not found. Tried:`, {
@@ -99,7 +174,48 @@ export async function loadTestEnv(): Promise<void> {
         projectRoot: projectRootEnvPath
       });
     }
+
+    // If auth-broker is preferred, try refreshing tokens even without .env
+    if (useAuthBroker && !brokerAttempted) {
+      try {
+        brokerAttempted = true;
+        await refreshTokensForTests({ force: true });
+        brokerOk = !!process.env.SAP_URL;
+        brokerSucceeded = brokerOk;
+        if (process.env.DEBUG_TESTS === 'true') {
+          console.log('[DEBUG] loadTestEnv - Refreshed tokens via auth-broker (no .env found)');
+        }
+      } catch (error: any) {
+        if (process.env.DEBUG_TESTS === 'true') {
+          console.warn(`[DEBUG] loadTestEnv - Auth-broker refresh failed without .env: ${error?.message || String(error)}`);
+        }
+      }
+    }
   }
+
+  // If auth-broker is preferred and we haven't tried yet (e.g., .env loaded but SAP_URL still empty)
+  if (useAuthBroker && !brokerOk && !process.env.SAP_URL && !brokerAttempted) {
+    try {
+      brokerAttempted = true;
+      await refreshTokensForTests({ force: true });
+      brokerOk = !!process.env.SAP_URL;
+      brokerSucceeded = brokerOk;
+    } catch (error: any) {
+      if (process.env.DEBUG_TESTS === 'true') {
+        console.warn(`[DEBUG] loadTestEnv - Final auth-broker refresh failed: ${error?.message || String(error)}`);
+      }
+    }
+  }
+
+  // Final guard: require SAP_URL from either auth-broker or .env
+  if (!process.env.SAP_URL) {
+    envLoadError = new Error(
+      'No SAP credentials available for tests. Provide service key/session for auth-broker or a .env file.'
+    );
+    throw envLoadError;
+  }
+
+  envLoaded = true;
 }
 
 /**
@@ -242,6 +358,62 @@ export function getTimeout(operationType: string = 'default'): number {
   const config = loadTestConfig();
   const timeouts = config.test_settings?.timeouts || {};
   return timeouts[operationType] || timeouts.default || 60000;
+}
+
+/**
+ * Build SAP config for tests from environment variables (auth-broker or .env)
+ */
+export function getSapConfigFromEnv(): SapConfig {
+  const urlRaw = process.env.SAP_URL?.trim();
+  if (!urlRaw) {
+    throw new Error('SAP_URL is not set. Ensure auth-broker or .env provided credentials.');
+  }
+
+  let url: string;
+  try {
+    const normalized = new URL(urlRaw);
+    url = normalized.href.replace(/\/$/, '');
+  } catch (err) {
+    throw new Error(`Invalid SAP_URL: ${urlRaw}`);
+  }
+
+  let authType: SapConfig['authType'] = 'basic';
+  if (process.env.SAP_JWT_TOKEN) {
+    authType = 'jwt';
+  } else if (process.env.SAP_AUTH_TYPE) {
+    const raw = process.env.SAP_AUTH_TYPE.trim().toLowerCase();
+    authType = raw === 'xsuaa' ? 'jwt' : (raw as SapConfig['authType']);
+  }
+
+  const config: SapConfig = { url, authType };
+
+  if (authType === 'jwt') {
+    config.jwtToken = process.env.SAP_JWT_TOKEN || '';
+    if (process.env.SAP_REFRESH_TOKEN) {
+      config.refreshToken = process.env.SAP_REFRESH_TOKEN;
+    }
+    if (process.env.SAP_UAA_URL) {
+      config.uaaUrl = process.env.SAP_UAA_URL;
+    }
+    if (process.env.SAP_UAA_CLIENT_ID) {
+      config.uaaClientId = process.env.SAP_UAA_CLIENT_ID;
+    }
+    if (process.env.SAP_UAA_CLIENT_SECRET) {
+      config.uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET;
+    }
+  } else {
+    config.username = process.env.SAP_USERNAME || '';
+    config.password = process.env.SAP_PASSWORD || '';
+  }
+
+  if (process.env.SAP_CLIENT) {
+    config.client = process.env.SAP_CLIENT.trim();
+  }
+  if (process.env.SAP_LANGUAGE) {
+    (config as any).language = process.env.SAP_LANGUAGE.trim();
+  }
+
+  return config;
 }
 
 /**

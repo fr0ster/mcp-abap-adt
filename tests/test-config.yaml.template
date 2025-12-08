@@ -72,6 +72,12 @@ environment:
 # instead of relying solely on refresh tokens from .env file
 
 auth_broker:
+  # Prefer auth-broker over .env (set MCP_USE_AUTH_BROKER=true)
+  use_auth_broker: true
+  # Use file-based session store (unsafe) to reuse saved sessions for tests (set MCP_UNSAFE=true)
+  unsafe: true
+  # Browser auth callback port (default 3001). Change if port is busy.
+  browser_auth_port: 3101
   # Paths configuration (applies to both ABAP and BTP/XSUAA)
   paths:
     # Directory where service key JSON files are stored

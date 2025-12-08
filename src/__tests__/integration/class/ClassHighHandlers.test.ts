@@ -19,7 +19,6 @@ import { handleCreateClass } from '../../../handlers/class/high/handleCreateClas
 import { handleUpdateClass } from '../../../handlers/class/high/handleUpdateClass';
 import { handleDeleteClass } from '../../../handlers/class/low/handleDeleteClass';
 import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
-import { getConfig } from '../../../index';
 import { generateSessionId } from '../../../lib/sessionUtils';
 
 import {
@@ -39,7 +38,8 @@ import {
   resolveTransportRequest,
   loadTestEnv,
   getCleanupAfter,
-  getSessionConfig
+  getSessionConfig,
+  getSapConfigFromEnv
 } from '../helpers/configHelpers';
 import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
@@ -50,14 +50,9 @@ describe('Class High-Level Handlers Integration', () => {
   let hasConfig = false;
 
   beforeAll(async () => {
-    try {
-      // Load environment variables before creating connections
-      await loadTestEnv();
-      hasConfig = true;
-    } catch (error) {
-      console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    // Load environment variables before creating connections
+    await loadTestEnv();
+    hasConfig = true;
   });
 
   it('should test all Class high-level handlers', async () => {
@@ -73,7 +68,7 @@ describe('Class High-Level Handlers Integration', () => {
 
     try {
       // Get configuration from environment variables
-      const config = getConfig();
+      const config = getSapConfigFromEnv();
 
       // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
       const connectionLogger = {

@@ -865,7 +865,10 @@ function parseMcpDestinationArg(): string | undefined {
 
 // Find .env file path from arguments
 // Check for --auth-broker flag (forces use of auth-broker, ignores .env)
-const useAuthBroker = process.argv.includes("--auth-broker");
+// Also allow env var MCP_USE_AUTH_BROKER=true to prefer auth-broker over .env
+const useAuthBroker = process.argv.includes("--auth-broker") || process.env.MCP_USE_AUTH_BROKER === "true";
+// Detect Jest/test environment to avoid mandatory .env exits during unit/integration tests
+const isTestEnv = process.env.JEST_WORKER_ID !== undefined || process.env.NODE_ENV === "test";
 const authBrokerPath = parseAuthBrokerPathArg();
 // Parse --mcp parameter for default MCP destination
 const defaultMcpDestination = parseMcpDestinationArg();
@@ -882,7 +885,7 @@ const isSse = transportType === "sse";
 const isStdio = transportType === "stdio";
 // .env is mandatory only if transport is explicitly set to stdio or sse AND --mcp is not specified
 // If --mcp is specified, auth-broker will be used instead of .env file
-const isEnvMandatory = explicitTransportType !== null && (isStdio || isSse) && !defaultMcpDestination;
+const isEnvMandatory = explicitTransportType !== null && (isStdio || isSse) && !defaultMcpDestination && !useAuthBroker && !isTestEnv;
 
 let envFilePath = parseEnvArg() ?? process.env.MCP_ENV_PATH;
 

@@ -11,8 +11,6 @@ import { getPlatformStoresAsync } from '../../../lib/stores';
 import { getPlatformPaths } from '../../../lib/stores/platformPaths';
 import { defaultLogger } from '@mcp-abap-adt/logger';
 import { loadTestConfig } from './configHelpers';
-import { setSapConfigOverride } from '../../../index';
-import type { SapConfig } from '@mcp-abap-adt/connection';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -26,11 +24,12 @@ import * as fs from 'fs';
  * - BtpTokenProvider() for token acquisition
  * - AuthBroker with stores and token provider
  */
-export async function refreshTokensForTests(): Promise<void> {
+export async function refreshTokensForTests(options?: { force?: boolean }): Promise<void> {
   try {
+    const force = options?.force === true;
     // Skip token refresh if we already have valid tokens in .env
     // This prevents unnecessary AuthBroker calls that might try to open browser
-    if (process.env.SAP_JWT_TOKEN && process.env.SAP_URL) {
+    if (!force && process.env.SAP_JWT_TOKEN && process.env.SAP_URL) {
       if (process.env.DEBUG_TESTS === 'true') {
         console.log('[refreshTokensForTests] Skipping token refresh - tokens already available in .env');
       }
@@ -56,8 +55,13 @@ export async function refreshTokensForTests(): Promise<void> {
       return;
     }
 
-    if (process.env.DEBUG_TESTS === 'true') {
-      console.log(`[refreshTokensForTests] Attempting to refresh tokens for destination: ${destination}`);
+    // Prefer file-based session store in tests when requested (to reuse saved sessions)
+    const useUnsafe =
+      process.env.MCP_UNSAFE === 'true' ||
+      config?.auth_broker?.unsafe === true ||
+      config?.auth_broker?.unsafe_session_store === true;
+    if (useUnsafe) {
+      process.env.MCP_UNSAFE = 'true';
     }
 
     // Get paths from test-config.yaml if available
@@ -109,11 +113,16 @@ export async function refreshTokensForTests(): Promise<void> {
     // Get stores with auto-detection of service key format
     const { serviceKeyStore, sessionStore, storeType } = await getPlatformStoresAsync(
       customPath, // Use paths from test-config.yaml if available, otherwise default paths
-      false, // Use safe (in-memory) session store for tests
+      useUnsafe, // File-based sessions allowed for tests
       destination
     );
 
+    let serviceKeyExists = false;
     if (process.env.DEBUG_TESTS === 'true') {
+      console.log(`[refreshTokensForTests] Attempting to refresh tokens for destination: ${destination}`);
+      if (useUnsafe) {
+        console.log('[refreshTokensForTests] Unsafe session store enabled (file-based)');
+      }
       // Log where we're looking for service keys
       const serviceKeysPaths = getPlatformPaths(customPath, 'service-keys');
       console.log(`[refreshTokensForTests] Looking for service key "${destination}.json" in:`, serviceKeysPaths);
@@ -122,13 +131,43 @@ export async function refreshTokensForTests(): Promise<void> {
       for (const serviceKeysPath of serviceKeysPaths) {
         const serviceKeyFile = path.join(serviceKeysPath, `${destination}.json`);
         const exists = fs.existsSync(serviceKeyFile);
+        if (exists) {
+          serviceKeyExists = true;
+        }
         console.log(`[refreshTokensForTests]   ${exists ? '✓' : '✗'} ${serviceKeyFile}`);
       }
+    } else {
+      // Fast existence check without debug output
+      const serviceKeysPaths = getPlatformPaths(customPath, 'service-keys');
+      serviceKeyExists = serviceKeysPaths.some((serviceKeysPath) =>
+        fs.existsSync(path.join(serviceKeysPath, `${destination}.json`))
+      );
+    }
+
+    if (!serviceKeyExists) {
+      throw new Error(
+        `Auth-broker destination \"${destination}\" not found in service-keys directories. ` +
+        `Provide ${destination}.json or disable auth-broker for tests.`
+      );
+    }
+
+    // Use existing session token if present to avoid browser auth
+    const existingConnConfig = await sessionStore.getConnectionConfig(destination);
+    if (existingConnConfig?.authorizationToken && existingConnConfig?.serviceUrl) {
+      process.env.SAP_URL = existingConnConfig.serviceUrl;
+      process.env.SAP_JWT_TOKEN = existingConnConfig.authorizationToken;
+      if (process.env.DEBUG_TESTS === 'true') {
+        console.log('[refreshTokensForTests] Using existing token from session store (no browser)');
+      }
+      return;
     }
 
     // Determine token provider based on store type (same as in getOrCreateAuthBroker)
     // ABAP and BTP use BtpTokenProvider (browser-based OAuth2)
-    const tokenProvider = new BtpTokenProvider();
+    const browserAuthPort =
+      (process.env.MCP_BROWSER_AUTH_PORT ? Number(process.env.MCP_BROWSER_AUTH_PORT) : undefined) ||
+      (config?.auth_broker?.browser_auth_port ?? 3101);
+    const tokenProvider = new BtpTokenProvider(browserAuthPort);
 
     // Create AuthBroker (same as in getOrCreateAuthBroker)
     // Use 'system' browser to allow browser authentication if refresh token fails
@@ -197,45 +236,39 @@ export async function refreshTokensForTests(): Promise<void> {
           process.env.SAP_UAA_CLIENT_SECRET = authConfig.uaaClientSecret;
         }
 
-        // Also update config override for getManagedConnection
-        const updatedConfig: SapConfig = {
-          url: connConfig.serviceUrl,
-          authType: 'jwt',
-          jwtToken: connConfig.authorizationToken || token,
-        };
-
-        if (authConfig?.refreshToken) {
-          updatedConfig.refreshToken = authConfig.refreshToken;
-        }
-        if (authConfig?.uaaUrl) {
-          updatedConfig.uaaUrl = authConfig.uaaUrl;
-        }
-        if (authConfig?.uaaClientId) {
-          updatedConfig.uaaClientId = authConfig.uaaClientId;
-        }
-        if (authConfig?.uaaClientSecret) {
-          updatedConfig.uaaClientSecret = authConfig.uaaClientSecret;
-        }
-
-        // Get client and language from connection config or process.env
-        if (connConfig.sapClient) {
-          updatedConfig.client = connConfig.sapClient;
-        } else if (process.env.SAP_CLIENT) {
-          updatedConfig.client = process.env.SAP_CLIENT.trim();
-        }
-        if (connConfig.language) {
-          (updatedConfig as any).language = connConfig.language;
-        } else if (process.env.SAP_LANGUAGE) {
-          (updatedConfig as any).language = process.env.SAP_LANGUAGE.trim();
-        }
-
-        setSapConfigOverride(updatedConfig);
-
         if (process.env.DEBUG_TESTS === 'true') {
           console.log('[refreshTokensForTests] ✓ Tokens refreshed successfully');
           console.log(`[refreshTokensForTests] URL: ${connConfig.serviceUrl}`);
           console.log(`[refreshTokensForTests] Token length: ${token.length}`);
           console.log(`[refreshTokensForTests] Has refresh token: ${!!authConfig?.refreshToken}`);
+        }
+
+        // Persist session env file explicitly (helps when session store is non-persistent)
+        try {
+          const sessionsPaths = getPlatformPaths(customPath, 'sessions');
+          const targetSessionsDir = sessionsPaths[0];
+          if (targetSessionsDir) {
+            fs.mkdirSync(targetSessionsDir, { recursive: true });
+            const sessionEnvPath = path.join(targetSessionsDir, `${destination}.env`);
+            const lines = [
+              `SAP_URL=${connConfig.serviceUrl}`,
+              `SAP_JWT_TOKEN=${connConfig.authorizationToken || token}`,
+              authConfig?.refreshToken ? `SAP_REFRESH_TOKEN=${authConfig.refreshToken}` : null,
+              authConfig?.uaaUrl ? `SAP_UAA_URL=${authConfig.uaaUrl}` : null,
+              authConfig?.uaaClientId ? `SAP_UAA_CLIENT_ID=${authConfig.uaaClientId}` : null,
+              authConfig?.uaaClientSecret ? `SAP_UAA_CLIENT_SECRET=${authConfig.uaaClientSecret}` : null,
+              connConfig.sapClient ? `SAP_CLIENT=${connConfig.sapClient}` : (process.env.SAP_CLIENT ? `SAP_CLIENT=${process.env.SAP_CLIENT}` : null),
+              connConfig.language ? `SAP_LANGUAGE=${connConfig.language}` : (process.env.SAP_LANGUAGE ? `SAP_LANGUAGE=${process.env.SAP_LANGUAGE}` : null),
+            ].filter(Boolean) as string[];
+            fs.writeFileSync(sessionEnvPath, lines.join('\n'), { encoding: 'utf8' });
+            if (process.env.DEBUG_TESTS === 'true') {
+              console.log(`[refreshTokensForTests] Session env written to ${sessionEnvPath}`);
+            }
+          }
+        } catch (persistErr: any) {
+          if (process.env.DEBUG_TESTS === 'true') {
+            console.warn(`[refreshTokensForTests] Failed to persist session env: ${persistErr?.message || String(persistErr)}`);
+          }
         }
       }
     } catch (error: any) {
@@ -254,4 +287,3 @@ export async function refreshTokensForTests(): Promise<void> {
     }
   }
 }
-

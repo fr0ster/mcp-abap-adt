@@ -91,7 +91,9 @@ describe('Package Low-Level Handlers Integration', () => {
         console.error(`❌ environment.default_package is not configured in test-config.yaml. Package tests require a default package.`);
       }
     } catch (error) {
-      console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+      if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
+        console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+      }
       hasConfig = false;
     }
   });

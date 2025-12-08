@@ -8,8 +8,8 @@
  */
 
 import { extractSessionState } from './testHelpers';
+import { loadTestEnv, getSapConfigFromEnv } from './configHelpers';
 import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
-import { getConfig } from '../../../index';
 import { generateSessionId } from '../../../lib/sessionUtils';
 
 export interface SessionInfo {
@@ -29,9 +29,18 @@ export async function createTestConnectionAndSession(): Promise<{
   connection: AbapConnection;
   session: SessionInfo;
 }> {
+  // Ensure environment and tokens are loaded (supports auth-broker fallback)
   try {
-    // Get configuration from environment variables
-    const config = getConfig();
+    await loadTestEnv();
+  } catch (error: any) {
+    if (process.env.DEBUG_TESTS === 'true') {
+      console.warn('[createTestConnectionAndSession] loadTestEnv failed', error?.message || String(error));
+    }
+  }
+
+  try {
+    // Get configuration from environment variables (auth-broker or .env)
+    const config = getSapConfigFromEnv();
 
     // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
     const connectionLogger = {
@@ -166,4 +175,3 @@ export function extractLockSession(lockResponse: any): SessionInfo {
     session_state
   };
 }
-

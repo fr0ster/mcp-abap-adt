@@ -14,7 +14,6 @@
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
-import { getConfig } from '../../../index';
 import { handleDeleteClass } from '../../../handlers/class/low/handleDeleteClass';
 import {
   getEnabledTestCase,
@@ -26,7 +25,8 @@ import {
   isCloudConnection,
   preCheckTestParameters,
   getCleanupAfter,
-  getSessionConfig
+  getSessionConfig,
+  getSapConfigFromEnv
 } from '../helpers/configHelpers';
 import { debugLog, delay } from '../helpers/testHelpers';
 import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
@@ -39,15 +39,9 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
   let isCloud = false;
 
   beforeAll(async () => {
-    try {
-      // Load environment variables before creating connection
-      await loadTestEnv();
-      hasConfig = true;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.warn('⚠️ Skipping tests: Failed to load test environment', errorMessage);
-      hasConfig = false;
-    }
+    // Load environment variables before creating connection
+    await loadTestEnv();
+    hasConfig = true;
   });
 
   it('should create class using CrudClient directly (reference implementation)', async () => {
@@ -63,7 +57,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
 
     try {
       // Get configuration from environment variables
-      const config = getConfig();
+      const config = getSapConfigFromEnv();
 
       // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
       const connectionLogger = {

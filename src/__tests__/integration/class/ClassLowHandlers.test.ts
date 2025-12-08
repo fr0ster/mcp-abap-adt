@@ -57,14 +57,9 @@ describe('Class Low-Level Handlers Integration', () => {
   let hasConfig = false;
 
   beforeAll(async () => {
-    try {
-      // Load environment variables and refresh tokens if needed
-      await loadTestEnv();
-      hasConfig = true;
-    } catch (error) {
-      console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    // Load environment variables and refresh tokens if needed
+    await loadTestEnv();
+    hasConfig = true;
   });
 
   afterAll(async () => {

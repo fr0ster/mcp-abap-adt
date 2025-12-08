@@ -45,6 +45,7 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -102,6 +103,10 @@ describe('View Low-Level Handlers Integration', () => {
       const packageName = resolvePackageName(testCase);
       const transportRequest = resolveTransportRequest(testCase);
       const description = testCase.params.description || `Test view for low-level handler`;
+      const diagnosticsTracker = createDiagnosticsTracker('view_low_full_workflow', testCase, session, {
+        handler: 'create_view_low',
+        object_name: viewName
+      });
 
       debugLog('TEST_START', `Starting full workflow test for view: ${viewName}`, {
         viewName,
@@ -227,6 +232,12 @@ define view entity ${viewName} as select from dummy {
 
         // CRITICAL: Extract session from Lock response
         const lockSession = extractLockSession(lockData);
+
+        diagnosticsTracker.persistLock(lockSession, lockHandle, {
+          object_type: 'VIEW',
+          object_name: viewName,
+          transport_request: transportRequest
+        });
 
         debugLog('LOCK', 'Lock completed, extracted session', {
           lock_handle: lockHandle,
@@ -412,8 +423,8 @@ define view entity ${viewName} as select from dummy {
             console.warn(`⚠️  Failed to cleanup test view ${viewName}: ${cleanupError}`);
           }
         }
+        diagnosticsTracker.cleanup();
       }
     }, getTimeout('long'));
   });
 });
-

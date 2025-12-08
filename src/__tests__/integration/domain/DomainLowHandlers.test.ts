@@ -45,6 +45,7 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -102,6 +103,10 @@ describe('Domain Low-Level Handlers Integration', () => {
       const packageName = resolvePackageName(testCase);
       const transportRequest = resolveTransportRequest(testCase);
       const description = testCase.params.description || `Test domain for low-level handler`;
+      const diagnosticsTracker = createDiagnosticsTracker('domain_low_full_workflow', testCase, session, {
+        handler: 'create_domain_low',
+        object_name: domainName
+      });
 
       debugLog('TEST_START', `Starting full workflow test for domain: ${domainName}`, {
         domainName,
@@ -224,6 +229,12 @@ describe('Domain Low-Level Handlers Integration', () => {
 
         // CRITICAL: Extract session from Lock response
         const lockSession = extractLockSession(lockData);
+
+        diagnosticsTracker.persistLock(lockSession, lockHandle, {
+          object_type: 'DOMA',
+          object_name: domainName,
+          transport_request: transportRequest
+        });
 
         // CRITICAL: Verify Lock returned session_id and session_state
         expect(lockSession.session_id).toBeDefined();
@@ -491,8 +502,9 @@ describe('Domain Low-Level Handlers Integration', () => {
             console.warn(`⚠️  Failed to cleanup test domain ${domainName}: ${cleanupError.message || cleanupError}`);
           }
         }
+
+        diagnosticsTracker.cleanup();
       }
     }, getTimeout('long'));
   });
 });
-

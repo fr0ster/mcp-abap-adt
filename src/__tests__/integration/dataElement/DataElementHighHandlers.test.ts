@@ -38,6 +38,7 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -75,6 +76,10 @@ describe('DataElement High-Level Handlers Integration', () => {
     const packageName = resolvePackageName(testCase);
     const transportRequest = resolveTransportRequest(testCase);
     const description = testCase.params.description || `Test data element for high-level handler`;
+    const diagnosticsTracker = createDiagnosticsTracker('data_element_high_handlers', testCase, session, {
+      handler: 'create_data_element',
+      object_name: dataElementName
+    });
 
     try {
       // Step 1: Test CreateDataElement (High-Level)
@@ -203,7 +208,8 @@ describe('DataElement High-Level Handlers Integration', () => {
           console.warn(`⚠️  Failed to cleanup test data element ${dataElementName}: ${cleanupError}`);
         }
       }
+
+      diagnosticsTracker.cleanup();
     }
   }, getTimeout('long'));
 });
-

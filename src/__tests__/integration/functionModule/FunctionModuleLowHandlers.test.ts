@@ -88,6 +88,10 @@ describe('FunctionModule Low-Level Handlers Integration', () => {
       const packageName = resolvePackageName(testCase);
       const transportRequest = resolveTransportRequest(testCase);
       const description = testCase.params.description || `Test function module for low-level handler`;
+      const diagnosticsTracker = createDiagnosticsTracker('function_module_low_full_workflow', testCase, session, {
+        handler: 'create_function_module_low',
+        object_name: functionModuleName
+      });
 
       let lockHandleForCleanup: string | null = null;
       let lockSessionForCleanup: SessionInfo | null = null;
@@ -191,6 +195,12 @@ describe('FunctionModule Low-Level Handlers Integration', () => {
         lockHandleForCleanup = lockHandle;
         lockSessionForCleanup = lockSession;
         console.log(`✅ Step 3: Locked ${functionModuleName} successfully`);
+
+        diagnosticsTracker.persistLock(lockSession, lockHandle, {
+          object_type: 'FUNC',
+          object_name: functionModuleName,
+          transport_request: transportRequest
+        });
 
         await delay(getOperationDelay('lock', testCase));
 
@@ -315,6 +325,8 @@ describe('FunctionModule Low-Level Handlers Integration', () => {
             console.warn(`⚠️  Failed to cleanup test function module ${functionModuleName}: ${cleanupError.message || cleanupError}`);
           }
         }
+
+        diagnosticsTracker.cleanup();
       }
     }, getTimeout('long'));
   });

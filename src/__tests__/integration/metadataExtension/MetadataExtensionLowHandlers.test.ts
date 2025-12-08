@@ -95,10 +95,13 @@ describe('MetadataExtension Low-Level Handlers Integration', () => {
       const transportRequest = resolveTransportRequest(testCase);
       const description = testCase.params.description || `Test metadata extension for low-level handler`;
 
-
       let lockHandleForCleanup: string | null = null;
       let lockSessionForCleanup: SessionInfo | null = null;
       let objectWasCreated = false; // Track if object was actually created
+      const diagnosticsTracker = createDiagnosticsTracker('metadata_extension_low_full_workflow', testCase, session, {
+        handler: 'create_metadata_extension_low',
+        object_name: ddlxName
+      });
 
       try {
         // Step 1: Validate
@@ -178,6 +181,12 @@ describe('MetadataExtension Low-Level Handlers Integration', () => {
         lockHandleForCleanup = lockHandle;
         lockSessionForCleanup = lockSession;
         console.log(`✅ Step 3: Locked ${ddlxName} successfully`);
+
+        diagnosticsTracker.persistLock(lockSession, lockHandle, {
+          object_type: 'DDLX',
+          object_name: ddlxName,
+          transport_request: transportRequest
+        });
 
         await delay(getOperationDelay('lock', testCase));
 
@@ -299,6 +308,8 @@ annotate view ${testCase.params.view_name || 'ZI_VIEW'} with {
             // Ignore cleanup errors - object may not exist or may have been deleted already
           }
         }
+
+        diagnosticsTracker.cleanup();
       }
     }, getTimeout('long'));
   });

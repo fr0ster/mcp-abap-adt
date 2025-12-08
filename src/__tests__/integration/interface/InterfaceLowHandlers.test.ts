@@ -48,6 +48,7 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -99,6 +100,10 @@ describe('Interface Low-Level Handlers Integration', () => {
       const packageName = resolvePackageName(testCase);
       const transportRequest = resolveTransportRequest(testCase);
       const description = testCase.params.description || `Test interface for low-level handler`;
+      const diagnosticsTracker = createDiagnosticsTracker('interface_low_full_workflow', testCase, session, {
+        handler: 'create_interface_low',
+        object_name: interfaceName
+      });
 
       debugLog('TEST_START', `Starting full workflow test for interface: ${interfaceName}`, {
         interfaceName,
@@ -194,6 +199,12 @@ describe('Interface Low-Level Handlers Integration', () => {
 
         lockHandleForCleanup = lockHandle;
         lockSessionForCleanup = lockSession;
+
+        diagnosticsTracker.persistLock(lockSession, lockHandle, {
+          object_type: 'INTF',
+          object_name: interfaceName,
+          transport_request: transportRequest
+        });
 
         await delay(getOperationDelay('lock', testCase));
 
@@ -367,8 +378,9 @@ describe('Interface Low-Level Handlers Integration', () => {
             console.warn(`⚠️  Failed to cleanup test interface ${interfaceName}: ${cleanupError.message || cleanupError}`);
           }
         }
+
+        diagnosticsTracker.cleanup();
       }
     }, getTimeout('long'));
   });
 });
-

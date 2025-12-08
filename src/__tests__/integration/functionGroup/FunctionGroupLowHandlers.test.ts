@@ -41,6 +41,7 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -92,6 +93,10 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
       const packageName = resolvePackageName(testCase);
       const transportRequest = resolveTransportRequest(testCase);
       const description = testCase.params.description || `Test function group for low-level handler`;
+      const diagnosticsTracker = createDiagnosticsTracker('function_group_low_full_workflow', testCase, session, {
+        handler: 'create_function_group_low',
+        object_name: functionGroupName
+      });
 
       debugLog('TEST_START', `Starting full workflow test for function group: ${functionGroupName}`, {
         functionGroupName,
@@ -250,6 +255,12 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
 
         lockHandleForCleanup = lockHandle;
         lockSessionForCleanup = lockSession;
+
+        diagnosticsTracker.persistLock(lockSession, lockHandle, {
+          object_type: 'FUGR',
+          object_name: functionGroupName,
+          transport_request: transportRequest
+        });
 
         debugLog('LOCK', 'Lock completed, extracted session', {
           lock_handle: lockHandle,
@@ -428,6 +439,8 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
             console.warn(`⚠️  Failed to cleanup test function group ${functionGroupName}: ${cleanupError.message || cleanupError}`);
           }
         }
+
+        diagnosticsTracker.cleanup();
       }
     }, getTimeout('long'));
   });

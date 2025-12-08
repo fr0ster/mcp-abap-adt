@@ -44,6 +44,7 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -109,6 +110,10 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
       let lockHandleForCleanup: string | null = null;
       let lockSessionForCleanup: SessionInfo | null = null;
       let objectWasCreated = false; // Track if object was actually created
+      const diagnosticsTracker = createDiagnosticsTracker('behavior_implementation_low_full_workflow', testCase, session, {
+        handler: 'create_behavior_implementation_low',
+        object_name: className
+      });
 
       try {
         // Step 1: Validate
@@ -213,6 +218,12 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
         lockHandleForCleanup = lockHandle;
         lockSessionForCleanup = lockSession;
         console.log(`✅ Step 4: Locked ${className} successfully`);
+
+        diagnosticsTracker.persistLock(lockSession, lockHandle, {
+          object_type: 'CLAS',
+          object_name: className,
+          transport_request: transportRequest
+        });
 
         await delay(getOperationDelay('lock', testCase));
 
@@ -345,8 +356,9 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
             // Ignore cleanup errors - object may not exist or may have been deleted already
           }
         }
+
+        diagnosticsTracker.cleanup();
       }
     }, getTimeout('long'));
   });
 });
-

@@ -46,8 +46,12 @@ import {
   resolvePackageName,
   resolveTransportRequest,
   loadTestEnv,
-  getCleanupAfter
+  getCleanupAfter,
+  getSessionConfig
 } from '../helpers/configHelpers';
+import {
+  createDiagnosticsTracker
+} from '../helpers/persistenceHelpers';
 
 describe('Class Low-Level Handlers Integration', () => {
   let hasConfig = false;
@@ -99,6 +103,7 @@ describe('Class Low-Level Handlers Integration', () => {
       // Create a separate connection and session for this test (not using getManagedConnection)
       let connection: AbapConnection | null = null;
       let session: SessionInfo | null = null;
+      let diagnosticsTracker: ReturnType<typeof createDiagnosticsTracker> | null = null;
 
       try {
         const { connection: testConnection, session: testSession } = await createTestConnectionAndSession();
@@ -118,6 +123,12 @@ describe('Class Low-Level Handlers Integration', () => {
       const packageName = resolvePackageName(testCase);
       const transportRequest = resolveTransportRequest(testCase);
       const description = testCase.params.description || `Test class for low-level handler`;
+
+      // Diagnostics tracker (persists session immediately)
+      diagnosticsTracker = createDiagnosticsTracker('class_low_full_workflow', testCase, session, {
+        handler: 'create_class_low',
+        object_name: className
+      });
 
       debugLog('TEST_START', `Starting full workflow test for class: ${className}`, {
         className,
@@ -331,6 +342,13 @@ describe('Class Low-Level Handlers Integration', () => {
 
         // CRITICAL: Extract session from Lock response
         lockSession = extractLockSession(lockData);
+
+        // Persist lock snapshot for diagnostics
+        diagnosticsTracker?.persistLock(lockSession, lockHandle, {
+          object_type: 'CLAS/OC',
+          object_name: className,
+          transport_request: transportRequest
+        });
 
         // CRITICAL: Verify Lock returned session_id and session_state
         expect(lockSession.session_id).toBeDefined();
@@ -558,23 +576,24 @@ ENDCLASS.`;
           }
         }
 
-        // Cleanup: Unlock is always required if class was locked
-        // For diagnostics: deletion is excluded, only unlock is performed
         if (session && className) {
           try {
+            const shouldCleanup = getCleanupAfter(testCase);
+            const sessionCfg = getSessionConfig();
+
             // Principle 1: If lock was done, unlock is mandatory
             // Unlock was already handled in catch block, but ensure it's done here too if needed
             if (lockHandle && lockSession) {
               try {
                 debugLog('CLEANUP', `Attempting to unlock class ${className} (cleanup)`, {
-              class_name: className,
+                  class_name: className,
                   session_id: lockSession.session_id,
                   class_created: classCreated,
                   has_lock_handle: !!lockHandle
-            });
+                });
 
                 await handleUnlockClass({
-                class_name: className,
+                  class_name: className,
                   lock_handle: lockHandle,
                   session_id: lockSession.session_id,
                   session_state: lockSession.session_state
@@ -587,16 +606,25 @@ ENDCLASS.`;
                   error: unlockError instanceof Error ? unlockError.message : String(unlockError)
                 });
                 console.warn(`⚠️  Failed to unlock class ${className} during cleanup: ${unlockError.message || unlockError}`);
-                  }
-                }
+              }
+            }
 
-            // Deletion is excluded for diagnostics - object left for analysis
-            debugLog('CLEANUP', `Deletion excluded for diagnostics - object left for analysis: ${className}`, {
-              class_name: className,
-              class_created: classCreated,
-              has_lock_handle: !!lockHandle
-            });
-            console.log(`⚠️ Deletion excluded for diagnostics - object left for analysis: ${className}`);
+            // Delete class only if cleanup_after is true
+            if (shouldCleanup) {
+              const deleteResponse = await handleDeleteClass({
+                class_name: className,
+                transport_request: transportRequest
+              });
+
+              if (!deleteResponse.isError) {
+                console.log(`🧹 Cleaned up test class: ${className}`);
+              } else {
+                const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+                console.warn(`⚠️  Failed to delete class ${className}: ${errorMsg}`);
+              }
+            } else {
+              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
+            }
           } catch (cleanupError) {
             debugLog('CLEANUP_ERROR', `Exception during cleanup: ${cleanupError}`, {
               error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
@@ -604,8 +632,10 @@ ENDCLASS.`;
             console.warn(`⚠️  Failed to cleanup test class ${className}: ${cleanupError}`);
           }
         }
+
+        // Cleanup persisted session snapshot if configured
+        diagnosticsTracker?.cleanup();
       }
     }, getTimeout('long'));
   });
 });
-

@@ -38,8 +38,10 @@ import {
   resolvePackageName,
   resolveTransportRequest,
   loadTestEnv,
-  getCleanupAfter
+  getCleanupAfter,
+  getSessionConfig
 } from '../helpers/configHelpers';
+import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -67,6 +69,7 @@ describe('Class High-Level Handlers Integration', () => {
     // Create a separate connection for this test (not using getManagedConnection)
     let connection: AbapConnection | null = null;
     let session: SessionInfo | null = null;
+    let diagnosticsTracker: ReturnType<typeof createDiagnosticsTracker> | null = null;
 
     try {
       // Get configuration from environment variables
@@ -111,6 +114,12 @@ describe('Class High-Level Handlers Integration', () => {
         authType: config.authType,
         hasClient: !!config.client,
         session_id: session.session_id
+      });
+
+      // Diagnostics tracker (persists session immediately)
+      diagnosticsTracker = createDiagnosticsTracker('class_high_handlers', testCase, session, {
+        handler: 'create_class',
+        object_name: className
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -364,46 +373,46 @@ ENDCLASS.`;
         }
       }
 
-      // Cleanup: Unlock is always required if class was locked
-      // For diagnostics: deletion is excluded, only unlock is performed
       if (session && className) {
         try {
+          const shouldCleanup = getCleanupAfter(testCase);
+
           // Principle 1: If lock was done, unlock is mandatory
           // High-level handler handles unlock internally in case of errors,
           // but we try unlock here as a safety net for diagnostics
           if (classLocked) {
             try {
               debugLog('CLEANUP', `Attempting to unlock class ${className} (cleanup safety net)`, {
-            class_name: className,
-            session_id: session.session_id,
+                class_name: className,
+                session_id: session.session_id,
                 class_created: classCreated,
                 class_locked: classLocked
-          });
+              });
 
               // Try to unlock using CrudClient directly
               // Note: High-level handler already handles unlock on error, but we try here as safety net
               if (!connection) {
                 debugLog('CLEANUP', `Cannot unlock: connection not available`);
-                return;
-              }
-              const { CrudClient } = await import('@mcp-abap-adt/adt-clients');
-              const client = new CrudClient(connection);
+              } else {
+                const { CrudClient } = await import('@mcp-abap-adt/adt-clients');
+                const client = new CrudClient(connection);
 
-              // Try unlock without lockHandle (CrudClient may have it stored internally)
-              // If lockHandle was available, try with it first
-              try {
-                if (lockHandle) {
-                  await client.unlockClass({ className }, lockHandle);
-                } else {
-                  await client.unlockClass({ className });
+                // Try unlock without lockHandle (CrudClient may have it stored internally)
+                // If lockHandle was available, try with it first
+                try {
+                  if (lockHandle) {
+                    await client.unlockClass({ className }, lockHandle);
+                  } else {
+                    await client.unlockClass({ className });
+                  }
+                  debugLog('CLEANUP', `Successfully unlocked class ${className} (cleanup safety net)`);
+                  console.log(`🔓 Unlocked class ${className} (cleanup safety net)`);
+                } catch (unlockErr: any) {
+                  // If unlock fails, it might be already unlocked - this is OK
+                  debugLog('CLEANUP', `Unlock attempt completed (may already be unlocked): ${className}`, {
+                    error: unlockErr instanceof Error ? unlockErr.message : String(unlockErr)
+                  });
                 }
-                debugLog('CLEANUP', `Successfully unlocked class ${className} (cleanup safety net)`);
-                console.log(`🔓 Unlocked class ${className} (cleanup safety net)`);
-              } catch (unlockErr: any) {
-                // If unlock fails, it might be already unlocked - this is OK
-                debugLog('CLEANUP', `Unlock attempt completed (may already be unlocked): ${className}`, {
-                  error: unlockErr instanceof Error ? unlockErr.message : String(unlockErr)
-                });
               }
             } catch (unlockError: any) {
               debugLog('CLEANUP', `Failed to unlock class ${className} (cleanup)`, {
@@ -413,13 +422,29 @@ ENDCLASS.`;
             }
           }
 
-          // Deletion is excluded for diagnostics - object left for analysis
-          debugLog('CLEANUP', `Deletion excluded for diagnostics - object left for analysis: ${className}`, {
-            class_name: className,
-            class_created: classCreated,
-            class_locked: classLocked
-          });
-          console.log(`⚠️ Deletion excluded for diagnostics - object left for analysis: ${className}`);
+          // Delete class only if cleanup_after is true
+          if (shouldCleanup) {
+            try {
+              const deleteResponse = await handleDeleteClass({
+                class_name: className,
+                transport_request: transportRequest
+              });
+
+              if (!deleteResponse.isError) {
+                console.log(`🧹 Cleaned up test class: ${className}`);
+              } else {
+                const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+                console.warn(`⚠️  Failed to delete class ${className}: ${errorMsg}`);
+              }
+            } catch (deleteError: any) {
+              debugLog('CLEANUP', `Exception during deleteClass for ${className}`, {
+                error: deleteError instanceof Error ? deleteError.message : String(deleteError)
+              });
+              console.warn(`⚠️  Failed to cleanup test class ${className}: ${deleteError}`);
+            }
+          } else {
+            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
+          }
         } catch (cleanupError) {
           debugLog('CLEANUP_ERROR', `Exception during cleanup: ${cleanupError}`, {
             error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
@@ -427,7 +452,9 @@ ENDCLASS.`;
           console.warn(`⚠️  Failed to cleanup test class ${className}: ${cleanupError}`);
         }
       }
+
+      // Cleanup persisted session snapshot if configured
+      diagnosticsTracker?.cleanup();
     }
   }, getTimeout('long'));
 });
-

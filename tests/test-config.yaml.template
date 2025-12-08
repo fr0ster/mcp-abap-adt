@@ -21,10 +21,36 @@
 test_settings:
   fail_fast: false
   verbose: true
-  timeout: 30000
+  timeout: 120000  # Global test timeout (ms)
   retry_on_failure: false
   max_retries: 1
-  # Note: cleanup_after_test was removed - use environment.cleanup_after instead
+  cleanup_after_test: false  # Legacy flag (handlers use environment.cleanup_after instead)
+  # Timeouts for different operations (ms)
+  timeouts:
+    default: 120000
+    long: 400000   # Long timeout for complex flows (e.g., group deletion)
+    create: 120000
+    test: 120000
+    delay: 3000    # Delay after delete/create operations
+# Operation delays (ms) - wait for SAP to persist state between steps
+  operation_delays:
+    lock: 3000
+    unlock: 3000
+    update: 3000
+    create: 3000
+    default: 3000
+
+# Session persistence configuration
+session_config:
+  persist_session: true           # Persist cookies/CSRF tokens between steps
+  sessions_dir: ".sessions"       # Directory (relative to repo) for session files
+  session_id_format: "auto"       # "auto" or custom pattern
+  cleanup_session_after_test: true
+
+# Lock persistence configuration
+lock_config:
+  locks_dir: ".locks"             # Directory (relative to repo) for lock files
+  persist_locks: true             # Track locks across steps for safety
 
 
 
@@ -83,6 +109,7 @@ create_behavior_definition_low:
       enabled: false
       description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         name: "<YOUR_BEHAVIOR_DEFINITION_NAME>"
         description: "Test behavior definition created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -160,6 +187,7 @@ create_behavior_implementation_low:
       enabled: false
       description: "Full workflow test: Validate → Create → Check → Lock → Update → Unlock → Activate"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         class_name: "<YOUR_BEHAVIOR_IMPLEMENTATION_CLASS_NAME>"
         description: "Behavior Implementation for <YOUR_BEHAVIOR_DEFINITION_NAME>"
         # package_name: "<YOUR_PACKAGE_NAME>"
@@ -245,6 +273,7 @@ create_class:
       enabled: true
       description: "High-level test: create → update → delete class"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         # Create step
         class_name: "<YOUR_CLASS_NAME>"
         description: "Test ABAP Class created via MCP ABAP ADT"
@@ -311,6 +340,7 @@ create_class_direct:
       enabled: false
       description: "Class CrudClient direct test (reference implementation)"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         class_name: "<YOUR_CLASS_NAME>_DIRECT"
         description: "Class CrudClient direct test"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -349,6 +379,7 @@ create_class_low:
       enabled: false
       description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         class_name: "<YOUR_CLASS_NAME>_LOW"
         description: "Test ABAP Class created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -388,6 +419,7 @@ create_class_low:
       enabled: false
       description: "Low-level flow test: create → update → delete through low-level handlers"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         class_name: "<YOUR_CLASS_NAME>_LOW"
         description: "Test ABAP Class created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -425,6 +457,7 @@ create_data_element:
       enabled: true
       description: "High-level test: create → update → delete data element"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         # Create step
         data_element_name: "<YOUR_DATA_ELEMENT_NAME>"
         description: "Test data element created via MCP"
@@ -459,6 +492,7 @@ create_data_element_low:
       enabled: false
       description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         data_element_name: "<YOUR_DATA_ELEMENT_NAME>_LOW"
         description: "Test data element created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -477,6 +511,7 @@ create_data_element_low:
       enabled: false
       description: "Low-level flow test: create → update → delete through low-level handlers"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         data_element_name: "<YOUR_DATA_ELEMENT_NAME>_LOW"
         description: "Test data element created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -506,6 +541,7 @@ create_domain:
       enabled: true
       description: "High-level test: create → update → delete domain"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         # Create step
         domain_name: "<YOUR_DOMAIN_NAME>"
         description: "Test domain created via MCP"
@@ -534,6 +570,7 @@ create_domain_low:
       enabled: false
       description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         domain_name: "<YOUR_DOMAIN_NAME>_LOW"
         description: "Test domain created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -554,6 +591,7 @@ create_domain_low:
       enabled: false
       description: "Low-level flow test: create → update → delete through low-level handlers"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         domain_name: "<YOUR_DOMAIN_NAME>_LOW"
         description: "Test domain created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -581,6 +619,7 @@ create_function_group:
       enabled: true
       description: "High-level test: create → update → delete function group"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         # Create step
         function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
         description: "Test function group created via MCP"
@@ -603,6 +642,7 @@ create_function_group_low:
       enabled: false
       description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         function_group_name: "<YOUR_FUNCTION_GROUP_NAME>_LOW"
         description: "Test function group created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -612,6 +652,7 @@ create_function_group_low:
       enabled: false
       description: "Low-level flow test: create → update → delete through low-level handlers"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         function_group_name: "<YOUR_FUNCTION_GROUP_NAME>_LOW"
         description: "Test function group created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -632,6 +673,7 @@ create_function_module:
       enabled: true
       description: "Create test function module (uses function group from GROUP 9)"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         function_module_name: "<YOUR_FUNCTION_MODULE_NAME>"
         function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
         description: "Test function module created via MCP"
@@ -673,6 +715,7 @@ create_function_module_low:
       enabled: false
       description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         function_module_name: "<YOUR_FUNCTION_MODULE_NAME>_LOW"
         function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
         description: "Test function module created via low-level MCP handler"
@@ -694,6 +737,7 @@ create_function_module_low:
       enabled: false
       description: "Low-level flow test: create → update → delete through low-level handlers"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         function_module_name: "<YOUR_FUNCTION_MODULE_NAME>_LOW"
         function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
         description: "Test function module created via low-level MCP handler"
@@ -720,6 +764,7 @@ create_interface:
       enabled: true
       description: "High-level test: create → update → delete interface"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         # Create step
         interface_name: "<YOUR_INTERFACE_NAME>"
         description: "Test interface created via MCP"
@@ -766,6 +811,7 @@ create_interface_low:
       enabled: false
       description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         interface_name: "<YOUR_INTERFACE_NAME>_LOW"
         description: "Test ABAP Interface created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -783,6 +829,7 @@ create_interface_low:
       enabled: false
       description: "Low-level flow test: create → update → delete through low-level handlers"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         interface_name: "<YOUR_INTERFACE_NAME>_LOW"
         description: "Test ABAP Interface created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -807,6 +854,7 @@ create_metadata_extension_low:
       enabled: false
       description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         name: "<YOUR_METADATA_EXTENSION_NAME>"
         description: "Test metadata extension created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -855,6 +903,7 @@ create_package:
       enabled: true
       description: "High-level test: create → update → delete package"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         # Create step
         package_name: "<YOUR_PACKAGE_NAME>"  # Package where test objects are added (existing package)
         description: "Test package created via MCP for test suite"
@@ -882,6 +931,7 @@ create_package_low:
       enabled: false
       description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         # package_name: "<YOUR_SUPER_PACKAGE>"  # Parent package (super_package) - optional, uses default_package from environment if not specified
         test_package: "<YOUR_PACKAGE_NAME>_LOW"  # Package to create
         description: "Test package created via low-level MCP handler"
@@ -900,6 +950,7 @@ create_package_low:
       enabled: false
       description: "Low-level flow test: create → update → delete through low-level handlers"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         package_name: "<YOUR_SUPER_PACKAGE>"  # Parent package (super_package) - use your system's local package (e.g., ZLOCAL for cloud, $TMP for on-premise)
         test_package: "<YOUR_PACKAGE_NAME>_LOW"  # Package to create
         description: "Test package created via low-level MCP handler"
@@ -923,6 +974,7 @@ create_program:
       enabled: true
       description: "High-level test: create → update → delete program"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         # Create step
         program_name: "<YOUR_PROGRAM_NAME>"
         description: "Test ABAP Program created via MCP ABAP ADT"
@@ -968,6 +1020,7 @@ create_program_low:
       enabled: false
       description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         program_name: "<YOUR_PROGRAM_NAME>_LOW"
         description: "Test ABAP Program created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -989,6 +1042,7 @@ create_program_low:
       enabled: false
       description: "Low-level flow test: create → update → delete through low-level handlers"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         program_name: "<YOUR_PROGRAM_NAME>_LOW"
         description: "Test ABAP Program created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -1014,6 +1068,7 @@ create_structure:
       enabled: false
       description: "High-level test: create → update → delete structure"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         # Create step
         structure_name: "<YOUR_STRUCTURE_NAME>"
         description: "Test structure created via MCP"
@@ -1057,6 +1112,7 @@ create_structure_low:
       enabled: false
       description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         structure_name: "<YOUR_STRUCTURE_NAME>_LOW"
         description: "Test structure created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -1080,6 +1136,7 @@ create_structure_low:
       enabled: false
       description: "Low-level flow test: create → update → delete through low-level handlers"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         structure_name: "<YOUR_STRUCTURE_NAME>_LOW"
         description: "Test structure created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -1101,6 +1158,7 @@ create_table:
       enabled: false
       description: "High-level test: create → update → delete table"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         # Create step
         table_name: "<YOUR_TABLE_NAME>"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -1140,6 +1198,7 @@ create_table_low:
       enabled: false
       description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         table_name: "<YOUR_TABLE_NAME>_LOW"
         description: "Test table created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -1169,6 +1228,7 @@ create_table_low:
       enabled: false
       description: "Low-level flow test: create → update → delete through low-level handlers"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         table_name: "<YOUR_TABLE_NAME>_LOW"
         description: "Test table created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -1193,6 +1253,7 @@ create_transport:
       enabled: true
       description: "Create a workbench transport request (required for package and transportable objects)"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         transport_type: "workbench"
         description: "Test transport created via MCP for test suite"
         owner: "<YOUR_RESPONSIBLE_USER>"  # ⚠️ UPDATE WITH YOUR USERNAME (e.g., CB9980002377)
@@ -1209,6 +1270,7 @@ create_view:
       enabled: false
       description: "High-level test: create → update → delete view"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         # Create step
         view_name: "<YOUR_VIEW_NAME>"
         description: "Test CDS view created via MCP"
@@ -1252,6 +1314,7 @@ create_view_low:
       enabled: false
       description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         view_name: "<YOUR_VIEW_NAME>_LOW"
         description: "Test CDS view created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -1280,6 +1343,7 @@ create_view_low:
       enabled: false
       description: "Low-level flow test: create → update → delete through low-level handlers"
       params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         view_name: "<YOUR_VIEW_NAME>_LOW"
         description: "Test CDS view created via low-level MCP handler"
         package_name: "<YOUR_PACKAGE_NAME>"
@@ -1309,4 +1373,3 @@ create_view_low:
         delete_object_type: "DDLS/DF"
 
 # Step 3: Read-only test (separate read-only handler)
-

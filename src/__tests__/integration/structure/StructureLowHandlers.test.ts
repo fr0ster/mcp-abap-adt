@@ -44,6 +44,7 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -89,6 +90,10 @@ describe('Structure Low-Level Handlers Integration', () => {
       const packageName = resolvePackageName(testCase);
       const transportRequest = resolveTransportRequest(testCase);
       const description = testCase.params.description || `Test structure for low-level handler`;
+      const diagnosticsTracker = createDiagnosticsTracker('structure_low_full_workflow', testCase, session, {
+        handler: 'create_structure_low',
+        object_name: structureName
+      });
 
       let lockHandleForCleanup: string | null = null;
       let lockSessionForCleanup: SessionInfo | null = null;
@@ -180,6 +185,12 @@ describe('Structure Low-Level Handlers Integration', () => {
         const lockData = parseHandlerResponse(lockResponse);
         const lockHandle = extractLockHandle(lockData);
         const lockSession = extractLockSession(lockData);
+
+        diagnosticsTracker.persistLock(lockSession, lockHandle, {
+          object_type: 'STRU',
+          object_name: structureName,
+          transport_request: transportRequest
+        });
 
         expect(lockSession.session_id).toBeDefined();
         expect(lockSession.session_state).toBeDefined();
@@ -337,6 +348,8 @@ define structure ${structureName} {
             console.warn(`⚠️  Failed to cleanup test structure ${structureName}: ${cleanupError.message || cleanupError}`);
           }
         }
+
+        diagnosticsTracker.cleanup();
       }
     }, getTimeout('long'));
   });

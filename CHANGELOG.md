@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [1.1.29] - 2025-12-08
+
+### Added
+- **Parameter Passing Unit Tests Roadmap**: Added comprehensive roadmap for unit tests to verify parameter passing
+  - Created `doc/roadmaps/parameter_passing_unit_tests_roadmap.md`
+  - Detailed test strategy for verifying all parameters pass correctly from MCP handlers through CrudClient to Builder classes and finally to low-level functions
+  - Test implementation plan with 4 phases covering infrastructure, individual object types, and integration tests
+  - Test examples for ViewBuilder, CrudClient, and low-level functions
+  - Coverage goals (100% for parameter passing) and success criteria
+  - Addresses issue where parameters like `transportRequest` can be lost during the call chain
+
+### Documentation
+- **Roadmap Documentation**: Added roadmap for future unit test development
+  - Comprehensive plan for preventing parameter loss regression
+  - Test file structure and organization guidelines
+  - Maintenance and CI/CD integration recommendations
+
 ## [1.1.28] - 2025-01-XX
 
 ### Changed

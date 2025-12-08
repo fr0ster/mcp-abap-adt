@@ -43,6 +43,7 @@ import {
 } from '../helpers/configHelpers';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getManagedConnection } from '../../../lib/utils';
+import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -130,6 +131,10 @@ describe('Package Low-Level Handlers Integration', () => {
       const superPackage = resolvePackageName(testCase); // Parent package (from package_name or default_package)
       const transportRequest = resolveTransportRequest(testCase);
       const description = testCase.params.description || `Test package for low-level handler`;
+      const diagnosticsTracker = createDiagnosticsTracker('package_low_full_workflow', testCase, session, {
+        handler: 'create_package_low',
+        object_name: packageName
+      });
 
       let lockHandleForCleanup: string | null = null;
       let lockSessionForCleanup: SessionInfo | null = null;
@@ -244,6 +249,12 @@ describe('Package Low-Level Handlers Integration', () => {
         lockHandleForCleanup = lockHandle;
         lockSessionForCleanup = lockSession;
 
+        diagnosticsTracker.persistLock(lockSession, lockHandle, {
+          object_type: 'DEVC',
+          object_name: packageName,
+          transport_request: transportRequest
+        });
+
         // IMPORTANT: Update session with lock session to use correct session_id and session_state
         session = {
           session_id: lockSession.session_id!,
@@ -349,6 +360,8 @@ describe('Package Low-Level Handlers Integration', () => {
             console.warn(`⚠️  Failed to cleanup test package ${packageName}: ${cleanupError.message || cleanupError}`);
           }
         }
+
+        diagnosticsTracker.cleanup();
       }
     }, getTimeout('long'));
   });

@@ -46,6 +46,7 @@ import {
   isCloudConnection,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -120,6 +121,10 @@ describe('Program Low-Level Handlers Integration', () => {
       // Variables for cleanup (in case test fails)
       let lockHandleForCleanup: string | null = null;
       let lockSessionForCleanup: SessionInfo | null = null;
+      const diagnosticsTracker = createDiagnosticsTracker('program_low_full_workflow', testCase, session, {
+        handler: 'create_program_low',
+        object_name: programName
+      });
 
       try {
         // Step 1: Validate
@@ -253,6 +258,12 @@ describe('Program Low-Level Handlers Integration', () => {
         // Save for cleanup
         lockHandleForCleanup = lockHandle;
         lockSessionForCleanup = lockSession;
+
+        diagnosticsTracker.persistLock(lockSession, lockHandle, {
+          object_type: 'PROG',
+          object_name: programName,
+          transport_request: transportRequest
+        });
 
         debugLog('LOCK', 'Lock completed, extracted session', {
           lock_handle: lockHandle,
@@ -446,8 +457,9 @@ describe('Program Low-Level Handlers Integration', () => {
             console.warn(`⚠️  Failed to cleanup test program ${programName}: ${cleanupError.message || cleanupError}`);
           }
         }
+
+        diagnosticsTracker.cleanup();
       }
     }, getTimeout('long'));
   });
 });
-

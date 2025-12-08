@@ -155,6 +155,30 @@ export function loadTestConfig(): any {
 }
 
 /**
+ * Get session persistence config
+ */
+export function getSessionConfig(): {
+  persist_session?: boolean;
+  sessions_dir?: string;
+  session_id_format?: string;
+  cleanup_session_after_test?: boolean;
+} {
+  const config = loadTestConfig();
+  return config.session_config || {};
+}
+
+/**
+ * Get lock persistence config
+ */
+export function getLockConfig(): {
+  persist_locks?: boolean;
+  locks_dir?: string;
+} {
+  const config = loadTestConfig();
+  return config.lock_config || {};
+}
+
+/**
  * Get enabled test case for a handler
  * @param handlerName - Handler name (e.g., 'create_class_low', 'lock_class_low')
  * @param testCaseName - Optional: specific test case name
@@ -295,6 +319,11 @@ export function resolveTransportRequest(testCase?: any): string | undefined {
  * @returns true if cleanup should be performed, false otherwise
  */
 export function getCleanupAfter(testCase?: any): boolean {
+  // Explicit skip flag has highest priority
+  if (testCase?.params?.skip_cleanup === true) {
+    return false;
+  }
+
   // Check test case specific setting first (overrides global)
   if (testCase?.params?.cleanup_after !== undefined) {
     return testCase.params.cleanup_after === true;
@@ -427,4 +456,3 @@ export async function preCheckTestParameters(
 
   return { success: true };
 }
-

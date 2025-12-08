@@ -15,6 +15,7 @@
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { getConfig } from '../../../index';
+import { handleDeleteClass } from '../../../handlers/class/low/handleDeleteClass';
 import {
   getEnabledTestCase,
   getTimeout,
@@ -24,9 +25,11 @@ import {
   loadTestEnv,
   isCloudConnection,
   preCheckTestParameters,
-  getCleanupAfter
+  getCleanupAfter,
+  getSessionConfig
 } from '../helpers/configHelpers';
 import { debugLog, delay } from '../helpers/testHelpers';
+import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -56,6 +59,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
     // Create a separate connection for this test (not using getManagedConnection)
     let connection: AbapConnection | null = null;
     let client: CrudClient | null = null;
+    let diagnosticsTracker: ReturnType<typeof createDiagnosticsTracker> | null = null;
 
     try {
       // Get configuration from environment variables
@@ -92,6 +96,23 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       await connection.connect();
       client = new CrudClient(connection);
       isCloud = isCloudConnection(); // Uses getManagedConnection internally, but we have separate connection
+
+      // Persist session snapshot for diagnostics
+      const sessionState = (connection as any).getSessionState?.();
+      if (sessionState) {
+        const pseudoSession = {
+          session_id: `crud_direct_${Date.now()}`,
+          session_state: {
+            cookies: sessionState.cookies || '',
+            csrf_token: sessionState.csrfToken || '',
+            cookie_store: sessionState.cookieStore || {}
+          }
+        };
+        diagnosticsTracker = createDiagnosticsTracker('class_crud_direct', testCase, pseudoSession as any, {
+          handler: 'create_class_direct',
+          object_name: 'unknown'
+        });
+      }
 
       debugLog('CONNECTION', `Created separate connection for test`, {
         url: config.url,
@@ -342,15 +363,30 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
         }
       }
 
-      // Cleanup: For diagnostics, deletion is excluded - object left for analysis
-      // This test doesn't use lock, so no unlock needed
       if (className) {
         try {
-          debugLog('CLEANUP', `Deletion excluded for diagnostics - object left for analysis: ${className}`, {
-            class_name: className,
-            class_created: classCreated
-          });
-          console.log(`⚠️ Deletion excluded for diagnostics - object left for analysis: ${className}`);
+          const shouldCleanup = getCleanupAfter(testCase);
+
+          if (shouldCleanup && classCreated) {
+            const deleteResponse = await handleDeleteClass({
+              class_name: className,
+              transport_request: transportRequest
+            });
+
+            if (!deleteResponse.isError) {
+              console.log(`🧹 Cleaned up test class: ${className}`);
+            } else {
+              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+              console.warn(`⚠️  Failed to delete class ${className}: ${errorMsg}`);
+            }
+          } else if (shouldCleanup) {
+            debugLog('CLEANUP', `Skipping deletion because class was not created during test`, {
+              class_name: className,
+              class_created: classCreated
+            });
+          } else {
+            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
+          }
         } catch (cleanupError: any) {
           debugLog('CLEANUP_ERROR', `Exception during cleanup: ${cleanupError}`, {
             error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
@@ -358,7 +394,9 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
           console.warn(`⚠️  Failed to cleanup test class ${className}: ${cleanupError.message}`);
         }
       }
+
+      // Cleanup persisted diagnostics if configured
+      diagnosticsTracker?.cleanup();
     }
   }, getTimeout('long'));
 });
-

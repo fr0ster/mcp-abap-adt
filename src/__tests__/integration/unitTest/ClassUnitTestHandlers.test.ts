@@ -50,6 +50,7 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 describe('Class Unit Test Handlers Integration', () => {
   let session: SessionInfo | null = null;
@@ -128,6 +129,10 @@ ENDCLASS.`;
       let testClassesLockSession: SessionInfo | null = null;
       let testClassesLocked = false;
       let runId: string | null = null;
+      const diagnosticsTracker = createDiagnosticsTracker('class_unit_test_full_workflow', testCase, session, {
+        handler: 'class_unit_test',
+        object_name: containerClass
+      });
 
       try {
         // Step 1: Lock test classes
@@ -154,6 +159,11 @@ ENDCLASS.`;
           session_id: lockData.session_id || session.session_id,
           session_state: lockData.session_state || session.session_state
         };
+
+        diagnosticsTracker.persistLock(testClassesLockSession, testClassesLockHandle, {
+          object_type: 'CLAS',
+          object_name: containerClass
+        });
 
         expect(testClassesLockHandle).toBeDefined();
         expect(testClassesLockSession.session_id).toBeDefined();
@@ -417,8 +427,9 @@ ENDCLASS.`;
             console.warn(`⚠️  Failed to cleanup test class ${containerClass}: ${cleanupError}`);
           }
         }
+
+        diagnosticsTracker.cleanup();
       }
     }, getTimeout('long'));
   });
 });
-

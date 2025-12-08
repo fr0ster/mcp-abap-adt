@@ -45,6 +45,7 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -102,6 +103,10 @@ describe('DataElement Low-Level Handlers Integration', () => {
       const packageName = resolvePackageName(testCase);
       const transportRequest = resolveTransportRequest(testCase);
       const description = testCase.params.description || `Test data element for low-level handler`;
+      const diagnosticsTracker = createDiagnosticsTracker('data_element_low_full_workflow', testCase, session, {
+        handler: 'create_data_element_low',
+        object_name: dataElementName
+      });
 
       debugLog('TEST_START', `Starting full workflow test for data element: ${dataElementName}`, {
         dataElementName,
@@ -244,6 +249,12 @@ describe('DataElement Low-Level Handlers Integration', () => {
 
         // CRITICAL: Extract session from Lock response
         const lockSession = extractLockSession(lockData);
+
+        diagnosticsTracker.persistLock(lockSession, lockHandle, {
+          object_type: 'DTEL',
+          object_name: dataElementName,
+          transport_request: transportRequest
+        });
 
         debugLog('LOCK', 'Lock completed, extracted session', {
           lock_handle: lockHandle,
@@ -433,8 +444,9 @@ describe('DataElement Low-Level Handlers Integration', () => {
             console.warn(`⚠️  Failed to cleanup test data element ${dataElementName}: ${cleanupError}`);
           }
         }
+
+        diagnosticsTracker.cleanup();
       }
     }, getTimeout('long'));
   });
 });
-

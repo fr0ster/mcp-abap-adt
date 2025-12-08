@@ -46,6 +46,7 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -103,6 +104,10 @@ describe('Table Low-Level Handlers Integration', () => {
       const packageName = resolvePackageName(testCase);
       const transportRequest = resolveTransportRequest(testCase);
       const description = testCase.params.description || `Test table for low-level handler`;
+      const diagnosticsTracker = createDiagnosticsTracker('table_low_full_workflow', testCase, session, {
+        handler: 'create_table_low',
+        object_name: tableName
+      });
 
       debugLog('TEST_START', `Starting full workflow test for table: ${tableName}`, {
         tableName,
@@ -205,6 +210,12 @@ define view entity ${tableName} as select from dummy {
 
         // CRITICAL: Extract session from Lock response
         const lockSession = extractLockSession(lockData);
+
+        diagnosticsTracker.persistLock(lockSession, lockHandle, {
+          object_type: 'TABL',
+          object_name: tableName,
+          transport_request: transportRequest
+        });
 
         // Track lock state for cleanup (principle 1: if lock was done, unlock is mandatory)
         lockHandleForCleanup = lockHandle;
@@ -368,8 +379,9 @@ define view entity ${tableName} as select from dummy {
             console.warn(`⚠️  Failed to cleanup test table ${tableName}: ${cleanupError}`);
           }
         }
+
+        diagnosticsTracker.cleanup();
       }
     }, getTimeout('long'));
   });
 });
-

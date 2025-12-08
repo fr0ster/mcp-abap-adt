@@ -164,3 +164,11 @@ DEBUG_ADT_TESTS=true npm test -- --testPathPattern=integration/class
 - Tests should use appropriate timeouts for long-running operations
 - Tests should add delays between operations to allow SAP to process changes
 
+## Session & Lock Persistence Roadmap
+
+- [ ] Read config: support `session_config` / `lock_config` (dirs, persist flags) in helpers (via `configHelpers` getters).
+- [ ] Implement persistence helper: new `helpers/persistenceHelpers.ts` with `saveSessionSnapshot`, `saveLockSnapshot` (JSON, base64 for heavy fields), `cleanupSessionSnapshot`.
+- [ ] Wire tests: call persistence helpers from cleanup/finally blocks where `session`/`lock_handle` are available.
+- [ ] Ensure files are written for every test run (last-resort diagnostics).
+- [ ] Add cleanup: remove session files on successful tests when `cleanup_session_after_test=true`; define policy for lock files (keep unless explicitly disabled).
+- [ ] Update template/docs (if needed) with persisted file paths/format and usage notes.

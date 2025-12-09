@@ -6,10 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import {
-  ErrorCode,
-  McpError,
-} from "@modelcontextprotocol/sdk/types.js";
+import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import * as z from "zod";
 import path from "path";
 import * as os from "os";
@@ -34,6 +31,14 @@ import { getPlatformStores, getPlatformStoresAsync } from "./lib/stores";
 import { getPlatformPaths } from "./lib/stores/platformPaths";
 import { BtpTokenProvider } from "@mcp-abap-adt/auth-providers";
 import { defaultLogger } from "@mcp-abap-adt/logger";
+import {
+  buildRuntimeConfig,
+  parseEnvArg,
+  parseAuthBrokerPathArg,
+  parseMcpDestinationArg,
+  getTransportType as getTransportTypeRuntime,
+  resolveEnvFromCwd,
+} from "./lib/runtimeConfig";
 
 // Import handler functions
 // Import handler functions
@@ -733,161 +738,31 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
   showHelp();
 }
 
-/**
- * Helper to determine transport type early for .env loading logic
- * Returns the transport type if explicitly specified, or null if not specified
- *
- * Auto-detects stdio mode if:
- * - stdin is not a TTY (piped/redirected, e.g., by MCP Inspector)
- * - and no explicit transport was specified
- */
-function getTransportType(): string | null {
-  const args = process.argv;
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg.startsWith("--transport=")) {
-      return arg.split("=")[1].toLowerCase();
-    }
-    if (arg === "--transport" && i + 1 < args.length) {
-      return args[i + 1].toLowerCase();
-    }
-    if (arg === "--http") return "streamable-http";
-    if (arg === "--stdio") return "stdio";
-    if (arg === "--sse") return "sse";
-  }
-  // Check environment variable
-  if (process.env.MCP_TRANSPORT) {
-    return process.env.MCP_TRANSPORT.toLowerCase();
-  }
-  // Auto-detect stdio mode: if stdin is not a TTY, we're likely in stdio mode (piped by MCP Inspector)
-  if (!process.stdin.isTTY) {
-    return "stdio";
-  }
-  // Not explicitly specified
-  return null;
-}
+// Runtime config (shared, no side-effects)
+const {
+  useAuthBroker,
+  isTestEnv,
+  authBrokerPath,
+  defaultMcpDestination,
+  unsafe,
+  explicitTransportType,
+  transportType,
+  isHttp,
+  isSse,
+  isStdio,
+  isEnvMandatory,
+  envFilePath: initialEnvFilePath,
+} = buildRuntimeConfig();
 
-/**
- * Parses command line arguments to find env file path
- * Supports both formats:
- * 1. --env=/path/to/.env
- * 2. --env /path/to/.env
- */
-function parseEnvArg(): string | undefined {
-  const args = process.argv;
+// Skip .env autoload under explicit instructions, auth-broker, mcp default, or test env
+const skipEnvAutoload =
+  process.env.MCP_SKIP_ENV_LOAD === "true" ||
+  process.env.MCP_ENV_LOADED_BY_LAUNCHER === "true" ||
+  useAuthBroker ||
+  !!defaultMcpDestination ||
+  isTestEnv;
 
-  // Always log on Windows for debugging (not just when DEBUG is set)
-  if (process.platform === 'win32') {
-    process.stderr.write(`[MCP-ENV] parseEnvArg: process.argv = ${JSON.stringify(args)}\n`);
-    process.stderr.write(`[MCP-ENV] parseEnvArg: process.argv.length = ${args.length}\n`);
-  }
-
-  // Skip first two args (node executable and script path), search from index 2
-  // But also check all args in case spawn passes them differently
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-
-    // Format: --env=/path/to/.env
-    if (arg.startsWith("--env=")) {
-      const envPath = arg.slice("--env=".length);
-      if (process.platform === 'win32') {
-        process.stderr.write(`[MCP-ENV] parseEnvArg: Found --env= format at index ${i}: ${envPath}\n`);
-      }
-      return envPath;
-    }
-    // Format: --env /path/to/.env
-    else if (arg === "--env" && i + 1 < args.length) {
-      let envPath = args[i + 1];
-
-      // On Windows, handle backslashes in paths (.\mdd.env)
-      // path.resolve will handle this correctly, but we need to preserve the path as-is
-      // The path will be normalized later in the code
-
-      if (process.platform === 'win32') {
-        process.stderr.write(`[MCP-ENV] parseEnvArg: Found --env space format at index ${i}: ${envPath}\n`);
-        process.stderr.write(`[MCP-ENV] parseEnvArg: envPath type: ${typeof envPath}, length: ${envPath.length}\n`);
-      }
-      return envPath;
-    }
-  }
-
-  if (process.platform === 'win32') {
-    process.stderr.write(`[MCP-ENV] parseEnvArg: No --env argument found in process.argv\n`);
-    process.stderr.write(`[MCP-ENV] parseEnvArg: Searched ${args.length} arguments\n`);
-  }
-
-  return undefined;
-}
-
-/**
- * Parse --auth-broker-path argument from command line
- * Supports both formats: --auth-broker-path=/path and --auth-broker-path /path
- */
-function parseAuthBrokerPathArg(): string | undefined {
-  const args = process.argv;
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-
-    // Format: --auth-broker-path=/path
-    if (arg.startsWith("--auth-broker-path=")) {
-      return arg.slice("--auth-broker-path=".length);
-    }
-    // Format: --auth-broker-path /path
-    else if (arg === "--auth-broker-path" && i + 1 < args.length) {
-      return args[i + 1];
-    }
-  }
-
-  return undefined;
-}
-
-/**
- * Parse --mcp argument from command line
- * Supports both formats: --mcp=<destination> and --mcp <destination>
- */
-function parseMcpDestinationArg(): string | undefined {
-  const args = process.argv;
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-
-    // Format: --mcp=<destination>
-    if (arg.startsWith("--mcp=")) {
-      return arg.slice("--mcp=".length);
-    }
-    // Format: --mcp <destination>
-    else if (arg === "--mcp" && i + 1 < args.length) {
-      return args[i + 1];
-    }
-  }
-
-  return undefined;
-}
-
-// Find .env file path from arguments
-// Check for --auth-broker flag (forces use of auth-broker, ignores .env)
-// Also allow env var MCP_USE_AUTH_BROKER=true to prefer auth-broker over .env
-const useAuthBroker = process.argv.includes("--auth-broker") || process.env.MCP_USE_AUTH_BROKER === "true";
-// Detect Jest/test environment to avoid mandatory .env exits during unit/integration tests
-const isTestEnv = process.env.JEST_WORKER_ID !== undefined || process.env.NODE_ENV === "test";
-const authBrokerPath = parseAuthBrokerPathArg();
-// Parse --mcp parameter for default MCP destination
-const defaultMcpDestination = parseMcpDestinationArg();
-// Check for --unsafe flag (uses FileSessionStore instead of SafeSessionStore)
-const unsafe = process.argv.includes("--unsafe") || process.env.MCP_UNSAFE === "true";
-// Skip .env loading if launcher already loaded it OR if --auth-broker is specified OR if --mcp is specified
-const skipEnvAutoload = process.env.MCP_SKIP_ENV_LOAD === "true" || process.env.MCP_ENV_LOADED_BY_LAUNCHER === "true" || useAuthBroker || !!defaultMcpDestination;
-const explicitTransportType = getTransportType();
-// If transport not explicitly specified, default to HTTP mode
-// Stdio mode is only used if explicitly specified via --transport=stdio
-const transportType = explicitTransportType || "streamable-http";
-const isHttp = transportType === "http" || transportType === "streamable-http" || transportType === "server";
-const isSse = transportType === "sse";
-const isStdio = transportType === "stdio";
-// .env is mandatory only if transport is explicitly set to stdio or sse AND --mcp is not specified
-// If --mcp is specified, auth-broker will be used instead of .env file
-const isEnvMandatory = explicitTransportType !== null && (isStdio || isSse) && !defaultMcpDestination && !useAuthBroker && !isTestEnv;
-
-let envFilePath = parseEnvArg() ?? process.env.MCP_ENV_PATH;
+let envFilePath = initialEnvFilePath;
 
 // Debug: Always log on Windows to help diagnose issues
 if (process.platform === 'win32' && !isStdio) {
@@ -1525,6 +1400,8 @@ export class mcp_abap_adt_server {
     sapConfig?: SapConfig; // Store SAP config per session
     destination?: string; // Store destination for AuthBroker-based token refresh
   }>();
+  // Map sessionId -> client key (streamable HTTP) for quick lookups
+  private streamableSessionIndex = new Map<string, string>();
 
   // SSE session tracking (McpServer + SSEServerTransport per session)
   private sseSessions = new Map<string, {
@@ -1533,16 +1410,19 @@ export class mcp_abap_adt_server {
   }>();
 
   // AuthBroker instances map for destination-based authentication (lazy initialization)
-  // Key: destination name, Value: AuthBroker instance
+  // Key: `${destination || 'default'}::${clientKey || 'global'}`, Value: AuthBroker instance
   private authBrokers = new Map<string, AuthBroker>();
 
-  // Default AuthBroker (for backward compatibility and non-destination requests)
-  private defaultAuthBroker?: AuthBroker;
+  private buildAuthBrokerKey(destination?: string, clientKey?: string): string {
+    const destPart = destination || 'default';
+    const clientPart = clientKey || 'global';
+    return `${destPart}::${clientPart}`;
+  }
 
   /**
    * Get or create AuthBroker for a specific destination (lazy initialization)
    */
-  private async getOrCreateAuthBroker(destination?: string): Promise<AuthBroker | undefined> {
+  private async getOrCreateAuthBroker(destination?: string, clientKey?: string): Promise<AuthBroker | undefined> {
     // Only for HTTP/streamable-http, stdio, and SSE transports
     const isHttpTransport = this.transportConfig.type === "streamable-http";
     const isStdioTransport = this.transportConfig.type === "stdio";
@@ -1554,51 +1434,25 @@ export class mcp_abap_adt_server {
     // Get custom path from command line argument or environment variable
     const customPath = authBrokerPath ? path.resolve(authBrokerPath) : undefined;
 
-    // If no destination specified, use default auth broker
-    if (!destination) {
-      if (!this.defaultAuthBroker) {
-        try {
-          const { serviceKeyStore, sessionStore } = getPlatformStores(customPath, unsafe);
-          // Default to BtpTokenProvider for backward compatibility (most common case)
-          const tokenProvider = new BtpTokenProvider();
-          this.defaultAuthBroker = new AuthBroker(
-            {
-              serviceKeyStore,
-              sessionStore,
-              tokenProvider,
-            },
-            'system',
-            defaultLogger
-          );
-          logger.debug("Default AuthBroker created", {
-            type: "AUTH_BROKER_CREATED",
-            destination: "default",
-          });
-        } catch (error) {
-          logger.warn("Failed to create default AuthBroker", {
-            type: "AUTH_BROKER_CREATE_FAILED",
-            error: error instanceof Error ? error.message : String(error),
-          });
-          return undefined;
-        }
-      }
-      return this.defaultAuthBroker;
-    }
+    const brokerKey = this.buildAuthBrokerKey(destination, clientKey);
 
-    // Get or create AuthBroker for specific destination
-    if (!this.authBrokers.has(destination)) {
+    // Get or create AuthBroker for specific destination/client
+    if (!this.authBrokers.has(brokerKey)) {
       try {
         logger.debug("Creating AuthBroker for destination", {
           type: "AUTH_BROKER_CREATE_START",
-          destination: destination,
+          destination: destination || 'default',
+          clientKey: clientKey || 'global',
           platform: process.platform,
           unsafe: unsafe,
         });
+
         // Use async version to auto-detect store type based on service key format
         const { serviceKeyStore, sessionStore, storeType } = await getPlatformStoresAsync(customPath, unsafe, destination);
         logger.debug("Platform stores created", {
           type: "PLATFORM_STORES_CREATED",
-          destination: destination,
+          destination: destination || 'default',
+          clientKey: clientKey || 'global',
           platform: process.platform,
           unsafe: unsafe,
           storeType: storeType,
@@ -1619,16 +1473,18 @@ export class mcp_abap_adt_server {
           'system',
           defaultLogger
         );
-        this.authBrokers.set(destination, authBroker);
+        this.authBrokers.set(brokerKey, authBroker);
         logger.info("AuthBroker created for destination", {
           type: "AUTH_BROKER_CREATED",
-          destination: destination,
+          destination: destination || 'default',
+          clientKey: clientKey || 'global',
           platform: process.platform,
         });
       } catch (error) {
         logger.error("Failed to create AuthBroker for destination", {
           type: "AUTH_BROKER_CREATE_FAILED",
-          destination: destination,
+          destination: destination || 'default',
+          clientKey: clientKey || 'global',
           platform: process.platform,
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
@@ -1636,19 +1492,20 @@ export class mcp_abap_adt_server {
         return undefined;
       }
     }
-    const authBroker = this.authBrokers.get(destination);
+    const authBroker = this.authBrokers.get(brokerKey);
     if (!authBroker) {
       logger.error("AuthBroker not found in map after creation", {
         type: "AUTH_BROKER_NOT_FOUND",
-        destination: destination,
+        destination: destination || 'default',
+        clientKey: clientKey || 'global',
         mapSize: this.authBrokers.size,
-        mapKeys: Array.from(this.authBrokers.keys()),
+        mapKeys: Array.from(this.authBrokers.keys()).slice(0, 20),
       });
     }
     return authBroker;
   }
 
-  private async applyAuthHeaders(headers?: IncomingHttpHeaders, sessionId?: string) {
+  private async applyAuthHeaders(headers?: IncomingHttpHeaders, sessionId?: string, clientKey?: string) {
     // If no headers but defaultMcpDestination is set, use it
     if (!headers || Object.keys(headers).length === 0) {
       if (this.defaultMcpDestination) {
@@ -1749,7 +1606,7 @@ export class mcp_abap_adt_server {
         }
 
         // Get or create AuthBroker for this destination (lazy initialization)
-        const authBroker = await this.getOrCreateAuthBroker(config.destination);
+        const authBroker = await this.getOrCreateAuthBroker(config.destination, clientKey || sessionId);
         if (!authBroker) {
           const errorMessage = `Failed to initialize AuthBroker for destination "${config.destination}". Auth-broker is only available for HTTP/streamable-http transport.`;
           logger.error(errorMessage, {
@@ -1822,7 +1679,7 @@ export class mcp_abap_adt_server {
         }
 
         // Get or create AuthBroker for this destination (lazy initialization)
-        const authBroker = await this.getOrCreateAuthBroker(config.destination);
+        const authBroker = await this.getOrCreateAuthBroker(config.destination, clientKey || sessionId);
         if (!authBroker) {
           logger.error("Failed to initialize AuthBroker for MCP destination", {
             type: "AUTH_BROKER_NOT_INITIALIZED",
@@ -2022,7 +1879,8 @@ export class mcp_abap_adt_server {
 
     // Store config and destination in session if sessionId is provided
     if (sessionId) {
-      const session = this.streamableHttpSessions.get(sessionId);
+      const clientKeyForSession = this.streamableSessionIndex.get(sessionId);
+      const session = clientKeyForSession ? this.streamableHttpSessions.get(clientKeyForSession) : undefined;
       if (session) {
         session.sapConfig = newConfig;
         if (destination) {
@@ -2059,7 +1917,7 @@ export class mcp_abap_adt_server {
    */
   private async processJwtConfigUpdateWithAuthBroker(sapUrl: string, destination: string, sessionId?: string) {
     // Get or create AuthBroker for this destination (lazy initialization)
-    const authBroker = await this.getOrCreateAuthBroker(destination);
+    const authBroker = await this.getOrCreateAuthBroker(destination, sessionId);
     if (!authBroker) {
       logger.warn("AuthBroker not available, falling back to direct token", {
         type: "AUTH_BROKER_NOT_AVAILABLE",
@@ -2137,7 +1995,8 @@ export class mcp_abap_adt_server {
 
     // Store config in session if sessionId is provided
     if (sessionId) {
-      const session = this.streamableHttpSessions.get(sessionId);
+      const clientKeyForSession = this.streamableSessionIndex.get(sessionId);
+      const session = clientKeyForSession ? this.streamableHttpSessions.get(clientKeyForSession) : undefined;
       if (session) {
         session.sapConfig = newConfig;
       }
@@ -3026,6 +2885,9 @@ export class mcp_abap_adt_server {
         const clientSessionId = (req.headers["x-session-id"] || req.headers["mcp-session-id"]) as string | undefined;
 
         let session = this.streamableHttpSessions.get(clientID);
+        if (session && !this.streamableSessionIndex.has(session.sessionId)) {
+          this.streamableSessionIndex.set(session.sessionId, clientID);
+        }
 
         // If client sent session ID, try to find existing session
         if (clientSessionId && !session) {
@@ -3036,6 +2898,7 @@ export class mcp_abap_adt_server {
               // Update clientID (port might have changed)
               this.streamableHttpSessions.delete(key);
               this.streamableHttpSessions.set(clientID, session);
+              this.streamableSessionIndex.set(session.sessionId, clientID);
               logger.debug("Existing session restored", {
                 type: "STREAMABLE_HTTP_SESSION_RESTORED",
                 sessionId: session.sessionId,
@@ -3055,6 +2918,7 @@ export class mcp_abap_adt_server {
             requestCount: 0,
           };
           this.streamableHttpSessions.set(clientID, session);
+          this.streamableSessionIndex.set(session.sessionId, clientID);
           logger.debug("New session created", {
             type: "STREAMABLE_HTTP_SESSION_CREATED",
             sessionId: session.sessionId,
@@ -3082,6 +2946,7 @@ export class mcp_abap_adt_server {
               removeConnectionForSession(closedSession.sessionId, closedSession.sapConfig, closedSession.destination);
             }
             this.streamableHttpSessions.delete(clientID);
+            this.streamableSessionIndex.delete(closedSession.sessionId);
             logger.debug("Session closed", {
               type: "STREAMABLE_HTTP_SESSION_CLOSED",
               sessionId: closedSession.sessionId,
@@ -3151,7 +3016,7 @@ export class mcp_abap_adt_server {
           // 2. AND (auth headers are present OR defaultMcpDestination is set)
           // If no headers are present and no defaultMcpDestination, fall back to .env file or base config
           if (requiresSapConfig && (this.hasSapHeaders(req.headers) || this.defaultMcpDestination)) {
-            await this.applyAuthHeaders(req.headers, session.sessionId);
+            await this.applyAuthHeaders(req.headers, session.sessionId, clientID);
           }
 
           // Get SAP config for this session (from headers or existing session)

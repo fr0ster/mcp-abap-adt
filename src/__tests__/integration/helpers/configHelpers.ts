@@ -74,8 +74,27 @@ export async function loadTestEnv(): Promise<void> {
 
   let brokerOk = brokerSucceeded;
 
-  // Always try to load .env file, even if SAP_URL is already set
-  // This ensures all variables (including refresh tokens) are loaded correctly
+  // If auth-broker is preferred, try it first and skip .env entirely unless explicitly requested
+  if (useAuthBroker) {
+    try {
+      brokerAttempted = true;
+      await refreshTokensForTests({ force: true });
+      brokerOk = !!process.env.SAP_URL;
+      brokerSucceeded = brokerOk;
+    } catch (error: any) {
+      if (process.env.DEBUG_TESTS === 'true') {
+        console.warn(`[DEBUG] loadTestEnv - Auth-broker refresh failed: ${error?.message || String(error)}`);
+      }
+    }
+
+    // If broker succeeded, we’re done (no .env fallback when broker is configured)
+    if (brokerOk && process.env.SAP_URL) {
+      envLoaded = true;
+      return;
+    }
+  }
+
+  // Always try to load .env file when auth-broker is not preferred (or broker failed and no URL available)
 
   let envPath: string | null = null;
 
@@ -88,7 +107,7 @@ export async function loadTestEnv(): Promise<void> {
   }
 
   // Priority 2: Try current working directory (where test was run from)
-  if (!envPath) {
+  if (!envPath && !useAuthBroker) {
     const cwdEnvPath = path.resolve(process.cwd(), '.env');
     if (fs.existsSync(cwdEnvPath)) {
       envPath = cwdEnvPath;
@@ -96,7 +115,7 @@ export async function loadTestEnv(): Promise<void> {
   }
 
   // Priority 3: Fallback to project root (for tests run from project root)
-  if (!envPath) {
+  if (!envPath && !useAuthBroker) {
     const projectRootEnvPath = path.resolve(__dirname, '../../../../.env');
     if (fs.existsSync(projectRootEnvPath)) {
       envPath = projectRootEnvPath;
@@ -147,16 +166,14 @@ export async function loadTestEnv(): Promise<void> {
         }
       }
 
-      // Try to refresh tokens using AuthBroker if destination is available
-      // This ensures tests have valid tokens even if refresh token in .env has expired
-      if (useAuthBroker && !brokerAttempted) {
+      // If auth-broker is enabled as a fallback, attempt refresh after .env load
+      if (useAuthBroker && !brokerAttempted && !process.env.SAP_URL) {
         try {
           brokerAttempted = true;
           await refreshTokensForTests({ force: true });
           brokerOk = !!process.env.SAP_URL;
           brokerSucceeded = brokerOk;
         } catch (error: any) {
-          // If token refresh fails, log but don't fail - tests will use existing .env tokens
           if (process.env.DEBUG_TESTS === 'true') {
             console.warn(`[DEBUG] loadTestEnv - Failed to refresh tokens via auth-broker: ${error?.message || String(error)}`);
           }
@@ -174,43 +191,14 @@ export async function loadTestEnv(): Promise<void> {
         projectRoot: projectRootEnvPath
       });
     }
-
-    // If auth-broker is preferred, try refreshing tokens even without .env
-    if (useAuthBroker && !brokerAttempted) {
-      try {
-        brokerAttempted = true;
-        await refreshTokensForTests({ force: true });
-        brokerOk = !!process.env.SAP_URL;
-        brokerSucceeded = brokerOk;
-        if (process.env.DEBUG_TESTS === 'true') {
-          console.log('[DEBUG] loadTestEnv - Refreshed tokens via auth-broker (no .env found)');
-        }
-      } catch (error: any) {
-        if (process.env.DEBUG_TESTS === 'true') {
-          console.warn(`[DEBUG] loadTestEnv - Auth-broker refresh failed without .env: ${error?.message || String(error)}`);
-        }
-      }
-    }
-  }
-
-  // If auth-broker is preferred and we haven't tried yet (e.g., .env loaded but SAP_URL still empty)
-  if (useAuthBroker && !brokerOk && !process.env.SAP_URL && !brokerAttempted) {
-    try {
-      brokerAttempted = true;
-      await refreshTokensForTests({ force: true });
-      brokerOk = !!process.env.SAP_URL;
-      brokerSucceeded = brokerOk;
-    } catch (error: any) {
-      if (process.env.DEBUG_TESTS === 'true') {
-        console.warn(`[DEBUG] loadTestEnv - Final auth-broker refresh failed: ${error?.message || String(error)}`);
-      }
-    }
   }
 
   // Final guard: require SAP_URL from either auth-broker or .env
   if (!process.env.SAP_URL) {
     envLoadError = new Error(
-      'No SAP credentials available for tests. Provide service key/session for auth-broker or a .env file.'
+      useAuthBroker
+        ? 'No SAP credentials available for tests via auth-broker. Ensure service key/session exist for configured destination.'
+        : 'No SAP credentials available for tests. Provide a .env file or enable auth-broker.'
     );
     throw envLoadError;
   }

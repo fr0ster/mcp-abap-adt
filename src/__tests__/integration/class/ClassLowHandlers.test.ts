@@ -313,6 +313,12 @@ describe('Class Low-Level Handlers Integration', () => {
           session_changed: oldSessionId2 !== session.session_id
         });
 
+        // Sanity check: ensure class now exists before proceeding to lock
+        const verifyResponse = await handleGetClass({ class_name: className });
+        if (verifyResponse.isError) {
+          throw new Error(`Create verification failed: ${verifyResponse.content[0]?.text || 'Object not found'}`);
+        }
+
         // Wait for creation to complete
         await delay(getOperationDelay('create', testCase));
 

@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "LockClassTestClassesLow",
@@ -59,6 +60,10 @@ export async function handleLockClassTestClasses(args: LockClassTestClassesArgs)
       return return_error(new Error('class_name is required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleLockClassTestClasses',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
@@ -73,7 +78,7 @@ export async function handleLockClassTestClasses(args: LockClassTestClassesArgs)
     }
 
     const className = class_name.toUpperCase();
-    logger.info(`Starting test classes lock for: ${className}`);
+    handlerLogger.info(`Starting test classes lock for: ${className}`);
 
     try {
       await client.lockTestClasses({ className });
@@ -85,7 +90,7 @@ export async function handleLockClassTestClasses(args: LockClassTestClassesArgs)
 
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ LockClassTestClasses completed: ${className}`);
+      handlerLogger.info(`✅ LockClassTestClasses completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -102,7 +107,7 @@ export async function handleLockClassTestClasses(args: LockClassTestClassesArgs)
         }, null, 2)
       } as AxiosResponse);
     } catch (error: any) {
-      logger.error(`Error locking test classes for ${className}:`, error);
+      handlerLogger.error(`Error locking test classes for ${className}: ${error?.message || error}`);
       const reason = error?.response?.status === 404
         ? `Class ${className} not found.`
         : error?.response?.status === 409
@@ -114,5 +119,4 @@ export async function handleLockClassTestClasses(args: LockClassTestClassesArgs)
     return return_error(error);
   }
 }
-
 

@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "LockClassLow",
@@ -65,6 +66,10 @@ export async function handleLockClass(args: LockClassArgs) {
       return return_error(new Error('class_name is required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleLockClass',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
@@ -82,7 +87,7 @@ export async function handleLockClass(args: LockClassArgs) {
 
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting class lock: ${className}`);
+    handlerLogger.info(`Starting class lock: ${className}`);
 
     try {
       // Lock class
@@ -96,8 +101,8 @@ export async function handleLockClass(args: LockClassArgs) {
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ LockClass completed: ${className}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      handlerLogger.info(`✅ LockClass completed: ${className}`);
+      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -115,7 +120,7 @@ export async function handleLockClass(args: LockClassArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking class ${className}:`, error);
+      handlerLogger.error(`Error locking class ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock class: ${error.message || String(error)}`;
@@ -148,4 +153,3 @@ export async function handleLockClass(args: LockClassArgs) {
     return return_error(error);
   }
 }
-

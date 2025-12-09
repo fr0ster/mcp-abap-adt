@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateClassLow",
@@ -77,6 +78,10 @@ export async function handleUpdateClass(args: UpdateClassArgs) {
       return return_error(new Error('class_name, source_code, and lock_handle are required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateClass',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
@@ -94,7 +99,7 @@ export async function handleUpdateClass(args: UpdateClassArgs) {
 
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting class update: ${className}`);
+    handlerLogger.info(`Starting class update: ${className}`);
 
     try {
       // Update class with source code
@@ -108,7 +113,7 @@ export async function handleUpdateClass(args: UpdateClassArgs) {
       // Get updated session state after update
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UpdateClass completed: ${className}`);
+      handlerLogger.info(`✅ UpdateClass completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -125,7 +130,7 @@ export async function handleUpdateClass(args: UpdateClassArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating class ${className}:`, error);
+      handlerLogger.error(`Error updating class ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update class: ${error.message || String(error)}`;
@@ -158,4 +163,3 @@ export async function handleUpdateClass(args: UpdateClassArgs) {
     return return_error(error);
   }
 }
-

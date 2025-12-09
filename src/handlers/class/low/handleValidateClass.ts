@@ -8,6 +8,7 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ValidateClassLow",
@@ -96,7 +97,8 @@ export async function handleValidateClass(args: ValidateClassArgs) {
 
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting class validation: ${className}`);
+    const handlerLogger = getHandlerLogger('handleValidateClass', logger);
+    handlerLogger.info(`Starting class validation: ${className}`);
 
     try {
       const builder = new CrudClient(connection);
@@ -137,8 +139,8 @@ export async function handleValidateClass(args: ValidateClassArgs) {
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ValidateClass completed: ${className}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message || 'N/A'}`);
+      handlerLogger.info(`✅ ValidateClass completed: ${className}`);
+      handlerLogger.debug(`Result: valid=${result.valid}, message=${result.message || 'N/A'}`);
 
       // Always return structured response, even if validation failed
       // This allows tests to check validation_result.valid and skip if needed
@@ -166,15 +168,13 @@ export async function handleValidateClass(args: ValidateClassArgs) {
       // For validation, 400 errors are expected (object exists or validation failed)
       // Only log as error if it's not a 400, or if debug is enabled
       const isValidationError = error.response?.status === 400;
-      const debugEnabled = process.env.DEBUG_TESTS === 'true' ||
-                          process.env.DEBUG_CONNECTORS === 'true' ||
-                          process.env.DEBUG_ADT_TESTS === 'true';
+      const debugEnabled = process.env.DEBUG_HANDLERS === 'true';
 
       if (!isValidationError || debugEnabled) {
         if (isValidationError) {
-          logger.debug(`Validation returned 400 for class ${className} (expected behavior):`, error);
+          handlerLogger.debug(`Validation returned 400 for class ${className} (expected behavior): ${error.message || String(error)}`);
         } else {
-          logger.error(`Error validating class ${className}:`, error);
+          handlerLogger.error(`Error validating class ${className}: ${error.message || String(error)}`);
         }
       }
 
@@ -206,4 +206,3 @@ export async function handleValidateClass(args: ValidateClassArgs) {
     return return_error(error);
   }
 }
-

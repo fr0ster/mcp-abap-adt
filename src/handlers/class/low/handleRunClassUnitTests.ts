@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 type ScopeOptions = {
   ownTests?: boolean;
@@ -146,6 +147,10 @@ export async function handleRunClassUnitTests(args: RunClassUnitTestsArgs) {
       };
     });
 
+    const handlerLogger = getHandlerLogger(
+      'handleRunClassUnitTests',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
@@ -175,7 +180,7 @@ export async function handleRunClassUnitTests(args: RunClassUnitTestsArgs) {
       duration
     };
 
-    logger.info(`Starting ABAP Unit run for ${formattedTests.length} definitions`);
+    handlerLogger.info(`Starting ABAP Unit run for ${formattedTests.length} definitions`);
 
     try {
       await client.runClassUnitTests(formattedTests, options);
@@ -187,7 +192,7 @@ export async function handleRunClassUnitTests(args: RunClassUnitTestsArgs) {
         throw new Error('Failed to obtain ABAP Unit run identifier from SAP response headers');
       }
 
-      logger.info(`✅ RunClassUnitTests started. Run ID: ${runId}`);
+      handlerLogger.info(`✅ RunClassUnitTests started. Run ID: ${runId}`);
 
       return return_response({
         data: JSON.stringify({
@@ -205,12 +210,11 @@ export async function handleRunClassUnitTests(args: RunClassUnitTestsArgs) {
         }, null, 2)
       } as AxiosResponse);
     } catch (error: any) {
-      logger.error(`Error starting ABAP Unit run:`, error);
+      handlerLogger.error(`Error starting ABAP Unit run: ${error?.message || error}`);
       return return_error(new Error(error?.message || String(error)));
     }
   } catch (error: any) {
     return return_error(error);
   }
 }
-
 

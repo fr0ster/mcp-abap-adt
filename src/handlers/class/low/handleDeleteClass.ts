@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "DeleteClassLow",
@@ -50,11 +51,15 @@ export async function handleDeleteClass(args: DeleteClassArgs) {
       return return_error(new Error('class_name is required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleDeleteClass',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting class deletion: ${className}`);
+    handlerLogger.info(`Starting class deletion: ${className}`);
 
     try {
       // Delete class
@@ -68,7 +73,7 @@ export async function handleDeleteClass(args: DeleteClassArgs) {
         throw new Error(`Delete did not return a response for class ${className}`);
       }
 
-      logger.info(`✅ DeleteClass completed successfully: ${className}`);
+      handlerLogger.info(`✅ DeleteClass completed successfully: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -80,7 +85,7 @@ export async function handleDeleteClass(args: DeleteClassArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting class ${className}:`, error);
+      handlerLogger.error(`Error deleting class ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete class: ${error.message || String(error)}`;
@@ -115,4 +120,3 @@ export async function handleDeleteClass(args: DeleteClassArgs) {
     return return_error(error);
   }
 }
-

@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UnlockClassLow",
@@ -71,6 +72,10 @@ export async function handleUnlockClass(args: UnlockClassArgs) {
       return return_error(new Error('class_name, lock_handle, and session_id are required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleUnlockClass',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
@@ -88,7 +93,7 @@ export async function handleUnlockClass(args: UnlockClassArgs) {
 
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting class unlock: ${className} (session: ${session_id.substring(0, 8)}...)`);
+    handlerLogger.info(`Starting class unlock: ${className} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock class
@@ -102,7 +107,7 @@ export async function handleUnlockClass(args: UnlockClassArgs) {
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UnlockClass completed: ${className}`);
+      handlerLogger.info(`✅ UnlockClass completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +124,7 @@ export async function handleUnlockClass(args: UnlockClassArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking class ${className}:`, error);
+      handlerLogger.error(`Error unlocking class ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock class: ${error.message || String(error)}`;
@@ -152,4 +157,3 @@ export async function handleUnlockClass(args: UnlockClassArgs) {
     return return_error(error);
   }
 }
-

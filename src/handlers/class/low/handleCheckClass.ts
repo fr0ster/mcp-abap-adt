@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CheckClassLow",
@@ -80,6 +81,10 @@ export async function handleCheckClass(args: CheckClassArgs) {
       ? version.toLowerCase() as 'active' | 'inactive'
       : 'active';
 
+    const handlerLogger = getHandlerLogger(
+      'handleCheckClass',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const connection = getManagedConnection();
 
     // Restore session state if provided
@@ -96,7 +101,7 @@ export async function handleCheckClass(args: CheckClassArgs) {
 
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting class check: ${className} (version: ${checkVersion}, has source: ${!!source_code})`);
+    handlerLogger.info(`Starting class check: ${className} (version: ${checkVersion}, has source: ${!!source_code})`);
 
     try {
       const client = new CrudClient(connection);
@@ -112,9 +117,9 @@ export async function handleCheckClass(args: CheckClassArgs) {
       // Get updated session state after check
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CheckClass completed: ${className}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      handlerLogger.info(`✅ CheckClass completed: ${className}`);
+      handlerLogger.info(`   Status: ${checkResult.status}`);
+      handlerLogger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -135,7 +140,7 @@ export async function handleCheckClass(args: CheckClassArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking class ${className}:`, error);
+      handlerLogger.error(`Error checking class ${className}: ${error?.message || error}`);
 
       let errorMessage = `Failed to check class: ${error.message || String(error)}`;
 
@@ -165,4 +170,3 @@ export async function handleCheckClass(args: CheckClassArgs) {
     return return_error(error);
   }
 }
-

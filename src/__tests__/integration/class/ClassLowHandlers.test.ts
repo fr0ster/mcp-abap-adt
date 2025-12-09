@@ -30,7 +30,8 @@ import {
   extractLockHandle,
   isSuccessResponse,
   delay,
-  debugLog
+  debugLog,
+  DEBUG_TESTS
 } from '../helpers/testHelpers';
 import {
   createTestConnectionAndSession,
@@ -52,9 +53,34 @@ import {
 import {
   createDiagnosticsTracker
 } from '../helpers/persistenceHelpers';
+import { createTestLogger, logObjectAction } from '../helpers/loggerHelpers';
+
+/**
+ * Always-on flow logger for key steps; adds one-line context when DEBUG_TESTS is enabled.
+ */
+function logFlow(step: string, context?: Record<string, any>) {
+  const className = context?.className || context?.object_name || '';
+  const lockHandle = context?.lockHandle;
+  const messages: Record<string, string> = {
+    validate: `🧪 Validating class ${className}`,
+    create: `🆕 Created class ${className}`,
+    lock: `🔒 Locked class ${className}`,
+    check: `🧐 Checked class ${className}`,
+    update: `✏️ Updated class ${className}`,
+    unlock: `🔓 Unlocked class ${className}`,
+    activate: `⚡ Activated class ${className}`,
+  };
+
+  const base = messages[step] || `[FLOW] ${step}${className ? ` ${className}` : ''}`;
+  const extra = DEBUG_TESTS && context ? ` ${JSON.stringify(context)}` : '';
+  process.stdout.write(base + extra + '\n');
+}
+
+const logLine = (msg: string) => process.stdout.write(`${msg}\n`);
 
 describe('Class Low-Level Handlers Integration', () => {
   let hasConfig = false;
+  const suiteLogger = createTestLogger('class');
 
   beforeAll(async () => {
     // Load environment variables and refresh tokens if needed
@@ -110,7 +136,7 @@ describe('Class Low-Level Handlers Integration', () => {
         });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.warn('⚠️ Skipping test: Failed to create connection', errorMessage);
+        logLine(`⚠️ Skipping test: Failed to create connection ${errorMessage}`);
         return;
       }
 
@@ -131,6 +157,8 @@ describe('Class Low-Level Handlers Integration', () => {
         transportRequest,
         description
       });
+      logObjectAction(suiteLogger, 'start', className, { packageName, transportRequest });
+      logFlow('validate', { className, packageName, transportRequest });
 
       // Pre-check: Try to read class to see if it exists
       // If class exists (even if corrupted/locked), we'll skip the test
@@ -284,6 +312,7 @@ describe('Class Low-Level Handlers Integration', () => {
           session_id: session.session_id,
           has_session_state: !!session.session_state
         });
+        logFlow('create', { className, packageName, transportRequest });
         const createResponse = await handleCreateClass({
           class_name: className,
           description,
@@ -303,6 +332,7 @@ describe('Class Low-Level Handlers Integration', () => {
 
         // Mark class as created successfully
         classCreated = true;
+        logObjectAction(suiteLogger, 'created', className, { packageName, transportRequest });
 
         // Update session from create response
         const oldSessionId2 = session.session_id;
@@ -314,12 +344,23 @@ describe('Class Low-Level Handlers Integration', () => {
         });
 
         // Sanity check: ensure class now exists before proceeding to lock
-        const verifyResponse = await handleGetClass({ class_name: className });
+        // Some systems need a small delay before the object is visible
+        const verifyDelay = getOperationDelay('create_verify', testCase) || 500;
+        if (verifyDelay > 0) {
+          await delay(verifyDelay);
+        }
+        let verifyResponse = await handleGetClass({ class_name: className });
+        if (verifyResponse.isError) {
+          // Retry once after an extra delay to handle eventual consistency
+          const retryDelay = getOperationDelay('create_verify_retry', testCase) || 1000;
+          await delay(retryDelay);
+          verifyResponse = await handleGetClass({ class_name: className });
+        }
         if (verifyResponse.isError) {
           throw new Error(`Create verification failed: ${verifyResponse.content[0]?.text || 'Object not found'}`);
         }
 
-        // Wait for creation to complete
+        // Wait for creation to settle
         await delay(getOperationDelay('create', testCase));
 
         // Step 3: Lock
@@ -328,6 +369,7 @@ describe('Class Low-Level Handlers Integration', () => {
           has_session_state: !!session.session_state,
           session_state_cookies: session.session_state?.cookies?.substring(0, 50) + '...'
         });
+        logFlow('lock', { className, session: session.session_id });
         const lockResponse = await handleLockClass({
           class_name: className,
           session_id: session.session_id,
@@ -343,6 +385,7 @@ describe('Class Low-Level Handlers Integration', () => {
 
         // CRITICAL: Extract session from Lock response
         lockSession = extractLockSession(lockData);
+        logObjectAction(suiteLogger, 'locked', className, { lockHandle });
 
         // Persist lock snapshot for diagnostics
         diagnosticsTracker?.persistLock(lockSession, lockHandle, {
@@ -374,6 +417,7 @@ describe('Class Low-Level Handlers Integration', () => {
           session_id: lockSession.session_id,
           has_session_state: !!lockSession.session_state
         });
+        logFlow('check', { className, lockHandle });
         const sourceCode = testCase.params.update_source_code || testCase.params.source_code || `CLASS ${className.toLowerCase()} DEFINITION
   PUBLIC
   FINAL
@@ -403,7 +447,7 @@ ENDCLASS.`;
           debugLog('CHECK_ERROR', `Check failed: ${checkError}`, {
             error: checkError
           });
-          console.log(`⚠️  Check failed for new code - skipping update, will only unlock`);
+          logLine(`⚠️  Check failed for new code - skipping update, will only unlock`);
         } else {
           const checkData = parseHandlerResponse(checkResponse);
           // Check if there are errors in check result
@@ -412,13 +456,13 @@ ENDCLASS.`;
             debugLog('CHECK_FAILED', `Check found errors`, {
               errors: checkData.check_result?.errors
             });
-            console.log(`⚠️  Check found errors in new code - skipping update, will only unlock`);
+            logLine(`⚠️  Check found errors in new code - skipping update, will only unlock`);
           } else {
             checkPassed = true;
             debugLog('CHECK_PASSED', `Check passed - new code is valid`, {
               check_result: checkData.check_result
             });
-            console.log(`✅ Check passed - new code is valid, proceeding with update`);
+            logLine(`✅ Check passed - new code is valid, proceeding with update`);
           }
         }
 
@@ -427,7 +471,7 @@ ENDCLASS.`;
 
         // Step 5: Update (only if check passed)
         if (!checkPassed) {
-          console.log(`⏭️  Skipping update due to check failure - proceeding to unlock`);
+          logLine(`⏭️  Skipping update due to check failure - proceeding to unlock`);
         } else {
           debugLog('UPDATE', `Starting update for ${className}`, {
             lock_handle: lockHandle,
@@ -436,6 +480,7 @@ ENDCLASS.`;
             session_state_cookies: lockSession.session_state?.cookies?.substring(0, 50) + '...',
             session_state_csrf: lockSession.session_state?.csrf_token?.substring(0, 20) + '...'
           });
+          logFlow('update', { className, lockHandle });
 
           const updateResponse = await handleUpdateClass({
           class_name: className,
@@ -473,6 +518,7 @@ ENDCLASS.`;
           session_state_cookies: lockSession.session_state?.cookies?.substring(0, 50) + '...',
           session_state_csrf: lockSession.session_state?.csrf_token?.substring(0, 20) + '...'
         });
+        logFlow('unlock', { className, lockHandle });
         const unlockResponse = await handleUnlockClass({
           class_name: className,
           lock_handle: lockHandle,
@@ -486,6 +532,7 @@ ENDCLASS.`;
 
         const unlockData = parseHandlerResponse(unlockResponse);
         expect(unlockData.success).toBe(true);
+        logObjectAction(suiteLogger, 'unlocked', className, { lockHandle });
 
         // Update session from unlock response
         const oldSessionId3 = session.session_id;
@@ -505,6 +552,7 @@ ENDCLASS.`;
           session_id: session.session_id,
           has_session_state: !!session.session_state
         });
+        logFlow('activate', { className });
         const activateResponse = await handleActivateClass({
           class_name: className,
           session_id: session.session_id,
@@ -527,7 +575,7 @@ ENDCLASS.`;
           steps_completed: ['validate', 'create', 'lock', 'update', 'unlock', 'activate']
         });
 
-        console.log(`✅ Full workflow completed successfully for ${className}`);
+        logLine(`✅ Full workflow completed successfully for ${className}`);
 
       } catch (error: any) {
         // Principle 1: If lock was done, unlock is mandatory
@@ -601,12 +649,12 @@ ENDCLASS.`;
                 });
 
                 debugLog('CLEANUP', `Successfully unlocked class ${className} (cleanup)`);
-                console.log(`🔓 Unlocked class ${className} (cleanup)`);
+                logLine(`🔓 Unlocked class ${className} (cleanup)`);
               } catch (unlockError: any) {
                 debugLog('CLEANUP', `Failed to unlock class ${className} (cleanup)`, {
                   error: unlockError instanceof Error ? unlockError.message : String(unlockError)
                 });
-                console.warn(`⚠️  Failed to unlock class ${className} during cleanup: ${unlockError.message || unlockError}`);
+                logLine(`⚠️  Failed to unlock class ${className} during cleanup: ${unlockError.message || unlockError}`);
               }
             }
 

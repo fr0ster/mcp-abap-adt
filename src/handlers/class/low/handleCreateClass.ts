@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateClassLow",
@@ -107,13 +108,17 @@ export async function handleCreateClass(args: CreateClassArgs) {
       return return_error(new Error('class_name, description, and package_name are required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleCreateClass',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const connection = getManagedConnection();
 
     // Check if connection can refresh token (for debugging)
     const connectionWithRefresh = connection as any;
-    if (connectionWithRefresh.canRefreshToken) {
+    if (process.env.DEBUG_HANDLERS === 'true' && connectionWithRefresh.canRefreshToken) {
       const canRefresh = connectionWithRefresh.canRefreshToken();
-      logger.debug(`[DEBUG] handleCreateClass - Connection can refresh token: ${canRefresh}`);
+      handlerLogger.debug(`Connection can refresh token: ${canRefresh}`);
     }
 
     const client = new CrudClient(connection);
@@ -125,7 +130,7 @@ export async function handleCreateClass(args: CreateClassArgs) {
 
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting class creation: ${className}`);
+    handlerLogger.info(`Starting class creation: ${className}`);
 
     try {
       // Create class
@@ -148,7 +153,7 @@ export async function handleCreateClass(args: CreateClassArgs) {
       // Get updated session state after create
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CreateClass completed: ${className}`);
+      handlerLogger.info(`✅ CreateClass completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -168,7 +173,7 @@ export async function handleCreateClass(args: CreateClassArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating class ${className}:`, error);
+      handlerLogger.error(`Error creating class ${className}: ${error.message || String(error)}`);
 
       // Parse error message
       let errorMessage = `Failed to create class: ${error.message || String(error)}`;
@@ -199,4 +204,3 @@ export async function handleCreateClass(args: CreateClassArgs) {
     return return_error(error);
   }
 }
-

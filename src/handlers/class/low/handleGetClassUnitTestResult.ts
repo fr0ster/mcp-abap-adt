@@ -5,8 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "GetClassUnitTestResultLow",
@@ -71,6 +72,10 @@ export async function handleGetClassUnitTestResult(args: GetResultArgs) {
       return return_error(new Error('run_id is required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleGetClassUnitTestResult',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
@@ -84,7 +89,7 @@ export async function handleGetClassUnitTestResult(args: GetResultArgs) {
       await connection.connect();
     }
 
-    logger.info(`Fetching ABAP Unit result for run ${run_id}`);
+    handlerLogger.info(`Fetching ABAP Unit result for run ${run_id}`);
 
     try {
       await client.getClassUnitTestRunResult(run_id, {
@@ -100,12 +105,11 @@ export async function handleGetClassUnitTestResult(args: GetResultArgs) {
 
       return return_response(resultResponse);
     } catch (error: any) {
-      logger.error(`Error retrieving ABAP Unit result for run ${run_id}:`, error);
+      handlerLogger.error(`Error retrieving ABAP Unit result for run ${run_id}: ${error?.message || error}`);
       return return_error(new Error(error?.message || String(error)));
     }
   } catch (error: any) {
     return return_error(error);
   }
 }
-
 

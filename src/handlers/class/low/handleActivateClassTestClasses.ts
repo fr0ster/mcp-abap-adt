@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ActivateClassTestClassesLow",
@@ -65,6 +66,10 @@ export async function handleActivateClassTestClasses(args: ActivateClassTestClas
       return return_error(new Error('class_name is required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleActivateClassTestClasses',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
@@ -81,7 +86,7 @@ export async function handleActivateClassTestClasses(args: ActivateClassTestClas
     const className = class_name.toUpperCase();
     const testClassName = test_class_name ? test_class_name.toUpperCase() : undefined;
 
-    logger.info(`Starting test classes activation for: ${className}`);
+    handlerLogger.info(`Starting test classes activation for: ${className}`);
 
     try {
       await client.activateTestClasses({
@@ -91,7 +96,7 @@ export async function handleActivateClassTestClasses(args: ActivateClassTestClas
       const activationResult = client.getTestClassActivateResult();
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ActivateClassTestClasses completed: ${className}`);
+      handlerLogger.info(`✅ ActivateClassTestClasses completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -108,7 +113,7 @@ export async function handleActivateClassTestClasses(args: ActivateClassTestClas
         }, null, 2)
       } as AxiosResponse);
     } catch (error: any) {
-      logger.error(`Error activating test classes for ${className}:`, error);
+      handlerLogger.error(`Error activating test classes for ${className}: ${error?.message || error}`);
       const reason = error?.response?.status === 404
         ? `Class ${className} not found or test classes are missing.`
         : error?.message || String(error);
@@ -118,5 +123,4 @@ export async function handleActivateClassTestClasses(args: ActivateClassTestClas
     return return_error(error);
   }
 }
-
 

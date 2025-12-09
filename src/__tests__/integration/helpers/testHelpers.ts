@@ -5,6 +5,7 @@
 
 import { AxiosError } from 'axios';
 import { isAlreadyCheckedError, isAlreadyExistsError } from '../../../lib/utils';
+import { createTestLogger } from './loggerHelpers';
 
 /**
  * Parse handler response content
@@ -102,13 +103,14 @@ export function safeStringify(obj: any): string {
  *   debugLog('STEP', 'Message', { data: 'value' });
  */
 export const DEBUG_TESTS = process.env.DEBUG_TESTS === 'true' || process.env.DEBUG_ADT_TESTS === 'true';
+const testLogger = createTestLogger('test');
 
 export function debugLog(step: string, message: string, data?: any): void {
-  if (DEBUG_TESTS) {
-    console.log(`[DEBUG] ${step}: ${message}`);
-    if (data !== undefined && data !== null) {
-      console.log(`[DEBUG] ${step} data:`, JSON.stringify(data, null, 2));
-    }
+  if (!DEBUG_TESTS) return;
+
+  testLogger.debug(`${step}: ${message}`);
+  if (data !== undefined && data !== null) {
+    testLogger.debug(`${step} data: ${JSON.stringify(data, null, 2)}`);
   }
 }
 
@@ -199,4 +201,3 @@ export function shouldSkipDueToExistingObject(
 
   return false;
 }
-

@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "LockMetadataExtensionLow",
@@ -67,6 +68,10 @@ export async function handleLockMetadataExtension(args: LockMetadataExtensionArg
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleLockMetadataExtension',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -82,7 +87,7 @@ export async function handleLockMetadataExtension(args: LockMetadataExtensionArg
 
     const ddlxName = name.toUpperCase();
 
-      logger.info(`Starting metadata extension lock: ${ddlxName}`);
+      handlerLogger.info(`Starting metadata extension lock: ${ddlxName}`);
 
     try {
       // Lock metadata extension
@@ -96,8 +101,8 @@ export async function handleLockMetadataExtension(args: LockMetadataExtensionArg
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ LockMetadataExtension completed: ${ddlxName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      handlerLogger.info(`✅ LockMetadataExtension completed: ${ddlxName}`);
+      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -115,7 +120,7 @@ export async function handleLockMetadataExtension(args: LockMetadataExtensionArg
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking metadata extension ${ddlxName}:`, error);
+      handlerLogger.error(`Error locking metadata extension ${ddlxName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock metadata extension: ${error.message || String(error)}`;
@@ -148,4 +153,3 @@ export async function handleLockMetadataExtension(args: LockMetadataExtensionArg
     return return_error(error);
   }
 }
-

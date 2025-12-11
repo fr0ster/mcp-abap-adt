@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ActivateFunctionGroupLow",
@@ -67,6 +68,10 @@ export async function handleActivateFunctionGroup(args: ActivateFunctionGroupArg
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleActivateFunctionGroup',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -82,7 +87,7 @@ export async function handleActivateFunctionGroup(args: ActivateFunctionGroupArg
 
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function group activation: ${functionGroupName}`);
+    handlerLogger.info(`Starting function group activation: ${functionGroupName}`);
 
     try {
       // Activate function group
@@ -100,9 +105,8 @@ export async function handleActivateFunctionGroup(args: ActivateFunctionGroupArg
       // Get updated session state after activation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ActivateFunctionGroup completed: ${functionGroupName}`);
-      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      logger.info(`   Messages: ${activationResult.messages.length}`);
+      handlerLogger.info(`✅ ActivateFunctionGroup completed: ${functionGroupName}`);
+      handlerLogger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -129,7 +133,7 @@ export async function handleActivateFunctionGroup(args: ActivateFunctionGroupArg
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating function group ${functionGroupName}:`, error);
+      handlerLogger.error(`Error activating function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate function group: ${error.message || String(error)}`;
@@ -160,4 +164,3 @@ export async function handleActivateFunctionGroup(args: ActivateFunctionGroupArg
     return return_error(error);
   }
 }
-

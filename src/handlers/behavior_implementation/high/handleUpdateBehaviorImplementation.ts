@@ -8,10 +8,11 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger as baseLogger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateBehaviorImplementation",
@@ -67,6 +68,10 @@ export async function handleUpdateBehaviorImplementation(args: UpdateBehaviorImp
       transport_request,
       activate = true
     } = args as UpdateBehaviorImplementationArgs;
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateBehaviorImplementation',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Validation
     if (!class_name || !behavior_definition || !implementation_code) {
@@ -77,7 +82,7 @@ export async function handleUpdateBehaviorImplementation(args: UpdateBehaviorImp
     const className = class_name.toUpperCase();
     const behaviorDefinition = behavior_definition.toUpperCase();
 
-    logger.info(`Starting behavior implementation source update: ${className} for ${behaviorDefinition}`);
+    handlerLogger.info(`Starting behavior implementation source update: ${className} for ${behaviorDefinition}`);
 
     try {
       // Create client
@@ -110,7 +115,7 @@ export async function handleUpdateBehaviorImplementation(args: UpdateBehaviorImp
             () => client.checkClass({ className }),
             className,
             {
-              debug: (message: string) => logger.info(`[UpdateBehaviorImplementation] ${message}`)
+              debug: (message: string) => handlerLogger.debug(message)
             }
           );
         } catch (checkError: any) {
@@ -133,7 +138,7 @@ export async function handleUpdateBehaviorImplementation(args: UpdateBehaviorImp
         try {
           await client.unlockClass({ className: className }, lockHandle);
         } catch (unlockError) {
-          logger.error('Failed to unlock behavior implementation after error:', unlockError);
+          handlerLogger.error(`Failed to unlock behavior implementation after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
         }
         throw error;
       }
@@ -155,7 +160,7 @@ export async function handleUpdateBehaviorImplementation(args: UpdateBehaviorImp
         }
       }
 
-      logger.info(`✅ UpdateBehaviorImplementation completed successfully: ${className}`);
+      handlerLogger.info(`✅ UpdateBehaviorImplementation completed successfully: ${className}`);
 
       // Return success result
       const stepsCompleted = ['lock', 'update_main_source', 'update_implementations', 'check', 'unlock'];
@@ -186,7 +191,7 @@ export async function handleUpdateBehaviorImplementation(args: UpdateBehaviorImp
       });
 
     } catch (error: any) {
-      logger.error(`Error updating behavior implementation source ${className}:`, error);
+      handlerLogger.error(`Error updating behavior implementation source ${className}: ${error?.message || error}`);
 
       const errorMessage = error.response?.data
         ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
@@ -199,4 +204,3 @@ export async function handleUpdateBehaviorImplementation(args: UpdateBehaviorImp
     return return_error(error);
   }
 }
-

@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UnlockFunctionModuleLow",
@@ -79,6 +80,10 @@ export async function handleUnlockFunctionModule(args: UnlockFunctionModuleArgs)
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUnlockFunctionModule',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -91,7 +96,7 @@ export async function handleUnlockFunctionModule(args: UnlockFunctionModuleArgs)
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function module unlock: ${functionModuleName} in ${functionGroupName} (session: ${session_id.substring(0, 8)}...)`);
+    handlerLogger.info(`Starting function module unlock: ${functionModuleName} in ${functionGroupName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock function module
@@ -101,7 +106,7 @@ export async function handleUnlockFunctionModule(args: UnlockFunctionModuleArgs)
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UnlockFunctionModule completed: ${functionModuleName}`);
+      handlerLogger.info(`✅ UnlockFunctionModule completed: ${functionModuleName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +124,7 @@ export async function handleUnlockFunctionModule(args: UnlockFunctionModuleArgs)
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking function module ${functionModuleName}:`, error);
+      handlerLogger.error(`Error unlocking function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock function module: ${error.message || String(error)}`;

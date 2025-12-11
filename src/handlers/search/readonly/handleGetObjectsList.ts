@@ -15,8 +15,8 @@ export const TOOL_DEFINITION = {
 
 // handleGetObjectsListStrict performs a recursive ADT node traversal starting from node_id '000000' like in the user example
 
-import { McpError, ErrorCode } from '../../../lib/utils';
-import { fetchNodeStructure, return_error } from '../../../lib/utils';
+import { McpError, ErrorCode, fetchNodeStructure, return_error, logger as baseLogger } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 
 /**
@@ -119,6 +119,11 @@ async function collectValidObjectsStrict(
  */
 export async function handleGetObjectsList(args: any) {
     try {
+    const handlerLogger = getHandlerLogger(
+      'handleGetObjectsList',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
         const { parent_name, parent_tech_name, parent_type, with_short_descriptions } = args;
 
         if (!parent_name || typeof parent_name !== 'string' || parent_name.trim() === '') {

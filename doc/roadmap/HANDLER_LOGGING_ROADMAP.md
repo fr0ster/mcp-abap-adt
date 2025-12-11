@@ -1,67 +1,75 @@
 # Roadmap: Handler Logging via ILogger
 
 ## Goals
-- Use a single logging interface (`ILogger` from `@mcp-abap-adt/logger` / `@mcp-abap-adt/interfaces`) across all handlers.
-- At server startup: inject a logger (or no-op). Default flow stays lightweight; when needed, enable richer logging with levels/prefixes.
-- In tests: use a dedicated handler logger with handler/object tags to show step-by-step flow (validate/create/lock/update/unlock/activate) and failure points.
-- Logging must be opt-in: enable handler logs only with `DEBUG_HANDLERS=true`, test logs only with `DEBUG_TESTS=true`/`DEBUG_ADT_TESTS=true`; broker/provider/connector logs only when their dedicated env flags (e.g., `DEBUG_BROKER`, `DEBUG_PROVIDER`, `DEBUG_CONNECTORS`) are set.
+- Єдиний інтерфейс логування (`ILogger` з `@mcp-abap-adt/logger` / `@mcp-abap-adt/interfaces`) для всіх хендлерів.
+- На старті серверу: інжектуємо логер або no-op. За замовчуванням мінімальний шум; при потребі вмикаємо розширений лог з рівнями/префіксами.
+- У тестах: окремий логер з тегами (handler/object/step) для прозорого флоу (validate/create/lock/update/unlock/activate) і точок падіння.
+- Опція за замовчуванням — мовчання: `DEBUG_HANDLERS=true` для хендлерів, `DEBUG_TESTS=true`/`DEBUG_ADT_TESTS=true` для тестів; окремі прапорці для брокера/провайдера/конектора.
 
 ## Tasks
-- [x] Create a handler logger factory (e.g., `createHandlerLogger(category: string): ILogger`) that:
-  - Reads level from env (e.g., `HANDLER_LOG_LEVEL`, default `info`);
-  - Returns no-op when level is `silent` or `HANDLER_LOG_SILENT=true`;
-  - Adds category prefix (handler name) and optional subcategory (connection/auth/adt).
-- [x] Migrate class low-level handlers to `ILogger` via `getHandlerLogger` with `DEBUG_HANDLERS` toggle (no-op by default).
-- [ ] Next up: align class high-level handlers with `ILogger` opt-in (replace ad-hoc `handlerLogger` usage), keep default silent when `DEBUG_HANDLERS` is not set.
-- [ ] Add broker/provider/connector loggers gated by their env flags (`DEBUG_BROKER`, `DEBUG_PROVIDER`, `DEBUG_CONNECTORS`), mirroring test/handler toggles.
-- [ ] Refactor remaining handlers (high/low) to use injected `ILogger` instead of direct `console`/global loggers:
-  - Inject via parameter/context or factory when creating `CrudClient`/`AbapConnection`;
-  - Keep no-op by default to avoid overhead.
-- [ ] Test logging:
-  - Add `createTestHandlerLogger(handlerName, objectName)` with tags (handler, object, step);
-  - Log key steps (validate/create/lock/update/unlock/activate) and errors;
-  - Env switches: `TEST_HANDLER_LOG_LEVEL` and optional `TEST_HANDLER_LOG_FILE` for file sink.
-- [ ] Docs:
-  - How to enable server logging: `HANDLER_LOG_LEVEL=debug`, `HANDLER_LOG_FILE=/tmp/...`;
-  - How to enable test logging: `TEST_HANDLER_LOG_LEVEL=debug`, sample output.
-- [ ] Optional: Add color/prefix markers per category and compact format for grep.
+- [x] Фабрика `getHandlerLogger` (рівень з env, `HANDLER_LOG_SILENT=true` → no-op, префікс категорії).
+- [x] Класи: low/high на `getHandlerLogger` (opt-in через `DEBUG_HANDLERS`).
+- [x] В’юхи: low/high на `getHandlerLogger` (opt-in через `DEBUG_HANDLERS`).
+- [ ] Додати логери для брокера/провайдера/конектора (`DEBUG_BROKER`, `DEBUG_PROVIDER`, `DEBUG_CONNECTORS`).
+- [ ] Узгодити решту хендлерів (behavior, data_element, table, program тощо) на `ILogger`; інжект через контекст/фабрику, no-op без прапорця.
+- [ ] Тестове логування: `createTestHandlerLogger` з тегами, перемикачі `TEST_HANDLER_LOG_LEVEL`/`TEST_HANDLER_LOG_FILE`.
+- [ ] Документація: як увімкнути серверне і тестове логування, приклади виводу.
+- [ ] Опція: компактні кольорові префікси для grep.
 
-## Handler Coverage (ILogger usage)
+## Handler Coverage (ILogger usage, opt-in via DEBUG_HANDLERS unless noted)
 - [x] `class/low/handleValidateClass` — uses `getHandlerLogger('handleValidateClass', logger)`
-- [ ] behavior_definition/high `handleCreateBehaviorDefinition`, `handleUpdateBehaviorDefinition`
-- [ ] behavior_definition/low `handleValidateBehaviorDefinition`, `handleCreateBehaviorDefinition`, `handleCheckBehaviorDefinition`, `handleLockBehaviorDefinition`, `handleUpdateBehaviorDefinition`, `handleUnlockBehaviorDefinition`, `handleActivateBehaviorDefinition`, `handleDeleteBehaviorDefinition`
-- [ ] behavior_implementation/high `handleCreateBehaviorImplementation`, `handleUpdateBehaviorImplementation`
-- [ ] behavior_implementation/low `handleValidateBehaviorImplementation`, `handleCreateBehaviorImplementation`, `handleLockBehaviorImplementation`, `handleUpdateBehaviorImplementation`
-- [ ] class/high `handleCreateClass`, `handleUpdateClass`
+- [x] behavior_definition/high `handleCreateBehaviorDefinition`, `handleUpdateBehaviorDefinition` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] behavior_definition/low `handleValidateBehaviorDefinition`, `handleCreateBehaviorDefinition`, `handleCheckBehaviorDefinition`, `handleLockBehaviorDefinition`, `handleUpdateBehaviorDefinition`, `handleUnlockBehaviorDefinition`, `handleActivateBehaviorDefinition`, `handleDeleteBehaviorDefinition` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] behavior_implementation/high `handleCreateBehaviorImplementation`, `handleUpdateBehaviorImplementation` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] behavior_implementation/low `handleValidateBehaviorImplementation`, `handleCreateBehaviorImplementation`, `handleLockBehaviorImplementation` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] class/high `handleCreateClass`, `handleUpdateClass` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
 - [x] class/low `handleCreateClass` — uses `getHandlerLogger` with DEBUG_HANDLERS switch
 - [x] class/low `handleCreateClass`, `handleUpdateClass`, `handleLockClass`, `handleUnlockClass`, `handleCheckClass`, `handleActivateClass`, `handleDeleteClass`, `handleRunClassUnitTests`, `handleGetClassUnitTestStatus`, `handleGetClassUnitTestResult`, `handleUpdateClassTestClasses`, `handleLockClassTestClasses`, `handleUnlockClassTestClasses`, `handleActivateClassTestClasses` — all use `getHandlerLogger` gated by `DEBUG_HANDLERS`
-- [ ] data_element/high `handleCreateDataElement`, `handleUpdateDataElement`
-- [ ] data_element/low `handleValidateDataElement`, `handleCreateDataElement`, `handleCheckDataElement`, `handleLockDataElement`, `handleUpdateDataElement`, `handleUnlockDataElement`, `handleActivateDataElement`, `handleDeleteDataElement`
-- [ ] ddlx/high `handleCreateMetadataExtension`, `handleUpdateMetadataExtension`
-- [ ] ddlx/low `handleValidateMetadataExtension`, `handleCreateMetadataExtension`, `handleCheckMetadataExtension`, `handleLockMetadataExtension`, `handleUpdateMetadataExtension`, `handleUnlockMetadataExtension`, `handleActivateMetadataExtension`, `handleDeleteMetadataExtension`
-- [ ] domain/high `handleCreateDomain`, `handleUpdateDomain`
-- [ ] domain/low `handleValidateDomain`, `handleCreateDomain`, `handleCheckDomain`, `handleLockDomain`, `handleUpdateDomain`, `handleUnlockDomain`, `handleActivateDomain`, `handleDeleteDomain`
-- [ ] function/high `handleCreateFunctionGroup`, `handleUpdateFunctionGroup`, `handleCreateFunctionModule`, `handleUpdateFunctionModule`
-- [ ] function/low `handleValidateFunctionGroup`, `handleCreateFunctionGroup`, `handleCheckFunctionGroup`, `handleLockFunctionGroup`, `handleUpdateFunctionGroup`, `handleUnlockFunctionGroup`, `handleActivateFunctionGroup`, `handleDeleteFunctionGroup`, `handleValidateFunctionModule`, `handleCreateFunctionModule`, `handleCheckFunctionModule`, `handleLockFunctionModule`, `handleUpdateFunctionModule`, `handleUnlockFunctionModule`, `handleActivateFunctionModule`, `handleDeleteFunctionModule`
-- [ ] include/readonly `handleGetInclude`, `handleGetIncludesList`
-- [ ] interface/high `handleCreateInterface`, `handleUpdateInterface`
-- [ ] interface/low `handleValidateInterface`, `handleCreateInterface`, `handleCheckInterface`, `handleLockInterface`, `handleUpdateInterface`, `handleUnlockInterface`, `handleActivateInterface`, `handleDeleteInterface`
-- [ ] package/high `handleCreatePackage`
-- [ ] package/low `handleValidatePackage`, `handleCreatePackage`, `handleCheckPackage`, `handleLockPackage`, `handleUpdatePackage`, `handleUnlockPackage`, `handleDeletePackage`
-- [ ] program/high `handleCreateProgram`, `handleUpdateProgram`
-- [ ] program/low `handleValidateProgram`, `handleCreateProgram`, `handleCheckProgram`, `handleLockProgram`, `handleUpdateProgram`, `handleUnlockProgram`, `handleActivateProgram`, `handleDeleteProgram`, `handleGetProgFullCode`
-- [ ] search/readonly `handleSearchObject`, `handleGetObjectsList`, `handleGetObjectsByType`, `handleDescribeByList`
-- [ ] service_definition/high `handleCreateServiceDefinition`, `handleUpdateServiceDefinition`
-- [ ] service_definition/readonly `handleGetServiceDefinition`
-- [ ] structure/high `handleCreateStructure`, `handleUpdateStructure`
-- [ ] structure/low `handleValidateStructure`, `handleCreateStructure`, `handleCheckStructure`, `handleLockStructure`, `handleUpdateStructure`, `handleUnlockStructure`, `handleActivateStructure`, `handleDeleteStructure`
-- [ ] system/readonly `handleGetSession`, `handleGetInactiveObjects`, `handleGetAbapAST`, `handleGetAbapSemanticAnalysis`, `handleGetAbapSystemSymbols`, `handleGetTypeInfo`, `handleGetTransaction`, `handleGetObjectInfo`, `handleGetObjectStructure`, `handleDescribeByList` (overlaps search), `handleGetSqlQuery`, `handleGetWhereUsed`, `handleGetAbapTypes` (GetAdtTypes)
-- [ ] table/high `handleCreateTable`, `handleUpdateTable`
-- [ ] table/low `handleValidateTable`, `handleCreateTable`, `handleCheckTable`, `handleLockTable`, `handleUpdateTable`, `handleUnlockTable`, `handleActivateTable`, `handleDeleteTable`
-- [ ] table/readonly `handleGetTable`, `handleGetTableContents`
-- [ ] transport/high `handleCreateTransport`
-- [ ] transport/low `handleCreateTransport`
-- [ ] view/high `handleCreateView`, `handleUpdateView`
-- [ ] view/low `handleValidateView`, `handleCreateView`, `handleCheckView`, `handleLockView`, `handleUpdateView`, `handleUnlockView`, `handleActivateView`, `handleDeleteView`
-- [ ] view/readonly `handleGetView`
-- [ ] common/low `handleValidateObject`, `handleLockObject`, `handleUnlockObject`, `handleActivateObject`, `handleCheckObject`, `handleDeleteObject`
+- [x] data_element/high `handleCreateDataElement`, `handleUpdateDataElement` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] data_element/low `handleValidateDataElement`, `handleCreateDataElement`, `handleCheckDataElement`, `handleLockDataElement`, `handleUpdateDataElement`, `handleUnlockDataElement`, `handleActivateDataElement`, `handleDeleteDataElement` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] ddlx/high `handleCreateMetadataExtension`, `handleUpdateMetadataExtension` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] ddlx/low `handleValidateMetadataExtension`, `handleCreateMetadataExtension`, `handleCheckMetadataExtension`, `handleLockMetadataExtension`, `handleUpdateMetadataExtension`, `handleUnlockMetadataExtension`, `handleActivateMetadataExtension`, `handleDeleteMetadataExtension` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] domain/high `handleCreateDomain`, `handleUpdateDomain` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] domain/low `handleValidateDomain`, `handleCreateDomain`, `handleCheckDomain`, `handleLockDomain`, `handleUpdateDomain`, `handleUnlockDomain`, `handleActivateDomain`, `handleDeleteDomain` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] function/high `handleCreateFunctionGroup`, `handleUpdateFunctionGroup`, `handleCreateFunctionModule`, `handleUpdateFunctionModule` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] function/low `handleValidateFunctionGroup`, `handleCreateFunctionGroup`, `handleCheckFunctionGroup`, `handleLockFunctionGroup`, `handleUnlockFunctionGroup`, `handleActivateFunctionGroup`, `handleDeleteFunctionGroup`, `handleValidateFunctionModule`, `handleCreateFunctionModule`, `handleCheckFunctionModule`, `handleLockFunctionModule`, `handleUpdateFunctionModule`, `handleUnlockFunctionModule`, `handleActivateFunctionModule`, `handleDeleteFunctionModule` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] include/readonly `handleGetInclude`, `handleGetIncludesList` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] interface/high `handleCreateInterface`, `handleUpdateInterface` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] interface/low `handleValidateInterface`, `handleCreateInterface`, `handleCheckInterface`, `handleLockInterface`, `handleUpdateInterface`, `handleUnlockInterface`, `handleActivateInterface`, `handleDeleteInterface` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] package/high `handleCreatePackage` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] package/low `handleValidatePackage`, `handleCreatePackage`, `handleCheckPackage`, `handleLockPackage`, `handleUpdatePackage`, `handleUnlockPackage`, `handleDeletePackage` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] program/high `handleCreateProgram`, `handleUpdateProgram` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] program/low `handleValidateProgram`, `handleCreateProgram`, `handleCheckProgram`, `handleLockProgram`, `handleUpdateProgram`, `handleUnlockProgram`, `handleActivateProgram`, `handleDeleteProgram`, `handleGetProgFullCode` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] search/readonly `handleSearchObject`, `handleGetObjectsList`, `handleGetObjectsByType`, `handleDescribeByList`
+- [x] service_definition/high `handleCreateServiceDefinition`, `handleUpdateServiceDefinition` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] service_definition/readonly `handleGetServiceDefinition` — uses `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] structure/high `handleCreateStructure`, `handleUpdateStructure` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS; connector logging via DEBUG_CONNECTORS)
+- [x] structure/low `handleValidateStructure`, `handleCreateStructure`, `handleCheckStructure`, `handleLockStructure`, `handleUpdateStructure`, `handleUnlockStructure`, `handleActivateStructure`, `handleDeleteStructure` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] system/readonly `handleGetSession`, `handleGetInactiveObjects`, `handleGetAbapAST`, `handleGetAbapSemanticAnalysis`, `handleGetAbapSystemSymbols`, `handleGetTypeInfo`, `handleGetTransaction`, `handleGetObjectInfo`, `handleGetObjectStructure`, `handleDescribeByList` (overlaps search), `handleGetSqlQuery`, `handleGetWhereUsed`, `handleGetAbapTypes` (GetAdtTypes) — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] table/high `handleCreateTable`, `handleUpdateTable` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS; connector logging via DEBUG_CONNECTORS)
+- [x] table/low `handleValidateTable`, `handleCreateTable`, `handleCheckTable`, `handleLockTable`, `handleUpdateTable`, `handleUnlockTable`, `handleActivateTable`, `handleDeleteTable` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] table/readonly `handleGetTableContents` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS); `handleGetTable` has no logging (n/a)
+- [x] transport/high `handleCreateTransport` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] transport/low `handleCreateTransport` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] view/high `handleCreateView`, `handleUpdateView` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] view/low `handleValidateView`, `handleCreateView`, `handleCheckView`, `handleLockView`, `handleUpdateView`, `handleUnlockView`, `handleActivateView`, `handleDeleteView` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] view/readonly `handleGetView` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+- [x] common/low `handleValidateObject`, `handleLockObject`, `handleUnlockObject`, `handleActivateObject`, `handleCheckObject`, `handleDeleteObject` — refactored to `getHandlerLogger` (opt-in via DEBUG_HANDLERS)
+
+## System/readonly migration checklist (done)
+- [x] handleGetSession
+- [x] handleGetInactiveObjects
+- [x] handleGetAbapAST
+- [x] handleGetAbapSemanticAnalysis
+- [x] handleGetAbapSystemSymbols
+- [x] handleGetTypeInfo
+- [x] handleGetTransaction
+- [x] handleGetObjectInfo
+- [x] handleGetObjectStructure
+- [x] handleDescribeByList
+- [x] handleGetSqlQuery
+- [x] handleGetWhereUsed
+- [x] handleGetAbapTypes / handleGetAllTypes
+## Latest test run (integration/view)
+- Status: PASS. Suites: 2/2. Tests: 2/2.
+- Notes: `ViewLowHandlers` skipped when no config/test case; `ViewHighHandlers` passed.

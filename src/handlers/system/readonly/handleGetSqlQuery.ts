@@ -1,6 +1,8 @@
 import { McpError, ErrorCode } from '../../../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, logger } from '../../../lib/utils';
+import { makeAdtRequestWithTimeout, return_error, return_response, logger as baseLogger } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { Logger } from '@mcp-abap-adt/logger';
 
 
 export const TOOL_DEFINITION = {
@@ -49,7 +51,7 @@ export interface SqlQueryResponse {
  * @param rowNumber - Number of rows requested
  * @returns Parsed SQL query response
  */
-function parseSqlQueryXml(xmlData: string, sqlQuery: string, rowNumber: number): SqlQueryResponse {
+function parseSqlQueryXml(xmlData: string, sqlQuery: string, rowNumber: number, handlerLogger: Logger): SqlQueryResponse {
     try {
         // Extract basic information
         const totalRowsMatch = xmlData.match(/<dataPreview:totalRows>(\d+)<\/dataPreview:totalRows>/);
@@ -129,7 +131,7 @@ function parseSqlQueryXml(xmlData: string, sqlQuery: string, rowNumber: number):
         };
         
     } catch (parseError) {
-        logger.error('Failed to parse SQL query XML:', parseError);
+        handlerLogger.error('Failed to parse SQL query XML:', parseError as any);
         
         // Return basic structure on parse error
         return {
@@ -149,8 +151,12 @@ function parseSqlQueryXml(xmlData: string, sqlQuery: string, rowNumber: number):
  * @returns Response with parsed SQL query results or error
  */
 export async function handleGetSqlQuery(args: any) {
+    const handlerLogger = getHandlerLogger(
+      'handleGetSqlQuery',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     try {
-        logger.info('handleGetSqlQuery called with args:', args);
+        handlerLogger.info('handleGetSqlQuery called');
         
         if (!args?.sql_query) {
             throw new McpError(ErrorCode.InvalidParams, 'SQL query is required');
@@ -159,28 +165,25 @@ export async function handleGetSqlQuery(args: any) {
         const sqlQuery = args.sql_query;
         const rowNumber = args.row_number || 100; // Default to 100 rows if not specified
         
-        logger.info('Executing SQL query', { sqlQuery, rowNumber });
+        handlerLogger.info(`Executing SQL query (rows=${rowNumber})`);
         
         // Build URL for freestyle data preview with rowNumber parameter
-        const url = `${await getBaseUrl()}/sap/bc/adt/datapreview/freestyle?rowNumber=${rowNumber}`;
+        const url = `/sap/bc/adt/datapreview/freestyle?rowNumber=${rowNumber}`;
         
-        logger.info(`Making SQL query request to: ${url}`);
+        handlerLogger.debug(`Making SQL query request to: ${url}`);
         
         // Execute POST request with SQL query in body
         const response = await makeAdtRequestWithTimeout(url, 'POST', 'long', sqlQuery);
         
         if (response.status === 200 && response.data) {
-            logger.info('SQL query request completed successfully', { status: response.status });
+            handlerLogger.info('SQL query request completed successfully');
             
             // Parse the XML response
-            const parsedData = parseSqlQueryXml(response.data, sqlQuery, rowNumber);
+            const parsedData = parseSqlQueryXml(response.data, sqlQuery, rowNumber, handlerLogger);
             
-            logger.info('Parsed SQL query data', { 
-                totalRows: parsedData.total_rows, 
-                columnsCount: parsedData.columns.length,
-                rowsCount: parsedData.rows.length,
-                executionTime: parsedData.execution_time
-            });
+            handlerLogger.debug(
+              `Parsed SQL query data: rows=${parsedData.rows.length}/${parsedData.total_rows ?? 0}, columns=${parsedData.columns.length}`
+            );
             
             const result = {
                 isError: false,
@@ -192,6 +195,7 @@ export async function handleGetSqlQuery(args: any) {
                 ]
             };
             if (args.filePath) {
+                handlerLogger.debug(`Writing SQL query result to file: ${args.filePath}`);
                 writeResultToFile(result, args.filePath);
             }
             return result;
@@ -200,6 +204,7 @@ export async function handleGetSqlQuery(args: any) {
         }
         
     } catch (error) {
+        handlerLogger.error('Failed to execute SQL query', error as any);
         // MCP-compliant error response: always return content[] with type "text"
         return {
             isError: true,

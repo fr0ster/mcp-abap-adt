@@ -8,11 +8,12 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateBehaviorImplementation",
@@ -69,6 +70,10 @@ interface CreateBehaviorImplementationArgs {
  * Uses CrudClient.createBehaviorImplementation - full workflow
  */
 export async function handleCreateBehaviorImplementation(args: CreateBehaviorImplementationArgs) {
+  const handlerLogger = getHandlerLogger(
+    'handleCreateBehaviorImplementation',
+    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+  );
   try {
     // Validate required parameters
     if (!args?.class_name) {
@@ -93,7 +98,7 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
     const className = typedArgs.class_name.toUpperCase();
     const behaviorDefinition = typedArgs.behavior_definition.toUpperCase();
 
-    logger.info(`Starting behavior implementation creation: ${className} for ${behaviorDefinition}`);
+    handlerLogger.info(`Starting behavior implementation creation: ${className} for ${behaviorDefinition}`);
 
     try {
       // Create client
@@ -134,7 +139,7 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
         }
       }
 
-      logger.info(`✅ CreateBehaviorImplementation completed successfully: ${className}`);
+      handlerLogger.info(`✅ CreateBehaviorImplementation completed successfully: ${className}`);
 
       // Return success result
       const stepsCompleted = ['create', 'lock', 'update_main_source'];
@@ -170,7 +175,7 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
       });
 
     } catch (error: any) {
-      logger.error(`Error creating behavior implementation ${className}:`, error);
+      handlerLogger.error(`Error creating behavior implementation ${className}: ${error?.message || error}`);
 
       // Check if behavior implementation already exists
       if (error.message?.includes('already exists') || error.response?.status === 409) {
@@ -200,8 +205,7 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
       return return_error(new Error(errorMessage));
     }
   } catch (error: any) {
-    logger.error('CreateBehaviorImplementation handler error:', error);
+    handlerLogger.error(`CreateBehaviorImplementation handler error: ${error?.message || error}`);
     return return_error(error);
   }
 }
-

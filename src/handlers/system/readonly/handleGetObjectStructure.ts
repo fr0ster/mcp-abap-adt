@@ -1,7 +1,8 @@
 // Handler for retrieving ADT object structure and returning compact JSON tree
 
-import { makeAdtRequestWithTimeout, getBaseUrl } from '../../../lib/utils';
+import { makeAdtRequestWithTimeout, logger as baseLogger } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "GetObjectStructure",
@@ -56,9 +57,14 @@ function serializeTree(tree: any[], indent: string = ''): string {
 }
 
 export async function handleGetObjectStructure(args: any) {
+  const handlerLogger = getHandlerLogger(
+    'handleGetObjectStructure',
+    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+  );
   try {
-    const url = `${await getBaseUrl()}/sap/bc/adt/repository/objectstructure?objecttype=${encodeURIComponent(args.objecttype)}&objectname=${encodeURIComponent(args.objectname)}`;
+    const url = `/sap/bc/adt/repository/objectstructure?objecttype=${encodeURIComponent(args.objecttype)}&objectname=${encodeURIComponent(args.objectname)}`;
     const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+    handlerLogger.info(`Fetched object structure for ${args.objecttype}/${args.objectname}`);
 
     // Parse XML response
     const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
@@ -93,6 +99,7 @@ export async function handleGetObjectStructure(args: any) {
       ]
     };
   } catch (error) {
+    handlerLogger.error(`Failed to fetch object structure for ${args?.objecttype}/${args?.objectname}`, error as any);
     return {
       isError: true,
       content: [

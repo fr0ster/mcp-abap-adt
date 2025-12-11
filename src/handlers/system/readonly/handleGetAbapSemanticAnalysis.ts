@@ -1,5 +1,6 @@
-import { McpError, ErrorCode } from '../../../lib/utils';
+import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "GetAbapSemanticAnalysis",
@@ -391,10 +392,15 @@ class SimpleAbapSemanticAnalyzer {
 }
 
 export async function handleGetAbapSemanticAnalysis(args: any) {
+    const handlerLogger = getHandlerLogger(
+      'handleGetAbapSemanticAnalysis',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     try {
         if (!args?.code) {
             throw new McpError(ErrorCode.InvalidParams, 'ABAP code is required');
         }
+        handlerLogger.debug('Running semantic analysis for provided ABAP code');
 
         const analyzer = new SimpleAbapSemanticAnalyzer();
         const analysis = analyzer.analyze(args.code);
@@ -410,11 +416,13 @@ export async function handleGetAbapSemanticAnalysis(args: any) {
         };
 
         if (args.filePath) {
+            handlerLogger.debug(`Writing semantic analysis result to file: ${args.filePath}`);
             writeResultToFile(JSON.stringify(analysis, null, 2), args.filePath);
         }
 
         return result;
     } catch (error) {
+        handlerLogger.error('Failed to perform ABAP semantic analysis', error as any);
         return {
             isError: true,
             content: [

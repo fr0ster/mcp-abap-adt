@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UnlockBehaviorDefinitionLow",
@@ -72,6 +73,11 @@ export async function handleUnlockBehaviorDefinition(args: UnlockBehaviorDefinit
       return return_error(new Error('name, lock_handle, and session_id are required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleUnlockBehaviorDefinition',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
@@ -89,7 +95,7 @@ export async function handleUnlockBehaviorDefinition(args: UnlockBehaviorDefinit
 
     const bdefName = name.toUpperCase();
 
-    logger.info(`Starting behavior definition unlock: ${bdefName} (session: ${session_id.substring(0, 8)}...)`);
+    handlerLogger.info(`Starting behavior definition unlock: ${bdefName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock behavior definition - using types from adt-clients
@@ -106,7 +112,7 @@ export async function handleUnlockBehaviorDefinition(args: UnlockBehaviorDefinit
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UnlockBehaviorDefinition completed: ${bdefName}`);
+      handlerLogger.info(`✅ UnlockBehaviorDefinition completed: ${bdefName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -123,7 +129,7 @@ export async function handleUnlockBehaviorDefinition(args: UnlockBehaviorDefinit
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking behavior definition ${bdefName}:`, error);
+      handlerLogger.error(`Error unlocking behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock behavior definition: ${error.message || String(error)}`;

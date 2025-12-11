@@ -8,9 +8,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger as baseLogger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateServiceDefinition",
@@ -54,6 +55,10 @@ interface UpdateServiceDefinitionArgs {
  */
 export async function handleUpdateServiceDefinition(args: UpdateServiceDefinitionArgs) {
   try {
+    const handlerLogger = getHandlerLogger(
+      "handleUpdateServiceDefinition",
+      process.env.DEBUG_HANDLERS === "true" ? baseLogger : noopLogger
+    );
     const {
       service_definition_name,
       source_code,
@@ -69,7 +74,7 @@ export async function handleUpdateServiceDefinition(args: UpdateServiceDefinitio
     const connection = getManagedConnection();
     const serviceDefinitionName = service_definition_name.toUpperCase();
 
-    logger.info(`Starting service definition source update: ${serviceDefinitionName}`);
+    handlerLogger.info(`Starting service definition source update: ${serviceDefinitionName}`);
 
     try {
       // Create client
@@ -96,7 +101,7 @@ export async function handleUpdateServiceDefinition(args: UpdateServiceDefinitio
             () => client.checkServiceDefinition({ serviceDefinitionName }),
             serviceDefinitionName,
             {
-              debug: (message: string) => logger.info(`[UpdateServiceDefinition] ${message}`)
+              debug: (message: string) => handlerLogger.debug(`[UpdateServiceDefinition] ${message}`)
             }
           );
         } catch (checkError: any) {
@@ -119,7 +124,7 @@ export async function handleUpdateServiceDefinition(args: UpdateServiceDefinitio
         try {
           await client.unlockServiceDefinition({ serviceDefinitionName: serviceDefinitionName }, lockHandle);
         } catch (unlockError) {
-          logger.error('Failed to unlock service definition after error:', unlockError);
+          handlerLogger.error('Failed to unlock service definition after error:', unlockError);
         }
         throw error;
       }
@@ -141,7 +146,7 @@ export async function handleUpdateServiceDefinition(args: UpdateServiceDefinitio
         }
       }
 
-      logger.info(`✅ UpdateServiceDefinition completed successfully: ${serviceDefinitionName}`);
+      handlerLogger.info(`✅ UpdateServiceDefinition completed successfully: ${serviceDefinitionName}`);
 
       // Return success result
       const stepsCompleted = ['lock', 'update', 'check', 'unlock'];
@@ -172,7 +177,7 @@ export async function handleUpdateServiceDefinition(args: UpdateServiceDefinitio
       });
 
     } catch (error: any) {
-      logger.error(`Error updating service definition source ${serviceDefinitionName}:`, error);
+      handlerLogger.error(`Error updating service definition source ${serviceDefinitionName}:`, error);
 
       const errorMessage = error.response?.data
         ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
@@ -185,4 +190,3 @@ export async function handleUpdateServiceDefinition(args: UpdateServiceDefinitio
     return return_error(error);
   }
 }
-

@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateFunctionModuleLow",
@@ -85,6 +86,10 @@ export async function handleUpdateFunctionModule(args: UpdateFunctionModuleArgs)
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateFunctionModuleLow',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -97,7 +102,7 @@ export async function handleUpdateFunctionModule(args: UpdateFunctionModuleArgs)
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function module update: ${functionModuleName} in ${functionGroupName}`);
+    handlerLogger.info(`Starting function module update: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       // Update function module with source code
@@ -111,7 +116,7 @@ export async function handleUpdateFunctionModule(args: UpdateFunctionModuleArgs)
       // Get updated session state after update
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UpdateFunctionModule completed: ${functionModuleName}`);
+      handlerLogger.info(`✅ UpdateFunctionModule completed: ${functionModuleName}`);
 
       // Get lock handle from builder (it should still be there after update)
       const lockHandleFromBuilder = client.getLockHandle();
@@ -133,7 +138,7 @@ export async function handleUpdateFunctionModule(args: UpdateFunctionModuleArgs)
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating function module ${functionModuleName}:`, error);
+      handlerLogger.error(`Error updating function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update function module: ${error.message || String(error)}`;
@@ -166,4 +171,3 @@ export async function handleUpdateFunctionModule(args: UpdateFunctionModuleArgs)
     return return_error(error);
   }
 }
-

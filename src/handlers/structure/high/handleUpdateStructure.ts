@@ -8,11 +8,12 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger as baseLogger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { getConfig } from '../../../index';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateStructure",
@@ -71,7 +72,12 @@ export async function handleUpdateStructure(args: UpdateStructureArgs) {
 
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure source update: ${structureName}`);
+    const handlerLogger = getHandlerLogger(
+      "handleUpdateStructure",
+      process.env.DEBUG_HANDLERS === "true" ? baseLogger : noopLogger
+    );
+
+    handlerLogger.info(`Starting structure source update: ${structureName}`);
 
     // Create a separate connection for this handler call (not using getManagedConnection)
     let connection: any = null;
@@ -81,21 +87,21 @@ export async function handleUpdateStructure(args: UpdateStructureArgs) {
 
       // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
       const connectionLogger = {
-        debug: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {},
-        info: process.env.DEBUG_CONNECTORS === 'true' ? logger.info.bind(logger) : () => {},
-        warn: process.env.DEBUG_CONNECTORS === 'true' ? logger.warn.bind(logger) : () => {},
-        error: process.env.DEBUG_CONNECTORS === 'true' ? logger.error.bind(logger) : () => {},
-        csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {}
+        debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : noopLogger.debug,
+        info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : noopLogger.info,
+        warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : noopLogger.warn,
+        error: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.error.bind(baseLogger) : noopLogger.error,
+        csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : noopLogger.debug
       };
 
       // Create connection directly for this handler call
       connection = createAbapConnection(config, connectionLogger);
       await connection.connect();
 
-      logger.debug(`[UpdateStructure] Created separate connection for handler call: ${structureName}`);
+      handlerLogger.debug(`[UpdateStructure] Created separate connection for handler call: ${structureName}`);
     } catch (connectionError: any) {
       const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
-      logger.error(`[UpdateStructure] Failed to create connection: ${errorMessage}`);
+      handlerLogger.error(`[UpdateStructure] Failed to create connection: ${errorMessage}`);
       return return_error(new Error(`Failed to create connection: ${errorMessage}`));
     }
 
@@ -113,26 +119,26 @@ export async function handleUpdateStructure(args: UpdateStructureArgs) {
 
       try {
         // Step 1: Check new code BEFORE update (with ddlCode and version='inactive')
-        logger.info(`[UpdateStructure] Checking new DDL code before update: ${structureName}`);
+        handlerLogger.info(`[UpdateStructure] Checking new DDL code before update: ${structureName}`);
         let checkNewCodePassed = false;
         try {
           await safeCheckOperation(
             () => client.checkStructure({ structureName }, ddl_code, 'inactive'),
             structureName,
             {
-              debug: (message: string) => logger.info(`[UpdateStructure] ${message}`)
+              debug: (message: string) => handlerLogger.debug(`[UpdateStructure] ${message}`)
             }
           );
           checkNewCodePassed = true;
-          logger.info(`[UpdateStructure] New code check passed: ${structureName}`);
+          handlerLogger.info(`[UpdateStructure] New code check passed: ${structureName}`);
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
           if ((checkError as any).isAlreadyChecked) {
-            logger.info(`[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`);
+            handlerLogger.info(`[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`);
             checkNewCodePassed = true;
           } else {
             // Real check error - don't update if check failed
-            logger.error(`[UpdateStructure] New code check failed: ${structureName}`, {
+            handlerLogger.error(`[UpdateStructure] New code check failed: ${structureName}`, {
               error: checkError instanceof Error ? checkError.message : String(checkError)
             });
             throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
@@ -141,35 +147,35 @@ export async function handleUpdateStructure(args: UpdateStructureArgs) {
 
         // Step 2: Update (only if check passed)
         if (checkNewCodePassed) {
-          logger.info(`[UpdateStructure] Updating structure with DDL code: ${structureName}`);
+          handlerLogger.info(`[UpdateStructure] Updating structure with DDL code: ${structureName}`);
           await client.updateStructure({ structureName, ddlCode: ddl_code }, lockHandle);
-          logger.info(`[UpdateStructure] Structure source code updated: ${structureName}`);
+          handlerLogger.info(`[UpdateStructure] Structure source code updated: ${structureName}`);
         } else {
-          logger.info(`[UpdateStructure] Skipping update - new code check failed: ${structureName}`);
+          handlerLogger.info(`[UpdateStructure] Skipping update - new code check failed: ${structureName}`);
         }
 
         // Step 3: Unlock (MANDATORY after lock)
         await client.unlockStructure({ structureName }, lockHandle);
-        logger.info(`[UpdateStructure] Structure unlocked: ${structureName}`);
+        handlerLogger.info(`[UpdateStructure] Structure unlocked: ${structureName}`);
 
         // Step 4: Check inactive version (after unlock)
-        logger.info(`[UpdateStructure] Checking inactive version: ${structureName}`);
+        handlerLogger.info(`[UpdateStructure] Checking inactive version: ${structureName}`);
         try {
           await safeCheckOperation(
             () => client.checkStructure({ structureName }, undefined, 'inactive'),
             structureName,
             {
-              debug: (message: string) => logger.info(`[UpdateStructure] ${message}`)
+              debug: (message: string) => handlerLogger.debug(`[UpdateStructure] ${message}`)
             }
           );
-          logger.info(`[UpdateStructure] Inactive version check completed: ${structureName}`);
+          handlerLogger.info(`[UpdateStructure] Inactive version check completed: ${structureName}`);
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
           if ((checkError as any).isAlreadyChecked) {
-            logger.info(`[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`);
+            handlerLogger.info(`[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`);
           } else {
             // Log warning but don't fail - inactive check is informational
-            logger.warn(`[UpdateStructure] Inactive version check had issues: ${structureName}`, {
+            handlerLogger.warn(`[UpdateStructure] Inactive version check had issues: ${structureName}`, {
               error: checkError instanceof Error ? checkError.message : String(checkError)
             });
           }
@@ -184,7 +190,7 @@ export async function handleUpdateStructure(args: UpdateStructureArgs) {
         try {
           await client.unlockStructure({ structureName: structureName }, lockHandle);
         } catch (unlockError) {
-          logger.error('Failed to unlock structure after error:', unlockError);
+          handlerLogger.error('Failed to unlock structure after error:', unlockError);
         }
         throw error;
       }
@@ -206,7 +212,7 @@ export async function handleUpdateStructure(args: UpdateStructureArgs) {
         }
       }
 
-      logger.info(`✅ UpdateStructure completed successfully: ${structureName}`);
+      handlerLogger.info(`✅ UpdateStructure completed successfully: ${structureName}`);
 
       // Return success result
       const stepsCompleted = ['lock', 'check_new_code', 'update', 'unlock', 'check_inactive'];
@@ -237,7 +243,7 @@ export async function handleUpdateStructure(args: UpdateStructureArgs) {
       });
 
     } catch (error: any) {
-      logger.error(`Error updating structure source ${structureName}:`, error);
+      handlerLogger.error(`Error updating structure source ${structureName}:`, error);
 
       const errorMessage = error.response?.data
         ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
@@ -249,9 +255,9 @@ export async function handleUpdateStructure(args: UpdateStructureArgs) {
       if (connection) {
         try {
           connection.reset();
-          logger.debug(`[UpdateStructure] Reset connection`);
+          handlerLogger.debug(`[UpdateStructure] Reset connection`);
         } catch (resetError: any) {
-          logger.error(`[UpdateStructure] Failed to reset connection: ${resetError.message || resetError}`);
+          handlerLogger.error(`[UpdateStructure] Failed to reset connection: ${resetError.message || resetError}`);
         }
       }
     }
@@ -260,4 +266,3 @@ export async function handleUpdateStructure(args: UpdateStructureArgs) {
     return return_error(error);
   }
 }
-

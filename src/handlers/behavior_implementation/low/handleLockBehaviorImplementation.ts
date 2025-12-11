@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { ClassBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "LockBehaviorImplementationLow",
@@ -82,8 +83,12 @@ export async function handleLockBehaviorImplementation(args: LockBehaviorImpleme
     }
 
     const className = class_name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleLockBehaviorImplementation',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting behavior implementation lock: ${className}`);
+    handlerLogger.info(`Starting behavior implementation lock: ${className}`);
 
     try {
       // Lock class (BehaviorImplementation extends ClassBuilder)
@@ -98,8 +103,8 @@ export async function handleLockBehaviorImplementation(args: LockBehaviorImpleme
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ LockBehaviorImplementation completed: ${className}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      handlerLogger.info(`✅ LockBehaviorImplementation completed: ${className}`);
+      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -117,7 +122,7 @@ export async function handleLockBehaviorImplementation(args: LockBehaviorImpleme
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking behavior implementation ${className}:`, error);
+      handlerLogger.error(`Error locking behavior implementation ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock behavior implementation: ${error.message || String(error)}`;

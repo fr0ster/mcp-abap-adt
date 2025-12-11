@@ -6,7 +6,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, parseValidationResponse, logErrorSafely } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, logErrorSafely } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -86,6 +87,11 @@ interface ValidateObjectArgs {
  */
 export async function handleValidateObject(args: ValidateObjectArgs) {
   try {
+    const handlerLogger = getHandlerLogger(
+      'handleValidateObject',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
     const {
       object_name,
       object_type,
@@ -126,9 +132,10 @@ export async function handleValidateObject(args: ValidateObjectArgs) {
 
     const objectName = object_name.toUpperCase();
 
-    logger.info(`Starting object validation: ${objectName} (type: ${object_type})`);
+    handlerLogger.info(`Starting object validation: ${objectName} (type: ${object_type})`);
 
     try {
+
       // Validate object using specific validation method based on type
       let result: any;
 
@@ -313,8 +320,8 @@ export async function handleValidateObject(args: ValidateObjectArgs) {
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ValidateObject completed: ${objectName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      handlerLogger.info(`✅ ValidateObject completed: ${objectName}`);
+      handlerLogger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
         data: JSON.stringify({
@@ -335,7 +342,7 @@ export async function handleValidateObject(args: ValidateObjectArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logErrorSafely(logger, `ValidateObject ${objectName}`, error);
+      logErrorSafely(handlerLogger, `ValidateObject ${objectName}`, error);
 
       // Parse error message
       let errorMessage = `Failed to validate object: ${error.message || String(error)}`;
@@ -366,4 +373,3 @@ export async function handleValidateObject(args: ValidateObjectArgs) {
     return return_error(error);
   }
 }
-

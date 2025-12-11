@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateBehaviorDefinitionLow",
@@ -78,6 +79,11 @@ export async function handleUpdateBehaviorDefinition(args: UpdateBehaviorDefinit
       return return_error(new Error('name, source_code, and lock_handle are required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateBehaviorDefinition',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
@@ -95,7 +101,7 @@ export async function handleUpdateBehaviorDefinition(args: UpdateBehaviorDefinit
 
     const behaviorDefinitionName = name.toUpperCase();
 
-    logger.info(`Starting behavior definition update: ${behaviorDefinitionName}`);
+    handlerLogger.info(`Starting behavior definition update: ${behaviorDefinitionName}`);
 
     try {
       // Update behavior definition with source code - using types from adt-clients
@@ -113,7 +119,7 @@ export async function handleUpdateBehaviorDefinition(args: UpdateBehaviorDefinit
       // Get updated session state after update
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UpdateBehaviorDefinition completed: ${behaviorDefinitionName}`);
+      handlerLogger.info(`✅ UpdateBehaviorDefinition completed: ${behaviorDefinitionName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -130,7 +136,7 @@ export async function handleUpdateBehaviorDefinition(args: UpdateBehaviorDefinit
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating behavior definition ${behaviorDefinitionName}:`, error);
+      handlerLogger.error(`Error updating behavior definition ${behaviorDefinitionName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update behavior definition: ${error.message || String(error)}`;
@@ -163,4 +169,3 @@ export async function handleUpdateBehaviorDefinition(args: UpdateBehaviorDefinit
     return return_error(error);
   }
 }
-

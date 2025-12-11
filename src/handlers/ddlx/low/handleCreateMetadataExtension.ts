@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateMetadataExtensionLow",
@@ -91,6 +92,10 @@ export async function handleCreateMetadataExtension(args: CreateMetadataExtensio
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCreateMetadataExtension',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -106,7 +111,7 @@ export async function handleCreateMetadataExtension(args: CreateMetadataExtensio
 
     const ddlxName = name.toUpperCase();
 
-    logger.info(`Starting metadata extension creation: ${ddlxName}`);
+    handlerLogger.info(`Starting metadata extension creation: ${ddlxName}`);
 
     try {
       // Create metadata extension
@@ -125,7 +130,7 @@ export async function handleCreateMetadataExtension(args: CreateMetadataExtensio
       // Get updated session state after create
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CreateMetadataExtension completed: ${ddlxName}`);
+      handlerLogger.info(`✅ CreateMetadataExtension completed: ${ddlxName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -145,7 +150,7 @@ export async function handleCreateMetadataExtension(args: CreateMetadataExtensio
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating metadata extension ${ddlxName}:`, error);
+      handlerLogger.error(`Error creating metadata extension ${ddlxName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create metadata extension: ${error.message || String(error)}`;

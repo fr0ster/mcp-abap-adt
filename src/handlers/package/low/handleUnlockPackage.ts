@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UnlockPackageLow",
@@ -79,6 +80,10 @@ export async function handleUnlockPackage(args: UnlockPackageArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUnlockPackage',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_state) {
@@ -93,7 +98,7 @@ export async function handleUnlockPackage(args: UnlockPackageArgs) {
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    logger.info(`Starting package unlock: ${packageName} (session: ${session_id.substring(0, 8)}...)`);
+    handlerLogger.info(`Starting package unlock: ${packageName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Get builder instance and set lockHandle in state before unlock
@@ -116,7 +121,7 @@ export async function handleUnlockPackage(args: UnlockPackageArgs) {
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UnlockPackage completed: ${packageName}`);
+      handlerLogger.info(`✅ UnlockPackage completed: ${packageName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -134,7 +139,7 @@ export async function handleUnlockPackage(args: UnlockPackageArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking package ${packageName}:`, error);
+      handlerLogger.error(`Error unlocking package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock package: ${error.message || String(error)}`;
@@ -167,4 +172,3 @@ export async function handleUnlockPackage(args: UnlockPackageArgs) {
     return return_error(error);
   }
 }
-

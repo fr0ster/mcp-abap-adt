@@ -6,10 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
-import { getConfig } from '../../../index';
-import { loggerAdapter } from '../../../lib/loggerAdapter';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "DeletePackageLow",
@@ -68,7 +67,12 @@ export async function handleDeletePackage(args: DeletePackageArgs) {
     const client = new CrudClient(connection);
     await connection.connect();
 
-    logger.info(`Starting package deletion: ${packageName}`);
+    const handlerLogger = getHandlerLogger(
+      'handleDeletePackage',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
+    handlerLogger.info(`Starting package deletion: ${packageName}`);
 
     try {
       // Delete package
@@ -79,7 +83,7 @@ export async function handleDeletePackage(args: DeletePackageArgs) {
         throw new Error(`Delete did not return a response for package ${packageName}`);
       }
 
-      logger.info(`✅ DeletePackage completed successfully: ${packageName}`);
+      handlerLogger.info(`✅ DeletePackage completed successfully: ${packageName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -91,7 +95,7 @@ export async function handleDeletePackage(args: DeletePackageArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting package ${packageName}:`, error);
+      handlerLogger.error(`Error deleting package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete package: ${error.message || String(error)}`;
@@ -126,4 +130,3 @@ export async function handleDeletePackage(args: DeletePackageArgs) {
     return return_error(error);
   }
 }
-

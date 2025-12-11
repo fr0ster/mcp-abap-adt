@@ -6,9 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
-import { handlerLogger } from '../../../lib/logger';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UnlockDataElementLow",
@@ -74,6 +74,10 @@ export async function handleUnlockDataElement(args: UnlockDataElementArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUnlockDataElement',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_state) {
@@ -89,33 +93,22 @@ export async function handleUnlockDataElement(args: UnlockDataElementArgs) {
 
     const dataElementName = data_element_name.toUpperCase();
 
-    handlerLogger.info('UnlockDataElementLow', 'start', `Starting data element unlock: ${dataElementName}`, {
-      dataElementName,
-      sessionId: session_id.substring(0, 8) + '...',
-      hasLockHandle: !!lock_handle
-    });
+    handlerLogger.info(`Starting data element unlock: ${dataElementName}`);
 
     try {
       // Unlock data element
-      handlerLogger.debug('UnlockDataElementLow', 'unlock', `Unlocking data element: ${dataElementName}`, {
-        dataElementName,
-        lockHandle: lock_handle.substring(0, 20) + '...'
-      });
       await client.unlockDataElement({ dataElementName: dataElementName }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {
-        handlerLogger.error('UnlockDataElementLow', 'unlock', `Unlock did not return a response for data element ${dataElementName}`);
+        handlerLogger.error(`Unlock did not return a response for data element ${dataElementName}`);
         throw new Error(`Unlock did not return a response for data element ${dataElementName}`);
       }
 
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();
 
-      handlerLogger.info('UnlockDataElementLow', 'complete', `Data element unlocked: ${dataElementName}`, {
-        dataElementName,
-        status: unlockResult.status
-      });
+      handlerLogger.info(`✅ UnlockDataElement completed: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -132,7 +125,7 @@ export async function handleUnlockDataElement(args: UnlockDataElementArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking data element ${dataElementName}:`, error);
+      handlerLogger.error(`Error unlocking data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock data element: ${error.message || String(error)}`;
@@ -165,4 +158,3 @@ export async function handleUnlockDataElement(args: UnlockDataElementArgs) {
     return return_error(error);
   }
 }
-

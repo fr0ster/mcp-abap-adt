@@ -5,9 +5,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { TableBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ValidateTableLow",
@@ -75,6 +76,10 @@ export async function handleValidateTable(args: ValidateTableArgs) {
     }
 
     const connection = getManagedConnection();
+    const handlerLogger = getHandlerLogger(
+      'handleValidateTable',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -90,7 +95,7 @@ export async function handleValidateTable(args: ValidateTableArgs) {
 
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table validation: ${tableName}`);
+    handlerLogger.info(`Starting table validation: ${tableName}`);
 
     try {
       const client = new CrudClient(connection);
@@ -109,8 +114,8 @@ export async function handleValidateTable(args: ValidateTableArgs) {
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ValidateTable completed: ${tableName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message || 'N/A'}`);
+      handlerLogger.info(`✅ ValidateTable completed: ${tableName}`);
+      handlerLogger.info(`   Valid: ${result.valid}, Message: ${result.message || 'N/A'}`);
 
       return return_response({
         data: JSON.stringify({
@@ -131,7 +136,7 @@ export async function handleValidateTable(args: ValidateTableArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating table ${tableName}:`, error);
+      handlerLogger.error(`Error validating table ${tableName}:`, error);
 
       let errorMessage = `Failed to validate table: ${error.message || String(error)}`;
 
@@ -161,4 +166,3 @@ export async function handleValidateTable(args: ValidateTableArgs) {
     return return_error(error);
   }
 }
-

@@ -3,8 +3,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
     name: "GetInactiveObjects",
@@ -18,11 +19,15 @@ export const TOOL_DEFINITION = {
 
 export async function handleGetInactiveObjects(params: any) {
     const connection = getManagedConnection();
+    const handlerLogger = getHandlerLogger(
+      'handleGetInactiveObjects',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     try {
         const client = new CrudClient(connection);
 
-        logger.info("Retrieving inactive objects...");
+        handlerLogger.info("Retrieving inactive objects...");
         const result = await client.getInactiveObjects();
 
         return return_response({
@@ -38,7 +43,7 @@ export async function handleGetInactiveObjects(params: any) {
         });
 
     } catch (error: any) {
-        logger.error("Error retrieving inactive objects:", error);
+        handlerLogger.error("Error retrieving inactive objects:", error);
         return return_error(error);
     }
 }

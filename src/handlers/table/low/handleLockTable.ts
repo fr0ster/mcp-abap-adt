@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "LockTableLow",
@@ -67,6 +68,10 @@ export async function handleLockTable(args: LockTableArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleLockTable',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -82,7 +87,7 @@ export async function handleLockTable(args: LockTableArgs) {
 
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table lock: ${tableName}`);
+    handlerLogger.info(`Starting table lock: ${tableName}`);
 
     try {
       // Lock table
@@ -96,8 +101,8 @@ export async function handleLockTable(args: LockTableArgs) {
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ LockTable completed: ${tableName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      handlerLogger.info(`✅ LockTable completed: ${tableName}`);
+      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -115,7 +120,7 @@ export async function handleLockTable(args: LockTableArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking table ${tableName}:`, error);
+      handlerLogger.error(`Error locking table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to lock table: ${error.message || String(error)}`;
@@ -148,4 +153,3 @@ export async function handleLockTable(args: LockTableArgs) {
     return return_error(error);
   }
 }
-

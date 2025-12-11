@@ -6,9 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
-import { handlerLogger } from '../../../lib/logger';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "LockDataElementLow",
@@ -68,6 +68,10 @@ export async function handleLockDataElement(args: LockDataElementArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleLockDataElement',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -83,30 +87,22 @@ export async function handleLockDataElement(args: LockDataElementArgs) {
 
     const dataElementName = data_element_name.toUpperCase();
 
-    handlerLogger.info('LockDataElementLow', 'start', `Starting data element lock: ${dataElementName}`, {
-      dataElementName,
-      hasSession: !!(session_id && session_state)
-    });
+    handlerLogger.info(`Starting data element lock: ${dataElementName}`);
 
     try {
       // Lock data element
-      handlerLogger.debug('LockDataElementLow', 'lock', `Locking data element: ${dataElementName}`);
       await client.lockDataElement({ dataElementName: dataElementName });
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {
-        handlerLogger.error('LockDataElementLow', 'lock', `Lock did not return a lock handle for data element ${dataElementName}`);
+        handlerLogger.error(`Lock did not return a lock handle for data element ${dataElementName}`);
         throw new Error(`Lock did not return a lock handle for data element ${dataElementName}`);
       }
 
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
-      handlerLogger.info('LockDataElementLow', 'complete', `Data element locked: ${dataElementName}`, {
-        dataElementName,
-        lockHandle: lockHandle.substring(0, 20) + '...',
-        status: 'success'
-      });
+      handlerLogger.info(`✅ LockDataElement completed: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -124,7 +120,7 @@ export async function handleLockDataElement(args: LockDataElementArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking data element ${dataElementName}:`, error);
+      handlerLogger.error(`Error locking data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock data element: ${error.message || String(error)}`;
@@ -157,4 +153,3 @@ export async function handleLockDataElement(args: LockDataElementArgs) {
     return return_error(error);
   }
 }
-

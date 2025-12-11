@@ -6,9 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
-import { handlerLogger } from '../../../lib/logger';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ActivateDataElementLow",
@@ -68,6 +68,10 @@ export async function handleActivateDataElement(args: ActivateDataElementArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleActivateDataElement',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -83,19 +87,15 @@ export async function handleActivateDataElement(args: ActivateDataElementArgs) {
 
     const dataElementName = data_element_name.toUpperCase();
 
-    handlerLogger.info('ActivateDataElementLow', 'start', `Starting data element activation: ${dataElementName}`, {
-      dataElementName,
-      hasSession: !!(session_id && session_state)
-    });
+    handlerLogger.info(`Starting data element activation: ${dataElementName}`);
 
     try {
       // Activate data element
-      handlerLogger.debug('ActivateDataElementLow', 'activate', `Activating data element: ${dataElementName}`);
       await client.activateDataElement({ dataElementName: dataElementName });
       const response = client.getActivateResult();
 
       if (!response) {
-        handlerLogger.error('ActivateDataElementLow', 'activate', `Activation did not return a response for data element ${dataElementName}`);
+        handlerLogger.error(`Activation did not return a response for data element ${dataElementName}`);
         throw new Error(`Activation did not return a response for data element ${dataElementName}`);
       }
 
@@ -106,13 +106,7 @@ export async function handleActivateDataElement(args: ActivateDataElementArgs) {
       // Get updated session state after activation
       const updatedSessionState = connection.getSessionState();
 
-      handlerLogger.info('ActivateDataElementLow', 'complete', `Data element activation completed: ${dataElementName}`, {
-        dataElementName,
-        activated: activationResult.activated,
-        checked: activationResult.checked,
-        messagesCount: activationResult.messages.length,
-        success
-      });
+      handlerLogger.info(`✅ ActivateDataElement completed: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -139,7 +133,7 @@ export async function handleActivateDataElement(args: ActivateDataElementArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating data element ${dataElementName}:`, error);
+      handlerLogger.error(`Error activating data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate data element: ${error.message || String(error)}`;
@@ -170,4 +164,3 @@ export async function handleActivateDataElement(args: ActivateDataElementArgs) {
     return return_error(error);
   }
 }
-

@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, logErrorSafely } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, logErrorSafely } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateDomainLow",
@@ -85,6 +86,10 @@ export async function handleCreateDomain(args: CreateDomainArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCreateDomainLow',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -100,7 +105,7 @@ export async function handleCreateDomain(args: CreateDomainArgs) {
 
     const domainName = domain_name.toUpperCase();
 
-    logger.info(`Starting domain creation: ${domainName}`);
+    handlerLogger.info(`Starting domain creation: ${domainName}`);
 
     try {
       // Create domain
@@ -119,7 +124,7 @@ export async function handleCreateDomain(args: CreateDomainArgs) {
       // Get updated session state after create
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CreateDomain completed: ${domainName}`);
+      handlerLogger.info(`✅ CreateDomain completed: ${domainName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -139,7 +144,7 @@ export async function handleCreateDomain(args: CreateDomainArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logErrorSafely(logger, `CreateDomain ${domainName}`, error);
+      logErrorSafely(baseLogger, `CreateDomain ${domainName}`, error);
 
       // Parse error message
       let errorMessage = `Failed to create domain: ${error.message || String(error)}`;
@@ -170,4 +175,3 @@ export async function handleCreateDomain(args: CreateDomainArgs) {
     return return_error(error);
   }
 }
-

@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "DeleteBehaviorDefinitionLow",
@@ -51,11 +52,16 @@ export async function handleDeleteBehaviorDefinition(args: DeleteBehaviorDefinit
       return return_error(new Error('name is required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleDeleteBehaviorDefinition',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
     const bdefName = name.toUpperCase();
 
-    logger.info(`Starting behavior definition deletion: ${bdefName}`);
+    handlerLogger.info(`Starting behavior definition deletion: ${bdefName}`);
 
     try {
       // Delete behavior definition - using types from adt-clients
@@ -70,7 +76,7 @@ export async function handleDeleteBehaviorDefinition(args: DeleteBehaviorDefinit
         throw new Error(`Delete did not return a response for behavior definition ${bdefName}`);
       }
 
-      logger.info(`✅ DeleteBehaviorDefinition completed successfully: ${bdefName}`);
+      handlerLogger.info(`✅ DeleteBehaviorDefinition completed successfully: ${bdefName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -82,7 +88,7 @@ export async function handleDeleteBehaviorDefinition(args: DeleteBehaviorDefinit
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting behavior definition ${bdefName}:`, error);
+      handlerLogger.error(`Error deleting behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete behavior definition: ${error.message || String(error)}`;

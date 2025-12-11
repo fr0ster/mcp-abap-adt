@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ActivateFunctionModuleLow",
@@ -76,6 +77,10 @@ export async function handleActivateFunctionModule(args: ActivateFunctionModuleA
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleActivateFunctionModule',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -92,7 +97,7 @@ export async function handleActivateFunctionModule(args: ActivateFunctionModuleA
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function module activation: ${functionModuleName} in group ${functionGroupName}`);
+    handlerLogger.info(`Starting function module activation: ${functionModuleName} in group ${functionGroupName}`);
 
     try {
       // Activate function module
@@ -110,9 +115,8 @@ export async function handleActivateFunctionModule(args: ActivateFunctionModuleA
       // Get updated session state after activation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ActivateFunctionModule completed: ${functionModuleName}`);
-      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      logger.info(`   Messages: ${activationResult.messages.length}`);
+      handlerLogger.info(`✅ ActivateFunctionModule completed: ${functionModuleName}`);
+      handlerLogger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -140,7 +144,7 @@ export async function handleActivateFunctionModule(args: ActivateFunctionModuleA
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating function module ${functionModuleName}:`, error);
+      handlerLogger.error(`Error activating function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate function module: ${error.message || String(error)}`;
@@ -171,4 +175,3 @@ export async function handleActivateFunctionModule(args: ActivateFunctionModuleA
     return return_error(error);
   }
 }
-

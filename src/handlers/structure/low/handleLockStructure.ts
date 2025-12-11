@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "LockStructureLow",
@@ -67,6 +68,10 @@ export async function handleLockStructure(args: LockStructureArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleLockStructure',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -82,7 +87,7 @@ export async function handleLockStructure(args: LockStructureArgs) {
 
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure lock: ${structureName}`);
+    handlerLogger.info(`Starting structure lock: ${structureName}`);
 
     try {
       // Lock structure
@@ -96,8 +101,8 @@ export async function handleLockStructure(args: LockStructureArgs) {
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ LockStructure completed: ${structureName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      handlerLogger.info(`✅ LockStructure completed: ${structureName}`);
+      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -115,7 +120,7 @@ export async function handleLockStructure(args: LockStructureArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking structure ${structureName}:`, error);
+      handlerLogger.error(`Error locking structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to lock structure: ${error.message || String(error)}`;
@@ -148,4 +153,3 @@ export async function handleLockStructure(args: LockStructureArgs) {
     return return_error(error);
   }
 }
-

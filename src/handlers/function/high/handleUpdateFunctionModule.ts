@@ -8,8 +8,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateFunctionModule",
@@ -73,8 +74,12 @@ export async function handleUpdateFunctionModule(args: UpdateFunctionModuleArgs)
     const connection = getManagedConnection();
     const functionGroupName = args.function_group_name.toUpperCase();
     const functionModuleName = args.function_module_name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateFunctionModule',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting function module source update: ${functionModuleName} in ${functionGroupName}`);
+    handlerLogger.info(`Starting function module source update: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       const client = new CrudClient(connection);
@@ -91,11 +96,11 @@ export async function handleUpdateFunctionModule(args: UpdateFunctionModuleArgs)
           await client.activateFunctionModule({ functionModuleName, functionGroupName });
         }
       } catch (error) {
-        logger.error('Function module update chain failed:', error);
+        handlerLogger.error(`Function module update chain failed: ${error instanceof Error ? error.message : String(error)}`);
         throw error;
       }
 
-      logger.info(`✅ UpdateFunctionModule completed successfully: ${functionModuleName}`);
+      handlerLogger.info(`✅ UpdateFunctionModule completed successfully: ${functionModuleName}`);
 
       const result = {
         success: true,
@@ -114,7 +119,7 @@ export async function handleUpdateFunctionModule(args: UpdateFunctionModuleArgs)
       });
 
     } catch (error: any) {
-      logger.error(`Error updating function module source ${functionModuleName}:`, error);
+      handlerLogger.error(`Error updating function module source ${functionModuleName}: ${error?.message || error}`);
 
       const errorMessage = error.response?.data
         ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))

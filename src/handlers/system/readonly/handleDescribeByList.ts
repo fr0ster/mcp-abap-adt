@@ -22,6 +22,8 @@ export const TOOL_DEFINITION = {
 // DescribeByList: Batch description for a list of ABAP objects
 
 import { handleSearchObject } from "../../search/readonly/handleSearchObject";
+import { logger as baseLogger } from "../../../lib/utils";
+import { getHandlerLogger, noopLogger } from "../../../lib/handlerLogger";
 
 /**
  * DescribeByListArray handler.
@@ -29,6 +31,10 @@ import { handleSearchObject } from "../../search/readonly/handleSearchObject";
  * @returns Result of handleDetectObjectTypeList with objects
  */
 export async function handleDescribeByList(args: any) {
+  const handlerLogger = getHandlerLogger(
+    'handleDescribeByList',
+    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+  );
   const objects = args?.objects;
   if (!args || !Array.isArray(objects) || objects.length === 0) {
     const err = new Error("Missing or invalid parameters: objects (array) is required and must not be empty.");
@@ -43,6 +49,7 @@ export async function handleDescribeByList(args: any) {
     };
     throw err;
   }
+  handlerLogger.info(`Describing ${objects.length} objects via search`);
   const results: any[] = [];
   try {
     for (const obj of objects) {
@@ -119,6 +126,7 @@ export async function handleDescribeByList(args: any) {
       content: results
     };
   } catch (e) {
+    handlerLogger.error('Failed to describe objects list', e as any);
     return { isError: true, content: [] };
   }
 }

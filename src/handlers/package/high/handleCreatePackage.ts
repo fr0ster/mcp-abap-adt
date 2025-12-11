@@ -8,10 +8,11 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, logErrorSafely } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, logErrorSafely } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { PackageBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreatePackage",
@@ -59,18 +60,12 @@ export async function handleCreatePackage(args: CreatePackageArgs) {
     const typedArgs = args;
     const connection = getManagedConnection();
     const packageName = typedArgs.package_name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleCreatePackage',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting package creation: ${packageName}`);
-    logger.info(`Received args:`, {
-      package_name: typedArgs.package_name,
-      super_package: typedArgs.super_package,
-      description: typedArgs.description,
-      package_type: typedArgs.package_type,
-      software_component: typedArgs.software_component,
-      transport_layer: typedArgs.transport_layer,
-      transport_request: typedArgs.transport_request,
-      application_component: typedArgs.application_component
-    });
+    handlerLogger.info(`Starting package creation: ${packageName}`);
 
     try {
       const client = new CrudClient(connection);
@@ -103,15 +98,15 @@ export async function handleCreatePackage(args: CreatePackageArgs) {
       }
 
       // DEBUG: Log softwareComponent at each step
-      console.log(`[HANDLER] software_component in args: ${typedArgs.software_component || 'undefined'}`);
-      console.log(`[HANDLER] softwareComponent in config: ${createConfig.softwareComponent || 'undefined'}`);
+      handlerLogger.debug(`[CreatePackage] software_component in args: ${typedArgs.software_component || 'undefined'}`);
+      handlerLogger.debug(`[CreatePackage] softwareComponent in config: ${createConfig.softwareComponent || 'undefined'}`);
 
       await client.createPackage(createConfig);
 
       // Check
       await client.checkPackage({ packageName: packageName, superPackage: typedArgs.super_package });
 
-      logger.info(`✅ CreatePackage completed successfully: ${packageName}`);
+      handlerLogger.info(`✅ CreatePackage completed successfully: ${packageName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -129,7 +124,7 @@ export async function handleCreatePackage(args: CreatePackageArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logErrorSafely(logger, `CreatePackage ${packageName}`, error);
+      logErrorSafely(baseLogger, `CreatePackage ${packageName}`, error);
 
       // Check for authentication errors (expired tokens)
       if (error.message?.includes('Refresh token has expired') ||

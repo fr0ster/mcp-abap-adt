@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "LockInterfaceLow",
@@ -67,6 +68,10 @@ export async function handleLockInterface(args: LockInterfaceArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleLockInterface',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -82,7 +87,7 @@ export async function handleLockInterface(args: LockInterfaceArgs) {
 
     const interfaceName = interface_name.toUpperCase();
 
-    logger.info(`Starting interface lock: ${interfaceName}`);
+    handlerLogger.info(`Starting interface lock: ${interfaceName}`);
 
     try {
       // Lock interface
@@ -96,8 +101,8 @@ export async function handleLockInterface(args: LockInterfaceArgs) {
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ LockInterface completed: ${interfaceName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      handlerLogger.info(`✅ LockInterface completed: ${interfaceName}`);
+      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -115,7 +120,7 @@ export async function handleLockInterface(args: LockInterfaceArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking interface ${interfaceName}:`, error);
+      handlerLogger.error(`Error locking interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock interface: ${error.message || String(error)}`;
@@ -148,4 +153,3 @@ export async function handleLockInterface(args: LockInterfaceArgs) {
     return return_error(error);
   }
 }
-

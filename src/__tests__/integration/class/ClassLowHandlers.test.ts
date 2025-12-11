@@ -110,21 +110,23 @@ describe('Class Low-Level Handlers Integration', () => {
       testClassName = testCase.params.class_name;
     });
 
-    it('should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate', async () => {
-      if (!hasConfig || !testCase || !testClassName) {
-        debugLog('TEST_SKIP', 'Skipping test: No configuration or test case', {
-          hasConfig,
-          hasTestCase: !!testCase,
-          hasTestClassName: !!testClassName
-        });
-        console.log('⏭️  Skipping test: No configuration or test case');
-        return;
-      }
+  it('should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate', async () => {
+    if (!hasConfig || !testCase || !testClassName) {
+      debugLog('TEST_SKIP', 'Skipping test: No configuration or test case', {
+        hasConfig,
+        hasTestCase: !!testCase,
+        hasTestClassName: !!testClassName
+      });
+      console.log('⏭️  Skipping test: No configuration or test case');
+      return;
+    }
 
-      // Create a separate connection and session for this test (not using getManagedConnection)
-      let connection: AbapConnection | null = null;
-      let session: SessionInfo | null = null;
-      let diagnosticsTracker: ReturnType<typeof createDiagnosticsTracker> | null = null;
+    logLine(`▶️ ClassLowHandlers workflow started for ${testClassName}`);
+
+    // Create a separate connection and session for this test (not using getManagedConnection)
+    let connection: AbapConnection | null = null;
+    let session: SessionInfo | null = null;
+    let diagnosticsTracker: ReturnType<typeof createDiagnosticsTracker> | null = null;
 
       try {
         const { connection: testConnection, session: testSession } = await createTestConnectionAndSession();
@@ -649,12 +651,16 @@ ENDCLASS.`;
                 });
 
                 debugLog('CLEANUP', `Successfully unlocked class ${className} (cleanup)`);
-                logLine(`🔓 Unlocked class ${className} (cleanup)`);
+                if (DEBUG_TESTS) {
+                  logLine(`🔓 Unlocked class ${className} (cleanup)`);
+                }
               } catch (unlockError: any) {
                 debugLog('CLEANUP', `Failed to unlock class ${className} (cleanup)`, {
                   error: unlockError instanceof Error ? unlockError.message : String(unlockError)
                 });
-                logLine(`⚠️  Failed to unlock class ${className} during cleanup: ${unlockError.message || unlockError}`);
+                if (DEBUG_TESTS) {
+                  logLine(`⚠️  Failed to unlock class ${className} during cleanup: ${unlockError.message || unlockError}`);
+                }
               }
             }
 
@@ -666,24 +672,29 @@ ENDCLASS.`;
               });
 
               if (!deleteResponse.isError) {
-                console.log(`🧹 Cleaned up test class: ${className}`);
-              } else {
+                if (DEBUG_TESTS) {
+                  logLine(`🧹 Cleaned up test class: ${className}`);
+                }
+              } else if (DEBUG_TESTS) {
                 const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-                console.warn(`⚠️  Failed to delete class ${className}: ${errorMsg}`);
+                logLine(`⚠️  Failed to delete class ${className}: ${errorMsg}`);
               }
-            } else {
-              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
+            } else if (DEBUG_TESTS) {
+              logLine(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
             }
           } catch (cleanupError) {
             debugLog('CLEANUP_ERROR', `Exception during cleanup: ${cleanupError}`, {
               error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
             });
-            console.warn(`⚠️  Failed to cleanup test class ${className}: ${cleanupError}`);
+            if (DEBUG_TESTS) {
+              logLine(`⚠️  Failed to cleanup test class ${className}: ${cleanupError}`);
+            }
           }
         }
 
         // Cleanup persisted session snapshot if configured
         diagnosticsTracker?.cleanup();
+        logLine(`🏁 ClassLowHandlers workflow finished for ${className}`);
       }
     }, getTimeout('long'));
   });

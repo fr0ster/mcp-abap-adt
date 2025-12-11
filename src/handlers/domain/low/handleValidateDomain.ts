@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ValidateDomainLow",
@@ -79,6 +80,10 @@ export async function handleValidateDomain(args: ValidateDomainArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleValidateDomain',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -94,7 +99,7 @@ export async function handleValidateDomain(args: ValidateDomainArgs) {
 
     const domainName = domain_name.toUpperCase();
 
-    logger.info(`Starting domain validation: ${domainName}`);
+    handlerLogger.info(`Starting domain validation: ${domainName}`);
 
     try {
       // Validate domain using CrudClient
@@ -112,8 +117,7 @@ export async function handleValidateDomain(args: ValidateDomainArgs) {
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ValidateDomain completed: ${domainName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      handlerLogger.info(`✅ ValidateDomain completed: ${domainName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -133,7 +137,7 @@ export async function handleValidateDomain(args: ValidateDomainArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating domain ${domainName}:`, error);
+      handlerLogger.error(`Error validating domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate domain: ${error.message || String(error)}`;
@@ -164,4 +168,3 @@ export async function handleValidateDomain(args: ValidateDomainArgs) {
     return return_error(error);
   }
 }
-

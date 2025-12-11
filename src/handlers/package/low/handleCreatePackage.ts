@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, logErrorSafely } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, logErrorSafely } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import type { PackageBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
 // Type matching CrudClient.createPackage signature
@@ -113,6 +114,10 @@ export async function handleCreatePackage(args: CreatePackageArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCreatePackageLow',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -129,7 +134,7 @@ export async function handleCreatePackage(args: CreatePackageArgs) {
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    logger.info(`Starting package creation: ${packageName} in ${superPackage}`);
+    handlerLogger.info(`Starting package creation: ${packageName} in ${superPackage}`);
 
     try {
       // Create package - build config object with proper typing
@@ -166,7 +171,7 @@ export async function handleCreatePackage(args: CreatePackageArgs) {
       // Get updated session state after create
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CreatePackage completed: ${packageName}`);
+      handlerLogger.info(`✅ CreatePackage completed: ${packageName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -190,7 +195,7 @@ export async function handleCreatePackage(args: CreatePackageArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logErrorSafely(logger, `CreatePackage ${packageName}`, error);
+      logErrorSafely(baseLogger, `CreatePackage ${packageName}`, error);
 
       // Check for authentication errors (expired tokens)
       if (error.message?.includes('Refresh token has expired') ||

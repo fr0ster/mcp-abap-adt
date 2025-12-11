@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ValidateInterfaceLow",
@@ -79,6 +80,10 @@ export async function handleValidateInterface(args: ValidateInterfaceArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleValidateInterface',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -94,7 +99,7 @@ export async function handleValidateInterface(args: ValidateInterfaceArgs) {
 
     const interfaceName = interface_name.toUpperCase();
 
-    logger.info(`Starting interface validation: ${interfaceName}`);
+    handlerLogger.info(`Starting interface validation: ${interfaceName}`);
 
     try {
       // Validate interface
@@ -112,8 +117,7 @@ export async function handleValidateInterface(args: ValidateInterfaceArgs) {
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ValidateInterface completed: ${interfaceName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      handlerLogger.info(`✅ ValidateInterface completed: ${interfaceName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -133,7 +137,7 @@ export async function handleValidateInterface(args: ValidateInterfaceArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating interface ${interfaceName}:`, error);
+      handlerLogger.error(`Error validating interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate interface: ${error.message || String(error)}`;
@@ -164,4 +168,3 @@ export async function handleValidateInterface(args: ValidateInterfaceArgs) {
     return return_error(error);
   }
 }
-

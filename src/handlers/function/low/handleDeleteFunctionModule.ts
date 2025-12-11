@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "DeleteFunctionModuleLow",
@@ -60,8 +61,12 @@ export async function handleDeleteFunctionModule(args: DeleteFunctionModuleArgs)
     const client = new CrudClient(connection);
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleDeleteFunctionModule',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting function module deletion: ${functionModuleName} in ${functionGroupName}`);
+    handlerLogger.info(`Starting function module deletion: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       // Delete function module
@@ -72,7 +77,7 @@ export async function handleDeleteFunctionModule(args: DeleteFunctionModuleArgs)
         throw new Error(`Delete did not return a response for function module ${functionModuleName}`);
       }
 
-      logger.info(`✅ DeleteFunctionModule completed successfully: ${functionModuleName}`);
+      handlerLogger.info(`✅ DeleteFunctionModule completed successfully: ${functionModuleName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -85,7 +90,7 @@ export async function handleDeleteFunctionModule(args: DeleteFunctionModuleArgs)
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting function module ${functionModuleName}:`, error);
+      handlerLogger.error(`Error deleting function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete function module: ${error.message || String(error)}`;

@@ -15,8 +15,8 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-import { McpError, ErrorCode } from '../../../lib/utils';
-import { fetchNodeStructure, return_error, return_response } from '../../../lib/utils';
+import { McpError, ErrorCode, fetchNodeStructure, return_error, return_response, logger as baseLogger } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 
 /**
@@ -67,6 +67,11 @@ function parseObjectNamesFromXml(xmlData: string): Array<{
 
 export async function handleGetObjectsByType(args: any) {
     try {
+    const handlerLogger = getHandlerLogger(
+      'handleGetObjectsByType',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
         const { parent_name, parent_tech_name, parent_type, node_id, format, with_short_descriptions } = args;
 
         if (!parent_name || typeof parent_name !== 'string' || parent_name.trim() === '') {

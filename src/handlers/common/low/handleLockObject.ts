@@ -1,38 +1,26 @@
 /**
  * LockObject Handler - Lock ABAP object for modification via ADT API
  *
- * Uses lock functions from @mcp-abap-adt/adt-clients/core for all operations.
- * Returns lock handle that must be used in subsequent requests with the same session_id.
+ * Uses CrudClient lock methods for specific object types.
+ * Returns lock handle that must be reused with the same session.
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "LockObjectLow",
-  description: "[low-level] Lock an ABAP object for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. Use GetSession first to get a session_id, then use that session_id for lock, update, and unlock operations.",
+  description: "[low-level] Lock an ABAP object for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.",
   inputSchema: {
     type: "object",
     properties: {
-      object_name: {
-        type: "string",
-        description: "Object name (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE). For function modules, use format GROUP|FM_NAME"
-      },
-      object_type: {
-        type: "string",
-        description: "Object type: 'class', 'program', 'interface', 'function_group', 'function_module', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'metadata_extension'",
-        enum: ["class", "program", "interface", "function_group", "function_module", "table", "structure", "view", "domain", "data_element", "package", "behavior_definition", "metadata_extension"]
-      },
-      super_package: {
-        type: "string",
-        description: "Super package (parent package) name. Required only for 'package' object_type."
-      },
-      session_id: {
-        type: "string",
-        description: "Session ID from GetSession. If not provided, a new session will be created."
-      },
+      object_name: { type: "string", description: "Object name (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE). For function modules, use format GROUP|FM_NAME" },
+      object_type: { type: "string", description: "Object type", enum: ["class", "program", "interface", "function_group", "function_module", "table", "structure", "view", "domain", "data_element", "package", "behavior_definition", "metadata_extension"] },
+      super_package: { type: "string", description: "Super package (required for package locking)" },
+      session_id: { type: "string", description: "Session ID from GetSession. If not provided, a new session will be created." },
       session_state: {
         type: "object",
         description: "Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.",
@@ -59,35 +47,28 @@ interface LockObjectArgs {
   };
 }
 
-/**
- * Main handler for LockObject MCP tool
- *
- * Uses lock functions from @mcp-abap-adt/adt-clients/core for all operations
- */
 export async function handleLockObject(args: LockObjectArgs) {
   try {
-    const {
-      object_name,
-      object_type,
-      super_package,
-      session_id,
-      session_state
-    } = args as LockObjectArgs;
+    const handlerLogger = getHandlerLogger(
+      'handleLockObject',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    // Validation
+    const { object_name, object_type, super_package, session_id, session_state } = args as LockObjectArgs;
+
     if (!object_name || !object_type) {
       return return_error(new Error('object_name and object_type are required'));
     }
 
     const validTypes = ['class', 'program', 'interface', 'function_group', 'function_module', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'metadata_extension'];
-    if (!validTypes.includes(object_type.toLowerCase())) {
+    const objectType = object_type.toLowerCase();
+    if (!validTypes.includes(objectType)) {
       return return_error(new Error(`Invalid object_type. Must be one of: ${validTypes.join(', ')}`));
     }
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
-    // Restore session state if provided
     if (session_id && session_state) {
       connection.setSessionState({
         cookies: session_state.cookies || null,
@@ -95,21 +76,17 @@ export async function handleLockObject(args: LockObjectArgs) {
         cookieStore: session_state.cookie_store || {}
       });
     } else {
-      // Ensure connection is established
       await connection.connect();
     }
 
-    // Use provided session_id or generate new one
     const desiredSessionId = session_id || generateSessionId();
     const objectName = object_name.toUpperCase();
-    const objectType = object_type.toLowerCase();
 
-    logger.info(`Starting object lock: ${objectName} (type: ${objectType}, session: ${desiredSessionId.substring(0, 8)}...)`);
+    handlerLogger.info(`Starting object lock: ${objectName} (type: ${objectType}, session: ${desiredSessionId.substring(0, 8)}...)`);
 
     try {
       let lockHandle: string | undefined;
 
-      // Call appropriate lock method based on object type
       switch (objectType) {
         case 'class':
           await client.lockClass({ className: objectName });
@@ -128,8 +105,7 @@ export async function handleLockObject(args: LockObjectArgs) {
           lockHandle = client.getLockHandle();
           break;
         case 'function_module':
-          // Function module requires function group name which is not provided in this generic handler
-          return return_error(new Error('Function module locking via LockObject is not supported. Function modules require function group name.'));
+          return return_error(new Error('Function module locking via LockObject is not supported. Use function-module-specific handler.'));
         case 'table':
           await client.lockTable({ tableName: objectName });
           lockHandle = client.getLockHandle();
@@ -159,9 +135,8 @@ export async function handleLockObject(args: LockObjectArgs) {
           lockHandle = client.getLockHandle();
           break;
         case 'package':
-          // Package requires superPackage parameter
           if (!super_package) {
-            return return_error(new Error('super_package is required for package locking. Please provide the parent package name.'));
+            return return_error(new Error('super_package is required for package locking.'));
           }
           await client.lockPackage({ packageName: objectName, superPackage: super_package.toUpperCase() });
           lockHandle = client.getLockHandle();
@@ -174,11 +149,10 @@ export async function handleLockObject(args: LockObjectArgs) {
         throw new Error(`Lock did not return a lock handle for object ${objectName}`);
       }
 
-      // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ LockObject completed: ${objectName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      handlerLogger.info(`✅ LockObject completed: ${objectName}`);
+      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -187,7 +161,6 @@ export async function handleLockObject(args: LockObjectArgs) {
           object_type: objectType,
           session_id: desiredSessionId,
           lock_handle: lockHandle,
-          transport_request: null, // CrudClient doesn't expose transport request
           session_state: updatedSessionState ? {
             cookies: updatedSessionState.cookies,
             csrf_token: updatedSessionState.csrfToken,
@@ -198,9 +171,8 @@ export async function handleLockObject(args: LockObjectArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking object ${objectName}:`, error);
+      handlerLogger.error(`Error locking object ${objectName}:`, error);
 
-      // Parse error message
       let errorMessage = `Failed to lock object: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
@@ -210,17 +182,14 @@ export async function handleLockObject(args: LockObjectArgs) {
       } else if (error.response?.data && typeof error.response.data === 'string') {
         try {
           const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_'
-          });
+          const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
           const errorData = parser.parse(error.response.data);
           const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
-          // Ignore parse errors
+        } catch {
+          // ignore parse errors
         }
       }
 
@@ -231,4 +200,3 @@ export async function handleLockObject(args: LockObjectArgs) {
     return return_error(error);
   }
 }
-

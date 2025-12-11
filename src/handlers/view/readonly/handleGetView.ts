@@ -8,11 +8,12 @@
  * - Support for both normal views and maintenance views
  */
 
-import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../../../lib/utils';
+import { McpError, ErrorCode, AxiosResponse, logger as baseLogger } from '../../../lib/utils';
+import { makeAdtRequestWithTimeout, return_error, return_response, encodeSapObjectName } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import * as z from 'zod';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "GetView",
@@ -168,7 +169,7 @@ async function getViewContents(viewName: string, maxRows: number = 100) {
   try {
     // Use SQL query handler to get view data
     const sqlQuery = `SELECT * FROM ${viewName}`;
-    const url = `${await getBaseUrl()}/sap/bc/adt/datapreview/freestyle`;
+    const url = `/sap/bc/adt/datapreview/freestyle`;
 
     const response = await makeAdtRequestWithTimeout(url, 'POST', 'default', {
       'Content-Type': 'text/plain; charset=utf-8'
@@ -204,6 +205,10 @@ async function getViewContents(viewName: string, maxRows: number = 100) {
 }
 
 export async function handleGetView(args: any) {
+  const handlerLogger = getHandlerLogger(
+    'handleGetView',
+    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+  );
   try {
     if (!args?.view_name) {
       throw new McpError(ErrorCode.InvalidParams, 'View name is required');
@@ -213,6 +218,7 @@ export async function handleGetView(args: any) {
       view_name: args.view_name,
       timestamp: new Date().toISOString()
     };
+    handlerLogger.info(`Starting view retrieval: ${args.view_name}`);
 
     // Step 1: Detect view type and get definition
     let definitionSuccess = false;
@@ -220,7 +226,7 @@ export async function handleGetView(args: any) {
 
     // Try CDS View first (modern views with DDL source)
     try {
-      const cdsUrl = `${await getBaseUrl()}/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(args.view_name)}`;
+      const cdsUrl = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(args.view_name)}`;
       const cdsResponse = await makeAdtRequestWithTimeout(cdsUrl, 'GET', 'default');
 
       if (cdsResponse.status === 200 && typeof cdsResponse.data === 'string') {
@@ -232,9 +238,11 @@ export async function handleGetView(args: any) {
           note: 'Modern CDS View with DDL source code'
         };
         definitionSuccess = true;
+        handlerLogger.info(`Detected CDS view ${args.view_name}`);
       }
     } catch (cdsError) {
       // Not a CDS view or not accessible, try database view
+      handlerLogger.debug(`CDS check failed for ${args.view_name}: ${cdsError instanceof Error ? cdsError.message : String(cdsError)}`);
     }
 
     // Try Database View (classic views with metadata only)
@@ -242,7 +250,7 @@ export async function handleGetView(args: any) {
       try {
         const objectUri = `/sap/bc/adt/vit/wb/object_type/viewdv/object_name/${args.view_name}`;
         const encodedUri = encodeURIComponent(objectUri);
-        const propertiesUrl = `${await getBaseUrl()}/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${encodedUri}`;
+        const propertiesUrl = `/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${encodedUri}`;
 
         const propertiesResponse = await makeAdtRequestWithTimeout(propertiesUrl, 'GET', 'default');
 
@@ -256,12 +264,14 @@ export async function handleGetView(args: any) {
             note: 'Classic database view with metadata only'
           };
           definitionSuccess = true;
+          handlerLogger.info(`Detected Database View ${args.view_name}`);
         }
       } catch (dbViewError) {
         results.definition = {
           error: dbViewError instanceof Error ? dbViewError.message : String(dbViewError),
           note: 'Could not retrieve view as CDS or Database View'
         };
+        handlerLogger.debug(`Database view detection failed for ${args.view_name}: ${dbViewError instanceof Error ? dbViewError.message : String(dbViewError)}`);
       }
     }
 
@@ -319,6 +329,7 @@ export async function handleGetView(args: any) {
         text: serializedResults
       }]
     };
+    handlerLogger.info(`✅ Retrieved view ${args.view_name} (type: ${results.view_type})`);
 
     // Write to file if path provided
     if (args.filePath) {
@@ -328,6 +339,9 @@ export async function handleGetView(args: any) {
     return finalResult;
 
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const status = (error as any)?.response?.status;
+    handlerLogger.error(`GetView failed for ${args?.view_name || 'unknown'}: ${message}${status ? ` (status=${status})` : ''}`);
     return {
       isError: true,
       content: [{

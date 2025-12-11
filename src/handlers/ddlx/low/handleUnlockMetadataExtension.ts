@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UnlockMetadataExtensionLow",
@@ -73,6 +74,10 @@ export async function handleUnlockMetadataExtension(args: UnlockMetadataExtensio
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUnlockMetadataExtension',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_state) {
@@ -88,7 +93,7 @@ export async function handleUnlockMetadataExtension(args: UnlockMetadataExtensio
 
     const ddlxName = name.toUpperCase();
 
-    logger.info(`Starting metadata extension unlock: ${ddlxName} (session: ${session_id.substring(0, 8)}...)`);
+    handlerLogger.info(`Starting metadata extension unlock: ${ddlxName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock metadata extension
@@ -102,7 +107,7 @@ export async function handleUnlockMetadataExtension(args: UnlockMetadataExtensio
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UnlockMetadataExtension completed: ${ddlxName}`);
+      handlerLogger.info(`✅ UnlockMetadataExtension completed: ${ddlxName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +124,7 @@ export async function handleUnlockMetadataExtension(args: UnlockMetadataExtensio
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking metadata extension ${ddlxName}:`, error);
+      handlerLogger.error(`Error unlocking metadata extension ${ddlxName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock metadata extension: ${error.message || String(error)}`;
@@ -152,4 +157,3 @@ export async function handleUnlockMetadataExtension(args: UnlockMetadataExtensio
     return return_error(error);
   }
 }
-

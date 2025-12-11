@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "DeleteProgramLow",
@@ -57,9 +58,13 @@ export async function handleDeleteProgram(args: DeleteProgramArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleDeleteProgram',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program deletion: ${programName}`);
+    handlerLogger.info(`Starting program deletion: ${programName}`);
 
     try {
       // Delete program
@@ -70,7 +75,7 @@ export async function handleDeleteProgram(args: DeleteProgramArgs) {
         throw new Error(`Delete did not return a response for program ${programName}`);
       }
 
-      logger.info(`✅ DeleteProgram completed successfully: ${programName}`);
+      handlerLogger.info(`✅ DeleteProgram completed successfully: ${programName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -82,7 +87,7 @@ export async function handleDeleteProgram(args: DeleteProgramArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting program ${programName}:`, error);
+      handlerLogger.error(`Error deleting program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete program: ${error.message || String(error)}`;
@@ -117,4 +122,3 @@ export async function handleDeleteProgram(args: DeleteProgramArgs) {
     return return_error(error);
   }
 }
-

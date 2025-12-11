@@ -28,10 +28,16 @@
  * instead of "SELECT * FROM T000" which SAP ADT doesn't support.
  */
 
-import { McpError, ErrorCode, AxiosResponse, logger } from '../../../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, encodeSapObjectName } from '../../../lib/utils';
+import { McpError, ErrorCode, AxiosResponse, logger as baseLogger } from '../../../lib/utils';
+import { makeAdtRequestWithTimeout, return_error, return_response, encodeSapObjectName } from '../../../lib/utils';
 import { getConfig } from '../../../index';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+
+const handlerLogger = getHandlerLogger(
+  'handleGetTableContents',
+  process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+);
 
 
 export const TOOL_DEFINITION = {
@@ -142,7 +148,7 @@ function parseTableDataXml(xmlData: string, tableName: string) {
         };
 
     } catch (error) {
-        logger.error('Error parsing table data XML', { error: error instanceof Error ? error.message : String(error) });
+        handlerLogger.error('Error parsing table data XML', { error: error instanceof Error ? error.message : String(error) });
 
         // Return basic structure on parse error
         return {
@@ -179,8 +185,8 @@ const STRUCTURE_KEYWORDS = new Set([
 
 async function getFieldsFromDatapreviewMetadata(tableName: string): Promise<string[]> {
     try {
-        const metadataUrl = `${await getBaseUrl()}/sap/bc/adt/datapreview/ddic/${encodeSapObjectName(tableName)}/metadata`;
-        logger.info('Fetching datapreview metadata', { metadataUrl });
+        const metadataUrl = `/sap/bc/adt/datapreview/ddic/${encodeSapObjectName(tableName)}/metadata`;
+        handlerLogger.info('Fetching datapreview metadata', { metadataUrl });
 
         const metadataResponse = await makeAdtRequestWithTimeout(metadataUrl, 'GET', 'default');
         const xmlText = metadataResponse.data;
@@ -209,7 +215,7 @@ async function getFieldsFromDatapreviewMetadata(tableName: string): Promise<stri
 
         return Array.from(new Set(fields));
     } catch (error) {
-        logger.warn('Failed to fetch datapreview metadata', {
+        handlerLogger.warn('Failed to fetch datapreview metadata', {
             error: error instanceof Error ? error.message : String(error),
             tableName
         });
@@ -220,7 +226,7 @@ async function getFieldsFromDatapreviewMetadata(tableName: string): Promise<stri
 
 export async function handleGetTableContents(args: any) {
     try {
-        logger.info('handleGetTableContents called', { args });
+        handlerLogger.info('handleGetTableContents called', { args });
 
         if (!args?.table_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Table name is required');
@@ -234,7 +240,7 @@ export async function handleGetTableContents(args: any) {
         try {
             const cfg = getConfig();
             if (cfg.authType === 'jwt') {
-                logger.warn('handleGetTableContents blocked on cloud deployment (JWT auth)', { tableName });
+                handlerLogger.warn('handleGetTableContents blocked on cloud deployment (JWT auth)', { tableName });
                 return {
                     isError: true,
                     content: [
@@ -247,21 +253,21 @@ export async function handleGetTableContents(args: any) {
             }
         } catch (cfgErr) {
             // If config cannot be determined, proceed with normal flow but log it.
-            logger.warn('Could not determine SAP config for deployment detection', { error: cfgErr instanceof Error ? cfgErr.message : String(cfgErr) });
+            handlerLogger.warn('Could not determine SAP config for deployment detection', { error: cfgErr instanceof Error ? cfgErr.message : String(cfgErr) });
         }
 
-        logger.info('Making table contents request', { tableName, maxRows });
+        handlerLogger.info('Making table contents request', { tableName, maxRows });
 
         // First, get the table structure to know all fields
-        const tableStructureUrl = `${await getBaseUrl()}/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}/source/main`;
+                const tableStructureUrl = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}/source/main`;
 
-        logger.info('Getting table structure first', { tableStructureUrl });
+        handlerLogger.info('Getting table structure first', { tableStructureUrl });
 
         let tableFields: string[] = await getFieldsFromDatapreviewMetadata(tableName);
 
         try {
             if (tableFields.length > 0) {
-                logger.info('Using fields from datapreview metadata', { count: tableFields.length, fields: tableFields.slice(0, 5) });
+                handlerLogger.info('Using fields from datapreview metadata', { count: tableFields.length, fields: tableFields.slice(0, 5) });
             }
 
             if (tableFields.length === 0) {
@@ -290,7 +296,7 @@ export async function handleGetTableContents(args: any) {
                         }
                     }
 
-                    logger.info('Parsed CDS view fields', { count: fieldNames.size, fields: Array.from(fieldNames).slice(0, 10) });
+                    handlerLogger.info('Parsed CDS view fields', { count: fieldNames.size, fields: Array.from(fieldNames).slice(0, 10) });
                 } else {
                     // Old ABAP syntax patterns
                     const patterns = [
@@ -312,7 +318,7 @@ export async function handleGetTableContents(args: any) {
                         }
                     }
 
-                    logger.info('Parsed traditional ABAP fields', { count: fieldNames.size, fields: Array.from(fieldNames).slice(0, 10) });
+                    handlerLogger.info('Parsed traditional ABAP fields', { count: fieldNames.size, fields: Array.from(fieldNames).slice(0, 10) });
                 }
 
                 if (fieldNames.size > 0) {
@@ -327,18 +333,18 @@ export async function handleGetTableContents(args: any) {
                         .map((fieldName) => `${tableName}~${fieldName}`);
                 }
 
-                logger.info('Extracted table fields', { count: tableFields.length, fields: tableFields.slice(0, 5) });
+                handlerLogger.info('Extracted table fields', { count: tableFields.length, fields: tableFields.slice(0, 5) });
             }
 
         } catch (structureError) {
-            logger.warn('Could not get table structure, falling back to alternative method', {
+            handlerLogger.warn('Could not get table structure, falling back to alternative method', {
                 error: structureError instanceof Error ? structureError.message : String(structureError)
             });
 
             // If we can't get structure from main source, try alternative endpoints
             try {
                 // Try getting table metadata via different endpoint
-                const metadataUrl = `${await getBaseUrl()}/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}`;
+                const metadataUrl = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}`;
                 const metadataResponse = await makeAdtRequestWithTimeout(metadataUrl, 'GET', 'default');
 
                 // Parse XML metadata to extract field names
@@ -360,10 +366,10 @@ export async function handleGetTableContents(args: any) {
                         })
                         .filter(field => field !== '');
 
-                    logger.info('Extracted fields from metadata', { count: tableFields.length, fields: tableFields.slice(0, 5) });
+                    handlerLogger.info('Extracted fields from metadata', { count: tableFields.length, fields: tableFields.slice(0, 5) });
                 }
             } catch (metadataError) {
-                logger.warn('Could not get table metadata either, using generic approach', {
+                handlerLogger.warn('Could not get table metadata either, using generic approach', {
                     error: metadataError instanceof Error ? metadataError.message : String(metadataError)
                 });
 
@@ -380,23 +386,23 @@ export async function handleGetTableContents(args: any) {
         } else {
             // Fallback: try with SELECT * (might not work but worth trying)
             selectStatement = `SELECT * FROM ${tableName}`;
-            logger.warn('Using SELECT * as fallback - this might not work with SAP ADT', { tableName });
+            handlerLogger.warn('Using SELECT * as fallback - this might not work with SAP ADT', { tableName });
         }
 
-        logger.info('Making request with SQL payload', { selectStatement });
+        handlerLogger.info('Making request with SQL payload', { selectStatement });
 
         // Use ADT data preview service to get table contents
-        const url = `${await getBaseUrl()}/sap/bc/adt/datapreview/ddic?rowNumber=${maxRows}&ddicEntityName=${encodeSapObjectName(tableName)}`;
+        const url = `/sap/bc/adt/datapreview/ddic?rowNumber=${maxRows}&ddicEntityName=${encodeSapObjectName(tableName)}`;
 
         const response = await makeAdtRequestWithTimeout(url, 'POST', 'long', selectStatement);
 
-        logger.info('Table contents request completed', { status: response.status });
+        handlerLogger.info('Table contents request completed', { status: response.status });
 
         // Parse XML response and convert to JSON format with rows
         const xmlData = response.data;
         const parsedData = parseTableDataXml(xmlData, tableName);
 
-        logger.info('Parsed table data', {
+        handlerLogger.info('Parsed table data', {
             totalRows: parsedData.totalRows,
             columnsCount: parsedData.columns.length,
             rowsCount: parsedData.rows.length
@@ -416,7 +422,7 @@ export async function handleGetTableContents(args: any) {
         }
         return result;
     } catch (error) {
-        logger.error('Error in handleGetTableContents', {
+        handlerLogger.error('Error in handleGetTableContents', {
             error: error instanceof Error ? error.message : String(error),
             tableName: args?.table_name
         });

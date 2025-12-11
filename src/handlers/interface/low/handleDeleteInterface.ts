@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "DeleteInterfaceLow",
@@ -53,8 +54,12 @@ export async function handleDeleteInterface(args: DeleteInterfaceArgs) {
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
     const interfaceName = interface_name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleDeleteInterface',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting interface deletion: ${interfaceName}`);
+    handlerLogger.info(`Starting interface deletion: ${interfaceName}`);
 
     try {
       // Delete interface
@@ -65,7 +70,7 @@ export async function handleDeleteInterface(args: DeleteInterfaceArgs) {
         throw new Error(`Delete did not return a response for interface ${interfaceName}`);
       }
 
-      logger.info(`✅ DeleteInterface completed successfully: ${interfaceName}`);
+      handlerLogger.info(`✅ DeleteInterface completed successfully: ${interfaceName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -77,7 +82,7 @@ export async function handleDeleteInterface(args: DeleteInterfaceArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting interface ${interfaceName}:`, error);
+      handlerLogger.error(`Error deleting interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete interface: ${error.message || String(error)}`;
@@ -112,4 +117,3 @@ export async function handleDeleteInterface(args: DeleteInterfaceArgs) {
     return return_error(error);
   }
 }
-

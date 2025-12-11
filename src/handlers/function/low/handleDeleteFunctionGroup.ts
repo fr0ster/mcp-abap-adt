@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "DeleteFunctionGroupLow",
@@ -53,8 +54,12 @@ export async function handleDeleteFunctionGroup(args: DeleteFunctionGroupArgs) {
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
     const functionGroupName = function_group_name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleDeleteFunctionGroup',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting function group deletion: ${functionGroupName}`);
+    handlerLogger.info(`Starting function group deletion: ${functionGroupName}`);
 
     try {
       // Delete function group
@@ -65,7 +70,7 @@ export async function handleDeleteFunctionGroup(args: DeleteFunctionGroupArgs) {
         throw new Error(`Delete did not return a response for function group ${functionGroupName}`);
       }
 
-      logger.info(`✅ DeleteFunctionGroup completed successfully: ${functionGroupName}`);
+      handlerLogger.info(`✅ DeleteFunctionGroup completed successfully: ${functionGroupName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -77,7 +82,7 @@ export async function handleDeleteFunctionGroup(args: DeleteFunctionGroupArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting function group ${functionGroupName}:`, error);
+      handlerLogger.error(`Error deleting function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete function group: ${error.message || String(error)}`;
@@ -112,4 +117,3 @@ export async function handleDeleteFunctionGroup(args: DeleteFunctionGroupArgs) {
     return return_error(error);
   }
 }
-

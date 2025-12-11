@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ValidateMetadataExtensionLow",
@@ -71,6 +72,10 @@ export async function handleValidateMetadataExtension(args: ValidateMetadataExte
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleValidateMetadataExtension',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -86,7 +91,7 @@ export async function handleValidateMetadataExtension(args: ValidateMetadataExte
 
     const ddlxName = name.toUpperCase();
 
-    logger.info(`Starting metadata extension validation: ${ddlxName}`);
+    handlerLogger.info(`Starting metadata extension validation: ${ddlxName}`);
 
     try {
       // Validate metadata extension
@@ -104,8 +109,7 @@ export async function handleValidateMetadataExtension(args: ValidateMetadataExte
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ValidateMetadataExtension completed: ${ddlxName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      handlerLogger.info(`✅ ValidateMetadataExtension completed: ${ddlxName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -125,7 +129,7 @@ export async function handleValidateMetadataExtension(args: ValidateMetadataExte
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating metadata extension ${ddlxName}:`, error);
+      handlerLogger.error(`Error validating metadata extension ${ddlxName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to validate metadata extension: ${error.message || String(error)}`;
@@ -156,4 +160,3 @@ export async function handleValidateMetadataExtension(args: ValidateMetadataExte
     return return_error(error);
   }
 }
-

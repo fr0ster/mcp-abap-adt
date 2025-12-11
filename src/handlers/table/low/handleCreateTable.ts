@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { TableBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateTableLow",
@@ -83,6 +84,10 @@ export async function handleCreateTable(args: CreateTableArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCreateTableLow',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -98,7 +103,7 @@ export async function handleCreateTable(args: CreateTableArgs) {
 
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table creation: ${tableName}`);
+    handlerLogger.info(`Starting table creation: ${tableName}`);
 
     try {
       // Create table
@@ -118,7 +123,7 @@ export async function handleCreateTable(args: CreateTableArgs) {
       // Get updated session state after create
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CreateTable completed: ${tableName}`);
+      handlerLogger.info(`✅ CreateTable completed: ${tableName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -137,7 +142,7 @@ export async function handleCreateTable(args: CreateTableArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating table ${tableName}:`, error);
+      handlerLogger.error(`Error creating table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to create table: ${error.message || String(error)}`;
@@ -168,4 +173,3 @@ export async function handleCreateTable(args: CreateTableArgs) {
     return return_error(error);
   }
 }
-

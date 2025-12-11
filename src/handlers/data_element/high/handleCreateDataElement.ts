@@ -8,9 +8,10 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateDataElement",
@@ -137,8 +138,12 @@ export async function handleCreateDataElement(args: DataElementArgs) {
     const typedArgs = args as DataElementArgs;
     const connection = getManagedConnection();
     const dataElementName = typedArgs.data_element_name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleCreateDataElement',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting data element creation: ${dataElementName}`);
+    handlerLogger.info(`Starting data element creation: ${dataElementName}`);
 
     try {
       // Create client
@@ -199,7 +204,7 @@ export async function handleCreateDataElement(args: DataElementArgs) {
           () => client.checkDataElement({ dataElementName }),
           dataElementName,
           {
-            debug: (message: string) => logger.info(`[CreateDataElement] ${message}`)
+            debug: (message: string) => handlerLogger.debug(message)
           }
         );
       } catch (checkError: any) {
@@ -249,7 +254,7 @@ export async function handleCreateDataElement(args: DataElementArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating data element ${dataElementName}:`, error);
+      handlerLogger.error(`Error creating data element ${dataElementName}: ${error?.message || error}`);
 
       // Check if data element already exists
       if (error.message?.includes('already exists') || error.response?.data?.includes('ExceptionResourceAlreadyExists')) {

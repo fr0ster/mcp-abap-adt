@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { FunctionModuleBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ValidateFunctionModuleLow",
@@ -76,6 +77,10 @@ export async function handleValidateFunctionModule(args: ValidateFunctionModuleA
     }
 
     const connection = getManagedConnection();
+    const handlerLogger = getHandlerLogger(
+      'handleValidateFunctionModule',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -92,7 +97,7 @@ export async function handleValidateFunctionModule(args: ValidateFunctionModuleA
     const functionGroupName = function_group_name.toUpperCase();
     const functionModuleName = function_module_name.toUpperCase();
 
-    logger.info(`Starting function module validation: ${functionModuleName} in group ${functionGroupName}`);
+    handlerLogger.info(`Starting function module validation: ${functionModuleName} in group ${functionGroupName}`);
 
     try {
       const client = new CrudClient(connection);
@@ -110,8 +115,7 @@ export async function handleValidateFunctionModule(args: ValidateFunctionModuleA
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ValidateFunctionModule completed: ${functionModuleName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message || 'N/A'}`);
+      handlerLogger.info(`✅ ValidateFunctionModule completed: ${functionModuleName} (valid=${result.valid}, msg=${result.message || 'N/A'})`);
 
       return return_response({
         data: JSON.stringify({
@@ -133,7 +137,7 @@ export async function handleValidateFunctionModule(args: ValidateFunctionModuleA
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating function module ${functionModuleName}:`, error);
+      handlerLogger.error(`Error validating function module ${functionModuleName}: ${error?.message || error}`);
 
       let errorMessage = `Failed to validate function module: ${error.message || String(error)}`;
 
@@ -163,4 +167,3 @@ export async function handleValidateFunctionModule(args: ValidateFunctionModuleA
     return return_error(error);
   }
 }
-

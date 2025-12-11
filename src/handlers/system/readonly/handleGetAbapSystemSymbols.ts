@@ -1,9 +1,10 @@
-import { McpError, ErrorCode } from '../../../lib/utils';
+import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import { handleGetClass } from '../../class/readonly/handleGetClass';
 import { handleGetFunction } from '../../function/readonly/handleGetFunction';
 import { handleGetInterface } from '../../interface/readonly/handleGetInterface';
 import { handleGetObjectInfo } from './handleGetObjectInfo';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
     name: "GetAbapSystemSymbols",
@@ -635,10 +636,15 @@ class AbapSystemSymbolResolver {
 }
 
 export async function handleGetAbapSystemSymbols(args: any) {
+    const handlerLogger = getHandlerLogger(
+      'handleGetAbapSystemSymbols',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     try {
         if (!args?.code) {
             throw new McpError(ErrorCode.InvalidParams, 'ABAP code is required');
         }
+        handlerLogger.debug('Running semantic analysis and system symbol resolution');
 
         // First, perform semantic analysis
         const analyzer = new SimpleAbapSemanticAnalyzer();
@@ -647,6 +653,7 @@ export async function handleGetAbapSystemSymbols(args: any) {
         // Then, resolve symbols with SAP system information
         const resolver = new AbapSystemSymbolResolver();
         const { resolvedSymbols, stats } = await resolver.resolveSymbols(semanticResult.symbols);
+        handlerLogger.info(`Resolved ${stats.resolvedSymbols}/${stats.totalSymbols} symbols from system`);
 
         const result: AbapSystemSymbolsResult = {
             symbols: resolvedSymbols,
@@ -667,11 +674,13 @@ export async function handleGetAbapSystemSymbols(args: any) {
         };
 
         if (args.filePath) {
+            handlerLogger.debug(`Writing system symbol resolution result to file: ${args.filePath}`);
             writeResultToFile(JSON.stringify(result, null, 2), args.filePath);
         }
 
         return response;
     } catch (error) {
+        handlerLogger.error('Failed to resolve ABAP system symbols', error as any);
         return {
             isError: true,
             content: [

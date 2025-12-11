@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UnlockFunctionGroupLow",
@@ -73,6 +74,10 @@ export async function handleUnlockFunctionGroup(args: UnlockFunctionGroupArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUnlockFunctionGroup',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_state) {
@@ -88,7 +93,7 @@ export async function handleUnlockFunctionGroup(args: UnlockFunctionGroupArgs) {
 
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function group unlock: ${functionGroupName} (session: ${session_id.substring(0, 8)}...)`);
+    handlerLogger.info(`Starting function group unlock: ${functionGroupName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock function group
@@ -102,7 +107,7 @@ export async function handleUnlockFunctionGroup(args: UnlockFunctionGroupArgs) {
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UnlockFunctionGroup completed: ${functionGroupName}`);
+      handlerLogger.info(`✅ UnlockFunctionGroup completed: ${functionGroupName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +124,7 @@ export async function handleUnlockFunctionGroup(args: UnlockFunctionGroupArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking function group ${functionGroupName}:`, error);
+      handlerLogger.error(`Error unlocking function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock function group: ${error.message || String(error)}`;
@@ -152,4 +157,3 @@ export async function handleUnlockFunctionGroup(args: UnlockFunctionGroupArgs) {
     return return_error(error);
   }
 }
-

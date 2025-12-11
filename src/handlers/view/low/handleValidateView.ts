@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ValidateViewLow",
@@ -63,6 +64,10 @@ interface ValidateViewArgs {
  * Uses CrudClient.validateView - low-level single method call
  */
 export async function handleValidateView(args: ValidateViewArgs) {
+  const handlerLogger = getHandlerLogger(
+    'handleValidateView',
+    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+  );
   try {
     const {
       view_name,
@@ -94,7 +99,7 @@ export async function handleValidateView(args: ValidateViewArgs) {
 
     const viewName = view_name.toUpperCase();
 
-    logger.info(`Starting view validation: ${viewName}`);
+    handlerLogger.info(`Starting view validation: ${viewName}`);
 
     try {
       // Validate view
@@ -112,8 +117,8 @@ export async function handleValidateView(args: ValidateViewArgs) {
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ValidateView completed: ${viewName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      handlerLogger.info(`✅ ValidateView completed: ${viewName}`);
+      handlerLogger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
         data: JSON.stringify({
@@ -133,7 +138,7 @@ export async function handleValidateView(args: ValidateViewArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating view ${viewName}:`, error);
+      handlerLogger.error(`Error validating view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate view: ${error.message || String(error)}`;
@@ -164,4 +169,3 @@ export async function handleValidateView(args: ValidateViewArgs) {
     return return_error(error);
   }
 }
-

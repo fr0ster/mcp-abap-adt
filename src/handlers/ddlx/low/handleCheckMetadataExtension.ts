@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CheckMetadataExtensionLow",
@@ -68,6 +69,10 @@ export async function handleCheckMetadataExtension(args: CheckMetadataExtensionA
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCheckMetadataExtension',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -83,7 +88,7 @@ export async function handleCheckMetadataExtension(args: CheckMetadataExtensionA
 
     const ddlxName = name.toUpperCase();
 
-    logger.info(`Starting metadata extension check: ${ddlxName}`);
+    handlerLogger.info(`Starting metadata extension check: ${ddlxName}`);
 
     try {
       // Check metadata extension
@@ -100,9 +105,8 @@ export async function handleCheckMetadataExtension(args: CheckMetadataExtensionA
       // Get updated session state after check
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CheckMetadataExtension completed: ${ddlxName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      handlerLogger.info(`✅ CheckMetadataExtension completed: ${ddlxName}`);
+      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -122,7 +126,7 @@ export async function handleCheckMetadataExtension(args: CheckMetadataExtensionA
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking metadata extension ${ddlxName}:`, error);
+      handlerLogger.error(`Error checking metadata extension ${ddlxName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check metadata extension: ${error.message || String(error)}`;
@@ -153,4 +157,3 @@ export async function handleCheckMetadataExtension(args: CheckMetadataExtensionA
     return return_error(error);
   }
 }
-

@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateViewLow",
@@ -108,7 +109,12 @@ export async function handleCreateView(args: CreateViewArgs) {
 
     const viewName = view_name.toUpperCase();
 
-    logger.info(`Starting view creation: ${viewName}`);
+    const handlerLogger = getHandlerLogger(
+      'handleCreateView',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
+    handlerLogger.info(`Starting view creation: ${viewName}`);
 
     try {
       // Create view
@@ -128,7 +134,7 @@ export async function handleCreateView(args: CreateViewArgs) {
       // Get updated session state after create
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CreateView completed: ${viewName}`);
+      handlerLogger.info(`✅ CreateView completed: ${viewName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -148,7 +154,7 @@ export async function handleCreateView(args: CreateViewArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating view ${viewName}:`, error);
+      handlerLogger.error(`Error creating view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create view: ${error.message || String(error)}`;
@@ -179,4 +185,3 @@ export async function handleCreateView(args: CreateViewArgs) {
     return return_error(error);
   }
 }
-

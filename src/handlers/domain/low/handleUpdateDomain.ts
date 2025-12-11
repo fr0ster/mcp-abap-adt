@@ -6,8 +6,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
-import { handlerLogger } from '../../../lib/logger';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -80,56 +80,28 @@ export async function handleUpdateDomain(args: UpdateDomainArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateDomain',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     const domainName = domain_name.toUpperCase();
 
-    handlerLogger.info('UpdateDomain', 'start', `Starting update for ${domainName}`, {
-      lock_handle: lock_handle,
-      session_id: session_id || 'none',
-      has_session_state: !!session_state,
-      session_state_cookies: session_state?.cookies?.substring(0, 50) + '...' || 'none',
-      session_state_csrf: session_state?.csrf_token?.substring(0, 20) + '...' || 'none',
-      properties_keys: Object.keys(properties),
-      properties_package_name: properties.package_name || properties.packageName || 'missing'
-    });
+    handlerLogger.info(`Starting domain update: ${domainName}`);
 
     // Restore session state if provided
     if (session_id && session_state) {
-      handlerLogger.info('UpdateDomain', 'restore_session', 'Restoring session state from Lock', {
-        session_id,
-        cookies_length: session_state.cookies?.length || 0,
-        csrf_token_length: session_state.csrf_token?.length || 0,
-        cookie_store_size: session_state.cookie_store ? Object.keys(session_state.cookie_store).length : 0
-      });
-
       // CRITICAL: Use restoreSessionInConnection to properly restore session
       // This will set sessionId in connection and enable stateful session mode
       await restoreSessionInConnection(connection, session_id, session_state);
-
-      // Verify session was restored
-      const restoredState = connection.getSessionState();
-      handlerLogger.info('UpdateDomain', 'session_restored', 'Session state restored successfully', {
-        session_id,
-        connection_session_id: connection.getSessionId(),
-        restored_cookies_length: restoredState?.cookies?.length || 0,
-        restored_csrf_token_length: restoredState?.csrfToken?.length || 0,
-        restored_cookie_store_size: restoredState?.cookieStore ? Object.keys(restoredState.cookieStore).length : 0,
-        cookies_match: restoredState?.cookies === session_state.cookies,
-        csrf_token_match: restoredState?.csrfToken === session_state.csrf_token
-      });
     } else {
-      handlerLogger.warn('UpdateDomain', 'no_session', 'No session provided, creating new connection (may fail if domain is locked)');
+      handlerLogger.debug('No session provided, creating new connection (may fail if domain is locked)');
       // Ensure connection is established
       await connection.connect();
     }
 
-    logger.info(`Starting domain update: ${domainName}`);
-
     try {
       // Update domain with properties
-      handlerLogger.debug('UpdateDomain', 'update', `Calling client.updateDomain({ domainName: ${domainName}, ...properties }, ${lock_handle})`, {
-        properties: properties
-      });
       await client.updateDomain({
         domainName,
         packageName: properties.package_name || properties.packageName,
@@ -144,17 +116,7 @@ export async function handleUpdateDomain(args: UpdateDomainArgs) {
       // Get updated session state after update
       const updatedSessionState = connection.getSessionState();
 
-      handlerLogger.info('UpdateDomain', 'success', `Update completed for ${domainName}`, {
-        updated_session_state: {
-          has_cookies: !!updatedSessionState?.cookies,
-          cookies_length: updatedSessionState?.cookies?.length || 0,
-          has_csrf_token: !!updatedSessionState?.csrfToken,
-          csrf_token_length: updatedSessionState?.csrfToken?.length || 0,
-          cookie_store_size: updatedSessionState?.cookieStore ? Object.keys(updatedSessionState.cookieStore).length : 0
-        }
-      });
-
-      logger.info(`✅ UpdateDomain completed: ${domainName}`);
+      handlerLogger.info(`✅ UpdateDomain completed: ${domainName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -171,7 +133,7 @@ export async function handleUpdateDomain(args: UpdateDomainArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating domain ${domainName}:`, error);
+      handlerLogger.error(`Error updating domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update domain: ${error.message || String(error)}`;
@@ -204,4 +166,3 @@ export async function handleUpdateDomain(args: UpdateDomainArgs) {
     return return_error(error);
   }
 }
-

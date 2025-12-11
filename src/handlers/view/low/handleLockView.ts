@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "LockViewLow",
@@ -65,6 +66,11 @@ export async function handleLockView(args: LockViewArgs) {
       return return_error(new Error('view_name is required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleLockView',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
@@ -82,7 +88,7 @@ export async function handleLockView(args: LockViewArgs) {
 
     const viewName = view_name.toUpperCase();
 
-    logger.info(`Starting view lock: ${viewName}`);
+    handlerLogger.info(`Starting view lock: ${viewName}`);
 
     try {
       // Lock view
@@ -96,8 +102,8 @@ export async function handleLockView(args: LockViewArgs) {
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ LockView completed: ${viewName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      handlerLogger.info(`✅ LockView completed: ${viewName}`);
+      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -115,7 +121,7 @@ export async function handleLockView(args: LockViewArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking view ${viewName}:`, error);
+      handlerLogger.error(`Error locking view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock view: ${error.message || String(error)}`;
@@ -148,4 +154,3 @@ export async function handleLockView(args: LockViewArgs) {
     return return_error(error);
   }
 }
-

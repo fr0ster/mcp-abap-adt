@@ -1,5 +1,5 @@
 import { McpError, ErrorCode } from '../../../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, getBaseUrl, logger, encodeSapObjectName } from '../../../lib/utils';
+import { makeAdtRequestWithTimeout, return_error, logger, encodeSapObjectName } from '../../../lib/utils';
 
 
 export const TOOL_DEFINITION = {
@@ -53,9 +53,8 @@ export async function handleGetBdef(args: any) {
 
         logger.info(`Getting BDEF source for: ${bdefName}${bdefUri ? ` (uri: ${bdefUri})` : ''}`);
 
-        const baseUrl = await getBaseUrl();
         // Always use the simple, direct endpoint as in the Python code
-        const endpoint = `${baseUrl}/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(bdefName)}/source/main`;
+        const endpoint = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(bdefName)}/source/main`;
         logger.info(`Requesting BDEF source from: ${endpoint}`);
         const response = await makeAdtRequestWithTimeout(endpoint, 'GET', 'default', {
             'Accept': 'text/plain'

@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "DeleteStructureLow",
@@ -52,9 +53,13 @@ export async function handleDeleteStructure(args: DeleteStructureArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleDeleteStructure',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure deletion: ${structureName}`);
+    handlerLogger.info(`Starting structure deletion: ${structureName}`);
 
     try {
       // Delete structure
@@ -65,7 +70,7 @@ export async function handleDeleteStructure(args: DeleteStructureArgs) {
         throw new Error(`Delete did not return a response for structure ${structureName}`);
       }
 
-      logger.info(`✅ DeleteStructure completed successfully: ${structureName}`);
+      handlerLogger.info(`✅ DeleteStructure completed successfully: ${structureName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -77,7 +82,7 @@ export async function handleDeleteStructure(args: DeleteStructureArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting structure ${structureName}:`, error);
+      handlerLogger.error(`Error deleting structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to delete structure: ${error.message || String(error)}`;
@@ -112,4 +117,3 @@ export async function handleDeleteStructure(args: DeleteStructureArgs) {
     return return_error(error);
   }
 }
-

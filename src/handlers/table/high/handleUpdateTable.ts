@@ -8,11 +8,12 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger as baseLogger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { getConfig } from '../../../index';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateTable",
@@ -71,7 +72,12 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
 
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table source update: ${tableName}`);
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateTable',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
+    handlerLogger.info(`Starting table source update: ${tableName}`);
 
     // Create a separate connection for this handler call (not using getManagedConnection)
     let connection: any = null;
@@ -81,21 +87,21 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
 
       // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
       const connectionLogger = {
-        debug: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {},
-        info: process.env.DEBUG_CONNECTORS === 'true' ? logger.info.bind(logger) : () => {},
-        warn: process.env.DEBUG_CONNECTORS === 'true' ? logger.warn.bind(logger) : () => {},
-        error: process.env.DEBUG_CONNECTORS === 'true' ? logger.error.bind(logger) : () => {},
-        csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? logger.debug.bind(logger) : () => {}
+        debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : noopLogger.debug,
+        info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : noopLogger.info,
+        warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : noopLogger.warn,
+        error: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.error.bind(baseLogger) : noopLogger.error,
+        csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : noopLogger.debug
       };
 
       // Create connection directly for this handler call
       connection = createAbapConnection(config, connectionLogger);
       await connection.connect();
 
-      logger.debug(`[UpdateTable] Created separate connection for handler call: ${tableName}`);
+      handlerLogger.debug(`[UpdateTable] Created separate connection for handler call: ${tableName}`);
     } catch (connectionError: any) {
       const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
-      logger.error(`[UpdateTable] Failed to create connection: ${errorMessage}`);
+      handlerLogger.error(`[UpdateTable] Failed to create connection: ${errorMessage}`);
       return return_error(new Error(`Failed to create connection: ${errorMessage}`));
     }
 
@@ -113,26 +119,26 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
 
       try {
         // Step 1: Check new code BEFORE update (with ddlCode and version='inactive')
-        logger.info(`[UpdateTable] Checking new DDL code before update: ${tableName}`);
+        handlerLogger.info(`[UpdateTable] Checking new DDL code before update: ${tableName}`);
         let checkNewCodePassed = false;
         try {
           await safeCheckOperation(
             () => client.checkTable({ tableName }, ddl_code, 'inactive'),
             tableName,
             {
-              debug: (message: string) => logger.info(`[UpdateTable] ${message}`)
+              debug: (message: string) => handlerLogger.debug(`[UpdateTable] ${message}`)
             }
           );
           checkNewCodePassed = true;
-          logger.info(`[UpdateTable] New code check passed: ${tableName}`);
+          handlerLogger.info(`[UpdateTable] New code check passed: ${tableName}`);
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
           if ((checkError as any).isAlreadyChecked) {
-            logger.info(`[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`);
+            handlerLogger.info(`[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`);
             checkNewCodePassed = true;
           } else {
             // Real check error - don't update if check failed
-            logger.error(`[UpdateTable] New code check failed: ${tableName}`, {
+            handlerLogger.error(`[UpdateTable] New code check failed: ${tableName}`, {
               error: checkError instanceof Error ? checkError.message : String(checkError)
             });
             throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
@@ -141,35 +147,35 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
 
         // Step 2: Update (only if check passed)
         if (checkNewCodePassed) {
-          logger.info(`[UpdateTable] Updating table with DDL code: ${tableName}`);
+          handlerLogger.info(`[UpdateTable] Updating table with DDL code: ${tableName}`);
           await client.updateTable({ tableName, ddlCode: ddl_code, transportRequest: transport_request }, lockHandle);
-          logger.info(`[UpdateTable] Table source code updated: ${tableName}`);
+          handlerLogger.info(`[UpdateTable] Table source code updated: ${tableName}`);
         } else {
-          logger.info(`[UpdateTable] Skipping update - new code check failed: ${tableName}`);
+          handlerLogger.info(`[UpdateTable] Skipping update - new code check failed: ${tableName}`);
         }
 
         // Step 3: Unlock (MANDATORY after lock)
         await client.unlockTable({ tableName }, lockHandle);
-        logger.info(`[UpdateTable] Table unlocked: ${tableName}`);
+        handlerLogger.info(`[UpdateTable] Table unlocked: ${tableName}`);
 
         // Step 4: Check inactive version (after unlock)
-        logger.info(`[UpdateTable] Checking inactive version: ${tableName}`);
+        handlerLogger.info(`[UpdateTable] Checking inactive version: ${tableName}`);
         try {
           await safeCheckOperation(
             () => client.checkTable({ tableName }, undefined, 'inactive'),
             tableName,
             {
-              debug: (message: string) => logger.info(`[UpdateTable] ${message}`)
+              debug: (message: string) => handlerLogger.debug(`[UpdateTable] ${message}`)
             }
           );
-          logger.info(`[UpdateTable] Inactive version check completed: ${tableName}`);
+          handlerLogger.info(`[UpdateTable] Inactive version check completed: ${tableName}`);
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
           if ((checkError as any).isAlreadyChecked) {
-            logger.info(`[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`);
+            handlerLogger.info(`[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`);
           } else {
             // Log warning but don't fail - inactive check is informational
-            logger.warn(`[UpdateTable] Inactive version check had issues: ${tableName}`, {
+            handlerLogger.warn(`[UpdateTable] Inactive version check had issues: ${tableName}`, {
               error: checkError instanceof Error ? checkError.message : String(checkError)
             });
           }
@@ -184,7 +190,7 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
         try {
           await client.unlockTable({ tableName: tableName }, lockHandle);
         } catch (unlockError) {
-          logger.error('Failed to unlock table after error:', unlockError);
+          handlerLogger.error('Failed to unlock table after error:', unlockError);
         }
         throw error;
       }
@@ -206,7 +212,7 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
         }
       }
 
-      logger.info(`✅ UpdateTable completed successfully: ${tableName}`);
+      handlerLogger.info(`✅ UpdateTable completed successfully: ${tableName}`);
 
       // Return success result
       const stepsCompleted = ['lock', 'check_new_code', 'update', 'unlock', 'check_inactive'];
@@ -237,7 +243,7 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
       });
 
     } catch (error: any) {
-      logger.error(`Error updating table source ${tableName}:`, error);
+      handlerLogger.error(`Error updating table source ${tableName}:`, error);
 
       const errorMessage = error.response?.data
         ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
@@ -249,9 +255,9 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
       if (connection) {
         try {
           connection.reset();
-          logger.debug(`[UpdateTable] Reset test connection`);
+          handlerLogger.debug(`[UpdateTable] Reset test connection`);
         } catch (resetError: any) {
-          logger.error(`[UpdateTable] Failed to reset connection: ${resetError.message || resetError}`);
+          handlerLogger.error(`[UpdateTable] Failed to reset connection: ${resetError.message || resetError}`);
         }
       }
     }
@@ -260,4 +266,3 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
     return return_error(error);
   }
 }
-

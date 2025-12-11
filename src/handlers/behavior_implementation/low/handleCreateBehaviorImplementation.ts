@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateBehaviorImplementationLow",
@@ -111,10 +112,15 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
       await connection.connect();
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleCreateBehaviorImplementation',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
     const className = class_name.toUpperCase();
     const behaviorDefinition = behavior_definition.toUpperCase();
 
-    logger.info(`Starting behavior implementation creation: ${className} for ${behaviorDefinition}`);
+    handlerLogger.info(`Starting behavior implementation creation: ${className} for ${behaviorDefinition}`);
 
     try {
       // Create behavior implementation (full workflow)
@@ -137,7 +143,7 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
       // Get updated session state after create
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CreateBehaviorImplementation completed: ${className}`);
+      handlerLogger.info(`✅ CreateBehaviorImplementation completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -158,7 +164,7 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating behavior implementation ${className}:`, error);
+      handlerLogger.error(`Error creating behavior implementation ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create behavior implementation: ${error.message || String(error)}`;
@@ -189,4 +195,3 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
     return return_error(error);
   }
 }
-

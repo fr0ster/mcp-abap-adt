@@ -1,48 +1,31 @@
 /**
  * ActivateObject Handler - Universal ABAP Object Activation via ADT API
- *
- * Uses activateObjectsGroup and parseActivationResponse from @mcp-abap-adt/adt-clients/core for all operations.
- * Connection management handled internally.
- *
- * Activates one or multiple ABAP repository objects using ADT activation endpoint.
- * This is a stateless operation - no session management or locking required.
  */
 
-import { return_error, return_response, logger, getManagedConnection, logErrorSafely } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient, ObjectReference } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "ActivateObjectLow",
-  description: "[low-level] Activate one or multiple ABAP repository objects. Works with any object type: classes, programs, tables, views, domains, data elements, etc. URI is auto-generated from name and type. Returns activation status and any warnings/errors.",
+  description: "[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type.",
   inputSchema: {
     type: "object",
     properties: {
       objects: {
         type: "array",
-        description: "Array of objects to activate. Each object must have 'name' and 'type'. URI is auto-generated.",
+        description: "Array of objects to activate. Each object must have 'name' and 'type'. URI is optional.",
         items: {
           type: "object",
           properties: {
-            name: {
-              type: "string",
-              description: "Object name in uppercase (e.g., 'ZCL_MY_CLASS', 'Z_MY_PROGRAM', 'ZOK_I_MARKET_0001')"
-            },
-            type: {
-              type: "string",
-              description: "Object type code (e.g., 'CLAS/OC', 'PROG/P', 'DDLS/DF', 'TABL/DT'). URI will be auto-generated from this."
-            },
-            uri: {
-              type: "string",
-              description: "Optional: Object URI in ADT format. If not provided, will be auto-generated from name and type."
-            }
+            name: { type: "string", description: "Object name in uppercase" },
+            type: { type: "string", description: "Object type code (e.g., 'CLAS/OC', 'PROG/P', 'DDLS/DF')" },
+            uri: { type: "string", description: "Optional ADT URI" }
           },
           required: ["name", "type"]
         }
       },
-      preaudit: {
-        type: "boolean",
-        description: "Request pre-audit before activation. Default: true"
-      }
+      preaudit: { type: "boolean", description: "Request pre-audit before activation. Default: true" }
     },
     required: ["objects"]
   }
@@ -57,63 +40,39 @@ interface ActivateObjectArgs {
   preaudit?: boolean;
 }
 
-
-
-/**
- * Main handler for ActivateObject MCP tool
- *
- * Uses activateObjectsGroup and parseActivationResponse from @mcp-abap-adt/adt-clients/core for all operations
- * Connection management handled internally
- *
- * This is a stateless operation - no session management needed.
- * Activation endpoint handles multiple objects in one request.
- */
-export async function handleActivateObject(params: any) {
+export async function handleActivateObject(params: ActivateObjectArgs) {
   try {
-    const args: ActivateObjectArgs = params;
+    const handlerLogger = getHandlerLogger(
+      'handleActivateObject',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    // Validate required parameters
+    const args = params;
+
     if (!args.objects || !Array.isArray(args.objects) || args.objects.length === 0) {
       return return_error(new Error("Missing required parameter: objects (must be non-empty array)"));
     }
 
-    // Validate each object has required properties
-    for (const obj of args.objects) {
-      if (!obj.name) {
-        return return_error(new Error("Each object must have 'name' property"));
-      }
-      if (!obj.uri && !obj.type) {
-        logger.warn(`Object ${obj.name} has no URI or type, will attempt to guess from name`);
-      }
-    }
-
     const connection = getManagedConnection();
-    const preaudit = args.preaudit !== false; // Default: true
+    const preaudit = args.preaudit !== false; // default true
     const client = new CrudClient(connection);
 
-    logger.info(`Starting activation of ${args.objects.length} object(s)`);
+    handlerLogger.info(`Starting activation of ${args.objects.length} object(s)`);
 
     try {
-      // Prepare objects for group activation
       const activationObjects = args.objects.map(obj => ({
         type: obj.type,
         name: obj.name.toUpperCase()
       }));
 
-      logger.debug('Activating objects:', activationObjects);
+      handlerLogger.debug(`Activating objects: ${activationObjects.map(o => o.name).join(', ')}`);
 
-      // Make group activation request using CrudClient
       const response = await client.activateObjectsGroup(activationObjects, preaudit);
+      handlerLogger.debug(`Activation response status: ${response.status}`);
 
-      // Debug: log raw response
-      logger.debug('Activation response status:', response.status);
-      logger.debug('Activation response data:', typeof response.data === 'string' ? response.data.substring(0, 500) : response.data);
-
-      // Parse response
       const activationResult = client.parseActivationResponse(response.data);
       const success = activationResult.activated && activationResult.checked;
 
-      // Build result object
       const result = {
         success,
         objects_count: args.objects.length,
@@ -132,10 +91,10 @@ export async function handleActivateObject(params: any) {
         errors: activationResult.messages.filter(m => m.type === 'error' || m.type === 'E'),
         message: success
           ? `Successfully activated ${args.objects.length} object(s)`
-          : `Activation completed with issues: ${activationResult.messages.length} message(s)`
+          : `Activation completed with ${activationResult.messages.length} message(s)`
       };
 
-      logger.info(`Activation completed: ${success ? 'SUCCESS' : 'WITH ISSUES'}`);
+      handlerLogger.info(`Activation completed: ${success ? 'SUCCESS' : 'WITH ISSUES'}`);
 
       return return_response({
         data: JSON.stringify(result, null, 2),
@@ -146,29 +105,16 @@ export async function handleActivateObject(params: any) {
       });
 
     } catch (error: any) {
-      logErrorSafely(logger, 'ActivateObject', error);
+      handlerLogger.error('Error during activation', error);
 
-      // Safely extract error message
       let errorMessage: string;
       if (error.response?.data) {
         if (typeof error.response.data === 'string') {
           errorMessage = error.response.data;
         } else {
           try {
-            const seen = new WeakSet();
-            errorMessage = JSON.stringify(error.response.data, (key, value) => {
-              if (typeof value === 'object' && value !== null) {
-                if (seen.has(value)) {
-                  return '[Circular]';
-                }
-                seen.add(value);
-              }
-              if (key === 'socket' || key === '_httpMessage' || key === 'res' || key === 'req') {
-                return '[HTTP Object]';
-              }
-              return value;
-            });
-          } catch (e) {
+            errorMessage = JSON.stringify(error.response.data);
+          } catch {
             errorMessage = `HTTP ${error.response.status}: ${error.response.statusText || 'Error'}`;
           }
         }

@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CheckInterfaceLow",
@@ -68,6 +69,10 @@ export async function handleCheckInterface(args: CheckInterfaceArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCheckInterface',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -83,7 +88,7 @@ export async function handleCheckInterface(args: CheckInterfaceArgs) {
 
     const interfaceName = interface_name.toUpperCase();
 
-    logger.info(`Starting interface check: ${interfaceName}`);
+    handlerLogger.info(`Starting interface check: ${interfaceName}`);
 
     try {
       // Check interface
@@ -100,9 +105,8 @@ export async function handleCheckInterface(args: CheckInterfaceArgs) {
       // Get updated session state after check
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CheckInterface completed: ${interfaceName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      handlerLogger.info(`✅ CheckInterface completed: ${interfaceName}`);
+      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -122,7 +126,7 @@ export async function handleCheckInterface(args: CheckInterfaceArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking interface ${interfaceName}:`, error);
+      handlerLogger.error(`Error checking interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check interface: ${error.message || String(error)}`;
@@ -153,4 +157,3 @@ export async function handleCheckInterface(args: CheckInterfaceArgs) {
     return return_error(error);
   }
 }
-

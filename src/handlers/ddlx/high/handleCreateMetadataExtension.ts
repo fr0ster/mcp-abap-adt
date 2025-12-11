@@ -3,9 +3,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
     name: "CreateMetadataExtension",
@@ -61,8 +62,12 @@ export async function handleCreateMetadataExtension(params: any) {
 
     const name = args.name.toUpperCase();
     const connection = getManagedConnection();
+    const handlerLogger = getHandlerLogger(
+      'handleCreateMetadataExtension',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting DDLX creation: ${name}`);
+    handlerLogger.info(`Starting DDLX creation: ${name}`);
 
     try {
         const client = new CrudClient(connection);
@@ -96,7 +101,7 @@ export async function handleCreateMetadataExtension(params: any) {
           try {
             await client.unlockMetadataExtension({ name: name }, lockHandle);
           } catch (unlockError) {
-            logger.error('Failed to unlock metadata extension after error:', unlockError);
+            handlerLogger.error(`Failed to unlock metadata extension after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
           }
           // Principle 2: first error and exit
           throw error;
@@ -121,7 +126,7 @@ export async function handleCreateMetadataExtension(params: any) {
         });
 
     } catch (error: any) {
-        logger.error(`Error creating DDLX ${name}:`, error);
+        handlerLogger.error(`Error creating DDLX ${name}: ${error?.message || error}`);
         return return_error(error);
     }
 }

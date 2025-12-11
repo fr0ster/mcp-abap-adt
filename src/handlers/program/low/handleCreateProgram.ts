@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateProgramLow",
@@ -102,6 +103,10 @@ export async function handleCreateProgram(args: CreateProgramArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCreateProgramLow',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -117,7 +122,7 @@ export async function handleCreateProgram(args: CreateProgramArgs) {
 
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program creation: ${programName}`);
+    handlerLogger.info(`Starting program creation: ${programName}`);
 
     try {
       // Create program
@@ -138,7 +143,7 @@ export async function handleCreateProgram(args: CreateProgramArgs) {
       // Get updated session state after create
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CreateProgram completed: ${programName}`);
+      handlerLogger.info(`✅ CreateProgram completed: ${programName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -158,7 +163,7 @@ export async function handleCreateProgram(args: CreateProgramArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating program ${programName}:`, error);
+      handlerLogger.error(`Error creating program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create program: ${error.message || String(error)}`;
@@ -189,4 +194,3 @@ export async function handleCreateProgram(args: CreateProgramArgs) {
     return return_error(error);
   }
 }
-

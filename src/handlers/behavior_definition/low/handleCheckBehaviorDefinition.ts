@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -67,6 +68,11 @@ export async function handleCheckBehaviorDefinition(args: CheckBehaviorDefinitio
       return return_error(new Error('name is required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleCheckBehaviorDefinition',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
@@ -84,7 +90,7 @@ export async function handleCheckBehaviorDefinition(args: CheckBehaviorDefinitio
 
     const bdefName = name.toUpperCase();
 
-    logger.info(`Starting behavior definition check: ${bdefName}`);
+    handlerLogger.info(`Starting behavior definition check: ${bdefName}`);
 
     try {
       // Check behavior definition - using types from adt-clients
@@ -104,9 +110,9 @@ export async function handleCheckBehaviorDefinition(args: CheckBehaviorDefinitio
       // Get updated session state after check
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CheckBehaviorDefinition completed: ${bdefName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      handlerLogger.info(`✅ CheckBehaviorDefinition completed: ${bdefName}`);
+      handlerLogger.info(`   Status: ${checkResult.status}`);
+      handlerLogger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -126,7 +132,7 @@ export async function handleCheckBehaviorDefinition(args: CheckBehaviorDefinitio
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking behavior definition ${bdefName}:`, error);
+      handlerLogger.error(`Error checking behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check behavior definition: ${error.message || String(error)}`;
@@ -157,4 +163,3 @@ export async function handleCheckBehaviorDefinition(args: CheckBehaviorDefinitio
     return return_error(error);
   }
 }
-

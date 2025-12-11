@@ -49,6 +49,7 @@ import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
+const logLine = (msg: string) => process.stdout.write(`${msg}\n`);
 
 describe('View Low-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;
@@ -61,7 +62,7 @@ describe('View Low-Level Handlers Integration', () => {
       hasConfig = true;
     } catch (error) {
       if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
-        console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+        logLine('⚠️ Skipping tests: No .env file or SAP configuration found');
       }
       hasConfig = false;
     }
@@ -91,15 +92,15 @@ describe('View Low-Level Handlers Integration', () => {
 
     it('should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate', async () => {
       if (!hasConfig || !session || !testCase || !testViewName) {
-        debugLog('TEST_SKIP', 'Skipping test: No configuration or test case', {
-          hasConfig,
-          hasSession: !!session,
-          hasTestCase: !!testCase,
-          hasTestViewName: !!testViewName
-        });
-        console.log('⏭️  Skipping test: No configuration or test case');
-        return;
-      }
+      debugLog('TEST_SKIP', 'Skipping test: No configuration or test case', {
+        hasConfig,
+        hasSession: !!session,
+        hasTestCase: !!testCase,
+        hasTestViewName: !!testViewName
+      });
+      logLine('⏭️  Skipping test: No configuration or test case');
+      return;
+    }
 
       const viewName = testViewName;
       const packageName = resolvePackageName(testCase);
@@ -110,12 +111,13 @@ describe('View Low-Level Handlers Integration', () => {
         object_name: viewName
       });
 
-      debugLog('TEST_START', `Starting full workflow test for view: ${viewName}`, {
-        viewName,
-        packageName,
-        transportRequest,
-        description
-      });
+        debugLog('TEST_START', `Starting full workflow test for view: ${viewName}`, {
+          viewName,
+          packageName,
+          transportRequest,
+          description
+        });
+      logLine(`▶️ ViewLowHandlers workflow started for ${viewName}`);
 
       try {
         // Step 1: Validate
@@ -139,7 +141,7 @@ describe('View Low-Level Handlers Integration', () => {
           });
           // If view already exists, that's okay - we'll skip creation
           if (errorMsg.includes('already exists')) {
-            console.log(`⏭️  View ${viewName} already exists, skipping test`);
+            logLine(`⏭️  View ${viewName} already exists, skipping test`);
             return;
           }
           throw new Error(`Validation failed: ${errorMsg}`);
@@ -356,7 +358,7 @@ define view entity ${viewName} as select from dummy {
           viewName,
           steps_completed: ['validate', 'create', 'lock', 'update', 'unlock', 'activate']
         });
-        console.log(`✅ Full workflow completed successfully for ${viewName}`);
+        logLine(`🏁 ViewLowHandlers workflow finished for ${viewName}`);
 
       } catch (error: any) {
         debugLog('TEST_ERROR', `Test failed: ${error.message}`, {
@@ -364,7 +366,7 @@ define view entity ${viewName} as select from dummy {
           stack: error.stack,
           viewName
         });
-        console.error(`❌ Test failed: ${error.message}`);
+        logLine(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
         // Cleanup: Unlock and optionally delete test view
@@ -408,24 +410,35 @@ define view entity ${viewName} as select from dummy {
 
               if (!deleteResponse.isError) {
                 debugLog('CLEANUP', `Successfully deleted test view: ${viewName}`);
-                console.log(`🧹 Cleaned up test view: ${viewName}`);
+                if (process.env.DEBUG_TESTS === 'true') {
+                  logLine(`🧹 Cleaned up test view: ${viewName}`);
+                }
               } else {
                 debugLog('CLEANUP', `Failed to delete test view: ${viewName}`, {
                   error: deleteResponse.content[0]?.text || 'Unknown error'
                 });
+                if (process.env.DEBUG_TESTS === 'true') {
+                  const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
+                  logLine(`⚠️  Failed to delete view ${viewName}: ${errorMsg}`);
+                }
               }
             } else {
               debugLog('CLEANUP', `Cleanup skipped (cleanup_after=false) - object left for analysis: ${viewName}`);
-              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${viewName}`);
+              if (process.env.DEBUG_TESTS === 'true') {
+                logLine(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${viewName}`);
+              }
             }
           } catch (cleanupError) {
             debugLog('CLEANUP_ERROR', `Failed to cleanup test view ${viewName}`, {
               error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
             });
-            console.warn(`⚠️  Failed to cleanup test view ${viewName}: ${cleanupError}`);
+            if (process.env.DEBUG_TESTS === 'true') {
+              logLine(`⚠️  Failed to cleanup test view ${viewName}: ${cleanupError}`);
+            }
           }
         }
         diagnosticsTracker.cleanup();
+        logLine(`🏁 ViewLowHandlers workflow finished for ${viewName}`);
       }
     }, getTimeout('long'));
   });

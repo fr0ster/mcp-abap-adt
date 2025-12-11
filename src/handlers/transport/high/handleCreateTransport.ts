@@ -8,8 +8,9 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateTransport",
@@ -56,6 +57,10 @@ interface CreateTransportArgs {
  */
 export async function handleCreateTransport(args: CreateTransportArgs) {
   try {
+    const handlerLogger = getHandlerLogger(
+      "handleCreateTransport",
+      process.env.DEBUG_HANDLERS === "true" ? baseLogger : noopLogger
+    );
     // Validate required parameters
     if (!args?.description) {
       throw new McpError(ErrorCode.InvalidParams, 'Transport description is required');
@@ -64,7 +69,7 @@ export async function handleCreateTransport(args: CreateTransportArgs) {
     const typedArgs = args as CreateTransportArgs;
     const connection = getManagedConnection();
 
-    logger.info(`Starting transport creation: ${typedArgs.description}`);
+    handlerLogger.info(`Starting transport creation: ${typedArgs.description}`);
 
     try {
       // Create client
@@ -79,7 +84,7 @@ export async function handleCreateTransport(args: CreateTransportArgs) {
       // Get create result
       const createResult = client.getCreateResult();
 
-      logger.info(`✅ CreateTransport completed successfully`);
+      handlerLogger.info(`✅ CreateTransport completed successfully`);
 
       // Parse response data if available
       let transportInfo: any = {};
@@ -153,7 +158,7 @@ export async function handleCreateTransport(args: CreateTransportArgs) {
       });
 
     } catch (error: any) {
-      logger.error(`Error creating transport:`, error);
+      handlerLogger.error(`Error creating transport:`, error);
 
       const errorMessage = error.response?.data
         ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))

@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdatePackageLow",
@@ -85,6 +86,10 @@ export async function handleUpdatePackage(args: UpdatePackageArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUpdatePackage',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -99,7 +104,7 @@ export async function handleUpdatePackage(args: UpdatePackageArgs) {
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    logger.info(`Starting package update: ${packageName}`);
+    handlerLogger.info(`Starting package update: ${packageName}`);
 
     try {
       // Update package description
@@ -117,7 +122,7 @@ export async function handleUpdatePackage(args: UpdatePackageArgs) {
       // Get updated session state after update
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UpdatePackage completed: ${packageName}`);
+      handlerLogger.info(`✅ UpdatePackage completed: ${packageName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -136,7 +141,7 @@ export async function handleUpdatePackage(args: UpdatePackageArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating package ${packageName}:`, error);
+      handlerLogger.error(`Error updating package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update package: ${error.message || String(error)}`;
@@ -169,4 +174,3 @@ export async function handleUpdatePackage(args: UpdatePackageArgs) {
     return return_error(error);
   }
 }
-

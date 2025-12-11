@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateFunctionGroupLow",
@@ -85,6 +86,10 @@ export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCreateFunctionGroup',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -100,7 +105,7 @@ export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
 
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function group creation: ${functionGroupName}`);
+    handlerLogger.info(`Starting function group creation: ${functionGroupName}`);
 
     try {
       // Create function group
@@ -119,7 +124,7 @@ export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
       // Get updated session state after create
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CreateFunctionGroup completed: ${functionGroupName}`);
+      handlerLogger.info(`✅ CreateFunctionGroup completed: ${functionGroupName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -139,7 +144,7 @@ export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating function group ${functionGroupName}:`, error);
+      handlerLogger.error(`Error creating function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create function group: ${error.message || String(error)}`;

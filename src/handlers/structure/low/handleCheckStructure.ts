@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CheckStructureLow",
@@ -80,6 +81,10 @@ export async function handleCheckStructure(args: CheckStructureArgs) {
     }
 
     const connection = getManagedConnection();
+    const handlerLogger = getHandlerLogger(
+      'handleCheckStructure',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const client = new CrudClient(connection);
 
     // Restore session state if provided
@@ -101,7 +106,7 @@ export async function handleCheckStructure(args: CheckStructureArgs) {
       ? version.toLowerCase() as 'active' | 'inactive'
       : 'inactive';
 
-    logger.info(`Starting structure check: ${structureName} (version: ${checkVersion}) ${ddl_code ? '(with new code)' : '(saved version)'}`);
+    handlerLogger.info(`Starting structure check: ${structureName} (version: ${checkVersion}) ${ddl_code ? '(with new code)' : '(saved version)'}`);
 
     try {
       // Check structure with optional source code (for validating new/unsaved code)
@@ -119,9 +124,9 @@ export async function handleCheckStructure(args: CheckStructureArgs) {
       // Get updated session state after check
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CheckStructure completed: ${structureName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      handlerLogger.info(`✅ CheckStructure completed: ${structureName}`);
+      handlerLogger.info(`   Status: ${checkResult.status}`);
+      handlerLogger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -142,7 +147,7 @@ export async function handleCheckStructure(args: CheckStructureArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking structure ${structureName}:`, error);
+      handlerLogger.error(`Error checking structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to check structure: ${error.message || String(error)}`;
@@ -173,4 +178,3 @@ export async function handleCheckStructure(args: CheckStructureArgs) {
     return return_error(error);
   }
 }
-

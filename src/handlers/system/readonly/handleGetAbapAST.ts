@@ -1,5 +1,6 @@
-import { McpError, ErrorCode } from '../../../lib/utils';
+import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "GetAbapAST",
@@ -151,6 +152,10 @@ class SimpleAbapASTGenerator {
 }
 
 export async function handleGetAbapAST(args: any) {
+    const handlerLogger = getHandlerLogger(
+      'handleGetAbapAST',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     try {
         if (!args?.code) {
             throw new McpError(ErrorCode.InvalidParams, 'ABAP code is required');
@@ -158,6 +163,7 @@ export async function handleGetAbapAST(args: any) {
 
         const astGenerator = new SimpleAbapASTGenerator();
         const ast = astGenerator.parseToAST(args.code);
+        handlerLogger.debug('Generated AST for provided ABAP code');
 
         const result = {
             isError: false,
@@ -170,11 +176,13 @@ export async function handleGetAbapAST(args: any) {
         };
 
         if (args.filePath) {
+            handlerLogger.debug(`Writing AST result to file: ${args.filePath}`);
             writeResultToFile(JSON.stringify(ast, null, 2), args.filePath);
         }
 
         return result;
     } catch (error) {
+        handlerLogger.error('Failed to generate ABAP AST', error as any);
         return {
             isError: true,
             content: [

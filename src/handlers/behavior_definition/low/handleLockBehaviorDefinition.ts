@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "LockBehaviorDefinitionLow",
@@ -66,6 +67,11 @@ export async function handleLockBehaviorDefinition(args: LockBehaviorDefinitionA
       return return_error(new Error('name is required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleLockBehaviorDefinition',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
@@ -83,7 +89,7 @@ export async function handleLockBehaviorDefinition(args: LockBehaviorDefinitionA
 
     const bdefName = name.toUpperCase();
 
-    logger.info(`Starting behavior definition lock: ${bdefName}`);
+    handlerLogger.info(`Starting behavior definition lock: ${bdefName}`);
 
     try {
       // Lock behavior definition - using types from adt-clients
@@ -100,8 +106,8 @@ export async function handleLockBehaviorDefinition(args: LockBehaviorDefinitionA
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ LockBehaviorDefinition completed: ${bdefName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      handlerLogger.info(`✅ LockBehaviorDefinition completed: ${bdefName}`);
+      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +125,7 @@ export async function handleLockBehaviorDefinition(args: LockBehaviorDefinitionA
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking behavior definition ${bdefName}:`, error);
+      handlerLogger.error(`Error locking behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock behavior definition: ${error.message || String(error)}`;

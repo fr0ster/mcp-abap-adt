@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ActivateTableLow",
@@ -67,6 +68,10 @@ export async function handleActivateTable(args: ActivateTableArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleActivateTable',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -82,7 +87,7 @@ export async function handleActivateTable(args: ActivateTableArgs) {
 
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table activation: ${tableName}`);
+    handlerLogger.info(`Starting table activation: ${tableName}`);
 
     try {
       // Activate table
@@ -100,9 +105,9 @@ export async function handleActivateTable(args: ActivateTableArgs) {
       // Get updated session state after activation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ActivateTable completed: ${tableName}`);
-      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      logger.info(`   Messages: ${activationResult.messages.length}`);
+      handlerLogger.info(`✅ ActivateTable completed: ${tableName}`);
+      handlerLogger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
+      handlerLogger.info(`   Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -129,7 +134,7 @@ export async function handleActivateTable(args: ActivateTableArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating table ${tableName}:`, error);
+      handlerLogger.error(`Error activating table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to activate table: ${error.message || String(error)}`;
@@ -160,4 +165,3 @@ export async function handleActivateTable(args: ActivateTableArgs) {
     return return_error(error);
   }
 }
-

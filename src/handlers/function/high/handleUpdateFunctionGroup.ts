@@ -11,8 +11,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient, ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateFunctionGroup",
@@ -64,8 +65,12 @@ export async function handleUpdateFunctionGroup(args: UpdateFunctionGroupArgs) {
 
     const connection = getManagedConnection();
     const functionGroupName = function_group_name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateFunctionGroup',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting function group metadata update: ${functionGroupName}`);
+    handlerLogger.info(`Starting function group metadata update: ${functionGroupName}`);
 
     try {
       // Use CrudClient for lock/unlock
@@ -118,7 +123,7 @@ export async function handleUpdateFunctionGroup(args: UpdateFunctionGroupArgs) {
         // Unlock
         await crudClient.unlockFunctionGroup({ functionGroupName }, lockHandle);
 
-        logger.info(`✅ UpdateFunctionGroup completed successfully: ${functionGroupName}`);
+        handlerLogger.info(`✅ UpdateFunctionGroup completed successfully: ${functionGroupName}`);
 
         // Return success result
         const result = {
@@ -144,14 +149,14 @@ export async function handleUpdateFunctionGroup(args: UpdateFunctionGroupArgs) {
           try {
             await crudClient.unlockFunctionGroup({ functionGroupName }, lockHandle);
           } catch (unlockError) {
-            logger.error('Failed to unlock function group after error:', unlockError);
+            handlerLogger.error(`Failed to unlock function group after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
           }
         }
         throw error;
       }
 
     } catch (error: any) {
-      logger.error(`Error updating function group metadata ${functionGroupName}:`, error);
+      handlerLogger.error(`Error updating function group metadata ${functionGroupName}: ${error?.message || error}`);
 
       // Check if function group not found
       if (error.message?.includes('not found') || error.response?.status === 404) {
@@ -169,4 +174,3 @@ export async function handleUpdateFunctionGroup(args: UpdateFunctionGroupArgs) {
     return return_error(error);
   }
 }
-

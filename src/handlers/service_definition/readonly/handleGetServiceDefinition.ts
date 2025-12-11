@@ -1,8 +1,9 @@
-import { McpError, ErrorCode, return_response, getManagedConnection } from '../../../lib/utils';
+import { McpError, ErrorCode, return_response, getManagedConnection, logger as baseLogger } from '../../../lib/utils';
 import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import * as z from 'zod';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "GetServiceDefinition",
@@ -50,6 +51,11 @@ function parseServiceDefinitionXml(xml: string) {
 
 export async function handleGetServiceDefinition(args: any): Promise<{ isError: boolean; content: Array<{ type: string; text?: string; json?: any }> }> {
   try {
+    const handlerLogger = getHandlerLogger(
+      'handleGetServiceDefinition',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
     if (!args?.service_definition_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Service definition name is required');
     }
@@ -62,6 +68,8 @@ export async function handleGetServiceDefinition(args: any): Promise<{ isError: 
     if (!response) {
       throw new McpError(ErrorCode.InternalError, 'Failed to read service definition');
     }
+
+    handlerLogger.info(`Read service definition ${args.service_definition_name.toUpperCase()}`);
 
     // Parse XML responses; otherwise return the payload unchanged
     if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
@@ -91,6 +99,11 @@ export async function handleGetServiceDefinition(args: any): Promise<{ isError: 
       return plainResult;
     }
   } catch (error) {
+    const handlerLogger = getHandlerLogger(
+      'handleGetServiceDefinition',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+    handlerLogger.error(`Error reading service definition ${args?.service_definition_name || ''}: ${error instanceof Error ? error.message : String(error)}`);
     // MCP-compliant error response: always return content[] with type "text"
     return {
       isError: true,
@@ -103,4 +116,3 @@ export async function handleGetServiceDefinition(args: any): Promise<{ isError: 
     };
   }
 }
-

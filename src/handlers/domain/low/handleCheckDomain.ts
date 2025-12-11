@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CheckDomainLow",
@@ -68,6 +69,10 @@ export async function handleCheckDomain(args: CheckDomainArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCheckDomain',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -83,7 +88,7 @@ export async function handleCheckDomain(args: CheckDomainArgs) {
 
     const domainName = domain_name.toUpperCase();
 
-    logger.info(`Starting domain check: ${domainName}`);
+    handlerLogger.info(`Starting domain check: ${domainName}`);
 
     try {
       // Check domain
@@ -100,9 +105,8 @@ export async function handleCheckDomain(args: CheckDomainArgs) {
       // Get updated session state after check
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CheckDomain completed: ${domainName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      handlerLogger.info(`✅ CheckDomain completed: ${domainName}`);
+      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -122,7 +126,7 @@ export async function handleCheckDomain(args: CheckDomainArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking domain ${domainName}:`, error);
+      handlerLogger.error(`Error checking domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check domain: ${error.message || String(error)}`;
@@ -153,4 +157,3 @@ export async function handleCheckDomain(args: CheckDomainArgs) {
     return return_error(error);
   }
 }
-

@@ -1,5 +1,5 @@
 import { McpError, ErrorCode } from '../../../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, getBaseUrl, logger, encodeSapObjectName } from '../../../lib/utils';
+import { makeAdtRequestWithTimeout, return_error, logger, encodeSapObjectName } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 
 
@@ -120,7 +120,7 @@ export async function handleGetEnhancementSpot(args: any) {
         logger.info(`Getting metadata for enhancement spot: ${enhancementSpot}`);
         
         // Build the ADT URL for the specific enhancement spot (Eclipse uses /sap/bc/adt/enhancements/enhsxsb/{spot_name})
-        const url = `${await getBaseUrl()}/sap/bc/adt/enhancements/enhsxsb/${encodeSapObjectName(enhancementSpot)}`;
+        const url = `/sap/bc/adt/enhancements/enhsxsb/${encodeSapObjectName(enhancementSpot)}`;
         
         logger.info(`Enhancement spot URL: ${url}`);
         

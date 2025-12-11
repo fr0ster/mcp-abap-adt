@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "DeleteTableLow",
@@ -52,9 +53,13 @@ export async function handleDeleteTable(args: DeleteTableArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleDeleteTable',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table deletion: ${tableName}`);
+    handlerLogger.info(`Starting table deletion: ${tableName}`);
 
     try {
       // Delete table
@@ -65,7 +70,7 @@ export async function handleDeleteTable(args: DeleteTableArgs) {
         throw new Error(`Delete did not return a response for table ${tableName}`);
       }
 
-      logger.info(`✅ DeleteTable completed successfully: ${tableName}`);
+      handlerLogger.info(`✅ DeleteTable completed successfully: ${tableName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -77,7 +82,7 @@ export async function handleDeleteTable(args: DeleteTableArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting table ${tableName}:`, error);
+      handlerLogger.error(`Error deleting table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to delete table: ${error.message || String(error)}`;
@@ -112,4 +117,3 @@ export async function handleDeleteTable(args: DeleteTableArgs) {
     return return_error(error);
   }
 }
-

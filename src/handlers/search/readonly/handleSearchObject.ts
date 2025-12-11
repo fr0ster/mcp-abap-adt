@@ -1,5 +1,5 @@
-import { McpError, ErrorCode } from '../../../lib/utils';
-import { return_response, getManagedConnection } from '../../../lib/utils';
+import { McpError, ErrorCode, return_response, getManagedConnection, logger as baseLogger } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import { SharedBuilder } from '@mcp-abap-adt/adt-clients';
 import type { SearchObjectsParams } from '@mcp-abap-adt/adt-clients';
@@ -36,6 +36,11 @@ function detectAdtSearchError(response: any): { isError: boolean, content: any[]
 
 export async function handleSearchObject(args: any) {
   try {
+    const handlerLogger = getHandlerLogger(
+      'handleSearchObject',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
     const { object_name, object_type, maxResults } = args;
     if (!object_name) {
       throw new McpError(ErrorCode.InvalidParams, 'object_name is required');
@@ -54,6 +59,7 @@ export async function handleSearchObject(args: any) {
       searchParams.objectType = object_type;
     }
 
+    handlerLogger.info(`Searching objects: query=${object_name}${object_type ? ` type=${object_type}` : ''}`);
     await sharedBuilder.search(searchParams);
     const response = sharedBuilder.getSearchResult();
 

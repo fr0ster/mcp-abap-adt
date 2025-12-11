@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ActivateProgramLow",
@@ -72,6 +73,10 @@ export async function handleActivateProgram(args: ActivateProgramArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleActivateProgram',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -87,7 +92,7 @@ export async function handleActivateProgram(args: ActivateProgramArgs) {
 
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program activation: ${programName}`);
+    handlerLogger.info(`Starting program activation: ${programName}`);
 
     try {
       // Activate program
@@ -105,9 +110,8 @@ export async function handleActivateProgram(args: ActivateProgramArgs) {
       // Get updated session state after activation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ActivateProgram completed: ${programName}`);
-      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      logger.info(`   Messages: ${activationResult.messages.length}`);
+      handlerLogger.info(`✅ ActivateProgram completed: ${programName}`);
+      handlerLogger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -134,7 +138,7 @@ export async function handleActivateProgram(args: ActivateProgramArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating program ${programName}:`, error);
+      handlerLogger.error(`Error activating program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate program: ${error.message || String(error)}`;
@@ -165,4 +169,3 @@ export async function handleActivateProgram(args: ActivateProgramArgs) {
     return return_error(error);
   }
 }
-

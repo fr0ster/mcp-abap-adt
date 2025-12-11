@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CheckFunctionGroupLow",
@@ -68,6 +69,10 @@ export async function handleCheckFunctionGroup(args: CheckFunctionGroupArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCheckFunctionGroup',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -83,7 +88,7 @@ export async function handleCheckFunctionGroup(args: CheckFunctionGroupArgs) {
 
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function group check: ${functionGroupName}`);
+    handlerLogger.info(`Starting function group check: ${functionGroupName}`);
 
     try {
       // Check function group
@@ -100,9 +105,8 @@ export async function handleCheckFunctionGroup(args: CheckFunctionGroupArgs) {
       // Get updated session state after check
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CheckFunctionGroup completed: ${functionGroupName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      handlerLogger.info(`✅ CheckFunctionGroup completed: ${functionGroupName}`);
+      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -122,7 +126,7 @@ export async function handleCheckFunctionGroup(args: CheckFunctionGroupArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking function group ${functionGroupName}:`, error);
+      handlerLogger.error(`Error checking function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check function group: ${error.message || String(error)}`;
@@ -153,4 +157,3 @@ export async function handleCheckFunctionGroup(args: CheckFunctionGroupArgs) {
     return return_error(error);
   }
 }
-

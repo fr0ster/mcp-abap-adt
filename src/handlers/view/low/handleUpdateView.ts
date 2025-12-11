@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateViewLow",
@@ -77,6 +78,11 @@ export async function handleUpdateView(args: UpdateViewArgs) {
       return return_error(new Error('view_name, ddl_source, and lock_handle are required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateView',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
@@ -94,7 +100,7 @@ export async function handleUpdateView(args: UpdateViewArgs) {
 
     const viewName = view_name.toUpperCase();
 
-    logger.info(`Starting view update: ${viewName}`);
+    handlerLogger.info(`Starting view update: ${viewName}`);
 
     try {
       // Update view with DDL source
@@ -108,7 +114,7 @@ export async function handleUpdateView(args: UpdateViewArgs) {
       // Get updated session state after update
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UpdateView completed: ${viewName}`);
+      handlerLogger.info(`✅ UpdateView completed: ${viewName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -125,7 +131,7 @@ export async function handleUpdateView(args: UpdateViewArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating view ${viewName}:`, error);
+      handlerLogger.error(`Error updating view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update view: ${error.message || String(error)}`;
@@ -158,4 +164,3 @@ export async function handleUpdateView(args: UpdateViewArgs) {
     return return_error(error);
   }
 }
-

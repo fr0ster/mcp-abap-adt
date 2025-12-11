@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CheckPackageLow",
@@ -74,6 +75,10 @@ export async function handleCheckPackage(args: CheckPackageArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCheckPackage',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -90,7 +95,7 @@ export async function handleCheckPackage(args: CheckPackageArgs) {
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    logger.info(`Starting package check: ${packageName} in ${superPackage}`);
+    handlerLogger.info(`Starting package check: ${packageName} in ${superPackage}`);
 
     try {
       // Check package
@@ -107,9 +112,8 @@ export async function handleCheckPackage(args: CheckPackageArgs) {
       // Get updated session state after check
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CheckPackage completed: ${packageName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      handlerLogger.info(`✅ CheckPackage completed: ${packageName}`);
+      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -130,7 +134,7 @@ export async function handleCheckPackage(args: CheckPackageArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking package ${packageName}:`, error);
+      handlerLogger.error(`Error checking package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check package: ${error.message || String(error)}`;
@@ -161,4 +165,3 @@ export async function handleCheckPackage(args: CheckPackageArgs) {
     return return_error(error);
   }
 }
-

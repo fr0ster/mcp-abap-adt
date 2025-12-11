@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ValidatePackageLow",
@@ -69,6 +70,10 @@ export async function handleValidatePackage(args: ValidatePackageArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleValidatePackage',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -85,7 +90,7 @@ export async function handleValidatePackage(args: ValidatePackageArgs) {
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    logger.info(`Starting package validation: ${packageName} in ${superPackage}`);
+    handlerLogger.info(`Starting package validation: ${packageName} in ${superPackage}`);
 
     try {
       // Validate package
@@ -99,8 +104,7 @@ export async function handleValidatePackage(args: ValidatePackageArgs) {
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ValidatePackage completed: ${packageName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      handlerLogger.info(`✅ ValidatePackage completed: ${packageName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -121,7 +125,7 @@ export async function handleValidatePackage(args: ValidatePackageArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating package ${packageName}:`, error);
+      handlerLogger.error(`Error validating package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate package: ${error.message || String(error)}`;
@@ -152,4 +156,3 @@ export async function handleValidatePackage(args: ValidatePackageArgs) {
     return return_error(error);
   }
 }
-

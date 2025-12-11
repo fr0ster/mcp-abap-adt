@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateProgramLow",
@@ -84,6 +85,10 @@ export async function handleUpdateProgram(args: UpdateProgramArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateProgram',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -99,7 +104,7 @@ export async function handleUpdateProgram(args: UpdateProgramArgs) {
 
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program update: ${programName}`);
+    handlerLogger.info(`Starting program update: ${programName}`);
 
     try {
       // Update program with source code
@@ -113,7 +118,7 @@ export async function handleUpdateProgram(args: UpdateProgramArgs) {
       // Get updated session state after update
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UpdateProgram completed: ${programName}`);
+      handlerLogger.info(`✅ UpdateProgram completed: ${programName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -130,7 +135,7 @@ export async function handleUpdateProgram(args: UpdateProgramArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating program ${programName}:`, error);
+      handlerLogger.error(`Error updating program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update program: ${error.message || String(error)}`;
@@ -163,4 +168,3 @@ export async function handleUpdateProgram(args: UpdateProgramArgs) {
     return return_error(error);
   }
 }
-

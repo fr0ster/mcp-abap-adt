@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateStructureLow",
@@ -79,6 +80,10 @@ export async function handleUpdateStructure(args: UpdateStructureArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateStructureLow',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -94,7 +99,7 @@ export async function handleUpdateStructure(args: UpdateStructureArgs) {
 
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure update: ${structureName}`);
+    handlerLogger.info(`Starting structure update: ${structureName}`);
 
     try {
       // Update structure with DDL code
@@ -108,7 +113,7 @@ export async function handleUpdateStructure(args: UpdateStructureArgs) {
       // Get updated session state after update
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UpdateStructure completed: ${structureName}`);
+      handlerLogger.info(`✅ UpdateStructure completed: ${structureName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -125,7 +130,7 @@ export async function handleUpdateStructure(args: UpdateStructureArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating structure ${structureName}:`, error);
+      handlerLogger.error(`Error updating structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to update structure: ${error.message || String(error)}`;
@@ -158,4 +163,3 @@ export async function handleUpdateStructure(args: UpdateStructureArgs) {
     return return_error(error);
   }
 }
-

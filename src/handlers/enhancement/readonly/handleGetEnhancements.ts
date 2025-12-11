@@ -1,5 +1,5 @@
 import { McpError, ErrorCode } from '../../../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl, logger, encodeSapObjectName, fetchNodeStructure } from '../../../lib/utils';
+import { makeAdtRequestWithTimeout, return_error, return_response, logger, encodeSapObjectName, fetchNodeStructure } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 
 
@@ -144,7 +144,7 @@ export function parseEnhancementsFromXml(xmlData: string): EnhancementImplementa
 async function determineObjectTypeAndPath(objectName: string, manualProgramContext?: string): Promise<{type: 'program' | 'include' | 'class', basePath: string, context?: string}> {
     try {
         // First try as a class
-        const classUrl = `${await getBaseUrl()}/sap/bc/adt/oo/classes/${encodeSapObjectName(objectName)}`;
+        const classUrl = `/sap/bc/adt/oo/classes/${encodeSapObjectName(objectName)}`;
         try {
             const response = await makeAdtRequestWithTimeout(classUrl, 'GET', 'csrf', {
                 'Accept': 'application/vnd.sap.adt.oo.classes.v4+xml'
@@ -163,7 +163,7 @@ async function determineObjectTypeAndPath(objectName: string, manualProgramConte
         }
         
         // Try as a program
-        const programUrl = `${await getBaseUrl()}/sap/bc/adt/programs/programs/${encodeSapObjectName(objectName)}`;
+        const programUrl = `/sap/bc/adt/programs/programs/${encodeSapObjectName(objectName)}`;
         try {
             const response = await makeAdtRequestWithTimeout(programUrl, 'GET', 'csrf', {
                 'Accept': 'application/vnd.sap.adt.programs.v3+xml'
@@ -182,7 +182,7 @@ async function determineObjectTypeAndPath(objectName: string, manualProgramConte
         }
         
         // Try as include
-        const includeUrl = `${await getBaseUrl()}/sap/bc/adt/programs/includes/${encodeSapObjectName(objectName)}`;
+        const includeUrl = `/sap/bc/adt/programs/includes/${encodeSapObjectName(objectName)}`;
         const response = await makeAdtRequestWithTimeout(includeUrl, 'GET', 'csrf', {
             'Accept': 'application/vnd.sap.adt.programs.includes.v2+xml'
         });
@@ -410,7 +410,7 @@ async function getEnhancementsForSingleObject(objectName: string, manualProgramC
     const objectInfo = await determineObjectTypeAndPath(objectName, manualProgramContext);
     
     // Build URL based on object type
-    let url = `${await getBaseUrl()}${objectInfo.basePath}`;
+    let url = objectInfo.basePath;
     
     // Add context parameter only for includes
     if (objectInfo.type === 'include' && objectInfo.context) {

@@ -6,8 +6,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
-import { handlerLogger } from '../../../lib/logger';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -74,26 +74,22 @@ export async function handleUnlockDomain(args: UnlockDomainArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUnlockDomain',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     const domainName = domain_name.toUpperCase();
 
-    handlerLogger.info('UnlockDomain', 'start', `Starting unlock for ${domainName}`, {
-      lock_handle: lock_handle,
-      session_id: session_id,
-      has_session_state: !!session_state,
-      session_state_cookies: session_state?.cookies?.substring(0, 50) + '...' || 'none',
-      session_state_csrf: session_state?.csrf_token?.substring(0, 20) + '...' || 'none',
-      session_state_cookie_store_keys: session_state?.cookie_store ? Object.keys(session_state.cookie_store) : []
-    });
+    handlerLogger.info(
+      `Starting unlock for ${domainName}; lock_handle=${lock_handle}; session=${session_id.substring(0, 8)}...; session_state=${session_state ? 'provided' : 'none'}`
+    );
 
     // Restore session state if provided
     if (session_state) {
-      handlerLogger.info('UnlockDomain', 'restore_session', 'Restoring session state from Lock', {
-        session_id,
-        cookies_length: session_state.cookies?.length || 0,
-        csrf_token_length: session_state.csrf_token?.length || 0,
-        cookie_store_size: session_state.cookie_store ? Object.keys(session_state.cookie_store).length : 0
-      });
+      handlerLogger.info(
+        `Restoring session state from lock: cookies=${session_state.cookies?.length || 0}, csrf=${session_state.csrf_token?.length || 0}, store_keys=${session_state.cookie_store ? Object.keys(session_state.cookie_store).length : 0}`
+      );
 
       // CRITICAL: Use restoreSessionInConnection to properly restore session
       // This will set sessionId in connection and enable stateful session mode
@@ -101,26 +97,20 @@ export async function handleUnlockDomain(args: UnlockDomainArgs) {
 
       // Verify session was restored
       const restoredState = connection.getSessionState();
-      handlerLogger.info('UnlockDomain', 'session_restored', 'Session state restored successfully', {
-        session_id,
-        connection_session_id: connection.getSessionId(),
-        restored_cookies_length: restoredState?.cookies?.length || 0,
-        restored_csrf_token_length: restoredState?.csrfToken?.length || 0,
-        restored_cookie_store_size: restoredState?.cookieStore ? Object.keys(restoredState.cookieStore).length : 0,
-        cookies_match: restoredState?.cookies === session_state.cookies,
-        csrf_token_match: restoredState?.csrfToken === session_state.csrf_token
-      });
+      handlerLogger.info(
+        `Session state restored (conn session ${connection.getSessionId()}): cookies=${restoredState?.cookies?.length || 0}, csrf=${restoredState?.csrfToken?.length || 0}, store_keys=${restoredState?.cookieStore ? Object.keys(restoredState.cookieStore).length : 0}`
+      );
     } else {
-      handlerLogger.warn('UnlockDomain', 'no_session', 'No session state provided (may fail if domain is locked)');
+      handlerLogger.warn('No session state provided (may fail if domain is locked)');
       // Ensure connection is established
       await connection.connect();
     }
 
-    logger.info(`Starting domain unlock: ${domainName} (session: ${session_id.substring(0, 8)}...)`);
+    handlerLogger.info(`Starting domain unlock: ${domainName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock domain
-      handlerLogger.debug('UnlockDomain', 'unlock', `Calling client.unlockDomain({ domainName: ${domainName} }, ${lock_handle})`);
+      handlerLogger.debug(`Calling client.unlockDomain({ domainName: ${domainName} }, ${lock_handle})`);
       await client.unlockDomain({ domainName }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
@@ -131,17 +121,11 @@ export async function handleUnlockDomain(args: UnlockDomainArgs) {
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();
 
-      handlerLogger.info('UnlockDomain', 'success', `Unlock completed for ${domainName}`, {
-        updated_session_state: {
-          has_cookies: !!updatedSessionState?.cookies,
-          cookies_length: updatedSessionState?.cookies?.length || 0,
-          has_csrf_token: !!updatedSessionState?.csrfToken,
-          csrf_token_length: updatedSessionState?.csrfToken?.length || 0,
-          cookie_store_size: updatedSessionState?.cookieStore ? Object.keys(updatedSessionState.cookieStore).length : 0
-        }
-      });
+      handlerLogger.info(
+        `Unlock completed for ${domainName}; cookies=${updatedSessionState?.cookies?.length || 0}, csrf=${updatedSessionState?.csrfToken?.length || 0}, store_keys=${updatedSessionState?.cookieStore ? Object.keys(updatedSessionState.cookieStore).length : 0}`
+      );
 
-      logger.info(`✅ UnlockDomain completed: ${domainName}`);
+      handlerLogger.info(`✅ UnlockDomain completed: ${domainName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -158,7 +142,7 @@ export async function handleUnlockDomain(args: UnlockDomainArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking domain ${domainName}:`, error);
+      handlerLogger.error(`Error unlocking domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock domain: ${error.message || String(error)}`;
@@ -191,4 +175,3 @@ export async function handleUnlockDomain(args: UnlockDomainArgs) {
     return return_error(error);
   }
 }
-

@@ -8,9 +8,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateFunctionModule",
@@ -89,8 +90,12 @@ export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs)
     const connection = getManagedConnection();
     const functionGroupName = typedArgs.function_group_name.toUpperCase();
     const functionModuleName = typedArgs.function_module_name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleCreateFunctionModule',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting function module creation: ${functionModuleName} in ${functionGroupName}`);
+    handlerLogger.info(`Starting function module creation: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       // Create client
@@ -134,7 +139,7 @@ export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs)
         await client.activateFunctionModule({ functionModuleName, functionGroupName });
       }
 
-      logger.info(`✅ CreateFunctionModule completed successfully: ${functionModuleName}`);
+      handlerLogger.info(`✅ CreateFunctionModule completed successfully: ${functionModuleName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -148,7 +153,7 @@ export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs)
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating function module ${functionModuleName}:`, error);
+      handlerLogger.error(`Error creating function module ${functionModuleName}: ${error?.message || error}`);
 
       // Check if function module already exists
       if (error.message?.includes('already exists') || error.response?.status === 409) {

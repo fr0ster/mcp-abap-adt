@@ -6,9 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
-import { handlerLogger } from '../../../lib/logger';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateDataElementLow",
@@ -80,6 +80,10 @@ export async function handleUpdateDataElement(args: UpdateDataElementArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateDataElement',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -95,18 +99,13 @@ export async function handleUpdateDataElement(args: UpdateDataElementArgs) {
 
     const dataElementName = data_element_name.toUpperCase();
 
-    handlerLogger.info('UpdateDataElementLow', 'start', `Starting data element update: ${dataElementName}`, {
-      dataElementName,
-      hasProperties: !!properties,
-      hasLockHandle: !!lock_handle,
-      hasSession: !!(session_id && session_state)
-    });
+    handlerLogger.info(`Starting data element update: ${dataElementName}`);
 
     // Validate required properties
     const packageName = properties.package_name || properties.packageName;
     if (!packageName) {
       const errorMsg = 'Package name is required in properties';
-      handlerLogger.error('UpdateDataElementLow', 'validation', errorMsg, { properties });
+      handlerLogger.error(errorMsg);
       return return_error(new Error(errorMsg));
     }
 
@@ -136,29 +135,19 @@ export async function handleUpdateDataElement(args: UpdateDataElementArgs) {
         }
       });
 
-      handlerLogger.debug('UpdateDataElementLow', 'update', `Updating data element with config`, {
-        dataElementName,
-        packageName: updateConfig.packageName,
-        typeKind: updateConfig.typeKind,
-        hasDescription: !!updateConfig.description
-      });
-
       // Update data element with properties
       await client.updateDataElement(updateConfig, lock_handle);
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {
-        handlerLogger.error('UpdateDataElementLow', 'update', `Update did not return a response for data element ${dataElementName}`);
+        handlerLogger.error(`Update did not return a response for data element ${dataElementName}`);
         throw new Error(`Update did not return a response for data element ${dataElementName}`);
       }
 
       // Get updated session state after update
       const updatedSessionState = connection.getSessionState();
 
-      handlerLogger.info('UpdateDataElementLow', 'complete', `Data element update completed: ${dataElementName}`, {
-        dataElementName,
-        status: updateResult.status
-      });
+      handlerLogger.info(`✅ UpdateDataElement completed: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -175,11 +164,7 @@ export async function handleUpdateDataElement(args: UpdateDataElementArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error('UpdateDataElementLow', 'error', `Failed to update data element ${dataElementName}`, {
-        error: error.message || String(error),
-        errorType: error instanceof Error ? error.constructor.name : 'Unknown'
-      });
-      logger.error(`Error updating data element ${dataElementName}:`, error);
+      handlerLogger.error(`Error updating data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update data element: ${error.message || String(error)}`;
@@ -212,4 +197,3 @@ export async function handleUpdateDataElement(args: UpdateDataElementArgs) {
     return return_error(error);
   }
 }
-

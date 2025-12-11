@@ -15,13 +15,18 @@ export const TOOL_DEFINITION = {
 // handleGetObjectNodeFromCache returns a cached node by OBJECT_TYPE, OBJECT_NAME, and TECH_NAME, expanding OBJECT_URI when available
 
 import { objectsListCache } from '../../../lib/getObjectsListCache';
-import { makeAdtRequest, getBaseUrl } from '../../../lib/utils';
+import { makeAdtRequest, logger as baseLogger } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 /**
  * @param args { object_type, object_name, tech_name }
  * @returns cached node including object_uri_response when OBJECT_URI exists
  */
 export async function handleGetObjectNodeFromCache(args: any) {
+    const handlerLogger = getHandlerLogger(
+      'handleGetObjectNodeFromCache',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const { object_type, object_name, tech_name } = args;
     if (!object_type || !object_name || !tech_name) {
         return {
@@ -40,18 +45,28 @@ export async function handleGetObjectNodeFromCache(args: any) {
         ) || null;
     }
     if (!node) {
+        handlerLogger.debug(`Node ${object_type}/${object_name}/${tech_name} not found in cache`);
         return {
             isError: true,
             content: [{ type: 'text', text: 'Node not found in cache' }]
         };
     }
     if (node.OBJECT_URI && !node.object_uri_response) {
+        const buildEndpoint = (uri: string) => {
+            if (uri.startsWith('http')) {
+                try {
+                    const parsed = new URL(uri);
+                    return `${parsed.pathname}${parsed.search}`;
+                } catch {
+                    // fall back to original if parsing fails
+                    return uri;
+                }
+            }
+            return uri;
+        };
         try {
-            const baseUrl = await getBaseUrl();
-            const url = node.OBJECT_URI.startsWith('http')
-                ? node.OBJECT_URI
-                : baseUrl.replace(/\/$/, '') + node.OBJECT_URI;
-            const resp = await makeAdtRequest(url, 'GET', 15000);
+            const endpoint = buildEndpoint(node.OBJECT_URI);
+            const resp = await makeAdtRequest(endpoint, 'GET', 15000);
             node.object_uri_response = typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data);
 
             // Persist the fetched OBJECT_URI payload back into the cache entry
@@ -66,9 +81,11 @@ export async function handleGetObjectNodeFromCache(args: any) {
                 objectsListCache.setCache(cache);
             }
         } catch (e) {
+            handlerLogger.error('Failed to expand OBJECT_URI from cache', e as any);
             node.object_uri_response = `ERROR: ${e instanceof Error ? e.message : String(e)}`;
         }
     }
+    handlerLogger.info(`Returning cached node for ${object_type}/${object_name}/${tech_name}`);
     return {
         content: [{ type: 'json', json: node }]
     };

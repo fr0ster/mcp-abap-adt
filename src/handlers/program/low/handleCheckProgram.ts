@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CheckProgramLow",
@@ -73,6 +74,10 @@ export async function handleCheckProgram(args: CheckProgramArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCheckProgram',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -88,7 +93,7 @@ export async function handleCheckProgram(args: CheckProgramArgs) {
 
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program check: ${programName}`);
+    handlerLogger.info(`Starting program check: ${programName}`);
 
     try {
       // Check program
@@ -105,9 +110,8 @@ export async function handleCheckProgram(args: CheckProgramArgs) {
       // Get updated session state after check
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CheckProgram completed: ${programName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      handlerLogger.info(`✅ CheckProgram completed: ${programName}`);
+      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -127,7 +131,7 @@ export async function handleCheckProgram(args: CheckProgramArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking program ${programName}:`, error);
+      handlerLogger.error(`Error checking program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check program: ${error.message || String(error)}`;
@@ -158,4 +162,3 @@ export async function handleCheckProgram(args: CheckProgramArgs) {
     return return_error(error);
   }
 }
-

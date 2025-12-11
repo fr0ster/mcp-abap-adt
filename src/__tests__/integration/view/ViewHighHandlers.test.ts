@@ -42,6 +42,8 @@ import {
 // Load environment variables
 // loadTestEnv will be called in beforeAll
 
+const logLine = (msg: string) => process.stdout.write(`${msg}\n`);
+
 
 describe('View High-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;
@@ -54,7 +56,7 @@ describe('View High-Level Handlers Integration', () => {
       hasConfig = true;
     } catch (error) {
       if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
-        console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+        logLine('⚠️ Skipping tests: No .env file or SAP configuration found');
       }
       hasConfig = false;
     }
@@ -62,18 +64,19 @@ describe('View High-Level Handlers Integration', () => {
 
   it('should test all View high-level handlers', async () => {
     if (!hasConfig || !session) {
-      console.log('⏭️  Skipping test: No configuration or session');
+      logLine('⏭️  Skipping test: No configuration or session');
       return;
     }
 
     // Get test case configuration
     const testCase = getEnabledTestCase('create_view', 'builder_view');
     if (!testCase) {
-      console.log('⏭️  Skipping test: No test case configuration');
+      logLine('⏭️  Skipping test: No test case configuration');
       return;
     }
 
     const viewName = testCase.params.view_name;
+    logLine(`▶️ ViewHighHandlers workflow started for ${viewName}`);
     const packageName = resolvePackageName(testCase);
     const transportRequest = resolveTransportRequest(testCase);
     const description = testCase.params.description || `Test view for high-level handler`;
@@ -106,7 +109,7 @@ as select from dummy
         const errorMsg = error.message || String(error);
         // If view already exists, that's okay - we'll skip test
         if (errorMsg.includes('already exists') || errorMsg.includes('InvalidObjName')) {
-          console.log(`⏭️  View ${viewName} already exists, skipping test`);
+          logLine(`⏭️  View ${viewName} already exists, skipping test`);
           return;
         }
         throw error;
@@ -127,7 +130,9 @@ as select from dummy
       });
 
       await delay(getOperationDelay('create', testCase));
-      console.log(`✅ High-level view creation completed successfully for ${viewName}`);
+      if (process.env.DEBUG_TESTS === 'true') {
+        logLine(`✅ High-level view creation completed successfully for ${viewName}`);
+      }
 
       // Step 2: Test UpdateView (High-Level)
       debugLog('UPDATE', `Starting high-level view update for ${viewName}`, {
@@ -154,7 +159,7 @@ as select from dummy
         const errorMsg = error.message || String(error);
         // If view doesn't exist or other validation error, skip test
         if (errorMsg.includes('already exists') || errorMsg.includes('InvalidObjName') || errorMsg.includes('not found')) {
-          console.log(`⏭️  Cannot update view ${viewName}: ${errorMsg}, skipping test`);
+          logLine(`⏭️  Cannot update view ${viewName}: ${errorMsg}, skipping test`);
           return;
         }
         throw new Error(`Update failed: ${errorMsg}`);
@@ -174,10 +179,12 @@ as select from dummy
       });
 
       await delay(getOperationDelay('update', testCase));
-      console.log(`✅ High-level view update completed successfully for ${viewName}`);
+      if (process.env.DEBUG_TESTS === 'true') {
+        logLine(`✅ High-level view update completed successfully for ${viewName}`);
+      }
 
     } catch (error: any) {
-      console.error(`❌ Test failed: ${error.message}`);
+      logLine(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
       // Cleanup: Optionally delete test view
@@ -193,19 +200,23 @@ as select from dummy
             });
 
             if (!deleteResponse.isError) {
-              console.log(`🧹 Cleaned up test view: ${viewName}`);
-            } else {
+              if (process.env.DEBUG_TESTS === 'true') {
+                logLine(`🧹 Cleaned up test view: ${viewName}`);
+              }
+            } else if (process.env.DEBUG_TESTS === 'true') {
               const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-              console.warn(`⚠️  Failed to delete view ${viewName}: ${errorMsg}`);
+              logLine(`⚠️  Failed to delete view ${viewName}: ${errorMsg}`);
             }
-          } else {
-            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${viewName}`);
+          } else if (process.env.DEBUG_TESTS === 'true') {
+            logLine(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${viewName}`);
           }
         } catch (cleanupError) {
-          console.warn(`⚠️  Failed to cleanup test view ${viewName}: ${cleanupError}`);
+          if (process.env.DEBUG_TESTS === 'true') {
+            logLine(`⚠️  Failed to cleanup test view ${viewName}: ${cleanupError}`);
+          }
         }
       }
+      logLine(`🏁 ViewHighHandlers workflow finished for ${viewName}`);
     }
   }, getTimeout('long'));
 });
-

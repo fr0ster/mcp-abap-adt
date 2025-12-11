@@ -2,10 +2,11 @@
  * CreateBehaviorDefinition Handler - ABAP Behavior Definition Creation via ADT API
  */
 
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
     name: "CreateBehaviorDefinition",
@@ -64,16 +65,20 @@ export async function handleCreateBehaviorDefinition(params: any) {
         return return_error(new Error("Missing required parameters"));
     }
 
-    try {
-        validateTransportRequest(args.package_name, args.transport_request);
-    } catch (error) {
-        return return_error(error as Error);
-    }
+   try {
+       validateTransportRequest(args.package_name, args.transport_request);
+   } catch (error) {
+       return return_error(error as Error);
+   }
 
-    const name = args.name.toUpperCase();
-    const connection = getManagedConnection();
+   const name = args.name.toUpperCase();
+   const connection = getManagedConnection();
+   const handlerLogger = getHandlerLogger(
+     'handleCreateBehaviorDefinition',
+     process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+   );
 
-    logger.info(`Starting BDEF creation: ${name}`);
+   handlerLogger.info(`Starting BDEF creation: ${name}`);
 
     try {
         const client = new CrudClient(connection);
@@ -115,7 +120,7 @@ export async function handleCreateBehaviorDefinition(params: any) {
             const unlockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
             await client.unlockBehaviorDefinition(unlockConfig, lockHandle);
           } catch (unlockError) {
-            logger.error('Failed to unlock behavior definition after error:', unlockError);
+            handlerLogger.error(`Failed to unlock behavior definition after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
           }
           // Principle 2: first error and exit
           throw error;
@@ -130,6 +135,7 @@ export async function handleCreateBehaviorDefinition(params: any) {
                 ? `Behavior Definition ${name} created and activated successfully`
                 : `Behavior Definition ${name} created successfully`
         };
+        handlerLogger.info(`✅ CreateBehaviorDefinition completed successfully: ${name}`);
 
         return return_response({
             data: JSON.stringify(result, null, 2),
@@ -140,7 +146,7 @@ export async function handleCreateBehaviorDefinition(params: any) {
         });
 
     } catch (error: any) {
-        logger.error(`Error creating BDEF ${name}:`, error);
+        handlerLogger.error(`Error creating BDEF ${name}: ${error?.message || error}`);
         return return_error(error);
     }
 }

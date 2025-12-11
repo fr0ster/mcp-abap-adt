@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "LockProgramLow",
@@ -72,6 +73,10 @@ export async function handleLockProgram(args: LockProgramArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleLockProgram',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -87,7 +92,7 @@ export async function handleLockProgram(args: LockProgramArgs) {
 
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program lock: ${programName}`);
+    handlerLogger.info(`Starting program lock: ${programName}`);
 
     try {
       // Lock program
@@ -101,8 +106,8 @@ export async function handleLockProgram(args: LockProgramArgs) {
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ LockProgram completed: ${programName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      handlerLogger.info(`✅ LockProgram completed: ${programName}`);
+      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -120,7 +125,7 @@ export async function handleLockProgram(args: LockProgramArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking program ${programName}:`, error);
+      handlerLogger.error(`Error locking program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock program: ${error.message || String(error)}`;
@@ -153,4 +158,3 @@ export async function handleLockProgram(args: LockProgramArgs) {
     return return_error(error);
   }
 }
-

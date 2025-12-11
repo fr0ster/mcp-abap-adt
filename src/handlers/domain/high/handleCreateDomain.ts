@@ -8,8 +8,8 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, logErrorSafely, safeCheckOperation } from '../../../lib/utils';
-import { handlerLogger } from '../../../lib/logger';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, logErrorSafely, safeCheckOperation } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { validateTransportRequest } from '../../../utils/transportValidation';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -135,13 +135,12 @@ export async function handleCreateDomain(args: DomainArgs) {
     const typedArgs = args as DomainArgs;
     const connection = getManagedConnection();
     const domainName = typedArgs.domain_name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleCreateDomain',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting domain creation: ${domainName}`);
-    handlerLogger.info('CreateDomain', 'start', `Starting domain creation: ${domainName}`, {
-      domainName,
-      packageName: typedArgs.package_name,
-      transportRequest: typedArgs.transport_request
-    });
+    handlerLogger.info(`Starting domain creation: ${domainName}`);
 
     try {
       // Create client
@@ -149,47 +148,25 @@ export async function handleCreateDomain(args: DomainArgs) {
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Validate
-      handlerLogger.debug('CreateDomain', 'validate', `Validating domain: ${domainName}`, {
-        domainName,
-        packageName: typedArgs.package_name,
-        description: typedArgs.description || domainName
-      });
       await client.validateDomain({
         domainName,
         packageName: typedArgs.package_name,
         description: typedArgs.description || domainName
       });
-      handlerLogger.debug('CreateDomain', 'validate', `Validation completed for: ${domainName}`);
 
       // Create
-      handlerLogger.debug('CreateDomain', 'create', `Creating domain: ${domainName}`, {
-        domainName,
-        packageName: typedArgs.package_name,
-        transportRequest: typedArgs.transport_request
-      });
       await client.createDomain({
         domainName,
         description: typedArgs.description || domainName,
         packageName: typedArgs.package_name,
         transportRequest: typedArgs.transport_request
       });
-      handlerLogger.debug('CreateDomain', 'create', `Domain created: ${domainName}`);
 
       // Lock
-      handlerLogger.debug('CreateDomain', 'lock', `Locking domain: ${domainName}`);
       await client.lockDomain({ domainName });
       const lockHandle = client.getLockHandle();
-      handlerLogger.debug('CreateDomain', 'lock', `Domain locked: ${domainName}`, {
-        lockHandle: lockHandle ? lockHandle.substring(0, 50) + '...' : null
-      });
 
       // Update with properties
-      handlerLogger.debug('CreateDomain', 'update', `Updating domain properties: ${domainName}`, {
-        domainName,
-        datatype: typedArgs.datatype || 'CHAR',
-        length: typedArgs.length || 100,
-        decimals: typedArgs.decimals || 0
-      });
       await client.updateDomain({
         domainName,
         packageName: typedArgs.package_name,
@@ -203,23 +180,20 @@ export async function handleCreateDomain(args: DomainArgs) {
         value_table: typedArgs.value_table,
         fixed_values: typedArgs.fixed_values
       }, lockHandle);
-      handlerLogger.debug('CreateDomain', 'update', `Domain updated: ${domainName}`);
 
       // Check
-      handlerLogger.debug('CreateDomain', 'check', `Checking domain syntax: ${domainName}`);
       try {
         await safeCheckOperation(
           () => client.checkDomain({ domainName }),
           domainName,
           {
-            debug: (message: string) => handlerLogger.debug('CreateDomain', 'check', message)
+            debug: (message: string) => handlerLogger.debug(message)
           }
         );
-        handlerLogger.debug('CreateDomain', 'check', `Domain check completed: ${domainName}`);
       } catch (checkError: any) {
         // If error was marked as "already checked", continue silently
         if ((checkError as any).isAlreadyChecked) {
-          handlerLogger.debug('CreateDomain', 'check', `Domain ${domainName} was already checked - this is OK, continuing`);
+          handlerLogger.debug(`Domain ${domainName} was already checked - continuing`);
         } else {
           // Real check error - rethrow
           throw checkError;
@@ -227,17 +201,13 @@ export async function handleCreateDomain(args: DomainArgs) {
       }
 
       // Unlock
-      handlerLogger.debug('CreateDomain', 'unlock', `Unlocking domain: ${domainName}`);
       await client.unlockDomain({ domainName }, lockHandle);
-      handlerLogger.debug('CreateDomain', 'unlock', `Domain unlocked: ${domainName}`);
 
       // Activate if requested
       if (shouldActivate) {
-        handlerLogger.debug('CreateDomain', 'activate', `Activating domain: ${domainName}`);
         await client.activateDomain({ domainName });
-        handlerLogger.debug('CreateDomain', 'activate', `Domain activated: ${domainName}`);
       } else {
-        handlerLogger.debug('CreateDomain', 'activate', `Skipping activation for: ${domainName}`);
+        handlerLogger.debug(`Skipping activation for: ${domainName}`);
       }
 
       // Get domain details from create result (createDomain already does verification)
@@ -247,12 +217,7 @@ export async function handleCreateDomain(args: DomainArgs) {
         domainDetails = (createResult.data as any).domain_details;
       }
 
-      handlerLogger.info('CreateDomain', 'complete', `Domain creation completed: ${domainName}`, {
-        domainName,
-        status: shouldActivate ? 'active' : 'inactive',
-        package: typedArgs.package_name,
-        transportRequest: typedArgs.transport_request
-      });
+      handlerLogger.info(`✅ CreateDomain completed: ${domainName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -267,7 +232,8 @@ export async function handleCreateDomain(args: DomainArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logErrorSafely(logger, `CreateDomain ${domainName}`, error);
+      logErrorSafely(baseLogger, `CreateDomain ${domainName}`, error);
+      handlerLogger.error(`Error creating domain ${domainName}: ${error?.message || error}`);
 
       // Check if domain already exists
       if (error.message?.includes('already exists') || error.response?.data?.includes('ExceptionResourceAlreadyExists')) {

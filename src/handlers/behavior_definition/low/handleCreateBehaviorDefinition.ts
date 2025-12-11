@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateBehaviorDefinitionLow",
@@ -113,9 +114,14 @@ export async function handleCreateBehaviorDefinition(args: CreateBehaviorDefinit
       await connection.connect();
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleCreateBehaviorDefinition',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
     const bdefName = name.toUpperCase();
 
-    logger.info(`Starting behavior definition creation: ${bdefName}`);
+    handlerLogger.info(`Starting behavior definition creation: ${bdefName}`);
 
     try {
       // Create behavior definition - using types from adt-clients
@@ -137,7 +143,7 @@ export async function handleCreateBehaviorDefinition(args: CreateBehaviorDefinit
       // Get updated session state after create
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CreateBehaviorDefinition completed: ${bdefName}`);
+      handlerLogger.info(`✅ CreateBehaviorDefinition completed: ${bdefName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -159,7 +165,7 @@ export async function handleCreateBehaviorDefinition(args: CreateBehaviorDefinit
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating behavior definition ${bdefName}:`, error);
+      handlerLogger.error(`Error creating behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create behavior definition: ${error.message || String(error)}`;

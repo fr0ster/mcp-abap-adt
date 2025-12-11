@@ -8,11 +8,12 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { ServiceDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateServiceDefinition",
@@ -64,6 +65,10 @@ interface CreateServiceDefinitionArgs {
  * Uses CrudClient.createServiceDefinition
  */
 export async function handleCreateServiceDefinition(args: CreateServiceDefinitionArgs) {
+  const handlerLogger = getHandlerLogger(
+    'handleCreateServiceDefinition',
+    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+  );
   try {
     // Validate required parameters
     if (!args?.service_definition_name) {
@@ -84,7 +89,7 @@ export async function handleCreateServiceDefinition(args: CreateServiceDefinitio
     const connection = getManagedConnection();
     const serviceDefinitionName = typedArgs.service_definition_name.toUpperCase();
 
-    logger.info(`Starting service definition creation: ${serviceDefinitionName}`);
+    handlerLogger.info(`Starting service definition creation: ${serviceDefinitionName}`);
 
     try {
       // Create client
@@ -135,7 +140,7 @@ export async function handleCreateServiceDefinition(args: CreateServiceDefinitio
         }
       }
 
-      logger.info(`✅ CreateServiceDefinition completed successfully: ${serviceDefinitionName}`);
+      handlerLogger.info(`✅ CreateServiceDefinition completed successfully: ${serviceDefinitionName}`);
 
       // Return success result
       const stepsCompleted = ['validate', 'create'];
@@ -166,7 +171,7 @@ export async function handleCreateServiceDefinition(args: CreateServiceDefinitio
       });
 
     } catch (error: any) {
-      logger.error(`Error creating service definition ${serviceDefinitionName}:`, error);
+      handlerLogger.error(`Error creating service definition ${serviceDefinitionName}:`, error);
 
       // Check if service definition already exists
       if (error.message?.includes('already exists') || error.response?.status === 409) {
@@ -180,8 +185,7 @@ export async function handleCreateServiceDefinition(args: CreateServiceDefinitio
       return return_error(new Error(`Failed to create service definition: ${errorMessage}`));
     }
   } catch (error: any) {
-    logger.error('CreateServiceDefinition handler error:', error);
+    handlerLogger.error('CreateServiceDefinition handler error:', error);
     return return_error(error);
   }
 }
-

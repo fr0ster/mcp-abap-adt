@@ -1,6 +1,7 @@
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { fetchNodeStructure, return_error } from '../../../lib/utils';
+import { fetchNodeStructure, return_error, logger as baseLogger } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 
 export const TOOL_DEFINITION = {
@@ -128,6 +129,10 @@ function parseIncludeNamesFromXml(xmlData: string): string[] {
 
 export async function handleGetIncludesList(args: any) {
     try {
+        const handlerLogger = getHandlerLogger(
+          'handleGetIncludesList',
+          process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+        );
         const { object_name, object_type, timeout, detailed } = args;
 
         if (!object_name || typeof object_name !== 'string' || object_name.trim() === '') {
@@ -145,6 +150,8 @@ export async function handleGetIncludesList(args: any) {
         let parentName = object_name;
         let parentTechName = object_name;
         let parentType = object_type;
+
+        handlerLogger.info(`Starting includes discovery for ${parentName.toUpperCase()} (${parentType}), detailed=${isDetailed}`);
 
         // Step 1: Get root node structure to find includes node (with timeout)
         const rootResponse = await Promise.race([
@@ -165,6 +172,7 @@ export async function handleGetIncludesList(args: any) {
         const includesNode = includesInfo.find(info => info.name === 'PROG/I');
         
         if (!includesNode) {
+            handlerLogger.info(`No includes found in ${object_type} '${object_name}'`);
             // Return empty result if no includes node found
             return {
                 isError: false,
@@ -240,14 +248,11 @@ export async function handleGetIncludesList(args: any) {
         }
 
     } catch (error) {
-        return {
-            isError: true,
-            content: [
-                {
-                        type: "text",
-                        text: error instanceof Error ? error.message : String(error)
-                }
-            ]
-        };
+        const handlerLogger = getHandlerLogger(
+          'handleGetIncludesList',
+          process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+        );
+        handlerLogger.error(`Error getting includes list: ${error instanceof Error ? error.message : String(error)}`);
+        return return_error(error instanceof Error ? error : new Error(String(error)));
     }
 }

@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ActivateViewLow",
@@ -65,6 +66,11 @@ export async function handleActivateView(args: ActivateViewArgs) {
       return return_error(new Error('view_name is required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleActivateView',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
@@ -82,7 +88,7 @@ export async function handleActivateView(args: ActivateViewArgs) {
 
     const viewName = view_name.toUpperCase();
 
-    logger.info(`Starting view activation: ${viewName}`);
+    handlerLogger.info(`Starting view activation: ${viewName}`);
 
     try {
       // Activate view
@@ -100,9 +106,9 @@ export async function handleActivateView(args: ActivateViewArgs) {
       // Get updated session state after activation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ActivateView completed: ${viewName}`);
-      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      logger.info(`   Messages: ${activationResult.messages.length}`);
+      handlerLogger.info(`✅ ActivateView completed: ${viewName}`);
+      handlerLogger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
+      handlerLogger.info(`   Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -129,7 +135,7 @@ export async function handleActivateView(args: ActivateViewArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating view ${viewName}:`, error);
+      handlerLogger.error(`Error activating view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate view: ${error.message || String(error)}`;
@@ -160,4 +166,3 @@ export async function handleActivateView(args: ActivateViewArgs) {
     return return_error(error);
   }
 }
-

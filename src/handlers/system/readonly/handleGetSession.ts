@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { generateSessionId } from '../../../lib/sessionUtils';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "GetSession",
@@ -34,10 +35,15 @@ interface GetSessionArgs {
  * Returns session ID and session state that can be reused in other handlers
  */
 export async function handleGetSession(args: GetSessionArgs) {
+  const handlerLogger = getHandlerLogger(
+    'handleGetSession',
+    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+  );
   try {
     const { force_new = false } = args as GetSessionArgs;
 
     const connection = getManagedConnection();
+    handlerLogger.debug(`Connecting managed session${force_new ? ' (force new)' : ''}...`);
 
     // Ensure connection is established (get cookies and CSRF token)
     await connection.connect();
@@ -52,7 +58,7 @@ export async function handleGetSession(args: GetSessionArgs) {
       return return_error(new Error('Failed to get session state. Connection may not be properly initialized.'));
     }
 
-    logger.info(`✅ GetSession completed: session ID ${sessionId.substring(0, 8)}...`);
+    handlerLogger.info(`✅ GetSession completed: session ID ${sessionId.substring(0, 8)}...`);
 
     return return_response({
       data: JSON.stringify({
@@ -68,8 +74,7 @@ export async function handleGetSession(args: GetSessionArgs) {
     } as AxiosResponse);
 
   } catch (error: any) {
-    logger.error('Error getting session:', error);
+    handlerLogger.error('Error getting session:', error);
     return return_error(error);
   }
 }
-

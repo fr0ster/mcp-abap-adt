@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "DeleteViewLow",
@@ -50,11 +51,15 @@ export async function handleDeleteView(args: DeleteViewArgs) {
       return return_error(new Error('view_name is required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleDeleteView',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
     const viewName = view_name.toUpperCase();
 
-    logger.info(`Starting view deletion: ${viewName}`);
+    handlerLogger.info(`Starting view deletion: ${viewName}`);
 
     try {
       // Delete view
@@ -65,7 +70,7 @@ export async function handleDeleteView(args: DeleteViewArgs) {
         throw new Error(`Delete did not return a response for view ${viewName}`);
       }
 
-      logger.info(`✅ DeleteView completed successfully: ${viewName}`);
+      handlerLogger.info(`✅ DeleteView completed successfully: ${viewName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -77,7 +82,7 @@ export async function handleDeleteView(args: DeleteViewArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting view ${viewName}:`, error);
+      handlerLogger.error(`Error deleting view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete view: ${error.message || String(error)}`;
@@ -112,4 +117,3 @@ export async function handleDeleteView(args: DeleteViewArgs) {
     return return_error(error);
   }
 }
-

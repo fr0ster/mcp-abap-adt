@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ValidateBehaviorImplementationLow",
@@ -99,10 +100,15 @@ export async function handleValidateBehaviorImplementation(args: ValidateBehavio
       await connection.connect();
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleValidateBehaviorImplementation',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
     const className = class_name.toUpperCase();
     const behaviorDefinition = behavior_definition.toUpperCase();
 
-    logger.info(`Starting behavior implementation validation: ${className} for ${behaviorDefinition}`);
+    handlerLogger.info(`Starting behavior implementation validation: ${className} for ${behaviorDefinition}`);
 
     try {
       // Validate behavior implementation
@@ -122,8 +128,8 @@ export async function handleValidateBehaviorImplementation(args: ValidateBehavio
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ValidateBehaviorImplementation completed: ${className}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      handlerLogger.info(`✅ ValidateBehaviorImplementation completed: ${className}`);
+      handlerLogger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
         data: JSON.stringify({
@@ -144,7 +150,7 @@ export async function handleValidateBehaviorImplementation(args: ValidateBehavio
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating behavior implementation ${className}:`, error);
+      handlerLogger.error(`Error validating behavior implementation ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate behavior implementation: ${error.message || String(error)}`;
@@ -175,4 +181,3 @@ export async function handleValidateBehaviorImplementation(args: ValidateBehavio
     return return_error(error);
   }
 }
-

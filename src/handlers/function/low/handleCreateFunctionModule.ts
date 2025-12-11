@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateFunctionModuleLow",
@@ -91,6 +92,10 @@ export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs)
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCreateFunctionModule',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -107,7 +112,7 @@ export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs)
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function module creation: ${functionModuleName} in ${functionGroupName}`);
+    handlerLogger.info(`Starting function module creation: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       // Create function module
@@ -128,7 +133,7 @@ export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs)
       // Get updated session state after create
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CreateFunctionModule completed: ${functionModuleName}`);
+      handlerLogger.info(`✅ CreateFunctionModule completed: ${functionModuleName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -149,7 +154,7 @@ export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs)
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating function module ${functionModuleName}:`, error);
+      handlerLogger.error(`Error creating function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create function module: ${error.message || String(error)}`;

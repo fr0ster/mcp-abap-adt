@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ActivateMetadataExtensionLow",
@@ -67,6 +68,10 @@ export async function handleActivateMetadataExtension(args: ActivateMetadataExte
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleActivateMetadataExtension',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -82,7 +87,7 @@ export async function handleActivateMetadataExtension(args: ActivateMetadataExte
 
     const metadataExtensionName = name.toUpperCase();
 
-    logger.info(`Starting metadata extension activation: ${metadataExtensionName}`);
+    handlerLogger.info(`Starting metadata extension activation: ${metadataExtensionName}`);
 
     try {
       // Activate metadata extension
@@ -100,9 +105,8 @@ export async function handleActivateMetadataExtension(args: ActivateMetadataExte
       // Get updated session state after activation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ActivateMetadataExtension completed: ${metadataExtensionName}`);
-      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      logger.info(`   Messages: ${activationResult.messages.length}`);
+      handlerLogger.info(`✅ ActivateMetadataExtension completed: ${metadataExtensionName}`);
+      handlerLogger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -129,7 +133,7 @@ export async function handleActivateMetadataExtension(args: ActivateMetadataExte
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating metadata extension ${metadataExtensionName}:`, error);
+      handlerLogger.error(`Error activating metadata extension ${metadataExtensionName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate metadata extension: ${error.message || String(error)}`;
@@ -160,4 +164,3 @@ export async function handleActivateMetadataExtension(args: ActivateMetadataExte
     return return_error(error);
   }
 }
-

@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, parseValidationResponse, isCloudConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, isCloudConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ValidateProgramLow",
@@ -84,6 +85,10 @@ export async function handleValidateProgram(args: ValidateProgramArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleValidateProgram',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -99,7 +104,7 @@ export async function handleValidateProgram(args: ValidateProgramArgs) {
 
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program validation: ${programName}`);
+    handlerLogger.info(`Starting program validation: ${programName}`);
 
     try {
       // Validate program
@@ -117,8 +122,7 @@ export async function handleValidateProgram(args: ValidateProgramArgs) {
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ValidateProgram completed: ${programName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      handlerLogger.info(`✅ ValidateProgram completed: ${programName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -138,7 +142,7 @@ export async function handleValidateProgram(args: ValidateProgramArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating program ${programName}:`, error);
+      handlerLogger.error(`Error validating program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate program: ${error.message || String(error)}`;
@@ -169,4 +173,3 @@ export async function handleValidateProgram(args: ValidateProgramArgs) {
     return return_error(error);
   }
 }
-

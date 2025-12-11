@@ -2,9 +2,10 @@
  * UpdateBehaviorDefinition Handler - ABAP Behavior Definition Update via ADT API
  */
 
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
     name: "UpdateBehaviorDefinition",
@@ -49,10 +50,14 @@ export async function handleUpdateBehaviorDefinition(params: any) {
 
     const name = args.name.toUpperCase();
     const connection = getManagedConnection();
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateBehaviorDefinition',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     try {
         const client = new CrudClient(connection);
-        const shouldActivate = args.activate !== false;
+    const shouldActivate = args.activate !== false;
         let lockHandle = args.lock_handle;
 
         // Lock if not provided - using types from adt-clients
@@ -98,7 +103,7 @@ export async function handleUpdateBehaviorDefinition(params: any) {
         });
 
     } catch (error: any) {
-        logger.error(`Error updating BDEF ${name}:`, error);
+        handlerLogger.error(`Error updating BDEF ${name}: ${error?.message || error}`);
         return return_error(error);
     }
 }

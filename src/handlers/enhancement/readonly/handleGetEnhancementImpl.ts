@@ -1,5 +1,5 @@
 import { McpError, ErrorCode } from '../../../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, getBaseUrl, logger, encodeSapObjectName } from '../../../lib/utils';
+import { makeAdtRequestWithTimeout, return_error, logger, encodeSapObjectName } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 
 
@@ -109,7 +109,7 @@ export async function handleGetEnhancementImpl(args: any) {
         
         // Build the ADT URL for the specific enhancement
         // Format: /sap/bc/adt/enhancements/{enhancement_spot}/{enhancement_name}/source/main
-        const url = `${await getBaseUrl()}/sap/bc/adt/enhancements/${encodeSapObjectName(enhancementSpot)}/${encodeSapObjectName(enhancementName)}/source/main`;
+        const url = `/sap/bc/adt/enhancements/${encodeSapObjectName(enhancementSpot)}/${encodeSapObjectName(enhancementName)}/source/main`;
         
         logger.info(`Enhancement URL: ${url}`);
         
@@ -141,7 +141,7 @@ export async function handleGetEnhancementImpl(args: any) {
         } else {
             logger.warn(`Enhancement ${enhancementName} not found in spot ${enhancementSpot}. Status: ${response.status}. Attempting to retrieve spot metadata as fallback.`);
             // Fallback to retrieve metadata about the enhancement spot
-            const spotUrl = `${await getBaseUrl()}/sap/bc/adt/enhancements/${encodeSapObjectName(enhancementSpot)}`;
+            const spotUrl = `/sap/bc/adt/enhancements/${encodeSapObjectName(enhancementSpot)}`;
             logger.info(`Fallback enhancement spot URL: ${spotUrl}`);
             
             const spotResponse = await makeAdtRequestWithTimeout(spotUrl, 'GET', 'default', {

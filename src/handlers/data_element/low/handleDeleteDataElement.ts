@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "DeleteDataElementLow",
@@ -53,8 +54,12 @@ export async function handleDeleteDataElement(args: DeleteDataElementArgs) {
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
     const dataElementName = data_element_name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleDeleteDataElement',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting data element deletion: ${dataElementName}`);
+    handlerLogger.info(`Starting data element deletion: ${dataElementName}`);
 
     try {
       // Delete data element
@@ -65,7 +70,7 @@ export async function handleDeleteDataElement(args: DeleteDataElementArgs) {
         throw new Error(`Delete did not return a response for data element ${dataElementName}`);
       }
 
-      logger.info(`✅ DeleteDataElement completed successfully: ${dataElementName}`);
+      handlerLogger.info(`✅ DeleteDataElement completed successfully: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -77,7 +82,7 @@ export async function handleDeleteDataElement(args: DeleteDataElementArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting data element ${dataElementName}:`, error);
+      handlerLogger.error(`Error deleting data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete data element: ${error.message || String(error)}`;
@@ -112,4 +117,3 @@ export async function handleDeleteDataElement(args: DeleteDataElementArgs) {
     return return_error(error);
   }
 }
-

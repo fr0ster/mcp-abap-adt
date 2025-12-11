@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ValidateStructureLow",
@@ -78,6 +79,10 @@ export async function handleValidateStructure(args: ValidateStructureArgs) {
     }
 
     const connection = getManagedConnection();
+    const handlerLogger = getHandlerLogger(
+      'handleValidateStructure',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     const client = new CrudClient(connection);
 
     // Restore session state if provided
@@ -94,7 +99,7 @@ export async function handleValidateStructure(args: ValidateStructureArgs) {
 
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure validation: ${structureName}`);
+    handlerLogger.info(`Starting structure validation: ${structureName}`);
 
     try {
       // Validate structure
@@ -112,8 +117,8 @@ export async function handleValidateStructure(args: ValidateStructureArgs) {
       // Get updated session state after validation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ValidateStructure completed: ${structureName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      handlerLogger.info(`✅ ValidateStructure completed: ${structureName}`);
+      handlerLogger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
         data: JSON.stringify({
@@ -133,7 +138,7 @@ export async function handleValidateStructure(args: ValidateStructureArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating structure ${structureName}:`, error);
+      handlerLogger.error(`Error validating structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to validate structure: ${error.message || String(error)}`;
@@ -164,4 +169,3 @@ export async function handleValidateStructure(args: ValidateStructureArgs) {
     return return_error(error);
   }
 }
-

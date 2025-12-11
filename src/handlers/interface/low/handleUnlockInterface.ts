@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UnlockInterfaceLow",
@@ -73,6 +74,10 @@ export async function handleUnlockInterface(args: UnlockInterfaceArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUnlockInterface',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_state) {
@@ -88,7 +93,7 @@ export async function handleUnlockInterface(args: UnlockInterfaceArgs) {
 
     const interfaceName = interface_name.toUpperCase();
 
-    logger.info(`Starting interface unlock: ${interfaceName} (session: ${session_id.substring(0, 8)}...)`);
+    handlerLogger.info(`Starting interface unlock: ${interfaceName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock interface
@@ -102,7 +107,7 @@ export async function handleUnlockInterface(args: UnlockInterfaceArgs) {
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UnlockInterface completed: ${interfaceName}`);
+      handlerLogger.info(`✅ UnlockInterface completed: ${interfaceName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +124,7 @@ export async function handleUnlockInterface(args: UnlockInterfaceArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking interface ${interfaceName}:`, error);
+      handlerLogger.error(`Error unlocking interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock interface: ${error.message || String(error)}`;
@@ -152,4 +157,3 @@ export async function handleUnlockInterface(args: UnlockInterfaceArgs) {
     return return_error(error);
   }
 }
-

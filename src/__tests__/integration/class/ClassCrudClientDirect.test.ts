@@ -28,7 +28,7 @@ import {
   getSessionConfig,
   getSapConfigFromEnv
 } from '../helpers/configHelpers';
-import { debugLog, delay } from '../helpers/testHelpers';
+import { debugLog, delay, DEBUG_TESTS } from '../helpers/testHelpers';
 import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
@@ -49,6 +49,14 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       console.log('⏭️  Skipping test: No SAP configuration');
       return;
     }
+
+    const testCase = getEnabledTestCase('create_class_direct', 'crud_direct');
+    if (!testCase) {
+      console.log('⏭️  Skipping test: Test case not enabled');
+      return;
+    }
+
+    const logLine = (msg: string) => process.stdout.write(`${msg}\n`);
 
     // Create a separate connection for this test (not using getManagedConnection)
     let connection: AbapConnection | null = null;
@@ -119,15 +127,6 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase('create_class_direct', 'crud_direct');
-    if (!testCase) {
-      console.log('⏭️  Skipping test: Test case not enabled');
-      if (connection) {
-        connection.reset();
-      }
-      return;
-    }
-
     const className = (testCase.params.class_name as string)?.trim().toUpperCase();
     // Resolve package name exactly as in adt-clients tests
     // In adt-clients: resolvePackageName(testCase.params.package_name)
@@ -145,6 +144,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
     // But our helper takes testCase, so we pass testCase
     const transportRequest = resolveTransportRequest(testCase);
     const description = (testCase.params.description || `Test class ${className}`).trim();
+    logLine(`▶️ CrudClient direct test starting for ${className}`);
 
     // Log parameters read from test case (only if DEBUG_TESTS is enabled)
     if (process.env.DEBUG_TESTS === 'true') {
@@ -318,6 +318,9 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       // Mark class as created successfully
       classCreated = true;
 
+      // Allow backend to persist before check
+      await delay(getOperationDelay('create_verify', testCase) || 500);
+
       // Step 3: Check (exactly as in adt-clients)
       debugLog('CHECK', `Starting check for ${className}`);
       const checkParams = {
@@ -336,7 +339,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       });
       expect(checkResponse?.status).toBeDefined();
 
-      console.log(`✅ CrudClient direct test completed successfully for ${className}`);
+      logLine(`🏁 CrudClient direct test finished for ${className}`);
 
     } catch (error: any) {
       const errorMessage = error.message || String(error);
@@ -367,11 +370,11 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
               transport_request: transportRequest
             });
 
-            if (!deleteResponse.isError) {
-              console.log(`🧹 Cleaned up test class: ${className}`);
-            } else {
+            if (!deleteResponse.isError && DEBUG_TESTS) {
+              logLine(`🧹 Cleaned up test class: ${className}`);
+            } else if (deleteResponse.isError) {
               const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-              console.warn(`⚠️  Failed to delete class ${className}: ${errorMsg}`);
+              logLine(`⚠️  Failed to delete class ${className}: ${errorMsg}`);
             }
           } else if (shouldCleanup) {
             debugLog('CLEANUP', `Skipping deletion because class was not created during test`, {

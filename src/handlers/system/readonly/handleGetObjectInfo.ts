@@ -1,8 +1,9 @@
-import { McpError, ErrorCode } from '../../../lib/utils';
-import { makeAdtRequestWithTimeout, getBaseUrl } from '../../../lib/utils';
+import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
+import { makeAdtRequestWithTimeout } from '../../../lib/utils';
 import convert from 'xml-js';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 import { XMLParser } from 'fast-xml-parser';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "GetObjectInfo",
@@ -27,7 +28,8 @@ function getDefaultDepth(parent_type: string): number {
 }
 
 async function fetchNodeStructureRaw(parent_type: string, parent_name: string, node_id?: string) {
-  const url = `${await getBaseUrl()}/sap/bc/adt/repository/nodestructure`;
+  // Pass only the endpoint path; the connection prepends baseUrl internally.
+  const url = `/sap/bc/adt/repository/nodestructure`;
   const params: any = {
     parent_type,
     parent_name,
@@ -183,16 +185,22 @@ async function buildTree(
 }
 
 export async function handleGetObjectInfo(args: { parent_type: string; parent_name: string; maxDepth?: number; enrich?: boolean }) {
+  const handlerLogger = getHandlerLogger(
+    'handleGetObjectInfo',
+    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+  );
   try {
     if (!args?.parent_type || !args?.parent_name) {
       throw new McpError(ErrorCode.InvalidParams, 'parent_type and parent_name are required');
     }
+    handlerLogger.info(`Building object info tree for ${args.parent_type}/${args.parent_name}`);
     // Determine the default depth if none is provided
     const maxDepth = Number.isInteger(args.maxDepth)
       ? args.maxDepth as number
       : getDefaultDepth(args.parent_type);
     const enrich = typeof args.enrich === 'boolean' ? args.enrich : true;
     const result = await buildTree(args.parent_type, args.parent_name, 0, maxDepth ?? getDefaultDepth(args.parent_type), enrich);
+    handlerLogger.debug(`Object tree built with depth ${maxDepth} (enrich=${enrich})`);
     return {
       isError: false,
       content: [
@@ -203,6 +211,7 @@ export async function handleGetObjectInfo(args: { parent_type: string; parent_na
       ]
     };
   } catch (error) {
+    handlerLogger.error(`Failed to build object info for ${args?.parent_type}/${args?.parent_name}`, error as any);
     return {
       isError: true,
       content: [

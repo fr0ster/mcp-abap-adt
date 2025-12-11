@@ -8,9 +8,10 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateDataElement",
@@ -152,8 +153,12 @@ export async function handleUpdateDataElement(args: DataElementArgs) {
     const typedArgs = args as DataElementArgs;
     const connection = getManagedConnection();
     const dataElementName = typedArgs.data_element_name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateDataElement',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting data element update: ${dataElementName}`);
+    handlerLogger.info(`Starting data element update: ${dataElementName}`);
 
     try {
       type AdtClientsTypeKind =
@@ -191,7 +196,7 @@ export async function handleUpdateDataElement(args: DataElementArgs) {
           throw validateError;
         }
         // "Already exists" is OK for update - continue
-        logger.info(`Data element ${dataElementName} already exists - this is expected for update operation`);
+        handlerLogger.info(`Data element ${dataElementName} already exists - this is expected for update operation`);
       }
 
       // Lock
@@ -227,7 +232,7 @@ export async function handleUpdateDataElement(args: DataElementArgs) {
             () => client.checkDataElement({ dataElementName }),
             dataElementName,
             {
-              debug: (message: string) => logger.info(`[UpdateDataElement] ${message}`)
+              debug: (message: string) => handlerLogger.debug(message)
             }
           );
         } catch (checkError: any) {
@@ -250,7 +255,7 @@ export async function handleUpdateDataElement(args: DataElementArgs) {
         try {
           await client.unlockDataElement({ dataElementName: dataElementName }, lockHandle);
         } catch (unlockError) {
-          logger.error('Failed to unlock data element after error:', unlockError);
+          handlerLogger.error(`Failed to unlock data element after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
         }
         throw error;
       }
@@ -276,7 +281,7 @@ export async function handleUpdateDataElement(args: DataElementArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating data element ${dataElementName}:`, error);
+      handlerLogger.error(`Error updating data element ${dataElementName}: ${error?.message || error}`);
 
       // Handle specific error cases
       if (error.message?.includes('not found') || error.response?.status === 404) {

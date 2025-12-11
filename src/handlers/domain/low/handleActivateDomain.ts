@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ActivateDomainLow",
@@ -67,6 +68,10 @@ export async function handleActivateDomain(args: ActivateDomainArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleActivateDomain',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -82,7 +87,7 @@ export async function handleActivateDomain(args: ActivateDomainArgs) {
 
     const domainName = domain_name.toUpperCase();
 
-    logger.info(`Starting domain activation: ${domainName}`);
+    handlerLogger.info(`Starting domain activation: ${domainName}`);
 
     try {
       // Activate domain
@@ -100,9 +105,8 @@ export async function handleActivateDomain(args: ActivateDomainArgs) {
       // Get updated session state after activation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ActivateDomain completed: ${domainName}`);
-      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      logger.info(`   Messages: ${activationResult.messages.length}`);
+      handlerLogger.info(`✅ ActivateDomain completed: ${domainName}`);
+      handlerLogger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -129,7 +133,7 @@ export async function handleActivateDomain(args: ActivateDomainArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating domain ${domainName}:`, error);
+      handlerLogger.error(`Error activating domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate domain: ${error.message || String(error)}`;
@@ -160,4 +164,3 @@ export async function handleActivateDomain(args: ActivateDomainArgs) {
     return return_error(error);
   }
 }
-

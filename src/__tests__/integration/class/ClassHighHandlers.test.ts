@@ -45,6 +45,18 @@ import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
+const logLine = (msg: string) => process.stdout.write(`${msg}\n`);
+
+function logStepError(step: string, error: any) {
+  const msg = error?.message || String(error);
+  const status = error?.response?.status;
+  const url = error?.response?.config?.url;
+  const suffix = [
+    status ? `status=${status}` : null,
+    url ? `url=${url}` : null
+  ].filter(Boolean).join(' ');
+  logLine(`❌ ${step} failed: ${msg}${suffix ? ' (' + suffix + ')' : ''}`);
+}
 
 describe('Class High-Level Handlers Integration', () => {
   let hasConfig = false;
@@ -60,6 +72,37 @@ describe('Class High-Level Handlers Integration', () => {
       console.log('⏭️  Skipping test: No SAP configuration');
       return;
     }
+
+    const testCase = getEnabledTestCase('create_class', 'builder_class');
+    if (!testCase) {
+      console.log('⏭️  Skipping test: No test case configuration');
+      return;
+    }
+
+    const className = testCase.params.class_name;
+    logLine(`▶️ ClassHighHandlers workflow started for ${className}`);
+    const packageName = resolvePackageName(testCase);
+    const transportRequest = resolveTransportRequest(testCase);
+    const description = testCase.params.description || `Test class for high-level handler`;
+    const sourceCode = testCase.params.source_code || `CLASS ${className} DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC .
+
+  PUBLIC SECTION.
+    METHODS: test_method.
+ENDCLASS.
+
+CLASS ${className} IMPLEMENTATION.
+  METHOD test_method.
+    WRITE: / 'Hello from ${className}'.
+  ENDMETHOD.
+ENDCLASS.`;
+
+    // Track creation state for cleanup
+    let classCreated = false;
+    let classLocked = false;
+    let lockHandle: string | null = null;
 
     // Create a separate connection for this test (not using getManagedConnection)
     let connection: AbapConnection | null = null;
@@ -122,37 +165,6 @@ describe('Class High-Level Handlers Integration', () => {
       return;
     }
 
-    // Get test case configuration
-    const testCase = getEnabledTestCase('create_class', 'builder_class');
-    if (!testCase) {
-      console.log('⏭️  Skipping test: No test case configuration');
-      return;
-    }
-
-    const className = testCase.params.class_name;
-    const packageName = resolvePackageName(testCase);
-    const transportRequest = resolveTransportRequest(testCase);
-    const description = testCase.params.description || `Test class for high-level handler`;
-    const sourceCode = testCase.params.source_code || `CLASS ${className} DEFINITION
-  PUBLIC
-  FINAL
-  CREATE PUBLIC .
-
-  PUBLIC SECTION.
-    METHODS: test_method.
-ENDCLASS.
-
-CLASS ${className} IMPLEMENTATION.
-  METHOD test_method.
-    WRITE: / 'Hello from ${className}'.
-  ENDMETHOD.
-ENDCLASS.`;
-
-    // Track creation state for cleanup
-    let classCreated = false;
-    let classLocked = false;
-    let lockHandle: string | null = null;
-
     try {
       // Step 1: Test CreateClass (High-Level)
       // High-level handler executes: Create → Lock → Update → Check → Unlock → Activate
@@ -167,7 +179,7 @@ ENDCLASS.`;
       });
 
       let createResponse;
-      try {
+      const callCreate = async () => {
         debugLog('HANDLER_CALL', `Calling handleCreateClass`, {
           class_name: className,
           package_name: packageName,
@@ -175,7 +187,7 @@ ENDCLASS.`;
           activate: true
         });
 
-        createResponse = await handleCreateClass({
+        const resp = await handleCreateClass({
           class_name: className,
           description,
           package_name: packageName,
@@ -189,15 +201,29 @@ ENDCLASS.`;
         });
 
         debugLog('HANDLER_RESPONSE', `Received response from handleCreateClass`, {
-          isError: createResponse.isError,
-          hasContent: createResponse.content && createResponse.content.length > 0
+          isError: resp.isError,
+          hasContent: resp.content && resp.content.length > 0
         });
+        return resp;
+      };
+
+      try {
+        createResponse = await callCreate();
+
+        // Retry once if backend not yet ready and we hit 404
+        const contentText = createResponse.content?.[0]?.text || '';
+        if (createResponse.isError && contentText.includes('404')) {
+          const retryDelay = getOperationDelay('create_verify_retry', testCase) || 1000;
+          await delay(retryDelay);
+          createResponse = await callCreate();
+        }
       } catch (error: any) {
         const errorMsg = error.message || String(error);
         debugLog('HANDLER_ERROR', `Error during handleCreateClass`, {
           error: errorMsg,
           errorType: error.constructor?.name || 'Unknown'
         });
+        logStepError('CreateClass', error);
         // If class already exists, that's okay - we'll skip test
         if (errorMsg.includes('already exists') || errorMsg.includes('InvalidObjName')) {
           const reason = errorMsg.includes('already exists') ? ' (object already exists)' : ' (validation failed)';
@@ -212,6 +238,9 @@ ENDCLASS.`;
 
       if (createResponse.isError) {
         const errorMsg = createResponse.content[0]?.text || 'Unknown error';
+        if (errorMsg.includes('404')) {
+          logStepError('CreateClass', new Error(errorMsg));
+        }
         // If validation fails (class already exists or invalid), skip test
         if (errorMsg.includes('already exists') ||
             errorMsg.includes('ExceptionResourceAlreadyExists') ||
@@ -250,7 +279,9 @@ ENDCLASS.`;
       });
 
       await delay(getOperationDelay('create', testCase));
-      console.log(`✅ High-level class creation completed successfully for ${className}`);
+      if (process.env.DEBUG_TESTS === 'true') {
+        logLine(`✅ High-level class creation completed successfully for ${className}`);
+      }
 
       // Step 2: Test UpdateClass (High-Level)
       // High-level handler executes: Validate → Lock → Update → Check → Unlock → Activate
@@ -305,6 +336,7 @@ ENDCLASS.`;
           error: errorMsg,
           errorType: error.constructor?.name || 'Unknown'
         });
+        logStepError('UpdateClass', error);
         // If class doesn't exist or other validation error, skip test
         if (errorMsg.includes('already exists') || errorMsg.includes('InvalidObjName') || errorMsg.includes('not found')) {
           const reason = errorMsg.includes('not found') ? ' (class does not exist)' : ' (validation failed)';
@@ -341,7 +373,9 @@ ENDCLASS.`;
       });
 
       await delay(getOperationDelay('update', testCase));
-      console.log(`✅ High-level class update completed successfully for ${className}`);
+      if (process.env.DEBUG_TESTS === 'true') {
+        logLine(`✅ High-level class update completed successfully for ${className}`);
+      }
 
     } catch (error: any) {
       // Check if this is a skip error (starts with "SKIP:")
@@ -426,30 +460,37 @@ ENDCLASS.`;
               });
 
               if (!deleteResponse.isError) {
-                console.log(`🧹 Cleaned up test class: ${className}`);
-              } else {
+                if (process.env.DEBUG_TESTS === 'true') {
+                  logLine(`🧹 Cleaned up test class: ${className}`);
+                }
+              } else if (process.env.DEBUG_TESTS === 'true') {
                 const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-                console.warn(`⚠️  Failed to delete class ${className}: ${errorMsg}`);
+                logLine(`⚠️  Failed to delete class ${className}: ${errorMsg}`);
               }
             } catch (deleteError: any) {
               debugLog('CLEANUP', `Exception during deleteClass for ${className}`, {
                 error: deleteError instanceof Error ? deleteError.message : String(deleteError)
               });
-              console.warn(`⚠️  Failed to cleanup test class ${className}: ${deleteError}`);
+              if (process.env.DEBUG_TESTS === 'true') {
+                logLine(`⚠️  Failed to cleanup test class ${className}: ${deleteError}`);
+              }
             }
-          } else {
-            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
+          } else if (process.env.DEBUG_TESTS === 'true') {
+            logLine(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
           }
         } catch (cleanupError) {
           debugLog('CLEANUP_ERROR', `Exception during cleanup: ${cleanupError}`, {
             error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
           });
-          console.warn(`⚠️  Failed to cleanup test class ${className}: ${cleanupError}`);
+          if (process.env.DEBUG_TESTS === 'true') {
+            logLine(`⚠️  Failed to cleanup test class ${className}: ${cleanupError}`);
+          }
         }
       }
 
       // Cleanup persisted session snapshot if configured
       diagnosticsTracker?.cleanup();
+      logLine(`🏁 ClassHighHandlers workflow finished for ${className}`);
     }
   }, getTimeout('long'));
 });

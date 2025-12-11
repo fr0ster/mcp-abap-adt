@@ -9,7 +9,7 @@
  */
 
 import { McpError, ErrorCode } from '../../../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response, getBaseUrl } from '../../../lib/utils';
+import { makeAdtRequestWithTimeout, return_error, return_response } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
@@ -157,8 +157,7 @@ export async function handleGetTransport(args: GetTransportArgs) {
     console.log(`[DEBUG] GetTransport: ${typedArgs.transport_number}`);
     console.log(`[DEBUG] Include objects: ${includeObjects}, Include tasks: ${includeTasks}`);
 
-    const baseUrl = await getBaseUrl();
-    let url = `${baseUrl}/sap/bc/adt/cts/transportrequests/${typedArgs.transport_number}`;
+    let url = `/sap/bc/adt/cts/transportrequests/${typedArgs.transport_number}`;
 
     // Add query parameters for additional information
     const params: string[] = [];

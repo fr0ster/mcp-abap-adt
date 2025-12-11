@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ActivateStructureLow",
@@ -67,6 +68,10 @@ export async function handleActivateStructure(args: ActivateStructureArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleActivateStructure',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -82,7 +87,7 @@ export async function handleActivateStructure(args: ActivateStructureArgs) {
 
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure activation: ${structureName}`);
+    handlerLogger.info(`Starting structure activation: ${structureName}`);
 
     try {
       // Activate structure
@@ -100,9 +105,9 @@ export async function handleActivateStructure(args: ActivateStructureArgs) {
       // Get updated session state after activation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ActivateStructure completed: ${structureName}`);
-      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      logger.info(`   Messages: ${activationResult.messages.length}`);
+      handlerLogger.info(`✅ ActivateStructure completed: ${structureName}`);
+      handlerLogger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
+      handlerLogger.info(`   Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -129,7 +134,7 @@ export async function handleActivateStructure(args: ActivateStructureArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating structure ${structureName}:`, error);
+      handlerLogger.error(`Error activating structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to activate structure: ${error.message || String(error)}`;
@@ -160,4 +165,3 @@ export async function handleActivateStructure(args: ActivateStructureArgs) {
     return return_error(error);
   }
 }
-

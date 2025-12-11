@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UnlockStructureLow",
@@ -73,6 +74,10 @@ export async function handleUnlockStructure(args: UnlockStructureArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUnlockStructure',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_state) {
@@ -88,7 +93,7 @@ export async function handleUnlockStructure(args: UnlockStructureArgs) {
 
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure unlock: ${structureName} (session: ${session_id.substring(0, 8)}...)`);
+    handlerLogger.info(`Starting structure unlock: ${structureName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock structure
@@ -102,7 +107,7 @@ export async function handleUnlockStructure(args: UnlockStructureArgs) {
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UnlockStructure completed: ${structureName}`);
+      handlerLogger.info(`✅ UnlockStructure completed: ${structureName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +124,7 @@ export async function handleUnlockStructure(args: UnlockStructureArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking structure ${structureName}:`, error);
+      handlerLogger.error(`Error unlocking structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to unlock structure: ${error.message || String(error)}`;
@@ -152,4 +157,3 @@ export async function handleUnlockStructure(args: UnlockStructureArgs) {
     return return_error(error);
   }
 }
-

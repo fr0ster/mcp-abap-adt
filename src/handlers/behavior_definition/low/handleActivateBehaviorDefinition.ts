@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ActivateBehaviorDefinitionLow",
@@ -66,6 +67,11 @@ export async function handleActivateBehaviorDefinition(args: ActivateBehaviorDef
       return return_error(new Error('name is required'));
     }
 
+    const handlerLogger = getHandlerLogger(
+      'handleActivateBehaviorDefinition',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
+
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
 
@@ -83,7 +89,7 @@ export async function handleActivateBehaviorDefinition(args: ActivateBehaviorDef
 
     const behaviorDefinitionName = name.toUpperCase();
 
-    logger.info(`Starting behavior definition activation: ${behaviorDefinitionName}`);
+    handlerLogger.info(`Starting behavior definition activation: ${behaviorDefinitionName}`);
 
     try {
       // Activate behavior definition - using types from adt-clients
@@ -104,9 +110,9 @@ export async function handleActivateBehaviorDefinition(args: ActivateBehaviorDef
       // Get updated session state after activation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ActivateBehaviorDefinition completed: ${behaviorDefinitionName}`);
-      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      logger.info(`   Messages: ${activationResult.messages.length}`);
+      handlerLogger.info(`✅ ActivateBehaviorDefinition completed: ${behaviorDefinitionName}`);
+      handlerLogger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
+      handlerLogger.info(`   Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -133,7 +139,7 @@ export async function handleActivateBehaviorDefinition(args: ActivateBehaviorDef
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating behavior definition ${behaviorDefinitionName}:`, error);
+      handlerLogger.error(`Error activating behavior definition ${behaviorDefinitionName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate behavior definition: ${error.message || String(error)}`;
@@ -164,4 +170,3 @@ export async function handleActivateBehaviorDefinition(args: ActivateBehaviorDef
     return return_error(error);
   }
 }
-

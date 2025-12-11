@@ -6,10 +6,11 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CheckTableLow",
@@ -95,6 +96,10 @@ export async function handleCheckTable(args: CheckTableArgs) {
       : 'new';
 
     const connection = getManagedConnection();
+    const handlerLogger = getHandlerLogger(
+      'handleCheckTable',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -112,7 +117,7 @@ export async function handleCheckTable(args: CheckTableArgs) {
     const sessionId = session_id || generateSessionId();
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table check: ${tableName} (reporter: ${checkReporter}, version: ${checkVersion}, session: ${sessionId.substring(0, 8)}..., ${ddl_code ? 'with new code' : 'saved version'})`);
+    handlerLogger.info(`Starting table check: ${tableName} (reporter: ${checkReporter}, version: ${checkVersion}, session: ${sessionId.substring(0, 8)}..., ${ddl_code ? 'with new code' : 'saved version'})`);
 
     try {
       const builder = new CrudClient(connection);
@@ -131,9 +136,9 @@ export async function handleCheckTable(args: CheckTableArgs) {
       // Get updated session state after check
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CheckTable completed: ${tableName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      handlerLogger.info(`✅ CheckTable completed: ${tableName}`);
+      handlerLogger.info(`   Status: ${checkResult.status}`);
+      handlerLogger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -155,7 +160,7 @@ export async function handleCheckTable(args: CheckTableArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking table ${tableName}:`, error);
+      handlerLogger.error(`Error checking table ${tableName}:`, error);
 
       let errorMessage = `Failed to check table: ${error.message || String(error)}`;
 
@@ -185,4 +190,3 @@ export async function handleCheckTable(args: CheckTableArgs) {
     return return_error(error);
   }
 }
-

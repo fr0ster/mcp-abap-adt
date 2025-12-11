@@ -1,6 +1,7 @@
-import { McpError, ErrorCode } from '../../../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, getBaseUrl, encodeSapObjectName } from '../../../lib/utils';
+import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
+import { makeAdtRequestWithTimeout, return_error, encodeSapObjectName } from '../../../lib/utils';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 
 export const TOOL_DEFINITION = {
@@ -149,9 +150,8 @@ function buildObjectUri(objectName: string, objectType: string): string {
  */
 async function resolveObjectIdentifier(objectIdentifier: string): Promise<string | null> {
     try {
-        const baseUrl = await getBaseUrl();
         const query = encodeURIComponent(`${objectIdentifier}*`);
-        const endpoint = `${baseUrl}/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${query}&maxResults=1`;
+        const endpoint = `/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${query}&maxResults=1`;
 
         const response = await makeAdtRequestWithTimeout(endpoint, 'GET', 'default');
 
@@ -379,6 +379,10 @@ function parseWhereUsedResponse(xmlData: string): WhereUsedReference[] {
  * - enhancementimpl, enhi
  */
 export async function handleGetWhereUsed(args: WhereUsedArgs) {
+    const handlerLogger = getHandlerLogger(
+      'handleGetWhereUsed',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
     try {
         // Validate required parameters
         if (!args?.object_name) {
@@ -391,13 +395,13 @@ export async function handleGetWhereUsed(args: WhereUsedArgs) {
 
         // Accept any object_type, validation is now handled in buildObjectUri
         const typedArgs = args as WhereUsedArgs;
+        handlerLogger.info(`Resolving where-used list for ${typedArgs.object_type}/${typedArgs.object_name}`);
 
         // 1. Build the object URI
         const objectUri = buildObjectUri(typedArgs.object_name, typedArgs.object_type);
 
         // 2. Prepare the usageReferences request
-        const baseUrl = await getBaseUrl();
-        const endpoint = `${baseUrl}/sap/bc/adt/repository/informationsystem/usageReferences?uri=${encodeURIComponent(objectUri)}`;
+        const endpoint = `/sap/bc/adt/repository/informationsystem/usageReferences?uri=${encodeURIComponent(objectUri)}`;
 
         const requestBody = '<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/></usagereferences:usageReferenceRequest>';
 
@@ -408,6 +412,7 @@ export async function handleGetWhereUsed(args: WhereUsedArgs) {
             'default',
             requestBody
         );
+        handlerLogger.debug(`Where-used ADT call completed for ${objectUri}`);
 
         // 5. Parse the XML response
         const allReferences = parseWhereUsedResponse(response.data);
@@ -457,6 +462,7 @@ export async function handleGetWhereUsed(args: WhereUsedArgs) {
         return result;
 
     } catch (error) {
+        handlerLogger.error('Failed to resolve where-used references', error as any);
         // MCP-compliant error response: always return content[] with type "text"
         return {
             isError: true,

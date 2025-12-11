@@ -1,35 +1,32 @@
 /**
- * UpdateView Handler - Update Existing CDS/Classic View DDL Source
+ * UpdateView Handler - Update existing CDS/Classic view DDL source
  *
- * Uses ViewBuilder from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by builder.
- *
- * Workflow: lock -> update -> check -> unlock -> (activate)
+ * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import {
+  return_error,
+  return_response,
+  encodeSapObjectName,
+  logger as baseLogger,
+  safeCheckOperation
+} from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateView",
-  description: "Update DDL source code of an existing CDS View or Classic View. Locks the view, uploads new DDL source, and unlocks. Optionally activates after update. Use this to modify existing views without re-creating metadata.",
+  description: "Update DDL source code of an existing CDS View or Classic View. Locks the view, checks new code, uploads new DDL source, unlocks, and optionally activates.",
   inputSchema: {
     type: "object",
     properties: {
-      view_name: {
-        type: "string",
-        description: "View name (e.g., ZOK_R_TEST_0002). View must already exist."
-      },
-      ddl_source: {
-        type: "string",
-        description: "Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 'define view' statement."
-      },
-      activate: {
-        type: "boolean",
-        description: "Activate view after source update. Default: false. Set to true to activate immediately, or use ActivateObject for batch activation."
-      }
+      view_name: { type: "string", description: "View name (e.g., ZOK_R_TEST_0002)." },
+      ddl_source: { type: "string", description: "Complete DDL source code." },
+      activate: { type: "boolean", description: "Activate after update. Default: false." }
     },
     required: ["view_name", "ddl_source"]
   }
@@ -41,74 +38,119 @@ interface UpdateViewArgs {
   activate?: boolean;
 }
 
-
-/**
- * Main handler for UpdateView MCP tool
- *
- * Uses ViewBuilder from @mcp-abap-adt/adt-clients for all operations
- * Session and lock management handled internally by builder
- */
 export async function handleUpdateView(params: any) {
+  const args: UpdateViewArgs = params;
+
+  if (!args.view_name || !args.ddl_source) {
+    return return_error(new Error("Missing required parameters: view_name and ddl_source"));
+  }
+
+  const viewName = args.view_name.toUpperCase();
+  const handlerLogger = getHandlerLogger(
+    'handleUpdateView',
+    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+  );
+  handlerLogger.info(`Starting view source update: ${viewName} (activate=${args.activate === true})`);
+
+  // Connection setup
+  let connection: any = null;
   try {
-    const args: UpdateViewArgs = params;
+    const config = getConfig();
+    const connectionLogger = {
+      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
+      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
+      error: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.error.bind(baseLogger) : () => {},
+      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {}
+    };
+    connection = createAbapConnection(config, connectionLogger);
+    await connection.connect();
+    handlerLogger.debug(`Created separate connection for handler call: ${viewName}`);
+  } catch (connectionError: any) {
+    const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
+    handlerLogger.error(`Failed to create connection: ${errorMessage}`);
+    return return_error(new Error(`Failed to create connection: ${errorMessage}`));
+  }
 
-    // Validate required parameters
-    if (!args.view_name || !args.ddl_source) {
-      return return_error(new Error("Missing required parameters: view_name and ddl_source"));
-    }
+  try {
+    const client = new CrudClient(connection);
+    const shouldActivate = args.activate === true;
 
-    const connection = getManagedConnection();
-    const viewName = args.view_name.toUpperCase();
-
-    logger.info(`Starting view source update: ${viewName}`);
+    // Lock
+    handlerLogger.debug(`Locking view: ${viewName}`);
+    await client.lockView({ viewName });
+    const lockHandle = client.getLockHandle();
+    handlerLogger.debug(`View locked: ${viewName} (handle=${lockHandle ? lockHandle.substring(0, 8) + '...' : 'none'})`);
 
     try {
-      // Create client
-      const client = new CrudClient(connection);
-      const shouldActivate = args.activate === true; // Default to false if not specified
-
-      // Note: No validation needed for update - view must already exist
-
-      // Lock
-      await client.lockView({ viewName });
-      const lockHandle = client.getLockHandle();
-
+      // Check new code BEFORE update
+      handlerLogger.debug(`Checking new DDL code before update: ${viewName}`);
+      let checkNewCodePassed = false;
       try {
-        // Update with DDL source
-        await client.updateView({ viewName, ddlSource: args.ddl_source }, lockHandle);
-
-        // Check
-        try {
-          await safeCheckOperation(
-            () => client.checkView({ viewName }),
-            viewName,
-            {
-              debug: (message: string) => logger.info(`[UpdateView] ${message}`)
-            }
-          );
-        } catch (checkError: any) {
-          // If error was marked as "already checked", continue silently
-          if (!(checkError as any).isAlreadyChecked) {
-            // Real check error - rethrow
-            throw checkError;
+        await safeCheckOperation(
+          () => client.checkView({ viewName }, args.ddl_source, 'inactive'),
+          viewName,
+          {
+            debug: (message: string) => handlerLogger.debug(message)
           }
+        );
+        checkNewCodePassed = true;
+        handlerLogger.debug(`New code check passed: ${viewName}`);
+      } catch (checkError: any) {
+        if ((checkError as any).isAlreadyChecked) {
+          handlerLogger.debug(`View ${viewName} was already checked - continuing`);
+          checkNewCodePassed = true;
+        } else {
+          handlerLogger.error(`New code check failed: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+          throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
         }
+      }
 
-        // Unlock
-        await client.unlockView({ viewName }, lockHandle);
+      // Update (only if check passed)
+      if (checkNewCodePassed) {
+        handlerLogger.debug(`Updating view DDL source: ${viewName}`);
+        await client.updateView({ viewName, ddlSource: args.ddl_source }, lockHandle);
+        handlerLogger.info(`View DDL source updated: ${viewName}`);
+      } else {
+        handlerLogger.warn(`Skipping update - new code check failed: ${viewName}`);
+      }
 
-        // Activate if requested
-        if (shouldActivate) {
-          await client.activateView({ viewName });
+      // Unlock (MANDATORY)
+      handlerLogger.debug(`Unlocking view: ${viewName}`);
+      await client.unlockView({ viewName }, lockHandle);
+      handlerLogger.info(`View unlocked: ${viewName}`);
+
+      // Check inactive version (after unlock)
+      handlerLogger.debug(`Checking inactive version: ${viewName}`);
+      try {
+        await safeCheckOperation(
+          () => client.checkView({ viewName }, undefined, 'inactive'),
+          viewName,
+          {
+            debug: (message: string) => handlerLogger.debug(message)
+          }
+        );
+        handlerLogger.debug(`Inactive version check completed: ${viewName}`);
+      } catch (checkError: any) {
+        if ((checkError as any).isAlreadyChecked) {
+          handlerLogger.debug(`View ${viewName} was already checked - continuing`);
+        } else {
+          handlerLogger.warn(`Inactive version check had issues: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
         }
-      } catch (error) {
-        // Try to unlock on error
+      }
+
+      // Activate if requested
+      if (shouldActivate) {
+        handlerLogger.debug(`Activating view: ${viewName}`);
         try {
-          await client.unlockView({ viewName: viewName }, lockHandle);
-        } catch (unlockError) {
-          logger.error('Failed to unlock view after error:', unlockError);
+          await client.activateView({ viewName });
+          handlerLogger.info(`View activated: ${viewName}`);
+        } catch (activationError: any) {
+          handlerLogger.error(`Activation failed: ${viewName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`);
+          throw new Error(`Activation failed: ${activationError instanceof Error ? activationError.message : String(activationError)}`);
         }
-        throw error;
+      } else {
+        handlerLogger.debug(`Skipping activation for: ${viewName}`);
       }
 
       // Parse activation warnings if activation was performed
@@ -128,25 +170,17 @@ export async function handleUpdateView(params: any) {
         }
       }
 
-      logger.info(`✅ UpdateView completed successfully: ${viewName}`);
-
-      // Return success result
-      const stepsCompleted = ['lock', 'update', 'check', 'unlock'];
-      if (shouldActivate) {
-        stepsCompleted.push('activate');
-      }
+      handlerLogger.info(`UpdateView completed successfully: ${viewName}`);
 
       const result = {
         success: true,
         view_name: viewName,
-        type: 'DDLS/DF',
-        message: shouldActivate
-          ? `View ${viewName} source updated and activated successfully`
-          : `View ${viewName} source updated successfully (not activated)`,
-        uri: `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName)}`,
-        steps_completed: stepsCompleted,
-        activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined,
-        source_size_bytes: args.ddl_source.length
+        type: 'DDLS',
+        activated: shouldActivate,
+        message: `View ${viewName} updated${shouldActivate ? ' and activated' : ''} successfully`,
+        uri: `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}`,
+        steps_completed: ['lock', 'check_new_code', 'update', 'unlock', 'check_inactive', ...(shouldActivate ? ['activate'] : [])],
+        activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined
       };
 
       return return_response({
@@ -155,19 +189,47 @@ export async function handleUpdateView(params: any) {
         statusText: 'OK',
         headers: {},
         config: {} as any
-      });
+      } as AxiosResponse);
 
-    } catch (error: any) {
-      logger.error(`Error updating view source ${viewName}:`, error);
+    } catch (workflowError: any) {
+      // On error, ensure we attempt unlock
+      try {
+        const lockHandle = client.getLockHandle();
+        if (lockHandle) {
+          handlerLogger.warn(`Attempting unlock after error for view ${viewName}`);
+          await client.unlockView({ viewName }, lockHandle);
+          handlerLogger.warn(`Unlocked view after error: ${viewName}`);
+        }
+      } catch (unlockError: any) {
+        handlerLogger.error(`Failed to unlock view after error: ${viewName} - ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+      }
 
-      const errorMessage = error.response?.data
-        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
-        : error.message || String(error);
+      // Parse error message
+      let errorMessage = workflowError instanceof Error ? workflowError.message : String(workflowError);
 
-      return return_error(new Error(`Failed to update view ${viewName}: ${errorMessage}`));
+      // Attempt to parse ADT XML error
+      try {
+        const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+        const errorData = workflowError?.response?.data ? parser.parse(workflowError.response.data) : null;
+        const errorMsg = errorData?.['exc:exception']?.message?.['#text'] || errorData?.['exc:exception']?.message;
+        if (errorMsg) {
+          errorMessage = `SAP Error: ${errorMsg}`;
+        }
+      } catch {
+        // ignore parse errors
+      }
+
+      return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
-    return return_error(error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    handlerLogger.error(`Error updating view ${viewName}: ${errorMessage}`);
+    return return_error(new Error(errorMessage));
+  } finally {
+    try {
+      connection?.reset?.();
+    } catch {
+      // ignore
+    }
   }
 }

@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateTableLow",
@@ -85,6 +86,10 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateTable',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -100,7 +105,7 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
 
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table update: ${tableName}`);
+    handlerLogger.info(`Starting table update: ${tableName}`);
 
     try {
       // Update table with DDL code
@@ -114,7 +119,7 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
       // Get updated session state after update
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UpdateTable completed: ${tableName}`);
+      handlerLogger.info(`✅ UpdateTable completed: ${tableName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -131,7 +136,7 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating table ${tableName}:`, error);
+      handlerLogger.error(`Error updating table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to update table: ${error.message || String(error)}`;
@@ -164,4 +169,3 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
     return return_error(error);
   }
 }
-

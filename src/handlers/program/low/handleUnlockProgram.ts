@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UnlockProgramLow",
@@ -78,6 +79,10 @@ export async function handleUnlockProgram(args: UnlockProgramArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUnlockProgram',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_state) {
@@ -93,7 +98,7 @@ export async function handleUnlockProgram(args: UnlockProgramArgs) {
 
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program unlock: ${programName} (session: ${session_id.substring(0, 8)}...)`);
+    handlerLogger.info(`Starting program unlock: ${programName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock program
@@ -107,7 +112,7 @@ export async function handleUnlockProgram(args: UnlockProgramArgs) {
       // Get updated session state after unlock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UnlockProgram completed: ${programName}`);
+      handlerLogger.info(`✅ UnlockProgram completed: ${programName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -124,7 +129,7 @@ export async function handleUnlockProgram(args: UnlockProgramArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking program ${programName}:`, error);
+      handlerLogger.error(`Error unlocking program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock program: ${error.message || String(error)}`;
@@ -157,4 +162,3 @@ export async function handleUnlockProgram(args: UnlockProgramArgs) {
     return return_error(error);
   }
 }
-

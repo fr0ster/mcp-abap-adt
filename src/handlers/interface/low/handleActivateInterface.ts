@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "ActivateInterfaceLow",
@@ -67,6 +68,10 @@ export async function handleActivateInterface(args: ActivateInterfaceArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleActivateInterface',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -82,7 +87,7 @@ export async function handleActivateInterface(args: ActivateInterfaceArgs) {
 
     const interfaceName = interface_name.toUpperCase();
 
-    logger.info(`Starting interface activation: ${interfaceName}`);
+    handlerLogger.info(`Starting interface activation: ${interfaceName}`);
 
     try {
       // Activate interface
@@ -100,9 +105,8 @@ export async function handleActivateInterface(args: ActivateInterfaceArgs) {
       // Get updated session state after activation
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ ActivateInterface completed: ${interfaceName}`);
-      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      logger.info(`   Messages: ${activationResult.messages.length}`);
+      handlerLogger.info(`✅ ActivateInterface completed: ${interfaceName}`);
+      handlerLogger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -129,7 +133,7 @@ export async function handleActivateInterface(args: ActivateInterfaceArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating interface ${interfaceName}:`, error);
+      handlerLogger.error(`Error activating interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate interface: ${error.message || String(error)}`;
@@ -160,4 +164,3 @@ export async function handleActivateInterface(args: ActivateInterfaceArgs) {
     return return_error(error);
   }
 }
-

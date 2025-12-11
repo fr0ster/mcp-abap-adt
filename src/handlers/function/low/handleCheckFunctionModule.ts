@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CheckFunctionModuleLow",
@@ -81,6 +82,10 @@ export async function handleCheckFunctionModule(args: CheckFunctionModuleArgs) {
       : 'active';
 
     const connection = getManagedConnection();
+    const handlerLogger = getHandlerLogger(
+      'handleCheckFunctionModule',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -97,7 +102,7 @@ export async function handleCheckFunctionModule(args: CheckFunctionModuleArgs) {
     const functionGroupName = function_group_name.toUpperCase();
     const functionModuleName = function_module_name.toUpperCase();
 
-    logger.info(`Starting function module check: ${functionModuleName} in group ${functionGroupName} (version: ${checkVersion})`);
+    handlerLogger.info(`Starting function module check: ${functionModuleName} in group ${functionGroupName} (version: ${checkVersion})`);
 
     try {
       const client = new CrudClient(connection);
@@ -113,9 +118,8 @@ export async function handleCheckFunctionModule(args: CheckFunctionModuleArgs) {
       // Get updated session state after check
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CheckFunctionModule completed: ${functionModuleName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      handlerLogger.info(`✅ CheckFunctionModule completed: ${functionModuleName}`);
+      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -137,7 +141,7 @@ export async function handleCheckFunctionModule(args: CheckFunctionModuleArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking function module ${functionModuleName}:`, error);
+      handlerLogger.error(`Error checking function module ${functionModuleName}: ${error?.message || error}`);
 
       let errorMessage = `Failed to check function module: ${error.message || String(error)}`;
 
@@ -167,4 +171,3 @@ export async function handleCheckFunctionModule(args: CheckFunctionModuleArgs) {
     return return_error(error);
   }
 }
-

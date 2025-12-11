@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateTransportLow",
@@ -41,6 +42,10 @@ interface CreateTransportArgs {
  */
 export async function handleCreateTransport(args: CreateTransportArgs) {
   try {
+    const handlerLogger = getHandlerLogger(
+      "handleCreateTransportLow",
+      process.env.DEBUG_HANDLERS === "true" ? baseLogger : noopLogger
+    );
     const {
       description,
       transport_type
@@ -57,7 +62,7 @@ export async function handleCreateTransport(args: CreateTransportArgs) {
     // Ensure connection is established
     await connection.connect();
 
-    logger.info(`Starting transport creation: ${description}`);
+    handlerLogger.info(`Starting transport creation: ${description}`);
 
     try {
       // Create transport
@@ -68,7 +73,7 @@ export async function handleCreateTransport(args: CreateTransportArgs) {
         throw new Error(`Create did not return a response for transport`);
       }
 
-      logger.info(`✅ CreateTransport completed`);
+      handlerLogger.info(`✅ CreateTransport completed`);
 
       return return_response({
         data: JSON.stringify({
@@ -80,7 +85,7 @@ export async function handleCreateTransport(args: CreateTransportArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating transport:`, error);
+      handlerLogger.error(`Error creating transport:`, error);
 
       // Parse error message
       let errorMessage = `Failed to create transport: ${error.message || String(error)}`;

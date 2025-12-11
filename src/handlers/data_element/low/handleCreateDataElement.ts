@@ -6,9 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
-import { handlerLogger } from '../../../lib/logger';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateDataElementLow",
@@ -116,6 +116,10 @@ export async function handleCreateDataElement(args: CreateDataElementArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCreateDataElement',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -131,13 +135,7 @@ export async function handleCreateDataElement(args: CreateDataElementArgs) {
 
     const dataElementName = data_element_name.toUpperCase();
 
-    handlerLogger.info('CreateDataElementLow', 'start', `Starting data element creation: ${dataElementName}`, {
-      dataElementName,
-      packageName: package_name,
-      typeKind: type_kind,
-      hasDescription: !!description,
-      hasSession: !!(session_id && session_state)
-    });
+    handlerLogger.info(`Starting data element creation: ${dataElementName}`);
 
     try {
       // Determine typeKind based on type_kind parameter
@@ -172,29 +170,18 @@ export async function handleCreateDataElement(args: CreateDataElementArgs) {
         transportRequest: transport_request
       };
 
-      handlerLogger.debug('CreateDataElementLow', 'create', `Creating data element: ${dataElementName}`, {
-        dataElementName,
-        packageName: package_name,
-        typeKind,
-        dataType: createConfig.dataType,
-        typeName: createConfig.typeName
-      });
-
       await client.createDataElement(createConfig);
       const createResult = client.getCreateResult();
 
       if (!createResult) {
-        handlerLogger.error('CreateDataElementLow', 'create', `Create did not return a response for data element ${dataElementName}`);
+        handlerLogger.error(`Create did not return a response for data element ${dataElementName}`);
         throw new Error(`Create did not return a response for data element ${dataElementName}`);
       }
 
       // Get updated session state after create
       const updatedSessionState = connection.getSessionState();
 
-      handlerLogger.info('CreateDataElementLow', 'complete', `Data element created: ${dataElementName}`, {
-        dataElementName,
-        status: createResult.status
-      });
+      handlerLogger.info(`✅ CreateDataElement completed: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -214,7 +201,7 @@ export async function handleCreateDataElement(args: CreateDataElementArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating data element ${dataElementName}:`, error);
+      handlerLogger.error(`Error creating data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create data element: ${error.message || String(error)}`;
@@ -245,4 +232,3 @@ export async function handleCreateDataElement(args: CreateDataElementArgs) {
     return return_error(error);
   }
 }
-

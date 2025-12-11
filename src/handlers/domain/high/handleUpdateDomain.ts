@@ -9,7 +9,8 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -138,8 +139,12 @@ export async function handleUpdateDomain(args: DomainArgs) {
     const typedArgs = args as DomainArgs;
     const connection = getManagedConnection();
     const domainName = typedArgs.domain_name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateDomain',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting domain update: ${domainName}`);
+    handlerLogger.info(`Starting domain update: ${domainName}`);
 
     try {
       // Create client
@@ -174,7 +179,7 @@ export async function handleUpdateDomain(args: DomainArgs) {
             () => client.checkDomain({ domainName }),
             domainName,
             {
-              debug: (message: string) => logger.info(`[UpdateDomain] ${message}`)
+              debug: (message: string) => handlerLogger.debug(message)
             }
           );
         } catch (checkError: any) {
@@ -197,7 +202,7 @@ export async function handleUpdateDomain(args: DomainArgs) {
         try {
           await client.unlockDomain({ domainName }, lockHandle);
         } catch (unlockError) {
-          logger.error('Failed to unlock domain after error:', unlockError);
+          handlerLogger.error(`Failed to unlock domain after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
         }
         throw error;
       }
@@ -222,7 +227,7 @@ export async function handleUpdateDomain(args: DomainArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating domain ${domainName}:`, error);
+      handlerLogger.error(`Error updating domain ${domainName}: ${error?.message || error}`);
 
       // Handle specific error cases
       if (error.message?.includes('not found') || error.response?.status === 404) {

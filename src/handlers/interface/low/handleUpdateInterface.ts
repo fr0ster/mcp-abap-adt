@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateInterfaceLow",
@@ -79,6 +80,10 @@ export async function handleUpdateInterface(args: UpdateInterfaceArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateInterface',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -94,7 +99,7 @@ export async function handleUpdateInterface(args: UpdateInterfaceArgs) {
 
     const interfaceName = interface_name.toUpperCase();
 
-    logger.info(`Starting interface update: ${interfaceName}`);
+    handlerLogger.info(`Starting interface update: ${interfaceName}`);
 
     try {
       // Update interface with source code
@@ -108,7 +113,7 @@ export async function handleUpdateInterface(args: UpdateInterfaceArgs) {
       // Get updated session state after update
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UpdateInterface completed: ${interfaceName}`);
+      handlerLogger.info(`✅ UpdateInterface completed: ${interfaceName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -125,7 +130,7 @@ export async function handleUpdateInterface(args: UpdateInterfaceArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating interface ${interfaceName}:`, error);
+      handlerLogger.error(`Error updating interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update interface: ${error.message || String(error)}`;
@@ -158,4 +163,3 @@ export async function handleUpdateInterface(args: UpdateInterfaceArgs) {
     return return_error(error);
   }
 }
-

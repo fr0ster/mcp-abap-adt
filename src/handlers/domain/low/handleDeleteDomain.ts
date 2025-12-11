@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "DeleteDomainLow",
@@ -53,8 +54,12 @@ export async function handleDeleteDomain(args: DeleteDomainArgs) {
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
     const domainName = domain_name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleDeleteDomain',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting domain deletion: ${domainName}`);
+    handlerLogger.info(`Starting domain deletion: ${domainName}`);
 
     try {
       // Delete domain
@@ -65,7 +70,7 @@ export async function handleDeleteDomain(args: DeleteDomainArgs) {
         throw new Error(`Delete did not return a response for domain ${domainName}`);
       }
 
-      logger.info(`✅ DeleteDomain completed successfully: ${domainName}`);
+      handlerLogger.info(`✅ DeleteDomain completed successfully: ${domainName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -77,7 +82,7 @@ export async function handleDeleteDomain(args: DeleteDomainArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting domain ${domainName}:`, error);
+      handlerLogger.error(`Error deleting domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete domain: ${error.message || String(error)}`;
@@ -112,4 +117,3 @@ export async function handleDeleteDomain(args: DeleteDomainArgs) {
     return return_error(error);
   }
 }
-

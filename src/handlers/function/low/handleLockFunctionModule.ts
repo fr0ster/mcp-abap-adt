@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "LockFunctionModuleLow",
@@ -73,6 +74,10 @@ export async function handleLockFunctionModule(args: LockFunctionModuleArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleLockFunctionModule',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -85,7 +90,7 @@ export async function handleLockFunctionModule(args: LockFunctionModuleArgs) {
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function module lock: ${functionModuleName} in ${functionGroupName}`);
+    handlerLogger.info(`Starting function module lock: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       // Lock function module
@@ -99,8 +104,8 @@ export async function handleLockFunctionModule(args: LockFunctionModuleArgs) {
       // Get updated session state after lock
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ LockFunctionModule completed: ${functionModuleName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      handlerLogger.info(`✅ LockFunctionModule completed: ${functionModuleName}`);
+      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +124,7 @@ export async function handleLockFunctionModule(args: LockFunctionModuleArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking function module ${functionModuleName}:`, error);
+      handlerLogger.error(`Error locking function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock function module: ${error.message || String(error)}`;

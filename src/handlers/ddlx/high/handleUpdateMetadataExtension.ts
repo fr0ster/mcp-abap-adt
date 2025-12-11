@@ -3,8 +3,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
     name: "UpdateMetadataExtension",
@@ -49,6 +50,10 @@ export async function handleUpdateMetadataExtension(params: any) {
 
     const name = args.name.toUpperCase();
     const connection = getManagedConnection();
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateMetadataExtension',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     try {
         const client = new CrudClient(connection);
@@ -94,7 +99,7 @@ export async function handleUpdateMetadataExtension(params: any) {
         });
 
     } catch (error: any) {
-        logger.error(`Error updating DDLX ${name}:`, error);
+        handlerLogger.error(`Error updating DDLX ${name}: ${error?.message || error}`);
         return return_error(error);
     }
 }

@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { AbapConnection } from '@mcp-abap-adt/connection';
 
 export const TOOL_DEFINITION = {
@@ -74,6 +75,10 @@ export async function handleLockPackage(args: LockPackageArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleLockPackage',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -88,7 +93,7 @@ export async function handleLockPackage(args: LockPackageArgs) {
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    logger.info(`Starting package lock: ${packageName} in ${superPackage}`);
+    handlerLogger.info(`Starting package lock: ${packageName} in ${superPackage}`);
 
     try {
       // Lock package
@@ -106,8 +111,8 @@ export async function handleLockPackage(args: LockPackageArgs) {
       // Connection.getSessionId() returns the current session ID used by the connection
       const actualSessionId = connection.getSessionId() || session_id || null;
 
-      logger.info(`✅ LockPackage completed: ${packageName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      handlerLogger.info(`✅ LockPackage completed: ${packageName}`);
+      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -126,7 +131,7 @@ export async function handleLockPackage(args: LockPackageArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking package ${packageName}:`, error);
+      handlerLogger.error(`Error locking package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock package: ${error.message || String(error)}`;

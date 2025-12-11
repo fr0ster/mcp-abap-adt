@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CheckDataElementLow",
@@ -68,6 +69,10 @@ export async function handleCheckDataElement(args: CheckDataElementArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCheckDataElement',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -83,7 +88,7 @@ export async function handleCheckDataElement(args: CheckDataElementArgs) {
 
     const dataElementName = data_element_name.toUpperCase();
 
-    logger.info(`Starting data element check: ${dataElementName}`);
+    handlerLogger.info(`Starting data element check: ${dataElementName}`);
 
     try {
       // Check data element
@@ -100,9 +105,8 @@ export async function handleCheckDataElement(args: CheckDataElementArgs) {
       // Get updated session state after check
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CheckDataElement completed: ${dataElementName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      handlerLogger.info(`✅ CheckDataElement completed: ${dataElementName}`);
+      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -122,7 +126,7 @@ export async function handleCheckDataElement(args: CheckDataElementArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking data element ${dataElementName}:`, error);
+      handlerLogger.error(`Error checking data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check data element: ${error.message || String(error)}`;
@@ -153,4 +157,3 @@ export async function handleCheckDataElement(args: CheckDataElementArgs) {
     return return_error(error);
   }
 }
-

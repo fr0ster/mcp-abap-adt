@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateStructureLow",
@@ -93,6 +94,10 @@ export async function handleCreateStructure(args: CreateStructureArgs) {
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleCreateStructureLow',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -108,7 +113,7 @@ export async function handleCreateStructure(args: CreateStructureArgs) {
 
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure creation: ${structureName}`);
+    handlerLogger.info(`Starting structure creation: ${structureName}`);
 
     try {
       // Create structure
@@ -128,7 +133,7 @@ export async function handleCreateStructure(args: CreateStructureArgs) {
       // Get updated session state after create
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ CreateStructure completed: ${structureName}`);
+      handlerLogger.info(`✅ CreateStructure completed: ${structureName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -148,7 +153,7 @@ export async function handleCreateStructure(args: CreateStructureArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating structure ${structureName}:`, error);
+      handlerLogger.error(`Error creating structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to create structure: ${error.message || String(error)}`;
@@ -179,4 +184,3 @@ export async function handleCreateStructure(args: CreateStructureArgs) {
     return return_error(error);
   }
 }
-

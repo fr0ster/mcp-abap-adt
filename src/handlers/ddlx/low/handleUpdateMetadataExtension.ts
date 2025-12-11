@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateMetadataExtensionLow",
@@ -79,6 +80,10 @@ export async function handleUpdateMetadataExtension(args: UpdateMetadataExtensio
 
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
+    const handlerLogger = getHandlerLogger(
+      'handleUpdateMetadataExtension',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -94,7 +99,7 @@ export async function handleUpdateMetadataExtension(args: UpdateMetadataExtensio
 
     const metadataExtensionName = name.toUpperCase();
 
-    logger.info(`Starting metadata extension update: ${metadataExtensionName}`);
+    handlerLogger.info(`Starting metadata extension update: ${metadataExtensionName}`);
 
     try {
       // Update metadata extension with source code
@@ -111,7 +116,7 @@ export async function handleUpdateMetadataExtension(args: UpdateMetadataExtensio
       // Get updated session state after update
       const updatedSessionState = connection.getSessionState();
 
-      logger.info(`✅ UpdateMetadataExtension completed: ${metadataExtensionName}`);
+      handlerLogger.info(`✅ UpdateMetadataExtension completed: ${metadataExtensionName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -128,7 +133,7 @@ export async function handleUpdateMetadataExtension(args: UpdateMetadataExtensio
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating metadata extension ${metadataExtensionName}:`, error);
+      handlerLogger.error(`Error updating metadata extension ${metadataExtensionName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update metadata extension: ${error.message || String(error)}`;
@@ -161,4 +166,3 @@ export async function handleUpdateMetadataExtension(args: UpdateMetadataExtensio
     return return_error(error);
   }
 }
-

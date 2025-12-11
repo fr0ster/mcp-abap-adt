@@ -8,8 +8,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateFunctionGroup",
@@ -71,8 +72,12 @@ export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
     const typedArgs = args as CreateFunctionGroupArgs;
     const connection = getManagedConnection();
     const functionGroupName = typedArgs.function_group_name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleCreateFunctionGroup',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting function group creation: ${functionGroupName}`);
+    handlerLogger.info(`Starting function group creation: ${functionGroupName}`);
 
     // NOTE: Do NOT call connection.connect() here
     // getManagedConnection() already calls connect() when creating connection
@@ -84,7 +89,7 @@ export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Validate
-      logger.info(`Validating function group: ${functionGroupName} with package: ${typedArgs.package_name}`);
+      handlerLogger.info(`Validating function group: ${functionGroupName} with package: ${typedArgs.package_name}`);
       try {
         await client.validateFunctionGroup({
           functionGroupName,
@@ -99,7 +104,7 @@ export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
           : JSON.stringify(validationError.response?.data || '');
 
         if (errorData.includes('Kerberos library not loaded')) {
-          logger.warn(`Function group validation returned Kerberos error, but proceeding with creation: ${functionGroupName}`);
+          handlerLogger.warn(`Function group validation returned Kerberos error, but proceeding with creation: ${functionGroupName}`);
           // Continue with creation - this is a known issue with FunctionGroup validation
         } else {
           // If validation throws an error, try to parse the response if available
@@ -108,13 +113,13 @@ export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
             const validationResult = parseValidationResponse(validationResponse);
             if (validationResult && !validationResult.valid) {
               const errorMessage = validationResult.message || 'Unknown validation error';
-              logger.error(`Function group validation failed: ${functionGroupName} - ${errorMessage}`);
+              handlerLogger.error(`Function group validation failed: ${functionGroupName} - ${errorMessage}`);
               return return_error(new Error(`Function group validation failed: ${errorMessage}`));
             }
           }
           // If we can't parse the error, return generic error
           const errorMessage = validationError.message || 'Unknown validation error';
-          logger.error(`Function group validation failed: ${functionGroupName} - ${errorMessage}`);
+          handlerLogger.error(`Function group validation failed: ${functionGroupName} - ${errorMessage}`);
           return return_error(new Error(`Function group validation failed: ${errorMessage}`));
         }
       }
@@ -158,22 +163,18 @@ export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
           : JSON.stringify(validationResponse.data || '');
 
         if (errorData.includes('Kerberos library not loaded') || errorMessage.includes('Kerberos library not loaded')) {
-          logger.warn(`Function group validation returned Kerberos error, but proceeding with creation: ${functionGroupName}`);
+          handlerLogger.warn(`Function group validation returned Kerberos error, but proceeding with creation: ${functionGroupName}`);
           // Continue with creation - this is a known issue with FunctionGroup validation
         } else {
-          logger.error(`Function group validation failed: ${functionGroupName} - ${errorMessage} (status: ${validationResponse.status})`);
+          handlerLogger.error(`Function group validation failed: ${functionGroupName} - ${errorMessage} (status: ${validationResponse.status})`);
           return return_error(new Error(`Function group validation failed: ${errorMessage}`));
         }
       }
 
-      logger.info(`✅ Function group validation passed: ${functionGroupName}`);
+      handlerLogger.info(`✅ Function group validation passed: ${functionGroupName}`);
 
       // Create
-      logger.info(`Creating function group: ${functionGroupName}`, {
-        package: typedArgs.package_name,
-        transportRequest: typedArgs.transport_request || '(not provided)',
-        description: typedArgs.description || functionGroupName
-      });
+      handlerLogger.info(`Creating function group: ${functionGroupName}`);
       await client.createFunctionGroup({
         functionGroupName,
         description: typedArgs.description || functionGroupName,
@@ -186,7 +187,7 @@ export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
         await client.activateFunctionGroup({ functionGroupName });
       }
 
-      logger.info(`✅ CreateFunctionGroup completed successfully: ${functionGroupName}`);
+      handlerLogger.info(`✅ CreateFunctionGroup completed successfully: ${functionGroupName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -200,13 +201,12 @@ export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating function group ${functionGroupName}:`, error);
-      logger.error(`Error details:`, {
+      handlerLogger.error(`Error creating function group ${functionGroupName}: ${error?.message || error}`);
+      handlerLogger.debug(`Error details: ${JSON.stringify({
         message: error.message,
         status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: typeof error.response?.data === 'string' ? error.response.data.substring(0, 500) : error.response?.data
-      });
+        statusText: error.response?.statusText
+      })}`);
 
       // Check if function group already exists
       if (error.message?.includes('already exists') || error.response?.status === 409) {
@@ -249,10 +249,7 @@ export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
             errorData.includes('Business partner') ||
             detailedError.includes('Kerberos library not loaded') ||
             detailedError.includes('Business partner')) {
-          logger.warn(`Function group creation returned known SAP error, but object may have been created: ${functionGroupName}`, {
-            errorMessage: detailedError,
-            package: typedArgs.package_name
-          });
+          handlerLogger.warn(`Function group creation returned known SAP error, but object may have been created: ${functionGroupName}`);
           // Check if object was actually created by trying to get it
           // For now, we'll assume it was created and return success
           // This is a known issue with FunctionGroup creation in SAP
@@ -268,11 +265,7 @@ export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
           } as AxiosResponse);
         }
 
-        logger.error(`Function group creation failed with 400: ${functionGroupName}`, {
-          package: typedArgs.package_name,
-          transportRequest: typedArgs.transport_request,
-          errorData: error.response?.data
-        });
+        handlerLogger.error(`Function group creation failed with 400: ${functionGroupName}`);
         return return_error(new Error(detailedError));
       }
 

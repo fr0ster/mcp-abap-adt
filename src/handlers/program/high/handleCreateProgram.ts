@@ -1,17 +1,17 @@
 /**
  * CreateProgram Handler - ABAP Program Creation via ADT API
  *
- * Uses ProgramBuilder from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by builder.
- *
- * Workflow: validate -> create -> lock -> update -> check -> unlock -> (activate)
+ * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger, getManagedConnection, parseValidationResponse, safeCheckOperation, isCloudConnection } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger as baseLogger, parseValidationResponse, safeCheckOperation, isCloudConnection } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateProgram",
@@ -123,12 +123,6 @@ START-OF-SELECTION.
   }
 }
 
-/**
- * Main handler for CreateProgram MCP tool
- *
- * Uses ProgramBuilder from @mcp-abap-adt/adt-clients for all operations
- * Session and lock management handled internally by builder
- */
 export async function handleCreateProgram(params: any) {
   const args: CreateProgramArgs = params;
 
@@ -150,9 +144,31 @@ export async function handleCreateProgram(params: any) {
   }
 
   const programName = args.program_name.toUpperCase();
-  const connection = getManagedConnection();
+  const handlerLogger = getHandlerLogger(
+    'handleCreateProgram',
+    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+  );
+  handlerLogger.info(`Starting program creation: ${programName} (activate=${args.activate !== false})`);
 
-  logger.info(`Starting program creation: ${programName}`);
+  // Connection setup
+  let connection: any = null;
+  try {
+    const config = getConfig();
+    const connectionLogger = {
+      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
+      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
+      error: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.error.bind(baseLogger) : () => {},
+      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {}
+    };
+    connection = createAbapConnection(config, connectionLogger);
+    await connection.connect();
+    handlerLogger.debug(`Created separate connection for handler call: ${programName}`);
+  } catch (connectionError: any) {
+    const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
+    handlerLogger.error(`Failed to create connection: ${errorMessage}`);
+    return return_error(new Error(`Failed to create connection: ${errorMessage}`));
+  }
 
   try {
     // Generate source code if not provided
@@ -161,11 +177,10 @@ export async function handleCreateProgram(params: any) {
 
     // Create client
     const client = new CrudClient(connection);
-
-    // Build operation chain: validate -> create -> lock -> update -> check -> unlock -> (activate)
     const shouldActivate = args.activate !== false; // Default to true if not specified
 
     // Validate
+    handlerLogger.debug(`Validating program: ${programName}`);
     await client.validateProgram({
       programName,
       description: args.description || programName,
@@ -179,8 +194,10 @@ export async function handleCreateProgram(params: any) {
     if (!validationResult || validationResult.valid === false) {
       throw new Error(`Program name validation failed: ${validationResult?.message || 'Invalid program name'}`);
     }
+    handlerLogger.debug(`Program validation passed: ${programName}`);
 
     // Create
+    handlerLogger.debug(`Creating program: ${programName}`);
     await client.createProgram({
       programName,
       description: args.description || programName,
@@ -189,92 +206,166 @@ export async function handleCreateProgram(params: any) {
       programType: args.program_type,
       application: args.application
     });
+    handlerLogger.info(`Program created: ${programName}`);
 
     // Lock
+    handlerLogger.debug(`Locking program: ${programName}`);
     await client.lockProgram({ programName });
     const lockHandle = client.getLockHandle();
+    handlerLogger.debug(`Program locked: ${programName} (handle=${lockHandle ? lockHandle.substring(0, 8) + '...' : 'none'})`);
 
-    // Update source code
-    await client.updateProgram({ programName, sourceCode }, lockHandle);
-
-    // Check
     try {
-      await safeCheckOperation(
-        () => client.checkProgram({ programName }),
-        programName,
-        {
-          debug: (message: string) => logger.info(`[CreateProgram] ${message}`)
+      // Check new code BEFORE update
+      handlerLogger.debug(`Checking new source code before update: ${programName}`);
+      let checkNewCodePassed = false;
+      try {
+        await safeCheckOperation(
+          () => client.checkProgram({ programName }, 'inactive', sourceCode),
+          programName,
+          {
+            debug: (message: string) => handlerLogger.debug(message)
+          }
+        );
+        checkNewCodePassed = true;
+        handlerLogger.debug(`New code check passed: ${programName}`);
+      } catch (checkError: any) {
+        if ((checkError as any).isAlreadyChecked) {
+          handlerLogger.debug(`Program ${programName} was already checked - continuing`);
+          checkNewCodePassed = true;
+        } else {
+          handlerLogger.error(`New code check failed: ${programName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+          throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
         }
-      );
-    } catch (checkError: any) {
-      // If error was marked as "already checked", continue silently
-      if (!(checkError as any).isAlreadyChecked) {
-        // Real check error - rethrow
-        throw checkError;
       }
-    }
-    const checkResult = client.getCheckResult();
 
-    // Unlock
-    await client.unlockProgram({ programName }, lockHandle);
+      // Update (only if check passed)
+      if (checkNewCodePassed) {
+        handlerLogger.debug(`Updating program source code: ${programName}`);
+        await client.updateProgram({ programName, sourceCode }, lockHandle);
+        handlerLogger.info(`Program source code updated: ${programName}`);
+      } else {
+        handlerLogger.warn(`Skipping update - new code check failed: ${programName}`);
+      }
 
-    // Activate if requested
-    if (shouldActivate) {
-      await client.activateProgram({ programName });
-    }
+      // Unlock (MANDATORY)
+      handlerLogger.debug(`Unlocking program: ${programName}`);
+      await client.unlockProgram({ programName }, lockHandle);
+      handlerLogger.info(`Program unlocked: ${programName}`);
 
-    // Parse activation warnings if activation was performed
-    let activationWarnings: string[] = [];
-    if (shouldActivate && client.getActivateResult()) {
-      const activateResponse = client.getActivateResult()!;
-      if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
+      // Check inactive version (after unlock)
+      handlerLogger.debug(`Checking inactive version: ${programName}`);
+      try {
+        await safeCheckOperation(
+          () => client.checkProgram({ programName }, 'inactive'),
+          programName,
+          {
+            debug: (message: string) => handlerLogger.debug(message)
+          }
+        );
+        handlerLogger.debug(`Inactive version check completed: ${programName}`);
+      } catch (checkError: any) {
+        if ((checkError as any).isAlreadyChecked) {
+          handlerLogger.debug(`Program ${programName} was already checked - continuing`);
+        } else {
+          handlerLogger.warn(`Inactive version check had issues: ${programName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+        }
+      }
+
+      // Activate if requested
+      if (shouldActivate) {
+        handlerLogger.debug(`Activating program: ${programName}`);
+        try {
+          await client.activateProgram({ programName });
+          handlerLogger.info(`Program activated: ${programName}`);
+        } catch (activationError: any) {
+          handlerLogger.error(`Activation failed: ${programName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`);
+          throw new Error(`Activation failed: ${activationError instanceof Error ? activationError.message : String(activationError)}`);
+        }
+      } else {
+        handlerLogger.debug(`Skipping activation for: ${programName}`);
+      }
+
+      // Parse activation warnings if activation was performed
+      let activationWarnings: string[] = [];
+      if (shouldActivate && client.getActivateResult()) {
+        const activateResponse = client.getActivateResult()!;
+        if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
+          const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+          const result = parser.parse(activateResponse.data);
+          const messages = result?.['chkl:messages']?.['msg'];
+          if (messages) {
+            const msgArray = Array.isArray(messages) ? messages : [messages];
+            activationWarnings = msgArray.map((msg: any) =>
+              `${msg['@_type']}: ${msg['shortText']?.['txt'] || 'Unknown'}`
+            );
+          }
+        }
+      }
+
+      handlerLogger.info(`CreateProgram completed successfully: ${programName}`);
+
+      const result = {
+        success: true,
+        program_name: programName,
+        package_name: args.package_name,
+        transport_request: args.transport_request || null,
+        program_type: args.program_type || 'executable',
+        type: 'PROG/P',
+        message: shouldActivate
+          ? `Program ${programName} created and activated successfully`
+          : `Program ${programName} created successfully (not activated)`,
+        uri: `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`,
+        steps_completed: ['validate', 'create', 'lock', 'check_new_code', 'update', 'unlock', 'check_inactive', ...(shouldActivate ? ['activate'] : [])],
+        activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined
+      };
+
+      return return_response({
+        data: JSON.stringify(result, null, 2),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      });
+
+    } catch (workflowError: any) {
+      // On error, ensure we attempt unlock
+      try {
+        const lockHandle = client.getLockHandle();
+        if (lockHandle) {
+          handlerLogger.warn(`Attempting unlock after error for program ${programName}`);
+          await client.unlockProgram({ programName }, lockHandle);
+          handlerLogger.warn(`Unlocked program after error: ${programName}`);
+        }
+      } catch (unlockError: any) {
+        handlerLogger.error(`Failed to unlock program after error: ${programName} - ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+      }
+
+      // Parse error message
+      let errorMessage = workflowError instanceof Error ? workflowError.message : String(workflowError);
+
+      // Attempt to parse ADT XML error
+      try {
         const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
-        const result = parser.parse(activateResponse.data);
-        const messages = result?.['chkl:messages']?.['msg'];
-        if (messages) {
-          const msgArray = Array.isArray(messages) ? messages : [messages];
-          activationWarnings = msgArray.map((msg: any) =>
-            `${msg['@_type']}: ${msg['shortText']?.['txt'] || 'Unknown'}`
-          );
+        const errorData = workflowError?.response?.data ? parser.parse(workflowError.response.data) : null;
+        const errorMsg = errorData?.['exc:exception']?.message?.['#text'] || errorData?.['exc:exception']?.message;
+        if (errorMsg) {
+          errorMessage = `SAP Error: ${errorMsg}`;
         }
+      } catch {
+        // ignore parse errors
       }
+
+      return return_error(new Error(errorMessage));
     }
-
-    // Return success result
-    const stepsCompleted = ['validate', 'create', 'lock', 'update', 'check', 'unlock'];
-    if (shouldActivate) {
-      stepsCompleted.push('activate');
-    }
-
-    const result = {
-      success: true,
-      program_name: programName,
-      package_name: args.package_name,
-      transport_request: args.transport_request || null,
-      program_type: args.program_type || 'executable',
-      type: 'PROG/P',
-      message: shouldActivate
-        ? `Program ${programName} created and activated successfully`
-        : `Program ${programName} created successfully (not activated)`,
-      uri: `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`,
-      steps_completed: stepsCompleted,
-      activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined
-    };
-
-    return return_response({
-      data: JSON.stringify(result, null, 2),
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    });
-
   } catch (error: any) {
-    logger.error(`Error creating program ${programName}:`, error);
-    const errorMessage = error.response?.data
-      ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
-      : error.message || String(error);
-
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    handlerLogger.error(`Error creating program ${programName}: ${errorMessage}`);
     return return_error(new Error(`Failed to create program ${programName}: ${errorMessage}`));
+  } finally {
+    try {
+      connection?.reset?.();
+    } catch {
+      // ignore
+    }
   }
 }

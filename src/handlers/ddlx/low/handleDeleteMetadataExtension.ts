@@ -6,8 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "DeleteMetadataExtensionLow",
@@ -53,8 +54,12 @@ export async function handleDeleteMetadataExtension(args: DeleteMetadataExtensio
     const connection = getManagedConnection();
     const client = new CrudClient(connection);
     const ddlxName = name.toUpperCase();
+    const handlerLogger = getHandlerLogger(
+      'handleDeleteMetadataExtension',
+      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+    );
 
-    logger.info(`Starting metadata extension deletion: ${ddlxName}`);
+    handlerLogger.info(`Starting metadata extension deletion: ${ddlxName}`);
 
     try {
       // Delete metadata extension
@@ -65,7 +70,7 @@ export async function handleDeleteMetadataExtension(args: DeleteMetadataExtensio
         throw new Error(`Delete did not return a response for metadata extension ${ddlxName}`);
       }
 
-      logger.info(`✅ DeleteMetadataExtension completed successfully: ${ddlxName}`);
+      handlerLogger.info(`✅ DeleteMetadataExtension completed successfully: ${ddlxName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -77,7 +82,7 @@ export async function handleDeleteMetadataExtension(args: DeleteMetadataExtensio
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting metadata extension ${ddlxName}:`, error);
+      handlerLogger.error(`Error deleting metadata extension ${ddlxName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete metadata extension: ${error.message || String(error)}`;
@@ -112,4 +117,3 @@ export async function handleDeleteMetadataExtension(args: DeleteMetadataExtensio
     return return_error(error);
   }
 }
-

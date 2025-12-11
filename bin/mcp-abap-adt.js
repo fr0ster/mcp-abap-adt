@@ -76,6 +76,11 @@ Environment Variables:
   AUTH_BROKER_PATH         Custom paths for service keys and sessions
                            Unix: colon-separated (e.g., /path1:/path2)
                            Windows: semicolon-separated (e.g., C:\\path1;C:\\path2)
+  AUTH_LOG_LEVEL           Handler logger level: error|warn|info|debug (default: info)
+  DEBUG_AUTH_LOG           Backward-compatible toggle to force debug level
+  HANDLER_LOG_SILENT       If "true", disables handler logging
+  DEBUG_CONNECTORS         Verbose connection logging in high-level handlers
+  DEBUG_HANDLERS           Verbose logging for selected read-only/system handlers
 
 Examples:
   mcp-abap-adt                                    # Use default .env, HTTP on port 3000

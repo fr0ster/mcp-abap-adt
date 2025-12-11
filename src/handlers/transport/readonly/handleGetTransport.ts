@@ -10,6 +10,7 @@
 
 import { McpError, ErrorCode } from '../../../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, return_response } from '../../../lib/utils';
+import { getHandlerLogger } from '../../../lib/handlerLogger';
 import { XMLParser } from 'fast-xml-parser';
 
 export const TOOL_DEFINITION = {
@@ -144,6 +145,7 @@ function parseTransportXml(xmlData: string, includeObjects: boolean = true, incl
  * Main handler for GetTransport MCP tool
  */
 export async function handleGetTransport(args: GetTransportArgs) {
+  const handlerLogger = getHandlerLogger('handleGetTransport');
   try {
     // Validate required parameters
     if (!args?.transport_number) {
@@ -154,8 +156,8 @@ export async function handleGetTransport(args: GetTransportArgs) {
     const includeObjects = typedArgs.include_objects !== false;
     const includeTasks = typedArgs.include_tasks !== false;
 
-    console.log(`[DEBUG] GetTransport: ${typedArgs.transport_number}`);
-    console.log(`[DEBUG] Include objects: ${includeObjects}, Include tasks: ${includeTasks}`);
+    handlerLogger.debug(`GetTransport: ${typedArgs.transport_number}`);
+    handlerLogger.debug(`Include objects: ${includeObjects}, Include tasks: ${includeTasks}`);
 
     let url = `/sap/bc/adt/cts/transportrequests/${typedArgs.transport_number}`;
 
@@ -171,12 +173,12 @@ export async function handleGetTransport(args: GetTransportArgs) {
       'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
     };
 
-    console.log(`[DEBUG] GET from: ${url}`);
+    handlerLogger.debug(`GET from: ${url}`);
 
     // Get transport request
     const response = await makeAdtRequestWithTimeout(url, 'GET', 'default', null, undefined, headers);
 
-    console.log('[DEBUG] GetTransport response status:', response.status);
+    handlerLogger.debug(`GetTransport response status: ${response.status}`);
 
     // Parse XML response
     const transportData = parseTransportXml(response.data, includeObjects, includeTasks);

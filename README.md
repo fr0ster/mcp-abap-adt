@@ -156,6 +156,12 @@ mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/ --unsafe
 
 See [Client Configuration](doc/user-guide/CLIENT_CONFIGURATION.md) for complete configuration options.
 
+### Handler logging switches
+- `AUTH_LOG_LEVEL=error|warn|info|debug` — sets base log level for handler logger; `DEBUG_AUTH_LOG=true` also enables `debug`.
+- `HANDLER_LOG_SILENT=true` — fully disables handler logging.
+- `DEBUG_CONNECTORS=true` — verbose connection logging in high-level handlers.
+- `DEBUG_HANDLERS=true` — enables verbose logs for selected read-only/system handlers.
+
 ## Development
 
 ### Testing

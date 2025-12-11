@@ -3,6 +3,7 @@ import { return_error, return_response } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import * as z from 'zod';
+import { getHandlerLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "GetDomain",
@@ -20,6 +21,7 @@ interface DomainArgs {
  * Main handler for GetDomain MCP tool
  */
 export async function handleGetDomain(args: DomainArgs) {
+  const handlerLogger = getHandlerLogger('handleGetDomain');
   try {
     // Validate required parameters
     if (!args?.domain_name) {
@@ -104,7 +106,7 @@ export async function handleGetDomain(args: DomainArgs) {
     });
 
   } catch (error) {
-    console.error('[GetDomain] Error:', error);
+    handlerLogger.error(`[GetDomain] Error: ${String(error)}`);
 
     if (error instanceof McpError) {
       throw error;

@@ -9,10 +9,12 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, safeCheckOperation } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 export const TOOL_DEFINITION = {
   name: "UpdateDomain",
@@ -125,6 +127,7 @@ interface DomainArgs {
  * Session and lock management handled internally by builder
  */
 export async function handleUpdateDomain(args: DomainArgs) {
+  let connection: any = null;
   try {
     if (!args?.domain_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Domain name is required');
@@ -137,7 +140,16 @@ export async function handleUpdateDomain(args: DomainArgs) {
     validateTransportRequest(args.package_name, args.transport_request);
 
     const typedArgs = args as DomainArgs;
-    const connection = getManagedConnection();
+    const config = getConfig();
+    const connectionLogger = {
+      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
+      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
+      error: baseLogger.error.bind(baseLogger),
+      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+    };
+    connection = createAbapConnection(config, connectionLogger);
+    await connection.connect();
     const domainName = typedArgs.domain_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleUpdateDomain',
@@ -259,5 +271,22 @@ export async function handleUpdateDomain(args: DomainArgs) {
       throw error;
     }
     return return_error(error);
+  } finally {
+    try {
+      if (connection) {
+        connection.reset();
+        const handlerLogger = getHandlerLogger(
+          'handleUpdateDomain',
+          process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+        );
+        handlerLogger.debug('Reset domain connection after use');
+      }
+    } catch (resetError: any) {
+      const handlerLogger = getHandlerLogger(
+        'handleUpdateDomain',
+        process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+      );
+      handlerLogger.error(`Failed to reset domain connection: ${resetError?.message || resetError}`);
+    }
   }
 }

@@ -8,10 +8,12 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 export const TOOL_DEFINITION = {
   name: "UpdateDataElement",
@@ -151,7 +153,16 @@ export async function handleUpdateDataElement(args: DataElementArgs) {
     validateTransportRequest(args.package_name, args.transport_request);
 
     const typedArgs = args as DataElementArgs;
-    const connection = getManagedConnection();
+    const config = getConfig();
+    const connectionLogger = {
+      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
+      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
+      error: baseLogger.error.bind(baseLogger),
+      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+    };
+    const connection = createAbapConnection(config, connectionLogger);
+    await connection.connect();
     const dataElementName = typedArgs.data_element_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleUpdateDataElement',
@@ -306,6 +317,13 @@ export async function handleUpdateDataElement(args: DataElementArgs) {
         ErrorCode.InternalError,
         `Failed to update data element ${dataElementName}: ${errorMessage}`
       );
+    } finally {
+      try {
+        connection.reset();
+        handlerLogger.debug('Reset data element connection after use');
+      } catch (resetError: any) {
+        handlerLogger.error(`Failed to reset data element connection: ${resetError?.message || resetError}`);
+      }
     }
 
   } catch (error: any) {

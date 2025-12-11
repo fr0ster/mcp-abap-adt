@@ -8,10 +8,12 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 export const TOOL_DEFINITION = {
   name: "CreateFunctionModule",
@@ -65,6 +67,7 @@ interface CreateFunctionModuleArgs {
  * Session and lock management handled internally by builder
  */
 export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs) {
+  let connection: any = null;
   try {
     // Validate required parameters
     if (!args?.function_group_name) {
@@ -87,7 +90,16 @@ export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs)
     // }
 
     const typedArgs = args as CreateFunctionModuleArgs;
-    const connection = getManagedConnection();
+    const config = getConfig();
+    const connectionLogger = {
+      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
+      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
+      error: baseLogger.error.bind(baseLogger),
+      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+    };
+    connection = createAbapConnection(config, connectionLogger);
+    await connection.connect();
     const functionGroupName = typedArgs.function_group_name.toUpperCase();
     const functionModuleName = typedArgs.function_module_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
@@ -177,5 +189,22 @@ export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs)
 
   } catch (error: any) {
     return return_error(error);
+  } finally {
+    try {
+      if (connection) {
+        connection.reset();
+        const handlerLogger = getHandlerLogger(
+          'handleCreateFunctionModule',
+          process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+        );
+        handlerLogger.debug('Reset function module connection after use');
+      }
+    } catch (resetError: any) {
+      const handlerLogger = getHandlerLogger(
+        'handleCreateFunctionModule',
+        process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+      );
+      handlerLogger.error(`Failed to reset function module connection: ${resetError?.message || resetError}`);
+    }
   }
 }

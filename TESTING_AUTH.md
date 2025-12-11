@@ -116,3 +116,9 @@ To enable debug logs for auth-broker:
 DEBUG_AUTH_LOG=true npm run dev:stdio
 ```
 
+## Test Logging Switches
+
+- `TEST_LOG_LEVEL=error|warn|info|debug` — sets verbosity for integration tests (DEBUG_TESTS/DEBUG_ADT_TESTS/DEBUG_CONNECTORS imply `debug`).
+- `TEST_LOG_FILE=/tmp/adt-tests.log` — optional file sink for test logs (best-effort).
+- `TEST_LOG_SILENT=true` — disable test logging pipeline entirely.
+- `TEST_LOG_COLOR=true` — enable colored/prefixed tags in stdout.

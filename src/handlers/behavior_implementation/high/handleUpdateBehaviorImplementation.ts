@@ -8,11 +8,13 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger as baseLogger, getManagedConnection, safeCheckOperation } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger as baseLogger, safeCheckOperation } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 export const TOOL_DEFINITION = {
   name: "UpdateBehaviorImplementation",
@@ -72,13 +74,23 @@ export async function handleUpdateBehaviorImplementation(args: UpdateBehaviorImp
       'handleUpdateBehaviorImplementation',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
+    let connection: any = null;
 
     // Validation
     if (!class_name || !behavior_definition || !implementation_code) {
       return return_error(new Error('class_name, behavior_definition, and implementation_code are required'));
     }
 
-    const connection = getManagedConnection();
+    const config = getConfig();
+    const connectionLogger = {
+      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
+      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
+      error: baseLogger.error.bind(baseLogger),
+      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+    };
+    connection = createAbapConnection(config, connectionLogger);
+    await connection.connect();
     const className = class_name.toUpperCase();
     const behaviorDefinition = behavior_definition.toUpperCase();
 
@@ -198,6 +210,15 @@ export async function handleUpdateBehaviorImplementation(args: UpdateBehaviorImp
         : error.message || String(error);
 
       return return_error(new Error(`Failed to update behavior implementation: ${errorMessage}`));
+    } finally {
+      try {
+        if (connection) {
+          connection.reset();
+          handlerLogger.debug('Reset behavior implementation connection after use');
+        }
+      } catch (resetError: any) {
+        handlerLogger.error(`Failed to reset behavior implementation connection: ${resetError?.message || resetError}`);
+      }
     }
 
   } catch (error: any) {

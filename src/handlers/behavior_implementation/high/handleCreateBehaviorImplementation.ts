@@ -8,12 +8,14 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger as baseLogger } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 export const TOOL_DEFINITION = {
   name: "CreateBehaviorImplementation",
@@ -74,6 +76,7 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
     'handleCreateBehaviorImplementation',
     process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
   );
+  let connection: any = null;
   try {
     // Validate required parameters
     if (!args?.class_name) {
@@ -94,7 +97,16 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
     }
 
     const typedArgs = args as CreateBehaviorImplementationArgs;
-    const connection = getManagedConnection();
+    const config = getConfig();
+    const connectionLogger = {
+      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
+      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
+      error: baseLogger.error.bind(baseLogger),
+      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+    };
+    connection = createAbapConnection(config, connectionLogger);
+    await connection.connect();
     const className = typedArgs.class_name.toUpperCase();
     const behaviorDefinition = typedArgs.behavior_definition.toUpperCase();
 
@@ -207,5 +219,14 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
   } catch (error: any) {
     handlerLogger.error(`CreateBehaviorImplementation handler error: ${error?.message || error}`);
     return return_error(error);
+  } finally {
+    try {
+      if (connection) {
+        connection.reset();
+        handlerLogger.debug('Reset behavior implementation connection after use');
+      }
+    } catch (resetError: any) {
+      handlerLogger.error(`Failed to reset behavior implementation connection: ${resetError?.message || resetError}`);
+    }
   }
 }

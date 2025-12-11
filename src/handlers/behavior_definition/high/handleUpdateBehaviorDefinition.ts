@@ -2,10 +2,12 @@
  * UpdateBehaviorDefinition Handler - ABAP Behavior Definition Update via ADT API
  */
 
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 export const TOOL_DEFINITION = {
     name: "UpdateBehaviorDefinition",
@@ -49,7 +51,16 @@ export async function handleUpdateBehaviorDefinition(params: any) {
     }
 
     const name = args.name.toUpperCase();
-    const connection = getManagedConnection();
+    const config = getConfig();
+    const connectionLogger = {
+      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
+      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
+      error: baseLogger.error.bind(baseLogger),
+      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+    };
+    const connection = createAbapConnection(config, connectionLogger);
+    await connection.connect();
     const handlerLogger = getHandlerLogger(
       'handleUpdateBehaviorDefinition',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -105,5 +116,12 @@ export async function handleUpdateBehaviorDefinition(params: any) {
     } catch (error: any) {
         handlerLogger.error(`Error updating BDEF ${name}: ${error?.message || error}`);
         return return_error(error);
+    } finally {
+        try {
+            connection.reset();
+            handlerLogger.debug('Reset BDEF connection after use');
+        } catch (resetError: any) {
+            handlerLogger.error(`Failed to reset BDEF connection: ${resetError?.message || resetError}`);
+        }
     }
 }

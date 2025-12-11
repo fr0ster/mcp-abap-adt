@@ -8,10 +8,12 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger as baseLogger, getManagedConnection, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger as baseLogger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 export const TOOL_DEFINITION = {
   name: "UpdateServiceDefinition",
@@ -54,6 +56,7 @@ interface UpdateServiceDefinitionArgs {
  * Session and lock management handled internally by client
  */
 export async function handleUpdateServiceDefinition(args: UpdateServiceDefinitionArgs) {
+  let connection: any = null;
   try {
     const handlerLogger = getHandlerLogger(
       "handleUpdateServiceDefinition",
@@ -71,7 +74,16 @@ export async function handleUpdateServiceDefinition(args: UpdateServiceDefinitio
       return return_error(new Error('service_definition_name and source_code are required'));
     }
 
-    const connection = getManagedConnection();
+    const config = getConfig();
+    const connectionLogger = {
+      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
+      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
+      error: baseLogger.error.bind(baseLogger),
+      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+    };
+    connection = createAbapConnection(config, connectionLogger);
+    await connection.connect();
     const serviceDefinitionName = service_definition_name.toUpperCase();
 
     handlerLogger.info(`Starting service definition source update: ${serviceDefinitionName}`);
@@ -184,6 +196,15 @@ export async function handleUpdateServiceDefinition(args: UpdateServiceDefinitio
         : error.message || String(error);
 
       return return_error(new Error(`Failed to update service definition: ${errorMessage}`));
+    } finally {
+      try {
+        if (connection) {
+          connection.reset();
+          handlerLogger.debug('Reset service definition connection after use');
+        }
+      } catch (resetError: any) {
+        handlerLogger.error(`Failed to reset service definition connection: ${resetError?.message || resetError}`);
+      }
     }
 
   } catch (error: any) {

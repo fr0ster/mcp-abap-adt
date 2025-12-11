@@ -11,9 +11,11 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger as baseLogger } from '../../../lib/utils';
 import { CrudClient, ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 export const TOOL_DEFINITION = {
   name: "UpdateFunctionGroup",
@@ -51,6 +53,7 @@ interface UpdateFunctionGroupArgs {
  * Session and lock management handled internally
  */
 export async function handleUpdateFunctionGroup(args: UpdateFunctionGroupArgs) {
+  let connection: any = null;
   try {
     const {
       function_group_name,
@@ -63,7 +66,16 @@ export async function handleUpdateFunctionGroup(args: UpdateFunctionGroupArgs) {
       return return_error(new Error('function_group_name and description are required'));
     }
 
-    const connection = getManagedConnection();
+    const config = getConfig();
+    const connectionLogger = {
+      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
+      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
+      error: baseLogger.error.bind(baseLogger),
+      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+    };
+    connection = createAbapConnection(config, connectionLogger);
+    await connection.connect();
     const functionGroupName = function_group_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleUpdateFunctionGroup',
@@ -172,5 +184,22 @@ export async function handleUpdateFunctionGroup(args: UpdateFunctionGroupArgs) {
 
   } catch (error: any) {
     return return_error(error);
+  } finally {
+    try {
+      if (connection) {
+        connection.reset();
+        const handlerLogger = getHandlerLogger(
+          'handleUpdateFunctionGroup',
+          process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+        );
+        handlerLogger.debug('Reset function group connection after use');
+      }
+    } catch (resetError: any) {
+      const handlerLogger = getHandlerLogger(
+        'handleUpdateFunctionGroup',
+        process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
+      );
+      handlerLogger.error(`Failed to reset function group connection: ${resetError?.message || resetError}`);
+    }
   }
 }

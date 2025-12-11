@@ -8,9 +8,11 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 export const TOOL_DEFINITION = {
   name: "CreateTransport",
@@ -67,7 +69,16 @@ export async function handleCreateTransport(args: CreateTransportArgs) {
     }
 
     const typedArgs = args as CreateTransportArgs;
-    const connection = getManagedConnection();
+    const config = getConfig();
+    const connectionLogger = {
+      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
+      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
+      error: baseLogger.error.bind(baseLogger),
+      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+    };
+    const connection = createAbapConnection(config, connectionLogger);
+    await connection.connect();
 
     handlerLogger.info(`Starting transport creation: ${typedArgs.description}`);
 
@@ -168,6 +179,13 @@ export async function handleCreateTransport(args: CreateTransportArgs) {
         ErrorCode.InternalError,
         `Failed to create transport: ${errorMessage}`
       );
+    } finally {
+      try {
+        connection.reset();
+        handlerLogger.debug('Reset transport connection after use');
+      } catch (resetError: any) {
+        handlerLogger.error(`Failed to reset transport connection: ${resetError?.message || resetError}`);
+      }
     }
 
   } catch (error: any) {

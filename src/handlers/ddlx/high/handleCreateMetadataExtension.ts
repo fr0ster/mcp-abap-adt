@@ -3,10 +3,12 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { getConfig } from '../../../index';
 
 export const TOOL_DEFINITION = {
     name: "CreateMetadataExtension",
@@ -49,6 +51,7 @@ interface CreateMetadataExtensionArgs {
 
 export async function handleCreateMetadataExtension(params: any) {
     const args: CreateMetadataExtensionArgs = params;
+    let connection: any = null;
 
     if (!args.name || !args.package_name) {
         return return_error(new Error("Missing required parameters"));
@@ -61,7 +64,16 @@ export async function handleCreateMetadataExtension(params: any) {
     }
 
     const name = args.name.toUpperCase();
-    const connection = getManagedConnection();
+    const config = getConfig();
+    const connectionLogger = {
+      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
+      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
+      error: baseLogger.error.bind(baseLogger),
+      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
+    };
+    connection = createAbapConnection(config, connectionLogger);
+    await connection.connect();
     const handlerLogger = getHandlerLogger(
       'handleCreateMetadataExtension',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -128,5 +140,14 @@ export async function handleCreateMetadataExtension(params: any) {
     } catch (error: any) {
         handlerLogger.error(`Error creating DDLX ${name}: ${error?.message || error}`);
         return return_error(error);
+    } finally {
+        try {
+            if (connection) {
+                connection.reset();
+                handlerLogger.debug('Reset metadata extension connection after use');
+            }
+        } catch (resetError: any) {
+            handlerLogger.error(`Failed to reset metadata extension connection: ${resetError?.message || resetError}`);
+        }
     }
 }

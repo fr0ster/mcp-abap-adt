@@ -163,6 +163,13 @@ See [Client Configuration](doc/user-guide/CLIENT_CONFIGURATION.md) for complete 
 npm test
 ```
 
+#### Test logging switches
+- `TEST_LOG_LEVEL=error|warn|info|debug` — controls test logger verbosity (DEBUG_TESTS/DEBUG_ADT_TESTS/DEBUG_CONNECTORS force `debug`).
+- `TEST_LOG_FILE=/tmp/adt-tests.log` — writes test logs to a file (best-effort).
+- `TEST_LOG_SILENT=true` — disables test logging pipeline (console output muted).
+- `TEST_LOG_COLOR=true` — adds colored/prefixed tags to test log lines.
+- All `console.*` in tests are routed through the test logger with a `[test]` prefix.
+
 ### Building
 ```bash
 npm run build

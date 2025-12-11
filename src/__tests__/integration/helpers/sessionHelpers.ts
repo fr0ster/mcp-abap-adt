@@ -11,6 +11,9 @@ import { extractSessionState } from './testHelpers';
 import { loadTestEnv, getSapConfigFromEnv } from './configHelpers';
 import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { generateSessionId } from '../../../lib/sessionUtils';
+import { createTestLogger } from './loggerHelpers';
+
+const sessionLogger = createTestLogger('connection');
 
 export interface SessionInfo {
   session_id: string;
@@ -33,9 +36,7 @@ export async function createTestConnectionAndSession(): Promise<{
   try {
     await loadTestEnv();
   } catch (error: any) {
-    if (process.env.DEBUG_TESTS === 'true') {
-      console.warn('[createTestConnectionAndSession] loadTestEnv failed', error?.message || String(error));
-    }
+    sessionLogger.warn(`[createTestConnectionAndSession] loadTestEnv failed: ${error?.message || String(error)}`);
   }
 
   try {
@@ -44,11 +45,11 @@ export async function createTestConnectionAndSession(): Promise<{
 
     // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
     const connectionLogger = {
-      debug: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {},
-      info: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {},
-      warn: process.env.DEBUG_CONNECTORS === 'true' ? console.warn : () => {},
-      error: process.env.DEBUG_CONNECTORS === 'true' ? console.error : () => {},
-      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {}
+      debug: sessionLogger.debug,
+      info: sessionLogger.info,
+      warn: sessionLogger.warn,
+      error: sessionLogger.error,
+      csrfToken: sessionLogger.debug,
     };
 
     // Create connection directly (same as in adt-clients tests)
@@ -60,7 +61,7 @@ export async function createTestConnectionAndSession(): Promise<{
       try {
         connectionConfig = connection.getConfig();
       } catch (error: any) {
-        console.warn('[getTestSession] Failed to get connection config:', error?.message);
+        sessionLogger.warn(`[getTestSession] Failed to get connection config: ${error?.message}`);
       }
 
       const connectionConfigJwtToken = connectionConfig?.jwtToken;
@@ -73,20 +74,29 @@ export async function createTestConnectionAndSession(): Promise<{
           : connectionConfigRefreshToken.substring(0, 10) + '...' // If too short, show only first 10
         : 'empty';
 
-      console.log('[getTestSession] Connection tokens:', {
-        hasJwtToken: !!connectionConfigJwtToken,
-        jwtTokenStart: connectionConfigJwtToken ? `${connectionConfigJwtToken.substring(0, 20)}...` : 'empty',
-        jwtTokenEnd: connectionConfigJwtToken && connectionConfigJwtToken.length > 20 ? `...${connectionConfigJwtToken.substring(connectionConfigJwtToken.length - 20)}` : 'empty',
-        jwtTokenLength: connectionConfigJwtToken?.length || 0,
-        hasRefreshToken: !!connectionConfigRefreshToken,
-        refreshTokenPreview: refreshTokenPreview,
-        refreshTokenLength: connectionConfigRefreshToken?.length || 0,
-        // Also check UAA config
-        hasUaaUrl: !!(connectionConfig?.uaaUrl),
-        hasUaaClientId: !!(connectionConfig?.uaaClientId),
-        hasUaaClientSecret: !!(connectionConfig?.uaaClientSecret),
-        canRefresh: !!(connectionConfigRefreshToken && connectionConfig?.uaaUrl && connectionConfig?.uaaClientId && connectionConfig?.uaaClientSecret)
-      });
+      sessionLogger.debug(
+        `[getTestSession] Connection tokens: ${JSON.stringify({
+          hasJwtToken: !!connectionConfigJwtToken,
+          jwtTokenStart: connectionConfigJwtToken ? `${connectionConfigJwtToken.substring(0, 20)}...` : 'empty',
+          jwtTokenEnd:
+            connectionConfigJwtToken && connectionConfigJwtToken.length > 20
+              ? `...${connectionConfigJwtToken.substring(connectionConfigJwtToken.length - 20)}`
+              : 'empty',
+          jwtTokenLength: connectionConfigJwtToken?.length || 0,
+          hasRefreshToken: !!connectionConfigRefreshToken,
+          refreshTokenPreview: refreshTokenPreview,
+          refreshTokenLength: connectionConfigRefreshToken?.length || 0,
+          hasUaaUrl: !!connectionConfig?.uaaUrl,
+          hasUaaClientId: !!connectionConfig?.uaaClientId,
+          hasUaaClientSecret: !!connectionConfig?.uaaClientSecret,
+          canRefresh: !!(
+            connectionConfigRefreshToken &&
+            connectionConfig?.uaaUrl &&
+            connectionConfig?.uaaClientId &&
+            connectionConfig?.uaaClientSecret
+          ),
+        })}`
+      );
     }
 
     // Connect once (same as adt-clients tests - no double connect)
@@ -116,12 +126,11 @@ export async function createTestConnectionAndSession(): Promise<{
       session
     };
   } catch (error: any) {
-    if (process.env.DEBUG_TESTS === 'true') {
-      console.error('[createTestConnectionAndSession] Error caught:', {
-        message: error?.message,
-        stack: error?.stack,
-        error: error
-      });
+    sessionLogger.error(
+      `[createTestConnectionAndSession] Error caught: ${error?.message || String(error)}`
+    );
+    if (process.env.DEBUG_TESTS === 'true' && error?.stack) {
+      sessionLogger.debug(`[createTestConnectionAndSession] Stack: ${error.stack}`);
     }
     throw error;
   }

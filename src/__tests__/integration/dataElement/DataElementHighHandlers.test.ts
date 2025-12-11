@@ -39,10 +39,12 @@ import {
   getCleanupAfter
 } from '../helpers/configHelpers';
 import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
 
+const testLogger = createTestLogger('dataelement-high');
 
 describe('DataElement High-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;
@@ -55,7 +57,7 @@ describe('DataElement High-Level Handlers Integration', () => {
       hasConfig = true;
     } catch (error) {
       if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
-        console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+        testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       }
       hasConfig = false;
     }
@@ -63,14 +65,14 @@ describe('DataElement High-Level Handlers Integration', () => {
 
   it('should test all DataElement high-level handlers', async () => {
     if (!hasConfig || !session) {
-      console.log('⏭️  Skipping test: No configuration or session');
+      testLogger.info('⏭️  Skipping test: No configuration or session');
       return;
     }
 
     // Get test case configuration
     const testCase = getEnabledTestCase('create_data_element', 'builder_data_element');
     if (!testCase) {
-      console.log('⏭️  Skipping test: No test case configuration');
+      testLogger.info('⏭️  Skipping test: No test case configuration');
       return;
     }
 
@@ -111,7 +113,7 @@ describe('DataElement High-Level Handlers Integration', () => {
         const errorMsg = error.message || String(error);
         // If data element already exists, that's okay - we'll skip test
         if (errorMsg.includes('already exists') || errorMsg.includes('InvalidObjName')) {
-          console.log(`⏭️  DataElement ${dataElementName} already exists, skipping test`);
+          testLogger.info(`⏭️  DataElement ${dataElementName} already exists, skipping test`);
           return;
         }
         throw error;
@@ -132,7 +134,7 @@ describe('DataElement High-Level Handlers Integration', () => {
       });
 
       await delay(getOperationDelay('create', testCase));
-      console.log(`✅ High-level data element creation completed successfully for ${dataElementName}`);
+      testLogger.info(`✅ High-level data element creation completed successfully for ${dataElementName}`);
 
       // Step 2: Test UpdateDataElement (High-Level)
       debugLog('UPDATE', `Starting high-level data element update for ${dataElementName}`, {
@@ -159,7 +161,7 @@ describe('DataElement High-Level Handlers Integration', () => {
         const errorMsg = error.message || String(error);
         // If data element doesn't exist or other validation error, skip test
         if (errorMsg.includes('already exists') || errorMsg.includes('InvalidObjName') || errorMsg.includes('not found')) {
-          console.log(`⏭️  Cannot update data element ${dataElementName}: ${errorMsg}, skipping test`);
+          testLogger.info(`⏭️  Cannot update data element ${dataElementName}: ${errorMsg}, skipping test`);
           return;
         }
         throw new Error(`Update failed: ${errorMsg}`);
@@ -179,10 +181,10 @@ describe('DataElement High-Level Handlers Integration', () => {
       });
 
       await delay(getOperationDelay('update', testCase));
-      console.log(`✅ High-level data element update completed successfully for ${dataElementName}`);
+      testLogger.info(`✅ High-level data element update completed successfully for ${dataElementName}`);
 
     } catch (error: any) {
-      console.error(`❌ Test failed: ${error.message}`);
+      testLogger.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
       // Cleanup: Optionally delete test data element
@@ -198,16 +200,16 @@ describe('DataElement High-Level Handlers Integration', () => {
             });
 
             if (!deleteResponse.isError) {
-              console.log(`🧹 Cleaned up test data element: ${dataElementName}`);
+              testLogger.info(`🧹 Cleaned up test data element: ${dataElementName}`);
             } else {
               const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-              console.warn(`⚠️  Failed to delete data element ${dataElementName}: ${errorMsg}`);
+              testLogger.warn(`⚠️  Failed to delete data element ${dataElementName}: ${errorMsg}`);
             }
           } else {
-            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${dataElementName}`);
+            testLogger.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${dataElementName}`);
           }
         } catch (cleanupError) {
-          console.warn(`⚠️  Failed to cleanup test data element ${dataElementName}: ${cleanupError}`);
+          testLogger.warn(`⚠️  Failed to cleanup test data element ${dataElementName}: ${cleanupError}`);
         }
       }
 

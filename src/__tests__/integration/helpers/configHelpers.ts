@@ -10,6 +10,9 @@ import * as dotenv from 'dotenv';
 import { invalidateConnectionCache } from '../../../lib/utils';
 import { refreshTokensForTests } from './authHelpers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
+import { createTestLogger } from './loggerHelpers';
+
+const configLogger = createTestLogger('config');
 
 let cachedConfig: any = null;
 let envLoaded = false;
@@ -82,9 +85,7 @@ export async function loadTestEnv(): Promise<void> {
       brokerOk = !!process.env.SAP_URL;
       brokerSucceeded = brokerOk;
     } catch (error: any) {
-      if (process.env.DEBUG_TESTS === 'true') {
-        console.warn(`[DEBUG] loadTestEnv - Auth-broker refresh failed: ${error?.message || String(error)}`);
-      }
+      configLogger.warn(`[DEBUG] loadTestEnv - Auth-broker refresh failed: ${error?.message || String(error)}`);
     }
 
     // If broker succeeded, we’re done (no .env fallback when broker is configured)
@@ -129,7 +130,7 @@ export async function loadTestEnv(): Promise<void> {
     // empty or stale values that would prevent .env from being loaded with override: false
     const result = dotenv.config({ path: envPath, quiet: true, override: true });
     if (result.error) {
-      console.warn(`⚠️ Failed to load .env file: ${result.error.message}`);
+      configLogger.warn(`⚠️ Failed to load .env file: ${result.error.message}`);
     } else {
       logEnvLoaded(envPath);
 
@@ -141,11 +142,9 @@ export async function loadTestEnv(): Promise<void> {
           if (useUnsafe) {
             process.env.MCP_UNSAFE = 'true';
           }
-          if (process.env.DEBUG_TESTS === 'true') {
-            console.log('[DEBUG] loadTestEnv - Using auth-broker as primary token source (MCP_USE_AUTH_BROKER=true)');
-            if (useUnsafe) {
-              console.log('[DEBUG] loadTestEnv - Using unsafe session store for auth-broker (MCP_UNSAFE=true)');
-            }
+          configLogger.debug('[DEBUG] loadTestEnv - Using auth-broker as primary token source (MCP_USE_AUTH_BROKER=true)');
+          if (useUnsafe) {
+            configLogger.debug('[DEBUG] loadTestEnv - Using unsafe session store for auth-broker (MCP_UNSAFE=true)');
           }
         }
       } catch {
@@ -156,14 +155,10 @@ export async function loadTestEnv(): Promise<void> {
       // (including refresh token that might have been missing before)
       try {
         invalidateConnectionCache();
-        if (process.env.DEBUG_TESTS === 'true') {
-          console.log(`[DEBUG] loadTestEnv - Invalidated connection cache to force recreation with updated .env values`);
-        }
+        configLogger.debug(`[DEBUG] loadTestEnv - Invalidated connection cache to force recreation with updated .env values`);
       } catch (error: any) {
         // If invalidateConnectionCache fails, log but don't fail
-        if (process.env.DEBUG_TESTS === 'true') {
-          console.warn(`[DEBUG] loadTestEnv - Failed to invalidate connection cache: ${error?.message || String(error)}`);
-        }
+        configLogger.warn(`[DEBUG] loadTestEnv - Failed to invalidate connection cache: ${error?.message || String(error)}`);
       }
 
       // If auth-broker is enabled as a fallback, attempt refresh after .env load
@@ -174,22 +169,22 @@ export async function loadTestEnv(): Promise<void> {
           brokerOk = !!process.env.SAP_URL;
           brokerSucceeded = brokerOk;
         } catch (error: any) {
-          if (process.env.DEBUG_TESTS === 'true') {
-            console.warn(`[DEBUG] loadTestEnv - Failed to refresh tokens via auth-broker: ${error?.message || String(error)}`);
-          }
+          configLogger.warn(`[DEBUG] loadTestEnv - Failed to refresh tokens via auth-broker: ${error?.message || String(error)}`);
         }
       }
     }
   } else {
     // No .env file found
-    if (!useAuthBroker && process.env.DEBUG_TESTS === 'true') {
+    if (!useAuthBroker) {
       const cwdEnvPath = path.resolve(process.cwd(), '.env');
       const projectRootEnvPath = path.resolve(__dirname, '../../../../.env');
-      console.warn(`⚠️ .env file not found. Tried:`, {
-        MCP_ENV_PATH: process.env.MCP_ENV_PATH || '(not set)',
-        cwd: cwdEnvPath,
-        projectRoot: projectRootEnvPath
-      });
+      configLogger.warn(
+        `⚠️ .env file not found. Tried: ${JSON.stringify({
+          MCP_ENV_PATH: process.env.MCP_ENV_PATH || '(not set)',
+          cwd: cwdEnvPath,
+          projectRoot: projectRootEnvPath
+        })}`
+      );
     }
   }
 
@@ -215,16 +210,16 @@ function logEnvLoaded(envPath: string): void {
   const hasUaaUrl = !!process.env.SAP_UAA_URL;
   const hasUaaClientId = !!process.env.SAP_UAA_CLIENT_ID;
   const hasUaaClientSecret = !!process.env.SAP_UAA_CLIENT_SECRET;
-  if (process.env.DEBUG_TESTS === 'true') {
-    console.log(`[DEBUG] loadTestEnv - Loaded .env from: ${envPath}`);
-    console.log(`[DEBUG] loadTestEnv - Refresh token config:`, {
+  configLogger.debug(`[DEBUG] loadTestEnv - Loaded .env from: ${envPath}`);
+  configLogger.debug(
+    `[DEBUG] loadTestEnv - Refresh token config: ${JSON.stringify({
       hasRefreshToken,
       hasUaaUrl,
       hasUaaClientId,
       hasUaaClientSecret,
       canRefresh: hasRefreshToken && hasUaaUrl && hasUaaClientId && hasUaaClientSecret
-    });
-  }
+    })}`
+  );
 }
 
 /**
@@ -247,14 +242,14 @@ export function loadTestConfig(): any {
   }
 
   if (fs.existsSync(templatePath)) {
-    console.warn('⚠️ tests/test-config.yaml not found. Using template (all integration tests will be disabled).');
+    configLogger.warn('⚠️ tests/test-config.yaml not found. Using template (all integration tests will be disabled).');
     const templateContent = fs.readFileSync(templatePath, 'utf8');
     cachedConfig = yaml.parse(templateContent) || {};
     return cachedConfig;
   }
 
-  console.error('❌ Test configuration files not found.');
-  console.error('Please create tests/test-config.yaml with test parameters.');
+  configLogger.error('❌ Test configuration files not found.');
+  configLogger.error('Please create tests/test-config.yaml with test parameters.');
   return {};
 }
 
@@ -292,9 +287,7 @@ export function getEnabledTestCase(handlerName: string, testCaseName?: string): 
   const handlerTests = config[handlerName]?.test_cases || [];
 
   if (handlerTests.length === 0) {
-    if (process.env.DEBUG_TESTS === 'true') {
-      console.log(`[DEBUG] No test cases found for handler: ${handlerName}`);
-    }
+    configLogger.debug(`[DEBUG] No test cases found for handler: ${handlerName}`);
     return null;
   }
 
@@ -302,13 +295,11 @@ export function getEnabledTestCase(handlerName: string, testCaseName?: string): 
   if (testCaseName) {
     const testCase = handlerTests.find((tc: any) => tc.name === testCaseName);
     if (!testCase) {
-      if (process.env.DEBUG_TESTS === 'true') {
-        console.log(`[DEBUG] Test case "${testCaseName}" not found for handler: ${handlerName}`);
-      }
+      configLogger.debug(`[DEBUG] Test case "${testCaseName}" not found for handler: ${handlerName}`);
       return null;
     }
     if (testCase.enabled !== true) {
-      console.log(`⏭️  Test case "${testCaseName}" for handler "${handlerName}" is disabled (enabled: ${testCase.enabled})`);
+      configLogger.info(`⏭️  Test case "${testCaseName}" for handler "${handlerName}" is disabled (enabled: ${testCase.enabled})`);
       return null;
     }
     enabledTest = testCase;
@@ -317,11 +308,9 @@ export function getEnabledTestCase(handlerName: string, testCaseName?: string): 
     if (!enabledTest) {
       const disabledTests = handlerTests.filter((tc: any) => tc.enabled === false);
       if (disabledTests.length > 0) {
-        console.log(`⏭️  All test cases for handler "${handlerName}" are disabled (${disabledTests.length} test case(s) found, all disabled)`);
+        configLogger.info(`⏭️  All test cases for handler "${handlerName}" are disabled (${disabledTests.length} test case(s) found, all disabled)`);
       } else {
-        if (process.env.DEBUG_TESTS === 'true') {
-          console.log(`[DEBUG] No enabled test cases found for handler: ${handlerName}`);
-        }
+        configLogger.debug(`[DEBUG] No enabled test cases found for handler: ${handlerName}`);
       }
       return null;
     }
@@ -530,32 +519,28 @@ export async function preCheckTestParameters(
   // Pre-check: Verify super package exists (if specified - for package tests)
   if (superPackage && client) {
     try {
-      if (process.env.DEBUG_TESTS === 'true') {
-        console.log(`[PRE_CHECK] Checking super package (parent) existence: ${superPackage}`);
-      }
+      configLogger.debug(`[PRE_CHECK] Checking super package (parent) existence: ${superPackage}`);
       const superPackageCheck = await client.checkPackage({
         packageName: superPackage,
         superPackage: undefined
       });
       if (superPackageCheck?.status !== 200) {
         const reason = `Super package (parent) ${superPackage} check returned status ${superPackageCheck?.status}. Parent package must exist before creating child package.`;
-        console.error(`❌ ${reason}`);
+        configLogger.error(`❌ ${reason}`);
         return { success: false, reason };
       } else {
-        if (process.env.DEBUG_TESTS === 'true') {
-          console.log(`[PRE_CHECK] ✓ Super package (parent) ${superPackage} exists and is accessible`);
-        }
+        configLogger.debug(`[PRE_CHECK] ✓ Super package (parent) ${superPackage} exists and is accessible`);
       }
     } catch (superPackageError: any) {
       const status = superPackageError.response?.status;
       if (status === 404) {
         const reason = `Super package (parent) ${superPackage} does not exist! Please create it before running the ${testLabel}.`;
-        console.error(`❌ ${reason}`);
+        configLogger.error(`❌ ${reason}`);
         return { success: false, reason };
       } else {
         const reason = `Cannot verify super package (parent) ${superPackage} (HTTP ${status}): ${superPackageError.message}`;
-        console.warn(`⚠️  ${reason}`);
-        console.warn(`⚠️  Continuing ${testLabel}, but it may fail if parent package is not accessible.`);
+        configLogger.warn(`⚠️  ${reason}`);
+        configLogger.warn(`⚠️  Continuing ${testLabel}, but it may fail if parent package is not accessible.`);
         // Don't fail test, just warn
       }
     }
@@ -567,51 +552,41 @@ export async function preCheckTestParameters(
   if (packageName && client && !superPackage) {
     // Only check package if we're not creating a child package (no superPackage)
     try {
-      if (process.env.DEBUG_TESTS === 'true') {
-        console.log(`[PRE_CHECK] Checking package existence: ${packageName}`);
-      }
+      configLogger.debug(`[PRE_CHECK] Checking package existence: ${packageName}`);
       const packageCheck = await client.checkPackage({
         packageName,
         superPackage: undefined
       });
       if (packageCheck?.status !== 200) {
         const reason = `Package ${packageName} check returned status ${packageCheck?.status}. Test may fail.`;
-        console.warn(`⚠️  ${reason}`);
+        configLogger.warn(`⚠️  ${reason}`);
         return { success: false, reason };
       } else {
-        if (process.env.DEBUG_TESTS === 'true') {
-          console.log(`[PRE_CHECK] ✓ Package ${packageName} exists and is accessible`);
-        }
+        configLogger.debug(`[PRE_CHECK] ✓ Package ${packageName} exists and is accessible`);
       }
     } catch (packageError: any) {
       const status = packageError.response?.status;
       if (status === 404) {
         // For package creation tests, 404 is expected (package doesn't exist yet)
-        if (process.env.DEBUG_TESTS === 'true') {
-          console.log(`[PRE_CHECK] ✓ Package ${packageName} does not exist (expected for creation test)`);
-        }
+        configLogger.debug(`[PRE_CHECK] ✓ Package ${packageName} does not exist (expected for creation test)`);
       } else {
         const reason = `Cannot verify package ${packageName} (HTTP ${status}): ${packageError.message}`;
-        console.warn(`⚠️  ${reason}`);
-        console.warn(`⚠️  Continuing ${testLabel}, but it may fail if package is not accessible.`);
+        configLogger.warn(`⚠️  ${reason}`);
+        configLogger.warn(`⚠️  Continuing ${testLabel}, but it may fail if package is not accessible.`);
         // Don't fail test, just warn
       }
     }
   } else if (packageName && superPackage) {
     // For package creation tests with superPackage, we skip checking packageName
-    if (process.env.DEBUG_TESTS === 'true') {
-      console.log(`[PRE_CHECK] Skipping package ${packageName} check (will be created as child of ${superPackage})`);
-    }
+    configLogger.debug(`[PRE_CHECK] Skipping package ${packageName} check (will be created as child of ${superPackage})`);
   }
 
   // Pre-check: Log transport request if specified
   if (transportRequest && transportRequest.trim()) {
-    if (process.env.DEBUG_TESTS === 'true') {
-      console.log(`[PRE_CHECK] Transport request specified: ${transportRequest}`);
-    }
+    configLogger.debug(`[PRE_CHECK] Transport request specified: ${transportRequest}`);
     // Note: Transport request validation would require additional API call
     // For now, we just log that it's specified
-    console.log(`ℹ️  Transport request specified: ${transportRequest} (not validated - ensure it exists)`);
+    configLogger.info(`ℹ️  Transport request specified: ${transportRequest} (not validated - ensure it exists)`);
   }
 
   return { success: true };

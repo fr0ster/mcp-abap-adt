@@ -39,9 +39,12 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
+
+const testLogger = createTestLogger('service-high');
 
 
 describe('ServiceDefinition High-Level Handlers Integration', () => {
@@ -54,23 +57,21 @@ describe('ServiceDefinition High-Level Handlers Integration', () => {
       session = await getTestSession();
       hasConfig = true;
     } catch (error) {
-      if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
-        console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      }
+      testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
 
   it('should test all ServiceDefinition high-level handlers', async () => {
     if (!hasConfig || !session) {
-      console.log('⏭️  Skipping test: No configuration or session');
+      testLogger.info('⏭️  Skipping test: No configuration or session');
       return;
     }
 
     // Get test case configuration
     const testCase = getEnabledTestCase('create_service_definition', 'builder_service_definition');
     if (!testCase) {
-      console.log('⏭️  Skipping test: No test case configuration');
+      testLogger.info('⏭️  Skipping test: No test case configuration');
       return;
     }
 
@@ -104,7 +105,7 @@ describe('ServiceDefinition High-Level Handlers Integration', () => {
         const errorMsg = error.message || String(error);
         // If service definition already exists, that's okay - we'll skip test
         if (errorMsg.includes('already exists') || errorMsg.includes('InvalidObjName')) {
-          console.log(`⏭️  Service Definition ${serviceDefinitionName} already exists, skipping test`);
+          testLogger.info(`⏭️  Service Definition ${serviceDefinitionName} already exists, skipping test`);
           return;
         }
         throw error;
@@ -125,7 +126,7 @@ describe('ServiceDefinition High-Level Handlers Integration', () => {
       });
 
       await delay(getOperationDelay('create', testCase));
-      console.log(`✅ High-level service definition creation completed successfully for ${serviceDefinitionName}`);
+      testLogger.info(`✅ High-level service definition creation completed successfully for ${serviceDefinitionName}`);
 
       // Step 2: Test UpdateServiceDefinition (High-Level)
       if (testCase.params.update_source_code) {
@@ -155,11 +156,11 @@ describe('ServiceDefinition High-Level Handlers Integration', () => {
         });
 
         await delay(getOperationDelay('update', testCase));
-        console.log(`✅ High-level service definition update completed successfully for ${serviceDefinitionName}`);
+        testLogger.success(`✅ High-level service definition update completed successfully for ${serviceDefinitionName}`);
       }
 
     } catch (error: any) {
-      console.error(`❌ Test failed: ${error.message}`);
+      testLogger.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
       // Cleanup: Optionally delete test service definition
@@ -176,19 +177,18 @@ describe('ServiceDefinition High-Level Handlers Integration', () => {
                 { serviceDefinitionName },
                 transportRequest
               );
-              console.log(`🧹 Cleaned up test service definition: ${serviceDefinitionName}`);
+          testLogger.info(`🧹 Cleaned up test service definition: ${serviceDefinitionName}`);
             } catch (deleteError: any) {
               const errorMsg = deleteError.message || String(deleteError);
-              console.warn(`⚠️  Failed to delete service definition ${serviceDefinitionName}: ${errorMsg}`);
+              testLogger.warn(`⚠️  Failed to delete service definition ${serviceDefinitionName}: ${errorMsg}`);
             }
           } else {
-            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${serviceDefinitionName}`);
+            testLogger.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${serviceDefinitionName}`);
           }
         } catch (cleanupError) {
-          console.warn(`⚠️  Failed to cleanup test service definition ${serviceDefinitionName}: ${cleanupError}`);
+          testLogger.warn(`⚠️  Failed to cleanup test service definition ${serviceDefinitionName}: ${cleanupError}`);
         }
       }
     }
   }, getTimeout('long'));
 });
-

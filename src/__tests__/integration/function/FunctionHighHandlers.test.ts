@@ -43,9 +43,12 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
+
+const testLogger = createTestLogger('function-high');
 
 
 describe('Function High-Level Handlers Integration', () => {
@@ -59,7 +62,7 @@ describe('Function High-Level Handlers Integration', () => {
       hasConfig = true;
     } catch (error) {
       if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
-        console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+        testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       }
       hasConfig = false;
     }
@@ -67,7 +70,7 @@ describe('Function High-Level Handlers Integration', () => {
 
   it('should test all Function high-level handlers', async () => {
     if (!hasConfig || !session) {
-      console.log('⏭️  Skipping test: No configuration or session');
+      testLogger.info('⏭️  Skipping test: No configuration or session');
       return;
     }
 
@@ -76,7 +79,7 @@ describe('Function High-Level Handlers Integration', () => {
     const functionModuleCase = getEnabledTestCase('create_function_module', 'builder_function_module');
 
     if (!functionGroupCase || !functionModuleCase) {
-      console.log('⏭️  Skipping test: No test case configuration');
+      testLogger.info('⏭️  Skipping test: No test case configuration');
       return;
     }
 
@@ -106,8 +109,8 @@ describe('Function High-Level Handlers Integration', () => {
     try {
       // Step 1: CreateFunctionGroup (High-Level)
       // High-level handler does validation internally, but we check the result
-      console.log(`📦 High Create: Creating function group ${functionGroupName}...`);
-      console.log(`📦 High Create: Package: ${packageName}, Transport: ${transportRequest || '(empty)'}`);
+      testLogger.info(`📦 High Create: Creating function group ${functionGroupName}...`);
+      testLogger.info(`📦 High Create: Package: ${packageName}, Transport: ${transportRequest || '(empty)'}`);
       const createFGResponse = await handleCreateFunctionGroup({
           function_group_name: functionGroupName,
           description: functionGroupDescription,
@@ -121,13 +124,13 @@ describe('Function High-Level Handlers Integration', () => {
       }
 
       const createFGData = parseHandlerResponse(createFGResponse);
-      console.log(`✅ High Create: Created function group ${functionGroupName} successfully`);
+      testLogger.info(`✅ High Create: Created function group ${functionGroupName} successfully`);
 
       await delay(getOperationDelay('create', functionGroupCase));
 
       // Step 2: UpdateFunctionGroup (High-Level)
       if (functionGroupCase.params.update_description) {
-        console.log(`📝 High Update: Updating function group ${functionGroupName}...`);
+        testLogger.info(`📝 High Update: Updating function group ${functionGroupName}...`);
         const updateFGResponse = await handleUpdateFunctionGroup({
           function_group_name: functionGroupName,
           description: functionGroupCase.params.update_description,
@@ -139,12 +142,12 @@ describe('Function High-Level Handlers Integration', () => {
         }
 
         const updateFGData = parseHandlerResponse(updateFGResponse);
-        console.log(`✅ High Update: Updated function group ${functionGroupName} successfully`);
+        testLogger.info(`✅ High Update: Updated function group ${functionGroupName} successfully`);
         await delay(getOperationDelay('update', functionGroupCase));
       }
 
       // Step 3: CreateFunctionModule (High-Level)
-      console.log(`📦 High Create: Creating function module ${functionModuleName}...`);
+      testLogger.info(`📦 High Create: Creating function module ${functionModuleName}...`);
       const createFMResponse = await handleCreateFunctionModule({
           function_group_name: functionGroupName,
           function_module_name: functionModuleName,
@@ -159,12 +162,12 @@ describe('Function High-Level Handlers Integration', () => {
       }
 
       const createFMData = parseHandlerResponse(createFMResponse);
-      console.log(`✅ High Create: Created function module ${functionModuleName} successfully`);
+      testLogger.info(`✅ High Create: Created function module ${functionModuleName} successfully`);
 
       await delay(getOperationDelay('create', functionModuleCase));
 
       // Step 4: UpdateFunctionModule (High-Level)
-      console.log(`📝 High Update: Updating function module ${functionModuleName}...`);
+      testLogger.info(`📝 High Update: Updating function module ${functionModuleName}...`);
       const updateFMResponse = await handleUpdateFunctionModule({
           function_group_name: functionGroupName,
           function_module_name: functionModuleName,
@@ -178,7 +181,7 @@ describe('Function High-Level Handlers Integration', () => {
       }
 
       const updateFMData = parseHandlerResponse(updateFMResponse);
-      console.log(`✅ High Update: Updated function module ${functionModuleName} successfully`);
+      testLogger.info(`✅ High Update: Updated function module ${functionModuleName} successfully`);
 
       await delay(getOperationDelay('update', functionModuleCase));
     } finally {
@@ -196,16 +199,16 @@ describe('Function High-Level Handlers Integration', () => {
             });
 
             if (!deleteFMResponse.isError) {
-              console.log(`🧹 Cleaned up test function module: ${functionModuleName}`);
+              testLogger.info(`🧹 Cleaned up test function module: ${functionModuleName}`);
             } else {
               const errorMsg = deleteFMResponse.content[0]?.text || 'Unknown error';
-              console.warn(`⚠️  Failed to delete function module ${functionModuleName}: ${errorMsg}`);
+              testLogger.warn(`⚠️  Failed to delete function module ${functionModuleName}: ${errorMsg}`);
             }
           } else {
-            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${functionModuleName}`);
+            testLogger.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${functionModuleName}`);
           }
         } catch (cleanupError) {
-          console.warn(`⚠️  Failed to cleanup test function module ${functionModuleName}: ${cleanupError}`);
+          testLogger.warn(`⚠️  Failed to cleanup test function module ${functionModuleName}: ${cleanupError}`);
         }
       }
 
@@ -219,19 +222,18 @@ describe('Function High-Level Handlers Integration', () => {
             });
 
             if (!deleteFGResponse.isError) {
-              console.log(`🧹 Cleaned up test function group: ${functionGroupName}`);
+              testLogger.info(`🧹 Cleaned up test function group: ${functionGroupName}`);
             } else {
               const errorMsg = deleteFGResponse.content[0]?.text || 'Unknown error';
-              console.warn(`⚠️  Failed to delete function group ${functionGroupName}: ${errorMsg}`);
+              testLogger.warn(`⚠️  Failed to delete function group ${functionGroupName}: ${errorMsg}`);
             }
           } else {
-            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${functionGroupName}`);
+            testLogger.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${functionGroupName}`);
           }
         } catch (cleanupError) {
-          console.warn(`⚠️  Failed to cleanup test function group ${functionGroupName}: ${cleanupError}`);
+          testLogger.warn(`⚠️  Failed to cleanup test function group ${functionGroupName}: ${cleanupError}`);
         }
       }
     }
   }, getTimeout('long'));
 });
-

@@ -37,10 +37,12 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
 
+const testLogger = createTestLogger('bimpl-high');
 
 describe('BehaviorImplementation High-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;
@@ -52,23 +54,21 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
       session = await getTestSession();
       hasConfig = true;
     } catch (error) {
-      if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
-        console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      }
+      testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
 
   it('should test all BehaviorImplementation high-level handlers', async () => {
     if (!hasConfig || !session) {
-      console.log('⏭️  Skipping test: No configuration or session');
+      testLogger.info('⏭️  Skipping test: No configuration or session');
       return;
     }
 
     // Get test case configuration - use high-level test case
     const testCase = getEnabledTestCase('create_behavior_implementation', 'full_workflow');
     if (!testCase) {
-      console.log('⏭️  Skipping test: No test case configuration');
+      testLogger.info('⏭️  Skipping test: No test case configuration');
       return;
     }
 
@@ -96,7 +96,7 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
 
     try {
       // Step 1: Test CreateBehaviorImplementation (High-Level)
-      console.log(`📦 High Create: Creating behavior implementation ${className}...`);
+      testLogger.info(`📦 High Create: Creating behavior implementation ${className}...`);
       let createResponse;
       try {
         const createArgs: any = {
@@ -116,13 +116,13 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
       } catch (error: any) {
         const errorMsg = error.message || String(error);
         // If behavior implementation already exists or validation error, skip test
-        console.log(`⏭️  High Create failed for ${className}: ${errorMsg}, skipping test`);
+        testLogger.info(`⏭️  High Create failed for ${className}: ${errorMsg}, skipping test`);
         return;
       }
 
       if (createResponse.isError) {
         const errorMsg = createResponse.content[0]?.text || 'Unknown error';
-        console.log(`⏭️  High Create failed for ${className}: ${errorMsg}, skipping test`);
+        testLogger.info(`⏭️  High Create failed for ${className}: ${errorMsg}, skipping test`);
         return;
       }
 
@@ -130,13 +130,13 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
       expect(createData.success).toBe(true);
       expect(createData.class_name).toBe(className);
       expect(createData.behavior_definition).toBe(behaviorDefinition);
-      console.log(`✅ High Create: Created behavior implementation ${className} successfully`);
+      testLogger.success(`✅ High Create: Created behavior implementation ${className} successfully`);
 
       await delay(getOperationDelay('create', testCase));
 
       // Step 2: Test UpdateBehaviorImplementation (High-Level)
       if (testCase.params.update_source_code) {
-        console.log(`📝 High Update: Updating behavior implementation ${className}...`);
+        testLogger.info(`📝 High Update: Updating behavior implementation ${className}...`);
         const updatedImplementationCode = testCase.params.update_source_code;
 
         let updateResponse;
@@ -150,28 +150,28 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
           });
         } catch (error: any) {
           const errorMsg = error.message || String(error);
-          console.log(`⏭️  High Update failed for ${className}: ${errorMsg}, skipping update test`);
+          testLogger.info(`⏭️  High Update failed for ${className}: ${errorMsg}, skipping update test`);
           return;
         }
 
         if (updateResponse.isError) {
           const errorMsg = updateResponse.content[0]?.text || 'Unknown error';
-          console.log(`⏭️  High Update failed for ${className}: ${errorMsg}, skipping update test`);
+          testLogger.info(`⏭️  High Update failed for ${className}: ${errorMsg}, skipping update test`);
           return;
         }
 
         const updateData = parseHandlerResponse(updateResponse);
         expect(updateData.success).toBe(true);
         expect(updateData.class_name).toBe(className);
-        console.log(`✅ High Update: Updated behavior implementation ${className} successfully`);
+        testLogger.success(`✅ High Update: Updated behavior implementation ${className} successfully`);
         await delay(getOperationDelay('update', testCase));
       }
 
       await delay(getOperationDelay('update', testCase));
-      console.log(`✅ Full high-level workflow completed successfully for ${className}`);
+      testLogger.success(`✅ Full high-level workflow completed successfully for ${className}`);
 
     } catch (error: any) {
-      console.error(`❌ Test failed: ${error.message}`);
+      testLogger.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
       // Cleanup: Optionally delete test behavior implementation
@@ -187,19 +187,18 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
             });
 
             if (!deleteResponse.isError) {
-              console.log(`🧹 Cleaned up test behavior implementation: ${className}`);
+              testLogger.info(`🧹 Cleaned up test behavior implementation: ${className}`);
             } else {
               const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-              console.warn(`⚠️  Failed to delete behavior implementation ${className}: ${errorMsg}`);
+              testLogger.warn(`⚠️  Failed to delete behavior implementation ${className}: ${errorMsg}`);
             }
           } else {
-            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
+            testLogger.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
           }
         } catch (cleanupError) {
-          console.warn(`⚠️  Failed to cleanup test behavior implementation ${className}: ${cleanupError}`);
+          testLogger.warn(`⚠️  Failed to cleanup test behavior implementation ${className}: ${cleanupError}`);
         }
       }
     }
   }, getTimeout('long'));
 });
-

@@ -38,9 +38,12 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
+
+const testLogger = createTestLogger('structure-high');
 
 
 describe('Structure High-Level Handlers Integration', () => {
@@ -54,7 +57,7 @@ describe('Structure High-Level Handlers Integration', () => {
       hasConfig = true;
     } catch (error) {
       if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
-        console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+        testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       }
       hasConfig = false;
     }
@@ -62,14 +65,14 @@ describe('Structure High-Level Handlers Integration', () => {
 
   it('should test all Structure high-level handlers', async () => {
     if (!hasConfig || !session) {
-      console.log('⏭️  Skipping test: No configuration or session');
+      testLogger.info('⏭️  Skipping test: No configuration or session');
       return;
     }
 
     // Get test case configuration
     const testCase = getEnabledTestCase('create_structure', 'builder_structure');
     if (!testCase) {
-      console.log('⏭️  Skipping test: No test case configuration');
+      testLogger.info('⏭️  Skipping test: No test case configuration');
       return;
     }
 
@@ -103,7 +106,7 @@ describe('Structure High-Level Handlers Integration', () => {
         const errorMsg = error.message || String(error);
         // If structure already exists, that's okay - we'll skip test
         if (errorMsg.includes('already exists') || errorMsg.includes('InvalidObjName')) {
-          console.log(`⏭️  Structure ${structureName} already exists, skipping test`);
+          testLogger.info(`⏭️  Structure ${structureName} already exists, skipping test`);
           return;
         }
         throw error;
@@ -124,7 +127,7 @@ describe('Structure High-Level Handlers Integration', () => {
       });
 
       await delay(getOperationDelay('create', testCase));
-      console.log(`✅ High-level structure creation completed successfully for ${structureName}`);
+      testLogger.info(`✅ High-level structure creation completed successfully for ${structureName}`);
 
       // Step 2: Test UpdateStructure (High-Level)
       if (testCase.params.update_ddl_code) {
@@ -154,11 +157,11 @@ describe('Structure High-Level Handlers Integration', () => {
         });
 
         await delay(getOperationDelay('update', testCase));
-        console.log(`✅ High-level structure update completed successfully for ${structureName}`);
+        testLogger.info(`✅ High-level structure update completed successfully for ${structureName}`);
       }
 
     } catch (error: any) {
-      console.error(`❌ Test failed: ${error.message}`);
+      testLogger.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
       // Cleanup: Optionally delete test structure
@@ -174,19 +177,18 @@ describe('Structure High-Level Handlers Integration', () => {
             });
 
             if (!deleteResponse.isError) {
-              console.log(`🧹 Cleaned up test structure: ${structureName}`);
+              testLogger.info(`🧹 Cleaned up test structure: ${structureName}`);
             } else {
               const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-              console.warn(`⚠️  Failed to delete structure ${structureName}: ${errorMsg}`);
+              testLogger.warn(`⚠️  Failed to delete structure ${structureName}: ${errorMsg}`);
             }
           } else {
-            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${structureName}`);
+            testLogger.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${structureName}`);
           }
         } catch (cleanupError) {
-          console.warn(`⚠️  Failed to cleanup test structure ${structureName}: ${cleanupError}`);
+          testLogger.warn(`⚠️  Failed to cleanup test structure ${structureName}: ${cleanupError}`);
         }
       }
     }
   }, getTimeout('long'));
 });
-

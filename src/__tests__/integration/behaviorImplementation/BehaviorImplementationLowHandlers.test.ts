@@ -45,9 +45,12 @@ import {
   getCleanupAfter
 } from '../helpers/configHelpers';
 import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
+
+const testLogger = createTestLogger('bimpl-low');
 
 describe('BehaviorImplementation Low-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;
@@ -58,9 +61,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
       session = await getTestSession();
       hasConfig = true;
     } catch (error) {
-      if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
-        console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      }
+      testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -90,7 +91,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
           hasTestCase: !!testCase,
           hasTestClassName: !!testClassName
         });
-        console.log('⏭️  Skipping test: No configuration or test case');
+        testLogger.info('⏭️  Skipping test: No configuration or test case');
         return;
       }
 
@@ -119,7 +120,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
       try {
         // Step 1: Validate
-        console.log(`🔍 Step 1: Validating ${className}...`);
+        testLogger.info(`🔍 Step 1: Validating ${className}...`);
         const validateResponse = await handleValidateBehaviorImplementation({
           class_name: className,
           behavior_definition: behaviorDefinition,
@@ -131,22 +132,22 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         if (validateResponse.isError) {
           const errorMsg = validateResponse.content[0]?.text || 'Unknown error';
-          console.log(`⏭️  Validation error for ${className}: ${errorMsg}, skipping test`);
+          testLogger.info(`⏭️  Validation error for ${className}: ${errorMsg}, skipping test`);
           return;
         }
 
         const validateData = parseHandlerResponse(validateResponse);
         if (!validateData.validation_result?.valid) {
           const message = validateData.validation_result?.message || '';
-          console.log(`⏭️  Validation failed for ${className}: ${message}, skipping test`);
+          testLogger.info(`⏭️  Validation failed for ${className}: ${message}, skipping test`);
           return;
         }
 
         session = updateSessionFromResponse(session, validateData);
-        console.log(`✅ Step 1: Validation successful for ${className}`);
+        testLogger.success(`✅ Step 1: Validation successful for ${className}`);
 
         // Step 2: Create (as regular class first)
-        console.log(`📦 Step 2: Creating ${className}...`);
+        testLogger.info(`📦 Step 2: Creating ${className}...`);
         const createArgs: any = {
           class_name: className,
           description,
@@ -163,7 +164,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
         if (createResponse.isError) {
           const errorMsg = createResponse.content[0]?.text || 'Unknown error';
           if (errorMsg.includes('already exists') || errorMsg.includes('does already exist')) {
-            console.log(`⏭️  BehaviorImplementation ${className} already exists, skipping test`);
+            testLogger.info(`⏭️  BehaviorImplementation ${className} already exists, skipping test`);
             return;
           }
           throw new Error(`Create failed: ${errorMsg}`);
@@ -175,13 +176,13 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         // Mark that object was successfully created
         objectWasCreated = true;
-        console.log(`✅ Step 2: Created ${className} successfully`);
+        testLogger.success(`✅ Step 2: Created ${className} successfully`);
 
         session = updateSessionFromResponse(session, createData);
         await delay(getOperationDelay('create', testCase));
 
         // Step 3: Check
-        console.log(`🔍 Step 3: Checking ${className}...`);
+        testLogger.info(`🔍 Step 3: Checking ${className}...`);
         const checkResponse = await handleCheckClass({
           class_name: className,
           session_id: session.session_id,
@@ -194,12 +195,12 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         const checkData = parseHandlerResponse(checkResponse);
         expect(checkData.success).toBeDefined();
-        console.log(`✅ Step 3: Check successful for ${className}`);
+        testLogger.success(`✅ Step 3: Check successful for ${className}`);
 
         await delay(getOperationDelay('create', testCase));
 
         // Step 4: Lock
-        console.log(`🔒 Step 4: Locking ${className}...`);
+        testLogger.info(`🔒 Step 4: Locking ${className}...`);
         const lockResponse = await handleLockBehaviorImplementation({
           class_name: className,
           session_id: session.session_id,
@@ -219,7 +220,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         lockHandleForCleanup = lockHandle;
         lockSessionForCleanup = lockSession;
-        console.log(`✅ Step 4: Locked ${className} successfully`);
+        testLogger.success(`✅ Step 4: Locked ${className} successfully`);
 
         diagnosticsTracker.persistLock(lockSession, lockHandle, {
           object_type: 'CLAS',
@@ -230,7 +231,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
         await delay(getOperationDelay('lock', testCase));
 
         // Step 5: Update implementations include (local handler class)
-        console.log(`📝 Step 5: Updating implementations include for ${className}...`);
+        testLogger.info(`📝 Step 5: Updating implementations include for ${className}...`);
         if (!testCase.params.implementation_code) {
           throw new Error('implementation_code is required in test configuration for update step (implementations include)');
         }
@@ -259,12 +260,12 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
           implementationCode: implementationCode
         }, lockHandle);
 
-        console.log(`✅ Step 5: Updated implementations include for ${className} successfully`);
+        testLogger.success(`✅ Step 5: Updated implementations include for ${className} successfully`);
 
         await delay(getOperationDelay('update', testCase));
 
         // Step 6: Unlock
-        console.log(`🔓 Step 6: Unlocking ${className}...`);
+        testLogger.info(`🔓 Step 6: Unlocking ${className}...`);
         const unlockResponse = await handleUnlockClass({
           class_name: className,
           lock_handle: lockHandle,
@@ -278,13 +279,13 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         const unlockData = parseHandlerResponse(unlockResponse);
         expect(unlockData.success).toBe(true);
-        console.log(`✅ Step 6: Unlocked ${className} successfully`);
+        testLogger.success(`✅ Step 6: Unlocked ${className} successfully`);
 
         session = updateSessionFromResponse(session, unlockData);
         await delay(getOperationDelay('unlock', testCase));
 
         // Step 7: Activate
-        console.log(`⚡ Step 7: Activating ${className}...`);
+        testLogger.info(`⚡ Step 7: Activating ${className}...`);
         const activateResponse = await handleActivateClass({
           class_name: className,
           session_id: session.session_id,
@@ -297,16 +298,16 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         const activateData = parseHandlerResponse(activateResponse);
         if (!activateData.success) {
-          console.error(`❌ Activation failed. Response data:`, JSON.stringify(activateData, null, 2));
+          testLogger.error(`❌ Activation failed. Response data: ${JSON.stringify(activateData, null, 2)}`);
           throw new Error(`Activation failed: ${JSON.stringify(activateData)}`);
         }
         expect(activateData.success).toBe(true);
-        console.log(`✅ Step 7: Activated ${className} successfully`);
+        testLogger.success(`✅ Step 7: Activated ${className} successfully`);
 
-        console.log(`✅ Full workflow completed successfully for ${className}`);
+        testLogger.success(`✅ Full workflow completed successfully for ${className}`);
 
       } catch (error: any) {
-        console.error(`❌ Test failed: ${error.message}`);
+        testLogger.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
         // Cleanup: only if object was actually created in this test run
@@ -340,7 +341,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
                 transport_request: transportRequest
               });
               if (!deleteResponse.isError) {
-                console.log(`🧹 Cleaned up test behavior implementation: ${className}`);
+                testLogger.info(`🧹 Cleaned up test behavior implementation: ${className}`);
               } else {
                 // Check if object doesn't exist (404) - that's okay, it may have been deleted already
                 const errorMsg = deleteResponse.content[0]?.text || '';
@@ -348,11 +349,11 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
                   // Object doesn't exist - that's fine, no need to log error
                 } else {
                   // Other error - log but don't fail test
-                  console.warn(`⚠️  Failed to delete behavior implementation ${className}: ${errorMsg}`);
+                  testLogger.warn(`⚠️  Failed to delete behavior implementation ${className}: ${errorMsg}`);
                 }
               }
             } else {
-              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
+              testLogger.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
             }
           } catch (cleanupError: any) {
             // Ignore cleanup errors - object may not exist or may have been deleted already

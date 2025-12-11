@@ -47,9 +47,12 @@ import {
   getCleanupAfter
 } from '../helpers/configHelpers';
 import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
+
+const testLogger = createTestLogger('bdef-low');
 
 describe('BehaviorDefinition Low-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;
@@ -60,9 +63,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
       session = await getTestSession();
       hasConfig = true;
     } catch (error) {
-      if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
-        console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      }
+      testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -92,7 +93,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
           hasTestCase: !!testCase,
           hasTestBdefName: !!testBdefName
         });
-        console.log('⏭️  Skipping test: No configuration or test case');
+        testLogger.info('⏭️  Skipping test: No configuration or test case');
         return;
       }
 
@@ -126,7 +127,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
 
       try {
         // Step 1: Validate
-        console.log(`🔍 Step 1: Validating ${bdefName}...`);
+        testLogger.info(`🔍 Step 1: Validating ${bdefName}...`);
         const validateResponse = await handleValidateBehaviorDefinition({
           name: bdefName,
           root_entity: rootEntity,
@@ -139,7 +140,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
 
         if (validateResponse.isError) {
           const errorMsg = validateResponse.content[0]?.text || 'Unknown error';
-          console.log(`⏭️  Validation error for ${bdefName}: ${errorMsg}, skipping test`);
+          testLogger.info(`⏭️  Validation error for ${bdefName}: ${errorMsg}, skipping test`);
           return;
         }
 
@@ -147,15 +148,15 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
 
         if (!validateData.validation_result?.valid) {
           const message = validateData.validation_result?.message || '';
-          console.log(`⏭️  Validation failed for ${bdefName}: ${message}, skipping test`);
+          testLogger.info(`⏭️  Validation failed for ${bdefName}: ${message}, skipping test`);
           return;
         }
 
         session = updateSessionFromResponse(session, validateData);
-        console.log(`✅ Step 1: Validation successful for ${bdefName}`);
+        testLogger.success(`✅ Step 1: Validation successful for ${bdefName}`);
 
         // Step 2: Create
-        console.log(`📦 Step 2: Creating ${bdefName}...`);
+        testLogger.info(`📦 Step 2: Creating ${bdefName}...`);
         const createArgs: any = {
           name: bdefName,
           description,
@@ -174,7 +175,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
         if (createResponse.isError) {
           const errorMsg = createResponse.content[0]?.text || 'Unknown error';
           if (errorMsg.includes('already exists') || errorMsg.includes('does already exist')) {
-            console.log(`⏭️  BehaviorDefinition ${bdefName} already exists, skipping test`);
+            testLogger.info(`⏭️  BehaviorDefinition ${bdefName} already exists, skipping test`);
             return;
           }
           throw new Error(`Create failed: ${errorMsg}`);
@@ -186,13 +187,13 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
 
         // Mark that object was successfully created
         objectWasCreated = true;
-        console.log(`✅ Step 2: Created ${bdefName} successfully`);
+        testLogger.success(`✅ Step 2: Created ${bdefName} successfully`);
 
         session = updateSessionFromResponse(session, createData);
         await delay(getOperationDelay('create', testCase));
 
         // Step 3: Lock
-        console.log(`🔒 Step 3: Locking ${bdefName}...`);
+        testLogger.info(`🔒 Step 3: Locking ${bdefName}...`);
         const lockResponse = await handleLockBehaviorDefinition({
           name: bdefName,
           session_id: session.session_id,
@@ -212,7 +213,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
 
         lockHandleForCleanup = lockHandle;
         lockSessionForCleanup = lockSession;
-        console.log(`✅ Step 3: Locked ${bdefName} successfully`);
+        testLogger.success(`✅ Step 3: Locked ${bdefName} successfully`);
 
         diagnosticsTracker.persistLock(lockSession, lockHandle, {
           object_type: 'BDEF',
@@ -223,7 +224,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
         await delay(getOperationDelay('lock', testCase));
 
         // Step 4: Update
-        console.log(`📝 Step 4: Updating ${bdefName}...`);
+        testLogger.info(`📝 Step 4: Updating ${bdefName}...`);
         if (!testCase.params.source_code) {
           throw new Error('source_code is required in test configuration for update step');
         }
@@ -244,12 +245,12 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
         const updateData = parseHandlerResponse(updateResponse);
         expect(updateData.success).toBe(true);
         expect(updateData.session_id).toBe(lockSession.session_id);
-        console.log(`✅ Step 4: Updated ${bdefName} successfully`);
+        testLogger.success(`✅ Step 4: Updated ${bdefName} successfully`);
 
         await delay(getOperationDelay('update', testCase));
 
         // Step 5: Unlock
-        console.log(`🔓 Step 5: Unlocking ${bdefName}...`);
+        testLogger.info(`🔓 Step 5: Unlocking ${bdefName}...`);
         const unlockResponse = await handleUnlockBehaviorDefinition({
           name: bdefName,
           lock_handle: lockHandle,
@@ -264,13 +265,13 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
         const unlockData = parseHandlerResponse(unlockResponse);
         expect(unlockData.success).toBe(true);
         expect(unlockData.session_id).toBe(lockSession.session_id);
-        console.log(`✅ Step 5: Unlocked ${bdefName} successfully`);
+        testLogger.success(`✅ Step 5: Unlocked ${bdefName} successfully`);
 
         session = updateSessionFromResponse(session, unlockData);
         await delay(getOperationDelay('unlock', testCase));
 
         // Step 6: Activate
-        console.log(`⚡ Step 6: Activating ${bdefName}...`);
+        testLogger.info(`⚡ Step 6: Activating ${bdefName}...`);
         const activateResponse = await handleActivateBehaviorDefinition({
           name: bdefName,
           session_id: session.session_id,
@@ -283,12 +284,11 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
 
         const activateData = parseHandlerResponse(activateResponse);
         expect(activateData.success).toBe(true);
-        console.log(`✅ Step 6: Activated ${bdefName} successfully`);
-
-        console.log(`✅ Full workflow completed successfully for ${bdefName}`);
+        testLogger.success(`✅ Step 6: Activated ${bdefName} successfully`);
+        testLogger.success(`✅ Full workflow completed successfully for ${bdefName}`);
 
       } catch (error: any) {
-        console.error(`❌ Test failed: ${error.message}`);
+        testLogger.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
         // Cleanup: only if object was actually created in this test run
@@ -327,7 +327,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
               });
 
               if (!deleteResponse.isError) {
-                console.log(`🧹 Cleaned up test behavior definition: ${bdefName}`);
+                testLogger.info(`🧹 Cleaned up test behavior definition: ${bdefName}`);
               } else {
                 // Check if object doesn't exist (404) - that's okay, it may have been deleted already
                 const errorMsg = deleteResponse.content[0]?.text || '';
@@ -335,11 +335,11 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
                   // Object doesn't exist - that's fine, no need to log error
                 } else {
                   // Other error - log but don't fail test
-                  console.warn(`⚠️  Failed to delete behavior definition ${bdefName}: ${errorMsg}`);
+                  testLogger.warn(`⚠️  Failed to delete behavior definition ${bdefName}: ${errorMsg}`);
                 }
               }
             } else {
-              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${bdefName}`);
+              testLogger.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${bdefName}`);
             }
           } catch (cleanupError: any) {
             // Ignore cleanup errors - object may not exist or may have been deleted already

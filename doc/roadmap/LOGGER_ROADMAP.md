@@ -33,9 +33,9 @@
 - [x] Transport handlers (high/low)
 
 ## Test Migration Checklist (replace console with logger)
-- [ ] Integration helpers: `sessionHelpers.ts`, `testHelpers.ts`, `authHelpers.ts`, `configHelpers.ts`
-- [ ] Behavior Definition integration suites (high/low)
-- [ ] Behavior Implementation integration suites (high/low)
+- [x] Integration helpers: `sessionHelpers.ts`, `testHelpers.ts`, `authHelpers.ts`, `configHelpers.ts`
+- [x] Behavior Definition integration suites (high/low)
+- [x] Behavior Implementation integration suites (high/low)
 - [ ] Class integration suites (high/low + unit-test flows)
 - [ ] Data Element integration suites (high/low)
 - [ ] Domain integration suites (high/low)
@@ -44,8 +44,9 @@
 - [ ] Metadata Extension (DDLX) integration suites (high/low)
 - [ ] Package integration suites (high/low)
 - [ ] Program integration suites (high/low)
-- [ ] Service Definition integration suites (high/low)
+- [x] Service Definition integration suites (high/low)
 - [ ] Structure integration suites (high/low)
 - [ ] Table integration suites (high/low)
 - [ ] View (CDS) integration suites (high/low)
 - [ ] Utility/system integration suites (search/object info/describe/etc.)
+- [x] Function integration suites (high/low)

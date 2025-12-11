@@ -112,6 +112,17 @@ For each handler needing migration:
 - [ ] Add `await connection.connect()`
 - [ ] Add `finally` block with `connection.reset()`
 
+### Pending migration targets (use createAbapConnection)
+- [ ] behavior_definition/high: `handleCreateBehaviorDefinition`, `handleUpdateBehaviorDefinition`
+- [ ] behavior_implementation/high: `handleCreateBehaviorImplementation`, `handleUpdateBehaviorImplementation`
+- [ ] data_element/high: `handleCreateDataElement`, `handleUpdateDataElement`
+- [ ] ddlx/high: `handleCreateMetadataExtension`, `handleUpdateMetadataExtension`
+- [ ] domain/high: `handleCreateDomain`, `handleUpdateDomain`
+- [ ] function/high: `handleCreateFunctionGroup`, `handleUpdateFunctionGroup`, `handleCreateFunctionModule`, `handleUpdateFunctionModule`
+- [ ] package/high: `handleCreatePackage`
+- [ ] service_definition/high: `handleCreateServiceDefinition`, `handleUpdateServiceDefinition`
+- [ ] transport/high: `handleCreateTransport`
+
 ---
 
 ## Priorities

@@ -4,8 +4,7 @@
  * Uses validateTableName from @mcp-abap-adt/adt-clients/core/table for table-specific validation.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { TableBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
@@ -83,11 +82,7 @@ export async function handleValidateTable(args: ValidateTableArgs) {
 
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -112,7 +107,7 @@ export async function handleValidateTable(args: ValidateTableArgs) {
       const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
-      const updatedSessionState = connection.getSessionState();
+
 
       handlerLogger.info(`✅ ValidateTable completed: ${tableName}`);
       handlerLogger.info(`   Valid: ${result.valid}, Message: ${result.message || 'N/A'}`);
@@ -124,11 +119,7 @@ export async function handleValidateTable(args: ValidateTableArgs) {
           description: description || null,
           validation_result: result,
           session_id: session_id || null,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: result.valid
             ? `Table name ${tableName} is valid and available`
             : `Table name ${tableName} validation failed: ${result.message || 'Unknown error'}`

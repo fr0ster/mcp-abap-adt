@@ -5,8 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -155,11 +154,7 @@ export async function handleRunClassUnitTests(args: RunClassUnitTestsArgs) {
     const client = new CrudClient(connection);
 
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       await connection.connect();
     }
@@ -186,7 +181,7 @@ export async function handleRunClassUnitTests(args: RunClassUnitTestsArgs) {
       await client.runClassUnitTests(formattedTests, options);
       const runResponse = client.getAbapUnitRunResponse();
       const runId = client.getAbapUnitRunId();
-      const updatedSessionState = connection.getSessionState();
+
 
       if (!runId) {
         throw new Error('Failed to obtain ABAP Unit run identifier from SAP response headers');
@@ -201,11 +196,7 @@ export async function handleRunClassUnitTests(args: RunClassUnitTestsArgs) {
           status_code: runResponse?.status,
           location: runResponse?.headers?.['location'] || runResponse?.headers?.['content-location'] || null,
           session_id: session_id || null,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `ABAP Unit run started. Use GetClassUnitTestStatusLow and GetClassUnitTestResultLow with run_id ${runId}.`
         }, null, 2)
       } as AxiosResponse);

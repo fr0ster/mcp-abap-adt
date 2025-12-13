@@ -5,8 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -81,11 +80,7 @@ export async function handleUnlockClass(args: UnlockClassArgs) {
 
     // Restore session state if provided
     if (session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -105,7 +100,7 @@ export async function handleUnlockClass(args: UnlockClassArgs) {
       }
 
       // Get updated session state after unlock
-      const updatedSessionState = connection.getSessionState();
+
 
       handlerLogger.info(`✅ UnlockClass completed: ${className}`);
 
@@ -114,11 +109,7 @@ export async function handleUnlockClass(args: UnlockClassArgs) {
           success: true,
           class_name: className,
           session_id: session_id,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `Class ${className} unlocked successfully.`
         }, null, 2)
       } as AxiosResponse);

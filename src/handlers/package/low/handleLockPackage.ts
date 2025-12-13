@@ -105,7 +105,7 @@ export async function handleLockPackage(args: LockPackageArgs) {
       }
 
       // Get updated session state after lock
-      const updatedSessionState = connection.getSessionState();
+      
 
       // Get actual session ID from connection (may be different from input if new session was created)
       // Connection.getSessionId() returns the current session ID used by the connection
@@ -121,11 +121,7 @@ export async function handleLockPackage(args: LockPackageArgs) {
           super_package: superPackage,
           session_id: actualSessionId,
           lock_handle: lockHandle,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `Package ${packageName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`
         }, null, 2)
       } as AxiosResponse);

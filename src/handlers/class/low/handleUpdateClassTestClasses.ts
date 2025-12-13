@@ -5,8 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -80,11 +79,7 @@ export async function handleUpdateClassTestClasses(args: UpdateClassTestClassesA
     const client = new CrudClient(connection);
 
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       await connection.connect();
     }
@@ -98,7 +93,7 @@ export async function handleUpdateClassTestClasses(args: UpdateClassTestClassesA
         testClassCode: test_class_source
       }, lock_handle);
       const updateResult = client.getTestClassUpdateResult();
-      const updatedSessionState = connection.getSessionState();
+
 
       handlerLogger.info(`✅ UpdateClassTestClasses completed: ${className}`);
 
@@ -108,11 +103,7 @@ export async function handleUpdateClassTestClasses(args: UpdateClassTestClassesA
           class_name: className,
           session_id: session_id || null,
           status: updateResult?.status,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `Test classes for ${className} updated successfully. Remember to unlock using UnlockClassTestClassesLow.`
         }, null, 2)
       } as AxiosResponse);

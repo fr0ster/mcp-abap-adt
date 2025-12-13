@@ -46,9 +46,12 @@ import {
   getCleanupAfter
 } from '../helpers/configHelpers';
 import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
+
+const testLogger = createTestLogger('dataelement-low');
 
 describe('DataElement Low-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;
@@ -61,7 +64,7 @@ describe('DataElement Low-Level Handlers Integration', () => {
       hasConfig = true;
     } catch (error) {
       if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
-        console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+        testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       }
       hasConfig = false;
     }
@@ -97,7 +100,7 @@ describe('DataElement Low-Level Handlers Integration', () => {
           hasTestCase: !!testCase,
           hasTestDataElementName: !!testDataElementName
         });
-        console.log('⏭️  Skipping test: No configuration or test case');
+        testLogger.info('⏭️  Skipping test: No configuration or test case');
         return;
       }
 
@@ -139,7 +142,7 @@ describe('DataElement Low-Level Handlers Integration', () => {
           });
           // If data element already exists, that's okay - we'll skip creation
           if (errorMsg.includes('already exists')) {
-            console.log(`⏭️  DataElement ${dataElementName} already exists, skipping test`);
+            testLogger.info(`⏭️  DataElement ${dataElementName} already exists, skipping test`);
             return;
           }
           throw new Error(`Validation failed: ${errorMsg}`);
@@ -161,12 +164,12 @@ describe('DataElement Low-Level Handlers Integration', () => {
               messageLower.includes('already exists') ||
               messageLower.includes('does already exist') ||
               messageLower.includes('resource') && messageLower.includes('exist')) {
-            console.log(`⏭️  DataElement ${dataElementName} already exists, skipping test`);
+            testLogger.info(`⏭️  DataElement ${dataElementName} already exists, skipping test`);
             return;
           }
           // For validation failures with status 400, it might be that validation is not fully supported
           // or object exists - try to continue and see if create fails with "already exists"
-          console.warn(`⚠️  Validation failed for ${dataElementName}: ${message}. Will attempt create and handle if object exists...`);
+          testLogger.warn(`⚠️  Validation failed for ${dataElementName}: ${message}. Will attempt create and handle if object exists...`);
         }
 
         // Update session from validation response
@@ -206,7 +209,7 @@ describe('DataElement Low-Level Handlers Integration', () => {
           });
           // If data element already exists, that's okay - we'll skip the rest of the test
           if (errorMsg.includes('already exists') || errorMsg.includes('does already exist')) {
-            console.log(`⏭️  DataElement ${dataElementName} already exists, skipping test`);
+            testLogger.info(`⏭️  DataElement ${dataElementName} already exists, skipping test`);
             return;
           }
           throw new Error(`Create failed: ${errorMsg}`);
@@ -376,7 +379,7 @@ describe('DataElement Low-Level Handlers Integration', () => {
           dataElementName,
           steps_completed: ['validate', 'create', 'lock', 'update', 'unlock', 'activate']
         });
-        console.log(`✅ Full workflow completed successfully for ${dataElementName}`);
+        testLogger.info(`✅ Full workflow completed successfully for ${dataElementName}`);
 
       } catch (error: any) {
         debugLog('TEST_ERROR', `Test failed: ${error.message}`, {
@@ -384,7 +387,7 @@ describe('DataElement Low-Level Handlers Integration', () => {
           stack: error.stack,
           dataElementName
         });
-        console.error(`❌ Test failed: ${error.message}`);
+        testLogger.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
         // Cleanup: Unlock and optionally delete test data element
@@ -428,7 +431,7 @@ describe('DataElement Low-Level Handlers Integration', () => {
 
               if (!deleteResponse.isError) {
                 debugLog('CLEANUP', `Successfully deleted test data element: ${dataElementName}`);
-                console.log(`🧹 Cleaned up test data element: ${dataElementName}`);
+                testLogger.info(`🧹 Cleaned up test data element: ${dataElementName}`);
               } else {
                 const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
                 debugLog('CLEANUP', `Failed to delete test data element: ${dataElementName}`, {
@@ -437,13 +440,13 @@ describe('DataElement Low-Level Handlers Integration', () => {
               }
             } else {
               debugLog('CLEANUP', `Cleanup skipped (cleanup_after=false) - object left for analysis: ${dataElementName}`);
-              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${dataElementName}`);
+              testLogger.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${dataElementName}`);
             }
           } catch (cleanupError) {
             debugLog('CLEANUP_ERROR', `Failed to cleanup test data element ${dataElementName}`, {
               error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
             });
-            console.warn(`⚠️  Failed to cleanup test data element ${dataElementName}: ${cleanupError}`);
+            testLogger.warn(`⚠️  Failed to cleanup test data element ${dataElementName}: ${cleanupError}`);
           }
         }
 

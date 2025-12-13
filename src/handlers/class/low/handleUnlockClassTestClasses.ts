@@ -5,8 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -74,11 +73,7 @@ export async function handleUnlockClassTestClasses(args: UnlockClassTestClassesA
     const client = new CrudClient(connection);
 
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       await connection.connect();
     }
@@ -88,7 +83,7 @@ export async function handleUnlockClassTestClasses(args: UnlockClassTestClassesA
 
     try {
       await client.unlockTestClasses({ className }, lock_handle);
-      const updatedSessionState = connection.getSessionState();
+
 
       handlerLogger.info(`✅ UnlockClassTestClasses completed: ${className}`);
 
@@ -97,11 +92,7 @@ export async function handleUnlockClassTestClasses(args: UnlockClassTestClassesA
           success: true,
           class_name: className,
           session_id: session_id || null,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `Test classes for ${className} unlocked successfully.`
         }, null, 2)
       } as AxiosResponse);

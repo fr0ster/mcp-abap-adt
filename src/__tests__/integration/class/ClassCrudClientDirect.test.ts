@@ -30,9 +30,12 @@ import {
 } from '../helpers/configHelpers';
 import { debugLog, delay, DEBUG_TESTS } from '../helpers/testHelpers';
 import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
+
+const testLogger = createTestLogger('class-crud-direct');
 
 describe('Class CrudClient Direct (Reference Implementation)', () => {
   let hasConfig = false;
@@ -46,13 +49,13 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
 
   it('should create class using CrudClient directly (reference implementation)', async () => {
     if (!hasConfig) {
-      console.log('⏭️  Skipping test: No SAP configuration');
+      testLogger.info('⏭️  Skipping test: No SAP configuration');
       return;
     }
 
     const testCase = getEnabledTestCase('create_class_direct', 'crud_direct');
     if (!testCase) {
-      console.log('⏭️  Skipping test: Test case not enabled');
+      testLogger.info('⏭️  Skipping test: Test case not enabled');
       return;
     }
 
@@ -85,7 +88,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
         const connConfig = connectionWithRefresh.getConfig();
         const canRefresh = connectionWithRefresh.canRefreshToken();
         if (process.env.DEBUG_TESTS === 'true') {
-          console.log(`[DEBUG] Test connection - Connection refresh token check:`, {
+          testLogger.debug(`[DEBUG] Test connection - Connection refresh token check:`, {
             canRefresh,
             hasRefreshToken: !!(connConfig?.refreshToken),
             hasUaaUrl: !!(connConfig?.uaaUrl),
@@ -123,7 +126,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.warn('⚠️ Skipping test: Failed to create connection', errorMessage);
+      testLogger.warn('⚠️ Skipping test: Failed to create connection', errorMessage);
       return;
     }
 
@@ -133,7 +136,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
     // But our helper takes testCase, so we pass testCase
     const packageName = resolvePackageName(testCase);
     if (!packageName) {
-      console.log('⏭️  Skipping test: package_name not configured');
+      testLogger.info('⏭️  Skipping test: package_name not configured');
       if (connection) {
         connection.reset();
       }
@@ -148,7 +151,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
 
     // Log parameters read from test case (only if DEBUG_TESTS is enabled)
     if (process.env.DEBUG_TESTS === 'true') {
-      console.log(`[DEBUG] Test case parameters read:`, {
+      testLogger.debug(`[DEBUG] Test case parameters read:`, {
         class_name: testCase.params.class_name,
         className,
         package_name: testCase.params.package_name,
@@ -166,7 +169,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
 
     // Pre-check: Verify test parameters
     if (!client) {
-      console.log('⏭️  Skipping test: Client not initialized');
+      testLogger.info('⏭️  Skipping test: Client not initialized');
       if (connection) {
         connection.reset();
       }
@@ -180,7 +183,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       'CrudClient direct test'
     );
     if (!preCheckResult.success) {
-      console.log(`⏭️  Skipping test: ${preCheckResult.reason}`);
+      testLogger.info(`⏭️  Skipping test: ${preCheckResult.reason}`);
       if (connection) {
         connection.reset();
       }
@@ -229,7 +232,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
         const errorData = typeof validateResponse?.data === 'string'
           ? validateResponse.data
           : JSON.stringify(validateResponse?.data);
-        console.error(`Validation failed (HTTP ${validateResponse?.status}): ${errorData}`);
+        testLogger.error(`Validation failed (HTTP ${validateResponse?.status}): ${errorData}`);
       }
       expect(validateResponse?.status).toBe(200);
 
@@ -248,7 +251,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
           const connConfig = connectionWithRefresh.getConfig();
         const canRefresh = connectionWithRefresh.canRefreshToken();
         if (process.env.DEBUG_TESTS === 'true') {
-          console.log(`[DEBUG] Before createClass - Connection refresh check:`, {
+          testLogger.debug(`[DEBUG] Before createClass - Connection refresh check:`, {
             canRefresh,
               hasRefreshToken: !!(connConfig?.refreshToken),
               hasUaaUrl: !!(connConfig?.uaaUrl),
@@ -270,8 +273,8 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
         createProtected: testCase.params.create_protected as boolean | undefined
       };
       if (process.env.DEBUG_TESTS === 'true') {
-        console.log(`[DEBUG] CrudClient.createClass - Parameters:`, JSON.stringify(createParams, null, 2));
-        console.log(`[DEBUG] CrudClient.createClass - Test case params:`, {
+        testLogger.debug(`[DEBUG] CrudClient.createClass - Parameters:`, JSON.stringify(createParams, null, 2));
+        testLogger.debug(`[DEBUG] CrudClient.createClass - Test case params:`, {
           superclass: testCase.params.superclass,
           final: testCase.params.final,
           abstract: testCase.params.abstract,
@@ -288,7 +291,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       } catch (createError: any) {
         // Log error details for debugging (only if DEBUG_TESTS is enabled)
         if (process.env.DEBUG_TESTS === 'true') {
-          console.error(`[DEBUG] createClass error:`, {
+          testLogger.error(`[DEBUG] createClass error:`, {
             message: createError.message,
             status: createError.response?.status,
             statusText: createError.response?.statusText,
@@ -327,7 +330,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
         className
       };
       if (process.env.DEBUG_TESTS === 'true') {
-        console.log(`[DEBUG] CrudClient.checkClass - Parameters:`, JSON.stringify(checkParams, null, 2));
+        testLogger.debug(`[DEBUG] CrudClient.checkClass - Parameters:`, JSON.stringify(checkParams, null, 2));
       }
       if (!client) {
         throw new Error('Client not initialized');
@@ -347,7 +350,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
         error: errorMessage,
         stack: error.stack?.substring(0, 500)
       });
-      console.error(`❌ CrudClient direct test failed: ${errorMessage}`);
+      testLogger.error(`❌ CrudClient direct test failed: ${errorMessage}`);
       throw error;
     } finally {
       // Cleanup: Reset connection created for this test
@@ -382,13 +385,13 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
               class_created: classCreated
             });
           } else {
-            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
+            testLogger.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`);
           }
         } catch (cleanupError: any) {
           debugLog('CLEANUP_ERROR', `Exception during cleanup: ${cleanupError}`, {
             error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
           });
-          console.warn(`⚠️  Failed to cleanup test class ${className}: ${cleanupError.message}`);
+          testLogger.warn(`⚠️  Failed to cleanup test class ${className}: ${cleanupError.message}`);
         }
       }
 

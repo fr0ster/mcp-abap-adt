@@ -117,7 +117,7 @@ describe('Class Low-Level Handlers Integration', () => {
         hasTestCase: !!testCase,
         hasTestClassName: !!testClassName
       });
-      console.log('⏭️  Skipping test: No configuration or test case');
+      suiteLogger.info('⏭️  Skipping test: No configuration or test case');
       return;
     }
 
@@ -294,7 +294,7 @@ describe('Class Low-Level Handlers Integration', () => {
           const validationMessage = validateData.validation_result?.message || 'Validation failed';
           const exists = validateData.validation_result?.exists ? ' (object already exists)' : '';
           const skipReason = `ValidateClass operation for class ${className} failed validation${exists}: ${validationMessage}`;
-          console.log(`⏭️  SKIP: ${skipReason}`);
+          suiteLogger.info(`⏭️  SKIP: ${skipReason}`);
           // Throw error to mark test as failed (not passed) when validation fails
           // This prevents test from being marked as "passed" when it should be skipped
           throw new Error(`SKIP: ${skipReason}`);
@@ -598,7 +598,7 @@ ENDCLASS.`;
             debugLog('CLEANUP_ON_ERROR', `Failed to unlock class ${className} after error`, {
               unlockError: unlockError instanceof Error ? unlockError.message : String(unlockError)
             });
-            console.error('Failed to unlock class after error:', unlockError);
+            suiteLogger.error('Failed to unlock class after error:', unlockError);
           }
         }
 
@@ -614,7 +614,7 @@ ENDCLASS.`;
           error: error.message,
           stack: error.stack?.substring(0, 500) // Limit stack trace length
         });
-        console.error(`❌ Test failed: ${error.message}`);
+        suiteLogger.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
         // Cleanup: Reset connection created for this test

@@ -5,8 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -96,9 +95,8 @@ export async function handleUnlockDomain(args: UnlockDomainArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
 
       // Verify session was restored
-      const restoredState = connection.getSessionState();
       handlerLogger.info(
-        `Session state restored (conn session ${connection.getSessionId()}): cookies=${restoredState?.cookies?.length || 0}, csrf=${restoredState?.csrfToken?.length || 0}, store_keys=${restoredState?.cookieStore ? Object.keys(restoredState.cookieStore).length : 0}`
+        `Session state restored (conn session ${connection.getSessionId()})`
       );
     } else {
       handlerLogger.warn('No session state provided (may fail if domain is locked)');
@@ -118,12 +116,7 @@ export async function handleUnlockDomain(args: UnlockDomainArgs) {
         throw new Error(`Unlock did not return a response for domain ${domainName}`);
       }
 
-      // Get updated session state after unlock
-      const updatedSessionState = connection.getSessionState();
-
-      handlerLogger.info(
-        `Unlock completed for ${domainName}; cookies=${updatedSessionState?.cookies?.length || 0}, csrf=${updatedSessionState?.csrfToken?.length || 0}, store_keys=${updatedSessionState?.cookieStore ? Object.keys(updatedSessionState.cookieStore).length : 0}`
-      );
+      // Session state management is now handled by auth-broker
 
       handlerLogger.info(`✅ UnlockDomain completed: ${domainName}`);
 
@@ -132,11 +125,7 @@ export async function handleUnlockDomain(args: UnlockDomainArgs) {
           success: true,
           domain_name: domainName,
           session_id: session_id,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `Domain ${domainName} unlocked successfully.`
         }, null, 2)
       } as AxiosResponse);

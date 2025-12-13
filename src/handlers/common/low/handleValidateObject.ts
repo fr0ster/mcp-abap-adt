@@ -5,8 +5,7 @@
  * Connection management handled internally.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, logErrorSafely } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, logErrorSafely, restoreSessionInConnection } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -120,11 +119,7 @@ export async function handleValidateObject(args: ValidateObjectArgs) {
 
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -318,7 +313,7 @@ export async function handleValidateObject(args: ValidateObjectArgs) {
       }
 
       // Get updated session state after validation
-      const updatedSessionState = connection.getSessionState();
+
 
       handlerLogger.info(`✅ ValidateObject completed: ${objectName}`);
       handlerLogger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
@@ -330,11 +325,7 @@ export async function handleValidateObject(args: ValidateObjectArgs) {
           object_type,
           validation_result: result,
           session_id: session_id || null,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: result.valid
             ? `Object name ${objectName} is valid and available`
             : `Object name ${objectName} validation failed: ${result.message}`

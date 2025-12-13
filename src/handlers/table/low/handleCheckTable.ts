@@ -5,8 +5,7 @@
  * Requires session_id for stateful operations.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
@@ -103,11 +102,7 @@ export async function handleCheckTable(args: CheckTableArgs) {
 
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -134,7 +129,7 @@ export async function handleCheckTable(args: CheckTableArgs) {
       const checkResult = parseCheckRunResponse(response);
 
       // Get updated session state after check
-      const updatedSessionState = connection.getSessionState();
+
 
       handlerLogger.info(`✅ CheckTable completed: ${tableName}`);
       handlerLogger.info(`   Status: ${checkResult.status}`);
@@ -148,11 +143,7 @@ export async function handleCheckTable(args: CheckTableArgs) {
           reporter: checkReporter,
           check_result: checkResult,
           session_id: sessionId,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: checkResult.success
             ? `Table ${tableName} has no syntax errors`
             : `Table ${tableName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`

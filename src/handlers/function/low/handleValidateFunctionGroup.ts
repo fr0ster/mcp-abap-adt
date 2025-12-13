@@ -5,8 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -81,11 +80,7 @@ export async function handleValidateFunctionGroup(args: ValidateFunctionGroupArg
 
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -110,7 +105,7 @@ export async function handleValidateFunctionGroup(args: ValidateFunctionGroupArg
       const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
-      const updatedSessionState = connection.getSessionState();
+
 
       handlerLogger.info(`✅ ValidateFunctionGroup completed: ${functionGroupName} (valid=${result.valid})`);
 
@@ -120,11 +115,7 @@ export async function handleValidateFunctionGroup(args: ValidateFunctionGroupArg
           function_group_name: functionGroupName,
           validation_result: result,
           session_id: session_id || null,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: result.valid
             ? `FunctionGroup name ${functionGroupName} is valid and available`
             : `FunctionGroup name ${functionGroupName} validation failed: ${result.message}`

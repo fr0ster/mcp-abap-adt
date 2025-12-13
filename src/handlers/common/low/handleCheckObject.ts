@@ -3,8 +3,7 @@
  * Uses CrudClient check methods per object type.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
@@ -71,11 +70,7 @@ export async function handleCheckObject(args: CheckObjectArgs) {
     const client = new CrudClient(connection);
 
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       await connection.connect();
     }
@@ -128,7 +123,7 @@ export async function handleCheckObject(args: CheckObjectArgs) {
       }
 
       const checkResult = parseCheckRunResponse(response);
-      const updatedSessionState = connection.getSessionState();
+      
 
       handlerLogger.info(`✅ CheckObject completed: ${objectName}`);
       handlerLogger.info(`   Status: ${checkResult.status}`);
@@ -142,11 +137,7 @@ export async function handleCheckObject(args: CheckObjectArgs) {
           version: checkVersion,
           check_result: checkResult,
           session_id: session_id || null,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: checkResult.success
             ? `Object ${objectName} has no syntax errors`
             : `Object ${objectName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`

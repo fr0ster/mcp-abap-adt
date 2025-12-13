@@ -8,7 +8,6 @@ import {
   sapConfigSignature,
   getTimeout,
   getTimeoutConfig,
-  FileSessionStorage,
 } from "@mcp-abap-adt/connection";
 import { encodeSapObjectName } from "@mcp-abap-adt/adt-clients";
 import { loggerAdapter } from "./loggerAdapter";
@@ -47,20 +46,8 @@ export const sessionContext = new AsyncLocalStorage<{
 
 // Session storage for stateful sessions (persists cookies and CSRF tokens)
 // Only enabled if MCP_ENABLE_SESSION_STORAGE=true or MCP_SESSION_DIR is set
-// When disabled, each request creates a fresh connection (stateless mode)
-let sessionStorage: FileSessionStorage | undefined;
-
-if (process.env.MCP_ENABLE_SESSION_STORAGE === 'true' || process.env.MCP_SESSION_DIR) {
-  const sessionDir = process.env.MCP_SESSION_DIR || path.join(os.tmpdir(), 'mcp-abap-adt-sessions');
-  sessionStorage = new FileSessionStorage({
-    sessionDir: sessionDir,
-    createDir: true,
-    prettyPrint: false
-  });
-  logger.info(`Session storage enabled: ${sessionDir}`);
-} else {
-  logger.info('Session storage disabled (stateless mode)');
-}
+// Session storage is now handled by @mcp-abap-adt/auth-broker package
+// Connection package no longer supports session storage parameter
 
 // Fixed session ID for server connection (allows session persistence across requests)
 const SERVER_SESSION_ID = 'mcp-abap-adt-session';
@@ -436,15 +423,14 @@ function getConnectionForSession(sessionId: string, config: SapConfig, destinati
 
     // Create new connection with unique session ID per client session
     const connectionSessionId = `mcp-abap-adt-session-${sessionId}`;
-    let connection = createAbapConnection(config, loggerAdapter, sessionStorage, connectionSessionId);
+    let connection = createAbapConnection(config, loggerAdapter, connectionSessionId);
 
     // Wrap connection to intercept refreshToken() for destination-based authentication
     connection = createDestinationAwareConnection(connection, destination);
 
     // Don't call enableStatefulSession during module import - it may trigger connection attempts
-    // Session ID and storage are already set via createAbapConnection() constructor
+    // Session ID is already set via createAbapConnection() constructor
     // enableStatefulSession() will be called lazily when first request is made (if needed)
-    // The connection is already in stateful mode if sessionStorage is provided to constructor
 
     // Don't call connect() here - it will be called lazily on first request
     // This prevents unnecessary connection attempts during module import (e.g., in Jest tests)
@@ -555,7 +541,7 @@ export function getManagedConnection(): AbapConnection {
     const fallbackSessionId = `mcp-abap-adt-fallback-${randomUUID()}`;
     connectionManagerLogger.debug(`[DEBUG] getManagedConnection - Creating fallback connection with unique session ID: ${fallbackSessionId.substring(0, 32)}...`);
 
-    cachedConnection = createAbapConnection(config, loggerAdapter, sessionStorage, fallbackSessionId);
+    cachedConnection = createAbapConnection(config, loggerAdapter, fallbackSessionId);
 
     // Verify connection has access to refresh token
     const connectionWithRefresh = cachedConnection as any;
@@ -572,9 +558,8 @@ export function getManagedConnection(): AbapConnection {
     cachedConfigSignature = signature;
 
     // Don't call enableStatefulSession during module import - it may trigger connection attempts
-    // Session ID and storage are already set via createAbapConnection() constructor
+    // Session ID is already set via createAbapConnection() constructor
     // enableStatefulSession() will be called lazily when first request is made (if needed)
-    // The connection is already in stateful mode if sessionStorage is provided to constructor
 
     // Don't call connect() here - it will be called lazily on first request
     // This prevents unnecessary connection attempts during module import (e.g., in Jest tests)
@@ -616,58 +601,31 @@ export function removeConnectionForSession(sessionId: string, config?: SapConfig
 }
 
 /**
- * Restore session state in connection using enableStatefulSession
- * This ensures connection properly manages session ID and loads/saves session state
+ * Restore session state in connection
+ * Note: Session state management (getSessionState/setSessionState) was removed in connection 0.2.0
+ * Session state persistence is now handled by @mcp-abap-adt/auth-broker package
+ * This function now only sets session type to stateful and session ID
  */
 export async function restoreSessionInConnection(
   connection: AbapConnection,
   sessionId: string,
   sessionState: { cookies?: string | null; csrf_token?: string | null; cookie_store?: Record<string, string> }
 ): Promise<void> {
-  // Cast to access enableStatefulSession (not in interface but available in implementation)
+  // Cast to access internal methods (not in interface but available in implementation)
   const connectionWithStateful = connection as any;
 
-  if (!connectionWithStateful.enableStatefulSession) {
-    // Fallback: just set session state manually
-    connection.setSessionState({
-      cookies: sessionState.cookies || null,
-      csrfToken: sessionState.csrf_token || null,
-      cookieStore: sessionState.cookie_store || {}
-    });
-    return;
-  }
-
-  // First, set session state manually (in case storage doesn't have it)
-  connection.setSessionState({
-    cookies: sessionState.cookies ?? null,
-    csrfToken: sessionState.csrf_token ?? null,
-    cookieStore: sessionState.cookie_store ?? {}
-  });
-
-  // Then enable stateful session - this will:
-  // 1. Set sessionId in connection (via setSessionId or constructor)
-  // 2. Set session storage (via setSessionStorage)
-  // 3. Load from storage (if exists, will override our setSessionState)
-  // 4. Enable stateful mode
   try {
     // Set session ID first (if not already set via constructor)
     if (connectionWithStateful.setSessionId) {
       connectionWithStateful.setSessionId(sessionId);
     }
-    // Set session storage (this will load existing state if available)
-    if (sessionStorage && connectionWithStateful.setSessionStorage) {
-      await connectionWithStateful.setSessionStorage(sessionStorage);
-    }
-    // Enable stateful session mode
-    if (connectionWithStateful.enableStatefulSession) {
-      connectionWithStateful.enableStatefulSession();
-    }
+    // Enable stateful session mode (adds x-sap-adt-sessiontype: stateful header)
+    connection.setSessionType("stateful");
   } catch (error: any) {
-    logger.warn("Failed to enable stateful session during restore", {
+    logger.warn("Failed to restore session in connection", {
       sessionId,
       error: error instanceof Error ? error.message : String(error)
     });
-    // If enableStatefulSession fails, at least we have setSessionState
   }
 }
 
@@ -678,7 +636,7 @@ export function setConfigOverride(override?: SapConfig) {
   });
   overrideConfig = override;
   disposeConnection(overrideConnection);
-  overrideConnection = override ? createAbapConnection(override, loggerAdapter) : undefined;
+  overrideConnection = override ? createAbapConnection(override, loggerAdapter, undefined) : undefined;
 
   // Reset shared connection so that it will be re-created lazily with fresh config
   disposeConnection(cachedConnection);

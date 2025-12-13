@@ -46,9 +46,12 @@ import {
   getCleanupAfter
 } from '../helpers/configHelpers';
 import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
+
+const testLogger = createTestLogger('domain-low');
 
 describe('Domain Low-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;
@@ -61,7 +64,7 @@ describe('Domain Low-Level Handlers Integration', () => {
       hasConfig = true;
     } catch (error) {
       if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
-        console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+        testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       }
       hasConfig = false;
     }
@@ -97,7 +100,7 @@ describe('Domain Low-Level Handlers Integration', () => {
           hasTestCase: !!testCase,
           hasTestDomainName: !!testDomainName
         });
-        console.log('⏭️  Skipping test: No configuration or test case');
+        testLogger.info('⏭️  Skipping test: No configuration or test case');
         return;
       }
 
@@ -144,7 +147,7 @@ describe('Domain Low-Level Handlers Integration', () => {
           // If domain already exists, that's okay - we'll skip creation
           // Cleanup will be done in finally block
           if (errorMsg.includes('already exists')) {
-            console.log(`⏭️  Domain ${domainName} already exists, skipping test`);
+            testLogger.info(`⏭️  Domain ${domainName} already exists, skipping test`);
             return;
           }
           throw new Error(`Validation failed: ${errorMsg}`);
@@ -385,7 +388,7 @@ describe('Domain Low-Level Handlers Integration', () => {
           domainName,
           steps_completed: ['validate', 'create', 'lock', 'update', 'unlock', 'activate']
         });
-        console.log(`✅ Full workflow completed successfully for ${domainName}`);
+        testLogger.info(`✅ Full workflow completed successfully for ${domainName}`);
 
       } catch (error: any) {
         debugLog('TEST_ERROR', `Test failed: ${error.message}`, {
@@ -393,7 +396,7 @@ describe('Domain Low-Level Handlers Integration', () => {
           stack: error.stack,
           domainName
         });
-        console.error(`❌ Test failed: ${error.message}`);
+        testLogger.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
         // Cleanup: Unlock and optionally delete test domain
@@ -421,7 +424,7 @@ describe('Domain Low-Level Handlers Integration', () => {
                 debugLog('CLEANUP', `Successfully unlocked domain ${domainName}`);
               } catch (unlockError: any) {
                 // If unlock fails, try to get new lock and unlock
-                console.warn(`⚠️  Failed to unlock with saved handle, trying to get new lock: ${unlockError.message}`);
+                testLogger.warn(`⚠️  Failed to unlock with saved handle, trying to get new lock: ${unlockError.message}`);
                 try {
                   const lockResponse = await handleLockDomain({
                     domain_name: domainName,
@@ -442,7 +445,7 @@ describe('Domain Low-Level Handlers Integration', () => {
                     debugLog('CLEANUP', `Successfully unlocked domain ${domainName} with new lock`);
                   }
                 } catch (e) {
-                  console.warn(`⚠️  Failed to unlock domain ${domainName} during cleanup: ${e}`);
+                  testLogger.warn(`⚠️  Failed to unlock domain ${domainName} during cleanup: ${e}`);
                 }
               }
             } else {
@@ -467,7 +470,7 @@ describe('Domain Low-Level Handlers Integration', () => {
                 }
               } catch (e) {
                 // Ignore unlock errors during cleanup
-                console.warn(`⚠️  Could not unlock domain ${domainName} during cleanup: ${e}`);
+                testLogger.warn(`⚠️  Could not unlock domain ${domainName} during cleanup: ${e}`);
               }
             }
 
@@ -485,23 +488,23 @@ describe('Domain Low-Level Handlers Integration', () => {
 
               if (!deleteResponse.isError) {
                 debugLog('CLEANUP', `Successfully deleted test domain: ${domainName}`);
-                console.log(`🧹 Cleaned up test domain: ${domainName}`);
+                testLogger.info(`🧹 Cleaned up test domain: ${domainName}`);
               } else {
                 const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
                 debugLog('CLEANUP_ERROR', `Failed to delete domain ${domainName}`, {
                   error: errorMsg
                 });
-                console.warn(`⚠️  Failed to delete domain ${domainName}: ${errorMsg}`);
+                testLogger.warn(`⚠️  Failed to delete domain ${domainName}: ${errorMsg}`);
               }
             } else {
               debugLog('CLEANUP', `Cleanup skipped (cleanup_after=false) - object left for analysis: ${domainName}`);
-              console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${domainName}`);
+              testLogger.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${domainName}`);
             }
           } catch (cleanupError: any) {
             debugLog('CLEANUP_ERROR', `Failed to cleanup test domain ${domainName}`, {
               error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
             });
-            console.warn(`⚠️  Failed to cleanup test domain ${domainName}: ${cleanupError.message || cleanupError}`);
+            testLogger.warn(`⚠️  Failed to cleanup test domain ${domainName}: ${cleanupError.message || cleanupError}`);
           }
         }
 

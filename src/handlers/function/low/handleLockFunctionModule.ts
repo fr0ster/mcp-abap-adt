@@ -102,7 +102,7 @@ export async function handleLockFunctionModule(args: LockFunctionModuleArgs) {
       }
 
       // Get updated session state after lock
-      const updatedSessionState = connection.getSessionState();
+      
 
       handlerLogger.info(`✅ LockFunctionModule completed: ${functionModuleName}`);
       handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
@@ -114,11 +114,7 @@ export async function handleLockFunctionModule(args: LockFunctionModuleArgs) {
           function_group_name: functionGroupName,
           session_id: session_id || null,
           lock_handle: lockHandle,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `Function module ${functionModuleName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`
         }, null, 2)
       } as AxiosResponse);

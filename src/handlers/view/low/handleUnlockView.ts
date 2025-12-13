@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -81,12 +81,8 @@ export async function handleUnlockView(args: UnlockViewArgs) {
     const client = new CrudClient(connection);
 
     // Restore session state if provided
-    if (session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+    if (session_id && session_state) {
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -106,7 +102,7 @@ export async function handleUnlockView(args: UnlockViewArgs) {
       }
 
       // Get updated session state after unlock
-      const updatedSessionState = connection.getSessionState();
+
 
       handlerLogger.info(`✅ UnlockView completed: ${viewName}`);
 
@@ -115,11 +111,7 @@ export async function handleUnlockView(args: UnlockViewArgs) {
           success: true,
           view_name: viewName,
           session_id: session_id,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `View ${viewName} unlocked successfully.`
         }, null, 2)
       } as AxiosResponse);

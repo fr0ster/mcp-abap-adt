@@ -151,7 +151,7 @@ export async function handleCreateClass(args: CreateClassArgs) {
       }
 
       // Get updated session state after create
-      const updatedSessionState = connection.getSessionState();
+      
 
       handlerLogger.info(`✅ CreateClass completed: ${className}`);
 
@@ -163,11 +163,7 @@ export async function handleCreateClass(args: CreateClassArgs) {
           package_name: package_name,
           transport_request: transport_request || null,
           session_id: session_id || null,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `Class ${className} created successfully. Use LockObject and UpdateClass to add source code, then UnlockObject and ActivateObject.`
         }, null, 2)
       } as AxiosResponse);

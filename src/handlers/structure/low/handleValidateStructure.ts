@@ -5,8 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -87,11 +86,7 @@ export async function handleValidateStructure(args: ValidateStructureArgs) {
 
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -115,7 +110,7 @@ export async function handleValidateStructure(args: ValidateStructureArgs) {
       const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
-      const updatedSessionState = connection.getSessionState();
+
 
       handlerLogger.info(`✅ ValidateStructure completed: ${structureName}`);
       handlerLogger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
@@ -126,11 +121,7 @@ export async function handleValidateStructure(args: ValidateStructureArgs) {
           structure_name: structureName,
           validation_result: result,
           session_id: session_id || null,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: result.valid
             ? `Structure name ${structureName} is valid and available`
             : `Structure name ${structureName} validation failed: ${result.message}`

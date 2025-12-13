@@ -42,10 +42,12 @@ import {
   getSapConfigFromEnv
 } from '../helpers/configHelpers';
 import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
 const logLine = (msg: string) => process.stdout.write(`${msg}\n`);
+const testLogger = createTestLogger('class-high');
 
 function logStepError(step: string, error: any) {
   const msg = error?.message || String(error);
@@ -69,13 +71,13 @@ describe('Class High-Level Handlers Integration', () => {
 
   it('should test all Class high-level handlers', async () => {
     if (!hasConfig) {
-      console.log('⏭️  Skipping test: No SAP configuration');
+      testLogger.info('⏭️  Skipping test: No SAP configuration');
       return;
     }
 
     const testCase = getEnabledTestCase('create_class', 'builder_class');
     if (!testCase) {
-      console.log('⏭️  Skipping test: No test case configuration');
+      testLogger.info('⏭️  Skipping test: No test case configuration');
       return;
     }
 
@@ -161,7 +163,7 @@ ENDCLASS.`;
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.warn('⚠️ Skipping test: Failed to create connection', errorMessage);
+      testLogger.warn('⚠️ Skipping test: Failed to create connection', errorMessage);
       return;
     }
 
@@ -228,7 +230,7 @@ ENDCLASS.`;
         if (errorMsg.includes('already exists') || errorMsg.includes('InvalidObjName')) {
           const reason = errorMsg.includes('already exists') ? ' (object already exists)' : ' (validation failed)';
           const skipReason = `CreateClass operation for class ${className} failed validation${reason}: ${errorMsg}`;
-          console.log(`⏭️  SKIP: ${skipReason}`);
+          testLogger.info(`⏭️  SKIP: ${skipReason}`);
           // Throw error to mark test as failed (not passed) when validation fails
           // This prevents test from being marked as "passed" when it should be skipped
           throw new Error(`SKIP: ${skipReason}`);
@@ -253,7 +255,7 @@ ENDCLASS.`;
             ? ' (object already exists)'
             : ' (validation failed)';
           const skipReason = `CreateClass operation for class ${className} failed validation${reason}: ${errorMsg}`;
-          console.log(`⏭️  SKIP: ${skipReason}`);
+          testLogger.info(`⏭️  SKIP: ${skipReason}`);
           // Throw error to mark test as failed (not passed) when validation fails
           // This prevents test from being marked as "passed" when it should be skipped
           throw new Error(`SKIP: ${skipReason}`);
@@ -341,7 +343,7 @@ ENDCLASS.`;
         if (errorMsg.includes('already exists') || errorMsg.includes('InvalidObjName') || errorMsg.includes('not found')) {
           const reason = errorMsg.includes('not found') ? ' (class does not exist)' : ' (validation failed)';
           const skipReason = `UpdateClass operation for class ${className} failed${reason}: ${errorMsg}`;
-          console.log(`⏭️  SKIP: ${skipReason}`);
+          testLogger.info(`⏭️  SKIP: ${skipReason}`);
           // Throw error to mark test as failed (not passed) when validation fails
           // This prevents test from being marked as "passed" when it should be skipped
           throw new Error(`SKIP: ${skipReason}`);
@@ -355,7 +357,7 @@ ENDCLASS.`;
         // If class doesn't exist (500 error with "does not exist" message), skip test
         if (errorMsg.includes('does not exist') || errorMsg.includes('not found')) {
           const skipReason = `UpdateClass operation for class ${className} failed (class does not exist): ${errorMsg}`;
-          console.log(`⏭️  SKIP: ${skipReason}`);
+          testLogger.info(`⏭️  SKIP: ${skipReason}`);
           throw new Error(`SKIP: ${skipReason}`);
         }
         throw new Error(`Update failed: ${errorMsg}`);
@@ -389,7 +391,7 @@ ENDCLASS.`;
         error: error.message,
         stack: error.stack?.substring(0, 500) // Limit stack trace length
       });
-      console.error(`❌ Test failed: ${error.message}`);
+      testLogger.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
       // Cleanup: Reset connection created for this test
@@ -435,7 +437,7 @@ ENDCLASS.`;
                     await client.unlockClass({ className });
                   }
                   debugLog('CLEANUP', `Successfully unlocked class ${className} (cleanup safety net)`);
-                  console.log(`🔓 Unlocked class ${className} (cleanup safety net)`);
+                  testLogger.info(`🔓 Unlocked class ${className} (cleanup safety net)`);
                 } catch (unlockErr: any) {
                   // If unlock fails, it might be already unlocked - this is OK
                   debugLog('CLEANUP', `Unlock attempt completed (may already be unlocked): ${className}`, {

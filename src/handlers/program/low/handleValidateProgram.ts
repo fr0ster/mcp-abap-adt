@@ -5,8 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, isCloudConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, isCloudConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -92,11 +91,7 @@ export async function handleValidateProgram(args: ValidateProgramArgs) {
 
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -120,7 +115,7 @@ export async function handleValidateProgram(args: ValidateProgramArgs) {
       const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
-      const updatedSessionState = connection.getSessionState();
+
 
       handlerLogger.info(`✅ ValidateProgram completed: ${programName} (valid=${result.valid})`);
 
@@ -130,11 +125,7 @@ export async function handleValidateProgram(args: ValidateProgramArgs) {
           program_name: programName,
           validation_result: result,
           session_id: session_id || null,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: result.valid
             ? `Program name ${programName} is valid and available`
             : `Program name ${programName} validation failed: ${result.message}`

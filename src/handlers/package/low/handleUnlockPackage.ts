@@ -119,7 +119,7 @@ export async function handleUnlockPackage(args: UnlockPackageArgs) {
       }
 
       // Get updated session state after unlock
-      const updatedSessionState = connection.getSessionState();
+      
 
       handlerLogger.info(`✅ UnlockPackage completed: ${packageName}`);
 
@@ -129,11 +129,7 @@ export async function handleUnlockPackage(args: UnlockPackageArgs) {
           package_name: packageName,
           super_package: superPackage,
           session_id: session_id,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `Package ${packageName} unlocked successfully.`
         }, null, 2)
       } as AxiosResponse);

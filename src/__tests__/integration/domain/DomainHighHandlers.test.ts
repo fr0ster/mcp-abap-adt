@@ -38,9 +38,12 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
+
+const testLogger = createTestLogger('domain-high');
 
 describe('Domain High-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;
@@ -53,7 +56,7 @@ describe('Domain High-Level Handlers Integration', () => {
       hasConfig = true;
     } catch (error) {
       if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
-        console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+        testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       }
       hasConfig = false;
     }
@@ -61,14 +64,14 @@ describe('Domain High-Level Handlers Integration', () => {
 
   it('should test all Domain high-level handlers', async () => {
     if (!hasConfig || !session) {
-      console.log('⏭️  Skipping test: No configuration or session');
+      testLogger.info('⏭️  Skipping test: No configuration or session');
       return;
     }
 
     // Get test case configuration
     const testCase = getEnabledTestCase('create_domain', 'builder_domain');
     if (!testCase) {
-      console.log('⏭️  Skipping test: No test case configuration');
+      testLogger.info('⏭️  Skipping test: No test case configuration');
       return;
     }
 
@@ -79,7 +82,7 @@ describe('Domain High-Level Handlers Integration', () => {
 
     try {
       // Step 1: Test CreateDomain (High-Level)
-      console.log(`📦 High Create: Creating domain ${domainName}...`);
+      testLogger.info(`📦 High Create: Creating domain ${domainName}...`);
       let createResponse;
       try {
         createResponse = await handleCreateDomain({
@@ -97,7 +100,7 @@ describe('Domain High-Level Handlers Integration', () => {
         const errorMsg = error.message || String(error);
         // If domain already exists, that's okay - we'll skip test
         if (errorMsg.includes('already exists') || errorMsg.includes('InvalidObjName')) {
-          console.log(`⏭️  Domain ${domainName} already exists, skipping test`);
+          testLogger.info(`⏭️  Domain ${domainName} already exists, skipping test`);
           return;
         }
         throw error;
@@ -105,7 +108,7 @@ describe('Domain High-Level Handlers Integration', () => {
 
       if (createResponse.isError) {
         const errorMsg = createResponse.content[0]?.text || 'Unknown error';
-        console.log(`⏭️  High Create failed for ${domainName}: ${errorMsg}, skipping test`);
+        testLogger.info(`⏭️  High Create failed for ${domainName}: ${errorMsg}, skipping test`);
         return;
       }
 
@@ -114,10 +117,10 @@ describe('Domain High-Level Handlers Integration', () => {
       expect(createData.domain_name).toBe(domainName);
 
       await delay(getOperationDelay('create', testCase));
-      console.log(`✅ High Create: Created domain ${domainName} successfully`);
+      testLogger.info(`✅ High Create: Created domain ${domainName} successfully`);
 
       // Step 2: Test UpdateDomain (High-Level)
-      console.log(`📝 High Update: Updating domain ${domainName}...`);
+      testLogger.info(`📝 High Update: Updating domain ${domainName}...`);
       let updateResponse;
       try {
         updateResponse = await handleUpdateDomain({
@@ -134,13 +137,13 @@ describe('Domain High-Level Handlers Integration', () => {
       } catch (error: any) {
         const errorMsg = error.message || String(error);
         // If update fails, just exit without checks
-        console.log(`⏭️  High Update failed for ${domainName}: ${errorMsg}, skipping test`);
+        testLogger.info(`⏭️  High Update failed for ${domainName}: ${errorMsg}, skipping test`);
           return;
       }
 
       if (updateResponse.isError) {
         const errorMsg = updateResponse.content[0]?.text || 'Unknown error';
-        console.log(`⏭️  High Update failed for ${domainName}: ${errorMsg}, skipping test`);
+        testLogger.info(`⏭️  High Update failed for ${domainName}: ${errorMsg}, skipping test`);
         return;
       }
 
@@ -149,11 +152,11 @@ describe('Domain High-Level Handlers Integration', () => {
       expect(updateData.domain_name).toBe(domainName);
 
       await delay(getOperationDelay('update', testCase));
-      console.log(`✅ High Update: Updated domain ${domainName} successfully`);
-      console.log(`✅ Full high-level workflow completed successfully for ${domainName}`);
+      testLogger.info(`✅ High Update: Updated domain ${domainName} successfully`);
+      testLogger.info(`✅ Full high-level workflow completed successfully for ${domainName}`);
 
     } catch (error: any) {
-      console.error(`❌ Test failed: ${error.message}`);
+      testLogger.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
       // Cleanup: Optionally delete test domain
@@ -169,16 +172,16 @@ describe('Domain High-Level Handlers Integration', () => {
             });
 
             if (!deleteResponse.isError) {
-              console.log(`🧹 Cleaned up test domain: ${domainName}`);
+              testLogger.info(`🧹 Cleaned up test domain: ${domainName}`);
             } else {
               const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-              console.warn(`⚠️  Failed to delete domain ${domainName}: ${errorMsg}`);
+              testLogger.warn(`⚠️  Failed to delete domain ${domainName}: ${errorMsg}`);
             }
           } else {
-            console.log(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${domainName}`);
+            testLogger.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${domainName}`);
           }
         } catch (cleanupError) {
-          console.warn(`⚠️  Failed to cleanup test domain ${domainName}: ${cleanupError}`);
+          testLogger.warn(`⚠️  Failed to cleanup test domain ${domainName}: ${cleanupError}`);
         }
       }
     }

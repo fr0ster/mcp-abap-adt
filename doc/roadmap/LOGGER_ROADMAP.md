@@ -36,9 +36,9 @@
 - [x] Integration helpers: `sessionHelpers.ts`, `testHelpers.ts`, `authHelpers.ts`, `configHelpers.ts`
 - [x] Behavior Definition integration suites (high/low)
 - [x] Behavior Implementation integration suites (high/low)
-- [ ] Class integration suites (high/low + unit-test flows)
-- [ ] Data Element integration suites (high/low)
-- [ ] Domain integration suites (high/low)
+- [x] Class integration suites (high/low + unit-test flows)
+- [x] Data Element integration suites (high/low)
+- [x] Domain integration suites (high/low)
 - [ ] Function Group / Function Module integration suites (high/low)
 - [ ] Interface integration suites (high/low)
 - [ ] Metadata Extension (DDLX) integration suites (high/low)

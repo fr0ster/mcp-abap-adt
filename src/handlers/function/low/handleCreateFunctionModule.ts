@@ -5,8 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -99,11 +98,7 @@ export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs)
 
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -131,7 +126,7 @@ export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs)
       }
 
       // Get updated session state after create
-      const updatedSessionState = connection.getSessionState();
+
 
       handlerLogger.info(`✅ CreateFunctionModule completed: ${functionModuleName}`);
 
@@ -144,11 +139,7 @@ export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs)
           package_name: package_name,
           transport_request: transport_request || null,
           session_id: session_id || null,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `Function module ${functionModuleName} created successfully. Use LockFunctionModule and UpdateFunctionModule to add source code, then UnlockFunctionModule and ActivateObject.`
         }, null, 2)
       } as AxiosResponse);

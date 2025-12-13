@@ -5,8 +5,7 @@
  * to other handlers to maintain the same session and lock handle across operations.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -51,24 +50,14 @@ export async function handleGetSession(args: GetSessionArgs) {
     // Generate new session ID
     const sessionId = generateSessionId();
 
-    // Get current session state (cookies, CSRF token)
-    const sessionState = connection.getSessionState();
-
-    if (!sessionState) {
-      return return_error(new Error('Failed to get session state. Connection may not be properly initialized.'));
-    }
-
+    // Session state management is now handled by auth-broker
     handlerLogger.info(`✅ GetSession completed: session ID ${sessionId.substring(0, 8)}...`);
 
     return return_response({
       data: JSON.stringify({
         success: true,
         session_id: sessionId,
-        session_state: {
-          cookies: sessionState.cookies,
-          csrf_token: sessionState.csrfToken,
-          cookie_store: sessionState.cookieStore
-        },
+        session_state: null, // Session state management is now handled by auth-broker
         message: `Session ID generated. Use this session_id in subsequent requests to maintain the same session.`
       }, null, 2)
     } as AxiosResponse);

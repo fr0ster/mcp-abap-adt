@@ -5,8 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { TableBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
@@ -91,11 +90,7 @@ export async function handleCreateTable(args: CreateTableArgs) {
 
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -121,7 +116,7 @@ export async function handleCreateTable(args: CreateTableArgs) {
       }
 
       // Get updated session state after create
-      const updatedSessionState = connection.getSessionState();
+      
 
       handlerLogger.info(`✅ CreateTable completed: ${tableName}`);
 
@@ -132,11 +127,7 @@ export async function handleCreateTable(args: CreateTableArgs) {
           package_name: package_name,
           transport_request: transport_request || null,
           session_id: session_id || null,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `Table ${tableName} created successfully. Use LockTable and UpdateTable to add source code, then UnlockTable and ActivateObject.`
         }, null, 2)
       } as AxiosResponse);

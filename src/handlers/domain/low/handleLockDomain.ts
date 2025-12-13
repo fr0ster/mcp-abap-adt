@@ -97,7 +97,7 @@ export async function handleLockDomain(args: LockDomainArgs) {
         throw new Error(`Lock did not return a lock handle for domain ${domainName}`);
       }
 
-      const updatedSessionState = connection.getSessionState();
+      
 
       // Get actual session ID from connection (may be different from input if new session was created)
       const actualSessionId = connection.getSessionId() || session_id || null;
@@ -111,11 +111,7 @@ export async function handleLockDomain(args: LockDomainArgs) {
           domain_name: domainName,
           session_id: actualSessionId,
           lock_handle: lockHandle,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `Domain ${domainName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`
         }, null, 2)
       } as AxiosResponse);

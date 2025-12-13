@@ -114,7 +114,7 @@ export async function handleUpdateDomain(args: UpdateDomainArgs) {
       }
 
       // Get updated session state after update
-      const updatedSessionState = connection.getSessionState();
+      
 
       handlerLogger.info(`✅ UpdateDomain completed: ${domainName}`);
 
@@ -123,11 +123,7 @@ export async function handleUpdateDomain(args: UpdateDomainArgs) {
           success: true,
           domain_name: domainName,
           session_id: session_id || null,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `Domain ${domainName} updated successfully. Remember to unlock using UnlockObject.`
         }, null, 2)
       } as AxiosResponse);

@@ -5,8 +5,7 @@
  * Supports package, description, and superclass validation.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger, getManagedConnection, parseValidationResponse } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger } from '../../../lib/handlerLogger';
 
@@ -85,11 +84,7 @@ export async function handleValidateClass(args: ValidateClassArgs) {
 
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -137,7 +132,7 @@ export async function handleValidateClass(args: ValidateClassArgs) {
       const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
-      const updatedSessionState = connection.getSessionState();
+
 
       handlerLogger.info(`✅ ValidateClass completed: ${className}`);
       handlerLogger.debug(`Result: valid=${result.valid}, message=${result.message || 'N/A'}`);
@@ -153,11 +148,7 @@ export async function handleValidateClass(args: ValidateClassArgs) {
           superclass: superclass || null,
           validation_result: result,
           session_id: session_id,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: result.valid
             ? `Class name ${className} is valid and available`
             : `Class name ${className} validation failed: ${result.message || 'Unknown error'}`

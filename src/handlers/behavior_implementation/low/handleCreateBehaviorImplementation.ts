@@ -5,8 +5,7 @@
  * Low-level handler: full workflow (create, lock, update main source, update implementations, unlock, activate).
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
@@ -102,11 +101,7 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
 
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -141,7 +136,7 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
       }
 
       // Get updated session state after create
-      const updatedSessionState = connection.getSessionState();
+
 
       handlerLogger.info(`✅ CreateBehaviorImplementation completed: ${className}`);
 
@@ -154,11 +149,7 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
           package_name: package_name.toUpperCase(),
           transport_request: transport_request || null,
           session_id: session_id || null,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `Behavior Implementation ${className} created and activated successfully.`
         }, null, 2)
       } as AxiosResponse);

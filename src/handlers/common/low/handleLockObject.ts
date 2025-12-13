@@ -6,7 +6,7 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
@@ -70,11 +70,7 @@ export async function handleLockObject(args: LockObjectArgs) {
     const client = new CrudClient(connection);
 
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       await connection.connect();
     }
@@ -149,8 +145,6 @@ export async function handleLockObject(args: LockObjectArgs) {
         throw new Error(`Lock did not return a lock handle for object ${objectName}`);
       }
 
-      const updatedSessionState = connection.getSessionState();
-
       handlerLogger.info(`✅ LockObject completed: ${objectName}`);
       handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
@@ -161,11 +155,7 @@ export async function handleLockObject(args: LockObjectArgs) {
           object_type: objectType,
           session_id: desiredSessionId,
           lock_handle: lockHandle,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker
           message: `Object ${objectName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`
         }, null, 2)
       } as AxiosResponse);

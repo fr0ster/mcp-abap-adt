@@ -5,8 +5,7 @@
  * Requires function group name.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
@@ -89,11 +88,7 @@ export async function handleCheckFunctionModule(args: CheckFunctionModuleArgs) {
 
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -116,7 +111,7 @@ export async function handleCheckFunctionModule(args: CheckFunctionModuleArgs) {
       const checkResult = parseCheckRunResponse(response);
 
       // Get updated session state after check
-      const updatedSessionState = connection.getSessionState();
+      
 
       handlerLogger.info(`✅ CheckFunctionModule completed: ${functionModuleName}`);
       handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
@@ -129,11 +124,7 @@ export async function handleCheckFunctionModule(args: CheckFunctionModuleArgs) {
           version: checkVersion,
           check_result: checkResult,
           session_id: session_id,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: checkResult.success
             ? `Function module ${functionModuleName} has no syntax errors`
             : `Function module ${functionModuleName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`

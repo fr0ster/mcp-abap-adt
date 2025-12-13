@@ -5,8 +5,7 @@
  * Must reuse session_id and lock_handle from LockObject.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -69,11 +68,7 @@ export async function handleUnlockObject(args: UnlockObjectArgs) {
     const client = new CrudClient(connection);
 
     if (session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       await connection.connect();
     }
@@ -126,7 +121,7 @@ export async function handleUnlockObject(args: UnlockObjectArgs) {
           return return_error(new Error(`Unsupported object_type: ${object_type}`));
       }
 
-      const updatedSessionState = connection.getSessionState();
+
 
       handlerLogger.info(`✅ UnlockObject completed: ${objectName}`);
 
@@ -136,11 +131,7 @@ export async function handleUnlockObject(args: UnlockObjectArgs) {
           object_name: objectName,
           object_type: objectType,
           session_id,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `Object ${objectName} unlocked successfully.`
         }, null, 2)
       } as AxiosResponse);

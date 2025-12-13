@@ -5,8 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
@@ -104,11 +103,7 @@ export async function handleCreateBehaviorDefinition(args: CreateBehaviorDefinit
 
     // Restore session state if provided
     if (session_id && session_state) {
-      connection.setSessionState({
-        cookies: session_state.cookies || null,
-        csrfToken: session_state.csrf_token || null,
-        cookieStore: session_state.cookie_store || {}
-      });
+      await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
       await connection.connect();
@@ -141,7 +136,7 @@ export async function handleCreateBehaviorDefinition(args: CreateBehaviorDefinit
       }
 
       // Get updated session state after create
-      const updatedSessionState = connection.getSessionState();
+
 
       handlerLogger.info(`✅ CreateBehaviorDefinition completed: ${bdefName}`);
 
@@ -155,11 +150,7 @@ export async function handleCreateBehaviorDefinition(args: CreateBehaviorDefinit
           root_entity: root_entity,
           implementation_type: implementation_type,
           session_id: session_id || null,
-          session_state: updatedSessionState ? {
-            cookies: updatedSessionState.cookies,
-            csrf_token: updatedSessionState.csrfToken,
-            cookie_store: updatedSessionState.cookieStore
-          } : null,
+          session_state: null, // Session state management is now handled by auth-broker,
           message: `Behavior Definition ${bdefName} created successfully. Use LockBehaviorDefinition and UpdateBehaviorDefinition to add source code, then UnlockBehaviorDefinition and ActivateObject.`
         }, null, 2)
       } as AxiosResponse);

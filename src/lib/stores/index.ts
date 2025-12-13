@@ -72,7 +72,7 @@ async function detectStoreType(
     case 'btp':
       return {
         serviceKeyStore: new BtpServiceKeyStore(directory),
-        sessionStore: new BtpSessionStore(directory),
+        sessionStore: new BtpSessionStore(directory, ''),
         storeType: 'btp',
       };
     // XSUAA format uses BTP stores (BTP uses XSUAA service key format)
@@ -159,7 +159,7 @@ export async function getPlatformStoresAsync(
         sessionStore = new AbapSessionStore(sessionsDir);
         break;
       case 'btp':
-        sessionStore = new BtpSessionStore(sessionsDir);
+        sessionStore = new BtpSessionStore(sessionsDir, '');
         break;
     }
   } else {
@@ -168,7 +168,7 @@ export async function getPlatformStoresAsync(
         sessionStore = new SafeAbapSessionStore();
         break;
       case 'btp':
-        sessionStore = new SafeBtpSessionStore();
+        sessionStore = new SafeBtpSessionStore('');
         break;
     }
   }

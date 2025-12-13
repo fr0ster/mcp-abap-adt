@@ -245,6 +245,14 @@
     "ZTEST",
     "ztst"
   ],
+  // Restricts spell checking to files inside the project only
+  "cSpell.files": [
+    "**/*"
+  ],
+  "cSpell.ignorePaths": [
+    // Ignore everything outside the project's root folder
+    "!**"
+  ],
   "git.autoRepositoryDetection": true,
   "git.scanRepositories": [
     "mcp-abap-adt",

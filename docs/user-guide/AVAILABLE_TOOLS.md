@@ -3131,8 +3131,8 @@ All functions return MCP-compliant responses in the following format:
 
 ## Additional Information
 
-- [Tools Architecture](../TOOLS_ARCHITECTURE.md) - Technical documentation about the tools architecture
-- [Installation Guide](INSTALLATION_GUIDE_UA.md) - Setup and configuration instructions
+- [Tools Architecture](../architecture/TOOLS_ARCHITECTURE.md) - Technical documentation about the tools architecture
+- [Installation Guide](../installation/INSTALLATION.md) - Setup and configuration instructions
 - [README](../README.md) - Main project documentation
 
 ---

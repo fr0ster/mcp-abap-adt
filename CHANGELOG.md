@@ -789,7 +789,7 @@ _Documentation for this tag is intentionally minimal; see the Git tag `v1.1.8` f
 - Added two new tools for batch ABAP object type detection:
   - DetectObjectTypeListArray: accepts array of objects via 'objects' parameter.
   - DetectObjectTypeListJson: accepts JSON payload with 'objects' array via 'payload' parameter.
-- Added documentation for both tools: see [doc/DetectObjectTypeListTools.md](doc/DetectObjectTypeListTools.md).
+- Added documentation for both tools: see [DetectObjectTypeListTools.md](docs/development/DetectObjectTypeListTools.md).
 - Repository URL changed from `mario-andreschak/mcp-abap-adt` to `fr0ster/mcp-abap-adt`
 - Added acknowledgment to original project in README.md
 - **All Create handlers updated**:

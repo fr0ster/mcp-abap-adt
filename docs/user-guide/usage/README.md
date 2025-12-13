@@ -124,9 +124,9 @@ Complete workflows for creating RAP (Restful ABAP Programming) Business Objects 
 
 ## Quick Navigation
 
-- [Classes](./simple-objects/classes.md) - Creating and updating ABAP classes
-- [Tables](./simple-objects/tables.md) - Creating and updating database tables
-- [CDS Views](./simple-objects/views.md) - Creating and updating CDS views
+- [Classes](./simple-objects/classes-high.md) - Creating and updating ABAP classes
+- [Tables](./simple-objects/tables-high.md) - Creating and updating database tables
+- [CDS Views](./simple-objects/views-high.md) - Creating and updating CDS views
 - [RAP BO Creation](./rap-business-objects/creating-rap-bo.md) - Complete RAP Business Object workflow
 - [Deferred Activation](./rap-business-objects/deferred-activation.md) - Group activation guide
 
@@ -135,4 +135,3 @@ Complete workflows for creating RAP (Restful ABAP Programming) Business Objects 
 - [Available Tools](../AVAILABLE_TOOLS.md) - Complete list of all MCP tools
 - [Scenarios](../scenarios/) - Low-level handler usage scenarios
 - [Client Configuration](../CLIENT_CONFIGURATION.md) - MCP client setup
-

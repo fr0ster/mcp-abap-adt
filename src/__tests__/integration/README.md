@@ -206,6 +206,5 @@ Common helpers are available in `helpers/`:
 ## Related Documentation
 
 - [Builder Tests in adt-clients](../../../../mcp-abap-adt-clients/src/__tests__/integration/README.md) - Reference for test patterns
-- [Session Management Guide](../../../doc/user-guide/scenarios/SESSION_MANAGEMENT.md) - Understanding sessions
-- [Creating Classes Guide](../../../doc/user-guide/scenarios/CREATING_CLASSES.md) - Workflow examples
-
+- [Session Management Guide](../../../docs/user-guide/scenarios/SESSION_MANAGEMENT.md) - Understanding sessions
+- [Creating Classes Guide](../../../docs/user-guide/scenarios/CREATING_CLASSES.md) - Workflow examples

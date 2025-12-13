@@ -469,9 +469,9 @@ source ~/.bash_profile  # for bash
 
 ## 📚 Next Steps
 
-- [Configure SAP Connection](../CONFIGURATION.md)
-- [Connect to AI Tools](../AI_TOOLS.md)
-- [Available Tools](../AVAILABLE_TOOLS.md)
+- [Configure SAP Connection](../../user-guide/CLIENT_CONFIGURATION.md)
+- [Review CLI Options](../../user-guide/CLI_OPTIONS.md)
+- [Available Tools](../../user-guide/AVAILABLE_TOOLS.md)
 
 ## 💡 Tips for macOS
 

@@ -520,12 +520,12 @@ For detailed platform-specific instructions, see:
 ## 🔗 Next Steps
 
 After installation:
-1. [Configure SAP Connection](./CONFIGURATION.md)
-2. [Connect to AI Tools](./AI_TOOLS.md)
-3. [Test Your Setup](./TESTING.md)
+1. [Configure SAP Connection](../user-guide/CLIENT_CONFIGURATION.md)
+2. [Review CLI Options](../user-guide/CLI_OPTIONS.md)
+3. [Explore Available Tools](../user-guide/AVAILABLE_TOOLS.md)
 
 ## 💡 Need Help?
 
-- [Troubleshooting Guide](./TROUBLESHOOTING.md)
-- [FAQ](./FAQ.md)
+- [Client Configuration Guide](../user-guide/CLIENT_CONFIGURATION.md)
+- [User Guide Overview](../user-guide/README.md)
 - [GitHub Issues](https://github.com/fr0ster/mcp-abap-adt/issues)

@@ -60,7 +60,7 @@ Optional workflow for publishing to npm registry.
 
 ## Release Process
 
-See [doc/deployment/RELEASE.md](../doc/deployment/RELEASE.md) for detailed release instructions.
+See [docs/deployment/RELEASE.md](../docs/deployment/RELEASE.md) for detailed release instructions.
 
 ### Quick Release
 

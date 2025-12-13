@@ -155,8 +155,8 @@ docker run -d \
 ## Documentation
 
 For detailed deployment instructions, see:
-- [Docker Deployment Guide](../doc/deployment/DOCKER.md)
-- [Cline Setup Guide](../doc/deployment/CLINE_SETUP.md)
+- [Docker Deployment Guide](../docs/deployment/DOCKER.md)
+- [Cline Setup Guide](../docs/deployment/CLINE_SETUP.md)
 
 ## Directory Structure
 

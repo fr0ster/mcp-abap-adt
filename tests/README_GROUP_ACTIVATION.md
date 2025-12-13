@@ -226,9 +226,9 @@ activate_object:
 
 ## Related Documentation
 
-- [ACTIVATION_ENDPOINT_UPDATE.md](../ACTIVATION_ENDPOINT_UPDATE.md) - Technical details
+- [Testing Guide](../docs/development/tests/TESTING_GUIDE.md) - End-to-end testing steps
 - [activationUtils.ts](../src/lib/activationUtils.ts) - Implementation
-- [handleActivateObject.ts](../src/handlers/handleActivateObject.ts) - Handler code
+- [handleActivateObject.ts](../src/handlers/common/low/handleActivateObject.ts) - Handler code
 
 ## See Also
 

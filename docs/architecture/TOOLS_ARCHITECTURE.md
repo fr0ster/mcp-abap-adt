@@ -244,7 +244,7 @@ node tools/update-handlers-with-tool-definitions.js [--help]
 
 ### Generating Documentation
 
-The `tools/generate-tools-docs.js` script automatically generates `doc/user-guide/AVAILABLE_TOOLS.md` from all `TOOL_DEFINITION` exports.
+The `tools/generate-tools-docs.js` script automatically generates `docs/user-guide/AVAILABLE_TOOLS.md` from all `TOOL_DEFINITION` exports.
 
 ```bash
 npm run docs:tools
@@ -263,9 +263,9 @@ node tools/generate-tools-docs.js [--help]
 - Before releasing a new version
 - To keep documentation in sync with code
 
-**Output:** `doc/user-guide/AVAILABLE_TOOLS.md` - Complete reference of all available tools.
+**Output:** `docs/user-guide/AVAILABLE_TOOLS.md` - Complete reference of all available tools.
 
-See [tools/README.md](tools/README.md) for more details on available developer tools.
+See [tools/README.md](../../tools/README.md) for more details on available developer tools.
 
 ## Future improvements
 

@@ -4,8 +4,8 @@
 
 - 📖 **[README_GROUP_ACTIVATION.md](README_GROUP_ACTIVATION.md)** - Complete testing guide
 - 📋 **[test-config.yaml.template](test-config.yaml.template)** - Configuration template
-- 🔧 **[test-activate-object.js](test-activate-object.js)** - Test script
-- 📚 **[../ACTIVATION_ENDPOINT_UPDATE.md](../ACTIVATION_ENDPOINT_UPDATE.md)** - Technical documentation
+- 🔧 **[deprecated/test-activate-object.js](deprecated/test-activate-object.js)** - Legacy activation test script
+- 📚 **[Testing Guide](../docs/development/tests/TESTING_GUIDE.md)** - End-to-end testing instructions
 
 ## Quick Start
 
@@ -34,7 +34,7 @@ activate_object:
 
 ### 3. Run Test
 ```bash
-node tests/test-activate-object.js
+node tests/deprecated/test-activate-object.js
 ```
 
 ## What's New
@@ -106,7 +106,6 @@ cat tests/test-config.yaml
 ### Updated Files
 - ✅ `tests/test-config.yaml.template` - Enhanced examples
 - ✅ `tests/README.md` - Added activation section
-- ✅ `ACTIVATION_ENDPOINT_UPDATE.md` - Updated documentation
 - ✅ 10 handler files - Using centralized utilities
 
 ## Next Steps
@@ -121,4 +120,4 @@ cat tests/test-config.yaml
 
 - See [README_GROUP_ACTIVATION.md](README_GROUP_ACTIVATION.md) for detailed guide
 - Check [test-config.yaml.template](test-config.yaml.template) for examples
-- Review [../ACTIVATION_ENDPOINT_UPDATE.md](../ACTIVATION_ENDPOINT_UPDATE.md) for technical details
+- Review [Testing Guide](../docs/development/tests/TESTING_GUIDE.md) for end-to-end steps

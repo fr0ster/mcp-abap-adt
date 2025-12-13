@@ -5,7 +5,7 @@
 **Created:** 2025-01-27  
 **Last Updated:** 2025-11-30
 
-**Note:** This roadmap has been completed. The `@mcp-abap-adt/auth-broker` package is now published and integrated into `mcp-abap-adt` server. See [Client Configuration Guide](../user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication) for usage details.
+**Note:** This roadmap has been completed. The `@mcp-abap-adt/auth-broker` package is now published and integrated into `mcp-abap-adt` server. See [Client Configuration Guide](../../user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication) for usage details.
 
 ## Goal
 
@@ -408,4 +408,3 @@ if (isJwtAuth && destination) {
 - Token validation should be minimal (just test connection, don't do full ADT operations)
 - The package should be stateless where possible, but token caching is acceptable for performance
 - Consider thread-safety if multiple requests come in for the same destination simultaneously
-

@@ -6,9 +6,9 @@ This project provides a server that allows you to interact with SAP ABAP systems
 
 ## Quick Start
 
-1. **Install**: See [Installation Guide](doc/installation/INSTALLATION.md)
-2. **Configure**: See [Client Configuration](doc/user-guide/CLIENT_CONFIGURATION.md)
-3. **Use**: See [Available Tools](doc/user-guide/AVAILABLE_TOOLS.md)
+1. **Install**: See [Installation Guide](docs/installation/INSTALLATION.md)
+2. **Configure**: See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md)
+3. **Use**: See [Available Tools](docs/user-guide/AVAILABLE_TOOLS.md)
 
 ## Features
 
@@ -27,7 +27,7 @@ This project provides a server that allows you to interact with SAP ABAP systems
 - **📋 Include Management**: `GetIncludesList` - Recursive include discovery
 - **🔍 System Tools**: `GetInactiveObjects` - Monitor inactive objects waiting for activation
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
-- **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](doc/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication))
+- **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication))
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
 
 > ℹ️ **ABAP Cloud limitation**: Direct ADT data preview of database tables is blocked by SAP BTP backend policies. The server returns a descriptive error when attempting such operations. On-premise systems continue to support data preview.
@@ -35,16 +35,16 @@ This project provides a server that allows you to interact with SAP ABAP systems
 ## Documentation
 
 ### For Users
-- **[Installation Guide](doc/installation/INSTALLATION.md)** - Installation instructions for all platforms
-- **[Client Configuration](doc/user-guide/CLIENT_CONFIGURATION.md)** - How to configure MCP clients
-- **[Available Tools](doc/user-guide/AVAILABLE_TOOLS.md)** - Complete list of available MCP tools
+- **[Installation Guide](docs/installation/INSTALLATION.md)** - Installation instructions for all platforms
+- **[Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md)** - How to configure MCP clients
+- **[Available Tools](docs/user-guide/AVAILABLE_TOOLS.md)** - Complete list of available MCP tools
 
 ### For Administrators
-- **[Installation Guide](doc/installation/INSTALLATION.md)** - Platform-specific installation guides
+- **[Installation Guide](docs/installation/INSTALLATION.md)** - Platform-specific installation guides
 
 ### For Developers
-- **[Architecture Documentation](doc/architecture/)** - System architecture and design decisions
-- **[Development Documentation](doc/development/)** - Testing guides and development resources
+- **[Architecture Documentation](docs/architecture/)** - System architecture and design decisions
+- **[Development Documentation](docs/development/)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
 
 ## Dependencies
@@ -154,7 +154,7 @@ mcp-abap-adt --auth-broker
 mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/ --unsafe
 ```
 
-See [Client Configuration](doc/user-guide/CLIENT_CONFIGURATION.md) for complete configuration options.
+See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md) for complete configuration options.
 
 ### Handler logging switches
 - `AUTH_LOG_LEVEL=error|warn|info|debug` — sets base log level for handler logger; `DEBUG_AUTH_LOG=true` also enables `debug`.

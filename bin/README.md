@@ -292,9 +292,9 @@ Ensure these directories are in `.gitignore`:
 
 ## See Also
 
-- [Session State Management](../docs/archive/SESSION_STATE_MANAGEMENT.md)
-- [Lock State Management](../docs/archive/LOCK_STATE_MANAGEMENT.md)
-- [Lock Recovery Test](../src/__tests__/integration/README_LOCK_RECOVERY.md)
+- [Stateful Session Guide](../docs/architecture/STATEFUL_SESSION_GUIDE.md)
+- [Tools Architecture](../docs/architecture/TOOLS_ARCHITECTURE.md)
+- [Integration Tests Overview](../src/__tests__/integration/README.md)
 
 
 # Clear all locks from registry
@@ -364,5 +364,5 @@ Both directories are in `.gitignore` and should not be committed.
 ## Documentation
 
 For detailed information, see:
-- [Lock State Management](../docs/archive/LOCK_STATE_MANAGEMENT.md)
-- [Session State Management](../docs/archive/SESSION_STATE_MANAGEMENT.md)
+- [Stateful Session Guide](../docs/architecture/STATEFUL_SESSION_GUIDE.md#lock-mechanism)
+- [Tools Architecture](../docs/architecture/TOOLS_ARCHITECTURE.md)

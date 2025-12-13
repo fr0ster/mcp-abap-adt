@@ -51,11 +51,27 @@ export function parseMcpDestinationArg(): string | undefined {
 }
 
 export function getTransportType(): string | null {
+  // First check command line arguments
   const args = process.argv;
-  for (const arg of args) {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    // Check for --transport=value format
     if (arg.startsWith("--transport=")) {
       return arg.slice("--transport=".length);
     }
+    // Check for --transport value format
+    if (arg === "--transport" && i + 1 < args.length) {
+      return args[i + 1];
+    }
+  }
+  // Then check environment variable
+  if (process.env.MCP_TRANSPORT) {
+    return process.env.MCP_TRANSPORT;
+  }
+  // Auto-detect stdio mode when stdin is not a TTY (e.g., when run by inspector)
+  // Only if no explicit transport was set via argv or env
+  if (!process.stdin.isTTY) {
+    return "stdio";
   }
   return null;
 }
@@ -72,11 +88,20 @@ export function buildRuntimeConfig() {
   const defaultMcpDestination = parseMcpDestinationArg();
   const unsafe = process.argv.includes("--unsafe") || process.env.MCP_UNSAFE === "true";
   const explicitTransportType = getTransportType();
+  // Check if transport was explicitly set (not auto-detected)
+  const hasExplicitTransportArg = process.argv.some((arg, i) =>
+    arg.startsWith("--transport=") || (arg === "--transport" && i + 1 < process.argv.length)
+  );
+  // If transport was auto-detected (not explicitly set), consider it as explicit for stdio mode
+  // This allows stdio mode to work when run by inspector without --transport=stdio argument
+  const isAutoDetectedStdio = explicitTransportType === "stdio" && !hasExplicitTransportArg && !process.env.MCP_TRANSPORT;
   const transportType = explicitTransportType || "streamable-http";
   const isHttp = transportType === "http" || transportType === "streamable-http" || transportType === "server";
   const isSse = transportType === "sse";
   const isStdio = transportType === "stdio";
-  const isEnvMandatory = explicitTransportType !== null && (isStdio || isSse) && !defaultMcpDestination && !useAuthBroker && !isTestEnv;
+  // For auto-detected stdio, treat it as explicit for env mandatory check
+  const effectiveExplicitTransportType = isAutoDetectedStdio ? "stdio" : explicitTransportType;
+  const isEnvMandatory = effectiveExplicitTransportType !== null && (isStdio || isSse) && !defaultMcpDestination && !useAuthBroker && !isTestEnv;
   let envFilePath = parseEnvArg() ?? process.env.MCP_ENV_PATH;
 
   return {
@@ -85,7 +110,7 @@ export function buildRuntimeConfig() {
     authBrokerPath,
     defaultMcpDestination,
     unsafe,
-    explicitTransportType,
+    explicitTransportType: effectiveExplicitTransportType,
     transportType,
     isHttp,
     isSse,

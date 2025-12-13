@@ -34,7 +34,9 @@
 - ✅ Broker must be able to load configuration from .env via sessionStore
 
 #### Scenario C: Neither destination nor .env
-- ⚠️ Question: What to do? Error on startup? Or create "empty" broker?
+- **✅ Answer**: 
+  - **stdio**: Error on startup (must have destination or .env)
+  - **SSE/HTTP**: Wait for connection parameters in headers. If header has destination → use token from broker, if no destination → use what's available. If token invalid or broker can't return valid token → return error
 
 ### 2. Handling Requests Without Connection Parameters
 
@@ -67,21 +69,54 @@
 
 ---
 
+## New Feature: `--config` YAML Support
+
+### Problem
+- Too many command-line parameters make testing complex
+- Hard to manage different test scenarios with different configurations
+- Command-line becomes unwieldy with many options
+
+### Solution
+- Add `--config=<path>` parameter that points to YAML file with configuration values
+- If `--config` is specified but file doesn't exist → generate template YAML file
+- User can fill in startup parameters in the YAML template
+- For tests: create different YAML files with different configurations
+
+### Benefits
+- Cleaner command-line interface
+- Easy to create test scenarios with different YAML configs
+- Template generation helps users understand available options
+- Configuration can be version-controlled and shared
+
+### Implementation Notes
+- YAML file should contain all startup parameters (transport, destination, ports, etc.)
+- Command-line arguments should still override YAML values (for flexibility)
+- Template should include comments explaining each option
+
+---
+
 ## Implementation Roadmap
 
-### Stage 1: AuthBroker Extension (if needed)
+### Stage 1: AuthBroker Extension (if needed) ✅
 
-**Question 1.1**: Does AuthBroker support "default destination" concept?
-- If not → need to add method `setDefaultDestination(destination: string)`
-- Or pass defaultDestination in constructor
+**✅ Question 1.1**: Does AuthBroker support "default destination" concept?
+- **Answer**: Default destination exists only at consumer level (mcp_abap_adt_server), not in broker itself
+- **Solution**: Store `defaultDestination` in `mcp_abap_adt_server` class
+- Default destination is any destination that consumer uses when request has no connection headers/parameters or when transport is stdio
 
-**Question 1.2**: Can AuthBroker work without serviceKeyStore?
-- If not → need to allow `serviceKeyStore: undefined` in configuration
-- Or create "dummy" serviceKeyStore for .env case
+**✅ Question 1.2**: Can AuthBroker work without serviceKeyStore?
+- **Answer**: Yes, broker can be created with only sessionStore (without serviceKeyStore)
+- **Solution**: When destination is not specified but .env file exists, create broker with only sessionStore
+- SessionStore will have default destination and will be used for connection
 
-**Question 1.3**: Can sessionStore load configuration from .env file?
-- If not → need to add .env loading logic to sessionStore
-- Or create separate "EnvSessionStore" that reads .env
+**✅ Question 1.3**: How does sessionStore load configuration from .env file?
+- **Answer**: When creating broker, sessionStore is injected:
+  - `FileSessionStore` - points to .env file path (used with `--unsafe` flag)
+  - Or create session from .env and store in `SafeSessionStore` (default behavior)
+- **Solution**: In mcp-abap-adt, use `--unsafe` parameter to choose FileSessionStore, otherwise use SafeSessionStore
+- .env has simple format (standard environment variables)
+
+**Status**: All questions answered. No changes needed in AuthBroker API - it already supports required functionality.
 
 ### Stage 2: Broker Initialization Refactoring
 
@@ -172,72 +207,128 @@ async run() {
 
 ### Questions about AuthBroker API
 
-**Q1**: Does `AuthBroker` support "default destination" concept?
-- If not, can we add method `setDefaultDestination()` or pass in constructor?
-- Is it enough to just store `defaultDestination` in `mcp_abap_adt_server`?
+**✅ Q1**: Does `AuthBroker` support "default destination" concept?
+- **Answer**: Default destination exists only at consumer level (mcp_abap_adt_server), not in broker itself
+- **Solution**: Store `defaultDestination` in `mcp_abap_adt_server` class
+- Default destination is any destination that consumer uses when request has no connection headers/parameters or when transport is stdio
 
-**Q2**: Can `AuthBroker` work without `serviceKeyStore`?
-- Can we pass `serviceKeyStore: undefined` in configuration?
-- Or need to create "dummy" store for .env case?
+**✅ Q2**: Can `AuthBroker` work without `serviceKeyStore`?
+- **Answer**: Yes, broker can be created with only sessionStore (without serviceKeyStore)
+- **Solution**: When destination is not specified but .env file exists, create broker with only sessionStore
+- SessionStore will have default destination and will be used for connection
 
-**Q3**: How does `sessionStore` load configuration from .env file?
-- Is there method `loadFromEnvFile(path: string)`?
-- Do we need to create separate "EnvSessionStore" that reads .env?
+**✅ Q3**: How does `sessionStore` load configuration from .env file?
+- **Answer**: When creating broker, sessionStore is injected:
+  - `FileSessionStore` - points to .env file path (used with `--unsafe` flag)
+  - Or create session from .env and store in `SafeSessionStore` (default behavior)
+- **Solution**: In mcp-abap-adt, use `--unsafe` parameter to choose FileSessionStore, otherwise use SafeSessionStore
+- .env has simple format (standard environment variables)
 
-**Q4**: Can `AuthBroker.getConnectionConfig(destination)` work without service key?
-- If destination not found in serviceKeyStore, does it search in sessionStore?
-- Do we need separate method for loading from .env?
+**✅ Q4**: Can `AuthBroker.getConnectionConfig(destination)` work without service key?
+- **Answer**: Yes, it can work without service key
+- When refreshing token, UAA will be taken from session
+- If it fails → return error
+- This logic should already be in broker
 
 ### Questions about Workflow Logic
 
-**Q5**: What to do if neither destination nor .env file exists at startup?
-- Error on startup?
-- Create "empty" broker and wait for first request with headers?
-- For stdio - must have destination or .env?
+**✅ Q5**: What to do if neither destination nor .env file exists at startup?
+- **Answer**:
+  - **stdio**: Error on startup (must have destination or specified .env or .env in current folder)
+  - **SSE/HTTP**: Wait for connection parameters in headers:
+    - If header has destination → use token from broker for that destination
+    - If no destination in header → use what's available (no token or invalid token → return error)
+    - If broker can't return valid authorization token for destination → return error on request
 
 **Q6**: How to handle situation when .env file appears after server startup?
-- Reload configuration?
-- Ignore (only on startup)?
+- **Analysis**: Based on Q5 answer, for SSE/HTTP we wait for headers on each request
+- **Conclusion**: Ignore .env changes after startup (only load on startup)
+- **Reasoning**: Configuration is loaded once at startup, runtime changes would require complex reloading logic
 
-**Q7**: For HTTP mode: if client sends request without destination, but default destination exists:
-- Create broker for this client with default destination?
-- Or use global default broker?
+**✅ Q7**: For HTTP mode: if client sends request without destination, but default destination exists:
+- **Answer**: Default destination is the destination to use when client doesn't specify which one they need
+- **Behavior**: When client sends request without destination header, but server has default destination (from `--mcp` or .env):
+  - Use default destination automatically
+  - Create broker for this client with default destination
+  - Each client has its own broker (`clientKey = sessionId`), but uses default destination if not specified in headers
 
-**Q8**: Can we have multiple default destinations for different clients (HTTP)?
-- For example, client A → destination A, client B → destination B
-- Or always one global default destination?
+**✅ Q8**: Can we have multiple default destinations for different clients (HTTP)?
+- **Answer**: Each client/session has its own broker
+- **SSE**: One session = one broker (global broker for the session)
+- **HTTP**: Each session has its own broker (separate broker per client session)
+- **Default destination**: One global default destination determined at server startup (from `--mcp` parameter or .env file)
+- **Behavior**: All clients without destination in headers will use the same global default destination, but each gets their own broker instance
+- **Note**: If client specifies different destination in headers, that destination will be used instead of default
 
 ### Questions about Compatibility
 
-**Q9**: How to maintain compatibility with current implementation?
-- Do we need to support old format (without default destination)?
-- Can we make breaking change?
+**✅ Q9**: How to maintain compatibility with current implementation?
+- **Answer**: Will think about compatibility after version 1.0.0
+- **Status**: Deferred until post-1.0.0
+- **Note**: For now, focus on implementing the feature, compatibility concerns will be addressed later
 
-**Q10**: How to handle case when client sends destination different from default?
-- Create separate broker for this destination?
-- Or use existing broker with new destination?
+**✅ Q10**: How to handle case when client sends destination different from default?
+- **Answer**: Client values have priority - if client specified connection parameters in headers, they know what they're doing
+- **Implementation**: Each destination gets its own broker instance (broker key: `${destination}::${clientKey}`)
+- **Behavior**: If client sends destination in header → create/use broker for that destination, not default one
+- **Priority**: Client-provided headers/parameters take precedence over default destination
 
 ### Questions about Testing
 
-**Q11**: How to test new logic?
-- Do we need new integration tests?
-- How to simulate different scenarios (with destination, without destination, with .env, without .env)?
+**✅ Q11**: How to test new logic?
+- **Answer**: Test through inspector by running in different modes with different destination options
+- **Testing approach**: Use inspector to test various scenarios
+- **New feature for testing**: Add `--config` parameter that points to YAML file with configuration values
+  - If `--config` is specified but file doesn't exist → generate template YAML file
+  - User can fill in startup parameters in the YAML template
+  - For tests: create different YAML files with different configurations
+  - This avoids drowning in command-line parameters
+- **Scenarios to test**:
+  - stdio with `--mcp=<destination>`
+  - stdio with .env file
+  - stdio without destination/.env (should error)
+  - SSE/HTTP with default destination, client sends request without headers
+  - SSE/HTTP with default destination, client sends request with different destination
+  - SSE/HTTP without default, client sends request with destination in headers
+  - SSE/HTTP without default, client sends request without headers (should error)
+  - Different YAML config files for different test scenarios
 
 ---
 
-## Action Plan (after receiving answers)
+## Action Plan
 
-1. ✅ Answer all questions
-2. ✅ Update roadmap based on answers
-3. ✅ Implement changes in AuthBroker (if needed)
-4. ✅ Refactor `mcp_abap_adt_server`:
+### ✅ Completed
+1. ✅ **Answer all questions Q1-Q11** - All answered:
+   - Q1: Default destination at consumer level ✅
+   - Q2: Broker can work with only sessionStore ✅
+   - Q3: SessionStore loads from .env via FileSessionStore/SafeSessionStore ✅
+   - Q4: getConnectionConfig works without service key ✅
+   - Q5: stdio requires destination/.env (error), SSE/HTTP wait for headers ✅
+   - Q6: Ignore .env changes after startup ✅
+   - Q7: Use default destination when client doesn't specify ✅
+   - Q8: Each client/session has its own broker (SSE: one, HTTP: per session) ✅
+   - Q9: Compatibility deferred until post-1.0.0 ✅
+   - Q10: Client values have priority over default ✅
+   - Q11: Test via inspector with different configs, add --config YAML support ✅
+2. ✅ **Update roadmap based on answers** - Roadmap updated with all answers
+
+### 📋 Next Steps
+3. ⏳ **Implement `--config` YAML support** (new feature for testing):
+   - Add `--config=<path>` parameter that points to YAML file with configuration values
+   - If `--config` specified but file doesn't exist → generate template YAML file
+   - User can fill in startup parameters in the YAML template
+   - For tests: create different YAML files with different configurations
+   - This avoids drowning in command-line parameters
+4. ⏳ **Implement changes in AuthBroker (if needed)**
+   - Status: No changes needed - AuthBroker already supports required functionality
+5. ⏳ **Refactor `mcp_abap_adt_server`**:
    - Add `defaultDestination` field
    - Add `initializeDefaultBroker()` method
-   - Update `getOrCreateAuthBroker()`
-   - Update `applyAuthHeaders()`
-   - Update `run()` for stdio/SSE
-5. ✅ Test all scenarios
-6. ✅ Update documentation
+   - Update `getOrCreateAuthBroker()` to support default destination
+   - Update `applyAuthHeaders()` to use default when no headers (client values have priority)
+   - Update `run()` for stdio/SSE to initialize default broker
+6. ⏳ **Test all scenarios** (see Q11 for test scenarios, use --config YAML files)
+7. ⏳ **Update documentation**
 
 ---
 

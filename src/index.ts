@@ -611,9 +611,9 @@ QUICK REFERENCE:
 
 DOCUMENTATION:
   https://github.com/fr0ster/mcp-abap-adt
-  Installation:    doc/installation/INSTALLATION.md
-  Configuration:   doc/user-guide/CLIENT_CONFIGURATION.md
-  Available Tools: doc/user-guide/AVAILABLE_TOOLS.md
+  Installation:    docs/installation/INSTALLATION.md
+  Configuration:   docs/user-guide/CLIENT_CONFIGURATION.md
+  Available Tools: docs/user-guide/AVAILABLE_TOOLS.md
 
 AUTHENTICATION:
   For JWT authentication with SAP BTP service keys:
@@ -719,7 +719,7 @@ SERVICE KEYS (Destination-Based Authentication):
       mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
       This creates service-keys and sessions subdirectories in the specified path.
 
-  For more details, see: doc/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication
+  For more details, see: docs/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication
 
 `;
   console.log(help);

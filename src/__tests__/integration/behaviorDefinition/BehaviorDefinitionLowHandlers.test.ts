@@ -13,7 +13,7 @@
  * Run: npm test -- --testPathPattern=integration/behaviorDefinition
  *
  * @todo TODO: Apply same step-by-step logging pattern to all other integration tests
- * See: doc/development/TEST_LOGGING_ROADMAP.md
+ * See: docs/development/TEST_LOGGING_ROADMAP.md
  * Pattern: console.log(`🔍 Step N: [Operation]...`) before, `✅ Step N: [Operation] successfully` after
  */
 

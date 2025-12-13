@@ -175,6 +175,5 @@ When making changes:
 - **Testing Guide**: `doc/tests/TESTING_GUIDE.md`
 - **Test Infrastructure**: `doc/tests/TEST_INFRASTRUCTURE.md`
 - **Test System Setup**: `TEST_SYSTEM_SETUP.md`
-- **Testing Roadmap**: `TESTING_ROADMAP.md`
 - **Cline Rules**: `.clinerules/` directory
 

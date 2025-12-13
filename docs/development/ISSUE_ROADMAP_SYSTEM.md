@@ -15,12 +15,12 @@ The system was introduced to:
 
 ## File Structure
 
-Issue roadmaps are stored in `doc/development/` directory with naming pattern:
+Issue roadmaps are stored in `docs/development/roadmaps/archive/` directory with naming pattern:
 ```
 TEST_ISSUES_ROADMAP_YYYY-MM-DD.md
 ```
 
-Example: `TEST_ISSUES_ROADMAP_2025-11-27.md`
+Example: `TEST_ISSUES_ROADMAP_2025-11-27.md` (archived)
 
 ## Workflow
 
@@ -183,13 +183,11 @@ The Issue Roadmap System is integrated into the development cycle:
 ## Maintenance
 
 - **Update after each test run** - Keep roadmap current
-- **Archive old roadmaps** - Keep historical versions for reference
 - **Review periodically** - Ensure pending issues are being addressed
 - **Clean up** - Remove resolved issues from active tracking if needed
 
 ## Related Documentation
 
-- `TEST_ISSUES_ROADMAP_*.md` - Actual issue roadmaps
 - `CHANGELOG.md` - Release notes including roadmap updates
 - `BUILDER_TEST_PATTERN.md` - Test writing patterns
 - `TEST_CONFIG_SCHEMA.md` - Test configuration structure

@@ -1,5 +1,24 @@
 # Roadmap: AuthBroker Refactoring for Default Destination Support
 
+## Implementation Status: ✅ Core Features Completed
+
+**Last Updated**: Implementation completed for core features (Stages 1-5)
+
+### What's Done:
+- ✅ Default destination support at consumer level
+- ✅ Broker initialization on startup for stdio/SSE
+- ✅ Automatic connection for stdio mode
+- ✅ Support for .env file without service keys
+- ✅ Client values priority over default destination
+- ✅ Error handling for stdio when no destination/.env
+
+### What's Next:
+- ✅ `--config` YAML support (for easier testing) - COMPLETED
+- ⏳ Testing all scenarios
+- ⏳ Final documentation review
+
+---
+
 ## Current Situation Analysis
 
 ### Current Implementation:
@@ -10,11 +29,11 @@
    - **HTTP/streamable-http**: `clientKey = sessionId` (separate broker per client)
 4. **Broker creation**: Always with `serviceKeyStore` + `sessionStore` (even if no service key exists)
 
-### Current Implementation Issues:
-1. ❌ Broker has no concept of "default destination"
-2. ❌ Cannot create broker with only sessionStore (for .env case)
-3. ❌ When request has no connection parameters - default destination is not used
-4. ❌ In stdio mode - no automatic connection on startup
+### Current Implementation Issues (RESOLVED):
+1. ✅ Broker has no concept of "default destination" → **FIXED**: Default destination stored at consumer level
+2. ✅ Cannot create broker with only sessionStore (for .env case) → **FIXED**: Broker supports optional serviceKeyStore
+3. ✅ When request has no connection parameters - default destination is not used → **FIXED**: `applyAuthHeaders()` uses default destination
+4. ✅ In stdio mode - no automatic connection on startup → **FIXED**: `run()` initializes broker and connects automatically
 
 ---
 
@@ -69,18 +88,18 @@
 
 ---
 
-## New Feature: `--config` YAML Support
+## New Feature: `--config` YAML Support ✅
 
 ### Problem
 - Too many command-line parameters make testing complex
 - Hard to manage different test scenarios with different configurations
 - Command-line becomes unwieldy with many options
 
-### Solution
-- Add `--config=<path>` parameter that points to YAML file with configuration values
-- If `--config` is specified but file doesn't exist → generate template YAML file
-- User can fill in startup parameters in the YAML template
-- For tests: create different YAML files with different configurations
+### Solution ✅
+- ✅ Add `--config=<path>` parameter that points to YAML file with configuration values
+- ✅ If `--config` is specified but file doesn't exist → generate template YAML file
+- ✅ User can fill in startup parameters in the YAML template
+- ✅ For tests: create different YAML files with different configurations
 
 ### Benefits
 - Cleaner command-line interface
@@ -88,10 +107,13 @@
 - Template generation helps users understand available options
 - Configuration can be version-controlled and shared
 
-### Implementation Notes
-- YAML file should contain all startup parameters (transport, destination, ports, etc.)
-- Command-line arguments should still override YAML values (for flexibility)
-- Template should include comments explaining each option
+### Implementation Status ✅
+- ✅ YAML file contains all startup parameters (transport, destination, ports, etc.)
+- ✅ Command-line arguments override YAML values (for flexibility)
+- ✅ Template includes comments explaining each option
+- ✅ Auto-generates template if file doesn't exist
+- ✅ Documentation: `docs/configuration/YAML_CONFIG.md`
+- ✅ Implementation: `src/lib/yamlConfig.ts`
 
 ---
 
@@ -118,9 +140,9 @@
 
 **Status**: All questions answered. No changes needed in AuthBroker API - it already supports required functionality.
 
-### Stage 2: Broker Initialization Refactoring
+### Stage 2: Broker Initialization Refactoring ✅
 
-#### 2.1. Create `initializeDefaultBroker()` method
+#### 2.1. Create `initializeDefaultBroker()` method ✅
 ```typescript
 private async initializeDefaultBroker(): Promise<void> {
   // Logic to determine: destination in parameters or .env
@@ -128,15 +150,16 @@ private async initializeDefaultBroker(): Promise<void> {
   // Set default destination
 }
 ```
+**Status**: ✅ Implemented in `src/index.ts` (lines 1427-1466)
 
-#### 2.2. Call on server startup
-- stdio: call in `run()` before connecting transport
-- SSE: call in `run()` before creating SSE server
-- HTTP: do not call (lazy initialization on first request)
+#### 2.2. Call on server startup ✅
+- ✅ stdio: call in `run()` before connecting transport
+- ✅ SSE: call in `run()` before creating SSE server
+- ✅ HTTP: do not call (lazy initialization on first request)
 
-### Stage 3: Refactor `getOrCreateAuthBroker()`
+### Stage 3: Refactor `getOrCreateAuthBroker()` ✅
 
-#### 3.1. Support default destination
+#### 3.1. Support default destination ✅
 ```typescript
 private async getOrCreateAuthBroker(
   destination?: string, 
@@ -148,8 +171,9 @@ private async getOrCreateAuthBroker(
   // Broker creation/retrieval logic
 }
 ```
+**Status**: ✅ Implemented in `src/index.ts` (lines 1472-1557)
 
-#### 3.2. Create broker with only sessionStore
+#### 3.2. Create broker with only sessionStore ✅
 ```typescript
 // If no service key, but .env exists
 if (!hasServiceKey && hasEnvFile) {
@@ -157,10 +181,11 @@ if (!hasServiceKey && hasEnvFile) {
   // Create broker without serviceKeyStore
 }
 ```
+**Status**: ✅ Implemented - AuthBroker supports optional serviceKeyStore, broker created with sessionStore when .env exists
 
-### Stage 4: Refactor `applyAuthHeaders()`
+### Stage 4: Refactor `applyAuthHeaders()` ✅
 
-#### 4.1. Use default destination
+#### 4.1. Use default destination ✅
 ```typescript
 private async applyAuthHeaders(
   headers?: IncomingHttpHeaders, 
@@ -178,10 +203,11 @@ private async applyAuthHeaders(
   }
 }
 ```
+**Status**: ✅ Implemented in `src/index.ts` (lines 1559-1650) - Uses default destination when no headers, client values have priority
 
-### Stage 5: Automatic Connection for stdio
+### Stage 5: Automatic Connection for stdio ✅
 
-#### 5.1. Connect on startup
+#### 5.1. Connect on startup ✅
 ```typescript
 async run() {
   if (this.transportConfig.type === "stdio") {
@@ -200,6 +226,11 @@ async run() {
   }
 }
 ```
+**Status**: ✅ Implemented in `src/index.ts` (lines 2861-2908):
+- ✅ Error handling when no destination/.env exists
+- ✅ Initialize default broker
+- ✅ Automatic connection to ABAP with default destination
+- ✅ SSE also updated (lines 3301-3331)
 
 ---
 
@@ -311,23 +342,35 @@ async run() {
    - Q10: Client values have priority over default ✅
    - Q11: Test via inspector with different configs, add --config YAML support ✅
 2. ✅ **Update roadmap based on answers** - Roadmap updated with all answers
+3. ✅ **Implement changes in AuthBroker (if needed)**
+   - Status: No changes needed - AuthBroker already supports required functionality ✅
+4. ✅ **Refactor `mcp_abap_adt_server`** - All changes implemented:
+   - ✅ Add `defaultDestination` field
+   - ✅ Add `initializeDefaultBroker()` method
+   - ✅ Update `getOrCreateAuthBroker()` to support default destination
+   - ✅ Update `applyAuthHeaders()` to use default when no headers (client values have priority)
+   - ✅ Update `run()` for stdio to initialize default broker and connect automatically
+   - ✅ Update `run()` for SSE to initialize default broker if destination/.env exists
+   - ✅ Handle .env file case: create broker with only sessionStore (without serviceKeyStore)
+   - ✅ Add error handling for stdio mode when no destination/.env exists
 
 ### 📋 Next Steps
-3. ⏳ **Implement `--config` YAML support** (new feature for testing):
-   - Add `--config=<path>` parameter that points to YAML file with configuration values
-   - If `--config` specified but file doesn't exist → generate template YAML file
-   - User can fill in startup parameters in the YAML template
-   - For tests: create different YAML files with different configurations
-   - This avoids drowning in command-line parameters
-4. ⏳ **Implement changes in AuthBroker (if needed)**
-   - Status: No changes needed - AuthBroker already supports required functionality
-5. ⏳ **Refactor `mcp_abap_adt_server`**:
-   - Add `defaultDestination` field
-   - Add `initializeDefaultBroker()` method
-   - Update `getOrCreateAuthBroker()` to support default destination
-   - Update `applyAuthHeaders()` to use default when no headers (client values have priority)
-   - Update `run()` for stdio/SSE to initialize default broker
-6. ⏳ **Test all scenarios** (see Q11 for test scenarios, use --config YAML files)
+5. ✅ **Implement `--config` YAML support** (new feature for testing) - COMPLETED:
+   - ✅ Add `--config=<path>` parameter that points to YAML file with configuration values
+   - ✅ If `--config` specified but file doesn't exist → generate template YAML file
+   - ✅ User can fill in startup parameters in the YAML template
+   - ✅ For tests: create different YAML files with different configurations
+   - ✅ This avoids drowning in command-line parameters
+   - ✅ Command-line arguments override YAML values
+   - ✅ Documentation created: `docs/configuration/YAML_CONFIG.md`
+6. ⏳ **Test all scenarios** (see Q11 for test scenarios, use --config YAML files):
+   - stdio with `--mcp=<destination>`
+   - stdio with .env file
+   - stdio without destination/.env (should error)
+   - SSE/HTTP with default destination, client sends request without headers
+   - SSE/HTTP with default destination, client sends request with different destination
+   - SSE/HTTP without default, client sends request with destination in headers
+   - SSE/HTTP without default, client sends request without headers (should error)
 7. ⏳ **Update documentation**
 
 ---

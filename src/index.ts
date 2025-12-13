@@ -39,6 +39,12 @@ import {
   getTransportType as getTransportTypeRuntime,
   resolveEnvFromCwd,
 } from "./lib/runtimeConfig";
+import {
+  parseConfigArg,
+  loadYamlConfig,
+  generateConfigTemplateIfNeeded,
+  applyYamlConfigToArgs,
+} from "./lib/yamlConfig";
 
 // Import handler functions
 // Import handler functions
@@ -433,12 +439,28 @@ DESCRIPTION:
   Supports multiple transport modes: HTTP (default), stdio, and SSE.
 
 TRANSPORT MODES:
-  Default: HTTP (can work without .env file, receives config via HTTP headers)
-  stdio:   --transport=stdio (for MCP clients like Cline, Cursor, Claude Desktop)
+  Default: stdio (for MCP clients like Cline, Cursor, Claude Desktop)
+  HTTP:    --transport=http (for web interfaces, receives config via HTTP headers)
   SSE:     --transport=sse
 
 OPTIONS:
   --help                           Show this help message
+  --config=<path>                  Path to YAML configuration file
+                                   If file doesn't exist, generates a template
+                                   Command-line arguments override YAML values
+                                   Example: --config=config.yaml
+
+YAML CONFIGURATION:
+  Instead of passing many command-line arguments, you can use a YAML config file:
+
+    mcp-abap-adt --config=config.yaml
+
+  If the file doesn't exist, a template will be generated automatically.
+  Edit the template to configure your server settings.
+
+  Command-line arguments always override YAML values for flexibility.
+
+  See docs/configuration/YAML_CONFIG.md for detailed documentation.
 
 ENVIRONMENT FILE:
   --env=<path>                     Path to .env file (uses .env instead of auth-broker)
@@ -467,7 +489,9 @@ TRANSPORT SELECTION:
 
 HTTP/STREAMABLE-HTTP OPTIONS:
   --http-port=<port>               HTTP server port (default: 3000)
-  --http-host=<host>               HTTP server host (default: 0.0.0.0)
+  --http-host=<host>               HTTP server host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
+                                   Security: When listening on 0.0.0.0, client must provide all connection headers
+                                   Server will not use default destination for non-local connections
   --http-json-response             Enable JSON response format
   --http-allowed-origins=<list>    Comma-separated allowed origins for CORS
                                    Example: --http-allowed-origins=http://localhost:3000,https://example.com
@@ -476,7 +500,9 @@ HTTP/STREAMABLE-HTTP OPTIONS:
 
 SSE (SERVER-SENT EVENTS) OPTIONS:
   --sse-port=<port>                SSE server port (default: 3001)
-  --sse-host=<host>                SSE server host (default: 0.0.0.0)
+  --sse-host=<host>                SSE server host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
+                                   Security: When listening on 0.0.0.0, client must provide all connection headers
+                                   Server will not use default destination for non-local connections
   --sse-allowed-origins=<list>     Comma-separated allowed origins for CORS
                                    Example: --sse-allowed-origins=http://localhost:3000
   --sse-allowed-hosts=<list>       Comma-separated allowed hosts
@@ -489,13 +515,13 @@ ENVIRONMENT VARIABLES:
   MCP_TRANSPORT                    Transport type (stdio|http|sse)
                                    Default: http (streamable-http) if not specified
   MCP_HTTP_PORT                    Default HTTP port (default: 3000)
-  MCP_HTTP_HOST                    Default HTTP host (default: 0.0.0.0)
+  MCP_HTTP_HOST                    Default HTTP host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
   MCP_HTTP_ENABLE_JSON_RESPONSE   Enable JSON responses (true|false)
   MCP_HTTP_ALLOWED_ORIGINS         Allowed CORS origins (comma-separated)
   MCP_HTTP_ALLOWED_HOSTS           Allowed hosts (comma-separated)
   MCP_HTTP_ENABLE_DNS_PROTECTION   Enable DNS protection (true|false)
   MCP_SSE_PORT                     Default SSE port (default: 3001)
-  MCP_SSE_HOST                     Default SSE host (default: 0.0.0.0)
+  MCP_SSE_HOST                     Default SSE host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
   MCP_SSE_ALLOWED_ORIGINS          Allowed CORS origins for SSE (comma-separated)
   MCP_SSE_ALLOWED_HOSTS            Allowed hosts for SSE (comma-separated)
   MCP_SSE_ENABLE_DNS_PROTECTION    Enable DNS protection for SSE (true|false)
@@ -552,17 +578,23 @@ GENERATING .ENV FROM SERVICE KEY (JWT Authentication):
   This will create/update .env file with JWT tokens and connection details.
 
 EXAMPLES:
-  # Default HTTP mode (works without .env file)
+  # Default stdio mode (for MCP clients, requires .env file or --mcp parameter)
   mcp-abap-adt
 
-  # HTTP server on custom port
-  mcp-abap-adt --http-port=8080
+  # HTTP mode (for web interfaces)
+  mcp-abap-adt --transport=http
 
-  # Use stdio mode (for MCP clients, requires .env file or --mcp parameter)
-  mcp-abap-adt --transport=stdio
+  # HTTP server on custom port, localhost only (default)
+  mcp-abap-adt --transport=http --http-port=8080
+
+  # HTTP server accepting connections from all interfaces (less secure)
+  mcp-abap-adt --transport=http --http-host=0.0.0.0 --http-port=8080
+
+  # Use YAML configuration file
+  mcp-abap-adt --config=config.yaml
 
   # Use stdio mode with --mcp parameter (uses auth-broker, skips .env file)
-  mcp-abap-adt --transport=stdio --mcp=TRIAL
+  mcp-abap-adt --mcp=TRIAL
 
   # Default: uses .env from current directory if exists, otherwise auth-broker
   mcp-abap-adt
@@ -736,6 +768,45 @@ if (process.argv.includes("--version") || process.argv.includes("-v")) {
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
   showHelp();
+}
+
+// Load YAML config if --config parameter is provided
+// YAML config values are applied to process.argv (command-line args override YAML)
+const configPath = parseConfigArg();
+if (configPath) {
+  try {
+    // Generate template if file doesn't exist
+    const templateGenerated = generateConfigTemplateIfNeeded(configPath);
+
+    // If template was just generated, exit successfully
+    // User needs to edit the file before running the server
+    if (templateGenerated) {
+      if (process.platform === 'win32') {
+        setTimeout(() => process.exit(0), 100);
+      } else {
+        process.exit(0);
+      }
+    }
+
+    // Load and apply YAML config (only if file exists)
+    const yamlConfig = loadYamlConfig(configPath);
+    if (yamlConfig) {
+      applyYamlConfigToArgs(yamlConfig);
+      // Only write to stderr if not in stdio mode (stdio mode requires clean JSON only)
+      const isStdioMode = process.env.MCP_TRANSPORT === "stdio" || !process.stdin.isTTY;
+      if (!isStdioMode) {
+        process.stderr.write(`[MCP-CONFIG] Loaded and validated configuration from: ${configPath}\n`);
+      }
+    }
+  } catch (error) {
+    const errorMsg = `Failed to load YAML config: ${error instanceof Error ? error.message : String(error)}`;
+    process.stderr.write(`[MCP-CONFIG] ✗ ERROR: ${errorMsg}\n`);
+    if (process.platform === 'win32') {
+      setTimeout(() => process.exit(1), 100);
+    } else {
+      process.exit(1);
+    }
+  }
 }
 
 // Runtime config (shared, no side-effects)
@@ -1160,7 +1231,9 @@ function parseTransportConfig(): TransportConfig {
 
   if (sseRequested) {
     const port = resolvePortOption("--sse-port", "MCP_SSE_PORT", 3001);
-    const host = getArgValue("--sse-host") ?? process.env.MCP_SSE_HOST ?? "0.0.0.0";
+    // Default to localhost (127.0.0.1) for security - only accepts local connections
+    // Use 0.0.0.0 to accept connections from all interfaces (less secure)
+    const host = getArgValue("--sse-host") ?? process.env.MCP_SSE_HOST ?? "127.0.0.1";
     const allowedOrigins = resolveListOption("--sse-allowed-origins", "MCP_SSE_ALLOWED_ORIGINS");
     const allowedHosts = resolveListOption("--sse-allowed-hosts", "MCP_SSE_ALLOWED_HOSTS");
     const enableDnsRebindingProtection = resolveBooleanOption(
@@ -1189,7 +1262,9 @@ function parseTransportConfig(): TransportConfig {
 
   if (httpRequested) {
     const port = resolvePortOption("--http-port", "MCP_HTTP_PORT", 3000);
-    const host = getArgValue("--http-host") ?? process.env.MCP_HTTP_HOST ?? "0.0.0.0";
+    // Default to localhost (127.0.0.1) for security - only accepts local connections
+    // Use 0.0.0.0 to accept connections from all interfaces (less secure)
+    const host = getArgValue("--http-host") ?? process.env.MCP_HTTP_HOST ?? "127.0.0.1";
     const enableJsonResponse = resolveBooleanOption(
       "--http-json-response",
       "MCP_HTTP_ENABLE_JSON_RESPONSE",
@@ -1390,6 +1465,7 @@ export class mcp_abap_adt_server {
   private httpServer?: HttpServer;
   private shuttingDown = false;
   private readonly defaultMcpDestination?: string; // Default MCP destination from --mcp parameter
+  private defaultDestination?: string; // Default destination (from --mcp or .env, used when client doesn't specify)
 
   // Client session tracking for StreamableHTTP (like the example)
   private streamableHttpSessions = new Map<string, {
@@ -1420,7 +1496,53 @@ export class mcp_abap_adt_server {
   }
 
   /**
+   * Initialize default broker on server startup (for stdio/SSE transports)
+   * Creates broker with default destination from --mcp parameter or .env file
+   */
+  private async initializeDefaultBroker(): Promise<void> {
+    // Determine default destination
+    if (this.defaultMcpDestination) {
+      // Scenario A: Destination specified at startup (--mcp parameter)
+      this.defaultDestination = this.defaultMcpDestination;
+
+      // Create broker with serviceKeyStore + sessionStore
+      const authBroker = await this.getOrCreateAuthBroker(this.defaultMcpDestination, 'global');
+      if (authBroker) {
+        logger.info("Default broker initialized with destination from --mcp parameter", {
+          type: "DEFAULT_BROKER_INITIALIZED",
+          destination: this.defaultMcpDestination,
+          transport: this.transportConfig.type,
+        });
+      }
+    } else if (this.hasEnvFile) {
+      // Scenario B: No destination specified, but .env file exists
+      this.defaultDestination = 'default'; // Use 'default' as destination name for .env case
+
+      // Create broker with only sessionStore (without serviceKeyStore)
+      // Note: getOrCreateAuthBroker will create broker, but we need to ensure it works with .env
+      // For .env case, sessionStore should load from .env file
+      const authBroker = await this.getOrCreateAuthBroker('default', 'global');
+      if (authBroker) {
+        logger.info("Default broker initialized with .env file", {
+          type: "DEFAULT_BROKER_INITIALIZED_ENV",
+          destination: 'default',
+          transport: this.transportConfig.type,
+        });
+      }
+    } else {
+      // Scenario C: Neither destination nor .env
+      // For stdio: error will be thrown in run() method
+      // For SSE/HTTP: no default broker, wait for headers
+      logger.debug("No default destination available (no --mcp parameter and no .env file)", {
+        type: "NO_DEFAULT_DESTINATION",
+        transport: this.transportConfig.type,
+      });
+    }
+  }
+
+  /**
    * Get or create AuthBroker for a specific destination (lazy initialization)
+   * If destination is not specified, uses default destination
    */
   private async getOrCreateAuthBroker(destination?: string, clientKey?: string): Promise<AuthBroker | undefined> {
     // Only for HTTP/streamable-http, stdio, and SSE transports
@@ -1431,27 +1553,31 @@ export class mcp_abap_adt_server {
       return undefined;
     }
 
+    // If destination not specified, use default destination
+    const actualDestination = destination || this.defaultDestination;
+
     // Get custom path from command line argument or environment variable
     const customPath = authBrokerPath ? path.resolve(authBrokerPath) : undefined;
 
-    const brokerKey = this.buildAuthBrokerKey(destination, clientKey);
+    const brokerKey = this.buildAuthBrokerKey(actualDestination, clientKey);
 
     // Get or create AuthBroker for specific destination/client
     if (!this.authBrokers.has(brokerKey)) {
       try {
         logger.debug("Creating AuthBroker for destination", {
           type: "AUTH_BROKER_CREATE_START",
-          destination: destination || 'default',
+          destination: actualDestination || 'default',
           clientKey: clientKey || 'global',
           platform: process.platform,
           unsafe: unsafe,
         });
 
         // Use async version to auto-detect store type based on service key format
-        const { serviceKeyStore, sessionStore, storeType } = await getPlatformStoresAsync(customPath, unsafe, destination);
+        // For .env case (destination='default' and no service key), we need to create broker with only sessionStore
+        const { serviceKeyStore, sessionStore, storeType } = await getPlatformStoresAsync(customPath, unsafe, actualDestination);
         logger.debug("Platform stores created", {
           type: "PLATFORM_STORES_CREATED",
-          destination: destination || 'default',
+          destination: actualDestination || 'default',
           clientKey: clientKey || 'global',
           platform: process.platform,
           unsafe: unsafe,
@@ -1476,14 +1602,14 @@ export class mcp_abap_adt_server {
         this.authBrokers.set(brokerKey, authBroker);
         logger.info("AuthBroker created for destination", {
           type: "AUTH_BROKER_CREATED",
-          destination: destination || 'default',
+          destination: actualDestination || 'default',
           clientKey: clientKey || 'global',
           platform: process.platform,
         });
       } catch (error) {
         logger.error("Failed to create AuthBroker for destination", {
           type: "AUTH_BROKER_CREATE_FAILED",
-          destination: destination || 'default',
+          destination: actualDestination || 'default',
           clientKey: clientKey || 'global',
           platform: process.platform,
           error: error instanceof Error ? error.message : String(error),
@@ -1496,7 +1622,7 @@ export class mcp_abap_adt_server {
     if (!authBroker) {
       logger.error("AuthBroker not found in map after creation", {
         type: "AUTH_BROKER_NOT_FOUND",
-        destination: destination || 'default',
+        destination: actualDestination || 'default',
         clientKey: clientKey || 'global',
         mapSize: this.authBrokers.size,
         mapKeys: Array.from(this.authBrokers.keys()).slice(0, 20),
@@ -1506,36 +1632,91 @@ export class mcp_abap_adt_server {
   }
 
   private async applyAuthHeaders(headers?: IncomingHttpHeaders, sessionId?: string, clientKey?: string) {
-    // If no headers but defaultMcpDestination is set, use it
-    if (!headers || Object.keys(headers).length === 0) {
-      if (this.defaultMcpDestination) {
-        // Create headers object with default MCP destination
-        headers = { [HEADER_MCP_DESTINATION]: this.defaultMcpDestination };
-        logger.info("No headers provided, using default MCP destination from --mcp parameter", {
-          type: "NO_HEADERS_DEFAULT_MCP_USED",
-          destination: this.defaultMcpDestination,
+    // Security: If server is listening on non-local interface (0.0.0.0), don't use default destination
+    // Client must provide all connection parameters in headers - server only proxies to ABAP
+    const isNonLocalInterface = this.isListeningOnNonLocalInterface();
+
+    if (isNonLocalInterface) {
+      // Non-local interface: use only what client provides in headers, no default destination
+      if (!headers || Object.keys(headers).length === 0) {
+        logger.info("No headers provided - server listening on non-local interface requires all headers from client", {
+          type: "NO_HEADERS_NON_LOCAL_INTERFACE",
           sessionId: sessionId?.substring(0, 8),
-        });
-      } else {
-        logger.info("No headers provided in request", {
-          type: "NO_HEADERS_PROVIDED",
-          sessionId: sessionId?.substring(0, 8),
-          hint: `Provide authentication headers (${HEADER_SAP_DESTINATION_SERVICE}, ${HEADER_SAP_URL}, ${HEADER_SAP_AUTH_TYPE}, etc.) or use --mcp parameter`,
+          hint: `Server is listening on 0.0.0.0 - client must provide all connection parameters in headers. Server will not use default destination for security.`,
         });
         return;
       }
-    }
-
-    // Apply default MCP destination from --mcp parameter if not provided in headers
-    const headersWithDefault = { ...headers };
-    if (this.defaultMcpDestination && !headers[HEADER_MCP_DESTINATION] && !headers['X-MCP-Destination']) {
-      headersWithDefault[HEADER_MCP_DESTINATION] = this.defaultMcpDestination;
-      logger.info("Using default MCP destination from --mcp parameter", {
-        type: "DEFAULT_MCP_DESTINATION_APPLIED",
-        destination: this.defaultMcpDestination,
+      // Use headers as-is, no default destination
+      logger.debug("Non-local interface: using only client-provided headers", {
+        type: "NON_LOCAL_INTERFACE_HEADERS_ONLY",
         sessionId: sessionId?.substring(0, 8),
       });
+    } else {
+      // Local interface (127.0.0.1): can use default destination if no headers
+      // If no headers but defaultDestination is set, use it
+      // Client values have priority (Q10), but if no headers at all, use default
+      if (!headers || Object.keys(headers).length === 0) {
+        if (this.defaultDestination) {
+          // Use default destination to get connection config from broker
+          const authBroker = await this.getOrCreateAuthBroker(this.defaultDestination, clientKey || sessionId);
+          if (authBroker) {
+            try {
+              const connConfig = await authBroker.getConnectionConfig(this.defaultDestination);
+              if (connConfig?.serviceUrl) {
+                const jwtToken = await authBroker.getToken(this.defaultDestination);
+                if (jwtToken) {
+                  // Create headers object with default destination
+                  headers = {
+                    [HEADER_MCP_DESTINATION]: this.defaultDestination,
+                    [HEADER_SAP_URL]: connConfig.serviceUrl,
+                    [HEADER_SAP_JWT_TOKEN]: jwtToken,
+                  };
+                  logger.info("No headers provided, using default destination", {
+                    type: "NO_HEADERS_DEFAULT_DESTINATION_USED",
+                    destination: this.defaultDestination,
+                    sessionId: sessionId?.substring(0, 8),
+                  });
+                }
+              }
+            } catch (error) {
+              logger.warn("Failed to get connection config from default destination", {
+                type: "DEFAULT_DESTINATION_CONFIG_FAILED",
+                destination: this.defaultDestination,
+                sessionId: sessionId?.substring(0, 8),
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+          }
+        }
+
+        // If still no headers after trying default destination, log and return
+        if (!headers || Object.keys(headers).length === 0) {
+          logger.info("No headers provided in request and no default destination available", {
+            type: "NO_HEADERS_PROVIDED",
+            sessionId: sessionId?.substring(0, 8),
+            hint: `Provide authentication headers (${HEADER_SAP_DESTINATION_SERVICE}, ${HEADER_SAP_URL}, ${HEADER_SAP_AUTH_TYPE}, etc.) or use --mcp parameter or .env file`,
+          });
+          return;
+        }
+      }
+
+      // Apply default destination if not provided in headers (client values have priority)
+      // Only for local interface
+      if (this.defaultDestination && !headers[HEADER_MCP_DESTINATION] && !headers['X-MCP-Destination']) {
+        headers[HEADER_MCP_DESTINATION] = this.defaultDestination;
+        logger.info("Using default destination (client didn't specify)", {
+          type: "DEFAULT_DESTINATION_APPLIED",
+          destination: this.defaultDestination,
+          sessionId: sessionId?.substring(0, 8),
+        });
+      }
     }
+
+    // Ensure headers is set for processing below
+    if (!headers) {
+      headers = {};
+    }
+    const headersWithDefault = { ...headers };
 
     // Log which auth headers are present (for debugging)
     // Check headers in both cases (Node.js normalizes to lowercase, but check both for safety)
@@ -2042,6 +2223,20 @@ export class mcp_abap_adt_server {
     if (remoteAddress.startsWith("127.") || remoteAddress.startsWith("::1")) {
       return true;
     }
+    return false;
+  }
+
+  /**
+   * Check if server is listening on non-local interface (0.0.0.0)
+   * When listening on 0.0.0.0, we don't use default destination - client must provide all headers
+   */
+  private isListeningOnNonLocalInterface(): boolean {
+    if (this.transportConfig.type === "streamable-http" || this.transportConfig.type === "sse") {
+      const host = this.transportConfig.host;
+      // If host is 0.0.0.0, ::, or empty, it accepts connections from all interfaces
+      return host === "0.0.0.0" || host === "::" || host === "" || !host;
+    }
+    // stdio is always local
     return false;
   }
 
@@ -2782,35 +2977,53 @@ export class mcp_abap_adt_server {
    */
   async run() {
     if (this.transportConfig.type === "stdio") {
-      // If --mcp parameter is provided, initialize auth-broker with default destination
-      if (this.defaultMcpDestination) {
+      // For stdio: must have destination or .env file (error if neither exists)
+      if (!this.defaultMcpDestination && !this.hasEnvFile) {
+        const errorMsg = "stdio transport requires either --mcp parameter or .env file";
+        logger.error(errorMsg, {
+          type: "STDIO_NO_DESTINATION_ERROR",
+        });
+        process.stderr.write(`[MCP] ✗ ERROR: ${errorMsg}\n`);
+        process.stderr.write(`[MCP]   Please provide --mcp=<destination> parameter or ensure .env file exists in current directory.\n`);
+        if (this.allowProcessExit) {
+          process.exit(1);
+        }
+        throw new Error(errorMsg);
+      }
+
+      // Initialize default broker (creates broker with default destination from --mcp or .env)
+      await this.initializeDefaultBroker();
+
+      // If default destination exists, connect to ABAP automatically
+      if (this.defaultDestination) {
         try {
-          const authBroker = await this.getOrCreateAuthBroker(this.defaultMcpDestination);
+          const authBroker = await this.getOrCreateAuthBroker(this.defaultDestination, 'global');
           if (authBroker) {
-            const connConfig = await authBroker.getConnectionConfig(this.defaultMcpDestination);
+            const connConfig = await authBroker.getConnectionConfig(this.defaultDestination);
             if (connConfig?.serviceUrl) {
-              const jwtToken = await authBroker.getToken(this.defaultMcpDestination);
+              const jwtToken = await authBroker.getToken(this.defaultDestination);
               if (jwtToken) {
                 // Register AuthBroker in global registry for connection to use during token refresh
                 const { registerAuthBroker } = require('./lib/utils');
-                registerAuthBroker(this.defaultMcpDestination, authBroker);
-                this.processJwtConfigUpdate(connConfig.serviceUrl, jwtToken, undefined, this.defaultMcpDestination);
-                logger.info("SAP configuration initialized from --mcp parameter for stdio transport", {
-                  type: "STDIO_MCP_DESTINATION_INIT",
-                  destination: this.defaultMcpDestination,
+                registerAuthBroker(this.defaultDestination, authBroker);
+                this.processJwtConfigUpdate(connConfig.serviceUrl, jwtToken, undefined, this.defaultDestination);
+                logger.info("SAP configuration initialized for stdio transport", {
+                  type: "STDIO_DESTINATION_INIT",
+                  destination: this.defaultDestination,
                   url: connConfig.serviceUrl,
                 });
               }
             }
           }
         } catch (error) {
-          logger.warn("Failed to initialize auth-broker with --mcp parameter for stdio transport", {
-            type: "STDIO_MCP_DESTINATION_INIT_FAILED",
-            destination: this.defaultMcpDestination,
+          logger.warn("Failed to initialize connection with default destination for stdio transport", {
+            type: "STDIO_DESTINATION_INIT_FAILED",
+            destination: this.defaultDestination,
             error: error instanceof Error ? error.message : String(error),
           });
         }
       }
+
       // Simple stdio setup like reference implementation
       const transport = new StdioServerTransport();
       await this.mcpServer.server.connect(transport);
@@ -3204,34 +3417,43 @@ export class mcp_abap_adt_server {
 
     const sseConfig = this.transportConfig;
 
-    // If --mcp parameter is provided, initialize auth-broker with default destination
-    if (this.defaultMcpDestination) {
-      try {
-        const authBroker = await this.getOrCreateAuthBroker(this.defaultMcpDestination);
-        if (authBroker) {
-          const connConfig = await authBroker.getConnectionConfig(this.defaultMcpDestination);
-          if (connConfig?.serviceUrl) {
-            const jwtToken = await authBroker.getToken(this.defaultMcpDestination);
-            if (jwtToken) {
-              // Register AuthBroker in global registry for connection to use during token refresh
-              const { registerAuthBroker } = require('./lib/utils');
-              registerAuthBroker(this.defaultMcpDestination, authBroker);
-              this.processJwtConfigUpdate(connConfig.serviceUrl, jwtToken, undefined, this.defaultMcpDestination);
-              logger.info("SAP configuration initialized from --mcp parameter for SSE transport", {
-                type: "SSE_MCP_DESTINATION_INIT",
-                destination: this.defaultMcpDestination,
-                url: connConfig.serviceUrl,
-              });
+    // Initialize default broker if destination/.env exists (for SSE: optional, wait for headers if not)
+    if (this.defaultMcpDestination || this.hasEnvFile) {
+      await this.initializeDefaultBroker();
+
+      // If default destination exists, connect to ABAP automatically
+      if (this.defaultDestination) {
+        try {
+          const authBroker = await this.getOrCreateAuthBroker(this.defaultDestination, 'global');
+          if (authBroker) {
+            const connConfig = await authBroker.getConnectionConfig(this.defaultDestination);
+            if (connConfig?.serviceUrl) {
+              const jwtToken = await authBroker.getToken(this.defaultDestination);
+              if (jwtToken) {
+                // Register AuthBroker in global registry for connection to use during token refresh
+                const { registerAuthBroker } = require('./lib/utils');
+                registerAuthBroker(this.defaultDestination, authBroker);
+                this.processJwtConfigUpdate(connConfig.serviceUrl, jwtToken, undefined, this.defaultDestination);
+                logger.info("SAP configuration initialized for SSE transport", {
+                  type: "SSE_DESTINATION_INIT",
+                  destination: this.defaultDestination,
+                  url: connConfig.serviceUrl,
+                });
+              }
             }
           }
+        } catch (error) {
+          logger.warn("Failed to initialize connection with default destination for SSE transport", {
+            type: "SSE_DESTINATION_INIT_FAILED",
+            destination: this.defaultDestination,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
-      } catch (error) {
-        logger.warn("Failed to initialize auth-broker with --mcp parameter for SSE transport", {
-          type: "SSE_MCP_DESTINATION_INIT_FAILED",
-          destination: this.defaultMcpDestination,
-          error: error instanceof Error ? error.message : String(error),
-        });
       }
+    } else {
+      logger.debug("No default destination for SSE transport, will wait for headers", {
+        type: "SSE_NO_DEFAULT_DESTINATION",
+      });
     }
 
     const streamPathMap = new Map<string, string>([

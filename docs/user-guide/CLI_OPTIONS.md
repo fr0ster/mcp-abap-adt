@@ -18,6 +18,32 @@ The help message shows all available options for all transport modes.
 
 ## General Options
 
+### YAML Configuration File
+
+**--config=\<path\>** or **--config \<path\>**
+
+Load server configuration from a YAML file instead of command-line arguments. If the file doesn't exist, a template will be automatically generated.
+
+```bash
+# Use YAML config file
+mcp-abap-adt --config=config.yaml
+
+# Override YAML values with command-line arguments
+mcp-abap-adt --config=config.yaml --http-port=8080
+```
+
+**Benefits:**
+- Cleaner command-line interface
+- Easy to create different configs for different scenarios
+- Template generation helps understand available options
+- Configuration can be version-controlled
+
+**Command-Line Override:**
+Command-line arguments always override YAML values, allowing you to use YAML as base configuration and override specific values when needed.
+
+**See Also:**
+- [YAML Configuration Guide](../configuration/YAML_CONFIG.md) - Complete YAML config documentation
+
 ### Environment File Configuration
 
 **--env=\<path\>** or **--env \<path\>**
@@ -76,18 +102,18 @@ mcp-abap-adt --env=/tmp/test.env
 Specify which transport protocol to use.
 
 Valid values:
-- `http` or `streamable-http` - HTTP server (default)
-- `stdio` - Standard input/output (for MCP protocol)
+- `stdio` - Standard input/output (default, for MCP clients like Cline, Cursor, Claude Desktop)
+- `http` or `streamable-http` - HTTP server (for web interfaces)
 - `sse` - Server-Sent Events
 
 ```bash
-# Default HTTP mode (no flag needed)
+# Default stdio mode (for MCP clients)
 mcp-abap-adt
 
-# Explicit stdio (for MCP clients like Cline, Cursor)
+# Explicit stdio mode
 mcp-abap-adt --transport=stdio
 
-# HTTP transport
+# HTTP transport (for web interfaces)
 mcp-abap-adt --transport=http
 
 # SSE transport
@@ -160,15 +186,24 @@ mcp-abap-adt --transport=http --http-port=8080
 
 **--http-host=\<host\>**
 
-HTTP server host address (default: 0.0.0.0, binds to all interfaces).
+HTTP server host address (default: 127.0.0.1, localhost only for security).
+
+**Security Note:**
+- **127.0.0.1 (default)**: Server accepts connections only from localhost. Safe to use default destination from auth-broker or .env file.
+- **0.0.0.0**: Server accepts connections from all network interfaces. **Less secure** - client must provide all connection headers. Server will not use default destination for non-local connections.
 
 ```bash
-# Bind to localhost only
+# Bind to localhost only (default, secure)
 mcp-abap-adt --transport=http --http-host=127.0.0.1
 
-# Bind to all interfaces (default)
+# Bind to all interfaces (less secure, client must provide all headers)
 mcp-abap-adt --transport=http --http-host=0.0.0.0
 ```
+
+**When using 0.0.0.0:**
+- Client must provide all connection parameters in HTTP headers (SAP_URL, SAP_JWT_TOKEN, etc.)
+- Server acts as a simple proxy - no default destination lookup
+- All responsibility for connection configuration is on the client
 
 ### Response Format
 
@@ -241,12 +276,24 @@ mcp-abap-adt --transport=sse --sse-port=8081
 
 **--sse-host=\<host\>**
 
-SSE server host address (default: 0.0.0.0).
+SSE server host address (default: 127.0.0.1, localhost only for security).
+
+**Security Note:**
+- **127.0.0.1 (default)**: Server accepts connections only from localhost. Safe to use default destination from auth-broker or .env file.
+- **0.0.0.0**: Server accepts connections from all network interfaces. **Less secure** - client must provide all connection headers. Server will not use default destination for non-local connections.
 
 ```bash
-# Bind to localhost only
+# Bind to localhost only (default, secure)
 mcp-abap-adt --transport=sse --sse-host=127.0.0.1
+
+# Bind to all interfaces (less secure, client must provide all headers)
+mcp-abap-adt --transport=sse --sse-host=0.0.0.0
 ```
+
+**When using 0.0.0.0:**
+- Client must provide all connection parameters in HTTP headers (SAP_URL, SAP_JWT_TOKEN, etc.)
+- Server acts as a simple proxy - no default destination lookup
+- All responsibility for connection configuration is on the client
 
 ### CORS Configuration
 
@@ -301,7 +348,7 @@ Alternative to command line arguments. Environment variables can be set in shell
 ### HTTP Transport
 
 - `MCP_HTTP_PORT` - Default HTTP port
-- `MCP_HTTP_HOST` - Default HTTP host
+- `MCP_HTTP_HOST` - Default HTTP host (default: 127.0.0.1)
 - `MCP_HTTP_ENABLE_JSON_RESPONSE` - Enable JSON responses (true|false)
 - `MCP_HTTP_ALLOWED_ORIGINS` - Allowed CORS origins (comma-separated)
 - `MCP_HTTP_ALLOWED_HOSTS` - Allowed hosts (comma-separated)

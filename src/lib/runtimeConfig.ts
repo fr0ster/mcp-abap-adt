@@ -95,7 +95,8 @@ export function buildRuntimeConfig() {
   // If transport was auto-detected (not explicitly set), consider it as explicit for stdio mode
   // This allows stdio mode to work when run by inspector without --transport=stdio argument
   const isAutoDetectedStdio = explicitTransportType === "stdio" && !hasExplicitTransportArg && !process.env.MCP_TRANSPORT;
-  const transportType = explicitTransportType || "streamable-http";
+  // Default transport is stdio (changed from streamable-http per user request)
+  const transportType = explicitTransportType || "stdio";
   const isHttp = transportType === "http" || transportType === "streamable-http" || transportType === "server";
   const isSse = transportType === "sse";
   const isStdio = transportType === "stdio";

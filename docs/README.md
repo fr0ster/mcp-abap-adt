@@ -18,6 +18,12 @@ Documentation for end users: configuration, usage, and available tools.
 
 - `CLIENT_CONFIGURATION.md` - How to configure MCP clients to connect to the server
 - `AVAILABLE_TOOLS.md` - Complete list of available MCP tools and their descriptions
+- `CLI_OPTIONS.md` - Complete command-line options reference
+
+### [configuration/](configuration/) - Configuration Guides
+Documentation for server configuration options.
+
+- `YAML_CONFIG.md` - YAML configuration file guide (alternative to command-line arguments)
 
 ### [architecture/](architecture/) - For Developers
 Technical documentation about the system architecture, design decisions, and internal structure.
@@ -42,6 +48,7 @@ Documentation for developers: testing, development guides, and internal document
 
 - **Getting Started**: [Installation Guide](installation/INSTALLATION.md)
 - **User Configuration**: [Client Configuration](user-guide/CLIENT_CONFIGURATION.md)
+- **Server Configuration**: [YAML Config](configuration/YAML_CONFIG.md) | [CLI Options](user-guide/CLI_OPTIONS.md)
 - **Available Tools**: [Tools List](user-guide/AVAILABLE_TOOLS.md)
 - **Architecture**: [Stateful Sessions](architecture/STATEFUL_SESSION_GUIDE.md)
 - **Development**: [Development Documentation](development/)

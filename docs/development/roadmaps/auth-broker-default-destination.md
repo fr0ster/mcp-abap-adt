@@ -1,8 +1,8 @@
 # Roadmap: AuthBroker Refactoring for Default Destination Support
 
-## Implementation Status: ✅ Core Features Completed
+## Implementation Status: ✅ Core Features Completed + Security & UX Improvements
 
-**Last Updated**: Implementation completed for core features (Stages 1-5)
+**Last Updated**: Implementation completed for core features (Stages 1-5) + Security improvements and YAML enhancements
 
 ### What's Done:
 - ✅ Default destination support at consumer level
@@ -11,9 +11,13 @@
 - ✅ Support for .env file without service keys
 - ✅ Client values priority over default destination
 - ✅ Error handling for stdio when no destination/.env
+- ✅ `--config` YAML support (for easier testing)
+- ✅ **Default transport changed to stdio** (per user request)
+- ✅ **Security: Host binding options (127.0.0.1 vs 0.0.0.0)**
+- ✅ **YAML template generation with command exit**
+- ✅ **YAML validation on load**
 
 ### What's Next:
-- ✅ `--config` YAML support (for easier testing) - COMPLETED
 - ⏳ Testing all scenarios
 - ⏳ Final documentation review
 
@@ -112,8 +116,82 @@
 - ✅ Command-line arguments override YAML values (for flexibility)
 - ✅ Template includes comments explaining each option
 - ✅ Auto-generates template if file doesn't exist
+- ✅ **Command exits after template generation** (user can edit before running server)
+- ✅ **YAML validation on load** (validates transport, ports, host, etc.)
 - ✅ Documentation: `docs/configuration/YAML_CONFIG.md`
 - ✅ Implementation: `src/lib/yamlConfig.ts`
+
+---
+
+## New Features: Security & Defaults ✅
+
+### Feature 1: Default Transport Changed to stdio ✅
+
+**Problem**: Users requested default transport to be stdio (for MCP clients like Cline, Cursor, Claude Desktop)
+
+**Solution** ✅:
+- Changed default transport from `streamable-http` to `stdio` in `runtimeConfig.ts`
+- Updated help text and documentation
+- Updated YAML template to use `stdio` as default
+
+**Implementation**:
+- `src/lib/runtimeConfig.ts`: Default transport = `stdio`
+- `src/index.ts`: Updated help text
+- `src/lib/yamlConfig.ts`: Updated template default
+- Documentation updated
+
+### Feature 2: Security - Host Binding Options ✅
+
+**Problem**: Need to control whether server accepts connections from localhost only (127.0.0.1) or all interfaces (0.0.0.0) for security
+
+**Solution** ✅:
+- Default host changed from `0.0.0.0` to `127.0.0.1` (localhost only, secure)
+- When listening on `0.0.0.0` (non-local interface):
+  - Client must provide all connection headers
+  - Server does NOT use default destination (security measure)
+  - Server acts as simple proxy - all responsibility on client
+- When listening on `127.0.0.1` (local interface):
+  - Can use default destination from auth-broker or .env
+  - Safe for local development
+
+**Implementation**:
+- `src/index.ts`: 
+  - Default host = `127.0.0.1` for HTTP and SSE
+  - Added `isListeningOnNonLocalInterface()` method
+  - Updated `applyAuthHeaders()` to skip default destination for non-local connections
+- `src/lib/yamlConfig.ts`: Updated template defaults
+- Documentation updated with security notes
+
+### Feature 3: YAML Template Generation with Exit ✅
+
+**Problem**: After generating YAML template, command continued execution instead of exiting
+
+**Solution** ✅:
+- `generateConfigTemplateIfNeeded()` now returns boolean (true if template was generated)
+- If template was generated, command exits with code 0
+- User can edit the file before running the server
+
+**Implementation**:
+- `src/lib/yamlConfig.ts`: Function returns boolean
+- `src/index.ts`: Check return value and exit if template was generated
+
+### Feature 4: YAML Validation on Load ✅
+
+**Problem**: Invalid YAML configurations could cause runtime errors
+
+**Solution** ✅:
+- Added `validateYamlConfig()` function that validates:
+  - Transport type (stdio, http, streamable-http, sse)
+  - Port ranges (1-65535)
+  - HTTP and SSE ports must be different
+  - Allowed-origins format (array or string)
+- Validation runs automatically when loading YAML config
+- On validation errors: command exits with code 1 and shows error list
+
+**Implementation**:
+- `src/lib/yamlConfig.ts`: Added `validateYamlConfig()` function
+- `loadYamlConfig()` calls validation before returning config
+- Error messages are clear and informative
 
 ---
 
@@ -362,8 +440,15 @@ async run() {
    - ✅ For tests: create different YAML files with different configurations
    - ✅ This avoids drowning in command-line parameters
    - ✅ Command-line arguments override YAML values
+   - ✅ **Command exits after template generation** (user can edit before running)
+   - ✅ **YAML validation on load** (validates all parameters)
    - ✅ Documentation created: `docs/configuration/YAML_CONFIG.md`
-6. ⏳ **Test all scenarios** (see Q11 for test scenarios, use --config YAML files):
+6. ✅ **Security & Defaults Improvements** - COMPLETED:
+   - ✅ Changed default transport to stdio (per user request)
+   - ✅ Changed default host to 127.0.0.1 (localhost only, secure)
+   - ✅ Added security logic: non-local connections (0.0.0.0) don't use default destination
+   - ✅ Updated all documentation with security notes
+7. ⏳ **Test all scenarios** (see Q11 for test scenarios, use --config YAML files):
    - stdio with `--mcp=<destination>`
    - stdio with .env file
    - stdio without destination/.env (should error)

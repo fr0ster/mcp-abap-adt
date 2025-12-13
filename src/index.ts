@@ -482,7 +482,7 @@ ENVIRONMENT FILE:
 
 TRANSPORT SELECTION:
   --transport=<type>               Transport type: stdio|http|streamable-http|sse
-                                   Default: http (streamable-http)
+                                   Default: stdio (for MCP clients)
                                    Shortcuts: --http (same as --transport=http)
                                              --sse (same as --transport=sse)
                                              --stdio (same as --transport=stdio)
@@ -513,7 +513,7 @@ ENVIRONMENT VARIABLES:
   MCP_SKIP_ENV_LOAD                Skip automatic .env loading (true|false)
   MCP_SKIP_AUTO_START              Skip automatic server start (true|false)
   MCP_TRANSPORT                    Transport type (stdio|http|sse)
-                                   Default: http (streamable-http) if not specified
+                                   Default: stdio if not specified
   MCP_HTTP_PORT                    Default HTTP port (default: 3000)
   MCP_HTTP_HOST                    Default HTTP host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
   MCP_HTTP_ENABLE_JSON_RESPONSE   Enable JSON responses (true|false)
@@ -1073,9 +1073,9 @@ if (!skipEnvAutoload) {
         process.exit(1);
       }
     } else {
-      // No .env found, but transport is HTTP (default) - this is OK
+      // No .env found, but transport is stdio (default) - this is OK for HTTP/SSE, but stdio requires .env or --mcp
       if (explicitTransportType === null) {
-        // Transport not specified, defaulting to HTTP mode
+        // Transport not specified, using default (stdio)
         // For stdio mode, don't write to stderr
         if (!isStdio) {
           process.stderr.write(`[MCP-ENV] NOTE: No .env file found in current directory: ${process.cwd()}\n`);
@@ -1257,7 +1257,7 @@ function parseTransportConfig(): TransportConfig {
     normalized === "streamable-http" ||
     normalized === "server" ||
     hasFlag("--http") ||
-    // Default to HTTP if not stdio/sse
+    // Note: Default is stdio (set in runtimeConfig), so this only applies if explicitly requested
     (!sseRequested && normalized !== "stdio");
 
   if (httpRequested) {

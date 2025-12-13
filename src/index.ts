@@ -446,7 +446,7 @@ TRANSPORT MODES:
 OPTIONS:
   --help                           Show this help message
   --config=<path>                  Path to YAML configuration file
-                                   If file doesn't exist, generates a template
+                                   If file doesn't exist, generates a template and exits
                                    Command-line arguments override YAML values
                                    Example: --config=config.yaml
 
@@ -455,8 +455,10 @@ YAML CONFIGURATION:
 
     mcp-abap-adt --config=config.yaml
 
-  If the file doesn't exist, a template will be generated automatically.
-  Edit the template to configure your server settings.
+  If the file doesn't exist, a template will be generated automatically and the command will exit.
+  Edit the template to configure your server settings, then run the command again.
+
+  The YAML file is validated on load - invalid configurations will cause the command to exit with an error.
 
   Command-line arguments always override YAML values for flexibility.
 

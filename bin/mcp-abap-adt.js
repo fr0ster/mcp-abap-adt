@@ -47,6 +47,10 @@ Usage:
   mcp-abap-adt [options]
 
 Options:
+  --config=<path>          Path to YAML configuration file
+                            If file doesn't exist, generates a template and exits
+                            Command-line arguments override YAML values
+                            Example: --config=config.yaml
   --env=<file>              Path to .env file (default: .env in current directory)
   --auth-broker             Force use of auth-broker (service keys) instead of .env file
                             Ignores .env file even if present in current directory
@@ -57,11 +61,13 @@ Options:
                             This allows using auth-broker with stdio and SSE transports
                             When --mcp is specified, .env file is not loaded automatically
                             (even if it exists in current directory)
-  --transport=<type>       Transport type: stdio, http, streamable-http, sse, server
+  --transport=<type>       Transport type: stdio (default), http, streamable-http, sse
   --http-port=<port>       HTTP server port (default: 3000)
   --sse-port=<port>        SSE server port (default: 3001)
-  --http-host=<host>       HTTP server host (default: 0.0.0.0)
-  --sse-host=<host>        SSE server host (default: 0.0.0.0)
+  --http-host=<host>       HTTP server host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
+                            Security: When listening on 0.0.0.0, client must provide all connection headers
+  --sse-host=<host>        SSE server host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
+                            Security: When listening on 0.0.0.0, client must provide all connection headers
   --skip-auto-start        Skip automatic server start (for testing)
   --help, -h               Show this help message
   --version, -v            Show version number
@@ -69,10 +75,10 @@ Options:
 Environment Variables:
   MCP_HTTP_PORT            HTTP server port (default: 3000)
   MCP_SSE_PORT             SSE server port (default: 3001)
-  MCP_HTTP_HOST            HTTP server host (default: 0.0.0.0)
-  MCP_SSE_HOST             SSE server host (default: 0.0.0.0)
+  MCP_HTTP_HOST            HTTP server host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
+  MCP_SSE_HOST             SSE server host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
   MCP_ENV_PATH             Path to .env file
-  MCP_TRANSPORT            Transport type (stdio|http|sse)
+  MCP_TRANSPORT            Transport type (default: stdio)
   AUTH_BROKER_PATH         Custom paths for service keys and sessions
                            Unix: colon-separated (e.g., /path1:/path2)
                            Windows: semicolon-separated (e.g., C:\\path1;C:\\path2)
@@ -83,19 +89,32 @@ Environment Variables:
   DEBUG_HANDLERS           Verbose logging for selected read-only/system handlers
 
 Examples:
-  mcp-abap-adt                                    # Use default .env, HTTP on port 3000
+  mcp-abap-adt                                    # Default stdio mode (for MCP clients, requires .env or --mcp)
+  mcp-abap-adt --config=config.yaml               # Use YAML configuration file
   mcp-abap-adt --env=e19.env                      # Use specific .env file
   mcp-abap-adt --env=e19.env --transport=stdio    # Use .env and stdio transport
   mcp-abap-adt --transport=stdio --mcp=TRIAL       # Use stdio with auth-broker (--mcp parameter)
   mcp-abap-adt --transport=http                   # HTTP mode (no .env required, port 3000)
   mcp-abap-adt --transport=http --http-port=8080   # HTTP mode on custom port 8080
+  mcp-abap-adt --transport=http --http-host=0.0.0.0  # HTTP mode accepting all interfaces (less secure)
   mcp-abap-adt --transport=sse --sse-port=3001    # SSE mode on port 3001
   mcp-abap-adt --transport=sse --mcp=TRIAL        # SSE mode with auth-broker (--mcp parameter)
   mcp-abap-adt --auth-broker                      # Use service keys instead of .env file
 
+YAML Configuration:
+  Instead of passing many command-line arguments, you can use a YAML config file:
+    mcp-abap-adt --config=config.yaml
+
+  If the file doesn't exist, a template will be generated automatically and the command will exit.
+  Edit the template to configure your server settings, then run the command again.
+
+  The YAML file is validated on load - invalid configurations will cause the command to exit with an error.
+
+  Command-line arguments always override YAML values for flexibility.
+
 Transport Modes:
-  - stdio (default if stdin is not TTY): For MCP clients like Cline/Cursor
-  - http / streamable-http: HTTP server (default if stdin is TTY, port 3000)
+  - stdio (default): For MCP clients like Cline, Cursor, Claude Desktop
+  - http / streamable-http: HTTP server (for web interfaces, receives config via HTTP headers)
   - sse: Server-Sent Events server (port 3001)
 
 Service Keys (Auth-Broker):

@@ -9,7 +9,7 @@ This directory contains documentation for developers: testing guides, developmen
 - **[SYNC_OPTIONAL_PARAMS.md](SYNC_OPTIONAL_PARAMS.md)** - Tool to sync optional parameters from adt-clients TypeScript interfaces
 - **[DetectObjectTypeListTools.md](DetectObjectTypeListTools.md)** - Documentation for object type detection tools
 - **[HANDLERS_COVERAGE.md](HANDLERS_COVERAGE.md)** - Analysis of low-level handlers coverage and implementation status
-- **[TEST_LOGGING_ROADMAP.md](TEST_LOGGING_ROADMAP.md)** - Test logging storage and rotation policy
+- **[TEST_LOGGING_ROADMAP.md](roadmaps/TEST_LOGGING_ROADMAP.md)** - Test logging storage and rotation policy
 
 ## Test Documentation
 

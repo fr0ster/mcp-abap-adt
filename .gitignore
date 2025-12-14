@@ -83,3 +83,7 @@ certbot-webroot/
 
 # Docker nginx configuration (user-specific)
 docker/nginx.conf
+
+
+*.d.ts
+*.d.ts.map

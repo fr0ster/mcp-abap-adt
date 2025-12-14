@@ -26,8 +26,8 @@ import {
   AbapServiceKeyStore,
   AbapSessionStore,
 } from '@mcp-abap-adt/auth-stores';
-import { XsuaaTokenProvider } from '@mcp-abap-adt/auth-providers';
-import { createLogger } from '@mcp-abap-adt/logger';
+import { BtpTokenProvider, XsuaaTokenProvider } from '@mcp-abap-adt/auth-providers';
+import { DefaultLogger } from '@mcp-abap-adt/logger';
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -40,16 +40,22 @@ if (!destination) {
   process.exit(1);
 }
 
-const logger = createLogger({ level: 'info' });
+const logger = new DefaultLogger();
 
 async function main() {
   try {
     logger.info('Starting MCP Server v2 (stdio transport)...', { destination });
 
     // 1. Create stores and providers
-    const serviceKeyStore = new AbapServiceKeyStore();
-    const sessionStore = new AbapSessionStore();
-    const tokenProvider = new XsuaaTokenProvider();
+    const serviceKeyStore = new AbapServiceKeyStore(
+      './service-keys',
+      logger,
+    );
+    const sessionStore = new AbapSessionStore(
+      './sessions',
+      logger,
+    );
+    const tokenProvider = new BtpTokenProvider();
 
     // 2. Create LocalModeFactory
     const localModeFactory = new LocalModeFactory({
@@ -91,7 +97,7 @@ async function main() {
     );
 
     // 8. Create transport
-    const transport = new StdioTransport(sdkServer);
+    const transport = new StdioTransport();
 
     // 9. Create v2 server
     const server = new V2McpServer(

@@ -105,6 +105,7 @@ Concise roadmap for implementing the new architecture with Dependency Injection.
 ### 3.5 Test Scripts
 - [x] Test script for stdio transport
 - [x] Test script for SSE transport
+- [x] Test script for StreamableHTTP transport
 - [x] npm scripts for running test servers
 - [x] Integration with MCP Inspector
 

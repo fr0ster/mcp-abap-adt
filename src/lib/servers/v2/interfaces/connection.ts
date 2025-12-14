@@ -175,15 +175,17 @@ export interface IAuthBrokerFactory {
   /**
    * Gets existing AuthBroker
    * @param sessionId - Session identifier
+   * @param destination - Destination name (optional, but recommended)
    * @returns AuthBroker instance or undefined
    */
-  getBroker(sessionId: string): any | undefined; // TODO: Import AuthBroker type
+  getBroker(sessionId: string, destination?: string): any | undefined; // TODO: Import AuthBroker type
 
   /**
    * Deletes AuthBroker for session
    * @param sessionId - Session identifier
+   * @param destination - Destination name (optional, if not provided deletes all brokers for session)
    */
-  deleteBroker(sessionId: string): void;
+  deleteBroker(sessionId: string, destination?: string): void;
 
   /**
    * Clears all brokers (on shutdown)

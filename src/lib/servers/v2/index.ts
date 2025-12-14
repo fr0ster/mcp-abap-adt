@@ -24,3 +24,6 @@ export * from './protocol/index.js';
 
 // Server implementations
 export * from './server/index.js';
+
+// Factory implementations
+export * from './factory/index.js';

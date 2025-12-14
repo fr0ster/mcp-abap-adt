@@ -39,19 +39,40 @@ export class LocalConnectionProvider implements IConnectionProvider {
     //   - ServiceKeyStore to read service key
     //   - SessionStore to save/read tokens
     //   - TokenProvider to get new tokens
-    const token = await authBroker.getToken(request.destination);
+    // getToken returns JWT token string
+    const jwtToken = await authBroker.getToken(request.destination);
 
-    // 3. Get service key for URL
-    const serviceKey = await authBroker.getServiceKey(request.destination);
+    // 3. Get connection config for URL and client
+    // Access sessionStore and serviceKeyStore from AuthBrokerFactory
+    const authBrokerFactory = this.authBrokerFactory as any;
+    let sapUrl: string | undefined;
+    let client: string | undefined;
+
+    // Try to get from sessionStore first
+    if (authBrokerFactory.sessionStore) {
+      const connConfig = await authBrokerFactory.sessionStore.getConnectionConfig(request.destination);
+      sapUrl = connConfig?.serviceUrl;
+      client = connConfig?.client;
+    }
+
+    // Fallback to serviceKeyStore if not in session
+    if (!sapUrl && authBrokerFactory.serviceKeyStore) {
+      const serviceKeyConnConfig = await authBrokerFactory.serviceKeyStore.getConnectionConfig(request.destination);
+      sapUrl = serviceKeyConnConfig?.serviceUrl;
+      client = serviceKeyConnConfig?.client;
+    }
+
+    if (!sapUrl) {
+      throw new Error(`Unable to determine SAP URL for destination: ${request.destination}`);
+    }
 
     return {
-      sapUrl: serviceKey.url,
+      sapUrl,
       auth: {
         type: 'jwt',
-        jwtToken: token.accessToken,
-        refreshToken: token.refreshToken,
+        jwtToken,
       },
-      client: serviceKey.client,
+      client,
     };
   }
 

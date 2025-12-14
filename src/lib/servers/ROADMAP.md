@@ -8,8 +8,9 @@ Concise roadmap for implementing the new architecture with Dependency Injection.
 - ✅ **Completed**: Phase 1 - Core Interfaces & Types (all interfaces and implementations)
 - ✅ **Completed**: Phase 1.2 & 1.3 - Connection Providers and SessionManager implementations
 - ✅ **Completed**: Phase 2 - Core Server Implementation (McpServer class, ProtocolHandler, unit tests)
-- 🔄 **In Progress**: Phase 3 - LOCAL Mode Implementation
-- ⏳ **Planned**: Remaining v2 architecture components (Phase 4-7)
+- ✅ **Completed**: Phase 3 - LOCAL Mode Implementation (AuthBrokerFactory, LocalModeFactory, test scripts)
+- 🔄 **In Progress**: Phase 4 - REMOTE Mode Implementation
+- ⏳ **Planned**: Remaining v2 architecture components (Phase 5-7)
 
 ---
 
@@ -80,21 +81,32 @@ Concise roadmap for implementing the new architecture with Dependency Injection.
 ## Phase 3: LOCAL Mode Implementation
 
 ### 3.1 Service Key Store
-- [ ] `FileSystemServiceKeyStore` implementation
-- [ ] Service key loading
-- [ ] Service key validation
+- [x] Use `AbapServiceKeyStore` from @mcp-abap-adt/auth-stores
+- [x] Service key loading (via external package)
+- [x] Service key validation (via external package)
 
 ### 3.2 Auth Broker
 - [x] `IAuthBrokerFactory` interface
-- [ ] `SessionBasedAuthBrokerFactory` implementation (implementation in @mcp-abap-adt/auth-broker)
-- [ ] `AuthBroker` integration with DI (implementation in @mcp-abap-adt/auth-broker)
-- [ ] Token management (get, refresh) (implementation in @mcp-abap-adt/auth-broker)
+- [x] `AuthBrokerFactory` implementation
+- [x] `AuthBroker` integration with DI (uses @mcp-abap-adt/auth-broker)
+- [x] Token management (get, refresh) (via AuthBroker from external package)
 
 ### 3.3 Local Connection Provider
 - [x] `LocalConnectionProvider` implementation
 - [x] Service key lookup (via AuthBroker)
 - [x] Auth broker creation (via Factory)
 - [x] Connection params building
+
+### 3.4 Local Mode Factory
+- [x] `LocalModeFactory` implementation
+- [x] DI assembly of all LOCAL mode components
+- [x] Integration with stores and providers from external packages
+
+### 3.5 Test Scripts
+- [x] Test script for stdio transport
+- [x] Test script for SSE transport
+- [x] npm scripts for running test servers
+- [x] Integration with MCP Inspector
 
 ---
 

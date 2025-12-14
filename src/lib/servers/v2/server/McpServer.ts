@@ -6,13 +6,15 @@
  */
 
 import { McpServer as SdkMcpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ITransport } from '../interfaces/transport.js';
+import { Transport, TransportSendOptions } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import { ISessionManager } from '../interfaces/session.js';
 import { IConnectionProvider } from '../interfaces/connection.js';
 import { IProtocolHandler } from '../interfaces/protocol.js';
 import { IHandlersRegistry } from '../../handlers/interfaces.js';
 import { sessionContext } from '../../../utils.js';
 import { SapConfig } from '@mcp-abap-adt/connection';
+import { IClientInfo, SessionInitializationCallback } from '../types/transport.js';
 
 /**
  * Logger interface (optional dependency)
@@ -25,6 +27,23 @@ export interface ILogger {
 }
 
 /**
+ * Extended transport interface with our architecture-specific methods
+ */
+interface ExtendedTransport extends Transport {
+  connectSdkServer?(
+    sdkServer: any,
+    initializeSession: SessionInitializationCallback,
+    defaultDestination?: string
+  ): Promise<void>;
+  type?: 'stdio' | 'sse' | 'http';
+  bindAddress?: string;
+  port?: number;
+  on?(event: 'session:created', handler: (sessionId: string, clientInfo: IClientInfo) => void): void;
+  on?(event: 'session:closed', handler: (sessionId: string) => void): void;
+  on?(event: 'message', handler: (sessionId: string, message: JSONRPCMessage) => void): void;
+}
+
+/**
  * McpServer - main server orchestrator with Dependency Injection
  *
  * Coordinates all components: transport, sessions, connections, and handlers
@@ -34,7 +53,7 @@ export class McpServer {
   private defaultDestination?: string;
 
   constructor(
-    private transport: ITransport,
+    private transport: ExtendedTransport,
     private sessionManager: ISessionManager,
     private connectionProvider: IConnectionProvider,
     private protocolHandler: IProtocolHandler,
@@ -68,82 +87,52 @@ export class McpServer {
     await this.transport.start();
 
     // Connect SDK server to transport
-    // SDK server needs direct access to SDK transport instances
-    if (this.transport.type === 'stdio') {
-      const stdioTransport = this.transport as any;
-      const sdkTransport = stdioTransport.getSdkTransport?.();
-      if (sdkTransport) {
-        // For stdio, SDK transport handles all message processing automatically
-        // We just need to connect and set up session/connection params
-        await this.mcpServer.server.connect(sdkTransport);
-        this.logger?.debug('SDK server connected to stdio transport');
-
-        // Create stdio session and get connection params immediately
-        // Stdio has a single global session
-        const stdioSessionId = 'stdio-session';
-        const clientInfo = { transport: 'stdio' as const };
+    // Transport implementation decides how to connect and when to initialize sessions
+    await this.transport.connectSdkServer(
+      this.mcpServer,
+      async (sessionId: string, clientInfo, destination?: string) => {
+        // Create session
         const session = this.sessionManager.createSession(clientInfo);
 
-        // Get connection parameters for stdio session
-        try {
-          const destination = this.defaultDestination;
-          if (!destination && this.connectionProvider.mode === 'LOCAL') {
-            throw new Error('Destination required for LOCAL mode. Provide --mcp=destination argument.');
-          }
+        // Get connection parameters
+        const connectionParams = await this.connectionProvider.getConnectionParams({
+          sessionId: session.clientSessionId,
+          destination: destination || this.defaultDestination,
+          headers: clientInfo.headers,
+        });
 
-          const connectionParams = await this.connectionProvider.getConnectionParams({
-            sessionId: session.clientSessionId,
-            destination: destination as string | undefined,
-            headers: undefined, // No headers for stdio
-          });
-
-          // Update session with connection parameters
-          if ('updateConnectionParams' in this.sessionManager && typeof this.sessionManager.updateConnectionParams === 'function') {
-            (this.sessionManager as any).updateConnectionParams(session.clientSessionId, connectionParams);
-          }
-
-          // Set session context for handlers to access connection params
-          // Convert IConnectionParams to SapConfig for sessionContext
-          const sapConfig: SapConfig = {
-            url: connectionParams.sapUrl,
-            authType: connectionParams.auth.type,
-            ...(connectionParams.auth.type === 'jwt' && connectionParams.auth.jwtToken
-              ? { jwtToken: connectionParams.auth.jwtToken }
-              : connectionParams.auth.type === 'basic' && connectionParams.auth.username && connectionParams.auth.password
-              ? { username: connectionParams.auth.username, password: connectionParams.auth.password }
-              : {}),
-            ...(connectionParams.client ? { client: connectionParams.client } : {}),
-          };
-
-          // Set session context globally for stdio (since SDK transport handles messages directly)
-          // This will be used by handlers via sessionContext.getStore()
-          sessionContext.enterWith({
-            sessionId: session.clientSessionId,
-            sapConfig,
-            destination: destination,
-          });
-
-          // Also set overrideConfig in lib/utils for backward compatibility
-          // This allows handlers to get connection params via getManagedConnection()
-          const { setConfigOverride } = require('../../../utils.js');
-          setConfigOverride(sapConfig);
-
-          this.logger?.debug('Connection params and session context set for stdio session');
-        } catch (error) {
-          this.logger?.error(`Failed to get connection params for stdio session:`, error);
-          // Don't throw - let SDK handle it
+        // Update session with connection parameters
+        if ('updateConnectionParams' in this.sessionManager && typeof this.sessionManager.updateConnectionParams === 'function') {
+          (this.sessionManager as any).updateConnectionParams(session.clientSessionId, connectionParams);
         }
-      } else {
-        throw new Error('Failed to get SDK transport from StdioTransport');
-      }
-    } else if (this.transport.type === 'sse') {
-      // For SSE, transport is handled per-connection
-      // Connection will be established when client connects
-      // See SseTransport for connection handling
-    } else if (this.transport.type === 'http') {
-      // For HTTP, transport is handled per-request
-      // Connection will be established per request
-      // See StreamableHttpTransport for request handling
+
+        // Set session context for handlers to access connection params
+        // Convert IConnectionParams to SapConfig for sessionContext
+        const sapConfig: SapConfig = {
+          url: connectionParams.sapUrl,
+          authType: connectionParams.auth.type,
+          ...(connectionParams.auth.type === 'jwt' && connectionParams.auth.jwtToken
+            ? { jwtToken: connectionParams.auth.jwtToken }
+            : connectionParams.auth.type === 'basic' && connectionParams.auth.username && connectionParams.auth.password
+            ? { username: connectionParams.auth.username, password: connectionParams.auth.password }
+            : {}),
+          ...(connectionParams.client ? { client: connectionParams.client } : {}),
+        };
+
+        // Set session context (used by handlers via sessionContext.getStore())
+        sessionContext.enterWith({
+          sessionId: session.clientSessionId,
+          sapConfig,
+          destination: destination || this.defaultDestination,
+        });
+
+        // Also set overrideConfig in lib/utils for backward compatibility
+        // This allows handlers to get connection params via getManagedConnection()
+        const { setConfigOverride } = require('../../../utils.js');
+        setConfigOverride(sapConfig);
+      },
+      this.defaultDestination
+      );
     }
 
     this.isStarted = true;
@@ -178,8 +167,12 @@ export class McpServer {
    * Ensures transport bind address matches connection provider mode
    */
   validateConfiguration(): void {
-    const isLocalTransport = this.transport.bindAddress === '127.0.0.1' || this.transport.bindAddress === 'localhost';
-    const isRemoteTransport = this.transport.bindAddress === '0.0.0.0';
+    const bindAddress = this.transport.bindAddress;
+    if (!bindAddress) {
+      return; // Cannot validate without bindAddress
+    }
+    const isLocalTransport = bindAddress === '127.0.0.1' || bindAddress === 'localhost';
+    const isRemoteTransport = bindAddress === '0.0.0.0';
 
     if (isLocalTransport && this.connectionProvider.mode !== 'LOCAL') {
       throw new Error(
@@ -205,7 +198,7 @@ export class McpServer {
     // This handler is only for SSE/HTTP transports
     if (this.transport.type !== 'stdio') {
       this.transport.on('session:created', async (sessionId: string, clientInfo) => {
-      this.logger?.debug(`Session created: ${sessionId}`, clientInfo);
+        this.logger?.debug(`Session created: ${sessionId}`, clientInfo);
 
       // Create session in session manager
       const session = this.sessionManager.createSession(clientInfo);
@@ -262,14 +255,14 @@ export class McpServer {
           // Handle request through protocol handler
           const response = await this.protocolHandler.handleRequest(sessionId, message);
 
-          // Send response back through transport
-          await this.transport.send(sessionId, response);
+          // Send response back through transport (use SDK send() directly)
+          await this.transport.send(response);
         } catch (error) {
           this.logger?.error(`Error processing message for session ${sessionId}:`, error);
 
           // Send error response
-          const errorResponse = {
-            jsonrpc: '2.0',
+          const errorResponse: JSONRPCMessage = {
+            jsonrpc: '2.0' as const,
             id: message.id,
             error: {
               code: -32603,
@@ -278,7 +271,7 @@ export class McpServer {
             },
           };
 
-          await this.transport.send(sessionId, errorResponse);
+          await this.transport.send(errorResponse);
         }
       });
     }
@@ -311,7 +304,7 @@ export class McpServer {
   /**
    * Gets the transport instance (for direct access if needed)
    */
-  getTransport(): ITransport {
+  getTransport(): Transport {
     return this.transport;
   }
 

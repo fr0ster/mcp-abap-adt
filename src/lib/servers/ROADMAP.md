@@ -7,9 +7,14 @@ Concise roadmap for implementing the new architecture with Dependency Injection.
 - ✅ **Completed**: Handler Groups system (ReadOnly, HighLevel, LowLevel, System, Search)
 - ✅ **Completed**: Phase 1 - Core Interfaces & Types (all interfaces and implementations)
 - ✅ **Completed**: Phase 1.2 & 1.3 - Connection Providers and SessionManager implementations
-- ✅ **Completed**: Phase 2 - Core Server Implementation (McpServer class, ProtocolHandler, unit tests)
-- ✅ **Completed**: Phase 3 - LOCAL Mode Implementation (AuthBrokerFactory, LocalModeFactory, test scripts)
-- 🔄 **In Progress**: Phase 4 - REMOTE Mode Implementation
+- 🔄 **Partially Completed**: Phase 2 - Core Server Implementation
+  - ✅ McpServer class, ProtocolHandler, unit tests
+  - ❌ HTTP server integration for SSE/HTTP transports (TODO in Phase 2)
+- 🔄 **Partially Completed**: Phase 3 - LOCAL Mode Implementation
+  - ✅ AuthBrokerFactory, LocalModeFactory
+  - ✅ Test script for stdio transport
+  - ❌ Test scripts for SSE/HTTP transports (require HTTP server integration from Phase 2)
+- ⏳ **Not Started**: Phase 4 - REMOTE Mode Implementation (only interfaces exist)
 - ⏳ **Planned**: Remaining v2 architecture components (Phase 5-7)
 
 ---
@@ -68,7 +73,16 @@ Concise roadmap for implementing the new architecture with Dependency Injection.
 - [x] Tool registration
 - [x] Request handling
 
-### 2.4 Unit Tests
+### 2.4 Transport Integration
+- [x] `connectSdkServer` method in ITransport interface
+- [x] `StdioTransport.connectSdkServer` implementation
+- [ ] HTTP server creation for SSE transport
+- [ ] HTTP server creation for HTTP transport
+- [ ] Integration of `SseTransport` with HTTP server
+- [ ] Integration of `StreamableHttpTransport` with HTTP server
+- [ ] Request handling via `handleRequest` for HTTP transports
+
+### 2.5 Unit Tests
 - [x] Unit tests with mocked interfaces
 - [x] Constructor tests
 - [x] Start/stop tests
@@ -104,10 +118,10 @@ Concise roadmap for implementing the new architecture with Dependency Injection.
 
 ### 3.5 Test Scripts
 - [x] Test script for stdio transport
-- [x] Test script for SSE transport
-- [x] Test script for StreamableHTTP transport
-- [x] npm scripts for running test servers
-- [x] Integration with MCP Inspector
+- [x] npm scripts for running test servers (stdio only)
+- [x] Integration with MCP Inspector (stdio only)
+- [ ] Test script for SSE transport (requires HTTP server from Phase 2)
+- [ ] Test script for StreamableHTTP transport (requires HTTP server from Phase 2)
 
 ---
 
@@ -119,9 +133,11 @@ Concise roadmap for implementing the new architecture with Dependency Injection.
 - [ ] Connection params extraction from headers (implementation in @mcp-abap-adt/header-validator)
 
 ### 4.2 Remote Connection Provider
-- [x] `RemoteConnectionProvider` implementation
-- [x] Header-based connection params
-- [x] No auth broker (proxy only)
+- [x] `RemoteConnectionProvider` implementation (basic structure)
+- [ ] Header-based connection params (requires HeaderValidator implementation)
+- [x] No auth broker (proxy only) - design confirmed
+- [ ] Integration with HTTP transports
+- [ ] Testing with REMOTE mode
 
 ---
 

@@ -9,8 +9,10 @@
  * so this is a placeholder that will need HTTP server integration.
  */
 
+import http from 'http';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { ITransport, IClientInfo, McpMessage } from '../interfaces/transport.js';
+import { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import { IClientInfo, SessionInitializationCallback } from '../types/transport.js';
 
 export interface SseTransportOptions {
   port: number;
@@ -24,7 +26,7 @@ export interface SseTransportOptions {
  * Note: SSEServerTransport is deprecated. Use StreamableHttpTransport instead.
  * This implementation is a placeholder and requires HTTP server integration.
  */
-export class SseTransport implements ITransport {
+export class SseTransport extends SSEServerTransport {
   readonly type = 'sse' as const;
   readonly bindAddress: string;
   readonly port: number;
@@ -33,7 +35,7 @@ export class SseTransport implements ITransport {
   private eventHandlers: {
     'session:created': Array<(sessionId: string, clientInfo: IClientInfo) => void>;
     'session:closed': Array<(sessionId: string) => void>;
-    'message': Array<(sessionId: string, message: McpMessage) => void>;
+    'message': Array<(sessionId: string, message: JSONRPCMessage) => void>;
   } = {
     'session:created': [],
     'session:closed': [],
@@ -42,38 +44,64 @@ export class SseTransport implements ITransport {
 
   // Note: SSEServerTransport is created per-request, not per-server
   // This will need to be integrated with HTTP server in Phase 2
-  private httpServer?: any; // HTTP server will be created in start()
+  private httpServer?: http.Server;
 
   constructor(options: SseTransportOptions) {
-    this.port = options.port;
-    this.bindAddress = options.host;
-    this.endpoint = options.endpoint || '/sse';
+    super(options.endpoint || '/sse', options.res);
   }
 
+  // SDK Transport methods (delegated to per-request transports)
   async start(): Promise<void> {
-    // TODO: Create HTTP server and integrate SSEServerTransport per-request
-    // SSEServerTransport requires endpoint + ServerResponse per request
-    // This will be implemented in Phase 2 when integrating with HTTP server
+    // SSE transport creates transport per-request, so we just create the HTTP server here
+    this.httpServer = http.createServer();
+    return new Promise((resolve, reject) => {
+      this.httpServer!.listen(this.port, this.bindAddress, () => resolve());
+      this.httpServer!.on('error', reject);
+    });
   }
 
-  async stop(): Promise<void> {
+  async close(): Promise<void> {
     if (this.httpServer) {
-      // Close HTTP server
+      return new Promise<void>((resolve) => {
+        this.httpServer!.close(() => resolve());
+      });
     }
   }
 
+  // Additional methods for our architecture (not in SDK Transport)
   on(event: 'session:created', handler: (sessionId: string, clientInfo: IClientInfo) => void): void;
   on(event: 'session:closed', handler: (sessionId: string) => void): void;
-  on(event: 'message', handler: (sessionId: string, message: McpMessage) => void): void;
+  on(event: 'message', handler: (sessionId: string, message: JSONRPCMessage) => void): void;
   on(event: string, handler: (...args: any[]) => void): void {
     if (event === 'session:created' || event === 'session:closed' || event === 'message') {
       this.eventHandlers[event].push(handler as any);
     }
   }
 
-  async send(sessionId: string, message: McpMessage): Promise<void> {
-    // Send message through SDK transport
-    // SDK transport handles message sending internally
+  // SDK Transport.send() - delegated to per-request transports
+  async send(message: JSONRPCMessage, options?: any): Promise<void> {
+    // SSE transport sends through per-request transports
+    // This will be implemented in Phase 2
+  }
+
+  // Additional methods for our architecture (not in SDK Transport)
+  async connectSdkServer(
+    _sdkServer: any,
+    _initializeSession: SessionInitializationCallback,
+    _defaultDestination?: string
+  ): Promise<void> {
+    // SSE transport creates transport per-request, not per-server
+    // SDK server connection will be handled per-request in Phase 2
+  }
+
+  async handleRequest(req: any, res: any): Promise<void> {
+    // SSE transport creates transport per-request
+    // This will be implemented in Phase 2
+  }
+
+  async sendMessage(sessionId: string, message: JSONRPCMessage): Promise<void> {
+    // SSE transport sends through per-request transports
+    // This will be implemented in Phase 2
   }
 
   /**

@@ -675,21 +675,26 @@ sequenceDiagram
 
 **Responsibility**: Determines whether the server will be local (127.0.0.1) or global (0.0.0.0)
 
+**Transport implementations extend SDK Transport classes directly**:
+
+Our transports extend SDK transport classes from `@modelcontextprotocol/sdk` and add additional methods for our architecture.
+
+**Base interface from SDK**:
 ```typescript
-interface ITransport {
-  readonly type: 'stdio' | 'sse' | 'http';
-  readonly bindAddress: string;  // '127.0.0.1' = LOCAL, '0.0.0.0' = REMOTE
-  readonly port?: number;
-  
+// From @modelcontextprotocol/sdk/shared/transport
+import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+
+interface Transport {
   start(): Promise<void>;
-  stop(): Promise<void>;
-  
-  on(event: 'session:created', handler: (sessionId: string, clientInfo: ClientInfo) => void): void;
-  on(event: 'session:closed', handler: (sessionId: string) => void): void;
-  on(event: 'message', handler: (sessionId: string, message: McpMessage) => void): void;
-  
-  send(sessionId: string, message: McpMessage): Promise<void>;
+  send(message: JSONRPCMessage, options?: TransportSendOptions): Promise<void>;
+  close(): Promise<void>;
+  onclose?: () => void;
+  onerror?: (error: Error) => void;
+  onmessage?: <T extends JSONRPCMessage>(message: T, extra?: MessageExtraInfo) => void;
+  sessionId?: string;
+  setProtocolVersion?: (version: string) => void;
 }
+```
 
 interface ClientInfo {
   transport: 'stdio' | 'sse' | 'http';
@@ -701,40 +706,46 @@ interface ClientInfo {
 
 **Implementations**:
 
-1. **StdioTransport**
-   - Uses: `StdioServerTransport` from `@modelcontextprotocol/sdk/server/stdio`
+1. **StdioTransport extends StdioServerTransport**
+   - Extends: `StdioServerTransport` from `@modelcontextprotocol/sdk/server/stdio`
    - Mode: always `LOCAL` (bindAddress = '127.0.0.1')
    - Single global session
    - Reads from stdin, writes to stdout
-   - Wraps SDK transport for compatibility with ITransport interface
+   - Additional methods: `connectSdkServer()`, `on()` for custom events
 ```typescript
-   import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio';
+   import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+   import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
    
-   class StdioTransport implements ITransport {
-     private sdkTransport: StdioServerTransport;
+   class StdioTransport extends StdioServerTransport implements Transport {
+     readonly type = 'stdio' as const;
+     readonly bindAddress = '127.0.0.1';  // Always local
+     readonly port?: number = undefined;
      
      constructor() {
-       this.sdkTransport = new StdioServerTransport();
-       this.bindAddress = '127.0.0.1';  // Always local
+       super();  // Call SDK transport constructor
      }
      
-     async start(): Promise<void> {
-       await this.sdkTransport.start();
+     // Additional method for our architecture
+     async connectSdkServer(sdkServer: any, initializeSession: SessionInitializationCallback, defaultDestination?: string): Promise<void> {
+       await sdkServer.server.connect(this);  // Connect to self (we are the SDK transport)
+       // ... session initialization
      }
    }
    ```
 
-2. **SseTransport**
-   - Uses: `SSEServerTransport` from `@modelcontextprotocol/sdk/server/sse`
+2. **SseTransport extends SSEServerTransport**
+   - Extends: `SSEServerTransport` from `@modelcontextprotocol/sdk/server/sse`
    - Mode: depends on bind address
    - SSE connections (Server-Sent Events)
    - Reconnect support
+   - Additional methods: `connectSdkServer()`, `on()` for custom events, `handleRequest()`
 
-3. **StreamableHttpTransport**
-   - Uses: `StreamableHTTPServerTransport` from `@modelcontextprotocol/sdk/server/streamableHttp`
+3. **StreamableHttpTransport extends StreamableHTTPServerTransport**
+   - Extends: `StreamableHTTPServerTransport` from `@modelcontextprotocol/sdk/server/streamableHttp`
    - Mode: depends on bind address
    - HTTP POST requests
    - Streaming responses
+   - Additional methods: `connectSdkServer()`, `on()` for custom events, `handleRequest()`
 
 **Mode determination**:
 - `bindAddress === '127.0.0.1' || bindAddress === 'localhost'` → LOCAL mode

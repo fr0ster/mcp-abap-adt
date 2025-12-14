@@ -10,7 +10,7 @@ import {
   ISession,
 } from '../interfaces/session.js';
 import { IConnectionParams } from '../interfaces/connection.js';
-import { IClientInfo } from '../interfaces/transport.js';
+import { IClientInfo } from '../types/transport.js';
 
 /**
  * SessionManager - manages client sessions with ABAP connection parameters

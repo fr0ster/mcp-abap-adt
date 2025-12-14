@@ -7,7 +7,9 @@
 /// <reference types="jest" />
 
 import { McpServer } from '../../server/McpServer.js';
-import { ITransport, IClientInfo, McpMessage } from '../../interfaces/transport.js';
+import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import { IClientInfo } from '../../types/transport.js';
 import { ISessionManager, ISession } from '../../interfaces/session.js';
 import { IConnectionProvider, IConnectionParams } from '../../interfaces/connection.js';
 import { IProtocolHandler } from '../../interfaces/protocol.js';

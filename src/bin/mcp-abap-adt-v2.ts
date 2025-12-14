@@ -28,8 +28,10 @@ import {
 } from '@mcp-abap-adt/auth-stores';
 import { BtpTokenProvider } from '@mcp-abap-adt/auth-providers';
 import { DefaultLogger } from '@mcp-abap-adt/logger';
+import { StdioLogger } from '../lib/servers/v2/utils/StdioLogger.js';
 import { showHelp, showVersion } from './help.js';
 import http from 'http';
+import { ITransport } from '../lib/servers/v2/interfaces/transport.js';
 
 interface ParsedArgs {
   help?: boolean;
@@ -108,13 +110,19 @@ async function main() {
     process.exit(1);
   }
 
-  const logger = new DefaultLogger();
+  // For stdio transport, use minimal logger that only writes errors to stderr
+  // MCP protocol requires only JSON-RPC messages on stdout
+  const logger = args.transport === 'stdio'
+    ? new StdioLogger()
+    : new DefaultLogger();
 
   try {
-    logger.info('Starting MCP Server v2...', {
-      destination: args.mcp,
-      transport: args.transport
-    });
+    if (args.transport !== 'stdio') {
+      logger.info('Starting MCP Server v2...', {
+        destination: args.mcp,
+        transport: args.transport
+      });
+    }
 
     // 1. Create stores and providers
     const serviceKeyStore = new AbapServiceKeyStore(
@@ -167,7 +175,7 @@ async function main() {
     );
 
     // 8. Create transport based on type
-    let transport: any;
+    let transport: ITransport;
     let httpServer: http.Server | undefined;
 
     if (args.transport === 'sse') {
@@ -186,7 +194,12 @@ async function main() {
         host: args.httpHost!,
       });
       httpServer.on('request', async (req, res) => {
-        await transport.handleRequest(req, res);
+        if ('handleRequest' in transport && typeof transport.handleRequest === 'function') {
+          await transport.handleRequest(req, res);
+        } else {
+          res.statusCode = 501;
+          res.end('Transport does not support HTTP requests');
+        }
       });
     } else {
       // stdio
@@ -213,24 +226,27 @@ async function main() {
       const port = args.transport === 'sse' ? args.ssePort! : args.httpPort!;
       const host = args.transport === 'sse' ? args.sseHost! : args.httpHost!;
       httpServer.listen(port, host, () => {
-        logger.info(`HTTP server listening on http://${host}:${port}`);
+        if (args.transport !== 'stdio') {
+          logger.info(`HTTP server listening on http://${host}:${port}`);
+        }
       });
     }
 
     // 12. Start server
     await server.start();
 
-    logger.info('MCP Server v2 started successfully');
-    if (args.transport === 'stdio') {
-      logger.info('Server is ready to accept connections (stdio)');
-    } else {
+    if (args.transport !== 'stdio') {
+      logger.info('MCP Server v2 started successfully');
       const port = args.transport === 'sse' ? args.ssePort! : args.httpPort!;
       logger.info(`Server is ready at http://${args.transport === 'sse' ? args.sseHost : args.httpHost}:${port}${args.transport === 'sse' ? '/sse' : ''}`);
     }
+    // For stdio, don't log to stdout - MCP protocol requires only JSON-RPC messages
 
     // Handle graceful shutdown
     process.on('SIGINT', async () => {
-      logger.info('Received SIGINT, shutting down gracefully...');
+      if (args.transport !== 'stdio') {
+        logger.info('Received SIGINT, shutting down gracefully...');
+      }
       if (httpServer) {
         httpServer.close();
       }
@@ -239,7 +255,9 @@ async function main() {
     });
 
     process.on('SIGTERM', async () => {
-      logger.info('Received SIGTERM, shutting down gracefully...');
+      if (args.transport !== 'stdio') {
+        logger.info('Received SIGTERM, shutting down gracefully...');
+      }
       if (httpServer) {
         httpServer.close();
       }
@@ -247,7 +265,28 @@ async function main() {
       process.exit(0);
     });
   } catch (error) {
-    logger.error('Failed to start server:', error);
+    // For stdio, write errors to stderr, not stdout
+    let errorMessage: string;
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      if (error.stack) {
+        errorMessage += `\n${error.stack}`;
+      }
+    } else if (error) {
+      try {
+        errorMessage = JSON.stringify(error, null, 2);
+      } catch {
+        errorMessage = String(error);
+      }
+    } else {
+      errorMessage = 'Unknown error';
+    }
+
+    if (args.transport === 'stdio') {
+      process.stderr.write(`[ERROR] 💥 Failed to start server: ${errorMessage}\n`);
+    } else {
+      logger.error('Failed to start server:', error);
+    }
     process.exit(1);
   }
 }

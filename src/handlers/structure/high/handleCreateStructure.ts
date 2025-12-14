@@ -11,10 +11,9 @@ import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger as baseLogger, safeCheckOperation } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { getConfig } from '../../../index';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
+import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "CreateStructure",
   description: "Create a new ABAP structure in SAP system with fields and type references. Includes create, activate, and verify steps.",
@@ -177,20 +176,11 @@ export async function handleCreateStructure(args: CreateStructureArgs): Promise<
     let connection: any = null;
     try {
       // Get configuration from environment variables
-      const config = getConfig();
-
-      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
-      const connectionLogger = {
-        debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : noopLogger.debug,
-        info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : noopLogger.info,
-        warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : noopLogger.warn,
-        error: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.error.bind(baseLogger) : noopLogger.error,
-        csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : noopLogger.debug
-      };
-
-      // Create connection directly for this handler call
-      connection = createAbapConnection(config, connectionLogger);
-      await connection.connect();
+            // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
+            // Create connection directly for this handler call
+      // Get connection from session context (set by ProtocolHandler)
+    // Connection is managed and cached per session, with proper token refresh via AuthBroker
+    connection = getManagedConnection();
 
       handlerLogger.debug(`[CreateStructure] Created separate connection for handler call: ${structureName}`);
     } catch (connectionError: any) {

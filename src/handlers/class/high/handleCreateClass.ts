@@ -14,8 +14,7 @@ import {
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { getConfig } from '../../../index';
+import { getManagedConnection } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
@@ -93,16 +92,8 @@ export async function handleCreateClass(params: CreateClassArgs) {
 
   // Connection setup
   let connection: any = null;
-  try {
-    const config = getConfig();
-    const connectionLogger = {
-      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
-      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
-      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
-      error: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.error.bind(baseLogger) : () => {},
-      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {}
-    };
-    connection = createAbapConnection(config, connectionLogger);
+    try {
+    connection = getManagedConnection();
     await connection.connect();
     handlerLogger.debug(`Created separate connection for handler call: ${className}`);
   } catch (connectionError: any) {

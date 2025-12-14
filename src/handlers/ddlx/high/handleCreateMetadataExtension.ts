@@ -7,9 +7,8 @@ import { return_error, return_response, logger as baseLogger } from '../../../li
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { getConfig } from '../../../index';
 
+import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
     name: "CreateMetadataExtension",
     description: "Create a new ABAP Metadata Extension (DDLX) in SAP system.",
@@ -64,16 +63,9 @@ export async function handleCreateMetadataExtension(params: any) {
     }
 
     const name = args.name.toUpperCase();
-    const config = getConfig();
-    const connectionLogger = {
-      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
-      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
-      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
-      error: baseLogger.error.bind(baseLogger),
-      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
-    };
-    connection = createAbapConnection(config, connectionLogger);
-    await connection.connect();
+            // Get connection from session context (set by ProtocolHandler)
+    // Connection is managed and cached per session, with proper token refresh via AuthBroker
+    connection = getManagedConnection();
     const handlerLogger = getHandlerLogger(
       'handleCreateMetadataExtension',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

@@ -5,6 +5,7 @@ import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 import { XMLParser } from 'fast-xml-parser';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: "GetObjectInfo",
   description: "[read-only] Return ABAP object tree: root, group nodes, and terminal leaves up to maxDepth. Enrich each node via SearchObject if enrich=true. Group nodes are included for hierarchy. Each node has node_type: root, point, end.",

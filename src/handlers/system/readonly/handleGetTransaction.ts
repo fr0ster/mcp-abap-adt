@@ -5,6 +5,7 @@ import { writeResultToFile } from '../../../lib/writeResultToFile';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   "name": "GetTransaction",
   "description": "[read-only] Retrieve ABAP transaction details.",

@@ -2,6 +2,7 @@ import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: "GetAbapAST",
   description: "[read-only] Parse ABAP code and return AST (Abstract Syntax Tree) in JSON format.",

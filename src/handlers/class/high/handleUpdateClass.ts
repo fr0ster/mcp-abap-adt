@@ -4,7 +4,7 @@
  * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
 
-import { AxiosResponse } from '../../../lib/utils';
+import { AxiosResponse, getManagedConnection } from '../../../lib/utils';
 import {
   return_error,
   return_response,
@@ -12,8 +12,6 @@ import {
   safeCheckOperation
 } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { getConfig } from '../../../index';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { XMLParser } from 'fast-xml-parser';
 
@@ -54,16 +52,9 @@ export async function handleUpdateClass(params: UpdateClassArgs) {
   // Connection setup
   let connection: any = null;
   try {
-    const config = getConfig();
-    const connectionLogger = {
-      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
-      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
-      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
-      error: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.error.bind(baseLogger) : () => {},
-      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {}
-    };
-    connection = createAbapConnection(config, connectionLogger);
-    await connection.connect();
+            // Get connection from session context (set by ProtocolHandler)
+    // Connection is managed and cached per session, with proper token refresh via AuthBroker
+    connection = getManagedConnection();
     handlerLogger.debug(`Created separate connection for handler call: ${className}`);
   } catch (connectionError: any) {
     const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);

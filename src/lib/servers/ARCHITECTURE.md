@@ -707,7 +707,7 @@ interface ClientInfo {
    - Single global session
    - Reads from stdin, writes to stdout
    - Wraps SDK transport for compatibility with ITransport interface
-   ```typescript
+```typescript
    import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio';
    
    class StdioTransport implements ITransport {
@@ -762,13 +762,13 @@ interface IConnectionProvider {
 }
 
 interface ConnectionRequest {
-  sessionId: string;
+    sessionId: string;
   destination?: string;  // Only for LOCAL mode
   headers?: Record<string, string>;  // Only for REMOTE mode
 }
 
 interface ConnectionParams {
-  sapUrl: string;
+    sapUrl: string;
   auth: {
     type: 'jwt' | 'basic';
     jwtToken?: string;
@@ -1993,9 +1993,9 @@ Client → HTTP POST (http://10.0.0.100:3000/mcp)
            x-sap-url: https://my-abap.com
            x-sap-jwt-token: eyJ...
            x-session-id: abc-123
-                    ↓
+            ↓
         McpServer (REMOTE)
-                    ↓
+            ↓
         ITransport (StreamableHttpTransport, bindAddress=0.0.0.0)
                     ↓
         IConnectionProvider (RemoteConnectionProvider)

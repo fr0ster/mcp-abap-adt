@@ -25,6 +25,7 @@ import { handleSearchObject } from "../../search/readonly/handleSearchObject";
 import { logger as baseLogger } from "../../../lib/utils";
 import { getHandlerLogger, noopLogger } from "../../../lib/handlerLogger";
 
+import { getManagedConnection } from '../../../lib/utils';
 /**
  * DescribeByListArray handler.
  * @param args { objects: Array<{ name: string, type?: string }> }

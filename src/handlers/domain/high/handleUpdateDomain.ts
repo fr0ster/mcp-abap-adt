@@ -13,9 +13,8 @@ import { return_error, return_response, logger as baseLogger, safeCheckOperation
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { getConfig } from '../../../index';
 
+import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "UpdateDomain",
   description: `Update an existing ABAP domain in SAP system.
@@ -140,16 +139,9 @@ export async function handleUpdateDomain(args: DomainArgs) {
     validateTransportRequest(args.package_name, args.transport_request);
 
     const typedArgs = args as DomainArgs;
-    const config = getConfig();
-    const connectionLogger = {
-      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
-      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
-      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
-      error: baseLogger.error.bind(baseLogger),
-      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
-    };
-    connection = createAbapConnection(config, connectionLogger);
-    await connection.connect();
+            // Get connection from session context (set by ProtocolHandler)
+    // Connection is managed and cached per session, with proper token refresh via AuthBroker
+    connection = getManagedConnection();
     const domainName = typedArgs.domain_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleUpdateDomain',

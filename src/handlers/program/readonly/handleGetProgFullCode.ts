@@ -49,6 +49,7 @@ import { handleGetProgram } from './handleGetProgram';
 import { handleGetFunctionGroup } from '../../function/readonly/handleGetFunctionGroup';
 import { handleGetInclude } from '../../include/readonly/handleGetInclude';
 
+import { getManagedConnection } from '../../../lib/utils';
 /**
  * handleGetProgFullCode: returns full code for program (report) or function group with all includes.
  * @param args { name: string, type: "PROG/P" | "FUGR" }

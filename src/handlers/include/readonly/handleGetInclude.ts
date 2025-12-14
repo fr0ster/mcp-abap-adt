@@ -4,6 +4,7 @@ import { writeResultToFile } from '../../../lib/writeResultToFile';
 import * as z from 'zod';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: "GetInclude",
   description: "[read-only] Retrieve source code of a specific ABAP include file.",

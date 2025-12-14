@@ -6,6 +6,7 @@ import { handleGetInterface } from '../../interface/readonly/handleGetInterface'
 import { handleGetObjectInfo } from './handleGetObjectInfo';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
     name: "GetAbapSystemSymbols",
     description: "[read-only] Resolve ABAP symbols from semantic analysis with SAP system information including types, scopes, descriptions, and packages.",

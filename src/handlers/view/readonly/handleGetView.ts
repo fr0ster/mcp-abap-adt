@@ -15,6 +15,7 @@ import { writeResultToFile } from '../../../lib/writeResultToFile';
 import * as z from 'zod';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: "GetView",
   description: "[read-only] Retrieve ABAP database view definition including tables, fields, joins, and selection conditions.",

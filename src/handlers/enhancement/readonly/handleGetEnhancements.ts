@@ -3,6 +3,7 @@ import { makeAdtRequestWithTimeout, return_error, return_response, logger, encod
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   "name": "GetEnhancements",
   "description": "[read-only] Retrieve a list of enhancements for a given ABAP object.",

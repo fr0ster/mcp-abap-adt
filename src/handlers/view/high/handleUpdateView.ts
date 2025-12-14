@@ -14,10 +14,9 @@ import {
 } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { getConfig } from '../../../index';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
+import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "UpdateView",
   description: "Update DDL source code of an existing CDS View or Classic View. Locks the view, checks new code, uploads new DDL source, unlocks, and optionally activates.",
@@ -55,16 +54,9 @@ export async function handleUpdateView(params: any) {
   // Connection setup
   let connection: any = null;
   try {
-    const config = getConfig();
-    const connectionLogger = {
-      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
-      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
-      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
-      error: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.error.bind(baseLogger) : () => {},
-      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {}
-    };
-    connection = createAbapConnection(config, connectionLogger);
-    await connection.connect();
+            // Get connection from session context (set by ProtocolHandler)
+    // Connection is managed and cached per session, with proper token refresh via AuthBroker
+    connection = getManagedConnection();
     handlerLogger.debug(`Created separate connection for handler call: ${viewName}`);
   } catch (connectionError: any) {
     const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);

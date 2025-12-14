@@ -201,7 +201,8 @@ async function main() {
       protocolHandler,
       handlersRegistry,
       sdkServer,
-      logger
+      logger,
+      args.mcp // Pass default destination from --mcp argument
     );
 
     // 10. Validate configuration

@@ -13,6 +13,7 @@ import { makeAdtRequestWithTimeout, return_error, return_response } from '../../
 import { getHandlerLogger } from '../../../lib/handlerLogger';
 import { XMLParser } from 'fast-xml-parser';
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: "GetTransport",
   description: "[read-only] Retrieve ABAP transport request information including metadata, included objects, and status from SAP system.",

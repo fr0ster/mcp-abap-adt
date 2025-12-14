@@ -2,6 +2,7 @@ import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: "GetAbapSemanticAnalysis",
   description: "[read-only] Perform semantic analysis on ABAP code and return symbols, types, scopes, and dependencies.",

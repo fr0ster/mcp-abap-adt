@@ -4,6 +4,7 @@ import { objectsListCache } from '../../../lib/getObjectsListCache';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   "name": "GetWhereUsed",
   "description": "[read-only] Retrieve where-used references for ABAP objects via ADT usageReferences.",

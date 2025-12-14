@@ -4,6 +4,7 @@ import { writeResultToFile } from '../../../lib/writeResultToFile';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   "name": "GetIncludesList",
   "description": "[read-only] Recursively discover and list ALL include files within an ABAP program or include.",

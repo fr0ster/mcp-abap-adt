@@ -4,6 +4,7 @@ import convert from 'xml-js';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import * as z from 'zod';
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: "GetPackage",
   description: "[read-only] Retrieve ABAP package details.",

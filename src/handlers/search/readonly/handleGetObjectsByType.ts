@@ -19,6 +19,7 @@ import { McpError, ErrorCode, fetchNodeStructure, return_error, return_response,
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 
+import { getManagedConnection } from '../../../lib/utils';
 /**
  * Parses XML response to extract object names from node structure
  * @param xmlData XML response data

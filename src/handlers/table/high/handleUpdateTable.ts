@@ -11,10 +11,9 @@ import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger as baseLogger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { getConfig } from '../../../index';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
+import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "UpdateTable",
   description: "Update DDL source code of an existing ABAP table. Locks the table, uploads new DDL source, and unlocks. Optionally activates after update. Use this to modify existing tables without re-creating metadata.",
@@ -83,20 +82,11 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
     let connection: any = null;
     try {
       // Get configuration from environment variables
-      const config = getConfig();
-
-      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
-      const connectionLogger = {
-        debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : noopLogger.debug,
-        info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : noopLogger.info,
-        warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : noopLogger.warn,
-        error: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.error.bind(baseLogger) : noopLogger.error,
-        csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : noopLogger.debug
-      };
-
-      // Create connection directly for this handler call
-      connection = createAbapConnection(config, connectionLogger);
-      await connection.connect();
+            // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
+            // Create connection directly for this handler call
+      // Get connection from session context (set by ProtocolHandler)
+    // Connection is managed and cached per session, with proper token refresh via AuthBroker
+    connection = getManagedConnection();
 
       handlerLogger.debug(`[UpdateTable] Created separate connection for handler call: ${tableName}`);
     } catch (connectionError: any) {

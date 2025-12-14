@@ -3,6 +3,7 @@ import { makeAdtRequestWithTimeout, return_error, logger, encodeSapObjectName } 
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   "name": "GetEnhancementSpot",
   "description": "[read-only] Retrieve metadata and list of implementations for a specific enhancement spot.",

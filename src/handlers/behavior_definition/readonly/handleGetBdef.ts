@@ -2,6 +2,7 @@ import { McpError, ErrorCode } from '../../../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, logger, encodeSapObjectName } from '../../../lib/utils';
 
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   "name": "GetBdef",
   "description": "[read-only] Retrieve the source code of a BDEF (Behavior Definition) for a CDS entity.",

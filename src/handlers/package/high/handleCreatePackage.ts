@@ -13,8 +13,7 @@ import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { PackageBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { getConfig } from '../../../index';
+import { getManagedConnection } from '../../../lib/utils.js';
 
 export const TOOL_DEFINITION = {
   name: "CreatePackage",
@@ -60,16 +59,10 @@ export async function handleCreatePackage(args: CreatePackageArgs) {
     }
 
     const typedArgs = args;
-    const config = getConfig();
-    const connectionLogger = {
-      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
-      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
-      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
-      error: baseLogger.error.bind(baseLogger),
-      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
-    };
-    const connection = createAbapConnection(config, connectionLogger);
-    await connection.connect();
+
+    // Get connection from session context (set by ProtocolHandler)
+    // Connection is managed and cached per session, with proper token refresh via AuthBroker
+    const connection = getManagedConnection();
     const packageName = typedArgs.package_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleCreatePackage',

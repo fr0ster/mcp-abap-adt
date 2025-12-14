@@ -5,6 +5,7 @@ import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import type { Logger } from '@mcp-abap-adt/logger';
 
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   "name": "GetSqlQuery",
   "description": "[read-only] Execute freestyle SQL queries via SAP ADT Data Preview API.",

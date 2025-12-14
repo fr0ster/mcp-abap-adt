@@ -30,10 +30,10 @@
 
 import { McpError, ErrorCode, AxiosResponse, logger as baseLogger } from '../../../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, return_response, encodeSapObjectName } from '../../../lib/utils';
-import { getConfig } from '../../../index';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
+import { getManagedConnection } from '../../../lib/utils';
 const handlerLogger = getHandlerLogger(
   'handleGetTableContents',
   process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -238,8 +238,8 @@ export async function handleGetTableContents(args: any) {
         // direct table datapreview access is restricted. Basic auth typically
         // indicates on-premise systems where ADT datapreview may work.
         try {
-            const cfg = getConfig();
-            if (cfg.authType === 'jwt') {
+            const cfg = getManagedConnection();
+            if (cfg.getConfig().authType === 'jwt') {
                 handlerLogger.warn('handleGetTableContents blocked on cloud deployment (JWT auth)', { tableName });
                 return {
                     isError: true,

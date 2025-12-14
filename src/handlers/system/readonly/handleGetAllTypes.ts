@@ -4,6 +4,7 @@ import { makeAdtRequestWithTimeout, logger as baseLogger } from '../../../lib/ut
 import { XMLParser } from 'fast-xml-parser';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: "GetAdtTypes",
   description: "[read-only] Retrieve all valid ADT object types.",

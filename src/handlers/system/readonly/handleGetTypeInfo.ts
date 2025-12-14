@@ -5,6 +5,7 @@ import { objectsListCache } from '../../../lib/getObjectsListCache';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 
+import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   "name": "GetTypeInfo",
   "description": "[read-only] Retrieve ABAP type information.",

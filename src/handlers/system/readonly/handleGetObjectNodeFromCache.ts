@@ -18,6 +18,7 @@ import { objectsListCache } from '../../../lib/getObjectsListCache';
 import { makeAdtRequest, logger as baseLogger } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
+import { getManagedConnection } from '../../../lib/utils';
 /**
  * @param args { object_type, object_name, tech_name }
  * @returns cached node including object_uri_response when OBJECT_URI exists

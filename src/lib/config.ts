@@ -6,7 +6,8 @@
  */
 
 import { SapConfig } from "@mcp-abap-adt/connection";
-import { setConfigOverride } from "./utils.js";
+// Don't import setConfigOverride from utils.ts to avoid circular dependency
+// setConfigOverride will be called lazily if needed
 
 let sapConfigOverride: SapConfig | undefined;
 
@@ -122,5 +123,10 @@ export function getConfig(): SapConfig {
 
 export function setSapConfigOverride(config?: SapConfig) {
   sapConfigOverride = config;
-  setConfigOverride(config);
+  // Lazy import setConfigOverride to avoid circular dependency
+  // Only import when actually needed (when config is set)
+  if (config !== undefined) {
+    const { setConfigOverride } = require('./utils.js');
+    setConfigOverride(config);
+  }
 }

@@ -7,15 +7,13 @@
  * Workflow: validate -> create -> (activate)
  */
 
-import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger as baseLogger } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { ServiceDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { getConfig } from '../../../index';
+import { getManagedConnection } from '../../../lib/utils.js';
 
 export const TOOL_DEFINITION = {
   name: "CreateServiceDefinition",
@@ -89,16 +87,10 @@ export async function handleCreateServiceDefinition(args: CreateServiceDefinitio
     }
 
     const typedArgs = args as CreateServiceDefinitionArgs;
-    const config = getConfig();
-    const connectionLogger = {
-      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
-      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
-      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
-      error: baseLogger.error.bind(baseLogger),
-      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
-    };
-    connection = createAbapConnection(config, connectionLogger);
-    await connection.connect();
+
+    // Get connection from session context (set by ProtocolHandler)
+    // Connection is managed and cached per session, with proper token refresh via AuthBroker
+    connection = getManagedConnection();
     const serviceDefinitionName = typedArgs.service_definition_name.toUpperCase();
 
     handlerLogger.info(`Starting service definition creation: ${serviceDefinitionName}`);

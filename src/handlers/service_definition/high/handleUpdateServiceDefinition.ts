@@ -12,9 +12,8 @@ import { return_error, return_response, encodeSapObjectName, logger as baseLogge
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { getConfig } from '../../../index';
 
+import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "UpdateServiceDefinition",
   description: "Update source code of an existing ABAP service definition. Uses stateful session with proper lock/unlock mechanism.",
@@ -74,16 +73,9 @@ export async function handleUpdateServiceDefinition(args: UpdateServiceDefinitio
       return return_error(new Error('service_definition_name and source_code are required'));
     }
 
-    const config = getConfig();
-    const connectionLogger = {
-      debug: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
-      info: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.info.bind(baseLogger) : () => {},
-      warn: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.warn.bind(baseLogger) : () => {},
-      error: baseLogger.error.bind(baseLogger),
-      csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? baseLogger.debug.bind(baseLogger) : () => {},
-    };
-    connection = createAbapConnection(config, connectionLogger);
-    await connection.connect();
+            // Get connection from session context (set by ProtocolHandler)
+    // Connection is managed and cached per session, with proper token refresh via AuthBroker
+    connection = getManagedConnection();
     const serviceDefinitionName = service_definition_name.toUpperCase();
 
     handlerLogger.info(`Starting service definition source update: ${serviceDefinitionName}`);

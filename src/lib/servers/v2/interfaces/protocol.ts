@@ -6,6 +6,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { IHandlersRegistry } from '../../handlers/interfaces.js';
+import { ISessionManager } from './session.js';
 
 /**
  * Protocol handler interface
@@ -17,8 +18,9 @@ export interface IProtocolHandler {
    * Initializes protocol handler with handlers registry and MCP server
    * @param handlersRegistry - Handlers registry
    * @param mcpServer - MCP server SDK instance
+   * @param sessionManager - Session manager (optional, for setting session context)
    */
-  initialize(handlersRegistry: IHandlersRegistry, mcpServer: McpServer): void;
+  initialize(handlersRegistry: IHandlersRegistry, mcpServer: McpServer, sessionManager?: ISessionManager): void;
 
   /**
    * Handles incoming MCP request

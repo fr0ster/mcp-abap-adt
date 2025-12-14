@@ -11,6 +11,8 @@ import { ISessionManager } from '../interfaces/session.js';
 import { IConnectionProvider } from '../interfaces/connection.js';
 import { IProtocolHandler } from '../interfaces/protocol.js';
 import { IHandlersRegistry } from '../../handlers/interfaces.js';
+import { sessionContext } from '../../../utils.js';
+import { SapConfig } from '@mcp-abap-adt/connection';
 
 /**
  * Logger interface (optional dependency)
@@ -29,6 +31,7 @@ export interface ILogger {
  */
 export class McpServer {
   private isStarted = false;
+  private defaultDestination?: string;
 
   constructor(
     private transport: ITransport,
@@ -37,10 +40,12 @@ export class McpServer {
     private protocolHandler: IProtocolHandler,
     private handlersRegistry: IHandlersRegistry,
     private mcpServer: SdkMcpServer,
-    private logger?: ILogger
+    private logger?: ILogger,
+    defaultDestination?: string
   ) {
-    // Initialize protocol handler with registry
-    this.protocolHandler.initialize(this.handlersRegistry, this.mcpServer);
+    this.defaultDestination = defaultDestination;
+    // Initialize protocol handler with registry and session manager
+    this.protocolHandler.initialize(this.handlersRegistry, this.mcpServer, this.sessionManager);
 
     // Setup transport event handlers
     this.setupTransportHandlers();
@@ -61,6 +66,85 @@ export class McpServer {
 
     // Start transport
     await this.transport.start();
+
+    // Connect SDK server to transport
+    // SDK server needs direct access to SDK transport instances
+    if (this.transport.type === 'stdio') {
+      const stdioTransport = this.transport as any;
+      const sdkTransport = stdioTransport.getSdkTransport?.();
+      if (sdkTransport) {
+        // For stdio, SDK transport handles all message processing automatically
+        // We just need to connect and set up session/connection params
+        await this.mcpServer.server.connect(sdkTransport);
+        this.logger?.debug('SDK server connected to stdio transport');
+
+        // Create stdio session and get connection params immediately
+        // Stdio has a single global session
+        const stdioSessionId = 'stdio-session';
+        const clientInfo = { transport: 'stdio' as const };
+        const session = this.sessionManager.createSession(clientInfo);
+
+        // Get connection parameters for stdio session
+        try {
+          const destination = this.defaultDestination;
+          if (!destination && this.connectionProvider.mode === 'LOCAL') {
+            throw new Error('Destination required for LOCAL mode. Provide --mcp=destination argument.');
+          }
+
+          const connectionParams = await this.connectionProvider.getConnectionParams({
+            sessionId: session.clientSessionId,
+            destination: destination as string | undefined,
+            headers: undefined, // No headers for stdio
+          });
+
+          // Update session with connection parameters
+          if ('updateConnectionParams' in this.sessionManager && typeof this.sessionManager.updateConnectionParams === 'function') {
+            (this.sessionManager as any).updateConnectionParams(session.clientSessionId, connectionParams);
+          }
+
+          // Set session context for handlers to access connection params
+          // Convert IConnectionParams to SapConfig for sessionContext
+          const sapConfig: SapConfig = {
+            url: connectionParams.sapUrl,
+            authType: connectionParams.auth.type,
+            ...(connectionParams.auth.type === 'jwt' && connectionParams.auth.jwtToken
+              ? { jwtToken: connectionParams.auth.jwtToken }
+              : connectionParams.auth.type === 'basic' && connectionParams.auth.username && connectionParams.auth.password
+              ? { username: connectionParams.auth.username, password: connectionParams.auth.password }
+              : {}),
+            ...(connectionParams.client ? { client: connectionParams.client } : {}),
+          };
+
+          // Set session context globally for stdio (since SDK transport handles messages directly)
+          // This will be used by handlers via sessionContext.getStore()
+          sessionContext.enterWith({
+            sessionId: session.clientSessionId,
+            sapConfig,
+            destination: destination,
+          });
+
+          // Also set overrideConfig in lib/utils for backward compatibility
+          // This allows handlers to get connection params via getManagedConnection()
+          const { setConfigOverride } = require('../../../utils.js');
+          setConfigOverride(sapConfig);
+
+          this.logger?.debug('Connection params and session context set for stdio session');
+        } catch (error) {
+          this.logger?.error(`Failed to get connection params for stdio session:`, error);
+          // Don't throw - let SDK handle it
+        }
+      } else {
+        throw new Error('Failed to get SDK transport from StdioTransport');
+      }
+    } else if (this.transport.type === 'sse') {
+      // For SSE, transport is handled per-connection
+      // Connection will be established when client connects
+      // See SseTransport for connection handling
+    } else if (this.transport.type === 'http') {
+      // For HTTP, transport is handled per-request
+      // Connection will be established per request
+      // See StreamableHttpTransport for request handling
+    }
 
     this.isStarted = true;
     this.logger?.info('MCP Server v2 started successfully');
@@ -117,7 +201,10 @@ export class McpServer {
    */
   private setupTransportHandlers(): void {
     // Handle new session creation
-    this.transport.on('session:created', async (sessionId: string, clientInfo) => {
+    // Note: For stdio, session is created in start() method
+    // This handler is only for SSE/HTTP transports
+    if (this.transport.type !== 'stdio') {
+      this.transport.on('session:created', async (sessionId: string, clientInfo) => {
       this.logger?.debug(`Session created: ${sessionId}`, clientInfo);
 
       // Create session in session manager
@@ -125,9 +212,17 @@ export class McpServer {
 
       // Get connection parameters from connection provider
       try {
+        // For LOCAL mode, destination must be provided (from --mcp argument)
+        // For REMOTE mode, destination comes from headers
+        const destination = this.defaultDestination || clientInfo.headers?.['x-mcp-destination'];
+
+        if (!destination && this.connectionProvider.mode === 'LOCAL') {
+          throw new Error('Destination required for LOCAL mode. Provide --mcp=destination argument or x-mcp-destination header.');
+        }
+
         const connectionParams = await this.connectionProvider.getConnectionParams({
           sessionId: session.clientSessionId,
-          destination: undefined, // Will be provided in request
+          destination: destination as string | undefined,
           headers: clientInfo.headers,
         });
 
@@ -138,47 +233,55 @@ export class McpServer {
       } catch (error) {
         this.logger?.error(`Failed to get connection params for session ${sessionId}:`, error);
       }
-    });
+      });
+    }
 
     // Handle session closure
-    this.transport.on('session:closed', (sessionId: string) => {
-      this.logger?.debug(`Session closed: ${sessionId}`);
-      this.sessionManager.deleteSession(sessionId);
-    });
+    // Note: For stdio, session closure is handled by SDK transport
+    if (this.transport.type !== 'stdio') {
+      this.transport.on('session:closed', (sessionId: string) => {
+        this.logger?.debug(`Session closed: ${sessionId}`);
+        this.sessionManager.deleteSession(sessionId);
+      });
+    }
 
     // Handle incoming messages
-    this.transport.on('message', async (sessionId: string, message: any) => {
-      this.logger?.debug(`Message received for session ${sessionId}:`, message);
+    // Note: For stdio, SDK transport handles messages automatically
+    // This handler is only for SSE/HTTP transports
+    if (this.transport.type !== 'stdio') {
+      this.transport.on('message', async (sessionId: string, message: any) => {
+        this.logger?.debug(`Message received for session ${sessionId}:`, message);
 
-      try {
-        // Get session
-        const session = this.sessionManager.getSession(sessionId);
-        if (!session) {
-          throw new Error(`Session not found: ${sessionId}`);
+        try {
+          // Get session
+          const session = this.sessionManager.getSession(sessionId);
+          if (!session) {
+            throw new Error(`Session not found: ${sessionId}`);
+          }
+
+          // Handle request through protocol handler
+          const response = await this.protocolHandler.handleRequest(sessionId, message);
+
+          // Send response back through transport
+          await this.transport.send(sessionId, response);
+        } catch (error) {
+          this.logger?.error(`Error processing message for session ${sessionId}:`, error);
+
+          // Send error response
+          const errorResponse = {
+            jsonrpc: '2.0',
+            id: message.id,
+            error: {
+              code: -32603,
+              message: 'Internal error',
+              data: error instanceof Error ? error.message : String(error),
+            },
+          };
+
+          await this.transport.send(sessionId, errorResponse);
         }
-
-        // Handle request through protocol handler
-        const response = await this.protocolHandler.handleRequest(sessionId, message);
-
-        // Send response back through transport
-        await this.transport.send(sessionId, response);
-      } catch (error) {
-        this.logger?.error(`Error processing message for session ${sessionId}:`, error);
-
-        // Send error response
-        const errorResponse = {
-          jsonrpc: '2.0',
-          id: message.id,
-          error: {
-            code: -32603,
-            message: 'Internal error',
-            data: error instanceof Error ? error.message : String(error),
-          },
-        };
-
-        await this.transport.send(sessionId, errorResponse);
-      }
-    });
+      });
+    }
   }
 
   /**

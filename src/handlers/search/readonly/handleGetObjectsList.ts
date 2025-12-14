@@ -19,6 +19,7 @@ import { McpError, ErrorCode, fetchNodeStructure, return_error, logger as baseLo
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 
+import { getManagedConnection } from '../../../lib/utils';
 /**
  * Parses every SEU_ADT_REPOSITORY_OBJ_NODE element from the XML and returns objects with the required fields
  */

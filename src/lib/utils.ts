@@ -1,6 +1,5 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { AxiosError, AxiosResponse } from "axios";
-import { getConfig } from "../index"; // getConfig needs to be exported from index.ts
 import {
   AbapConnection,
   createAbapConnection,
@@ -466,8 +465,12 @@ export function getManagedConnection(): AbapConnection {
     return getConnectionForSession(context.sessionId, context.sapConfig, context.destination);
   }
 
-  // Fallback to global config (for backward compatibility with non-HTTP transports)
-  const config = overrideConfig ?? getConfig();
+  // Config must be provided via overrideConfig (from connection provider/broker)
+  // No fallback to getConfig() - incompatible with broker-based architecture
+  if (!overrideConfig) {
+    throw new Error('Connection config must be provided via overrideConfig or session context. In v2 architecture, config comes from connection provider (broker), not from environment variables.');
+  }
+  const config = overrideConfig;
 
   // Helper function for Windows-compatible logging
   // Only logs when DEBUG_CONNECTORS, DEBUG_TESTS, or DEBUG_ADT_TESTS is enabled
@@ -782,11 +785,36 @@ export async function getSystemInformation(): Promise<{ systemID?: string; userN
 
 /**
  * Check if current connection is cloud (JWT auth) or on-premise (basic auth)
+ * In v2 architecture, config must come from connection provider/broker, not from getConfig()
  */
-export function isCloudConnection(): boolean {
+export function isCloudConnection(config?: SapConfig): boolean {
   try {
-    const config = getConfig();
-    return config.authType === 'jwt';
+    // If config provided as parameter, use it
+    if (config) {
+      return config.authType === 'jwt';
+    }
+
+    // Try to get config from session context (v2 architecture)
+    const context = sessionContext.getStore();
+    if (context?.sapConfig) {
+      return context.sapConfig.authType === 'jwt';
+    }
+
+    // Try to get config from overrideConfig (set by connection provider)
+    if (overrideConfig) {
+      return overrideConfig.authType === 'jwt';
+    }
+
+    // Try to get config from cached connection
+    if (cachedConnection) {
+      const connectionConfig = (cachedConnection as any).getConfig?.();
+      if (connectionConfig) {
+        return connectionConfig.authType === 'jwt';
+      }
+    }
+
+    // If no config available, cannot determine - return false for safety
+    return false;
   } catch {
     return false;
   }

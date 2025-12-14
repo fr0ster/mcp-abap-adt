@@ -1110,6 +1110,8 @@ interface ConnectionParams {
 
 **Responsibility**: Registration and management of MCP tool handlers
 
+Handlers are organized into groups and registered through Dependency Injection, allowing flexible composition of handler sets based on requirements.
+
 ```typescript
 interface IHandlersRegistry {
   /**
@@ -1145,13 +1147,165 @@ interface ToolDefinition {
 }
 
 type ToolHandler = (args: any) => Promise<any>;
+
+/**
+ * Interface for a group of handlers
+ * Allows splitting handlers into logical groups (readonly, high-level, low-level, system, etc.)
+ */
+interface IHandlerGroup {
+  /**
+   * Gets the name of the handler group (for identification and debugging)
+   */
+  getName(): string;
+
+  /**
+   * Gets all handler entries in this group
+   * @returns Array of handler entries (tool definition + handler function)
+   */
+  getHandlers(): HandlerEntry[];
+
+  /**
+   * Registers all handlers from this group on the MCP server
+   * @param server - McpServer instance for tool registration
+   */
+  registerHandlers(server: McpServer): void;
+}
+
+interface HandlerEntry {
+  toolDefinition: ToolDefinition;
+  handler: ToolHandler;
+}
 ```
 
 **Implementations**:
-- `McpHandlers` (from `mcp_handlers.ts`) - implements `IHandlersRegistry`
-  - Method `RegisterAllToolsOnServer()` → `registerAllTools()`
-  - Imports all handlers and their `TOOL_DEFINITION`
-  - Converts JSON Schema to Zod schema for SDK
+
+1. **`CompositeHandlersRegistry`** (recommended) - implements `IHandlersRegistry`
+   - Accepts array of `IHandlerGroup` instances via constructor (Dependency Injection)
+   - Allows flexible composition of handler sets
+   - Supports dynamic addition/removal of handler groups
+   - Example:
+     ```typescript
+     const registry = new CompositeHandlersRegistry([
+       new ReadOnlyHandlersGroup(),
+       new HighLevelHandlersGroup(),
+       new LowLevelHandlersGroup(),
+     ]);
+     ```
+
+2. **`McpHandlers`** (legacy, from `mcp_handlers.ts`) - implements `IHandlersRegistry`
+   - Method `RegisterAllToolsOnServer()` → `registerAllTools()`
+   - Imports all handlers and their `TOOL_DEFINITION`
+   - Converts JSON Schema to Zod schema for SDK
+   - **Note**: Consider migrating to `CompositeHandlersRegistry` with handler groups
+
+**Handler Groups**:
+
+- **`ReadOnlyHandlersGroup`** - All read-only handlers (get operations)
+- Additional groups can be created:
+  - `HighLevelHandlersGroup` - High-level CRUD operations
+  - `LowLevelHandlersGroup` - Low-level operations (lock, unlock, activate, etc.)
+  - `SystemHandlersGroup` - System-level operations
+  - `SearchHandlersGroup` - Search and discovery operations
+
+**Base Class for Handler Groups**:
+
+- **`BaseHandlerGroup`** - Abstract base class for creating handler groups
+  - Provides `jsonSchemaToZod()` conversion utility
+  - Provides `registerToolOnServer()` helper with error handling
+  - Handles response format conversion (JSON to MCP text format)
+  - Subclasses must implement `getHandlers()` method
+
+**Creating Custom Handler Groups**:
+
+```typescript
+import { BaseHandlerGroup } from "./handlers/base/BaseHandlerGroup.js";
+import { HandlerEntry } from "./handlers/interfaces.js";
+
+export class CustomHandlersGroup extends BaseHandlerGroup {
+  protected groupName = "CustomHandlers";
+
+  getHandlers(): HandlerEntry[] {
+    return [
+      {
+        toolDefinition: {
+          name: "MyCustomTool",
+          description: "Description of my custom tool",
+          inputSchema: {
+            type: "object",
+            properties: { param1: { type: "string" } },
+            required: ["param1"],
+          },
+        },
+        handler: async (args: any) => {
+          // Handler implementation
+          return { content: [{ type: "text", text: "Result" }] };
+        },
+      },
+    ];
+  }
+}
+```
+
+**Usage Example**:
+
+```typescript
+// For a read-only server (e.g., public API)
+const readonlyRegistry = new CompositeHandlersRegistry([
+  new ReadOnlyHandlersGroup(),
+]);
+
+// For a full-featured server
+const fullRegistry = new CompositeHandlersRegistry([
+  new ReadOnlyHandlersGroup(),
+  new HighLevelHandlersGroup(),
+  new LowLevelHandlersGroup(),
+]);
+
+// Register all tools
+fullRegistry.registerAllTools(mcpServer);
+```
+
+**Integration with McpServer**:
+
+The `IHandlersRegistry` is injected into `McpServer` via constructor:
+
+```typescript
+class McpServer {
+  constructor(
+    private transport: ITransport,
+    private sessionManager: ISessionManager,
+    private connectionProvider: IConnectionProvider,
+    private protocolHandler: IProtocolHandler,
+    private handlersRegistry: IHandlersRegistry,  // Injected
+    private mcpServer: McpServer,  // SDK instance
+    private logger?: ILogger
+  ) {
+    // Initialize protocol handler with registry
+    this.protocolHandler.initialize(this.handlersRegistry, this.mcpServer);
+  }
+}
+```
+
+**Integration with McpServerFactory**:
+
+```typescript
+// In McpServerFactory.createLocal() or createRemote()
+const handlersRegistry = new CompositeHandlersRegistry([
+  new ReadOnlyHandlersGroup(),
+  new HighLevelHandlersGroup(),
+  new LowLevelHandlersGroup(),
+]);
+
+const server = new McpServer(
+  transport,
+  sessionManager,
+  connectionProvider,
+  protocolHandler,
+  handlersRegistry,  // Injected
+  mcpServer,
+  logger
+);
+```
 
 ### 7. Protocol Handler
 

@@ -5,37 +5,41 @@ Concise roadmap for implementing the new architecture with Dependency Injection.
 ## Status
 
 - ✅ **Completed**: Handler Groups system (ReadOnly, HighLevel, LowLevel, System, Search)
-- 🔄 **In Progress**: -
-- ⏳ **Planned**: Remaining v2 architecture components
+- ✅ **Completed**: Phase 1 - Core Interfaces & Types (all interfaces and implementations)
+- ✅ **Completed**: Phase 1.2 & 1.3 - Connection Providers and SessionManager implementations
+- 🔄 **In Progress**: Phase 2 - Core Server Implementation
+- ⏳ **Planned**: Remaining v2 architecture components (Phase 3-7)
 
 ---
 
 ## Phase 1: Core Interfaces & Types
 
 ### 1.1 Transport Layer
-- [ ] `ITransport` interface
-- [ ] `StdioTransport` implementation
-- [ ] `SseTransport` implementation
-- [ ] `StreamableHttpTransport` implementation
+- [x] `ITransport` interface
+- [x] `StdioTransport` implementation
+- [x] `SseTransport` implementation
+- [x] `StreamableHttpTransport` implementation
 
 ### 1.2 Connection & Auth
-- [ ] `IConnectionProvider` interface
-- [ ] `LocalConnectionProvider` (LOCAL mode)
-- [ ] `RemoteConnectionProvider` (REMOTE mode)
-- [ ] `IServiceKeyStore` interface
-- [ ] `ISessionStore` interface
-- [ ] `ITokenProvider` interface
+- [x] `IConnectionProvider` interface
+- [x] `LocalConnectionProvider` (LOCAL mode)
+- [x] `RemoteConnectionProvider` (REMOTE mode)
+- [x] `IServiceKeyStore` interface
+- [x] `ISessionStore` interface
+- [x] `ITokenProvider` interface
+- [x] `IAuthBrokerFactory` interface
+- [x] `IHeaderValidator` interface
 
 ### 1.3 Session Management
-- [ ] `ISessionManager` interface
-- [ ] `ISession` type (unified: clientSessionId + abapSession)
-- [ ] `SessionManager` implementation
+- [x] `ISessionManager` interface
+- [x] `ISession` type (unified: clientSessionId + abapSession)
+- [x] `SessionManager` implementation
 
 ### 1.4 Protocol & Handlers
-- [ ] `IProtocolHandler` interface
-- [ ] `IHandlersRegistry` interface (✅ already exists)
-- [ ] `CompositeHandlersRegistry` (✅ already exists)
-- [ ] Handler Groups (✅ already exists: ReadOnly, HighLevel, LowLevel, System, Search)
+- [x] `IProtocolHandler` interface
+- [x] `IHandlersRegistry` interface (✅ already exists)
+- [x] `CompositeHandlersRegistry` (✅ already exists)
+- [x] Handler Groups (✅ already exists: ReadOnly, HighLevel, LowLevel, System, Search)
 
 ---
 
@@ -66,30 +70,30 @@ Concise roadmap for implementing the new architecture with Dependency Injection.
 - [ ] Service key validation
 
 ### 3.2 Auth Broker
-- [ ] `IAuthBrokerFactory` interface
-- [ ] `SessionBasedAuthBrokerFactory` implementation
-- [ ] `AuthBroker` integration with DI
-- [ ] Token management (get, refresh)
+- [x] `IAuthBrokerFactory` interface
+- [ ] `SessionBasedAuthBrokerFactory` implementation (implementation in @mcp-abap-adt/auth-broker)
+- [ ] `AuthBroker` integration with DI (implementation in @mcp-abap-adt/auth-broker)
+- [ ] Token management (get, refresh) (implementation in @mcp-abap-adt/auth-broker)
 
 ### 3.3 Local Connection Provider
-- [ ] `LocalConnectionProvider` implementation
-- [ ] Service key lookup
-- [ ] Auth broker creation
-- [ ] Connection params building
+- [x] `LocalConnectionProvider` implementation
+- [x] Service key lookup (via AuthBroker)
+- [x] Auth broker creation (via Factory)
+- [x] Connection params building
 
 ---
 
 ## Phase 4: REMOTE Mode Implementation
 
 ### 4.1 Header Validator
-- [ ] `IHeaderValidator` interface
-- [ ] Header validation logic
-- [ ] Connection params extraction from headers
+- [x] `IHeaderValidator` interface
+- [ ] Header validation logic (implementation in @mcp-abap-adt/header-validator)
+- [ ] Connection params extraction from headers (implementation in @mcp-abap-adt/header-validator)
 
 ### 4.2 Remote Connection Provider
-- [ ] `RemoteConnectionProvider` implementation
-- [ ] Header-based connection params
-- [ ] No auth broker (proxy only)
+- [x] `RemoteConnectionProvider` implementation
+- [x] Header-based connection params
+- [x] No auth broker (proxy only)
 
 ---
 
@@ -169,3 +173,11 @@ Concise roadmap for implementing the new architecture with Dependency Injection.
 - Handler Groups system is already implemented and ready to use
 - Architecture is described in `ARCHITECTURE.md`
 - Detailed roadmap in `IMPLEMENTATION_ROADMAP.md`
+- Some implementations depend on external packages:
+  - `AuthBroker` and `SessionBasedAuthBrokerFactory` - in `@mcp-abap-adt/auth-broker`
+  - `IHeaderValidator` implementation - in `@mcp-abap-adt/header-validator`
+  - `IServiceKeyStore`, `ISessionStore`, `ITokenProvider` implementations - in `@mcp-abap-adt/auth-stores` and `@mcp-abap-adt/auth-providers`
+- Some implementations depend on external packages:
+  - `AuthBroker` and `SessionBasedAuthBrokerFactory` - in `@mcp-abap-adt/auth-broker`
+  - `IHeaderValidator` implementation - in `@mcp-abap-adt/header-validator`
+  - `IServiceKeyStore`, `ISessionStore`, `ITokenProvider` implementations - in `@mcp-abap-adt/auth-stores` and `@mcp-abap-adt/auth-providers`

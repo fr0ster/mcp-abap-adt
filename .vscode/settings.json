@@ -161,6 +161,8 @@
     "oleksiikyslytsia",
     "ondemand",
     "onprem",
+    "onsessionclosed",
+    "onsessioninitialized",
     "orchestraight",
     "packagehighhandlers",
     "packagelowhandlers",

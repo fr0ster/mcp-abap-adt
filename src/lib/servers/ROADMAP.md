@@ -7,8 +7,9 @@ Concise roadmap for implementing the new architecture with Dependency Injection.
 - ✅ **Completed**: Handler Groups system (ReadOnly, HighLevel, LowLevel, System, Search)
 - ✅ **Completed**: Phase 1 - Core Interfaces & Types (all interfaces and implementations)
 - ✅ **Completed**: Phase 1.2 & 1.3 - Connection Providers and SessionManager implementations
-- 🔄 **In Progress**: Phase 2 - Core Server Implementation
-- ⏳ **Planned**: Remaining v2 architecture components (Phase 3-7)
+- ✅ **Completed**: Phase 2 - Core Server Implementation (McpServer class, ProtocolHandler, unit tests)
+- 🔄 **In Progress**: Phase 3 - LOCAL Mode Implementation
+- ⏳ **Planned**: Remaining v2 architecture components (Phase 4-7)
 
 ---
 
@@ -46,19 +47,33 @@ Concise roadmap for implementing the new architecture with Dependency Injection.
 ## Phase 2: Core Server Implementation
 
 ### 2.1 McpServer Class
-- [ ] `McpServer` class with DI constructor
-- [ ] Integration with `ITransport`
-- [ ] Integration with `ISessionManager`
-- [ ] Integration with `IConnectionProvider`
-- [ ] Integration with `IProtocolHandler`
-- [ ] Integration with `IHandlersRegistry`
+- [x] `McpServer` class with DI constructor
+- [x] Integration with `ITransport`
+- [x] Integration with `ISessionManager`
+- [x] Integration with `IConnectionProvider`
+- [x] Integration with `IProtocolHandler`
+- [x] Integration with `IHandlersRegistry`
+- [x] Configuration validation
 
 ### 2.2 Request Processing
-- [ ] Request routing
-- [ ] Session extraction
-- [ ] Connection params resolution
-- [ ] Handler execution
-- [ ] Error handling
+- [x] Request routing
+- [x] Session extraction
+- [x] Connection params resolution
+- [x] Handler execution
+- [x] Error handling
+
+### 2.3 Protocol Handler
+- [x] `ProtocolHandler` implementation
+- [x] Tool registration
+- [x] Request handling
+
+### 2.4 Unit Tests
+- [x] Unit tests with mocked interfaces
+- [x] Constructor tests
+- [x] Start/stop tests
+- [x] Configuration validation tests
+- [x] Session creation flow tests
+- [x] Message handling flow tests
 
 ---
 

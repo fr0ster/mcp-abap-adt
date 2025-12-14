@@ -18,3 +18,9 @@ export * from './connection/index.js';
 
 // Session management implementations
 export * from './session/index.js';
+
+// Protocol handler implementations
+export * from './protocol/index.js';
+
+// Server implementations
+export * from './server/index.js';

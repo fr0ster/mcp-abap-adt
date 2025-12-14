@@ -75,9 +75,20 @@ export class StdioTransport implements ITransport {
   private emit(event: 'session:closed', sessionId: string): void;
   private emit(event: 'message', sessionId: string, message: McpMessage): void;
   private emit(event: string, ...args: any[]): void {
-    if (event === 'session:created' || event === 'session:closed' || event === 'message') {
-      this.eventHandlers[event].forEach((handler) => {
-        handler(...args);
+    if (event === 'session:created') {
+      const [sessionId, clientInfo] = args as [string, IClientInfo];
+      this.eventHandlers['session:created'].forEach((handler) => {
+        handler(sessionId, clientInfo);
+      });
+    } else if (event === 'session:closed') {
+      const [sessionId] = args as [string];
+      this.eventHandlers['session:closed'].forEach((handler) => {
+        handler(sessionId);
+      });
+    } else if (event === 'message') {
+      const [sessionId, message] = args as [string, McpMessage];
+      this.eventHandlers['message'].forEach((handler) => {
+        handler(sessionId, message);
       });
     }
   }

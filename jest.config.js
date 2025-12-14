@@ -9,6 +9,7 @@ module.exports = {
   testMatch: [
     '**/src/__tests__/**/*.test.[tj]s',
     '**/src/__tests__/**/*.integration.test.[tj]s',
+    '**/src/lib/servers/v2/__tests__/**/*.test.[tj]s',
   ],
   testPathIgnorePatterns: [
     '/node_modules/',

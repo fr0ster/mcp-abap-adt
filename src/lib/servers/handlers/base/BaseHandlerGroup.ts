@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { IHandlerGroup, HandlerEntry, ToolDefinition, ToolHandler } from "../interfaces.js";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import * as z from "zod";
+import { AbapConnection } from "@mcp-abap-adt/connection";
 
 /**
  * Base class for handler groups
@@ -9,7 +10,11 @@ import * as z from "zod";
  */
 export abstract class BaseHandlerGroup implements IHandlerGroup {
   protected abstract groupName: string;
+  protected connection: AbapConnection;
 
+  constructor(connection: AbapConnection) {
+    this.connection = connection;
+  }
   /**
    * Gets the name of the handler group
    */
@@ -214,7 +219,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
         inputSchema: zodSchema,
       },
       async (args: any) => {
-        const result = await handler(args);
+        const result = await handler(this.connection, args);
 
         // If error, throw it
         if (result.isError) {

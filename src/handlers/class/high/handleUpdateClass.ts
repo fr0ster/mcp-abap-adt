@@ -1,17 +1,18 @@
 /**
- * UpdateClass Handler - Update existing ABAP class source code (opti
-import { AbapConnection } from '@mcp-abap-adt/connection';onal activation)
+ * UpdateClass Handler - Update existing ABAP class source code (optional activation)
  *
  * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
 
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import {
   return_error,
   return_response,
   logger as baseLogger,
-  safeCheckOperation
+  safeCheckOperation,
+  AxiosResponse
 } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { XMLParser } from 'fast-xml-parser';
 

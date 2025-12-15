@@ -3,8 +3,7 @@
  *
  * Description for MCP server:
  * Name: Get full code for program or function group
- * Description: Returns the full code for a given ABAP program (report) or function gr
-import { AbapConnection } from '@mcp-abap-adt/connection';oup, including all includes. The main object (report or function group) always comes first in the response, followed by all child includes in tree traversal order.
+ * Description: Returns the full code for a given ABAP program (report) or function group, including all includes. The main object (report or function group) always comes first in the response, followed by all child includes in tree traversal order.
  *
  * Parameters:
  * - name: technical name of the program or function group (string, e.g., "/CBY/MM_INVENTORY") — required
@@ -46,6 +45,7 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { handleGetProgram } from './handleGetProgram';
 import { handleGetFunctionGroup } from '../../function/readonly/handleGetFunctionGroup';
 import { handleGetInclude } from '../../include/readonly/handleGetInclude';
@@ -64,7 +64,7 @@ export async function handleGetProgFullCode(connection: AbapConnection, args: { 
     collected.add(objectName);
 
     // Try to get include source
-    const includeResult = await handleGetInclude({ include_name: objectName });
+    const includeResult = await handleGetInclude(connection, { include_name: objectName });
     let code: string | null = null;
     if (Array.isArray(includeResult?.content) && includeResult.content.length > 0) {
       const c = includeResult.content[0];
@@ -94,7 +94,7 @@ export async function handleGetProgFullCode(connection: AbapConnection, args: { 
     let codeObjects: any[] = [];
     if (typeUpper === 'PROG/P') {
       // Get main program code
-      const progResult = await handleGetProgram({ program_name: name });
+      const progResult = await handleGetProgram(connection, { program_name: name });
       let progCode: string | null = null;
       let debug = { handleGetProgram: progResult };
       if (Array.isArray(progResult?.content) && progResult.content.length > 0) {
@@ -146,7 +146,7 @@ export async function handleGetProgFullCode(connection: AbapConnection, args: { 
         for (const incName of all) {
           if (!codeObjects.some(obj => obj.OBJECT_TYPE === 'PROG/I' && obj.OBJECT_NAME === incName)) {
             // Get code for each include
-            const incResult = await handleGetInclude({ include_name: incName });
+            const incResult = await handleGetInclude(connection, { include_name: incName });
             let incCode: string | null = null;
             if (Array.isArray(incResult?.content) && incResult.content.length > 0) {
               const c = incResult.content[0];
@@ -162,7 +162,7 @@ export async function handleGetProgFullCode(connection: AbapConnection, args: { 
       }
     } else if (typeUpper === 'FUGR') {
       // Get function group main code
-      const fgResult = await handleGetFunctionGroup({ function_group: name });
+      const fgResult = await handleGetFunctionGroup(connection, { function_group: name });
       let fgCode: string | null = null;
       if (Array.isArray(fgResult?.content) && fgResult.content.length > 0) {
         const c = fgResult.content[0];
@@ -191,7 +191,7 @@ export async function handleGetProgFullCode(connection: AbapConnection, args: { 
         for (const incName of all) {
           if (!codeObjects.some(obj => obj.OBJECT_TYPE === 'PROG/I' && obj.OBJECT_NAME === incName)) {
             // Get code for each include
-            const incResult = await handleGetInclude({ include_name: incName });
+            const incResult = await handleGetInclude(connection, { include_name: incName });
             let incCode: string | null = null;
             if (Array.isArray(incResult?.content) && incResult.content.length > 0) {
               const c = incResult.content[0];

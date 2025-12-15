@@ -33,15 +33,18 @@ export abstract class BaseMcpServer extends McpServer {
 
     // Get connection parameters from broker
     const token = await authBroker.getToken(destination);
-    const serviceKey = authBroker.getServiceKey(destination);
+    const serviceKey = await authBroker.getConnectionConfig(destination);
+    if (!serviceKey) {
+      throw new Error('Connection config not found');
+    }
 
     this.connectionContext = {
       sessionId: destination,
       connectionParams: {
-        url: serviceKey.url,
+        url: serviceKey.serviceUrl || '',
         authType: 'jwt',
         jwtToken: token,
-        client: serviceKey.client,
+        client: serviceKey.sapClient || '',
       },
       metadata: {
         destination,

@@ -9,6 +9,7 @@ import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: "CreateBehaviorDefinitionLow",

@@ -5,11 +5,11 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse  } from '../../../lib/utils';
 import { AbapConnection } from '@mcp-abap-adt/connection';
-import { dClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: "DeleteBehaviorDefinitionLow",

@@ -1,20 +1,20 @@
 /**
- * UpdateView Handler - Update existing CDS/Cla
-import { AbapConnection } from '@mcp-abap-adt/connection';ssic view DDL source
+ * UpdateView Handler - Update existing CDS/Classic view DDL source
  *
  * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
 
-import { AxiosResponse } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import {
   return_error,
   return_response,
   encodeSapObjectName,
   logger as baseLogger,
-  safeCheckOperation
+  safeCheckOperation,
+  AxiosResponse
 } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {

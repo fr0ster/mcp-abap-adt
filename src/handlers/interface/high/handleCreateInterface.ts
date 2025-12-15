@@ -7,12 +7,11 @@
  * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
-import { AxiosResponse  } from '../../../lib/utils';
 import { AbapConnection } from '@mcp-abap-adt/connection';
-import { ion } from '../../../lib/utils';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { return_error, return_response, logger as baseLogger, safeCheckOperation, encodeSapObjectName, AxiosResponse } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {

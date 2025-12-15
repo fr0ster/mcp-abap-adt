@@ -7,9 +7,10 @@
 
 import { CrudClient  } from '@mcp-abap-adt/adt-clients';
 import { AbapConnection } from '@mcp-abap-adt/connection';
-import { kRunResponse } from '../../../lib/checkRunParser';
+import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 
 export const TOOL_DEFINITION = {
   name: "CheckBdefLow",

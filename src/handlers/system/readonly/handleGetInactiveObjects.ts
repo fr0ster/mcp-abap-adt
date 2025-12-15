@@ -2,9 +2,9 @@
  * GetInactiveObjects Handler - Retrieve list of inactive ABAP objects
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { AbapConnection } from '@mcp-abap-adt/connection';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {

@@ -7,11 +7,10 @@
  * Workflow: validate -> create -> lock -> check (inactive version) -> unlock -> (activate)
  */
 
-import { McpError, ErrorCode, AxiosResponse  } from '../../../lib/utils';
 import { AbapConnection } from '@mcp-abap-adt/connection';
-import { ation } from '../../../lib/utils';
-import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { McpError, ErrorCode, return_error, return_response, logger as baseLogger, safeCheckOperation, AxiosResponse } from '../../../lib/utils';
+import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {

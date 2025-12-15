@@ -1,21 +1,21 @@
 /**
- * CreateView Handler - CDS/Classic View Creati
-import { AbapConnection } from '@mcp-abap-adt/connection';on via ADT API
+ * CreateView Handler - CDS/Classic View Creation via ADT API
  *
  * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
 
-import { AxiosResponse } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import {
   return_error,
   return_response,
   encodeSapObjectName,
   logger as baseLogger,
-  safeCheckOperation
+  safeCheckOperation,
+  AxiosResponse
 } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {

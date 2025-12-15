@@ -13,21 +13,22 @@ import { HighLevelHandlersGroup } from "../groups/HighLevelHandlersGroup.js";
 import { LowLevelHandlersGroup } from "../groups/LowLevelHandlersGroup.js";
 import { SystemHandlersGroup } from "../groups/SystemHandlersGroup.js";
 import { SearchHandlersGroup } from "../groups/SearchHandlersGroup.js";
+import { AbapConnection } from "@mcp-abap-adt/connection";
 
 /**
  * Example 1: Read-only server (e.g., for public API)
  * Only registers read-only handlers, system handlers, and search handlers
  */
-export function createReadOnlyServer(): McpServer {
+export function createReadOnlyServer(connection: AbapConnection): McpServer {
   const mcpServer = new McpServer({
     name: "mcp-abap-adt-readonly",
     version: "1.0.0",
   });
 
   const handlersRegistry = new CompositeHandlersRegistry([
-    new ReadOnlyHandlersGroup(),
-    new SystemHandlersGroup(),
-    new SearchHandlersGroup(),
+    new ReadOnlyHandlersGroup(connection),
+    new SystemHandlersGroup(connection),
+    new SearchHandlersGroup(connection),
   ]);
 
   handlersRegistry.registerAllTools(mcpServer);
@@ -39,18 +40,18 @@ export function createReadOnlyServer(): McpServer {
  * Example 2: Full-featured server
  * Registers all handler groups
  */
-export function createFullServer(): McpServer {
+export function createFullServer(connection: AbapConnection): McpServer {
   const mcpServer = new McpServer({
     name: "mcp-abap-adt-full",
     version: "1.0.0",
   });
 
   const handlersRegistry = new CompositeHandlersRegistry([
-    new ReadOnlyHandlersGroup(),
-    new HighLevelHandlersGroup(),
-    new LowLevelHandlersGroup(),
-    new SystemHandlersGroup(),
-    new SearchHandlersGroup(),
+    new ReadOnlyHandlersGroup(connection),
+    new HighLevelHandlersGroup(connection),
+    new LowLevelHandlersGroup(connection),
+    new SystemHandlersGroup(connection),
+    new SearchHandlersGroup(connection),
   ]);
 
   handlersRegistry.registerAllTools(mcpServer);
@@ -62,7 +63,7 @@ export function createFullServer(): McpServer {
  * Example 3: Dynamic handler group management
  * Add/remove handler groups at runtime
  */
-export function createDynamicServer(): McpServer {
+export function createDynamicServer(connection: AbapConnection): McpServer {
   const mcpServer = new McpServer({
     name: "mcp-abap-adt-dynamic",
     version: "1.0.0",
@@ -71,10 +72,10 @@ export function createDynamicServer(): McpServer {
   const handlersRegistry = new CompositeHandlersRegistry();
 
   // Add groups dynamically
-  handlersRegistry.addHandlerGroup(new ReadOnlyHandlersGroup());
-  handlersRegistry.addHandlerGroup(new HighLevelHandlersGroup());
-  handlersRegistry.addHandlerGroup(new SystemHandlersGroup());
-  handlersRegistry.addHandlerGroup(new SearchHandlersGroup());
+  handlersRegistry.addHandlerGroup(new ReadOnlyHandlersGroup(connection));
+  handlersRegistry.addHandlerGroup(new HighLevelHandlersGroup(connection));
+  handlersRegistry.addHandlerGroup(new SystemHandlersGroup(connection));
+  handlersRegistry.addHandlerGroup(new SearchHandlersGroup(connection));
 
   // Register all tools
   handlersRegistry.registerAllTools(mcpServer);
@@ -87,7 +88,7 @@ export function createDynamicServer(): McpServer {
   // handlersRegistry.removeHandlerGroup("HighLevelHandlers");
 
   // Add low-level handlers if needed
-  handlersRegistry.addHandlerGroup(new LowLevelHandlersGroup());
+  handlersRegistry.addHandlerGroup(new LowLevelHandlersGroup(connection));
 
   return mcpServer;
 }
@@ -96,7 +97,7 @@ export function createDynamicServer(): McpServer {
  * Example 4: Custom server configuration
  * Create a server with only specific handler groups
  */
-export function createCustomServer(includeReadOnly: boolean = true): McpServer {
+export function createCustomServer(includeReadOnly: boolean = true, connection: AbapConnection): McpServer {
   const mcpServer = new McpServer({
     name: "mcp-abap-adt-custom",
     version: "1.0.0",
@@ -105,7 +106,7 @@ export function createCustomServer(includeReadOnly: boolean = true): McpServer {
   const handlerGroups: IHandlerGroup[] = [];
 
   if (includeReadOnly) {
-    handlerGroups.push(new ReadOnlyHandlersGroup() as IHandlerGroup);
+    handlerGroups.push(new ReadOnlyHandlersGroup(connection) as IHandlerGroup);
   }
 
   // Add other groups based on configuration
@@ -123,10 +124,10 @@ export function createCustomServer(includeReadOnly: boolean = true): McpServer {
   // }
 
   // Example: Add high-level, low-level, system, and search groups
-  handlerGroups.push(new HighLevelHandlersGroup() as IHandlerGroup);
-  handlerGroups.push(new LowLevelHandlersGroup() as IHandlerGroup);
-  handlerGroups.push(new SystemHandlersGroup() as IHandlerGroup);
-  handlerGroups.push(new SearchHandlersGroup() as IHandlerGroup);
+  handlerGroups.push(new HighLevelHandlersGroup(connection) as IHandlerGroup);
+  handlerGroups.push(new LowLevelHandlersGroup(connection) as IHandlerGroup);
+  handlerGroups.push(new SystemHandlersGroup(connection) as IHandlerGroup);
+  handlerGroups.push(new SearchHandlersGroup(connection) as IHandlerGroup);
 
   const handlersRegistry = new CompositeHandlersRegistry(handlerGroups);
   handlersRegistry.registerAllTools(mcpServer);

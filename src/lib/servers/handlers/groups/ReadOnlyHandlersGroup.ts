@@ -1,5 +1,7 @@
 import { BaseHandlerGroup } from "../base/BaseHandlerGroup.js";
 import { HandlerEntry } from "../interfaces.js";
+import { AbapConnection } from "@mcp-abap-adt/connection";
+import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 
 // Import readonly handlers
 import { handleGetProgram } from "../../../../handlers/program/readonly/handleGetProgram";
@@ -66,7 +68,6 @@ import { TOOL_DEFINITION as GetView_Tool } from "../../../../handlers/view/reado
 import { TOOL_DEFINITION as GetServiceDefinition_Tool } from "../../../../handlers/service_definition/readonly/handleGetServiceDefinition";
 import { TOOL_DEFINITION as GetSession_Tool } from "../../../../handlers/system/readonly/handleGetSession";
 import { TOOL_DEFINITION as GetInactiveObjects_Tool } from "../../../../handlers/system/readonly/handleGetInactiveObjects";
-import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 
 /**
  * Handler group for all readonly (read-only) handlers
@@ -246,11 +247,11 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetObjectInfo_Tool.description,
           inputSchema: GetObjectInfo_Tool.inputSchema,
         },
-        handler: async (args: any) => {
+        handler: async (connection: AbapConnection, args: any) => {
           if (!args || typeof args !== "object") {
             throw new McpError(ErrorCode.InvalidParams, "Missing or invalid arguments for GetObjectInfo");
           }
-          return await handleGetObjectInfo(args as { parent_type: string; parent_name: string });
+          return await handleGetObjectInfo(connection, args as { parent_type: string; parent_name: string });
         },
       },
       {
@@ -340,8 +341,8 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: "Get all ADT types available in the system",
           inputSchema: { type: "object", properties: {}, required: [] },
         },
-        handler: async (args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleGetAllTypes.js")).handleGetAdtTypes(args);
+        handler: async (connection: AbapConnection, args: any) => {
+          return await (await import("../../../../handlers/system/readonly/handleGetAllTypes.js")).handleGetAdtTypes(connection, args);
         },
       },
       {
@@ -357,8 +358,8 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
             required: ["object_name", "object_type"],
           },
         },
-        handler: async (args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleGetObjectStructure.js")).handleGetObjectStructure(args);
+        handler: async (connection: AbapConnection, args: any) => {
+          return await (await import("../../../../handlers/system/readonly/handleGetObjectStructure.js")).handleGetObjectStructure(connection, args);
         },
       },
       {
@@ -371,8 +372,8 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
             required: ["package_name"],
           },
         },
-        handler: async (args: any) => {
-          return await (await import("../../../../handlers/search/readonly/handleGetObjectsList.js")).handleGetObjectsList(args);
+        handler: async (connection: AbapConnection, args: any) => {
+          return await (await import("../../../../handlers/search/readonly/handleGetObjectsList.js")).handleGetObjectsList(connection, args);
         },
       },
       {
@@ -388,8 +389,8 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
             required: ["object_type"],
           },
         },
-        handler: async (args: any) => {
-          return await (await import("../../../../handlers/search/readonly/handleGetObjectsByType.js")).handleGetObjectsByType(args);
+        handler: async (connection: AbapConnection, args: any) => {
+          return await (await import("../../../../handlers/search/readonly/handleGetObjectsByType.js")).handleGetObjectsByType(connection, args);
         },
       },
       {
@@ -402,8 +403,8 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
             required: ["program_name"],
           },
         },
-        handler: async (args: any) => {
-          return await (await import("../../../../handlers/program/readonly/handleGetProgFullCode.js")).handleGetProgFullCode(args);
+        handler: async (connection: AbapConnection, args: any) => {
+          return await (await import("../../../../handlers/program/readonly/handleGetProgFullCode.js")).handleGetProgFullCode(connection, args);
         },
       },
       {
@@ -419,8 +420,8 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
             required: ["object_name", "object_type"],
           },
         },
-        handler: async (args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(args);
+        handler: async (connection: AbapConnection, args: any) => {
+          return await (await import("../../../../handlers/system/readonly/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(connection, args);
         },
       },
       {
@@ -438,8 +439,8 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
             required: ["objects"],
           },
         },
-        handler: async (args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleDescribeByList.js")).handleDescribeByList(args);
+        handler: async (connection: AbapConnection, args: any) => {
+          return await (await import("../../../../handlers/system/readonly/handleDescribeByList.js")).handleDescribeByList(connection, args);
         },
       },
     ];

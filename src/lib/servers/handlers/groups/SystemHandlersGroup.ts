@@ -1,5 +1,6 @@
 import { BaseHandlerGroup } from "../base/BaseHandlerGroup.js";
 import { HandlerEntry } from "../interfaces.js";
+import { AbapConnection } from "@mcp-abap-adt/connection";
 
 // Import system handlers
 import { handleGetTypeInfo } from "../../../../handlers/system/readonly/handleGetTypeInfo";
@@ -75,11 +76,11 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           description: GetObjectInfo_Tool.description,
           inputSchema: GetObjectInfo_Tool.inputSchema,
         },
-        handler: async (args: any) => {
+        handler: async (connection: AbapConnection, args: any) => {
           if (!args || typeof args !== "object") {
             throw new Error("Missing or invalid arguments for GetObjectInfo");
           }
-          return await handleGetObjectInfo(args as { parent_type: string; parent_name: string });
+          return await handleGetObjectInfo(connection, args as { parent_type: string; parent_name: string });
         },
       },
       {
@@ -133,8 +134,8 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
             required: [],
           },
         },
-        handler: async (args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleGetAllTypes.js")).handleGetAdtTypes(args);
+        handler: async (connection: AbapConnection, args: any) => {
+          return await (await import("../../../../handlers/system/readonly/handleGetAllTypes.js")).handleGetAdtTypes(connection, args);
         },
       },
       {
@@ -150,8 +151,8 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
             required: ["object_name", "object_type"],
           },
         },
-        handler: async (args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleGetObjectStructure.js")).handleGetObjectStructure(args);
+        handler: async (connection: AbapConnection, args: any) => {
+          return await (await import("../../../../handlers/system/readonly/handleGetObjectStructure.js")).handleGetObjectStructure(connection, args);
         },
       },
       {
@@ -167,8 +168,8 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
             required: ["object_name", "object_type"],
           },
         },
-        handler: async (args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(args);
+        handler: async (connection: AbapConnection, args: any) => {
+          return await (await import("../../../../handlers/system/readonly/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(connection, args);
         },
       },
       {
@@ -186,8 +187,8 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
             required: ["objects"],
           },
         },
-        handler: async (args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleDescribeByList.js")).handleDescribeByList(args);
+        handler: async (connection: AbapConnection, args: any) => {
+          return await (await import("../../../../handlers/system/readonly/handleDescribeByList.js")).handleDescribeByList(connection, args);
         },
       },
     ];

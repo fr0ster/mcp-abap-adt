@@ -3,9 +3,10 @@
  *
  * Returns session ID and session state (cookies, CSRF token) that can be passed
  * to other handlers to maintain the same session and lock handle across operations.
-import { AbapConnection } from '@mcp-abap-adt/connection';
  */
 
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 

@@ -8,6 +8,7 @@
       "program": "${workspaceFolder}/dist/index.js",
       "args": ["--transport", "sse", "--env", "${workspaceFolder}/.env"],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
       "skipFiles": ["<node_internals>/**"],
       "console": "internalConsole",
       "env": {
@@ -22,6 +23,7 @@
       "program": "${workspaceFolder}/dist/index.js",
       "args": ["--transport", "streamable-http", "--env", "${workspaceFolder}/.env"],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
       "skipFiles": ["<node_internals>/**"],
       "console": "internalConsole",
       "env": {
@@ -33,9 +35,24 @@
       "type": "node",
       "request": "launch",
       "name": "MCP Inspector - STDIO",
-      "program": "${workspaceFolder}/node_modules/@modelcontextprotocol/inspector/dist/index.js",
-      "args": ["node", "${workspaceFolder}/dist/index.js", "--env", "${workspaceFolder}/.env"],
+      "program": "${workspaceFolder}/node_modules/@modelcontextprotocol/inspector/cli/build/cli.js",
+      "args": ["node", "${workspaceFolder}/dist/index.js", "--transport=stdio", "--env", "${workspaceFolder}/.env"],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**"],
+      "console": "internalConsole",
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "MCP Server - STDIO",
+      "program": "${workspaceFolder}/dist/index.js",
+      "args": ["--transport", "stdio", "--env", "${workspaceFolder}/.env"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
       "skipFiles": ["<node_internals>/**"],
       "console": "internalConsole",
       "env": {
@@ -49,6 +66,7 @@
       "program": "${workspaceFolder}/node_modules/.bin/jest",
       "args": ["--runInBand"],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "sourceMaps": true,
       "skipFiles": ["<node_internals>/**"],
       "console": "internalConsole",
       "env": {

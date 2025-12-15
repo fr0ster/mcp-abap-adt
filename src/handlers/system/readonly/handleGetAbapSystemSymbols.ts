@@ -489,9 +489,9 @@ class AbapSystemSymbolResolver {
                 systemInfo: {
                     exists: true,
                     objectType: 'CLAS',
-                    description: classInfo.description || `ABAP Class ${symbol.name}`,
-                    package: classInfo.packageName || 'Unknown',
-                    superClass: classInfo.superclass || '',
+                    description: classInfo.content[0].json?.description || `ABAP Class ${symbol.name}`,
+                    package: classInfo.content[0].json?.packageName || 'Unknown',
+                    superClass: classInfo.content[0].json?.superclass || '',
                 }
             };
         } catch (error) {
@@ -519,9 +519,9 @@ class AbapSystemSymbolResolver {
                 systemInfo: {
                     exists: true,
                     objectType: 'FUNC',
-                    description: functionInfo.description || `ABAP Function ${symbol.name}`,
-                    package: functionInfo.packageName || 'Unknown',
-                    techName: functionInfo.functionModuleName || ''
+                    description: functionInfo.content[0].json?.description || `ABAP Function ${symbol.name}`,
+                    package: functionInfo.content[0].json?.packageName || 'Unknown',
+                    techName: functionInfo.content[0].json?.functionModuleName || ''
                 } as AbapSystemInfo
             };
         } catch (error) {
@@ -554,8 +554,8 @@ class AbapSystemSymbolResolver {
                 systemInfo: {
                     exists: true,
                     objectType: 'INTF',
-                    description: interfaceInfo.description || `ABAP Interface ${symbol.name}`,
-                    package: interfaceInfo.packageName || 'Unknown'
+                    description: interfaceInfo.content[0].json?.description || `ABAP Interface ${symbol.name}`,
+                    package: interfaceInfo.content[0].json?.packageName || 'Unknown'
                 } as AbapSystemInfo
             };
         } catch (error) {
@@ -627,8 +627,8 @@ export async function handleGetAbapSystemSymbols(connection: AbapConnection, arg
             isError: false,
             content: [
                 {
-                    type: "text",
-                    text: JSON.stringify(result, null, 2)
+                    type: "json",
+                    json: result
                 }
             ]
         };

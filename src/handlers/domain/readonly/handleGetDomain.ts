@@ -18,5 +18,8 @@ export async function handleGetDomain(connection: AbapConnection, args: any) {
 
   // Create client
   const client = new ReadOnlyClient(connection);
-  return await client.readDomain(args.domain_name);
+  const result = await client.readDomain(args.domain_name);
+  return {
+    content: [{ type: "json", json: result }],
+  };
 }

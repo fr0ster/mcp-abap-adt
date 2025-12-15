@@ -18,5 +18,8 @@ export async function handleGetStructure(connection: AbapConnection, args: any) 
 
   // Create client
   const client = new ReadOnlyClient(connection);
-  return await client.readStructure(args.structure_name);
+  const result = await client.readStructure(args.structure_name);
+  return {
+    content: [{ type: "json", json: result }],
+  };
 }

@@ -29,6 +29,8 @@ export async function handleGetView(connection: AbapConnection, args: any) {
 
   // Create client
   const client = new ReadOnlyClient(connection);
-  const view = await client.readView(args.view_name);
-  return view;
+  const result = await client.readView(args.view_name);
+  return {
+    content: [{ type: "json", json: result }],
+  };
 }

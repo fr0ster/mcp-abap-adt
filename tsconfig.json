@@ -13,6 +13,7 @@
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
     "declarationMap": true,
+    "sourceMap": true,
     "typeRoots": [
       "./node_modules/@types",
       "./node_modules/@modelcontextprotocol/sdk/types"

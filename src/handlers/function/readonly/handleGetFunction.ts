@@ -19,5 +19,8 @@ export async function handleGetFunction(connection: AbapConnection, args: any) {
 
   // Create client
   const client = new ReadOnlyClient(connection);
-  return await client.readFunctionModule(args.function_name, args.function_group);
+  const result = await client.readFunctionModule(args.function_name, args.function_group);
+  return {
+    content: [{ type: "json", json: result }],
+  };
 }

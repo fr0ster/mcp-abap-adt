@@ -18,5 +18,8 @@ export async function handleGetClass(connection: AbapConnection, args: any) {
 
   // Create client
   const client = new ReadOnlyClient(connection);
-  return await client.readClass(args.class_name);
+  const result = await client.readClass(args.class_name);
+  return {
+    content: [{ type: "json", json: result }],
+  };
 }

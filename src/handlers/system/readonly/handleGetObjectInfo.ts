@@ -206,8 +206,8 @@ export async function handleGetObjectInfo(connection: AbapConnection, args: { pa
       isError: false,
       content: [
         {
-          type: 'text',
-          text: JSON.stringify(result, null, 2)
+          type: 'json',
+          json: result
         }
       ]
     };

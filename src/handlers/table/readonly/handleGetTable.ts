@@ -18,5 +18,8 @@ export async function handleGetTable(connection: AbapConnection, args: any) {
 
   // Create client
   const client = new ReadOnlyClient(connection);
-  return await client.readTable(args.table_name);
+  let result = await client.readTable(args.table_name);
+  return {
+    content: [{ type: "json", json: result }],
+  };
 }

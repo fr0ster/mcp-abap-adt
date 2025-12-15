@@ -18,5 +18,8 @@ export async function handleGetProgram(connection: AbapConnection, args: any) {
 
   // Create client
   const client = new ReadOnlyClient(connection);
-  return await client.readProgram(args.program_name);
+  const result = await client.readProgram(args.program_name);
+  return {
+    content: [{ type: "json", json: result }],
+  };
 }

@@ -18,5 +18,8 @@ export async function handleGetDataElement(connection: AbapConnection, args: any
 
   // Create client
   const client = new ReadOnlyClient(connection);
-  return await client.readDataElement(args.data_element_name);
+  const result = await client.readDataElement(args.data_element_name);
+  return {
+    content: [{ type: "json", json: result }],
+  };
 }

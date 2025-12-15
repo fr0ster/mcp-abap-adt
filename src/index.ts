@@ -26,6 +26,7 @@ import {
   HEADER_SAP_UAA_CLIENT_SECRET,
   HEADER_AUTHORIZATION,
 } from "@mcp-abap-adt/interfaces";
+import type { ISessionStore, IServiceKeyStore } from "@mcp-abap-adt/interfaces";
 import { getPlatformStoresAsync } from "./lib/stores";
 import { getPlatformPaths } from "./lib/stores/platformPaths";
 import { BtpTokenProvider } from "@mcp-abap-adt/auth-providers";
@@ -1032,6 +1033,9 @@ export class mcp_abap_adt_server {
   // Key: `${destination || 'default'}::${clientKey || 'global'}`, Value: AuthBroker instance
   private authBrokers = new Map<string, AuthBroker>();
 
+  // Path to .env file (used to create SessionStore when --mcp is not specified)
+  private readonly envFilePath?: string;
+
   private buildAuthBrokerKey(destination?: string, clientKey?: string): string {
     const destPart = destination || 'default';
     const clientPart = clientKey || 'global';
@@ -1117,7 +1121,37 @@ export class mcp_abap_adt_server {
 
         // Use async version to auto-detect store type based on service key format
         // For .env case (destination='default' and no service key), we need to create broker with only sessionStore
-        const { serviceKeyStore, sessionStore, storeType } = await getPlatformStoresAsync(customPath, unsafe, actualDestination);
+        let sessionStore: ISessionStore;
+        let serviceKeyStore: IServiceKeyStore;
+        let storeType: 'abap' | 'btp';
+
+        // If --mcp is not specified and .env file exists, create SessionStore from .env file directory
+        if (!this.defaultMcpDestination && this.envFilePath) {
+          // Get directory where .env file is located
+          const envFileDir = path.dirname(this.envFilePath);
+
+          // Use getPlatformStoresAsync with .env file directory as custom path
+          // This will create SessionStore in the same directory as .env file
+          const stores = await getPlatformStoresAsync(envFileDir, unsafe, actualDestination);
+          serviceKeyStore = stores.serviceKeyStore;
+          sessionStore = stores.sessionStore;
+          storeType = stores.storeType;
+
+          logger.debug("Created SessionStore from .env file directory", {
+            type: "SESSION_STORE_FROM_ENV",
+            envFilePath: this.envFilePath,
+            envFileDir,
+            destination: actualDestination || 'default',
+            storeType,
+            unsafe,
+          });
+        } else {
+          // Use default platform stores (from service keys directory)
+          const stores = await getPlatformStoresAsync(customPath, unsafe, actualDestination);
+          serviceKeyStore = stores.serviceKeyStore;
+          sessionStore = stores.sessionStore;
+          storeType = stores.storeType;
+        }
         logger.debug("Platform stores created", {
           type: "PLATFORM_STORES_CREATED",
           destination: actualDestination || 'default',
@@ -1807,6 +1841,7 @@ export class mcp_abap_adt_server {
     this.allowProcessExit = options?.allowProcessExit ?? true;
     this.registerSignalHandlers = options?.registerSignalHandlers ?? true;
     this.defaultMcpDestination = defaultMcpDestination;
+    this.envFilePath = envFilePath; // Store .env file path for SessionStore creation
 
     this.mcpHandlers = new McpHandlers();
 
@@ -2008,9 +2043,22 @@ export class mcp_abap_adt_server {
     sessionId?: string,
     destination?: string
   ): Promise<AbapConnection> {
+    logger.info("Creating connection for server", {
+      type: "CONNECTION_CREATION_START",
+      hasHeaders: !!headers,
+      sessionId: sessionId || 'not-provided',
+      destination: destination || 'not-provided',
+    });
+
     // Try to get connection from session context first
     const context = sessionContext.getStore();
     if (context?.sapConfig) {
+      logger.info("Using connection from session context", {
+        type: "CONNECTION_FROM_SESSION_CONTEXT",
+        sessionId: sessionId || 'not-provided',
+        url: context.sapConfig.url,
+        authType: context.sapConfig.authType,
+      });
       const sessionConnection = createAbapConnection(
         context.sapConfig,
         loggerAdapter,
@@ -2024,6 +2072,12 @@ export class mcp_abap_adt_server {
       // Get config from headers (already processed by applyAuthHeaders)
       const config = this.sapConfig;
       if (config && config.url !== "http://placeholder" && config.url !== "http://injected-connection") {
+        logger.info("Using connection from headers", {
+          type: "CONNECTION_FROM_HEADERS",
+          sessionId: sessionId || 'not-provided',
+          url: config.url,
+          authType: config.authType,
+        });
         return createAbapConnection(
           config,
           loggerAdapter,
@@ -2035,6 +2089,11 @@ export class mcp_abap_adt_server {
     // If destination provided, create connection via broker
     if (destination) {
       try {
+        logger.info("Attempting to create connection via auth broker", {
+          type: "CONNECTION_VIA_BROKER_ATTEMPT",
+          destination,
+          sessionId: sessionId || 'not-provided',
+        });
         const authBroker = await this.getOrCreateAuthBroker(destination, sessionId || 'global');
         if (authBroker) {
           const connConfig = await authBroker.getConnectionConfig(destination);
@@ -2046,6 +2105,13 @@ export class mcp_abap_adt_server {
                 authType: "jwt",
                 jwtToken,
               };
+              logger.info("Using connection from auth broker", {
+                type: "CONNECTION_FROM_BROKER",
+                destination,
+                sessionId: sessionId || 'not-provided',
+                url: config.url,
+                authType: config.authType,
+              });
               return createAbapConnection(
                 config,
                 loggerAdapter,
@@ -2065,6 +2131,12 @@ export class mcp_abap_adt_server {
 
     // Fallback to default config (from .env or constructor)
     if (this.sapConfig && this.sapConfig.url !== "http://placeholder" && this.sapConfig.url !== "http://injected-connection") {
+      logger.info("Using connection from default config (.env or constructor)", {
+        type: "CONNECTION_FROM_DEFAULT_CONFIG",
+        sessionId: sessionId || 'not-provided',
+        url: this.sapConfig.url,
+        authType: this.sapConfig.authType,
+      });
       return createAbapConnection(
         this.sapConfig,
         loggerAdapter,
@@ -2072,6 +2144,14 @@ export class mcp_abap_adt_server {
       );
     }
 
+    logger.error("Unable to create connection: no valid configuration available", {
+      type: "CONNECTION_CREATION_FAILED",
+      hasHeaders: !!headers,
+      sessionId: sessionId || 'not-provided',
+      destination: destination || 'not-provided',
+      hasSapConfig: !!this.sapConfig,
+      sapConfigUrl: this.sapConfig?.url || 'not-set',
+    });
     throw new Error("Unable to create connection: no valid configuration available");
   }
 

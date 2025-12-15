@@ -115,7 +115,7 @@ describe('Function High-Level Handlers Integration', () => {
       // High-level handler does validation internally, but we check the result
       testLogger.info(`📦 High Create: Creating function group ${functionGroupName}...`);
       testLogger.info(`📦 High Create: Package: ${packageName}, Transport: ${transportRequest || '(empty)'}`);
-      const createFGResponse = await handleCreateFunctionGroup(connection, {
+      const createFGResponse = await handleCreateFunctionGroup({connection, logger: testLogger}, {
           function_group_name: functionGroupName,
           description: functionGroupDescription,
           package_name: packageName,
@@ -135,7 +135,7 @@ describe('Function High-Level Handlers Integration', () => {
       // Step 2: UpdateFunctionGroup (High-Level)
       if (functionGroupCase.params.update_description) {
         testLogger.info(`📝 High Update: Updating function group ${functionGroupName}...`);
-        const updateFGResponse = await handleUpdateFunctionGroup(connection, {
+        const updateFGResponse = await handleUpdateFunctionGroup({connection, logger: testLogger}, {
           function_group_name: functionGroupName,
           description: functionGroupCase.params.update_description,
           transport_request: transportRequest
@@ -152,7 +152,7 @@ describe('Function High-Level Handlers Integration', () => {
 
       // Step 3: CreateFunctionModule (High-Level)
       testLogger.info(`📦 High Create: Creating function module ${functionModuleName}...`);
-      const createFMResponse = await handleCreateFunctionModule(connection, {
+      const createFMResponse = await handleCreateFunctionModule({connection, logger: testLogger}, {
           function_group_name: functionGroupName,
           function_module_name: functionModuleName,
           description: functionModuleDescription,
@@ -172,7 +172,7 @@ describe('Function High-Level Handlers Integration', () => {
 
       // Step 4: UpdateFunctionModule (High-Level)
       testLogger.info(`📝 High Update: Updating function module ${functionModuleName}...`);
-      const updateFMResponse = await handleUpdateFunctionModule(connection, {
+      const updateFMResponse = await handleUpdateFunctionModule({connection, logger: testLogger}, {
           function_group_name: functionGroupName,
           function_module_name: functionModuleName,
           source_code: updatedSourceCode,
@@ -196,7 +196,7 @@ describe('Function High-Level Handlers Integration', () => {
         try {
           // Delete function module only if cleanup_after is true
           if (shouldCleanup) {
-            const deleteFMResponse = await handleDeleteFunctionModule(connection, {
+            const deleteFMResponse = await handleDeleteFunctionModule({connection, logger: testLogger}, {
               function_module_name: functionModuleName,
               function_group_name: functionGroupName,
               transport_request: transportRequest
@@ -220,7 +220,7 @@ describe('Function High-Level Handlers Integration', () => {
         try {
           // Delete function group only if cleanup_after is true
           if (shouldCleanup) {
-            const deleteFGResponse = await handleDeleteFunctionGroup(connection, {
+            const deleteFGResponse = await handleDeleteFunctionGroup({connection, logger: testLogger}, {
               function_group_name: functionGroupName,
               transport_request: transportRequest
             });

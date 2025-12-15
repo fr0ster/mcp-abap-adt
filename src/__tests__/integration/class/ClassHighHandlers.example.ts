@@ -1,9 +1,9 @@
 /**
  * Example: How to use HighTester with workflow functions (lambda approach)
- * 
+ *
  * This shows how tests can define workflow functions (lambdas) that call handlers
  * with logging, while tester provides all infrastructure (connection, session, logger, etc.)
- * 
+ *
  * This approach allows:
  * - Tests to define custom handler call logic
  * - Tests to add custom logging
@@ -32,7 +32,7 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
         // Lambda that calls create handler with logging
         create: async (context: TesterContext) => {
           const { connection, session, logger, objectName, params, packageName, transportRequest } = context;
-          
+
           logger.info(`   • create: ${objectName}`);
 
           const sourceCode = params.source_code || '';
@@ -50,11 +50,11 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
 
           let createResponse;
           try {
-            createResponse = await handleCreateClass(connection, createArgs);
+            createResponse = await handleCreateClass({connection, logger}, createArgs);
           } catch (error: any) {
             if (error.message?.includes('404')) {
               await delay(1000);
-              createResponse = await handleCreateClass(connection, createArgs);
+              createResponse = await handleCreateClass({connection, logger}, createArgs);
             } else {
               throw error;
             }
@@ -76,14 +76,14 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
 
           logger.success(`✅ create: ${objectName} completed successfully`);
           updateSessionFromResponse(session, createData);
-          
+
           return createData;
         },
 
         // Lambda that calls update handler with logging
         update: async (context: TesterContext) => {
           const { connection, session, logger, objectName, params } = context;
-          
+
           logger.info(`   • update: ${objectName}`);
 
           const updatedSourceCode = params.update_source_code;
@@ -91,12 +91,10 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
             throw new Error('update_source_code is required');
           }
 
-          const updateResponse = await handleUpdateClass(connection, {
-            class_name: objectName,
+          const updateResponse = await handleUpdateClass({connection, logger}, {
+            class_name: objectName || '',
             source_code: updatedSourceCode,
             activate: true,
-            session_id: session.session_id,
-            session_state: session.session_state
           });
 
           if (updateResponse.isError) {
@@ -110,18 +108,18 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
           }
 
           logger.success(`✅ update: ${objectName} completed successfully`);
-          
+
           return updateData;
         },
 
         // Lambda that calls delete handler with logging
         delete: async (context: TesterContext) => {
           const { connection, logger, objectName, transportRequest } = context;
-          
+
           logger.info(`   • delete: ${objectName}`);
 
-          const deleteResponse = await handleDeleteClass(connection, {
-            class_name: objectName,
+          const deleteResponse = await handleDeleteClass({connection, logger}, {
+            class_name: objectName || '',
             ...(transportRequest && { transport_request: transportRequest })
           });
 

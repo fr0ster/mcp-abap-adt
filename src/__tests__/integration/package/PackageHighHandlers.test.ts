@@ -38,6 +38,7 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -47,7 +48,7 @@ describe('Package High-Level Handlers Integration', () => {
   let connection: AbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
-
+  const testLogger = createTestLogger('package-high');
   beforeAll(async () => {
     try {
       const { connection: testConnection, session: testSession } = await createTestConnectionAndSession();
@@ -103,7 +104,7 @@ describe('Package High-Level Handlers Integration', () => {
           transport_request: transportRequest,
           application_component: testCase.params.application_component
         };
-        createResponse = await handleCreatePackage(connection, createArgs);
+        createResponse = await handleCreatePackage({connection, logger: testLogger}, createArgs);
       } catch (error: any) {
         const errorMsg = error.message || String(error);
         const errorMsgLower = errorMsg.toLowerCase();
@@ -160,7 +161,7 @@ describe('Package High-Level Handlers Integration', () => {
             await delay(getOperationDelay('delete', testCase));
 
             console.log(`🧹 Cleanup: Deleting test package ${packageName}...`);
-            const deleteResponse = await handleDeletePackage(connection, {
+            const deleteResponse = await handleDeletePackage({connection, logger: testLogger}, {
               package_name: packageName,
               transport_request: transportRequest,
               force_new_connection: true

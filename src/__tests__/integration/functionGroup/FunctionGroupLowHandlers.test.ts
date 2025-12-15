@@ -39,10 +39,10 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
 import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -51,6 +51,7 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
   let connection: AbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
+  const testLogger = createTestLogger('function-group-low');
 
   beforeAll(async () => {
     try {
@@ -126,11 +127,9 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
           description: description,
           has_session: !!(session.session_id && session.session_state)
         });
-        const validateResponse = await handleValidateFunctionGroup(connection, {
+        const validateResponse = await handleValidateFunctionGroup({connection, logger: testLogger}, {
           function_group_name: functionGroupName,
           description: description,
-          session_id: session.session_id,
-          session_state: session.session_state
         });
         debugLog('HANDLER_RESPONSE', `Received response from handleValidateFunctionGroup`, {
           isError: validateResponse.isError,
@@ -188,7 +187,7 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
           transport_request: transportRequest,
           has_session: !!(session.session_id && session.session_state)
         });
-        const createResponse = await handleCreateFunctionGroup(connection, {
+        const createResponse = await handleCreateFunctionGroup({connection, logger: testLogger}, {
           function_group_name: functionGroupName,
           description,
           package_name: packageName,
@@ -236,7 +235,7 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
           function_group_name: functionGroupName,
           has_session: !!(session.session_id && session.session_state)
         });
-        const lockResponse = await handleLockFunctionGroup(connection, {
+        const lockResponse = await handleLockFunctionGroup({connection, logger: testLogger}, {
           function_group_name: functionGroupName,
           session_id: session.session_id,
           session_state: session.session_state
@@ -288,7 +287,7 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
           lock_handle: lockHandle,
           has_session: !!(lockSession.session_id && lockSession.session_state)
         });
-        const unlockResponse = await handleUnlockFunctionGroup(connection, {
+        const unlockResponse = await handleUnlockFunctionGroup({connection, logger: testLogger}, {
           function_group_name: functionGroupName,
           lock_handle: lockHandle,
           session_id: lockSession.session_id,
@@ -328,7 +327,7 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
           function_group_name: functionGroupName,
           has_session: !!(session.session_id && session.session_state)
         });
-        const activateResponse = await handleActivateFunctionGroup(connection, {
+        const activateResponse = await handleActivateFunctionGroup({connection, logger: testLogger}, {
           function_group_name: functionGroupName,
           session_id: session.session_id,
           session_state: session.session_state
@@ -405,7 +404,7 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
             // Always unlock (unlock is always performed)
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
-                await handleUnlockFunctionGroup(connection, {
+                await handleUnlockFunctionGroup({connection, logger: testLogger}, {
                   function_group_name: functionGroupName,
                   lock_handle: lockHandleForCleanup,
                   session_id: lockSessionForCleanup.session_id,
@@ -420,7 +419,7 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
             if (shouldCleanup) {
               await delay(1000);
 
-              const deleteResponse = await handleDeleteFunctionGroup(connection, {
+              const deleteResponse = await handleDeleteFunctionGroup({connection, logger: testLogger}, {
                 function_group_name: functionGroupName,
                 transport_request: transportRequest
               });

@@ -149,7 +149,7 @@ ENDCLASS.`;
           session_id: session.session_id,
           has_session_state: !!session.session_state
         });
-        const lockResponse = await handleLockClassTestClasses(connection, {
+        const lockResponse = await handleLockClassTestClasses({connection, logger: testLogger}, {
           class_name: containerClass,
           session_id: session.session_id,
           session_state: session.session_state
@@ -191,7 +191,7 @@ ENDCLASS.`;
           session_id: testClassesLockSession.session_id,
           testClassSourceLength: testClassSource.length
         });
-        const updateResponse = await handleUpdateClassTestClasses(connection, {
+        const updateResponse = await handleUpdateClassTestClasses({connection, logger: testLogger}, {
           class_name: containerClass,
           test_class_source: testClassSource,
           lock_handle: testClassesLockHandle!,
@@ -217,7 +217,7 @@ ENDCLASS.`;
           lock_handle: testClassesLockHandle,
           session_id: testClassesLockSession.session_id
         });
-        const unlockResponse = await handleUnlockClassTestClasses(connection, {
+        const unlockResponse = await handleUnlockClassTestClasses({connection, logger: testLogger}, {
           class_name: containerClass,
           lock_handle: testClassesLockHandle!,
           session_id: testClassesLockSession.session_id,
@@ -246,7 +246,7 @@ ENDCLASS.`;
           session_id: session.session_id,
           test_class: testClass
         });
-        const activateResponse = await handleActivateClassTestClasses(connection, {
+        const activateResponse = await handleActivateClassTestClasses({connection, logger: testLogger}, {
           class_name: containerClass,
           test_class_name: testClass,
           session_id: session.session_id,
@@ -272,7 +272,7 @@ ENDCLASS.`;
           container_class: containerClass,
           test_class: testClass
         });
-        const runResponse = await handleRunClassUnitTests(connection, {
+        const runResponse = await handleRunClassUnitTests({connection, logger: testLogger}, {
           tests: [{
             container_class: containerClass,
             test_class: testClass
@@ -308,7 +308,7 @@ ENDCLASS.`;
             session_id: session.session_id,
             run_id: runId
           });
-          const statusResponse = await handleGetClassUnitTestStatus(connection, {
+          const statusResponse = await handleGetClassUnitTestStatus({connection, logger: testLogger}, {
             run_id: runId,
             session_id: session.session_id,
             session_state: session.session_state
@@ -337,7 +337,7 @@ ENDCLASS.`;
             session_id: session.session_id,
             run_id: runId
           });
-          const resultResponse = await handleGetClassUnitTestResult(connection, {
+          const resultResponse = await handleGetClassUnitTestResult({connection, logger: testLogger}, {
             run_id: runId,
             session_id: session.session_id,
             session_state: session.session_state
@@ -373,7 +373,7 @@ ENDCLASS.`;
               lock_handle: testClassesLockHandle,
               session_id: testClassesLockSession.session_id
             });
-            await handleUnlockClassTestClasses(connection, {
+            await handleUnlockClassTestClasses({connection, logger: testLogger}, {
               class_name: containerClass!,
               lock_handle: testClassesLockHandle,
               session_id: testClassesLockSession.session_id,
@@ -406,7 +406,7 @@ ENDCLASS.`;
                   lock_handle: testClassesLockHandle,
                   session_id: testClassesLockSession.session_id
                 });
-                await handleUnlockClassTestClasses(connection, {
+                await handleUnlockClassTestClasses({connection, logger: testLogger}, {
                   class_name: containerClass,
                   lock_handle: testClassesLockHandle,
                   session_id: testClassesLockSession.session_id,

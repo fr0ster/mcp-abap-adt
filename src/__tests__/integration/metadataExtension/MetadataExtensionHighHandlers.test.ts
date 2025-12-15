@@ -39,6 +39,7 @@ import {
   loadTestEnv,
   getCleanupAfter
 } from '../helpers/configHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -48,7 +49,7 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
   let connection: AbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
-
+  const testLogger = createTestLogger('metadata-extension-high');
   beforeAll(async () => {
     try {
       const { connection: testConnection, session: testSession } = await createTestConnectionAndSession();
@@ -90,7 +91,7 @@ annotate view ZI_TEST_ENTITY with {
       console.log(`📦 High Create: Creating ${ddlxName}...`);
       let createResponse;
       try {
-        createResponse = await handleCreateMetadataExtension(connection, {
+        createResponse = await handleCreateMetadataExtension({connection, logger: testLogger}, {
           name: ddlxName,
           description,
           package_name: packageName,
@@ -103,13 +104,13 @@ annotate view ZI_TEST_ENTITY with {
         if (errorMsg.includes('already exists') || errorMsg.includes('does already exist') || errorMsg.includes('ResourceAlreadyExists')) {
           console.log(`⚠️  MetadataExtension ${ddlxName} appears to exist, attempting cleanup...`);
           try {
-            await handleDeleteMetadataExtension(connection, {
+            await handleDeleteMetadataExtension({connection, logger: testLogger}, {
               name: ddlxName,
               transport_request: transportRequest
             });
             console.log(`🧹 Cleaned up existing metadata extension ${ddlxName}, retrying create...`);
             // Retry create after cleanup
-            createResponse = await handleCreateMetadataExtension(connection, {
+            createResponse = await handleCreateMetadataExtension({connection, logger: testLogger}, {
               name: ddlxName,
               description,
               package_name: packageName,
@@ -155,7 +156,7 @@ annotate view ZI_TEST_ENTITY with {
 
       let updateResponse;
       try {
-        updateResponse = await handleUpdateMetadataExtension(connection, {
+        updateResponse = await handleUpdateMetadataExtension({connection, logger: testLogger}, {
           name: ddlxName,
           source_code: updatedSourceCode,
           transport_request: transportRequest,
@@ -196,7 +197,7 @@ annotate view ZI_TEST_ENTITY with {
 
           // Delete only if cleanup_after is true
           if (shouldCleanup) {
-            const deleteResponse = await handleDeleteMetadataExtension(connection, {
+            const deleteResponse = await handleDeleteMetadataExtension({connection, logger: testLogger}, {
               name: ddlxName,
               transport_request: transportRequest
             });

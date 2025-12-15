@@ -126,7 +126,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
       try {
         // Step 1: Validate
         testLogger.info(`🔍 Step 1: Validating ${className}...`);
-        const validateResponse = await handleValidateBehaviorImplementation(connection, {
+        const validateResponse = await handleValidateBehaviorImplementation({connection, logger: testLogger}, {
           class_name: className,
           behavior_definition: behaviorDefinition,
           package_name: packageName,
@@ -164,7 +164,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
         if (transportRequest) {
           createArgs.transport_request = transportRequest;
         }
-        const createResponse = await handleCreateClass(connection, createArgs);
+        const createResponse = await handleCreateClass({connection, logger: testLogger}, createArgs);
 
         if (createResponse.isError) {
           const errorMsg = createResponse.content[0]?.text || 'Unknown error';
@@ -188,7 +188,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         // Step 3: Check
         testLogger.info(`🔍 Step 3: Checking ${className}...`);
-        const checkResponse = await handleCheckClass(connection, {
+        const checkResponse = await handleCheckClass({connection, logger: testLogger}, {
           class_name: className,
           session_id: session.session_id,
           session_state: session.session_state
@@ -206,7 +206,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         // Step 4: Lock
         testLogger.info(`🔒 Step 4: Locking ${className}...`);
-        const lockResponse = await handleLockBehaviorImplementation(connection, {
+        const lockResponse = await handleLockBehaviorImplementation({connection, logger: testLogger}, {
           class_name: className,
           session_id: session.session_id,
           session_state: session.session_state
@@ -265,7 +265,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         // Step 6: Unlock
         testLogger.info(`🔓 Step 6: Unlocking ${className}...`);
-        const unlockResponse = await handleUnlockClass(connection, {
+        const unlockResponse = await handleUnlockClass({connection, logger: testLogger}, {
           class_name: className,
           lock_handle: lockHandle,
           session_id: lockSession.session_id,
@@ -285,7 +285,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         // Step 7: Activate
         testLogger.info(`⚡ Step 7: Activating ${className}...`);
-        const activateResponse = await handleActivateClass(connection, {
+        const activateResponse = await handleActivateClass({connection, logger: testLogger}, {
           class_name: className,
           session_id: session.session_id,
           session_state: session.session_state
@@ -321,7 +321,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
             // Always unlock (unlock is always performed)
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
-                await handleUnlockClass(connection, {
+                await handleUnlockClass({connection, logger: testLogger}, {
                   class_name: className,
                   lock_handle: lockHandleForCleanup,
                   session_id: lockSessionForCleanup.session_id,
@@ -335,7 +335,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
             // Delete only if cleanup_after is true
             if (shouldCleanup) {
               await delay(1000);
-              const deleteResponse = await handleDeleteClass(connection, {
+              const deleteResponse = await handleDeleteClass({connection, logger: testLogger}, {
                 class_name: className,
                 transport_request: transportRequest
               });

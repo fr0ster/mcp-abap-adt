@@ -16,9 +16,6 @@
     "dev": "npx @modelcontextprotocol/inspector node ./dist/index.js --transport=stdio",
     "dev:http": "node ./tools/dev-http.js",
     "dev:sse": "node ./tools/dev-sse.js",
-    "test:v2:stdio": "npx ts-node ./tools/test-v2-server-stdio.ts",
-    "test:v2:sse": "npx ts-node ./tools/test-v2-server-sse.ts",
-    "dev:v2": "npx @modelcontextprotocol/inspector node ./bin/mcp-abap-adt-v2.js",
     "auth": "npx sap-abap-auth auth",
     "clean": "make clean",
     "docs:tools": "node ./tools/generate-tools-docs.js",
@@ -89,7 +86,6 @@
   ],
   "bin": {
     "mcp-abap-adt": "./bin/mcp-abap-adt.js",
-    "mcp-abap-adt-v2": "./bin/mcp-abap-adt-v2.js",
     "adt-lock-object": "./bin/lock-object.js",
     "adt-unlock-object": "./bin/unlock-object.js",
     "adt-manage-locks": "./bin/manage-locks.js",

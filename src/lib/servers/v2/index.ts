@@ -1,29 +1,12 @@
 /**
  * MCP Server v2 module exports
  *
- * New architecture with Dependency Injection
+ * Simplified architecture - only types and utilities
+ * Transports are used directly from @modelcontextprotocol/sdk
  */
-
-// Interfaces
-export * from './interfaces/index.js';
 
 // Types
 export * from './types/index.js';
 
-// Transport implementations
-export * from './transports/index.js';
-
-// Connection provider implementations
-export * from './connection/index.js';
-
-// Session management implementations
-export * from './session/index.js';
-
-// Protocol handler implementations
-export * from './protocol/index.js';
-
-// Server implementations
-export * from './server/index.js';
-
-// Factory implementations
-export * from './factory/index.js';
+// Utilities
+export * from './utils/StdioLogger.js';

@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ActivateViewLow",
@@ -53,7 +52,8 @@ interface ActivateViewArgs {
  *
  * Uses CrudClient.activateView - low-level single method call
  */
-export async function handleActivateView(connection: AbapConnection, args: ActivateViewArgs) {
+export async function handleActivateView(context: HandlerContext, args: ActivateViewArgs) {
+  const { connection, logger } = context;
   try {
     const {
       view_name,
@@ -66,23 +66,18 @@ export async function handleActivateView(connection: AbapConnection, args: Activ
       return return_error(new Error('view_name is required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleActivateView',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const viewName = view_name.toUpperCase();
 
-    handlerLogger.info(`Starting view activation: ${viewName}`);
+    logger.info(`Starting view activation: ${viewName}`);
 
     try {
       // Activate view
@@ -100,9 +95,9 @@ export async function handleActivateView(connection: AbapConnection, args: Activ
       // Get updated session state after activation
 
 
-      handlerLogger.info(`✅ ActivateView completed: ${viewName}`);
-      handlerLogger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      handlerLogger.info(`   Messages: ${activationResult.messages.length}`);
+      logger.info(`✅ ActivateView completed: ${viewName}`);
+      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
+      logger.info(`   Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -125,7 +120,7 @@ export async function handleActivateView(connection: AbapConnection, args: Activ
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error activating view ${viewName}: ${error?.message || error}`);
+      logger.error(`Error activating view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate view: ${error.message || String(error)}`;

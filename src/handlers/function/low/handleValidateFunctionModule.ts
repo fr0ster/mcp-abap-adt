@@ -5,11 +5,10 @@
  * Requires function group name.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { FunctionModuleBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, parseValidationResponse, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, parseValidationResponse, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ValidateFunctionModuleLow",

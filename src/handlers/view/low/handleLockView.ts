@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse, return_error, return_response, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "LockViewLow",
@@ -53,7 +52,8 @@ interface LockViewArgs {
  *
  * Uses CrudClient.lockView - low-level single method call
  */
-export async function handleLockView(connection: AbapConnection, args: LockViewArgs) {
+export async function handleLockView(context: HandlerContext, args: LockViewArgs) {
+  const { connection, logger } = context;
   try {
     const {
       view_name,
@@ -66,23 +66,18 @@ export async function handleLockView(connection: AbapConnection, args: LockViewA
       return return_error(new Error('view_name is required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleLockView',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const viewName = view_name.toUpperCase();
 
-    handlerLogger.info(`Starting view lock: ${viewName}`);
+    logger.info(`Starting view lock: ${viewName}`);
 
     try {
       // Lock view
@@ -96,8 +91,8 @@ export async function handleLockView(connection: AbapConnection, args: LockViewA
       // Get updated session state after lock
 
 
-      handlerLogger.info(`✅ LockView completed: ${viewName}`);
-      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger.info(`✅ LockView completed: ${viewName}`);
+      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -111,7 +106,7 @@ export async function handleLockView(connection: AbapConnection, args: LockViewA
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error locking view ${viewName}: ${error?.message || error}`);
+      logger.error(`Error locking view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock view: ${error.message || String(error)}`;

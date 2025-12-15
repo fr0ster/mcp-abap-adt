@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateTableLow",
@@ -68,7 +67,8 @@ interface UpdateTableArgs {
  *
  * Uses CrudClient.updateTable - low-level single method call
  */
-export async function handleUpdateTable(connection: AbapConnection, args: UpdateTableArgs) {
+export async function handleUpdateTable(context: HandlerContext, args: UpdateTableArgs) {
+  const { connection, logger } = context;
   try {
     const {
       table_name,
@@ -84,22 +84,16 @@ export async function handleUpdateTable(connection: AbapConnection, args: Update
       return return_error(new Error('table_name, ddl_code, and lock_handle are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateTable',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const tableName = table_name.toUpperCase();
 
-    handlerLogger.info(`Starting table update: ${tableName}`);
+    logger.info(`Starting table update: ${tableName}`);
 
     try {
       // Update table with DDL code
@@ -111,9 +105,9 @@ export async function handleUpdateTable(connection: AbapConnection, args: Update
       }
 
       // Get updated session state after update
-      
 
-      handlerLogger.info(`✅ UpdateTable completed: ${tableName}`);
+
+      logger.info(`✅ UpdateTable completed: ${tableName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -126,7 +120,7 @@ export async function handleUpdateTable(connection: AbapConnection, args: Update
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating table ${tableName}:`, error);
+      logger.error(`Error updating table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to update table: ${error.message || String(error)}`;

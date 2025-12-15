@@ -1,8 +1,7 @@
-import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
+import { McpError, ErrorCode } from '../../../lib/utils';
 import * as z from 'zod';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "GetClass",
@@ -12,28 +11,25 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-export async function handleGetClass(connection: AbapConnection, args: any) {
-  const handlerLogger = getHandlerLogger(
-    'handleGetClass',
-    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-  );
+export async function handleGetClass(context: HandlerContext, args: any) {
+  const { connection, logger } = context;
   try {
     if (!args?.class_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Class name is required');
     }
 
-    handlerLogger.info(`Reading class ${args.class_name}`);
+    logger.info(`Reading class ${args.class_name}`);
 
     // Create client
     const client = new ReadOnlyClient(connection);
     const result = await client.readClass(args.class_name);
-    handlerLogger.debug(`Successfully read class ${args.class_name}`);
+    logger.debug(`Successfully read class ${args.class_name}`);
     return {
       isError: false,
       content: [{ type: "json", json: result }],
     };
   } catch (error) {
-    handlerLogger.error(`Failed to read class ${args?.class_name || ''}`, error as any);
+    logger.error(`Failed to read class ${args?.class_name || ''}`, error as any);
     return {
       isError: true,
       content: [

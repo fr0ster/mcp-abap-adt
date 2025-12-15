@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse, return_error, return_response, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "LockClassLow",
@@ -53,7 +52,8 @@ interface LockClassArgs {
  *
  * Uses CrudClient.lockClass - low-level single method call
  */
-export async function handleLockClass(connection: AbapConnection, args: LockClassArgs) {
+export async function handleLockClass(context: HandlerContext, args: LockClassArgs) {
+  const { connection, logger } = context;
   try {
     const {
       class_name,
@@ -66,22 +66,16 @@ export async function handleLockClass(connection: AbapConnection, args: LockClas
       return return_error(new Error('class_name is required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleLockClass',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const className = class_name.toUpperCase();
 
-    handlerLogger.info(`Starting class lock: ${className}`);
+    logger.info(`Starting class lock: ${className}`);
 
     try {
       // Lock class
@@ -95,8 +89,8 @@ export async function handleLockClass(connection: AbapConnection, args: LockClas
       // Get updated session state after lock
 
 
-      handlerLogger.info(`✅ LockClass completed: ${className}`);
-      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger.info(`✅ LockClass completed: ${className}`);
+      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -110,7 +104,7 @@ export async function handleLockClass(connection: AbapConnection, args: LockClas
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error locking class ${className}: ${error?.message || error}`);
+      logger.error(`Error locking class ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock class: ${error.message || String(error)}`;

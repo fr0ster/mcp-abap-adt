@@ -7,9 +7,8 @@
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionValidationParams, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { return_error, return_response, logger as baseLogger, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { return_error, return_response, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
 import { AxiosResponse } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: "ValidateBehaviorDefinitionLow",
@@ -75,7 +74,8 @@ interface ValidateBehaviorDefinitionArgs {
  *
  * Uses CrudClient.validateBehaviorDefinition - low-level single method call
  */
-export async function handleValidateBehaviorDefinition(connection: AbapConnection, args: ValidateBehaviorDefinitionArgs) {
+export async function handleValidateBehaviorDefinition(context: HandlerContext, args: ValidateBehaviorDefinitionArgs) {
+  const { connection, logger } = context;
   try {
     const {
       name,
@@ -101,14 +101,9 @@ export async function handleValidateBehaviorDefinition(connection: AbapConnectio
       // Ensure connection is established
           }
 
-    const handlerLogger = getHandlerLogger(
-      'handleValidateBehaviorDefinition',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     const bdefName = name.toUpperCase();
 
-    handlerLogger.info(`Starting behavior definition validation: ${bdefName}`);
+    logger.info(`Starting behavior definition validation: ${bdefName}`);
 
     try {
       // Validate behavior definition - using BehaviorDefinitionValidationParams from adt-clients
@@ -142,8 +137,8 @@ export async function handleValidateBehaviorDefinition(connection: AbapConnectio
       // Get updated session state after validation
 
 
-      handlerLogger.info(`✅ ValidateBehaviorDefinition completed: ${bdefName}`);
-      handlerLogger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      logger.info(`✅ ValidateBehaviorDefinition completed: ${bdefName}`);
+      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
         data: JSON.stringify({
@@ -159,7 +154,7 @@ export async function handleValidateBehaviorDefinition(connection: AbapConnectio
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error validating behavior definition ${bdefName}: ${error?.message || error}`);
+      logger.error(`Error validating behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate behavior definition: ${error.message || String(error)}`;

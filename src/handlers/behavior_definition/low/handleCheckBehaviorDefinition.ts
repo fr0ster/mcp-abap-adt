@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { CrudClient  } from '@mcp-abap-adt/adt-clients';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 
@@ -55,7 +54,8 @@ interface CheckBehaviorDefinitionArgs {
  *
  * Uses CrudClient.checkBehaviorDefinition - low-level single method call
  */
-export async function handleCheckBehaviorDefinition(connection: AbapConnection, args: CheckBehaviorDefinitionArgs) {
+export async function handleCheckBehaviorDefinition(context: HandlerContext, args: CheckBehaviorDefinitionArgs) {
+  const { connection, logger } = context;
   try {
     const {
       name,
@@ -68,23 +68,18 @@ export async function handleCheckBehaviorDefinition(connection: AbapConnection, 
       return return_error(new Error('name is required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleCheckBehaviorDefinition',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const bdefName = name.toUpperCase();
 
-    handlerLogger.info(`Starting behavior definition check: ${bdefName}`);
+    logger.info(`Starting behavior definition check: ${bdefName}`);
 
     try {
       // Check behavior definition - using types from adt-clients
@@ -104,9 +99,9 @@ export async function handleCheckBehaviorDefinition(connection: AbapConnection, 
       // Get updated session state after check
 
 
-      handlerLogger.info(`✅ CheckBehaviorDefinition completed: ${bdefName}`);
-      handlerLogger.info(`   Status: ${checkResult.status}`);
-      handlerLogger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger.info(`✅ CheckBehaviorDefinition completed: ${bdefName}`);
+      logger.info(`   Status: ${checkResult.status}`);
+      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -122,7 +117,7 @@ export async function handleCheckBehaviorDefinition(connection: AbapConnection, 
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error checking behavior definition ${bdefName}: ${error?.message || error}`);
+      logger.error(`Error checking behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check behavior definition: ${error.message || String(error)}`;

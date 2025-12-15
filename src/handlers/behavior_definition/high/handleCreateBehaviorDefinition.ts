@@ -2,12 +2,11 @@
  * CreateBehaviorDefinition Handler - ABAP Behavior Definition Creation via ADT API
  */
 
-import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 
 export const TOOL_DEFINITION = {
@@ -60,7 +59,8 @@ interface CreateBehaviorDefinitionArgs {
     activate?: boolean;
 }
 
-export async function handleCreateBehaviorDefinition(connection: AbapConnection, params: any) {
+export async function handleCreateBehaviorDefinition(context: HandlerContext, params: any) {
+    const { connection, logger } = context;
     const args: CreateBehaviorDefinitionArgs = params;
 
     if (!args.name || !args.package_name || !args.root_entity || !args.implementation_type) {
@@ -76,12 +76,7 @@ export async function handleCreateBehaviorDefinition(connection: AbapConnection,
    const name = args.name.toUpperCase();
    // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-       const handlerLogger = getHandlerLogger(
-     'handleCreateBehaviorDefinition',
-     process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-   );
-
-   handlerLogger.info(`Starting BDEF creation: ${name}`);
+   logger.info(`Starting BDEF creation: ${name}`);
 
     try {
         const client = new CrudClient(connection);
@@ -123,7 +118,7 @@ export async function handleCreateBehaviorDefinition(connection: AbapConnection,
             const unlockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
             await client.unlockBehaviorDefinition(unlockConfig, lockHandle);
           } catch (unlockError) {
-            handlerLogger.error(`Failed to unlock behavior definition after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+            logger.error(`Failed to unlock behavior definition after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
           }
           // Principle 2: first error and exit
           throw error;
@@ -138,7 +133,7 @@ export async function handleCreateBehaviorDefinition(connection: AbapConnection,
                 ? `Behavior Definition ${name} created and activated successfully`
                 : `Behavior Definition ${name} created successfully`
         };
-        handlerLogger.info(`✅ CreateBehaviorDefinition completed successfully: ${name}`);
+        logger.info(`✅ CreateBehaviorDefinition completed successfully: ${name}`);
 
         return return_response({
             data: JSON.stringify(result, null, 2),
@@ -149,14 +144,14 @@ export async function handleCreateBehaviorDefinition(connection: AbapConnection,
         });
 
     } catch (error: any) {
-        handlerLogger.error(`Error creating BDEF ${name}: ${error?.message || error}`);
+        logger.error(`Error creating BDEF ${name}: ${error?.message || error}`);
         return return_error(error);
     } finally {
         try {
             connection.reset();
-            handlerLogger.debug('Reset BDEF connection after use');
+            logger.debug('Reset BDEF connection after use');
         } catch (resetError: any) {
-            handlerLogger.error(`Failed to reset BDEF connection: ${resetError?.message || resetError}`);
+            logger.error(`Failed to reset BDEF connection: ${resetError?.message || resetError}`);
         }
     }
 }

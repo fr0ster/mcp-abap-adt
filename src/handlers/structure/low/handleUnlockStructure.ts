@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UnlockStructureLow",
@@ -58,7 +57,8 @@ interface UnlockStructureArgs {
  *
  * Uses CrudClient.unlockStructure - low-level single method call
  */
-export async function handleUnlockStructure(connection: AbapConnection, args: UnlockStructureArgs) {
+export async function handleUnlockStructure(context: HandlerContext, args: UnlockStructureArgs) {
+  const { connection, logger } = context;
   try {
     const {
       structure_name,
@@ -72,22 +72,18 @@ export async function handleUnlockStructure(connection: AbapConnection, args: Un
       return return_error(new Error('structure_name, lock_handle, and session_id are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUnlockStructure',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const structureName = structure_name.toUpperCase();
 
-    handlerLogger.info(`Starting structure unlock: ${structureName} (session: ${session_id.substring(0, 8)}...)`);
+    logger.info(`Starting structure unlock: ${structureName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock structure
@@ -101,7 +97,7 @@ export async function handleUnlockStructure(connection: AbapConnection, args: Un
       // Get updated session state after unlock
 
 
-      handlerLogger.info(`✅ UnlockStructure completed: ${structureName}`);
+      logger.info(`✅ UnlockStructure completed: ${structureName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -114,7 +110,7 @@ export async function handleUnlockStructure(connection: AbapConnection, args: Un
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error unlocking structure ${structureName}:`, error);
+      logger.error(`Error unlocking structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to unlock structure: ${error.message || String(error)}`;

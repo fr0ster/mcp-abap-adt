@@ -5,11 +5,10 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "LockBehaviorDefinitionLow",
@@ -54,7 +53,8 @@ interface LockBehaviorDefinitionArgs {
  *
  * Uses CrudClient.lockBehaviorDefinition - low-level single method call
  */
-export async function handleLockBehaviorDefinition(connection: AbapConnection, args: LockBehaviorDefinitionArgs) {
+export async function handleLockBehaviorDefinition(context: HandlerContext, args: LockBehaviorDefinitionArgs) {
+  const { connection, logger } = context;
   try {
     const {
       name,
@@ -67,23 +67,18 @@ export async function handleLockBehaviorDefinition(connection: AbapConnection, a
       return return_error(new Error('name is required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleLockBehaviorDefinition',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const bdefName = name.toUpperCase();
 
-    handlerLogger.info(`Starting behavior definition lock: ${bdefName}`);
+    logger.info(`Starting behavior definition lock: ${bdefName}`);
 
     try {
       // Lock behavior definition - using types from adt-clients
@@ -100,8 +95,8 @@ export async function handleLockBehaviorDefinition(connection: AbapConnection, a
       // Get updated session state after lock
 
 
-      handlerLogger.info(`✅ LockBehaviorDefinition completed: ${bdefName}`);
-      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger.info(`✅ LockBehaviorDefinition completed: ${bdefName}`);
+      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -115,7 +110,7 @@ export async function handleLockBehaviorDefinition(connection: AbapConnection, a
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error locking behavior definition ${bdefName}: ${error?.message || error}`);
+      logger.error(`Error locking behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock behavior definition: ${error.message || String(error)}`;

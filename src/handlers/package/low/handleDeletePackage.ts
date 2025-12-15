@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "DeletePackageLow",
@@ -44,7 +43,8 @@ interface DeletePackageArgs {
  *
  * Uses CrudClient.deletePackage - low-level single method call
  */
-export async function handleDeletePackage(connection: AbapConnection, args: DeletePackageArgs) {
+export async function handleDeletePackage(context: HandlerContext, args: DeletePackageArgs) {
+  const { connection, logger } = context;
   try {
     const {
       package_name,
@@ -59,16 +59,9 @@ export async function handleDeletePackage(connection: AbapConnection, args: Dele
 
     const packageName = package_name.toUpperCase();
 
-    // Note: force_new_connection parameter is deprecated and ignored
-    // All connections now use the same session management
-    // To force a new session, restart the MCP server
-        const client = new CrudClient(connection);
-        const handlerLogger = getHandlerLogger(
-      'handleDeletePackage',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
-    handlerLogger.info(`Starting package deletion: ${packageName}`);
+    logger.info(`Starting package deletion: ${packageName}`);
 
     try {
       // Delete package
@@ -79,7 +72,7 @@ export async function handleDeletePackage(connection: AbapConnection, args: Dele
         throw new Error(`Delete did not return a response for package ${packageName}`);
       }
 
-      handlerLogger.info(`✅ DeletePackage completed successfully: ${packageName}`);
+      logger.info(`✅ DeletePackage completed successfully: ${packageName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -91,7 +84,7 @@ export async function handleDeletePackage(connection: AbapConnection, args: Dele
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error deleting package ${packageName}: ${error?.message || error}`);
+      logger.error(`Error deleting package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete package: ${error.message || String(error)}`;

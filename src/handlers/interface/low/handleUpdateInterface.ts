@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateInterfaceLow",
@@ -63,7 +62,8 @@ interface UpdateInterfaceArgs {
  *
  * Uses CrudClient.updateInterface - low-level single method call
  */
-export async function handleUpdateInterface(connection: AbapConnection, args: UpdateInterfaceArgs) {
+export async function handleUpdateInterface(context: HandlerContext, args: UpdateInterfaceArgs) {
+  const { connection, logger } = context;
   try {
     const {
       interface_name,
@@ -78,22 +78,18 @@ export async function handleUpdateInterface(connection: AbapConnection, args: Up
       return return_error(new Error('interface_name, source_code, and lock_handle are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateInterface',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const interfaceName = interface_name.toUpperCase();
 
-    handlerLogger.info(`Starting interface update: ${interfaceName}`);
+    logger.info(`Starting interface update: ${interfaceName}`);
 
     try {
       // Update interface with source code
@@ -107,7 +103,7 @@ export async function handleUpdateInterface(connection: AbapConnection, args: Up
       // Get updated session state after update
 
 
-      handlerLogger.info(`✅ UpdateInterface completed: ${interfaceName}`);
+      logger.info(`✅ UpdateInterface completed: ${interfaceName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -120,7 +116,7 @@ export async function handleUpdateInterface(connection: AbapConnection, args: Up
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating interface ${interfaceName}: ${error?.message || error}`);
+      logger.error(`Error updating interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update interface: ${error.message || String(error)}`;

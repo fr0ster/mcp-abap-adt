@@ -1,6 +1,7 @@
 import { McpError, ErrorCode } from '../../../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, logger, encodeSapObjectName  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+
 export const TOOL_DEFINITION = {
   "name": "GetBdef",
   "description": "[read-only] Retrieve the source code of a BDEF (Behavior Definition) for a CDS entity.",
@@ -30,7 +31,7 @@ export interface BdefResponse {
 /**
  * Handler to retrieve the source code of a BDEF (Behavior Definition) for a CDS entity.
  * Uses the SAP ADT API endpoint for behavior definitions.
- * 
+ *
  * @param args - Tool arguments containing:
  *   - bdef_name: Name of the BDEF (Behavior Definition) (e.g., 'Z_I_MYENTITY')
  * @returns Response object containing:
@@ -39,7 +40,8 @@ export interface BdefResponse {
  *   - raw_xml: The raw XML response from the ADT API for debugging purposes
  *   - In case of error, an error object with details about the failure
  */
-export async function handleGetBdef(connection: AbapConnection, args: any) {
+export async function handleGetBdef(context: HandlerContext, args: any) {
+    const { connection, logger } = context;
     try {
         logger.info('handleGetBdef called with args:', args);
 

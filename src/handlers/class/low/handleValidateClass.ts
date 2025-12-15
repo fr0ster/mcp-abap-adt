@@ -5,10 +5,9 @@
  * Supports package, description, and superclass validation.
  */
 
-import { return_error, return_response, logger, parseValidationResponse, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { return_error, return_response, parseValidationResponse, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ValidateClassLow",
@@ -66,7 +65,8 @@ interface ValidateClassArgs {
 /**
  * Main handler for ValidateClass MCP tool
  */
-export async function handleValidateClass(connection: AbapConnection, args: ValidateClassArgs) {
+export async function handleValidateClass(context: HandlerContext, args: ValidateClassArgs) {
+  const { connection, logger } = context;
   try {
     const {
       class_name,
@@ -81,17 +81,14 @@ export async function handleValidateClass(connection: AbapConnection, args: Vali
       return return_error(new Error('class_name, package_name, and description are required'));
     }
 
-        // Restore session state if provided
+    // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const className = class_name.toUpperCase();
 
-    const handlerLogger = getHandlerLogger('handleValidateClass', logger);
-    handlerLogger.info(`Starting class validation: ${className}`);
+    logger.info(`Starting class validation: ${className}`);
 
     try {
       const builder = new CrudClient(connection);
@@ -132,8 +129,8 @@ export async function handleValidateClass(connection: AbapConnection, args: Vali
       // Get updated session state after validation
 
 
-      handlerLogger.info(`✅ ValidateClass completed: ${className}`);
-      handlerLogger.debug(`Result: valid=${result.valid}, message=${result.message || 'N/A'}`);
+      logger.info(`✅ ValidateClass completed: ${className}`);
+      logger.debug(`Result: valid=${result.valid}, message=${result.message || 'N/A'}`);
 
       // Always return structured response, even if validation failed
       // This allows tests to check validation_result.valid and skip if needed
@@ -161,9 +158,9 @@ export async function handleValidateClass(connection: AbapConnection, args: Vali
 
       if (!isValidationError || debugEnabled) {
         if (isValidationError) {
-          handlerLogger.debug(`Validation returned 400 for class ${className} (expected behavior): ${error.message || String(error)}`);
+          logger.debug(`Validation returned 400 for class ${className} (expected behavior): ${error.message || String(error)}`);
         } else {
-          handlerLogger.error(`Error validating class ${className}: ${error.message || String(error)}`);
+          logger.error(`Error validating class ${className}: ${error.message || String(error)}`);
         }
       }
 

@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "DeleteDomainLow",
@@ -39,7 +38,8 @@ interface DeleteDomainArgs {
  *
  * Uses CrudClient.deleteDomain - low-level single method call
  */
-export async function handleDeleteDomain(connection: AbapConnection, args: DeleteDomainArgs) {
+export async function handleDeleteDomain(context: HandlerContext, args: DeleteDomainArgs) {
+  const { connection, logger } = context;
   try {
     const {
       domain_name,
@@ -51,14 +51,10 @@ export async function handleDeleteDomain(connection: AbapConnection, args: Delet
       return return_error(new Error('domain_name is required'));
     }
 
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
     const domainName = domain_name.toUpperCase();
-    const handlerLogger = getHandlerLogger(
-      'handleDeleteDomain',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
 
-    handlerLogger.info(`Starting domain deletion: ${domainName}`);
+    logger.info(`Starting domain deletion: ${domainName}`);
 
     try {
       // Delete domain
@@ -69,7 +65,7 @@ export async function handleDeleteDomain(connection: AbapConnection, args: Delet
         throw new Error(`Delete did not return a response for domain ${domainName}`);
       }
 
-      handlerLogger.info(`✅ DeleteDomain completed successfully: ${domainName}`);
+      logger.info(`✅ DeleteDomain completed successfully: ${domainName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -81,7 +77,7 @@ export async function handleDeleteDomain(connection: AbapConnection, args: Delet
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error deleting domain ${domainName}: ${error?.message || error}`);
+      logger.error(`Error deleting domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete domain: ${error.message || String(error)}`;

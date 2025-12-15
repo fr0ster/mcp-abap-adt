@@ -8,11 +8,10 @@
  * - Support for both normal views and maintenance views
  */
 
-import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { McpError, ErrorCode } from '../../../lib/utils';
 import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "GetView",
@@ -23,28 +22,25 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-export async function handleGetView(connection: AbapConnection, args: any) {
-  const handlerLogger = getHandlerLogger(
-    'handleGetView',
-    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-  );
+export async function handleGetView(context: HandlerContext, args: any) {
+  const { connection, logger } = context;
   try {
     if (!args?.view_name) {
       throw new McpError(ErrorCode.InvalidParams, 'View name is required');
     }
 
-    handlerLogger.info(`Reading view ${args.view_name}`);
+    logger.info(`Reading view ${args.view_name}`);
 
     // Create client
     const client = new ReadOnlyClient(connection);
     const result = await client.readView(args.view_name);
-    handlerLogger.debug(`Successfully read view ${args.view_name}`);
+    logger.debug(`Successfully read view ${args.view_name}`);
     return {
       isError: false,
       content: [{ type: "json", json: result }],
     };
   } catch (error) {
-    handlerLogger.error(`Failed to read view ${args?.view_name || ''}`, error as any);
+    logger.error(`Failed to read view ${args?.view_name || ''}`, error as any);
     return {
       isError: true,
       content: [

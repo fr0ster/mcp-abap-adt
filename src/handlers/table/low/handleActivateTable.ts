@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ActivateTableLow",
@@ -53,7 +52,8 @@ interface ActivateTableArgs {
  *
  * Uses CrudClient.activateTable - low-level single method call
  */
-export async function handleActivateTable(connection: AbapConnection, args: ActivateTableArgs) {
+export async function handleActivateTable(context: HandlerContext, args: ActivateTableArgs) {
+  const { connection, logger } = context;
   try {
     const {
       table_name,
@@ -66,11 +66,7 @@ export async function handleActivateTable(connection: AbapConnection, args: Acti
       return return_error(new Error('table_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleActivateTable',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -81,7 +77,7 @@ export async function handleActivateTable(connection: AbapConnection, args: Acti
 
     const tableName = table_name.toUpperCase();
 
-    handlerLogger.info(`Starting table activation: ${tableName}`);
+    logger.info(`Starting table activation: ${tableName}`);
 
     try {
       // Activate table
@@ -99,9 +95,9 @@ export async function handleActivateTable(connection: AbapConnection, args: Acti
       // Get updated session state after activation
 
 
-      handlerLogger.info(`✅ ActivateTable completed: ${tableName}`);
-      handlerLogger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      handlerLogger.info(`   Messages: ${activationResult.messages.length}`);
+      logger.info(`✅ ActivateTable completed: ${tableName}`);
+      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
+      logger.info(`   Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -124,7 +120,7 @@ export async function handleActivateTable(connection: AbapConnection, args: Acti
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error activating table ${tableName}:`, error);
+      logger.error(`Error activating table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to activate table: ${error.message || String(error)}`;

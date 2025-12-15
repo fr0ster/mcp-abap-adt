@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ActivateStructureLow",
@@ -53,7 +52,8 @@ interface ActivateStructureArgs {
  *
  * Uses CrudClient.activateStructure - low-level single method call
  */
-export async function handleActivateStructure(connection: AbapConnection, args: ActivateStructureArgs) {
+export async function handleActivateStructure(context: HandlerContext, args: ActivateStructureArgs) {
+  const { connection, logger } = context;
   try {
     const {
       structure_name,
@@ -66,22 +66,18 @@ export async function handleActivateStructure(connection: AbapConnection, args: 
       return return_error(new Error('structure_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleActivateStructure',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const structureName = structure_name.toUpperCase();
 
-    handlerLogger.info(`Starting structure activation: ${structureName}`);
+    logger.info(`Starting structure activation: ${structureName}`);
 
     try {
       // Activate structure
@@ -99,9 +95,9 @@ export async function handleActivateStructure(connection: AbapConnection, args: 
       // Get updated session state after activation
 
 
-      handlerLogger.info(`✅ ActivateStructure completed: ${structureName}`);
-      handlerLogger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      handlerLogger.info(`   Messages: ${activationResult.messages.length}`);
+      logger.info(`✅ ActivateStructure completed: ${structureName}`);
+      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
+      logger.info(`   Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -124,7 +120,7 @@ export async function handleActivateStructure(connection: AbapConnection, args: 
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error activating structure ${structureName}:`, error);
+      logger.error(`Error activating structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to activate structure: ${error.message || String(error)}`;

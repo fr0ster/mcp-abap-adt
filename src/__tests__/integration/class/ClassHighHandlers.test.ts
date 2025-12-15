@@ -59,13 +59,13 @@ describe('Class High-Level Handlers Integration', () => {
 
           let createResponse;
           try {
-            createResponse = await handleCreateClass(connection, createArgs);
+            createResponse = await handleCreateClass({ connection, logger }, createArgs);
           } catch (error: any) {
             // If handler throws an error directly (not wrapped in response)
             logger.error(`Handler threw error: ${error.message || String(error)}`);
             if (error.message?.includes('404')) {
               await delay(1000);
-              createResponse = await handleCreateClass(connection, createArgs);
+              createResponse = await handleCreateClass({ connection, logger }, createArgs);
             } else {
               throw error;
             }
@@ -145,7 +145,7 @@ describe('Class High-Level Handlers Integration', () => {
             }
           }
 
-          const updateResponse = await handleUpdateClass(connection, {
+          const updateResponse = await handleUpdateClass({ connection, logger }, {
             class_name: objectName,
             source_code: updatedSourceCode,
             activate: true
@@ -176,7 +176,7 @@ describe('Class High-Level Handlers Integration', () => {
 
           logger.info(`   • delete: ${objectName}`);
 
-          const deleteResponse = await handleDeleteClass(connection, {
+          const deleteResponse = await handleDeleteClass({ connection: connection, logger }, {
             class_name: objectName,
             ...(transportRequest && { transport_request: transportRequest })
           });

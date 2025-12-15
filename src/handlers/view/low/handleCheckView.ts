@@ -5,11 +5,10 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CheckViewLow",
@@ -65,7 +64,8 @@ interface CheckViewArgs {
  *
  * Uses CrudClient.checkView - low-level single method call
  */
-export async function handleCheckView(connection: AbapConnection, args: CheckViewArgs) {
+export async function handleCheckView(context: HandlerContext, args: CheckViewArgs) {
+  const { connection, logger } = context;
   try {
     const {
       view_name,
@@ -96,12 +96,7 @@ export async function handleCheckView(connection: AbapConnection, args: CheckVie
       ? version.toLowerCase() as 'active' | 'inactive'
       : 'inactive';
 
-    const handlerLogger = getHandlerLogger(
-      'handleCheckView',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
-    handlerLogger.info(`Starting view check: ${viewName} (version: ${checkVersion}) ${ddl_source ? '(with new code)' : '(saved version)'}`);
+    logger.info(`Starting view check: ${viewName} (version: ${checkVersion}) ${ddl_source ? '(with new code)' : '(saved version)'}`);
 
     try {
       // Check view with optional source code (for validating new/unsaved code)
@@ -119,9 +114,9 @@ export async function handleCheckView(connection: AbapConnection, args: CheckVie
       // Get updated session state after check
 
 
-      handlerLogger.info(`✅ CheckView completed: ${viewName}`);
-      handlerLogger.info(`   Status: ${checkResult.status}`);
-      handlerLogger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger.info(`✅ CheckView completed: ${viewName}`);
+      logger.info(`   Status: ${checkResult.status}`);
+      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -138,7 +133,7 @@ export async function handleCheckView(connection: AbapConnection, args: CheckVie
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error checking view ${viewName}: ${error?.message || error}`);
+      logger.error(`Error checking view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check view: ${error.message || String(error)}`;

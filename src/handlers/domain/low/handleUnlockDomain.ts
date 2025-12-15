@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UnlockDomainLow",
@@ -58,7 +57,8 @@ interface UnlockDomainArgs {
  *
  * Uses CrudClient.unlockDomain - low-level single method call
  */
-export async function handleUnlockDomain(connection: AbapConnection, args: UnlockDomainArgs) {
+export async function handleUnlockDomain(context: HandlerContext, args: UnlockDomainArgs) {
+  const { connection, logger } = context;
   try {
     const {
       domain_name,
@@ -72,21 +72,17 @@ export async function handleUnlockDomain(connection: AbapConnection, args: Unloc
       return return_error(new Error('domain_name, lock_handle, and session_id are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUnlockDomain',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     const domainName = domain_name.toUpperCase();
 
-    handlerLogger.info(
+    logger.info(
       `Starting unlock for ${domainName}; lock_handle=${lock_handle}; session=${session_id.substring(0, 8)}...; session_state=${session_state ? 'provided' : 'none'}`
     );
 
     // Restore session state if provided
     if (session_state) {
-      handlerLogger.info(
+      logger.info(
         `Restoring session state from lock: cookies=${session_state.cookies?.length || 0}, csrf=${session_state.csrf_token?.length || 0}, store_keys=${session_state.cookie_store ? Object.keys(session_state.cookie_store).length : 0}`
       );
 
@@ -95,19 +91,19 @@ export async function handleUnlockDomain(connection: AbapConnection, args: Unloc
       await restoreSessionInConnection(connection, session_id, session_state);
 
       // Verify session was restored
-      handlerLogger.info(
+      logger.info(
         `Session state restored (conn session ${connection.getSessionId()})`
       );
     } else {
-      handlerLogger.warn('No session state provided (may fail if domain is locked)');
+      logger.warn('No session state provided (may fail if domain is locked)');
       // Ensure connection is established
-          }
+    }
 
-    handlerLogger.info(`Starting domain unlock: ${domainName} (session: ${session_id.substring(0, 8)}...)`);
+    logger.info(`Starting domain unlock: ${domainName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock domain
-      handlerLogger.debug(`Calling client.unlockDomain({ domainName: ${domainName} }, ${lock_handle})`);
+      logger.debug(`Calling client.unlockDomain({ domainName: ${domainName} }, ${lock_handle})`);
       await client.unlockDomain({ domainName }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
@@ -117,7 +113,7 @@ export async function handleUnlockDomain(connection: AbapConnection, args: Unloc
 
       // Session state management is now handled by auth-broker
 
-      handlerLogger.info(`✅ UnlockDomain completed: ${domainName}`);
+      logger.info(`✅ UnlockDomain completed: ${domainName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -130,7 +126,7 @@ export async function handleUnlockDomain(connection: AbapConnection, args: Unloc
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error unlocking domain ${domainName}: ${error?.message || error}`);
+      logger.error(`Error unlocking domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock domain: ${error.message || String(error)}`;

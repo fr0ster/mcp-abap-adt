@@ -8,7 +8,7 @@
 import { return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "GetClassUnitTestResultLow",
@@ -59,7 +59,8 @@ interface GetResultArgs {
   };
 }
 
-export async function handleGetClassUnitTestResult(connection: AbapConnection, args: GetResultArgs) {
+export async function handleGetClassUnitTestResult(context: HandlerContext, args: GetResultArgs) {
+  const { connection, logger } = context;
   try {
     const {
       run_id,
@@ -73,18 +74,14 @@ export async function handleGetClassUnitTestResult(connection: AbapConnection, a
       return return_error(new Error('run_id is required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleGetClassUnitTestResult',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
           }
 
-    handlerLogger.info(`Fetching ABAP Unit result for run ${run_id}`);
+    logger.info(`Fetching ABAP Unit result for run ${run_id}`);
 
     try {
       await client.getClassUnitTestRunResult(run_id, {
@@ -100,7 +97,7 @@ export async function handleGetClassUnitTestResult(connection: AbapConnection, a
 
       return return_response(resultResponse);
     } catch (error: any) {
-      handlerLogger.error(`Error retrieving ABAP Unit result for run ${run_id}: ${error?.message || error}`);
+      logger.error(`Error retrieving ABAP Unit result for run ${run_id}: ${error?.message || error}`);
       return return_error(new Error(error?.message || String(error)));
     }
   } catch (error: any) {

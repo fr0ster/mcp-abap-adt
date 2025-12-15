@@ -1,8 +1,7 @@
-import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
+import { McpError, ErrorCode } from '../../../lib/utils';
 import * as z from 'zod';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "GetDataElement",
@@ -12,28 +11,25 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-export async function handleGetDataElement(connection: AbapConnection, args: any) {
-  const handlerLogger = getHandlerLogger(
-    'handleGetDataElement',
-    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-  );
+export async function handleGetDataElement(context: HandlerContext, args: any) {
+  const { connection, logger } = context;
   try {
     if (!args?.data_element_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Data element name is required');
     }
 
-    handlerLogger.info(`Reading data element ${args.data_element_name}`);
+    logger.info(`Reading data element ${args.data_element_name}`);
 
     // Create client
     const client = new ReadOnlyClient(connection);
     const result = await client.readDataElement(args.data_element_name);
-    handlerLogger.debug(`Successfully read data element ${args.data_element_name}`);
+    logger.debug(`Successfully read data element ${args.data_element_name}`);
     return {
       isError: false,
       content: [{ type: "json", json: result }],
     };
   } catch (error) {
-    handlerLogger.error(`Failed to read data element ${args?.data_element_name || ''}`, error as any);
+    logger.error(`Failed to read data element ${args?.data_element_name || ''}`, error as any);
     return {
       isError: true,
       content: [

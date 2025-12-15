@@ -6,11 +6,10 @@
  */
 
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CheckInterfaceLow",
@@ -55,7 +54,8 @@ interface CheckInterfaceArgs {
  *
  * Uses CrudClient.checkInterface - low-level single method call
  */
-export async function handleCheckInterface(connection: AbapConnection, args: CheckInterfaceArgs) {
+export async function handleCheckInterface(context: HandlerContext, args: CheckInterfaceArgs) {
+  const { connection, logger } = context;
   try {
     const {
       interface_name,
@@ -68,22 +68,16 @@ export async function handleCheckInterface(connection: AbapConnection, args: Che
       return return_error(new Error('interface_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCheckInterface',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const interfaceName = interface_name.toUpperCase();
 
-    handlerLogger.info(`Starting interface check: ${interfaceName}`);
+    logger.info(`Starting interface check: ${interfaceName}`);
 
     try {
       // Check interface
@@ -100,8 +94,8 @@ export async function handleCheckInterface(connection: AbapConnection, args: Che
       // Get updated session state after check
 
 
-      handlerLogger.info(`✅ CheckInterface completed: ${interfaceName}`);
-      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger.info(`✅ CheckInterface completed: ${interfaceName}`);
+      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -117,7 +111,7 @@ export async function handleCheckInterface(connection: AbapConnection, args: Che
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error checking interface ${interfaceName}: ${error?.message || error}`);
+      logger.error(`Error checking interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check interface: ${error.message || String(error)}`;

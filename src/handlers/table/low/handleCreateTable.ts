@@ -5,11 +5,10 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { TableBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CreateTableLow",
@@ -67,7 +66,8 @@ interface CreateTableArgs extends Pick<TableBuilderConfig, 'tableName' | 'packag
  *
  * Uses CrudClient.createTable - low-level single method call
  */
-export async function handleCreateTable(connection: AbapConnection, args: CreateTableArgs) {
+export async function handleCreateTable(context: HandlerContext, args: CreateTableArgs) {
+  const { connection, logger } = context;
   try {
     const {
       table_name,
@@ -82,22 +82,18 @@ export async function handleCreateTable(connection: AbapConnection, args: Create
       return return_error(new Error('table_name and package_name are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCreateTableLow',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const tableName = table_name.toUpperCase();
 
-    handlerLogger.info(`Starting table creation: ${tableName}`);
+    logger.info(`Starting table creation: ${tableName}`);
 
     try {
       // Create table
@@ -115,9 +111,9 @@ export async function handleCreateTable(connection: AbapConnection, args: Create
       }
 
       // Get updated session state after create
-      
 
-      handlerLogger.info(`✅ CreateTable completed: ${tableName}`);
+
+      logger.info(`✅ CreateTable completed: ${tableName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -132,7 +128,7 @@ export async function handleCreateTable(connection: AbapConnection, args: Create
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating table ${tableName}:`, error);
+      logger.error(`Error creating table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to create table: ${error.message || String(error)}`;

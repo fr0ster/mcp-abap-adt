@@ -8,10 +8,9 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, safeCheckOperation  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { return_error, return_response, safeCheckOperation  } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 export const TOOL_DEFINITION = {
   name: "CreateDataElement",
@@ -119,7 +118,8 @@ interface DataElementArgs {
  * Uses DataElementBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateDataElement(connection: AbapConnection, args: DataElementArgs) {
+export async function handleCreateDataElement(context: HandlerContext, args: DataElementArgs) {
+  const { connection, logger } = context;
   try {
     // Validate required parameters
     if (!args?.data_element_name) {
@@ -139,12 +139,8 @@ export async function handleCreateDataElement(connection: AbapConnection, args: 
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
         const dataElementName = typedArgs.data_element_name.toUpperCase();
-    const handlerLogger = getHandlerLogger(
-      'handleCreateDataElement',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
 
-    handlerLogger.info(`Starting data element creation: ${dataElementName}`);
+    logger.info(`Starting data element creation: ${dataElementName}`);
 
     try {
       // Create client
@@ -205,7 +201,7 @@ export async function handleCreateDataElement(connection: AbapConnection, args: 
           () => client.checkDataElement({ dataElementName }),
           dataElementName,
           {
-            debug: (message: string) => handlerLogger.debug(message)
+            debug: (message: string) => logger.debug(message)
           }
         );
       } catch (checkError: any) {
@@ -255,7 +251,7 @@ export async function handleCreateDataElement(connection: AbapConnection, args: 
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating data element ${dataElementName}: ${error?.message || error}`);
+      logger.error(`Error creating data element ${dataElementName}: ${error?.message || error}`);
 
       // Check if data element already exists
       if (error.message?.includes('already exists') || error.response?.data?.includes('ExceptionResourceAlreadyExists')) {
@@ -276,9 +272,9 @@ export async function handleCreateDataElement(connection: AbapConnection, args: 
     } finally {
       try {
         connection.reset();
-        handlerLogger.debug('Reset data element connection after use');
+        logger.debug('Reset data element connection after use');
       } catch (resetError: any) {
-        handlerLogger.error(`Failed to reset data element connection: ${resetError?.message || resetError}`);
+        logger.error(`Failed to reset data element connection: ${resetError?.message || resetError}`);
       }
     }
 

@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   name: "DeleteClassLow",
   description: "[low-level] Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for $TMP objects.",
@@ -38,7 +37,8 @@ interface DeleteClassArgs {
  *
  * Uses CrudClient.deleteClass - low-level single method call
  */
-export async function handleDeleteClass(connection: AbapConnection, args: DeleteClassArgs) {
+export async function handleDeleteClass(context: HandlerContext, args: DeleteClassArgs) {
+  const { connection, logger } = context;
   try {
     const {
       class_name,
@@ -50,14 +50,10 @@ export async function handleDeleteClass(connection: AbapConnection, args: Delete
       return return_error(new Error('class_name is required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleDeleteClass',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
     const className = class_name.toUpperCase();
 
-    handlerLogger.info(`Starting class deletion: ${className}`);
+    logger.info(`Starting class deletion: ${className}`);
 
     try {
       // Delete class
@@ -71,7 +67,7 @@ export async function handleDeleteClass(connection: AbapConnection, args: Delete
         throw new Error(`Delete did not return a response for class ${className}`);
       }
 
-      handlerLogger.info(`✅ DeleteClass completed successfully: ${className}`);
+      logger.info(`✅ DeleteClass completed successfully: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -83,7 +79,7 @@ export async function handleDeleteClass(connection: AbapConnection, args: Delete
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error deleting class ${className}: ${error?.message || error}`);
+      logger.error(`Error deleting class ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete class: ${error.message || String(error)}`;

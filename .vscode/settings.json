@@ -25,6 +25,7 @@
   "terminal.integrated.cwd": "${workspaceFolder}",
   "cSpell.language": "en",
   "cSpell.words": [
+    "abapunit",
     "ABPLNGVS",
     "ADRNR",
     "adtcore",
@@ -131,6 +132,7 @@
     "locinst",
     "lockhandle",
     "loglevel",
+    "LTCL",
     "MAKTX",
     "MANDT",
     "MATNR",

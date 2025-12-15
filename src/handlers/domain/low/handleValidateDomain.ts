@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, parseValidationResponse, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, parseValidationResponse, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ValidateDomainLow",
@@ -63,7 +62,8 @@ interface ValidateDomainArgs {
  *
  * Uses CrudClient.validateDomain - low-level single method call
  */
-export async function handleValidateDomain(connection: AbapConnection, args: ValidateDomainArgs) {
+export async function handleValidateDomain(context: HandlerContext, args: ValidateDomainArgs) {
+  const { connection, logger } = context;
   try {
     const {
       domain_name,
@@ -78,22 +78,16 @@ export async function handleValidateDomain(connection: AbapConnection, args: Val
       return return_error(new Error('domain_name, package_name, and description are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleValidateDomain',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const domainName = domain_name.toUpperCase();
 
-    handlerLogger.info(`Starting domain validation: ${domainName}`);
+    logger.info(`Starting domain validation: ${domainName}`);
 
     try {
       // Validate domain using CrudClient
@@ -111,7 +105,7 @@ export async function handleValidateDomain(connection: AbapConnection, args: Val
       // Get updated session state after validation
 
 
-      handlerLogger.info(`✅ ValidateDomain completed: ${domainName} (valid=${result.valid})`);
+      logger.info(`✅ ValidateDomain completed: ${domainName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -127,7 +121,7 @@ export async function handleValidateDomain(connection: AbapConnection, args: Val
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error validating domain ${domainName}: ${error?.message || error}`);
+      logger.error(`Error validating domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate domain: ${error.message || String(error)}`;

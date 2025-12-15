@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "DeleteStructureLow",
@@ -39,7 +38,8 @@ interface DeleteStructureArgs {
  *
  * Uses CrudClient.deleteStructure - low-level single method call
  */
-export async function handleDeleteStructure(connection: AbapConnection, args: DeleteStructureArgs) {
+export async function handleDeleteStructure(context: HandlerContext, args: DeleteStructureArgs) {
+  const { connection, logger } = context;
   try {
     const {
       structure_name,
@@ -51,14 +51,10 @@ export async function handleDeleteStructure(connection: AbapConnection, args: De
       return return_error(new Error('structure_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleDeleteStructure',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
     const structureName = structure_name.toUpperCase();
 
-    handlerLogger.info(`Starting structure deletion: ${structureName}`);
+    logger.info(`Starting structure deletion: ${structureName}`);
 
     try {
       // Delete structure
@@ -69,7 +65,7 @@ export async function handleDeleteStructure(connection: AbapConnection, args: De
         throw new Error(`Delete did not return a response for structure ${structureName}`);
       }
 
-      handlerLogger.info(`✅ DeleteStructure completed successfully: ${structureName}`);
+      logger.info(`✅ DeleteStructure completed successfully: ${structureName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -81,7 +77,7 @@ export async function handleDeleteStructure(connection: AbapConnection, args: De
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error deleting structure ${structureName}:`, error);
+      logger.error(`Error deleting structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to delete structure: ${error.message || String(error)}`;

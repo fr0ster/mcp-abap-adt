@@ -8,7 +8,7 @@
 import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ActivateClassTestClassesLow",
@@ -53,7 +53,8 @@ interface ActivateClassTestClassesArgs {
   };
 }
 
-export async function handleActivateClassTestClasses(connection: AbapConnection, args: ActivateClassTestClassesArgs) {
+export async function handleActivateClassTestClasses(context: HandlerContext, args: ActivateClassTestClassesArgs) {
+  const { connection, logger } = context;
   try {
     const {
       class_name,
@@ -66,11 +67,7 @@ export async function handleActivateClassTestClasses(connection: AbapConnection,
       return return_error(new Error('class_name is required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleActivateClassTestClasses',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -80,7 +77,7 @@ export async function handleActivateClassTestClasses(connection: AbapConnection,
     const className = class_name.toUpperCase();
     const testClassName = test_class_name ? test_class_name.toUpperCase() : undefined;
 
-    handlerLogger.info(`Starting test classes activation for: ${className}`);
+    logger.info(`Starting test classes activation for: ${className}`);
 
     try {
       await client.activateTestClasses({
@@ -90,7 +87,7 @@ export async function handleActivateClassTestClasses(connection: AbapConnection,
       const activationResult = client.getTestClassActivateResult();
 
 
-      handlerLogger.info(`✅ ActivateClassTestClasses completed: ${className}`);
+      logger.info(`✅ ActivateClassTestClasses completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -103,7 +100,7 @@ export async function handleActivateClassTestClasses(connection: AbapConnection,
         }, null, 2)
       } as AxiosResponse);
     } catch (error: any) {
-      handlerLogger.error(`Error activating test classes for ${className}: ${error?.message || error}`);
+      logger.error(`Error activating test classes for ${className}: ${error?.message || error}`);
       const reason = error?.response?.status === 404
         ? `Class ${className} not found or test classes are missing.`
         : error?.message || String(error);

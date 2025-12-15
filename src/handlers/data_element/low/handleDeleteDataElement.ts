@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "DeleteDataElementLow",
@@ -39,7 +38,8 @@ interface DeleteDataElementArgs {
  *
  * Uses CrudClient.deleteDataElement - low-level single method call
  */
-export async function handleDeleteDataElement(connection: AbapConnection, args: DeleteDataElementArgs) {
+export async function handleDeleteDataElement(context: HandlerContext, args: DeleteDataElementArgs) {
+  const { connection, logger } = context;
   try {
     const {
       data_element_name,
@@ -51,14 +51,10 @@ export async function handleDeleteDataElement(connection: AbapConnection, args: 
       return return_error(new Error('data_element_name is required'));
     }
 
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
     const dataElementName = data_element_name.toUpperCase();
-    const handlerLogger = getHandlerLogger(
-      'handleDeleteDataElement',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
 
-    handlerLogger.info(`Starting data element deletion: ${dataElementName}`);
+    logger.info(`Starting data element deletion: ${dataElementName}`);
 
     try {
       // Delete data element
@@ -69,7 +65,7 @@ export async function handleDeleteDataElement(connection: AbapConnection, args: 
         throw new Error(`Delete did not return a response for data element ${dataElementName}`);
       }
 
-      handlerLogger.info(`✅ DeleteDataElement completed successfully: ${dataElementName}`);
+      logger.info(`✅ DeleteDataElement completed successfully: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -81,7 +77,7 @@ export async function handleDeleteDataElement(connection: AbapConnection, args: 
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error deleting data element ${dataElementName}: ${error?.message || error}`);
+      logger.error(`Error deleting data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete data element: ${error.message || String(error)}`;

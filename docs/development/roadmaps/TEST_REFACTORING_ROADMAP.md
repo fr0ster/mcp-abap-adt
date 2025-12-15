@@ -189,6 +189,175 @@ BaseTester (abstract)
 #### Read-Only Tests (ReadOnlyTester)
 - [ ] Convert read-only tests to workflow functions (if any)
 
+### Phase 8: Refactor Handlers to Use Context Instead of Connection
+**Goal**: Replace `connection: AbapConnection` parameter with `context: HandlerContext` in all handlers. The context will contain `connection` and `logger`, providing better structure and enabling consistent logging across all handlers.
+
+**Benefits**:
+- Unified context object for all handlers
+- Consistent logger access in all handlers
+- Better separation of concerns
+- Easier to extend context with additional properties in the future
+
+**Context Structure**:
+```typescript
+interface HandlerContext {
+  connection: AbapConnection;
+  logger: Logger;
+}
+```
+
+**Migration Strategy**:
+1. Create `HandlerContext` interface in shared location
+2. Update handler signatures one by one
+3. Update all handler calls in tests and MCP server
+4. Remove direct `connection` parameter usage
+
+#### Create HandlerContext Interface
+- [x] Create `src/lib/handlers/interfaces.ts` with `HandlerContext` interface
+- [x] Export `HandlerContext` from appropriate location
+- [ ] Document context structure and usage
+
+#### Update Handler Signatures
+- [ ] Update all high-level handlers:
+  - [x] `handleCreateClass`
+  - [x] `handleUpdateClass`
+  - [x] `handleCreateDataElement`
+  - [x] `handleUpdateDataElement`
+  - [x] `handleCreateDomain`
+  - [x] `handleUpdateDomain`
+  - [ ] `handleCreateInterface`
+  - [ ] `handleUpdateInterface`
+  - [ ] `handleCreateProgram`
+  - [ ] `handleUpdateProgram`
+  - [ ] `handleCreateStructure`
+  - [ ] `handleUpdateStructure`
+  - [ ] `handleCreateTable`
+  - [ ] `handleUpdateTable`
+  - [ ] `handleCreateView`
+  - [ ] `handleUpdateView`
+  - [x] `handleCreateBehaviorDefinition`
+  - [ ] `handleUpdateBehaviorDefinition`
+  - [ ] `handleCreateBehaviorImplementation`
+  - [ ] `handleUpdateBehaviorImplementation`
+  - [ ] `handleCreateServiceDefinition`
+  - [ ] `handleUpdateServiceDefinition`
+  - [ ] `handleCreateMetadataExtension`
+  - [ ] `handleUpdateMetadataExtension`
+  - [ ] `handleCreateFunctionModule`
+  - [ ] `handleUpdateFunctionModule`
+  - [ ] `handleCreatePackage`
+  - [ ] `handleUpdatePackage`
+
+- [ ] Update all low-level handlers:
+  - [ ] Class handlers:
+    - [x] `handleDeleteClass`
+    - [x] `handleLockClass`
+    - [x] `handleActivateClass`
+    - [x] `handleCheckClass`
+    - [x] `handleCreateClass` (low-level)
+    - [x] `handleUpdateClass` (low-level)
+    - [x] `handleUnlockClass`
+    - [x] `handleValidateClass`
+  - [x] DataElement handlers:
+    - [x] `handleCreateDataElement` (low-level)
+    - [x] `handleUpdateDataElement` (low-level)
+    - [x] `handleDeleteDataElement`
+    - [x] `handleLockDataElement`
+    - [x] `handleUnlockDataElement`
+    - [x] `handleActivateDataElement`
+    - [x] `handleCheckDataElement`
+    - [x] `handleValidateDataElement`
+  - [x] Domain handlers:
+    - [x] `handleCreateDomain` (low-level)
+    - [x] `handleUpdateDomain` (low-level)
+    - [x] `handleDeleteDomain`
+    - [x] `handleLockDomain`
+    - [x] `handleUnlockDomain`
+    - [x] `handleActivateDomain`
+    - [x] `handleCheckDomain`
+    - [x] `handleValidateDomain`
+  - [ ] Interface handlers
+  - [ ] Program handlers
+  - [ ] Structure handlers
+  - [ ] Table handlers
+  - [ ] View handlers
+  - [ ] BehaviorDefinition handlers:
+    - [x] `handleCreateBehaviorDefinition` (high-level)
+    - [x] `handleDeleteBehaviorDefinition`
+    - [x] `handleUpdateBehaviorDefinition`
+    - [x] `handleLockBehaviorDefinition`
+    - [x] `handleUnlockBehaviorDefinition`
+    - [x] `handleCheckBehaviorDefinition`
+    - [x] `handleValidateBehaviorDefinition`
+  - [ ] BehaviorImplementation handlers:
+    - [x] `handleCreateBehaviorImplementation` (high-level)
+    - [x] `handleUpdateBehaviorImplementation` (high-level)
+    - [x] `handleCreateBehaviorImplementation` (low-level)
+    - [x] `handleLockBehaviorImplementation`
+    - [x] `handleValidateBehaviorImplementation`
+  - [ ] FunctionModule handlers
+  - [ ] FunctionGroup handlers
+  - [ ] Package handlers
+  - [ ] MetadataExtension handlers
+
+- [ ] Update all read-only handlers:
+  - [x] `handleGetProgram`
+  - [x] `handleGetTable`
+  - [x] `handleGetDataElement`
+  - [x] `handleGetDomain`
+  - [x] `handleGetStructure`
+  - [x] `handleGetInterface`
+  - [x] `handleGetView`
+  - [x] `handleGetClass`
+  - [x] `handleGetFunction`
+  - [x] `handleGetFunctionGroup`
+  - [ ] `handleGetObjectInfo`
+  - [ ] `handleGetProgFullCode`
+  - [ ] `handleGetServiceDefinition`
+  - [ ] `handleGetTransport`
+  - [ ] `handleGetAbapSystemSymbols`
+  - [ ] `handleGetInactiveObjects`
+  - [ ] `handleGetSession`
+  - [ ] `handleSearchObject`
+
+#### Update Handler Registration Infrastructure
+- [x] Update `BaseHandlerGroup` class:
+  - [x] Change constructor to accept `context: HandlerContext` instead of `connection: AbapConnection`
+  - [x] Update `registerToolOnServer` method to pass `context` instead of `this.connection` to handlers
+  - [x] Store context instead of connection as class property
+  - [ ] Update all handler group subclasses:
+    - [ ] `ReadOnlyHandlersGroup`
+    - [ ] `HighLevelHandlersGroup`
+    - [ ] `LowLevelHandlersGroup`
+    - [ ] `SystemHandlersGroup`
+    - [ ] `SearchHandlersGroup`
+    - [ ] Any other handler group classes
+- [x] Update `mcp_handlers.ts`:
+  - [x] Create `HandlerContext` with connection and logger before registering handlers (context passed as parameter)
+  - [ ] Update all `registerToolOnServer` calls (hundreds of calls) to pass `context` instead of `connection` (in progress by user)
+  - [ ] Update pattern: `handler(connection, args)` → `handler(context, args)`
+  - [ ] Ensure logger is created with appropriate category/prefix for each handler group
+- [ ] Update handler group instantiations:
+  - [ ] Update `usage-example.ts` to pass context instead of connection
+  - [ ] Update any other files that instantiate handler groups
+  - [ ] Update `index.ts` or main server file if it creates handler groups
+- [ ] Update any other handler registry files:
+  - [ ] Check for other files that register handlers directly (not through groups)
+  - [ ] Update to use context pattern
+  - [ ] Ensure consistent logger creation across all registration points
+
+#### Update Handler Calls
+- [ ] Update MCP server handler registration to pass context
+- [ ] Update test workflow functions to pass context
+- [ ] Update direct handler calls in tests
+- [ ] Update any internal handler-to-handler calls
+
+#### Update Handler Internals
+- [ ] Replace `connection` usage with `context.connection` in all handlers
+- [ ] Replace logger creation/usage with `context.logger` in all handlers
+- [ ] Remove redundant logger initialization code
+- [ ] Ensure consistent logging format across all handlers
+
 ## File Structure
 
 ```
@@ -273,7 +442,7 @@ describe('Class High-Level Handlers Integration', () => {
         // Lambda that calls create handler with logging
         create: async (context: TesterContext) => {
           const { connection, session, logger, objectName, params, packageName, transportRequest } = context;
-          
+
           logger.info(`   • create: ${objectName}`);
 
           const createResponse = await handleCreateClass(connection, {
@@ -309,6 +478,65 @@ describe('Class High-Level Handlers Integration', () => {
 
 **See**: `src/__tests__/integration/class/ClassHighHandlers.example.ts` for complete example.
 
+## Progress Summary
+
+### Phase 8: Handler Context Refactoring Status
+
+#### Completed ✅
+- **HandlerContext Interface**: Created in `src/lib/handlers/interfaces.ts`
+- **BaseHandlerGroup**: Updated to accept and use `HandlerContext`
+- **Class Handlers (8/8)**:
+  - High-level: `handleCreateClass`, `handleUpdateClass`
+  - Low-level: `handleDeleteClass`, `handleLockClass`, `handleActivateClass`, `handleCheckClass`, `handleCreateClass`, `handleUpdateClass`, `handleUnlockClass`, `handleValidateClass`
+- **Read-only Handlers (10/18)**:
+  - `handleGetProgram`, `handleGetTable`, `handleGetDataElement`, `handleGetDomain`, `handleGetStructure`, `handleGetInterface`, `handleGetView`, `handleGetClass`, `handleGetFunction`, `handleGetFunctionGroup`
+- **BehaviorDefinition Handlers (7/7)**:
+  - High-level: `handleCreateBehaviorDefinition`
+  - Low-level: `handleDeleteBehaviorDefinition`, `handleUpdateBehaviorDefinition`, `handleLockBehaviorDefinition`, `handleUnlockBehaviorDefinition`, `handleCheckBehaviorDefinition`, `handleValidateBehaviorDefinition`
+- **BehaviorImplementation Handlers (3/10+)**:
+  - High-level: `handleCreateBehaviorImplementation`, `handleUpdateBehaviorImplementation`
+  - Low-level: `handleCreateBehaviorImplementation`, `handleLockBehaviorImplementation`, `handleValidateBehaviorImplementation`
+- **DataElement Handlers (10/10)** ✅:
+  - High-level: `handleCreateDataElement`, `handleUpdateDataElement`
+  - Low-level: `handleCreateDataElement`, `handleUpdateDataElement`, `handleDeleteDataElement`, `handleLockDataElement`, `handleUnlockDataElement`, `handleActivateDataElement`, `handleCheckDataElement`, `handleValidateDataElement`
+- **Domain Handlers (10/10)** ✅:
+  - High-level: `handleCreateDomain`, `handleUpdateDomain`
+  - Low-level: `handleCreateDomain`, `handleUpdateDomain`, `handleDeleteDomain`, `handleLockDomain`, `handleUnlockDomain`, `handleActivateDomain`, `handleCheckDomain`, `handleValidateDomain`
+- **Interface Handlers (10/10)** ✅:
+  - High-level: `handleCreateInterface`, `handleUpdateInterface`
+  - Low-level: `handleCreateInterface`, `handleUpdateInterface`, `handleDeleteInterface`, `handleLockInterface`, `handleUnlockInterface`, `handleActivateInterface`, `handleCheckInterface`, `handleValidateInterface`
+- **Program Handlers (11/11)** ✅:
+  - High-level: `handleCreateProgram`, `handleUpdateProgram`
+  - Low-level: `handleCreateProgram`, `handleUpdateProgram`, `handleDeleteProgram`, `handleLockProgram`, `handleUnlockProgram`, `handleActivateProgram`, `handleCheckProgram`, `handleValidateProgram`
+  - Read-only: `handleGetProgFullCode`
+- **Structure Handlers (10/10)** ✅:
+  - High-level: `handleCreateStructure`, `handleUpdateStructure`
+  - Low-level: `handleCreateStructure`, `handleUpdateStructure`, `handleDeleteStructure`, `handleLockStructure`, `handleUnlockStructure`, `handleActivateStructure`, `handleCheckStructure`, `handleValidateStructure`
+  - Read-only: `handleGetStructure`
+- **Table Handlers (11/11)** ✅:
+  - High-level: `handleCreateTable`, `handleUpdateTable`
+  - Low-level: `handleCreateTable`, `handleUpdateTable`, `handleDeleteTable`, `handleLockTable`, `handleUnlockTable`, `handleActivateTable`, `handleCheckTable`, `handleValidateTable`
+  - Read-only: `handleGetTableContents`
+- **View Handlers (10/10)** ✅:
+  - High-level: `handleCreateView`, `handleUpdateView`
+  - Low-level: `handleCreateView`, `handleUpdateView`, `handleDeleteView`, `handleLockView`, `handleUnlockView`, `handleActivateView`, `handleCheckView`, `handleValidateView`
+  - Read-only: `handleGetView`
+- **Package Handlers (9/9)** ✅:
+  - High-level: `handleCreatePackage`
+  - Low-level: `handleCreatePackage`, `handleUpdatePackage`, `handleDeletePackage`, `handleLockPackage`, `handleUnlockPackage`, `handleCheckPackage`, `handleValidatePackage`
+  - Read-only: `handleGetPackage`
+
+#### In Progress 🔄
+- **mcp_handlers.ts**: Context parameter added, registration calls being updated by user
+- **Remaining read-only handlers**: `handleGetObjectInfo`, `handleGetServiceDefinition`, `handleGetTransport`, `handleGetAbapSystemSymbols`, `handleGetInactiveObjects`, `handleGetSession`, `handleSearchObject`, and others
+- **Remaining high-level handlers**: ServiceDefinition, FunctionModule handlers
+- **Remaining low-level handlers**: FunctionModule, FunctionGroup handlers
+
+#### Pending ⏳
+- Update all handler group subclasses to use context
+- Update test workflow functions to pass context
+- Update any internal handler-to-handler calls
+
 ## Benefits
 
 1. **Consistency**: All tests follow the same pattern
@@ -321,7 +549,9 @@ describe('Class High-Level Handlers Integration', () => {
 ## Notes
 
 - All testers must use `createTestConnectionAndSession()` from `sessionHelpers.ts`
-- Connection is always passed as first argument to handlers
+- **Current**: Connection is always passed as first argument to handlers
+- **Future (Phase 8)**: Context (with connection and logger) will be passed as first argument to handlers
 - Session state is managed automatically
 - Cleanup is handled automatically in `afterEach`/`afterAll`
 - Test configuration is loaded from `test-config.yaml` via config helpers
+- Cleanup parameters (`skip_cleanup`, `cleanup_after`) from YAML are now properly respected, including parameters from parameter groups

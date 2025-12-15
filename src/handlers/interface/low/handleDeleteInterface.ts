@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "DeleteInterfaceLow",
@@ -39,7 +38,8 @@ interface DeleteInterfaceArgs {
  *
  * Uses CrudClient.deleteInterface - low-level single method call
  */
-export async function handleDeleteInterface(connection: AbapConnection, args: DeleteInterfaceArgs) {
+export async function handleDeleteInterface(context: HandlerContext, args: DeleteInterfaceArgs) {
+  const { connection, logger } = context;
   try {
     const {
       interface_name,
@@ -51,14 +51,10 @@ export async function handleDeleteInterface(connection: AbapConnection, args: De
       return return_error(new Error('interface_name is required'));
     }
 
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
     const interfaceName = interface_name.toUpperCase();
-    const handlerLogger = getHandlerLogger(
-      'handleDeleteInterface',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
 
-    handlerLogger.info(`Starting interface deletion: ${interfaceName}`);
+    logger.info(`Starting interface deletion: ${interfaceName}`);
 
     try {
       // Delete interface
@@ -69,7 +65,7 @@ export async function handleDeleteInterface(connection: AbapConnection, args: De
         throw new Error(`Delete did not return a response for interface ${interfaceName}`);
       }
 
-      handlerLogger.info(`✅ DeleteInterface completed successfully: ${interfaceName}`);
+      logger.info(`✅ DeleteInterface completed successfully: ${interfaceName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -81,7 +77,7 @@ export async function handleDeleteInterface(connection: AbapConnection, args: De
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error deleting interface ${interfaceName}: ${error?.message || error}`);
+      logger.error(`Error deleting interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete interface: ${error.message || String(error)}`;

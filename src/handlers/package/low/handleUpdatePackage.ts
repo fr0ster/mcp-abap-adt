@@ -6,10 +6,9 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { return_error, return_response, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdatePackageLow",
@@ -69,7 +68,8 @@ interface UpdatePackageArgs {
  *
  * Uses CrudClient.updatePackage - low-level single method call
  */
-export async function handleUpdatePackage(connection: AbapConnection, args: UpdatePackageArgs) {
+export async function handleUpdatePackage(context: HandlerContext, args: UpdatePackageArgs) {
+  const { connection, logger } = context;
   try {
     const {
       package_name,
@@ -86,10 +86,6 @@ export async function handleUpdatePackage(connection: AbapConnection, args: Upda
     }
 
         const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUpdatePackage',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -103,7 +99,7 @@ export async function handleUpdatePackage(connection: AbapConnection, args: Upda
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    handlerLogger.info(`Starting package update: ${packageName}`);
+    logger.info(`Starting package update: ${packageName}`);
 
     try {
       // Update package description
@@ -121,7 +117,7 @@ export async function handleUpdatePackage(connection: AbapConnection, args: Upda
       // Get updated session state after update
 
 
-      handlerLogger.info(`✅ UpdatePackage completed: ${packageName}`);
+      logger.info(`✅ UpdatePackage completed: ${packageName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -136,7 +132,7 @@ export async function handleUpdatePackage(connection: AbapConnection, args: Upda
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating package ${packageName}: ${error?.message || error}`);
+      logger.error(`Error updating package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update package: ${error.message || String(error)}`;

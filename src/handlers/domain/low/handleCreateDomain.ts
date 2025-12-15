@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, logErrorSafely, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, logErrorSafely, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CreateDomainLow",
@@ -68,7 +67,8 @@ interface CreateDomainArgs {
  *
  * Uses CrudClient.createDomain - low-level single method call
  */
-export async function handleCreateDomain(connection: AbapConnection, args: CreateDomainArgs) {
+export async function handleCreateDomain(context: HandlerContext, args: CreateDomainArgs) {
+  const { connection, logger } = context;
   try {
     const {
       domain_name,
@@ -84,22 +84,16 @@ export async function handleCreateDomain(connection: AbapConnection, args: Creat
       return return_error(new Error('domain_name, description, and package_name are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCreateDomainLow',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const domainName = domain_name.toUpperCase();
 
-    handlerLogger.info(`Starting domain creation: ${domainName}`);
+    logger.info(`Starting domain creation: ${domainName}`);
 
     try {
       // Create domain
@@ -118,7 +112,7 @@ export async function handleCreateDomain(connection: AbapConnection, args: Creat
       // Get updated session state after create
 
 
-      handlerLogger.info(`✅ CreateDomain completed: ${domainName}`);
+      logger.info(`✅ CreateDomain completed: ${domainName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -134,7 +128,7 @@ export async function handleCreateDomain(connection: AbapConnection, args: Creat
       } as AxiosResponse);
 
     } catch (error: any) {
-      logErrorSafely(baseLogger, `CreateDomain ${domainName}`, error);
+      logger.error(`Error creating domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create domain: ${error.message || String(error)}`;

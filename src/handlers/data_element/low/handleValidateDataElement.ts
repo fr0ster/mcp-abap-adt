@@ -6,9 +6,8 @@
  */
 
 import { return_error, return_response, logger as baseLogger, parseValidationResponse, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ValidateDataElementLow",
@@ -63,7 +62,8 @@ interface ValidateDataElementArgs {
  *
  * Uses CrudClient.validateDataElement - low-level single method call
  */
-export async function handleValidateDataElement(connection: AbapConnection, args: ValidateDataElementArgs) {
+export async function handleValidateDataElement(context: HandlerContext, args: ValidateDataElementArgs) {
+  const { connection, logger } = context;
   try {
     const {
       data_element_name,
@@ -78,22 +78,17 @@ export async function handleValidateDataElement(connection: AbapConnection, args
       return return_error(new Error('data_element_name, package_name, and description are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleValidateDataElement',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
+    const client = new CrudClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const dataElementName = data_element_name.toUpperCase();
 
-    handlerLogger.info(`Starting data element validation: ${dataElementName}`);
+    logger.info(`Starting data element validation: ${dataElementName}`);
 
     try {
       // Validate data element
@@ -115,7 +110,7 @@ export async function handleValidateDataElement(connection: AbapConnection, args
       }
 
       if (!validationResponse) {
-        handlerLogger.error(`Validation did not return a result for data element ${dataElementName}`);
+        logger.error(`Validation did not return a result for data element ${dataElementName}`);
         throw new Error('Validation did not return a result');
       }
       const result = parseValidationResponse(validationResponse);
@@ -123,7 +118,7 @@ export async function handleValidateDataElement(connection: AbapConnection, args
       // Get updated session state after validation
 
 
-      handlerLogger.info(`✅ ValidateDataElement completed: ${dataElementName} (valid=${result.valid})`);
+      logger.info(`✅ ValidateDataElement completed: ${dataElementName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -139,7 +134,7 @@ export async function handleValidateDataElement(connection: AbapConnection, args
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error validating data element ${dataElementName}: ${error?.message || error}`);
+      logger.error(`Error validating data element ${dataElementName}: ${error?.message || error}`);
 
       // If validation endpoint returns 400, try to parse it as validation response
       if (error.response?.status === 400) {

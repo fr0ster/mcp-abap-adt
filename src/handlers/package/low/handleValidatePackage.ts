@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, parseValidationResponse, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, parseValidationResponse, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ValidatePackageLow",
@@ -54,7 +53,8 @@ interface ValidatePackageArgs {
  *
  * Uses CrudClient.validatePackage - low-level single method call
  */
-export async function handleValidatePackage(connection: AbapConnection, args: ValidatePackageArgs) {
+export async function handleValidatePackage(context: HandlerContext, args: ValidatePackageArgs) {
+  const { connection, logger } = context;
   try {
     const {
       package_name,
@@ -68,23 +68,19 @@ export async function handleValidatePackage(connection: AbapConnection, args: Va
       return return_error(new Error('package_name and super_package are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleValidatePackage',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    handlerLogger.info(`Starting package validation: ${packageName} in ${superPackage}`);
+    logger.info(`Starting package validation: ${packageName} in ${superPackage}`);
 
     try {
       // Validate package
@@ -98,7 +94,7 @@ export async function handleValidatePackage(connection: AbapConnection, args: Va
       // Get updated session state after validation
 
 
-      handlerLogger.info(`✅ ValidatePackage completed: ${packageName} (valid=${result.valid})`);
+      logger.info(`✅ ValidatePackage completed: ${packageName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -115,7 +111,7 @@ export async function handleValidatePackage(connection: AbapConnection, args: Va
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error validating package ${packageName}: ${error?.message || error}`);
+      logger.error(`Error validating package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate package: ${error.message || String(error)}`;

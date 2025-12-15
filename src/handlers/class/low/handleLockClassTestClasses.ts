@@ -6,9 +6,8 @@
  */
 
 import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "LockClassTestClassesLow",
@@ -48,7 +47,8 @@ interface LockClassTestClassesArgs {
   };
 }
 
-export async function handleLockClassTestClasses(connection: AbapConnection, args: LockClassTestClassesArgs) {
+export async function handleLockClassTestClasses(context: HandlerContext, args: LockClassTestClassesArgs) {
+  const { connection, logger } = context;
   try {
     const {
       class_name,
@@ -60,11 +60,7 @@ export async function handleLockClassTestClasses(connection: AbapConnection, arg
       return return_error(new Error('class_name is required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleLockClassTestClasses',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -72,7 +68,7 @@ export async function handleLockClassTestClasses(connection: AbapConnection, arg
           }
 
     const className = class_name.toUpperCase();
-    handlerLogger.info(`Starting test classes lock for: ${className}`);
+    logger.info(`Starting test classes lock for: ${className}`);
 
     try {
       await client.lockTestClasses({ className });
@@ -84,7 +80,7 @@ export async function handleLockClassTestClasses(connection: AbapConnection, arg
 
 
 
-      handlerLogger.info(`✅ LockClassTestClasses completed: ${className}`);
+      logger.info(`✅ LockClassTestClasses completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -97,7 +93,7 @@ export async function handleLockClassTestClasses(connection: AbapConnection, arg
         }, null, 2)
       } as AxiosResponse);
     } catch (error: any) {
-      handlerLogger.error(`Error locking test classes for ${className}: ${error?.message || error}`);
+      logger.error(`Error locking test classes for ${className}: ${error?.message || error}`);
       const reason = error?.response?.status === 404
         ? `Class ${className} not found.`
         : error?.response?.status === 409

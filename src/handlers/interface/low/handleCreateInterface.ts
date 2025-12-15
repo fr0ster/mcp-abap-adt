@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CreateInterfaceLow",
@@ -68,7 +67,8 @@ interface CreateInterfaceArgs {
  *
  * Uses CrudClient.createInterface - low-level single method call
  */
-export async function handleCreateInterface(connection: AbapConnection, args: CreateInterfaceArgs) {
+export async function handleCreateInterface(context: HandlerContext, args: CreateInterfaceArgs) {
+  const { connection, logger } = context;
   try {
     const {
       interface_name,
@@ -84,22 +84,16 @@ export async function handleCreateInterface(connection: AbapConnection, args: Cr
       return return_error(new Error('interface_name, description, and package_name are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCreateInterfaceLow',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const interfaceName = interface_name.toUpperCase();
 
-    handlerLogger.info(`Starting interface creation: ${interfaceName}`);
+    logger.info(`Starting interface creation: ${interfaceName}`);
 
     try {
       // Create interface
@@ -118,7 +112,7 @@ export async function handleCreateInterface(connection: AbapConnection, args: Cr
       // Get updated session state after create
 
 
-      handlerLogger.info(`✅ CreateInterface completed: ${interfaceName}`);
+      logger.info(`✅ CreateInterface completed: ${interfaceName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -134,7 +128,7 @@ export async function handleCreateInterface(connection: AbapConnection, args: Cr
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating interface ${interfaceName}: ${error?.message || error}`);
+      logger.error(`Error creating interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create interface: ${error.message || String(error)}`;

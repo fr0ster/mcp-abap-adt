@@ -8,11 +8,10 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { return_error, return_response, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateDataElement",
@@ -139,7 +138,8 @@ interface DataElementArgs {
  * Uses DataElementBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleUpdateDataElement(connection: AbapConnection, args: DataElementArgs) {
+export async function handleUpdateDataElement(context: HandlerContext, args: DataElementArgs) {
+  const { connection, logger } = context;
   try {
     if (!args?.data_element_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Data element name is required');
@@ -154,13 +154,9 @@ export async function handleUpdateDataElement(connection: AbapConnection, args: 
     const typedArgs = args as DataElementArgs;
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-        const dataElementName = typedArgs.data_element_name.toUpperCase();
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateDataElement',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const dataElementName = typedArgs.data_element_name.toUpperCase();
 
-    handlerLogger.info(`Starting data element update: ${dataElementName}`);
+    logger.info(`Starting data element update: ${dataElementName}`);
 
     try {
       type AdtClientsTypeKind =
@@ -198,7 +194,7 @@ export async function handleUpdateDataElement(connection: AbapConnection, args: 
           throw validateError;
         }
         // "Already exists" is OK for update - continue
-        handlerLogger.info(`Data element ${dataElementName} already exists - this is expected for update operation`);
+        logger.info(`Data element ${dataElementName} already exists - this is expected for update operation`);
       }
 
       // Lock
@@ -234,7 +230,7 @@ export async function handleUpdateDataElement(connection: AbapConnection, args: 
             () => client.checkDataElement({ dataElementName }),
             dataElementName,
             {
-              debug: (message: string) => handlerLogger.debug(message)
+              debug: (message: string) => logger.debug(message)
             }
           );
         } catch (checkError: any) {
@@ -257,7 +253,7 @@ export async function handleUpdateDataElement(connection: AbapConnection, args: 
         try {
           await client.unlockDataElement({ dataElementName: dataElementName }, lockHandle);
         } catch (unlockError) {
-          handlerLogger.error(`Failed to unlock data element after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+          logger.error(`Failed to unlock data element after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
         }
         throw error;
       }
@@ -283,7 +279,7 @@ export async function handleUpdateDataElement(connection: AbapConnection, args: 
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating data element ${dataElementName}: ${error?.message || error}`);
+      logger.error(`Error updating data element ${dataElementName}: ${error?.message || error}`);
 
       // Handle specific error cases
       if (error.message?.includes('not found') || error.response?.status === 404) {
@@ -311,9 +307,9 @@ export async function handleUpdateDataElement(connection: AbapConnection, args: 
     } finally {
       try {
         connection.reset();
-        handlerLogger.debug('Reset data element connection after use');
+        logger.debug('Reset data element connection after use');
       } catch (resetError: any) {
-        handlerLogger.error(`Failed to reset data element connection: ${resetError?.message || resetError}`);
+        logger.error(`Failed to reset data element connection: ${resetError?.message || resetError}`);
       }
     }
 

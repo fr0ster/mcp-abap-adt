@@ -5,11 +5,10 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UnlockBehaviorDefinitionLow",
@@ -59,7 +58,8 @@ interface UnlockBehaviorDefinitionArgs {
  *
  * Uses CrudClient.unlockBehaviorDefinition - low-level single method call
  */
-export async function handleUnlockBehaviorDefinition(connection: AbapConnection, args: UnlockBehaviorDefinitionArgs) {
+export async function handleUnlockBehaviorDefinition(context: HandlerContext, args: UnlockBehaviorDefinitionArgs) {
+  const { connection, logger } = context;
   try {
     const {
       name,
@@ -73,23 +73,18 @@ export async function handleUnlockBehaviorDefinition(connection: AbapConnection,
       return return_error(new Error('name, lock_handle, and session_id are required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleUnlockBehaviorDefinition',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const bdefName = name.toUpperCase();
 
-    handlerLogger.info(`Starting behavior definition unlock: ${bdefName} (session: ${session_id.substring(0, 8)}...)`);
+    logger.info(`Starting behavior definition unlock: ${bdefName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock behavior definition - using types from adt-clients
@@ -106,7 +101,7 @@ export async function handleUnlockBehaviorDefinition(connection: AbapConnection,
       // Get updated session state after unlock
 
 
-      handlerLogger.info(`✅ UnlockBehaviorDefinition completed: ${bdefName}`);
+      logger.info(`✅ UnlockBehaviorDefinition completed: ${bdefName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +114,7 @@ export async function handleUnlockBehaviorDefinition(connection: AbapConnection,
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error unlocking behavior definition ${bdefName}: ${error?.message || error}`);
+      logger.error(`Error unlocking behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock behavior definition: ${error.message || String(error)}`;

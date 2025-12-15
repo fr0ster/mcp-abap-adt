@@ -7,13 +7,10 @@
  * Workflow: lock -> update main source -> update implementations -> check -> unlock -> (activate)
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger as baseLogger, safeCheckOperation } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { return_error, return_response, encodeSapObjectName, safeCheckOperation } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateBehaviorImplementation",
@@ -60,7 +57,8 @@ interface UpdateBehaviorImplementationArgs {
  * Uses CrudClient for all operations
  * Session and lock management handled internally by client
  */
-export async function handleUpdateBehaviorImplementation(connection: AbapConnection, args: UpdateBehaviorImplementationArgs) {
+export async function handleUpdateBehaviorImplementation(context: HandlerContext, args: UpdateBehaviorImplementationArgs) {
+  const { connection, logger } = context;
   try {
     const {
       class_name,
@@ -69,10 +67,6 @@ export async function handleUpdateBehaviorImplementation(connection: AbapConnect
       transport_request,
       activate = true
     } = args as UpdateBehaviorImplementationArgs;
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateBehaviorImplementation',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
         // Validation
     if (!class_name || !behavior_definition || !implementation_code) {
       return return_error(new Error('class_name, behavior_definition, and implementation_code are required'));
@@ -83,7 +77,7 @@ export async function handleUpdateBehaviorImplementation(connection: AbapConnect
     const className = class_name.toUpperCase();
     const behaviorDefinition = behavior_definition.toUpperCase();
 
-    handlerLogger.info(`Starting behavior implementation source update: ${className} for ${behaviorDefinition}`);
+    logger.info(`Starting behavior implementation source update: ${className} for ${behaviorDefinition}`);
 
     try {
       // Create client
@@ -116,7 +110,7 @@ export async function handleUpdateBehaviorImplementation(connection: AbapConnect
             () => client.checkClass({ className }),
             className,
             {
-              debug: (message: string) => handlerLogger.debug(message)
+              debug: (message: string) => logger.debug(message)
             }
           );
         } catch (checkError: any) {
@@ -139,7 +133,7 @@ export async function handleUpdateBehaviorImplementation(connection: AbapConnect
         try {
           await client.unlockClass({ className: className }, lockHandle);
         } catch (unlockError) {
-          handlerLogger.error(`Failed to unlock behavior implementation after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+          logger.error(`Failed to unlock behavior implementation after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
         }
         throw error;
       }
@@ -161,7 +155,7 @@ export async function handleUpdateBehaviorImplementation(connection: AbapConnect
         }
       }
 
-      handlerLogger.info(`✅ UpdateBehaviorImplementation completed successfully: ${className}`);
+      logger.info(`✅ UpdateBehaviorImplementation completed successfully: ${className}`);
 
       // Return success result
       const stepsCompleted = ['lock', 'update_main_source', 'update_implementations', 'check', 'unlock'];
@@ -192,7 +186,7 @@ export async function handleUpdateBehaviorImplementation(connection: AbapConnect
       });
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating behavior implementation source ${className}: ${error?.message || error}`);
+      logger.error(`Error updating behavior implementation source ${className}: ${error?.message || error}`);
 
       const errorMessage = error.response?.data
         ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
@@ -203,10 +197,10 @@ export async function handleUpdateBehaviorImplementation(connection: AbapConnect
       try {
         if (connection) {
           connection.reset();
-          handlerLogger.debug('Reset behavior implementation connection after use');
+          logger.debug('Reset behavior implementation connection after use');
         }
       } catch (resetError: any) {
-        handlerLogger.error(`Failed to reset behavior implementation connection: ${resetError?.message || resetError}`);
+        logger.error(`Failed to reset behavior implementation connection: ${resetError?.message || resetError}`);
       }
     }
 

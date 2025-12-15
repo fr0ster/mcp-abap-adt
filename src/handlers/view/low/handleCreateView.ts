@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 
 export const TOOL_DEFINITION = {
@@ -77,7 +76,8 @@ interface CreateViewArgs {
  *
  * Uses CrudClient.createView - low-level single method call
  */
-export async function handleCreateView(connection: AbapConnection, args: CreateViewArgs) {
+export async function handleCreateView(context: HandlerContext, args: CreateViewArgs) {
+  const { connection, logger } = context;
   try {
     const {
       view_name,
@@ -104,12 +104,7 @@ export async function handleCreateView(connection: AbapConnection, args: CreateV
 
     const viewName = view_name.toUpperCase();
 
-    const handlerLogger = getHandlerLogger(
-      'handleCreateView',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
-    handlerLogger.info(`Starting view creation: ${viewName}`);
+    logger.info(`Starting view creation: ${viewName}`);
 
     try {
       // Create view
@@ -129,7 +124,7 @@ export async function handleCreateView(connection: AbapConnection, args: CreateV
       // Get updated session state after create
 
 
-      handlerLogger.info(`✅ CreateView completed: ${viewName}`);
+      logger.info(`✅ CreateView completed: ${viewName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -145,7 +140,7 @@ export async function handleCreateView(connection: AbapConnection, args: CreateV
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating view ${viewName}: ${error?.message || error}`);
+      logger.error(`Error creating view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create view: ${error.message || String(error)}`;

@@ -5,11 +5,10 @@
  * Supports checking existing classes or hypothetical source code.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CheckClassLow",
@@ -63,7 +62,8 @@ interface CheckClassArgs {
 /**
  * Main handler for CheckClass MCP tool
  */
-export async function handleCheckClass(connection: AbapConnection, args: CheckClassArgs) {
+export async function handleCheckClass(context: HandlerContext, args: CheckClassArgs) {
+  const { connection, logger } = context;
   try {
     const {
       class_name,
@@ -81,10 +81,6 @@ export async function handleCheckClass(connection: AbapConnection, args: CheckCl
       ? version.toLowerCase() as 'active' | 'inactive'
       : 'active';
 
-    const handlerLogger = getHandlerLogger(
-      'handleCheckClass',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
         // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -94,7 +90,7 @@ export async function handleCheckClass(connection: AbapConnection, args: CheckCl
 
     const className = class_name.toUpperCase();
 
-    handlerLogger.info(`Starting class check: ${className} (version: ${checkVersion}, has source: ${!!source_code})`);
+    logger.info(`Starting class check: ${className} (version: ${checkVersion}, has source: ${!!source_code})`);
 
     try {
       const client = new CrudClient(connection);
@@ -110,9 +106,9 @@ export async function handleCheckClass(connection: AbapConnection, args: CheckCl
       // Get updated session state after check
 
 
-      handlerLogger.info(`✅ CheckClass completed: ${className}`);
-      handlerLogger.info(`   Status: ${checkResult.status}`);
-      handlerLogger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger.info(`✅ CheckClass completed: ${className}`);
+      logger.info(`   Status: ${checkResult.status}`);
+      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -129,7 +125,7 @@ export async function handleCheckClass(connection: AbapConnection, args: CheckCl
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error checking class ${className}: ${error?.message || error}`);
+      logger.error(`Error checking class ${className}: ${error?.message || error}`);
 
       let errorMessage = `Failed to check class: ${error.message || String(error)}`;
 

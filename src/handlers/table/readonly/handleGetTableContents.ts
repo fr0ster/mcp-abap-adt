@@ -1,6 +1,6 @@
 import { McpError, ErrorCode } from '../../../lib/utils';
 import * as z from 'zod';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "GetTableContents",
@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-export async function handleGetTableContents(connection: AbapConnection, args: any) {
+export async function handleGetTableContents(context: HandlerContext, args: any) {
   if (!args?.table_name) {
     throw new McpError(ErrorCode.InvalidParams, 'Table name is required');
   }

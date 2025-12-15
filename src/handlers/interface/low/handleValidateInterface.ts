@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, parseValidationResponse, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, parseValidationResponse, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ValidateInterfaceLow",
@@ -63,7 +62,8 @@ interface ValidateInterfaceArgs {
  *
  * Uses CrudClient.validateInterface - low-level single method call
  */
-export async function handleValidateInterface(connection: AbapConnection, args: ValidateInterfaceArgs) {
+export async function handleValidateInterface(context: HandlerContext, args: ValidateInterfaceArgs) {
+  const { connection, logger } = context;
   try {
     const {
       interface_name,
@@ -78,22 +78,16 @@ export async function handleValidateInterface(connection: AbapConnection, args: 
       return return_error(new Error('interface_name, package_name, and description are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleValidateInterface',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const interfaceName = interface_name.toUpperCase();
 
-    handlerLogger.info(`Starting interface validation: ${interfaceName}`);
+    logger.info(`Starting interface validation: ${interfaceName}`);
 
     try {
       // Validate interface
@@ -111,7 +105,7 @@ export async function handleValidateInterface(connection: AbapConnection, args: 
       // Get updated session state after validation
 
 
-      handlerLogger.info(`✅ ValidateInterface completed: ${interfaceName} (valid=${result.valid})`);
+      logger.info(`✅ ValidateInterface completed: ${interfaceName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -127,7 +121,7 @@ export async function handleValidateInterface(connection: AbapConnection, args: 
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error validating interface ${interfaceName}: ${error?.message || error}`);
+      logger.error(`Error validating interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate interface: ${error.message || String(error)}`;

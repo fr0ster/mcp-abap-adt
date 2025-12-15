@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UnlockInterfaceLow",
@@ -58,7 +57,8 @@ interface UnlockInterfaceArgs {
  *
  * Uses CrudClient.unlockInterface - low-level single method call
  */
-export async function handleUnlockInterface(connection: AbapConnection, args: UnlockInterfaceArgs) {
+export async function handleUnlockInterface(context: HandlerContext, args: UnlockInterfaceArgs) {
+  const { connection, logger } = context;
   try {
     const {
       interface_name,
@@ -72,22 +72,16 @@ export async function handleUnlockInterface(connection: AbapConnection, args: Un
       return return_error(new Error('interface_name, lock_handle, and session_id are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUnlockInterface',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const interfaceName = interface_name.toUpperCase();
 
-    handlerLogger.info(`Starting interface unlock: ${interfaceName} (session: ${session_id.substring(0, 8)}...)`);
+    logger.info(`Starting interface unlock: ${interfaceName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock interface
@@ -101,7 +95,7 @@ export async function handleUnlockInterface(connection: AbapConnection, args: Un
       // Get updated session state after unlock
 
 
-      handlerLogger.info(`✅ UnlockInterface completed: ${interfaceName}`);
+      logger.info(`✅ UnlockInterface completed: ${interfaceName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -114,7 +108,7 @@ export async function handleUnlockInterface(connection: AbapConnection, args: Un
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error unlocking interface ${interfaceName}: ${error?.message || error}`);
+      logger.error(`Error unlocking interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock interface: ${error.message || String(error)}`;

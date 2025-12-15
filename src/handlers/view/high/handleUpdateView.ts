@@ -4,18 +4,16 @@
  * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import {
   return_error,
   return_response,
   encodeSapObjectName,
-  logger as baseLogger,
   safeCheckOperation,
   AxiosResponse
 } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateView",
@@ -37,7 +35,8 @@ interface UpdateViewArgs {
   activate?: boolean;
 }
 
-export async function handleUpdateView(connection: AbapConnection, params: any) {
+export async function handleUpdateView(context: HandlerContext, params: any) {
+  const { connection, logger } = context;
   const args: UpdateViewArgs = params;
 
   if (!args.view_name || !args.ddl_source) {
@@ -45,20 +44,16 @@ export async function handleUpdateView(connection: AbapConnection, params: any) 
   }
 
   const viewName = args.view_name.toUpperCase();
-  const handlerLogger = getHandlerLogger(
-    'handleUpdateView',
-    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-  );
-  handlerLogger.info(`Starting view source update: ${viewName} (activate=${args.activate === true})`);
+  logger.info(`Starting view source update: ${viewName} (activate=${args.activate === true})`);
 
   // Connection setup
     try {
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    handlerLogger.debug(`Created separate connection for handler call: ${viewName}`);
+    logger.debug(`Created separate connection for handler call: ${viewName}`);
   } catch (connectionError: any) {
     const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
-    handlerLogger.error(`Failed to create connection: ${errorMessage}`);
+    logger.error(`Failed to create connection: ${errorMessage}`);
     return return_error(new Error(`Failed to create connection: ${errorMessage}`));
   }
 
@@ -67,80 +62,80 @@ export async function handleUpdateView(connection: AbapConnection, params: any) 
     const shouldActivate = args.activate === true;
 
     // Lock
-    handlerLogger.debug(`Locking view: ${viewName}`);
+    logger.debug(`Locking view: ${viewName}`);
     await client.lockView({ viewName });
     const lockHandle = client.getLockHandle();
-    handlerLogger.debug(`View locked: ${viewName} (handle=${lockHandle ? lockHandle.substring(0, 8) + '...' : 'none'})`);
+    logger.debug(`View locked: ${viewName} (handle=${lockHandle ? lockHandle.substring(0, 8) + '...' : 'none'})`);
 
     try {
       // Check new code BEFORE update
-      handlerLogger.debug(`Checking new DDL code before update: ${viewName}`);
+      logger.debug(`Checking new DDL code before update: ${viewName}`);
       let checkNewCodePassed = false;
       try {
         await safeCheckOperation(
           () => client.checkView({ viewName }, args.ddl_source, 'inactive'),
           viewName,
           {
-            debug: (message: string) => handlerLogger.debug(message)
+            debug: (message: string) => logger.debug(message)
           }
         );
         checkNewCodePassed = true;
-        handlerLogger.debug(`New code check passed: ${viewName}`);
+        logger.debug(`New code check passed: ${viewName}`);
       } catch (checkError: any) {
         if ((checkError as any).isAlreadyChecked) {
-          handlerLogger.debug(`View ${viewName} was already checked - continuing`);
+          logger.debug(`View ${viewName} was already checked - continuing`);
           checkNewCodePassed = true;
         } else {
-          handlerLogger.error(`New code check failed: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+          logger.error(`New code check failed: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
           throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
         }
       }
 
       // Update (only if check passed)
       if (checkNewCodePassed) {
-        handlerLogger.debug(`Updating view DDL source: ${viewName}`);
+        logger.debug(`Updating view DDL source: ${viewName}`);
         await client.updateView({ viewName, ddlSource: args.ddl_source }, lockHandle);
-        handlerLogger.info(`View DDL source updated: ${viewName}`);
+        logger.info(`View DDL source updated: ${viewName}`);
       } else {
-        handlerLogger.warn(`Skipping update - new code check failed: ${viewName}`);
+        logger.warn(`Skipping update - new code check failed: ${viewName}`);
       }
 
       // Unlock (MANDATORY)
-      handlerLogger.debug(`Unlocking view: ${viewName}`);
+      logger.debug(`Unlocking view: ${viewName}`);
       await client.unlockView({ viewName }, lockHandle);
-      handlerLogger.info(`View unlocked: ${viewName}`);
+      logger.info(`View unlocked: ${viewName}`);
 
       // Check inactive version (after unlock)
-      handlerLogger.debug(`Checking inactive version: ${viewName}`);
+      logger.debug(`Checking inactive version: ${viewName}`);
       try {
         await safeCheckOperation(
           () => client.checkView({ viewName }, undefined, 'inactive'),
           viewName,
           {
-            debug: (message: string) => handlerLogger.debug(message)
+            debug: (message: string) => logger.debug(message)
           }
         );
-        handlerLogger.debug(`Inactive version check completed: ${viewName}`);
+        logger.debug(`Inactive version check completed: ${viewName}`);
       } catch (checkError: any) {
         if ((checkError as any).isAlreadyChecked) {
-          handlerLogger.debug(`View ${viewName} was already checked - continuing`);
+          logger.debug(`View ${viewName} was already checked - continuing`);
         } else {
-          handlerLogger.warn(`Inactive version check had issues: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+          logger.warn(`Inactive version check had issues: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
         }
       }
 
       // Activate if requested
       if (shouldActivate) {
-        handlerLogger.debug(`Activating view: ${viewName}`);
+        logger.debug(`Activating view: ${viewName}`);
         try {
           await client.activateView({ viewName });
-          handlerLogger.info(`View activated: ${viewName}`);
+          logger.info(`View activated: ${viewName}`);
         } catch (activationError: any) {
-          handlerLogger.error(`Activation failed: ${viewName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`);
+          logger.error(`Activation failed: ${viewName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`);
           throw new Error(`Activation failed: ${activationError instanceof Error ? activationError.message : String(activationError)}`);
         }
       } else {
-        handlerLogger.debug(`Skipping activation for: ${viewName}`);
+        logger.debug(`Skipping activation for: ${viewName}`);
       }
 
       // Parse activation warnings if activation was performed
@@ -160,7 +155,7 @@ export async function handleUpdateView(connection: AbapConnection, params: any) 
         }
       }
 
-      handlerLogger.info(`UpdateView completed successfully: ${viewName}`);
+      logger.info(`UpdateView completed successfully: ${viewName}`);
 
       const result = {
         success: true,
@@ -186,12 +181,12 @@ export async function handleUpdateView(connection: AbapConnection, params: any) 
       try {
         const lockHandle = client.getLockHandle();
         if (lockHandle) {
-          handlerLogger.warn(`Attempting unlock after error for view ${viewName}`);
+          logger.warn(`Attempting unlock after error for view ${viewName}`);
           await client.unlockView({ viewName }, lockHandle);
-          handlerLogger.warn(`Unlocked view after error: ${viewName}`);
+          logger.warn(`Unlocked view after error: ${viewName}`);
         }
       } catch (unlockError: any) {
-        handlerLogger.error(`Failed to unlock view after error: ${viewName} - ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+        logger.error(`Failed to unlock view after error: ${viewName} - ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
       }
 
       // Parse error message
@@ -213,7 +208,7 @@ export async function handleUpdateView(connection: AbapConnection, params: any) 
     }
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    handlerLogger.error(`Error updating view ${viewName}: ${errorMessage}`);
+    logger.error(`Error updating view ${viewName}: ${errorMessage}`);
     return return_error(new Error(errorMessage));
   } finally {
     try {

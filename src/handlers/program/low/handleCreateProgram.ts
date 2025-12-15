@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, isCloudConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, isCloudConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CreateProgramLow",
@@ -78,7 +77,8 @@ interface CreateProgramArgs {
  *
  * Uses CrudClient.createProgram - low-level single method call
  */
-export async function handleCreateProgram(connection: AbapConnection, args: CreateProgramArgs) {
+export async function handleCreateProgram(context: HandlerContext, args: CreateProgramArgs) {
+  const { connection, logger } = context;
   try {
     const {
       program_name,
@@ -101,11 +101,7 @@ export async function handleCreateProgram(connection: AbapConnection, args: Crea
       return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCreateProgramLow',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -116,7 +112,7 @@ export async function handleCreateProgram(connection: AbapConnection, args: Crea
 
     const programName = program_name.toUpperCase();
 
-    handlerLogger.info(`Starting program creation: ${programName}`);
+    logger.info(`Starting program creation: ${programName}`);
 
     try {
       // Create program
@@ -137,7 +133,7 @@ export async function handleCreateProgram(connection: AbapConnection, args: Crea
       // Get updated session state after create
 
 
-      handlerLogger.info(`✅ CreateProgram completed: ${programName}`);
+      logger.info(`✅ CreateProgram completed: ${programName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -153,7 +149,7 @@ export async function handleCreateProgram(connection: AbapConnection, args: Crea
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating program ${programName}: ${error?.message || error}`);
+      logger.error(`Error creating program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create program: ${error.message || String(error)}`;

@@ -6,9 +6,8 @@
  */
 
 import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 type ScopeOptions = {
   ownTests?: boolean;
@@ -120,7 +119,8 @@ interface RunClassUnitTestsArgs {
   };
 }
 
-export async function handleRunClassUnitTests(connection: AbapConnection, args: RunClassUnitTestsArgs) {
+export async function handleRunClassUnitTests(context: HandlerContext, args: RunClassUnitTestsArgs) {
+  const { connection, logger } = context;
   try {
     const {
       tests,
@@ -147,11 +147,7 @@ export async function handleRunClassUnitTests(connection: AbapConnection, args: 
       };
     });
 
-    const handlerLogger = getHandlerLogger(
-      'handleRunClassUnitTests',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -174,7 +170,7 @@ export async function handleRunClassUnitTests(connection: AbapConnection, args: 
       duration
     };
 
-    handlerLogger.info(`Starting ABAP Unit run for ${formattedTests.length} definitions`);
+    logger.info(`Starting ABAP Unit run for ${formattedTests.length} definitions`);
 
     try {
       await client.runClassUnitTests(formattedTests, options);
@@ -186,7 +182,7 @@ export async function handleRunClassUnitTests(connection: AbapConnection, args: 
         throw new Error('Failed to obtain ABAP Unit run identifier from SAP response headers');
       }
 
-      handlerLogger.info(`✅ RunClassUnitTests started. Run ID: ${runId}`);
+      logger.info(`✅ RunClassUnitTests started. Run ID: ${runId}`);
 
       return return_response({
         data: JSON.stringify({
@@ -200,7 +196,7 @@ export async function handleRunClassUnitTests(connection: AbapConnection, args: 
         }, null, 2)
       } as AxiosResponse);
     } catch (error: any) {
-      handlerLogger.error(`Error starting ABAP Unit run: ${error?.message || error}`);
+      logger.error(`Error starting ABAP Unit run: ${error?.message || error}`);
       return return_error(new Error(error?.message || String(error)));
     }
   } catch (error: any) {

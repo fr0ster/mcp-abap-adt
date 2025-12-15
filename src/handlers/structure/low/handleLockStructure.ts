@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "LockStructureLow",
@@ -53,7 +52,8 @@ interface LockStructureArgs {
  *
  * Uses CrudClient.lockStructure - low-level single method call
  */
-export async function handleLockStructure(connection: AbapConnection, args: LockStructureArgs) {
+export async function handleLockStructure(context: HandlerContext, args: LockStructureArgs) {
+  const { connection, logger } = context;
   try {
     const {
       structure_name,
@@ -66,22 +66,18 @@ export async function handleLockStructure(connection: AbapConnection, args: Lock
       return return_error(new Error('structure_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleLockStructure',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const structureName = structure_name.toUpperCase();
 
-    handlerLogger.info(`Starting structure lock: ${structureName}`);
+    logger.info(`Starting structure lock: ${structureName}`);
 
     try {
       // Lock structure
@@ -95,8 +91,8 @@ export async function handleLockStructure(connection: AbapConnection, args: Lock
       // Get updated session state after lock
 
 
-      handlerLogger.info(`✅ LockStructure completed: ${structureName}`);
-      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger.info(`✅ LockStructure completed: ${structureName}`);
+      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -110,7 +106,7 @@ export async function handleLockStructure(connection: AbapConnection, args: Lock
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error locking structure ${structureName}:`, error);
+      logger.error(`Error locking structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to lock structure: ${error.message || String(error)}`;

@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse, return_error, return_response, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UnlockClassLow",
@@ -58,7 +57,8 @@ interface UnlockClassArgs {
  *
  * Uses CrudClient.unlockClass - low-level single method call
  */
-export async function handleUnlockClass(connection: AbapConnection, args: UnlockClassArgs) {
+export async function handleUnlockClass(context: HandlerContext, args: UnlockClassArgs) {
+  const { connection, logger } = context;
   try {
     const {
       class_name,
@@ -72,22 +72,16 @@ export async function handleUnlockClass(connection: AbapConnection, args: Unlock
       return return_error(new Error('class_name, lock_handle, and session_id are required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleUnlockClass',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const className = class_name.toUpperCase();
 
-    handlerLogger.info(`Starting class unlock: ${className} (session: ${session_id.substring(0, 8)}...)`);
+    logger.info(`Starting class unlock: ${className} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock class
@@ -101,7 +95,7 @@ export async function handleUnlockClass(connection: AbapConnection, args: Unlock
       // Get updated session state after unlock
 
 
-      handlerLogger.info(`✅ UnlockClass completed: ${className}`);
+      logger.info(`✅ UnlockClass completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -114,7 +108,7 @@ export async function handleUnlockClass(connection: AbapConnection, args: Unlock
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error unlocking class ${className}: ${error?.message || error}`);
+      logger.error(`Error unlocking class ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock class: ${error.message || String(error)}`;

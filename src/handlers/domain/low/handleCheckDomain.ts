@@ -5,11 +5,10 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CheckDomainLow",
@@ -54,7 +53,8 @@ interface CheckDomainArgs {
  *
  * Uses CrudClient.checkDomain - low-level single method call
  */
-export async function handleCheckDomain(connection: AbapConnection, args: CheckDomainArgs) {
+export async function handleCheckDomain(context: HandlerContext, args: CheckDomainArgs) {
+  const { connection, logger } = context;
   try {
     const {
       domain_name,
@@ -67,22 +67,16 @@ export async function handleCheckDomain(connection: AbapConnection, args: CheckD
       return return_error(new Error('domain_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCheckDomain',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const domainName = domain_name.toUpperCase();
 
-    handlerLogger.info(`Starting domain check: ${domainName}`);
+    logger.info(`Starting domain check: ${domainName}`);
 
     try {
       // Check domain
@@ -99,8 +93,8 @@ export async function handleCheckDomain(connection: AbapConnection, args: CheckD
       // Get updated session state after check
 
 
-      handlerLogger.info(`✅ CheckDomain completed: ${domainName}`);
-      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger.info(`✅ CheckDomain completed: ${domainName}`);
+      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -116,7 +110,7 @@ export async function handleCheckDomain(connection: AbapConnection, args: CheckD
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error checking domain ${domainName}: ${error?.message || error}`);
+      logger.error(`Error checking domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check domain: ${error.message || String(error)}`;

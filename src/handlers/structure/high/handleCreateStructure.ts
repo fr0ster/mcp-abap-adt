@@ -7,11 +7,10 @@
  * Workflow: validate -> create -> lock -> check (inactive version) -> unlock -> (activate)
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { McpError, ErrorCode, return_error, return_response, logger as baseLogger, safeCheckOperation, AxiosResponse } from '../../../lib/utils';
+import { McpError, ErrorCode, return_error, return_response, safeCheckOperation, AxiosResponse } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CreateStructure",
@@ -143,7 +142,8 @@ interface CreateStructureArgs {
  * Uses StructureBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateStructure(connection: AbapConnection, args: CreateStructureArgs): Promise<any> {
+export async function handleCreateStructure(context: HandlerContext, args: CreateStructureArgs): Promise<any> {
+  const { connection, logger } = context;
   try {
     const createStructureArgs = args as CreateStructureArgs;
 
@@ -164,12 +164,7 @@ export async function handleCreateStructure(connection: AbapConnection, args: Cr
 
     const structureName = createStructureArgs.structure_name.toUpperCase();
 
-    const handlerLogger = getHandlerLogger(
-      "handleCreateStructure",
-      process.env.DEBUG_HANDLERS === "true" ? baseLogger : noopLogger
-    );
-
-    handlerLogger.info(`Starting structure creation: ${structureName}`);
+    logger.info(`Starting structure creation: ${structureName}`);
 
             try {
       // Get configuration from environment variables
@@ -177,7 +172,7 @@ export async function handleCreateStructure(connection: AbapConnection, args: Cr
             // Create connection directly for this handler call
       // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-      handlerLogger.debug(`[CreateStructure] Created separate connection for handler call: ${structureName}`);
+      logger.debug(`[CreateStructure] Created separate connection for handler call: ${structureName}`);
     } catch (connectionError: any) {
       const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
       throw new McpError(ErrorCode.InternalError, `Failed to create connection: ${errorMessage}`);
@@ -215,26 +210,26 @@ export async function handleCreateStructure(connection: AbapConnection, args: Cr
 
         // Unlock (MANDATORY after lock)
         await client.unlockStructure({ structureName }, lockHandle);
-        handlerLogger.info(`[CreateStructure] Structure unlocked: ${structureName}`);
+        logger.info(`[CreateStructure] Structure unlocked: ${structureName}`);
 
         // Check inactive version (after unlock)
-        handlerLogger.info(`[CreateStructure] Checking inactive version: ${structureName}`);
+        logger.info(`[CreateStructure] Checking inactive version: ${structureName}`);
         try {
           await safeCheckOperation(
             () => client.checkStructure({ structureName }, undefined, 'inactive'),
             structureName,
             {
-              debug: (message: string) => handlerLogger.debug(`[CreateStructure] ${message}`)
+              debug: (message: string) => logger.debug(`[CreateStructure] ${message}`)
             }
           );
-          handlerLogger.info(`[CreateStructure] Inactive version check completed: ${structureName}`);
+          logger.info(`[CreateStructure] Inactive version check completed: ${structureName}`);
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
           if ((checkError as any).isAlreadyChecked) {
-            handlerLogger.info(`[CreateStructure] Structure ${structureName} was already checked - this is OK, continuing`);
+            logger.info(`[CreateStructure] Structure ${structureName} was already checked - this is OK, continuing`);
           } else {
             // Log warning but don't fail - inactive check is informational
-            handlerLogger.warn(`[CreateStructure] Inactive version check had issues: ${structureName}`, {
+            logger.warn(`[CreateStructure] Inactive version check had issues: ${structureName}`, {
               error: checkError instanceof Error ? checkError.message : String(checkError)
             });
           }
@@ -249,13 +244,13 @@ export async function handleCreateStructure(connection: AbapConnection, args: Cr
         try {
           await client.unlockStructure({ structureName }, lockHandle);
         } catch (unlockError) {
-          handlerLogger.error('Failed to unlock structure after error:', unlockError);
+          logger.error('Failed to unlock structure after error:', unlockError);
         }
         // Principle 2: first error and exit
         throw error;
       }
 
-      handlerLogger.info(`✅ CreateStructure completed successfully: ${structureName}`);
+      logger.info(`✅ CreateStructure completed successfully: ${structureName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -269,7 +264,7 @@ export async function handleCreateStructure(connection: AbapConnection, args: Cr
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating structure ${structureName}:`, error);
+      logger.error(`Error creating structure ${structureName}:`, error);
 
       // Check if structure already exists
       if (error.message?.includes('already exists') || error.response?.status === 409) {
@@ -292,9 +287,9 @@ export async function handleCreateStructure(connection: AbapConnection, args: Cr
       if (connection) {
         try {
           connection.reset();
-          handlerLogger.debug(`[CreateStructure] Reset connection`);
+          logger.debug(`[CreateStructure] Reset connection`);
         } catch (resetError: any) {
-          handlerLogger.error(`[CreateStructure] Failed to reset connection: ${resetError.message || resetError}`);
+          logger.error(`[CreateStructure] Failed to reset connection: ${resetError.message || resetError}`);
         }
       }
     }

@@ -5,11 +5,9 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import type { TableBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { parseValidationResponse } from '../../../lib/utils';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse, parseValidationResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ValidateTableLow",
@@ -62,7 +60,8 @@ interface ValidateTableArgs extends Pick<TableBuilderConfig, 'tableName' | 'pack
 /**
  * Main handler for ValidateTable MCP tool
  */
-export async function handleValidateTable(connection: AbapConnection, args: ValidateTableArgs) {
+export async function handleValidateTable(context: HandlerContext, args: ValidateTableArgs) {
+  const { connection, logger } = context;
   try {
     const {
       table_name,
@@ -76,21 +75,14 @@ export async function handleValidateTable(connection: AbapConnection, args: Vali
       return return_error(new Error('table_name, package_name, and description are required'));
     }
 
-        const handlerLogger = getHandlerLogger(
-      'handleValidateTable',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const tableName = table_name.toUpperCase();
 
-    handlerLogger.info(`Starting table validation: ${tableName}`);
+    logger.info(`Starting table validation: ${tableName}`);
 
     try {
       const client = new CrudClient(connection);
@@ -109,8 +101,8 @@ export async function handleValidateTable(connection: AbapConnection, args: Vali
       // Get updated session state after validation
 
 
-      handlerLogger.info(`✅ ValidateTable completed: ${tableName}`);
-      handlerLogger.info(`   Valid: ${result.valid}, Message: ${result.message || 'N/A'}`);
+      logger.info(`✅ ValidateTable completed: ${tableName}`);
+      logger.info(`   Valid: ${result.valid}, Message: ${result.message || 'N/A'}`);
 
       return return_response({
         data: JSON.stringify({
@@ -127,7 +119,7 @@ export async function handleValidateTable(connection: AbapConnection, args: Vali
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error validating table ${tableName}:`, error);
+      logger.error(`Error validating table ${tableName}:`, error);
 
       let errorMessage = `Failed to validate table: ${error.message || String(error)}`;
 

@@ -5,11 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { AxiosResponse, return_error, return_response, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "LockDomainLow",
@@ -54,7 +52,8 @@ interface LockDomainArgs {
  *
  * Uses CrudClient.lockDomain - low-level single method call
  */
-export async function handleLockDomain(connection: AbapConnection, args: LockDomainArgs) {
+export async function handleLockDomain(context: HandlerContext, args: LockDomainArgs) {
+  const { connection, logger } = context;
   try {
     const {
       domain_name,
@@ -67,25 +66,16 @@ export async function handleLockDomain(connection: AbapConnection, args: LockDom
       return return_error(new Error('domain_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleLockDomain',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     const domainName = domain_name.toUpperCase();
 
-    handlerLogger.info(`Starting domain lock: ${domainName}`);
+    logger.info(`Starting domain lock: ${domainName}`);
 
     // Restore session state if provided
     if (session_id && session_state) {
-      // CRITICAL: Use restoreSessionInConnection to properly restore session
-      // This will set sessionId in connection and enable stateful session mode
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      handlerLogger.debug('No session provided, creating new connection');
-      // Ensure connection is established
-          }
+    }
 
     try {
       // Lock domain
@@ -101,8 +91,8 @@ export async function handleLockDomain(connection: AbapConnection, args: LockDom
       // Get actual session ID from connection (may be different from input if new session was created)
       const actualSessionId = connection.getSessionId() || session_id || null;
 
-      handlerLogger.info(`✅ LockDomain completed: ${domainName}`);
-      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger.info(`✅ LockDomain completed: ${domainName}`);
+      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -116,7 +106,7 @@ export async function handleLockDomain(connection: AbapConnection, args: LockDom
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error locking domain ${domainName}: ${error?.message || error}`);
+      logger.error(`Error locking domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock domain: ${error.message || String(error)}`;

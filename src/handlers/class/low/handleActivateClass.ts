@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ActivateClassLow",
@@ -53,7 +52,8 @@ interface ActivateClassArgs {
  *
  * Uses CrudClient.activateClass - low-level single method call
  */
-export async function handleActivateClass(connection: AbapConnection, args: ActivateClassArgs) {
+export async function handleActivateClass(context: HandlerContext, args: ActivateClassArgs) {
+  const { connection, logger } = context;
   try {
     const {
       class_name,
@@ -66,22 +66,16 @@ export async function handleActivateClass(connection: AbapConnection, args: Acti
       return return_error(new Error('class_name is required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleActivateClass',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const className = class_name.toUpperCase();
 
-    handlerLogger.info(`Starting class activation: ${className}`);
+    logger.info(`Starting class activation: ${className}`);
 
     try {
       // Activate class
@@ -99,9 +93,9 @@ export async function handleActivateClass(connection: AbapConnection, args: Acti
       // Get updated session state after activation
 
 
-      handlerLogger.info(`✅ ActivateClass completed: ${className}`);
-      handlerLogger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      handlerLogger.info(`   Messages: ${activationResult.messages.length}`);
+      logger.info(`✅ ActivateClass completed: ${className}`);
+      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
+      logger.info(`   Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -124,7 +118,7 @@ export async function handleActivateClass(connection: AbapConnection, args: Acti
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error activating class ${className}: ${error?.message || error}`);
+      logger.error(`Error activating class ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate class: ${error.message || String(error)}`;

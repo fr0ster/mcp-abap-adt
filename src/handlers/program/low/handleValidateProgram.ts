@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, isCloudConnection, parseValidationResponse, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, isCloudConnection, parseValidationResponse, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ValidateProgramLow",
@@ -63,7 +62,8 @@ interface ValidateProgramArgs {
  *
  * Uses CrudClient.validateProgram - low-level single method call
  */
-export async function handleValidateProgram(connection: AbapConnection, args: ValidateProgramArgs) {
+export async function handleValidateProgram(context: HandlerContext, args: ValidateProgramArgs) {
+  const { connection, logger } = context;
   try {
     const {
       program_name,
@@ -83,22 +83,16 @@ export async function handleValidateProgram(connection: AbapConnection, args: Va
       return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleValidateProgram',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const programName = program_name.toUpperCase();
 
-    handlerLogger.info(`Starting program validation: ${programName}`);
+    logger.info(`Starting program validation: ${programName}`);
 
     try {
       // Validate program
@@ -116,7 +110,7 @@ export async function handleValidateProgram(connection: AbapConnection, args: Va
       // Get updated session state after validation
 
 
-      handlerLogger.info(`✅ ValidateProgram completed: ${programName} (valid=${result.valid})`);
+      logger.info(`✅ ValidateProgram completed: ${programName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -132,7 +126,7 @@ export async function handleValidateProgram(connection: AbapConnection, args: Va
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error validating program ${programName}: ${error?.message || error}`);
+      logger.error(`Error validating program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate program: ${error.message || String(error)}`;

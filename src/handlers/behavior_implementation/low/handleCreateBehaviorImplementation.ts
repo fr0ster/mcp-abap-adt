@@ -5,11 +5,10 @@
  * Low-level handler: full workflow (create, lock, update main source, update implementations, unlock, activate).
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse, return_error, return_response, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CreateBehaviorImplementationLow",
@@ -79,7 +78,8 @@ interface CreateBehaviorImplementationArgs {
  *
  * Uses CrudClient.createBehaviorImplementation - full workflow
  */
-export async function handleCreateBehaviorImplementation(connection: AbapConnection, args: CreateBehaviorImplementationArgs) {
+export async function handleCreateBehaviorImplementation(context: HandlerContext, args: CreateBehaviorImplementationArgs) {
+  const { connection, logger } = context;
   try {
     const {
       class_name,
@@ -106,15 +106,10 @@ export async function handleCreateBehaviorImplementation(connection: AbapConnect
       // Ensure connection is established
           }
 
-    const handlerLogger = getHandlerLogger(
-      'handleCreateBehaviorImplementation',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     const className = class_name.toUpperCase();
     const behaviorDefinition = behavior_definition.toUpperCase();
 
-    handlerLogger.info(`Starting behavior implementation creation: ${className} for ${behaviorDefinition}`);
+    logger.info(`Starting behavior implementation creation: ${className} for ${behaviorDefinition}`);
 
     try {
       // Create behavior implementation (full workflow)
@@ -137,7 +132,7 @@ export async function handleCreateBehaviorImplementation(connection: AbapConnect
       // Get updated session state after create
 
 
-      handlerLogger.info(`✅ CreateBehaviorImplementation completed: ${className}`);
+      logger.info(`✅ CreateBehaviorImplementation completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -154,7 +149,7 @@ export async function handleCreateBehaviorImplementation(connection: AbapConnect
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating behavior implementation ${className}: ${error?.message || error}`);
+      logger.error(`Error creating behavior implementation ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create behavior implementation: ${error.message || String(error)}`;

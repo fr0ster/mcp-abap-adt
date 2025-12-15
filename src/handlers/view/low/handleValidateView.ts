@@ -5,11 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, parseValidationResponse, restoreSessionInConnection  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse, return_error, return_response, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ValidateViewLow",
@@ -64,11 +62,8 @@ interface ValidateViewArgs {
  *
  * Uses CrudClient.validateView - low-level single method call
  */
-export async function handleValidateView(connection: AbapConnection, args: ValidateViewArgs) {
-  const handlerLogger = getHandlerLogger(
-    'handleValidateView',
-    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-  );
+export async function handleValidateView(context: HandlerContext, args: ValidateViewArgs) {
+  const { connection, logger } = context;
   try {
     const {
       view_name,
@@ -94,7 +89,7 @@ export async function handleValidateView(connection: AbapConnection, args: Valid
 
     const viewName = view_name.toUpperCase();
 
-    handlerLogger.info(`Starting view validation: ${viewName}`);
+    logger.info(`Starting view validation: ${viewName}`);
 
     try {
       // Validate view
@@ -112,8 +107,8 @@ export async function handleValidateView(connection: AbapConnection, args: Valid
       // Get updated session state after validation
 
 
-      handlerLogger.info(`✅ ValidateView completed: ${viewName}`);
-      handlerLogger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      logger.info(`✅ ValidateView completed: ${viewName}`);
+      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
         data: JSON.stringify({
@@ -129,7 +124,7 @@ export async function handleValidateView(connection: AbapConnection, args: Valid
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error validating view ${viewName}: ${error?.message || error}`);
+      logger.error(`Error validating view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate view: ${error.message || String(error)}`;

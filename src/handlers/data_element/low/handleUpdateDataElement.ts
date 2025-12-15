@@ -6,9 +6,8 @@
  */
 
 import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateDataElementLow",
@@ -63,7 +62,8 @@ interface UpdateDataElementArgs {
  *
  * Uses CrudClient.updateDataElement - low-level single method call
  */
-export async function handleUpdateDataElement(connection: AbapConnection, args: UpdateDataElementArgs) {
+export async function handleUpdateDataElement(context: HandlerContext, args: UpdateDataElementArgs) {
+  const { connection, logger } = context;
   try {
     const {
       data_element_name,
@@ -78,28 +78,23 @@ export async function handleUpdateDataElement(connection: AbapConnection, args: 
       return return_error(new Error('data_element_name, properties, and lock_handle are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateDataElement',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
+    const client = new CrudClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const dataElementName = data_element_name.toUpperCase();
 
-    handlerLogger.info(`Starting data element update: ${dataElementName}`);
+    logger.info(`Starting data element update: ${dataElementName}`);
 
     // Validate required properties
     const packageName = properties.package_name || properties.packageName;
     if (!packageName) {
       const errorMsg = 'Package name is required in properties';
-      handlerLogger.error(errorMsg);
+      logger.error(errorMsg);
       return return_error(new Error(errorMsg));
     }
 
@@ -134,14 +129,14 @@ export async function handleUpdateDataElement(connection: AbapConnection, args: 
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {
-        handlerLogger.error(`Update did not return a response for data element ${dataElementName}`);
+        logger.error(`Update did not return a response for data element ${dataElementName}`);
         throw new Error(`Update did not return a response for data element ${dataElementName}`);
       }
 
       // Get updated session state after update
 
 
-      handlerLogger.info(`✅ UpdateDataElement completed: ${dataElementName}`);
+      logger.info(`✅ UpdateDataElement completed: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -154,7 +149,7 @@ export async function handleUpdateDataElement(connection: AbapConnection, args: 
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating data element ${dataElementName}: ${error?.message || error}`);
+      logger.error(`Error updating data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update data element: ${error.message || String(error)}`;

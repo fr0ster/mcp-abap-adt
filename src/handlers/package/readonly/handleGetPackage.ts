@@ -1,10 +1,10 @@
-import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, return_response } from '../../../lib/utils';
+import { McpError, ErrorCode } from '../../../lib/utils';
+import { makeAdtRequestWithTimeout } from '../../../lib/utils';
 import convert from 'xml-js';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import * as z from 'zod';
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   name: "GetPackage",
   description: "[read-only] Retrieve ABAP package details.",
@@ -18,7 +18,8 @@ interface GetPackageArgs {
   filePath?: string;
 }
 
-export async function handleGetPackage(connection: AbapConnection, args: GetPackageArgs) {
+export async function handleGetPackage(context: HandlerContext, args: GetPackageArgs) {
+  const { connection, logger } = context;
     try {
         if (!args?.package_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Package name is required');

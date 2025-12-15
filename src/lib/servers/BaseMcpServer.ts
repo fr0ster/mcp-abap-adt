@@ -4,6 +4,8 @@ import { AuthBroker } from "@mcp-abap-adt/auth-broker";
 import { ConnectionContext } from "./ConnectionContext.js";
 import { IHandlersRegistry } from "./handlers/interfaces.js";
 import { CompositeHandlersRegistry } from "./handlers/registry/CompositeHandlersRegistry.js";
+import { HandlerContext } from "../handlers/interfaces.js";
+import { defaultLogger as logger } from "@mcp-abap-adt/logger";
 
 /**
  * Base MCP Server class that extends SDK McpServer
@@ -94,10 +96,13 @@ export abstract class BaseMcpServer extends McpServer {
           // Wrapped handler: (args: any) => handler(getConnection(), args)
           const wrappedHandler = async (args: any) => {
             // Get connection from context (this.connectionContext)
-            const connection = this.getConnection();
+            const context: HandlerContext = {
+              connection: this.getConnection(),
+              logger: logger,
+            };
 
             // Call original handler with connection as first parameter
-            return await entry.handler(connection, args);
+            return await entry.handler(context, args);
           };
 
           // Register wrapped handler via SDK registerTool

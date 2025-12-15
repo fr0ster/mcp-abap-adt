@@ -5,11 +5,10 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, parseValidationResponse, restoreSessionInConnection  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse, return_error, return_response, parseValidationResponse, restoreSessionInConnection  } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ValidateBehaviorImplementationLow",
@@ -69,7 +68,8 @@ interface ValidateBehaviorImplementationArgs {
  *
  * Uses CrudClient.validateBehaviorImplementation - low-level single method call
  */
-export async function handleValidateBehaviorImplementation(connection: AbapConnection, args: ValidateBehaviorImplementationArgs) {
+export async function handleValidateBehaviorImplementation(context: HandlerContext, args: ValidateBehaviorImplementationArgs) {
+  const { connection, logger } = context;
   try {
     const {
       class_name,
@@ -94,15 +94,10 @@ export async function handleValidateBehaviorImplementation(connection: AbapConne
       // Ensure connection is established
           }
 
-    const handlerLogger = getHandlerLogger(
-      'handleValidateBehaviorImplementation',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     const className = class_name.toUpperCase();
     const behaviorDefinition = behavior_definition.toUpperCase();
 
-    handlerLogger.info(`Starting behavior implementation validation: ${className} for ${behaviorDefinition}`);
+    logger.info(`Starting behavior implementation validation: ${className} for ${behaviorDefinition}`);
 
     try {
       // Validate behavior implementation
@@ -122,8 +117,8 @@ export async function handleValidateBehaviorImplementation(connection: AbapConne
       // Get updated session state after validation
 
 
-      handlerLogger.info(`✅ ValidateBehaviorImplementation completed: ${className}`);
-      handlerLogger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      logger.info(`✅ ValidateBehaviorImplementation completed: ${className}`);
+      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
         data: JSON.stringify({
@@ -140,7 +135,7 @@ export async function handleValidateBehaviorImplementation(connection: AbapConne
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error validating behavior implementation ${className}: ${error?.message || error}`);
+      logger.error(`Error validating behavior implementation ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate behavior implementation: ${error.message || String(error)}`;

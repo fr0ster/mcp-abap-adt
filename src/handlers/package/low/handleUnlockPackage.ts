@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UnlockPackageLow",
@@ -63,7 +62,8 @@ interface UnlockPackageArgs {
  *
  * Uses CrudClient.unlockPackage - low-level single method call
  */
-export async function handleUnlockPackage(connection: AbapConnection, args: UnlockPackageArgs) {
+export async function handleUnlockPackage(context: HandlerContext, args: UnlockPackageArgs) {
+  const { connection, logger } = context;
   try {
     const {
       package_name,
@@ -78,11 +78,7 @@ export async function handleUnlockPackage(connection: AbapConnection, args: Unlo
       return return_error(new Error('package_name, super_package, lock_handle, and session_id are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUnlockPackage',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_state) {
@@ -91,12 +87,12 @@ export async function handleUnlockPackage(connection: AbapConnection, args: Unlo
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    handlerLogger.info(`Starting package unlock: ${packageName} (session: ${session_id.substring(0, 8)}...)`);
+    logger.info(`Starting package unlock: ${packageName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Get builder instance and set lockHandle in state before unlock
@@ -117,9 +113,9 @@ export async function handleUnlockPackage(connection: AbapConnection, args: Unlo
       }
 
       // Get updated session state after unlock
-      
 
-      handlerLogger.info(`✅ UnlockPackage completed: ${packageName}`);
+
+      logger.info(`✅ UnlockPackage completed: ${packageName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -133,7 +129,7 @@ export async function handleUnlockPackage(connection: AbapConnection, args: Unlo
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error unlocking package ${packageName}: ${error?.message || error}`);
+      logger.error(`Error unlocking package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock package: ${error.message || String(error)}`;

@@ -5,11 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse, return_error, return_response, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateViewLow",
@@ -64,7 +62,8 @@ interface UpdateViewArgs {
  *
  * Uses CrudClient.updateView - low-level single method call
  */
-export async function handleUpdateView(connection: AbapConnection, args: UpdateViewArgs) {
+export async function handleUpdateView(context: HandlerContext, args: UpdateViewArgs) {
+  const { connection, logger } = context;
   try {
     const {
       view_name,
@@ -79,11 +78,6 @@ export async function handleUpdateView(connection: AbapConnection, args: UpdateV
       return return_error(new Error('view_name, ddl_source, and lock_handle are required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateView',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
         const client = new CrudClient(connection);
 
     // Restore session state if provided
@@ -95,7 +89,7 @@ export async function handleUpdateView(connection: AbapConnection, args: UpdateV
 
     const viewName = view_name.toUpperCase();
 
-    handlerLogger.info(`Starting view update: ${viewName}`);
+    logger.info(`Starting view update: ${viewName}`);
 
     try {
       // Update view with DDL source
@@ -109,7 +103,7 @@ export async function handleUpdateView(connection: AbapConnection, args: UpdateV
       // Get updated session state after update
 
 
-      handlerLogger.info(`✅ UpdateView completed: ${viewName}`);
+      logger.info(`✅ UpdateView completed: ${viewName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -122,7 +116,7 @@ export async function handleUpdateView(connection: AbapConnection, args: UpdateV
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating view ${viewName}: ${error?.message || error}`);
+      logger.error(`Error updating view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update view: ${error.message || String(error)}`;

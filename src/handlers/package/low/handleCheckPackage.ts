@@ -6,10 +6,9 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CheckPackageLow",
@@ -59,7 +58,8 @@ interface CheckPackageArgs {
  *
  * Uses CrudClient.checkPackage - low-level single method call
  */
-export async function handleCheckPackage(connection: AbapConnection, args: CheckPackageArgs) {
+export async function handleCheckPackage(context: HandlerContext, args: CheckPackageArgs) {
+  const { connection, logger } = context;
   try {
     const {
       package_name,
@@ -74,10 +74,6 @@ export async function handleCheckPackage(connection: AbapConnection, args: Check
     }
 
     const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCheckPackage',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -89,7 +85,7 @@ export async function handleCheckPackage(connection: AbapConnection, args: Check
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    handlerLogger.info(`Starting package check: ${packageName} in ${superPackage}`);
+    logger.info(`Starting package check: ${packageName} in ${superPackage}`);
 
     try {
       // Check package
@@ -106,8 +102,8 @@ export async function handleCheckPackage(connection: AbapConnection, args: Check
       // Get updated session state after check
 
 
-      handlerLogger.info(`✅ CheckPackage completed: ${packageName}`);
-      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger.info(`✅ CheckPackage completed: ${packageName}`);
+      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -124,7 +120,7 @@ export async function handleCheckPackage(connection: AbapConnection, args: Check
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error checking package ${packageName}: ${error?.message || error}`);
+      logger.error(`Error checking package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check package: ${error.message || String(error)}`;

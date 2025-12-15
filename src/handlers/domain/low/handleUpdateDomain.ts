@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateDomainLow",
@@ -63,7 +62,8 @@ interface UpdateDomainArgs {
  *
  * Uses CrudClient.updateDomain - low-level single method call
  */
-export async function handleUpdateDomain(connection: AbapConnection, args: UpdateDomainArgs) {
+export async function handleUpdateDomain(context: HandlerContext, args: UpdateDomainArgs) {
+  const { connection, logger } = context;
   try {
     const {
       domain_name,
@@ -78,25 +78,16 @@ export async function handleUpdateDomain(connection: AbapConnection, args: Updat
       return return_error(new Error('domain_name, properties, and lock_handle are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateDomain',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     const domainName = domain_name.toUpperCase();
 
-    handlerLogger.info(`Starting domain update: ${domainName}`);
+    logger.info(`Starting domain update: ${domainName}`);
 
     // Restore session state if provided
     if (session_id && session_state) {
-      // CRITICAL: Use restoreSessionInConnection to properly restore session
-      // This will set sessionId in connection and enable stateful session mode
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      handlerLogger.debug('No session provided, creating new connection (may fail if domain is locked)');
-      // Ensure connection is established
-          }
+    }
 
     try {
       // Update domain with properties
@@ -112,9 +103,9 @@ export async function handleUpdateDomain(connection: AbapConnection, args: Updat
       }
 
       // Get updated session state after update
-      
 
-      handlerLogger.info(`✅ UpdateDomain completed: ${domainName}`);
+
+      logger.info(`✅ UpdateDomain completed: ${domainName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -127,7 +118,7 @@ export async function handleUpdateDomain(connection: AbapConnection, args: Updat
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating domain ${domainName}: ${error?.message || error}`);
+      logger.error(`Error updating domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update domain: ${error.message || String(error)}`;

@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, isCloudConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, isCloudConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "DeleteProgramLow",
@@ -39,7 +38,8 @@ interface DeleteProgramArgs {
  *
  * Uses CrudClient.deleteProgram - low-level single method call
  */
-export async function handleDeleteProgram(connection: AbapConnection, args: DeleteProgramArgs) {
+export async function handleDeleteProgram(context: HandlerContext, args: DeleteProgramArgs) {
+  const { connection, logger } = context;
   try {
     const {
       program_name,
@@ -56,14 +56,10 @@ export async function handleDeleteProgram(connection: AbapConnection, args: Dele
       return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleDeleteProgram',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
     const programName = program_name.toUpperCase();
 
-    handlerLogger.info(`Starting program deletion: ${programName}`);
+    logger.info(`Starting program deletion: ${programName}`);
 
     try {
       // Delete program
@@ -74,7 +70,7 @@ export async function handleDeleteProgram(connection: AbapConnection, args: Dele
         throw new Error(`Delete did not return a response for program ${programName}`);
       }
 
-      handlerLogger.info(`✅ DeleteProgram completed successfully: ${programName}`);
+      logger.info(`✅ DeleteProgram completed successfully: ${programName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -86,7 +82,7 @@ export async function handleDeleteProgram(connection: AbapConnection, args: Dele
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error deleting program ${programName}: ${error?.message || error}`);
+      logger.error(`Error deleting program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete program: ${error.message || String(error)}`;

@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "LockInterfaceLow",
@@ -53,7 +52,8 @@ interface LockInterfaceArgs {
  *
  * Uses CrudClient.lockInterface - low-level single method call
  */
-export async function handleLockInterface(connection: AbapConnection, args: LockInterfaceArgs) {
+export async function handleLockInterface(context: HandlerContext, args: LockInterfaceArgs) {
+  const { connection, logger } = context;
   try {
     const {
       interface_name,
@@ -66,22 +66,16 @@ export async function handleLockInterface(connection: AbapConnection, args: Lock
       return return_error(new Error('interface_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleLockInterface',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const interfaceName = interface_name.toUpperCase();
 
-    handlerLogger.info(`Starting interface lock: ${interfaceName}`);
+    logger.info(`Starting interface lock: ${interfaceName}`);
 
     try {
       // Lock interface
@@ -95,8 +89,8 @@ export async function handleLockInterface(connection: AbapConnection, args: Lock
       // Get updated session state after lock
 
 
-      handlerLogger.info(`✅ LockInterface completed: ${interfaceName}`);
-      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger.info(`✅ LockInterface completed: ${interfaceName}`);
+      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -110,7 +104,7 @@ export async function handleLockInterface(connection: AbapConnection, args: Lock
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error locking interface ${interfaceName}: ${error?.message || error}`);
+      logger.error(`Error locking interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock interface: ${error.message || String(error)}`;

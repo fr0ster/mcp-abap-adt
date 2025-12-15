@@ -14,19 +14,15 @@
  * Run: npm test -- --testPathPattern=integration/behaviorDefinition
  */
 
-import { handleGetSession } from '../../../handlers/system/readonly/handleGetSession';
 import { handleCreateBehaviorDefinition } from '../../../handlers/behavior_definition/high/handleCreateBehaviorDefinition';
 import { handleUpdateBehaviorDefinition } from '../../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
 import { handleDeleteBehaviorDefinition } from '../../../handlers/behavior_definition/low/handleDeleteBehaviorDefinition';
 
 import {
   parseHandlerResponse,
-  delay,
-  debugLog
-} from '../helpers/testHelpers';
+  delay} from '../helpers/testHelpers';
 import {
   getTestSession,
-  updateSessionFromResponse,
   SessionInfo
 } from '../helpers/sessionHelpers';
 import {
@@ -35,13 +31,13 @@ import {
   getOperationDelay,
   resolvePackageName,
   resolveTransportRequest,
-  loadTestEnv,
   getCleanupAfter,
   getSapConfigFromEnv
 } from '../helpers/configHelpers';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -49,7 +45,7 @@ import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 const testLogger = createTestLogger('bdef-high');
 
 describe('BehaviorDefinition High-Level Handlers Integration', () => {
-  let connection: AbapConnection;
+  let context: HandlerContext;
   let session: SessionInfo | null = null;
   let hasConfig = false;
 
@@ -68,29 +64,15 @@ describe('BehaviorDefinition High-Level Handlers Integration', () => {
       };
 
       // Create connection directly (same as in adt-clients tests)
-      connection = createAbapConnection(config, connectionLogger);
-
-      // Connect to get session state
-      await connection.connect();
-
-      // Generate session ID
-      const sessionId = generateSessionId();
-
-      // Get initial session
-      session = await getTestSession();
-      hasConfig = true;
+      const connection = createAbapConnection(config, connectionLogger);
+      context = { connection, logger: testLogger };
     } catch (error) {
       testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
-  });
+  }, getTimeout('long'));
 
   it('should test all BehaviorDefinition high-level handlers', async () => {
-    if (!hasConfig || !session) {
-      testLogger.info('⏭️  Skipping test: No configuration or session');
-      return;
-    }
-
     // Get test case configuration - use low-level test case as template
     const testCase = getEnabledTestCase('create_behavior_definition_low', 'full_workflow');
     if (!testCase) {
@@ -132,7 +114,7 @@ describe('BehaviorDefinition High-Level Handlers Integration', () => {
       testLogger.info(`📦 High Create: Creating ${bdefName}...`);
       let createResponse;
       try {
-        createResponse = await handleCreateBehaviorDefinition(connection, {
+        createResponse = await handleCreateBehaviorDefinition(context, {
           name: bdefName,
           description,
           package_name: packageName,
@@ -168,7 +150,7 @@ describe('BehaviorDefinition High-Level Handlers Integration', () => {
 
       let updateResponse;
       try {
-        updateResponse = await handleUpdateBehaviorDefinition(connection, {
+        updateResponse = await handleUpdateBehaviorDefinition(context, {
           name: bdefName,
           source_code: updatedSourceCode,
           transport_request: transportRequest,
@@ -204,7 +186,7 @@ describe('BehaviorDefinition High-Level Handlers Integration', () => {
 
           // Delete only if cleanup_after is true
         if (shouldCleanup) {
-          const deleteResponse = await handleDeleteBehaviorDefinition(connection, {
+          const deleteResponse = await handleDeleteBehaviorDefinition(context, {
             name: bdefName,
             transport_request: transportRequest
           });

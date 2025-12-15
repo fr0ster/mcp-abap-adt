@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, isCloudConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, isCloudConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ActivateProgramLow",
@@ -53,7 +52,8 @@ interface ActivateProgramArgs {
  *
  * Uses CrudClient.activateProgram - low-level single method call
  */
-export async function handleActivateProgram(connection: AbapConnection, args: ActivateProgramArgs) {
+export async function handleActivateProgram(context: HandlerContext, args: ActivateProgramArgs) {
+  const { connection, logger } = context;
   try {
     const {
       program_name,
@@ -71,11 +71,7 @@ export async function handleActivateProgram(connection: AbapConnection, args: Ac
       return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleActivateProgram',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -86,7 +82,7 @@ export async function handleActivateProgram(connection: AbapConnection, args: Ac
 
     const programName = program_name.toUpperCase();
 
-    handlerLogger.info(`Starting program activation: ${programName}`);
+    logger.info(`Starting program activation: ${programName}`);
 
     try {
       // Activate program
@@ -104,8 +100,8 @@ export async function handleActivateProgram(connection: AbapConnection, args: Ac
       // Get updated session state after activation
 
 
-      handlerLogger.info(`✅ ActivateProgram completed: ${programName}`);
-      handlerLogger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
+      logger.info(`✅ ActivateProgram completed: ${programName}`);
+      logger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -128,7 +124,7 @@ export async function handleActivateProgram(connection: AbapConnection, args: Ac
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error activating program ${programName}: ${error?.message || error}`);
+      logger.error(`Error activating program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate program: ${error.message || String(error)}`;

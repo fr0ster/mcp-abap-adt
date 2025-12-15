@@ -5,11 +5,10 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse, return_error, return_response, restoreSessionInConnection  } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { ClassBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "LockBehaviorImplementationLow",
@@ -54,7 +53,8 @@ interface LockBehaviorImplementationArgs {
  *
  * Uses CrudClient.lockClass - BehaviorImplementation extends ClassBuilder
  */
-export async function handleLockBehaviorImplementation(connection: AbapConnection, args: LockBehaviorImplementationArgs) {
+export async function handleLockBehaviorImplementation(context: HandlerContext, args: LockBehaviorImplementationArgs) {
+  const { connection, logger } = context;
   try {
     const {
       class_name,
@@ -77,12 +77,8 @@ export async function handleLockBehaviorImplementation(connection: AbapConnectio
           }
 
     const className = class_name.toUpperCase();
-    const handlerLogger = getHandlerLogger(
-      'handleLockBehaviorImplementation',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
 
-    handlerLogger.info(`Starting behavior implementation lock: ${className}`);
+    logger.info(`Starting behavior implementation lock: ${className}`);
 
     try {
       // Lock class (BehaviorImplementation extends ClassBuilder)
@@ -97,8 +93,8 @@ export async function handleLockBehaviorImplementation(connection: AbapConnectio
       // Get updated session state after lock
 
 
-      handlerLogger.info(`✅ LockBehaviorImplementation completed: ${className}`);
-      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger.info(`✅ LockBehaviorImplementation completed: ${className}`);
+      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -112,7 +108,7 @@ export async function handleLockBehaviorImplementation(connection: AbapConnectio
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error locking behavior implementation ${className}: ${error?.message || error}`);
+      logger.error(`Error locking behavior implementation ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock behavior implementation: ${error.message || String(error)}`;

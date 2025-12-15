@@ -7,14 +7,12 @@
  * Workflow: create -> lock -> update main source -> update implementations -> unlock -> activate
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger as baseLogger } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName } from '../../../lib/utils';
 import { validateTransportRequest  } from '../../../utils/transportValidation.js';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CreateBehaviorImplementation",
@@ -70,12 +68,9 @@ interface CreateBehaviorImplementationArgs {
  *
  * Uses CrudClient.createBehaviorImplementation - full workflow
  */
-export async function handleCreateBehaviorImplementation(connection: AbapConnection, args: CreateBehaviorImplementationArgs) {
-  const handlerLogger = getHandlerLogger(
-    'handleCreateBehaviorImplementation',
-    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-  );
-    try {
+export async function handleCreateBehaviorImplementation(context: HandlerContext, args: CreateBehaviorImplementationArgs) {
+  const { connection, logger } = context;
+  try {
     // Validate required parameters
     if (!args?.class_name) {
       return return_error(new Error('class_name is required'));
@@ -100,7 +95,7 @@ export async function handleCreateBehaviorImplementation(connection: AbapConnect
     const className = typedArgs.class_name.toUpperCase();
     const behaviorDefinition = typedArgs.behavior_definition.toUpperCase();
 
-    handlerLogger.info(`Starting behavior implementation creation: ${className} for ${behaviorDefinition}`);
+    logger.info(`Starting behavior implementation creation: ${className} for ${behaviorDefinition}`);
 
     try {
       // Create client
@@ -141,7 +136,7 @@ export async function handleCreateBehaviorImplementation(connection: AbapConnect
         }
       }
 
-      handlerLogger.info(`✅ CreateBehaviorImplementation completed successfully: ${className}`);
+      logger.info(`✅ CreateBehaviorImplementation completed successfully: ${className}`);
 
       // Return success result
       const stepsCompleted = ['create', 'lock', 'update_main_source'];
@@ -177,7 +172,7 @@ export async function handleCreateBehaviorImplementation(connection: AbapConnect
       });
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating behavior implementation ${className}: ${error?.message || error}`);
+      logger.error(`Error creating behavior implementation ${className}: ${error?.message || error}`);
 
       // Check if behavior implementation already exists
       if (error.message?.includes('already exists') || error.response?.status === 409) {
@@ -207,16 +202,16 @@ export async function handleCreateBehaviorImplementation(connection: AbapConnect
       return return_error(new Error(errorMessage));
     }
   } catch (error: any) {
-    handlerLogger.error(`CreateBehaviorImplementation handler error: ${error?.message || error}`);
+    logger.error(`CreateBehaviorImplementation handler error: ${error?.message || error}`);
     return return_error(error);
   } finally {
     try {
       if (connection) {
         connection.reset();
-        handlerLogger.debug('Reset behavior implementation connection after use');
+        logger.debug('Reset behavior implementation connection after use');
       }
     } catch (resetError: any) {
-      handlerLogger.error(`Failed to reset behavior implementation connection: ${resetError?.message || resetError}`);
+      logger.error(`Failed to reset behavior implementation connection: ${resetError?.message || resetError}`);
     }
   }
 }

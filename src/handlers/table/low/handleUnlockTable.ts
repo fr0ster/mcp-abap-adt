@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UnlockTableLow",
@@ -58,36 +57,23 @@ interface UnlockTableArgs {
  *
  * Uses CrudClient.unlockTable - low-level single method call
  */
-export async function handleUnlockTable(connection: AbapConnection, args: UnlockTableArgs) {
+export async function handleUnlockTable(context: HandlerContext, args: UnlockTableArgs) {
+  const { connection, logger } = context;
   try {
-    const {
-      table_name,
-      lock_handle,
-      session_id,
-      session_state
-    } = args as UnlockTableArgs;
+    const { table_name, lock_handle, session_id, session_state } = args as UnlockTableArgs;
 
-    // Validation
-    if (!table_name || !lock_handle || !session_id) {
-      return return_error(new Error('table_name, lock_handle, and session_id are required'));
-    }
-
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUnlockTable',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const tableName = table_name.toUpperCase();
 
-    handlerLogger.info(`Starting table unlock: ${tableName} (session: ${session_id.substring(0, 8)}...)`);
+    logger.info(`Starting table unlock: ${tableName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock table
@@ -101,7 +87,7 @@ export async function handleUnlockTable(connection: AbapConnection, args: Unlock
       // Get updated session state after unlock
 
 
-      handlerLogger.info(`✅ UnlockTable completed: ${tableName}`);
+      logger.info(`✅ UnlockTable completed: ${tableName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -114,7 +100,7 @@ export async function handleUnlockTable(connection: AbapConnection, args: Unlock
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error unlocking table ${tableName}:`, error);
+      logger.error(`Error unlocking table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to unlock table: ${error.message || String(error)}`;

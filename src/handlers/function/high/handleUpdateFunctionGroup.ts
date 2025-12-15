@@ -11,11 +11,9 @@ import { AbapConnection } from '@mcp-abap-adt/connection';.
  * Workflow: lock -> get current -> update metadata -> unlock
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger as baseLogger } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, encodeSapObjectName } from '../../../lib/utils';
 import { CrudClient, ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateFunctionGroup",

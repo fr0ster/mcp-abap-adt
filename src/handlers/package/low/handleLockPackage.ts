@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "LockPackageLow",
@@ -58,7 +57,8 @@ interface LockPackageArgs {
  *
  * Uses CrudClient.lockPackage - low-level single method call
  */
-export async function handleLockPackage(connection: AbapConnection, args: LockPackageArgs) {
+export async function handleLockPackage(context: HandlerContext, args: LockPackageArgs) {
+  const { connection, logger } = context;
   try {
     const {
       package_name,
@@ -72,25 +72,18 @@ export async function handleLockPackage(connection: AbapConnection, args: LockPa
       return return_error(new Error('package_name and super_package are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleLockPackage',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
+    const client = new CrudClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       // CRITICAL: Use restoreSessionInConnection to properly restore session
       // This will set sessionId in connection and enable stateful session mode
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    handlerLogger.info(`Starting package lock: ${packageName} in ${superPackage}`);
+    logger.info(`Starting package lock: ${packageName} in ${superPackage}`);
 
     try {
       // Lock package
@@ -102,14 +95,14 @@ export async function handleLockPackage(connection: AbapConnection, args: LockPa
       }
 
       // Get updated session state after lock
-      
+
 
       // Get actual session ID from connection (may be different from input if new session was created)
       // Connection.getSessionId() returns the current session ID used by the connection
       const actualSessionId = connection.getSessionId() || session_id || null;
 
-      handlerLogger.info(`✅ LockPackage completed: ${packageName}`);
-      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger.info(`✅ LockPackage completed: ${packageName}`);
+      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -124,7 +117,7 @@ export async function handleLockPackage(connection: AbapConnection, args: LockPa
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error locking package ${packageName}: ${error?.message || error}`);
+      logger.error(`Error locking package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock package: ${error.message || String(error)}`;

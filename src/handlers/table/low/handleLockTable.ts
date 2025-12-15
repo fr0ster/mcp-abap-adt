@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "LockTableLow",
@@ -53,7 +52,8 @@ interface LockTableArgs {
  *
  * Uses CrudClient.lockTable - low-level single method call
  */
-export async function handleLockTable(connection: AbapConnection, args: LockTableArgs) {
+export async function handleLockTable(context: HandlerContext, args: LockTableArgs) {
+  const { connection, logger } = context;
   try {
     const {
       table_name,
@@ -66,22 +66,17 @@ export async function handleLockTable(connection: AbapConnection, args: LockTabl
       return return_error(new Error('table_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleLockTable',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
+    const client = new CrudClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const tableName = table_name.toUpperCase();
 
-    handlerLogger.info(`Starting table lock: ${tableName}`);
+    logger.info(`Starting table lock: ${tableName}`);
 
     try {
       // Lock table
@@ -95,8 +90,8 @@ export async function handleLockTable(connection: AbapConnection, args: LockTabl
       // Get updated session state after lock
 
 
-      handlerLogger.info(`✅ LockTable completed: ${tableName}`);
-      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger.info(`✅ LockTable completed: ${tableName}`);
+      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -110,7 +105,7 @@ export async function handleLockTable(connection: AbapConnection, args: LockTabl
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error locking table ${tableName}:`, error);
+      logger.error(`Error locking table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to lock table: ${error.message || String(error)}`;

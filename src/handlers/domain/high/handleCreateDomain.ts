@@ -8,11 +8,10 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, logErrorSafely, safeCheckOperation  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { return_error, return_response, safeCheckOperation } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CreateDomain",
@@ -120,7 +119,8 @@ interface DomainArgs {
  * Uses DomainBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateDomain(connection: AbapConnection, args: DomainArgs) {
+export async function handleCreateDomain(context: HandlerContext, args: DomainArgs) {
+  const { connection, logger } = context;
   try {
     // Validate required parameters
     if (!args?.domain_name) {
@@ -134,15 +134,9 @@ export async function handleCreateDomain(connection: AbapConnection, args: Domai
     validateTransportRequest(args.package_name, args.transport_request, args.super_package);
 
     const typedArgs = args as DomainArgs;
-    // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-        const domainName = typedArgs.domain_name.toUpperCase();
-    const handlerLogger = getHandlerLogger(
-      'handleCreateDomain',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const domainName = typedArgs.domain_name.toUpperCase();
 
-    handlerLogger.info(`Starting domain creation: ${domainName}`);
+    logger.info(`Starting domain creation: ${domainName}`);
 
     try {
       // Create client
@@ -189,13 +183,13 @@ export async function handleCreateDomain(connection: AbapConnection, args: Domai
           () => client.checkDomain({ domainName }),
           domainName,
           {
-            debug: (message: string) => handlerLogger.debug(message)
+            debug: (message: string) => logger.debug(message)
           }
         );
       } catch (checkError: any) {
         // If error was marked as "already checked", continue silently
         if ((checkError as any).isAlreadyChecked) {
-          handlerLogger.debug(`Domain ${domainName} was already checked - continuing`);
+          logger.debug(`Domain ${domainName} was already checked - continuing`);
         } else {
           // Real check error - rethrow
           throw checkError;
@@ -209,7 +203,7 @@ export async function handleCreateDomain(connection: AbapConnection, args: Domai
       if (shouldActivate) {
         await client.activateDomain({ domainName });
       } else {
-        handlerLogger.debug(`Skipping activation for: ${domainName}`);
+        logger.debug(`Skipping activation for: ${domainName}`);
       }
 
       // Get domain details from create result (createDomain already does verification)
@@ -219,7 +213,7 @@ export async function handleCreateDomain(connection: AbapConnection, args: Domai
         domainDetails = (createResult.data as any).domain_details;
       }
 
-      handlerLogger.info(`✅ CreateDomain completed: ${domainName}`);
+      logger.info(`✅ CreateDomain completed: ${domainName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -234,8 +228,7 @@ export async function handleCreateDomain(connection: AbapConnection, args: Domai
       } as AxiosResponse);
 
     } catch (error: any) {
-      logErrorSafely(baseLogger, `CreateDomain ${domainName}`, error);
-      handlerLogger.error(`Error creating domain ${domainName}: ${error?.message || error}`);
+      logger.error(`Error creating domain ${domainName}: ${error?.message || error}`);
 
       // Check if domain already exists
       if (error.message?.includes('already exists') || error.response?.data?.includes('ExceptionResourceAlreadyExists')) {
@@ -268,9 +261,9 @@ export async function handleCreateDomain(connection: AbapConnection, args: Domai
     } finally {
       try {
         connection.reset();
-        handlerLogger.debug('Reset domain connection after use');
+        logger.debug('Reset domain connection after use');
       } catch (resetError: any) {
-        handlerLogger.error(`Failed to reset domain connection: ${resetError?.message || resetError}`);
+        logger.error(`Failed to reset domain connection: ${resetError?.message || resetError}`);
       }
     }
 

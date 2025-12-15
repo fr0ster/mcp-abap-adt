@@ -6,10 +6,9 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: "CreateBehaviorDefinitionLow",
@@ -80,7 +79,8 @@ interface CreateBehaviorDefinitionArgs {
  *
  * Uses CrudClient.createBehaviorDefinition - low-level single method call
  */
-export async function handleCreateBehaviorDefinition(connection: AbapConnection, args: CreateBehaviorDefinitionArgs) {
+export async function handleCreateBehaviorDefinition(context: HandlerContext, args: CreateBehaviorDefinitionArgs) {
+  const { connection, logger } = context;
   try {
     const {
       name,
@@ -108,14 +108,9 @@ export async function handleCreateBehaviorDefinition(connection: AbapConnection,
       // Ensure connection is established
           }
 
-    const handlerLogger = getHandlerLogger(
-      'handleCreateBehaviorDefinition',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     const bdefName = name.toUpperCase();
 
-    handlerLogger.info(`Starting behavior definition creation: ${bdefName}`);
+    logger.info(`Starting behavior definition creation: ${bdefName}`);
 
     try {
       // Create behavior definition - using types from adt-clients
@@ -137,7 +132,7 @@ export async function handleCreateBehaviorDefinition(connection: AbapConnection,
       // Get updated session state after create
 
 
-      handlerLogger.info(`✅ CreateBehaviorDefinition completed: ${bdefName}`);
+      logger.info(`✅ CreateBehaviorDefinition completed: ${bdefName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -155,7 +150,7 @@ export async function handleCreateBehaviorDefinition(connection: AbapConnection,
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating behavior definition ${bdefName}: ${error?.message || error}`);
+      logger.error(`Error creating behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create behavior definition: ${error.message || String(error)}`;

@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CreateDataElementLow",
@@ -93,7 +92,8 @@ interface CreateDataElementArgs {
  *
  * Uses CrudClient.createDataElement - low-level single method call
  */
-export async function handleCreateDataElement(connection: AbapConnection, args: CreateDataElementArgs) {
+export async function handleCreateDataElement(context: HandlerContext, args: CreateDataElementArgs) {
+  const { connection, logger } = context;
   try {
     const {
       data_element_name,
@@ -114,22 +114,17 @@ export async function handleCreateDataElement(connection: AbapConnection, args: 
       return return_error(new Error('data_element_name, description, and package_name are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCreateDataElement',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
+    const client = new CrudClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const dataElementName = data_element_name.toUpperCase();
 
-    handlerLogger.info(`Starting data element creation: ${dataElementName}`);
+    logger.info(`Starting data element creation: ${dataElementName}`);
 
     try {
       // Determine typeKind based on type_kind parameter
@@ -168,14 +163,14 @@ export async function handleCreateDataElement(connection: AbapConnection, args: 
       const createResult = client.getCreateResult();
 
       if (!createResult) {
-        handlerLogger.error(`Create did not return a response for data element ${dataElementName}`);
+        logger.error(`Create did not return a response for data element ${dataElementName}`);
         throw new Error(`Create did not return a response for data element ${dataElementName}`);
       }
 
       // Get updated session state after create
 
 
-      handlerLogger.info(`✅ CreateDataElement completed: ${dataElementName}`);
+      logger.info(`✅ CreateDataElement completed: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -191,7 +186,7 @@ export async function handleCreateDataElement(connection: AbapConnection, args: 
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating data element ${dataElementName}: ${error?.message || error}`);
+      logger.error(`Error creating data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create data element: ${error.message || String(error)}`;

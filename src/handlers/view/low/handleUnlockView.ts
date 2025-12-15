@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UnlockViewLow",
@@ -58,7 +57,8 @@ interface UnlockViewArgs {
  *
  * Uses CrudClient.unlockView - low-level single method call
  */
-export async function handleUnlockView(connection: AbapConnection, args: UnlockViewArgs) {
+export async function handleUnlockView(context: HandlerContext, args: UnlockViewArgs) {
+  const { connection, logger } = context;
   try {
     const {
       view_name,
@@ -72,11 +72,6 @@ export async function handleUnlockView(connection: AbapConnection, args: UnlockV
       return return_error(new Error('view_name, lock_handle, and session_id are required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleUnlockView',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
         const client = new CrudClient(connection);
 
     // Restore session state if provided
@@ -88,7 +83,7 @@ export async function handleUnlockView(connection: AbapConnection, args: UnlockV
 
     const viewName = view_name.toUpperCase();
 
-    handlerLogger.info(`Starting view unlock: ${viewName} (session: ${session_id.substring(0, 8)}...)`);
+    logger.info(`Starting view unlock: ${viewName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock view
@@ -102,7 +97,7 @@ export async function handleUnlockView(connection: AbapConnection, args: UnlockV
       // Get updated session state after unlock
 
 
-      handlerLogger.info(`✅ UnlockView completed: ${viewName}`);
+      logger.info(`✅ UnlockView completed: ${viewName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -115,7 +110,7 @@ export async function handleUnlockView(connection: AbapConnection, args: UnlockV
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error unlocking view ${viewName}: ${error?.message || error}`);
+      logger.error(`Error unlocking view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock view: ${error.message || String(error)}`;

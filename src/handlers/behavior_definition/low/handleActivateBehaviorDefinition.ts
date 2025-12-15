@@ -8,9 +8,10 @@
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
 import { AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+
 export const TOOL_DEFINITION = {
   name: "ActivateBehaviorDefinitionLow",
   description: "[low-level] Activate an ABAP behavior definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.",
@@ -54,7 +55,8 @@ interface ActivateBehaviorDefinitionArgs {
  *
  * Uses CrudClient.activateBehaviorDefinition - low-level single method call
  */
-export async function handleActivateBehaviorDefinition(connection: AbapConnection, args: ActivateBehaviorDefinitionArgs) {
+export async function handleActivateBehaviorDefinition(context: HandlerContext, args: ActivateBehaviorDefinitionArgs) {
+  const { connection, logger } = context;
   try {
     const {
       name,
@@ -67,12 +69,7 @@ export async function handleActivateBehaviorDefinition(connection: AbapConnectio
       return return_error(new Error('name is required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleActivateBehaviorDefinition',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -83,7 +80,7 @@ export async function handleActivateBehaviorDefinition(connection: AbapConnectio
 
     const behaviorDefinitionName = name.toUpperCase();
 
-    handlerLogger.info(`Starting behavior definition activation: ${behaviorDefinitionName}`);
+    logger.info(`Starting behavior definition activation: ${behaviorDefinitionName}`);
 
     try {
       // Activate behavior definition - using types from adt-clients
@@ -104,9 +101,9 @@ export async function handleActivateBehaviorDefinition(connection: AbapConnectio
       // Get updated session state after activation
 
 
-      handlerLogger.info(`✅ ActivateBehaviorDefinition completed: ${behaviorDefinitionName}`);
-      handlerLogger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      handlerLogger.info(`   Messages: ${activationResult.messages.length}`);
+      logger.info(`✅ ActivateBehaviorDefinition completed: ${behaviorDefinitionName}`);
+      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
+      logger.info(`   Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -129,7 +126,7 @@ export async function handleActivateBehaviorDefinition(connection: AbapConnectio
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error activating behavior definition ${behaviorDefinitionName}: ${error?.message || error}`);
+      logger.error(`Error activating behavior definition ${behaviorDefinitionName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate behavior definition: ${error.message || String(error)}`;

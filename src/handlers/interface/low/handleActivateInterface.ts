@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ActivateInterfaceLow",
@@ -53,7 +52,8 @@ interface ActivateInterfaceArgs {
  *
  * Uses CrudClient.activateInterface - low-level single method call
  */
-export async function handleActivateInterface(connection: AbapConnection, args: ActivateInterfaceArgs) {
+export async function handleActivateInterface(context: HandlerContext, args: ActivateInterfaceArgs) {
+  const { connection, logger } = context;
   try {
     const {
       interface_name,
@@ -66,22 +66,16 @@ export async function handleActivateInterface(connection: AbapConnection, args: 
       return return_error(new Error('interface_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleActivateInterface',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const interfaceName = interface_name.toUpperCase();
 
-    handlerLogger.info(`Starting interface activation: ${interfaceName}`);
+    logger.info(`Starting interface activation: ${interfaceName}`);
 
     try {
       // Activate interface
@@ -99,8 +93,8 @@ export async function handleActivateInterface(connection: AbapConnection, args: 
       // Get updated session state after activation
 
 
-      handlerLogger.info(`✅ ActivateInterface completed: ${interfaceName}`);
-      handlerLogger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
+      logger.info(`✅ ActivateInterface completed: ${interfaceName}`);
+      logger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -123,7 +117,7 @@ export async function handleActivateInterface(connection: AbapConnection, args: 
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error activating interface ${interfaceName}: ${error?.message || error}`);
+      logger.error(`Error activating interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate interface: ${error.message || String(error)}`;

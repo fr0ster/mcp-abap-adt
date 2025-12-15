@@ -5,12 +5,11 @@
  * Requires session_id for stateful operations.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CheckTableLow",
@@ -70,7 +69,8 @@ interface CheckTableArgs {
 /**
  * Main handler for CheckTable MCP tool
  */
-export async function handleCheckTable(connection: AbapConnection, args: CheckTableArgs) {
+export async function handleCheckTable(context: HandlerContext, args: CheckTableArgs) {
+  const { connection, logger } = context;
   try {
     const {
       table_name,
@@ -95,23 +95,16 @@ export async function handleCheckTable(connection: AbapConnection, args: CheckTa
       ? version.toLowerCase() as 'active' | 'inactive' | 'new'
       : 'new';
 
-        const handlerLogger = getHandlerLogger(
-      'handleCheckTable',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     // Use provided session_id or generate new one (required for table check)
     const sessionId = session_id || generateSessionId();
     const tableName = table_name.toUpperCase();
 
-    handlerLogger.info(`Starting table check: ${tableName} (reporter: ${checkReporter}, version: ${checkVersion}, session: ${sessionId.substring(0, 8)}..., ${ddl_code ? 'with new code' : 'saved version'})`);
+    logger.info(`Starting table check: ${tableName} (reporter: ${checkReporter}, version: ${checkVersion}, session: ${sessionId.substring(0, 8)}..., ${ddl_code ? 'with new code' : 'saved version'})`);
 
     try {
       const builder = new CrudClient(connection);
@@ -130,9 +123,9 @@ export async function handleCheckTable(connection: AbapConnection, args: CheckTa
       // Get updated session state after check
 
 
-      handlerLogger.info(`✅ CheckTable completed: ${tableName}`);
-      handlerLogger.info(`   Status: ${checkResult.status}`);
-      handlerLogger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger.info(`✅ CheckTable completed: ${tableName}`);
+      logger.info(`   Status: ${checkResult.status}`);
+      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -150,7 +143,7 @@ export async function handleCheckTable(connection: AbapConnection, args: CheckTa
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error checking table ${tableName}:`, error);
+      logger.error(`Error checking table ${tableName}:`, error);
 
       let errorMessage = `Failed to check table: ${error.message || String(error)}`;
 

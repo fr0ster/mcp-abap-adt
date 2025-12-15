@@ -6,9 +6,8 @@
  */
 
 import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateClassTestClassesLow",
@@ -58,7 +57,8 @@ interface UpdateClassTestClassesArgs {
   };
 }
 
-export async function handleUpdateClassTestClasses(connection: AbapConnection, args: UpdateClassTestClassesArgs) {
+export async function handleUpdateClassTestClasses(context: HandlerContext, args: UpdateClassTestClassesArgs) {
+  const { connection, logger } = context;
   try {
     const {
       class_name,
@@ -72,11 +72,7 @@ export async function handleUpdateClassTestClasses(connection: AbapConnection, a
       return return_error(new Error('class_name, test_class_source, and lock_handle are required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateClassTestClasses',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -84,7 +80,7 @@ export async function handleUpdateClassTestClasses(connection: AbapConnection, a
           }
 
     const className = class_name.toUpperCase();
-    handlerLogger.info(`Starting test classes update for: ${className}`);
+    logger.info(`Starting test classes update for: ${className}`);
 
     try {
       await client.updateClassTestIncludes({
@@ -94,7 +90,7 @@ export async function handleUpdateClassTestClasses(connection: AbapConnection, a
       const updateResult = client.getTestClassUpdateResult();
 
 
-      handlerLogger.info(`✅ UpdateClassTestClasses completed: ${className}`);
+      logger.info(`✅ UpdateClassTestClasses completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -107,7 +103,7 @@ export async function handleUpdateClassTestClasses(connection: AbapConnection, a
         }, null, 2)
       } as AxiosResponse);
     } catch (error: any) {
-      handlerLogger.error(`Error updating test classes for ${className}: ${error?.message || error}`);
+      logger.error(`Error updating test classes for ${className}: ${error?.message || error}`);
       const reason = error?.response?.status === 404
         ? `Class ${className} not found.`
         : error?.response?.status === 423

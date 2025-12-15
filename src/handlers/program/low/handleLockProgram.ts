@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, isCloudConnection, restoreSessionInConnection } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse, return_error, return_response, isCloudConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "LockProgramLow",
@@ -53,7 +52,8 @@ interface LockProgramArgs {
  *
  * Uses CrudClient.lockProgram - low-level single method call
  */
-export async function handleLockProgram(connection: AbapConnection, args: LockProgramArgs) {
+export async function handleLockProgram(context: HandlerContext, args: LockProgramArgs) {
+  const { connection, logger } = context;
   try {
     const {
       program_name,
@@ -71,22 +71,17 @@ export async function handleLockProgram(connection: AbapConnection, args: LockPr
       return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleLockProgram',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
+    const client = new CrudClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const programName = program_name.toUpperCase();
 
-    handlerLogger.info(`Starting program lock: ${programName}`);
+    logger.info(`Starting program lock: ${programName}`);
 
     try {
       // Lock program
@@ -100,8 +95,8 @@ export async function handleLockProgram(connection: AbapConnection, args: LockPr
       // Get updated session state after lock
 
 
-      handlerLogger.info(`✅ LockProgram completed: ${programName}`);
-      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger.info(`✅ LockProgram completed: ${programName}`);
+      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -115,7 +110,7 @@ export async function handleLockProgram(connection: AbapConnection, args: LockPr
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error locking program ${programName}: ${error?.message || error}`);
+      logger.error(`Error locking program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock program: ${error.message || String(error)}`;

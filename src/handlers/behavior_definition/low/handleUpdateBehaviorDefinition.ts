@@ -5,11 +5,10 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "UpdateBehaviorDefinitionLow",
@@ -64,7 +63,8 @@ interface UpdateBehaviorDefinitionArgs {
  *
  * Uses CrudClient.updateBehaviorDefinition - low-level single method call
  */
-export async function handleUpdateBehaviorDefinition(connection: AbapConnection, args: UpdateBehaviorDefinitionArgs) {
+export async function handleUpdateBehaviorDefinition(context: HandlerContext, args: UpdateBehaviorDefinitionArgs) {
+  const { connection, logger } = context;
   try {
     const {
       name,
@@ -79,23 +79,18 @@ export async function handleUpdateBehaviorDefinition(connection: AbapConnection,
       return return_error(new Error('name, source_code, and lock_handle are required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateBehaviorDefinition',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const behaviorDefinitionName = name.toUpperCase();
 
-    handlerLogger.info(`Starting behavior definition update: ${behaviorDefinitionName}`);
+    logger.info(`Starting behavior definition update: ${behaviorDefinitionName}`);
 
     try {
       // Update behavior definition with source code - using types from adt-clients
@@ -111,9 +106,9 @@ export async function handleUpdateBehaviorDefinition(connection: AbapConnection,
       }
 
       // Get updated session state after update
-      
 
-      handlerLogger.info(`✅ UpdateBehaviorDefinition completed: ${behaviorDefinitionName}`);
+
+      logger.info(`✅ UpdateBehaviorDefinition completed: ${behaviorDefinitionName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -126,7 +121,7 @@ export async function handleUpdateBehaviorDefinition(connection: AbapConnection,
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating behavior definition ${behaviorDefinitionName}: ${error?.message || error}`);
+      logger.error(`Error updating behavior definition ${behaviorDefinitionName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update behavior definition: ${error.message || String(error)}`;

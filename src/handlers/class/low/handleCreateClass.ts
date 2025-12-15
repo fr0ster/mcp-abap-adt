@@ -5,11 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse, return_error, return_response } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CreateClassLow",
@@ -89,7 +87,8 @@ interface CreateClassArgs {
  *
  * Uses CrudClient.createClass - low-level single method call
  */
-export async function handleCreateClass(connection: AbapConnection, args: CreateClassArgs) {
+  export async function handleCreateClass(context: HandlerContext, args: CreateClassArgs) {
+  const { connection, logger } = context;
   try {
     const {
       class_name,
@@ -109,22 +108,18 @@ export async function handleCreateClass(connection: AbapConnection, args: Create
       return return_error(new Error('class_name, description, and package_name are required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleCreateClass',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
         // Check if connection can refresh token (for debugging)
     const connectionWithRefresh = connection as any;
     if (process.env.DEBUG_HANDLERS === 'true' && connectionWithRefresh.canRefreshToken) {
       const canRefresh = connectionWithRefresh.canRefreshToken();
-      handlerLogger.debug(`Connection can refresh token: ${canRefresh}`);
+      logger.debug(`Connection can refresh token: ${canRefresh}`);
     }
 
     const client = new CrudClient(connection);
 
     const className = class_name.toUpperCase();
 
-    handlerLogger.info(`Starting class creation: ${className}`);
+    logger.info(`Starting class creation: ${className}`);
 
     try {
       // Create class
@@ -147,7 +142,7 @@ export async function handleCreateClass(connection: AbapConnection, args: Create
       // Get updated session state after create
 
 
-      handlerLogger.info(`✅ CreateClass completed: ${className}`);
+      logger.info(`✅ CreateClass completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -163,7 +158,7 @@ export async function handleCreateClass(connection: AbapConnection, args: Create
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating class ${className}: ${error.message || String(error)}`);
+      logger.error(`Error creating class ${className}: ${error.message || String(error)}`);
 
       // Parse error message
       let errorMessage = `Failed to create class: ${error.message || String(error)}`;

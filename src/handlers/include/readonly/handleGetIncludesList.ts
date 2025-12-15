@@ -1,8 +1,7 @@
-import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { fetchNodeStructure, return_error, logger as baseLogger } from '../../../lib/utils';
+import { McpError, ErrorCode } from '../../../lib/utils';
+import { fetchNodeStructure, return_error } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
-import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   "name": "GetIncludesList",
   "description": "[read-only] Recursively discover and list ALL include files within an ABAP program or include.",
@@ -47,20 +46,20 @@ export const TOOL_DEFINITION = {
  */
 function parseIncludesFromXml(xmlData: string): Array<{name: string, node_id: string, label: string}> {
     const includes: Array<{name: string, node_id: string, label: string}> = [];
-    
+
     try {
         // Simple regex-based parsing for XML
         // Look for OBJECT_TYPE entries that contain "PROG/I" (includes)
         const objectTypeRegex = /<SEU_ADT_OBJECT_TYPE_INFO>(.*?)<\/SEU_ADT_OBJECT_TYPE_INFO>/gs;
         const matches = xmlData.match(objectTypeRegex);
-        
+
         if (matches) {
             for (const match of matches) {
                 // Check if this is an include type
                 if (match.includes('<OBJECT_TYPE>PROG/I</OBJECT_TYPE>')) {
                     const nodeIdMatch = match.match(/<NODE_ID>(\d+)<\/NODE_ID>/);
                     const labelMatch = match.match(/<OBJECT_TYPE_LABEL>(.*?)<\/OBJECT_TYPE_LABEL>/);
-                    
+
                     if (nodeIdMatch && labelMatch) {
                         includes.push({
                             name: 'PROG/I',
@@ -74,7 +73,7 @@ function parseIncludesFromXml(xmlData: string): Array<{name: string, node_id: st
     } catch (error) {
         // console.warn('Error parsing XML for includes:', error);
     }
-    
+
     return includes;
 }
 
@@ -85,12 +84,12 @@ function parseIncludesFromXml(xmlData: string): Array<{name: string, node_id: st
  */
 function parseIncludeNamesFromXml(xmlData: string): string[] {
     const includeNames: string[] = [];
-    
+
     try {
         // Look for SEU_ADT_REPOSITORY_OBJ_NODE entries with OBJECT_TYPE PROG/I
         const nodeRegex = /<SEU_ADT_REPOSITORY_OBJ_NODE>(.*?)<\/SEU_ADT_REPOSITORY_OBJ_NODE>/gs;
         const nodeMatches = xmlData.match(nodeRegex);
-        
+
         if (nodeMatches) {
             for (const nodeMatch of nodeMatches) {
                 // Check if this node is for includes (PROG/I)
@@ -106,7 +105,7 @@ function parseIncludeNamesFromXml(xmlData: string): string[] {
                 }
             }
         }
-        
+
         // If no nodes found, try alternative parsing for OBJECT_NAME tags
         if (includeNames.length === 0) {
             const objectNameRegex = /<OBJECT_NAME>([^<]+)<\/OBJECT_NAME>/g;
@@ -122,16 +121,13 @@ function parseIncludeNamesFromXml(xmlData: string): string[] {
     } catch (error) {
         // console.warn('Error parsing XML for include names:', error);
     }
-    
+
     return [...new Set(includeNames)]; // Remove duplicates
 }
 
-export async function handleGetIncludesList(connection: AbapConnection, args: any) {
+export async function handleGetIncludesList(context: HandlerContext, args: any) {
+    const { connection, logger } = context;
     try {
-        const handlerLogger = getHandlerLogger(
-          'handleGetIncludesList',
-          process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-        );
         const { object_name, object_type, timeout, detailed } = args;
 
         if (!object_name || typeof object_name !== 'string' || object_name.trim() === '') {
@@ -150,7 +146,7 @@ export async function handleGetIncludesList(connection: AbapConnection, args: an
         let parentTechName = object_name;
         let parentType = object_type;
 
-        handlerLogger.info(`Starting includes discovery for ${parentName.toUpperCase()} (${parentType}), detailed=${isDetailed}`);
+        logger.info(`Starting includes discovery for ${parentName.toUpperCase()} (${parentType}), detailed=${isDetailed}`);
 
         // Step 1: Get root node structure to find includes node (with timeout)
         const rootResponse = await Promise.race([
@@ -161,7 +157,7 @@ export async function handleGetIncludesList(connection: AbapConnection, args: an
                 '000000', // Root node
                 true // with descriptions
             ),
-            new Promise<never>((_, reject) => 
+            new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error(`Timeout after ${requestTimeout}ms while fetching root node structure for ${object_name}`)), requestTimeout)
             )
         ]);
@@ -169,9 +165,9 @@ export async function handleGetIncludesList(connection: AbapConnection, args: an
         // Step 2: Parse response to find includes node ID
         const includesInfo = parseIncludesFromXml(rootResponse.data);
         const includesNode = includesInfo.find(info => info.name === 'PROG/I');
-        
+
         if (!includesNode) {
-            handlerLogger.info(`No includes found in ${object_type} '${object_name}'`);
+            logger.info(`No includes found in ${object_type} '${object_name}'`);
             // Return empty result if no includes node found
             return {
                 isError: false,
@@ -193,14 +189,14 @@ export async function handleGetIncludesList(connection: AbapConnection, args: an
                 includesNode.node_id,
                 true // with descriptions
             ),
-            new Promise<never>((_, reject) => 
+            new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error(`Timeout after ${requestTimeout}ms while fetching includes list for ${object_name}`)), requestTimeout)
             )
         ]);
 
         // Step 4: Parse the includes response to extract include names
         const includeNames = parseIncludeNamesFromXml(includesResponse.data);
-        
+
         if (isDetailed) {
             // Return detailed JSON response as text (for compatibility)
             const detailedResponse = {
@@ -227,7 +223,7 @@ export async function handleGetIncludesList(connection: AbapConnection, args: an
             return result;
         } else {
             // Return minimal text response (original format)
-            const responseData = includeNames.length > 0 
+            const responseData = includeNames.length > 0
                 ? includeNames.join('\n')
                 : '';
 
@@ -247,11 +243,7 @@ export async function handleGetIncludesList(connection: AbapConnection, args: an
         }
 
     } catch (error) {
-        const handlerLogger = getHandlerLogger(
-          'handleGetIncludesList',
-          process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-        );
-        handlerLogger.error(`Error getting includes list: ${error instanceof Error ? error.message : String(error)}`);
+        logger.error(`Error getting includes list: ${error instanceof Error ? error.message : String(error)}`);
         return return_error(error instanceof Error ? error : new Error(String(error)));
     }
 }

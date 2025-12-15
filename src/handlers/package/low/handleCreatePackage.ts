@@ -5,11 +5,10 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { PackageBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, logErrorSafely, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 // Type matching CrudClient.createPackage signature
 type CreatePackageConfig = Partial<PackageBuilderConfig> & Pick<PackageBuilderConfig, 'packageName' | 'superPackage' | 'description' | 'softwareComponent'>;
@@ -36,10 +35,10 @@ export const TOOL_DEFINITION = {
         type: "string",
         description: "Package type (development/structure). Defaults to development."
       },
-            software_component: {
-              type: "string",
-              description: "Software component (e.g., HOME, ZLOCAL). If not provided, SAP will set a default (typically ZLOCAL for local packages)."
-            },
+      software_component: {
+        type: "string",
+        description: "Software component (e.g., HOME, ZLOCAL). If not provided, SAP will set a default (typically ZLOCAL for local packages)."
+      },
       transport_layer: {
         type: "string",
         description: "Transport layer (e.g., ZDEV). Required for transportable packages."
@@ -92,7 +91,8 @@ interface CreatePackageArgs {
  *
  * Uses CrudClient.createPackage - low-level single method call
  */
-export async function handleCreatePackage(connection: AbapConnection, args: CreatePackageArgs) {
+export async function handleCreatePackage(context: HandlerContext, args: CreatePackageArgs) {
+  const { connection, logger } = context;
   try {
     const {
       package_name,
@@ -112,23 +112,17 @@ export async function handleCreatePackage(connection: AbapConnection, args: Crea
       return return_error(new Error('package_name, super_package, and description are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCreatePackageLow',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    handlerLogger.info(`Starting package creation: ${packageName} in ${superPackage}`);
+    logger.info(`Starting package creation: ${packageName} in ${superPackage}`);
 
     try {
       // Create package - build config object with proper typing
@@ -165,7 +159,7 @@ export async function handleCreatePackage(connection: AbapConnection, args: Crea
       // Get updated session state after create
 
 
-      handlerLogger.info(`✅ CreatePackage completed: ${packageName}`);
+      logger.info(`✅ CreatePackage completed: ${packageName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -185,12 +179,12 @@ export async function handleCreatePackage(connection: AbapConnection, args: Crea
       } as AxiosResponse);
 
     } catch (error: any) {
-      logErrorSafely(baseLogger, `CreatePackage ${packageName}`, error);
+      logger.error(`CreatePackage ${packageName}`, error);
 
       // Check for authentication errors (expired tokens)
       if (error.message?.includes('Refresh token has expired') ||
-          error.message?.includes('JWT token has expired') ||
-          error.message?.includes('Please re-authenticate')) {
+        error.message?.includes('JWT token has expired') ||
+        error.message?.includes('Please re-authenticate')) {
         return return_error(new Error(`Authentication failed: ${error.message}. Please re-authenticate using the authentication tool or update your credentials.`));
       }
 

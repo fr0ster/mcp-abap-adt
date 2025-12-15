@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, parseValidationResponse, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, parseValidationResponse, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ValidateStructureLow",
@@ -63,7 +62,8 @@ interface ValidateStructureArgs {
  *
  * Uses CrudClient.validateStructure - low-level single method call
  */
-export async function handleValidateStructure(connection: AbapConnection, args: ValidateStructureArgs) {
+export async function handleValidateStructure(context: HandlerContext, args: ValidateStructureArgs) {
+  const { connection, logger } = context;
   try {
     const {
       structure_name,
@@ -78,10 +78,6 @@ export async function handleValidateStructure(connection: AbapConnection, args: 
       return return_error(new Error('structure_name, package_name, and description are required'));
     }
 
-        const handlerLogger = getHandlerLogger(
-      'handleValidateStructure',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
     const client = new CrudClient(connection);
 
     // Restore session state if provided
@@ -93,7 +89,7 @@ export async function handleValidateStructure(connection: AbapConnection, args: 
 
     const structureName = structure_name.toUpperCase();
 
-    handlerLogger.info(`Starting structure validation: ${structureName}`);
+    logger.info(`Starting structure validation: ${structureName}`);
 
     try {
       // Validate structure
@@ -111,8 +107,8 @@ export async function handleValidateStructure(connection: AbapConnection, args: 
       // Get updated session state after validation
 
 
-      handlerLogger.info(`✅ ValidateStructure completed: ${structureName}`);
-      handlerLogger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      logger.info(`✅ ValidateStructure completed: ${structureName}`);
+      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
         data: JSON.stringify({
@@ -128,7 +124,7 @@ export async function handleValidateStructure(connection: AbapConnection, args: 
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error validating structure ${structureName}:`, error);
+      logger.error(`Error validating structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to validate structure: ${error.message || String(error)}`;

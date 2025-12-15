@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ActivateDomainLow",
@@ -53,7 +52,8 @@ interface ActivateDomainArgs {
  *
  * Uses CrudClient.activateDomain - low-level single method call
  */
-export async function handleActivateDomain(connection: AbapConnection, args: ActivateDomainArgs) {
+export async function handleActivateDomain(context: HandlerContext, args: ActivateDomainArgs) {
+  const { connection, logger } = context;
   try {
     const {
       domain_name,
@@ -66,22 +66,16 @@ export async function handleActivateDomain(connection: AbapConnection, args: Act
       return return_error(new Error('domain_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleActivateDomain',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const domainName = domain_name.toUpperCase();
 
-    handlerLogger.info(`Starting domain activation: ${domainName}`);
+    logger.info(`Starting domain activation: ${domainName}`);
 
     try {
       // Activate domain
@@ -99,8 +93,8 @@ export async function handleActivateDomain(connection: AbapConnection, args: Act
       // Get updated session state after activation
 
 
-      handlerLogger.info(`✅ ActivateDomain completed: ${domainName}`);
-      handlerLogger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
+      logger.info(`✅ ActivateDomain completed: ${domainName}`);
+      logger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -123,7 +117,7 @@ export async function handleActivateDomain(connection: AbapConnection, args: Act
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error activating domain ${domainName}: ${error?.message || error}`);
+      logger.error(`Error activating domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate domain: ${error.message || String(error)}`;

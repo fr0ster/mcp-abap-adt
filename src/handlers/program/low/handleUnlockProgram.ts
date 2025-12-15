@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, isCloudConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, isCloudConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UnlockProgramLow",
@@ -58,7 +57,8 @@ interface UnlockProgramArgs {
  *
  * Uses CrudClient.unlockProgram - low-level single method call
  */
-export async function handleUnlockProgram(connection: AbapConnection, args: UnlockProgramArgs) {
+export async function handleUnlockProgram(context: HandlerContext, args: UnlockProgramArgs) {
+  const { connection, logger } = context;
   try {
     const {
       program_name,
@@ -77,22 +77,16 @@ export async function handleUnlockProgram(connection: AbapConnection, args: Unlo
       return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUnlockProgram',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const programName = program_name.toUpperCase();
 
-    handlerLogger.info(`Starting program unlock: ${programName} (session: ${session_id.substring(0, 8)}...)`);
+    logger.info(`Starting program unlock: ${programName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock program
@@ -106,7 +100,7 @@ export async function handleUnlockProgram(connection: AbapConnection, args: Unlo
       // Get updated session state after unlock
 
 
-      handlerLogger.info(`✅ UnlockProgram completed: ${programName}`);
+      logger.info(`✅ UnlockProgram completed: ${programName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +113,7 @@ export async function handleUnlockProgram(connection: AbapConnection, args: Unlo
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error unlocking program ${programName}: ${error?.message || error}`);
+      logger.error(`Error unlocking program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock program: ${error.message || String(error)}`;

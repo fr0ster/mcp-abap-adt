@@ -8,12 +8,12 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, logErrorSafely } from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import type { PackageBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+
 export const TOOL_DEFINITION = {
   name: "CreatePackage",
   description: "Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.",
@@ -47,7 +47,8 @@ interface CreatePackageArgs {
  * Uses PackageBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreatePackage(connection: AbapConnection, args: CreatePackageArgs) {
+export async function handleCreatePackage(context: HandlerContext, args: CreatePackageArgs) {
+  const { connection, logger } = context;
   try {
     // Validate required parameters
     if (!args?.package_name) {
@@ -61,13 +62,9 @@ export async function handleCreatePackage(connection: AbapConnection, args: Crea
 
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-        const packageName = typedArgs.package_name.toUpperCase();
-    const handlerLogger = getHandlerLogger(
-      'handleCreatePackage',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const packageName = typedArgs.package_name.toUpperCase();
 
-    handlerLogger.info(`Starting package creation: ${packageName}`);
+    logger.info(`Starting package creation: ${packageName}`);
 
     try {
       const client = new CrudClient(connection);
@@ -100,15 +97,15 @@ export async function handleCreatePackage(connection: AbapConnection, args: Crea
       }
 
       // DEBUG: Log softwareComponent at each step
-      handlerLogger.debug(`[CreatePackage] software_component in args: ${typedArgs.software_component || 'undefined'}`);
-      handlerLogger.debug(`[CreatePackage] softwareComponent in config: ${createConfig.softwareComponent || 'undefined'}`);
+      logger.debug(`[CreatePackage] software_component in args: ${typedArgs.software_component || 'undefined'}`);
+      logger.debug(`[CreatePackage] softwareComponent in config: ${createConfig.softwareComponent || 'undefined'}`);
 
       await client.createPackage(createConfig);
 
       // Check
       await client.checkPackage({ packageName: packageName, superPackage: typedArgs.super_package });
 
-      handlerLogger.info(`✅ CreatePackage completed successfully: ${packageName}`);
+      logger.info(`✅ CreatePackage completed successfully: ${packageName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -126,12 +123,12 @@ export async function handleCreatePackage(connection: AbapConnection, args: Crea
       } as AxiosResponse);
 
     } catch (error: any) {
-      logErrorSafely(baseLogger, `CreatePackage ${packageName}`, error);
+      logger.error(`CreatePackage ${packageName}`, error);
 
       // Check for authentication errors (expired tokens)
       if (error.message?.includes('Refresh token has expired') ||
-          error.message?.includes('JWT token has expired') ||
-          error.message?.includes('Please re-authenticate')) {
+        error.message?.includes('JWT token has expired') ||
+        error.message?.includes('Please re-authenticate')) {
         throw new McpError(
           ErrorCode.InvalidRequest,
           `Authentication failed: ${error.message}. Please re-authenticate using the authentication tool or update your credentials.`
@@ -142,11 +139,11 @@ export async function handleCreatePackage(connection: AbapConnection, args: Crea
       const errorMessageLower = error.message?.toLowerCase() || '';
       const errorDataLower = typeof error.response?.data === 'string' ? error.response.data.toLowerCase() : '';
       if (errorMessageLower.includes('already exists') ||
-          errorMessageLower.includes('does already exist') ||
-          errorDataLower.includes('already exists') ||
-          errorDataLower.includes('does already exist') ||
-          errorDataLower.includes('exceptionresourcealreadyexists') ||
-          error.response?.status === 409) {
+        errorMessageLower.includes('does already exist') ||
+        errorDataLower.includes('already exists') ||
+        errorDataLower.includes('does already exist') ||
+        errorDataLower.includes('exceptionresourcealreadyexists') ||
+        error.response?.status === 409) {
         throw new McpError(
           ErrorCode.InvalidParams,
           `Package ${packageName} already exists. Please delete it first or use a different name.`
@@ -175,9 +172,9 @@ export async function handleCreatePackage(connection: AbapConnection, args: Crea
     } finally {
       try {
         connection.reset();
-        handlerLogger.debug('Reset package connection after use');
+        logger.debug('Reset package connection after use');
       } catch (resetError: any) {
-        handlerLogger.error(`Failed to reset package connection: ${resetError?.message || resetError}`);
+        logger.error(`Failed to reset package connection: ${resetError?.message || resetError}`);
       }
     }
 

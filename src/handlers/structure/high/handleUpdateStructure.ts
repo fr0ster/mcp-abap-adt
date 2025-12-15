@@ -7,11 +7,10 @@
  * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
-import { return_error, return_response, encodeSapObjectName, logger as baseLogger, safeCheckOperation, isAlreadyExistsError, AxiosResponse } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { return_error, return_response, encodeSapObjectName, safeCheckOperation, isAlreadyExistsError, AxiosResponse } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateStructure",
@@ -54,7 +53,8 @@ interface UpdateStructureArgs {
  * Uses StructureBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleUpdateStructure(connection: AbapConnection, args: UpdateStructureArgs) {
+export async function handleUpdateStructure(context: HandlerContext, args: UpdateStructureArgs) {
+  const { connection, logger } = context;
   try {
     const {
       structure_name,
@@ -70,12 +70,7 @@ export async function handleUpdateStructure(connection: AbapConnection, args: Up
 
     const structureName = structure_name.toUpperCase();
 
-    const handlerLogger = getHandlerLogger(
-      "handleUpdateStructure",
-      process.env.DEBUG_HANDLERS === "true" ? baseLogger : noopLogger
-    );
-
-    handlerLogger.info(`Starting structure source update: ${structureName}`);
+    logger.info(`Starting structure source update: ${structureName}`);
 
             try {
       // Get configuration from environment variables
@@ -83,10 +78,10 @@ export async function handleUpdateStructure(connection: AbapConnection, args: Up
             // Create connection directly for this handler call
       // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-      handlerLogger.debug(`[UpdateStructure] Created separate connection for handler call: ${structureName}`);
+      logger.debug(`[UpdateStructure] Created separate connection for handler call: ${structureName}`);
     } catch (connectionError: any) {
       const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
-      handlerLogger.error(`[UpdateStructure] Failed to create connection: ${errorMessage}`);
+      logger.error(`[UpdateStructure] Failed to create connection: ${errorMessage}`);
       return return_error(new Error(`Failed to create connection: ${errorMessage}`));
     }
 
@@ -104,26 +99,26 @@ export async function handleUpdateStructure(connection: AbapConnection, args: Up
 
       try {
         // Step 1: Check new code BEFORE update (with ddlCode and version='inactive')
-        handlerLogger.info(`[UpdateStructure] Checking new DDL code before update: ${structureName}`);
+        logger.info(`[UpdateStructure] Checking new DDL code before update: ${structureName}`);
         let checkNewCodePassed = false;
         try {
           await safeCheckOperation(
             () => client.checkStructure({ structureName }, ddl_code, 'inactive'),
             structureName,
             {
-              debug: (message: string) => handlerLogger.debug(`[UpdateStructure] ${message}`)
+              debug: (message: string) => logger.debug(`[UpdateStructure] ${message}`)
             }
           );
           checkNewCodePassed = true;
-          handlerLogger.info(`[UpdateStructure] New code check passed: ${structureName}`);
+          logger.info(`[UpdateStructure] New code check passed: ${structureName}`);
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
           if ((checkError as any).isAlreadyChecked) {
-            handlerLogger.info(`[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`);
+            logger.info(`[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`);
             checkNewCodePassed = true;
           } else {
             // Real check error - don't update if check failed
-            handlerLogger.error(`[UpdateStructure] New code check failed: ${structureName}`, {
+            logger.error(`[UpdateStructure] New code check failed: ${structureName}`, {
               error: checkError instanceof Error ? checkError.message : String(checkError)
             });
             throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
@@ -132,35 +127,35 @@ export async function handleUpdateStructure(connection: AbapConnection, args: Up
 
         // Step 2: Update (only if check passed)
         if (checkNewCodePassed) {
-          handlerLogger.info(`[UpdateStructure] Updating structure with DDL code: ${structureName}`);
+          logger.info(`[UpdateStructure] Updating structure with DDL code: ${structureName}`);
           await client.updateStructure({ structureName, ddlCode: ddl_code }, lockHandle);
-          handlerLogger.info(`[UpdateStructure] Structure source code updated: ${structureName}`);
+          logger.info(`[UpdateStructure] Structure source code updated: ${structureName}`);
         } else {
-          handlerLogger.info(`[UpdateStructure] Skipping update - new code check failed: ${structureName}`);
+          logger.info(`[UpdateStructure] Skipping update - new code check failed: ${structureName}`);
         }
 
         // Step 3: Unlock (MANDATORY after lock)
         await client.unlockStructure({ structureName }, lockHandle);
-        handlerLogger.info(`[UpdateStructure] Structure unlocked: ${structureName}`);
+        logger.info(`[UpdateStructure] Structure unlocked: ${structureName}`);
 
         // Step 4: Check inactive version (after unlock)
-        handlerLogger.info(`[UpdateStructure] Checking inactive version: ${structureName}`);
+        logger.info(`[UpdateStructure] Checking inactive version: ${structureName}`);
         try {
           await safeCheckOperation(
             () => client.checkStructure({ structureName }, undefined, 'inactive'),
             structureName,
             {
-              debug: (message: string) => handlerLogger.debug(`[UpdateStructure] ${message}`)
+              debug: (message: string) => logger.debug(`[UpdateStructure] ${message}`)
             }
           );
-          handlerLogger.info(`[UpdateStructure] Inactive version check completed: ${structureName}`);
+          logger.info(`[UpdateStructure] Inactive version check completed: ${structureName}`);
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
           if ((checkError as any).isAlreadyChecked) {
-            handlerLogger.info(`[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`);
+            logger.info(`[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`);
           } else {
             // Log warning but don't fail - inactive check is informational
-            handlerLogger.warn(`[UpdateStructure] Inactive version check had issues: ${structureName}`, {
+            logger.warn(`[UpdateStructure] Inactive version check had issues: ${structureName}`, {
               error: checkError instanceof Error ? checkError.message : String(checkError)
             });
           }
@@ -175,7 +170,7 @@ export async function handleUpdateStructure(connection: AbapConnection, args: Up
         try {
           await client.unlockStructure({ structureName: structureName }, lockHandle);
         } catch (unlockError) {
-          handlerLogger.error('Failed to unlock structure after error:', unlockError);
+          logger.error('Failed to unlock structure after error:', unlockError);
         }
         throw error;
       }
@@ -197,7 +192,7 @@ export async function handleUpdateStructure(connection: AbapConnection, args: Up
         }
       }
 
-      handlerLogger.info(`✅ UpdateStructure completed successfully: ${structureName}`);
+      logger.info(`✅ UpdateStructure completed successfully: ${structureName}`);
 
       // Return success result
       const stepsCompleted = ['lock', 'check_new_code', 'update', 'unlock', 'check_inactive'];
@@ -228,7 +223,7 @@ export async function handleUpdateStructure(connection: AbapConnection, args: Up
       });
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating structure source ${structureName}:`, error);
+      logger.error(`Error updating structure source ${structureName}:`, error);
 
       const errorMessage = error.response?.data
         ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
@@ -240,9 +235,9 @@ export async function handleUpdateStructure(connection: AbapConnection, args: Up
       if (connection) {
         try {
           connection.reset();
-          handlerLogger.debug(`[UpdateStructure] Reset connection`);
+          logger.debug(`[UpdateStructure] Reset connection`);
         } catch (resetError: any) {
-          handlerLogger.error(`[UpdateStructure] Failed to reset connection: ${resetError.message || resetError}`);
+          logger.error(`[UpdateStructure] Failed to reset connection: ${resetError.message || resetError}`);
         }
       }
     }

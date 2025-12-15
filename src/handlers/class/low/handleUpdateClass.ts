@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateClassLow",
@@ -63,7 +62,8 @@ interface UpdateClassArgs {
  *
  * Uses CrudClient.updateClass - low-level single method call
  */
-export async function handleUpdateClass(connection: AbapConnection, args: UpdateClassArgs) {
+export async function handleUpdateClass(context: HandlerContext, args: UpdateClassArgs) {
+  const { connection, logger } = context;
   try {
     const {
       class_name,
@@ -78,22 +78,16 @@ export async function handleUpdateClass(connection: AbapConnection, args: Update
       return return_error(new Error('class_name, source_code, and lock_handle are required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateClass',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const className = class_name.toUpperCase();
 
-    handlerLogger.info(`Starting class update: ${className}`);
+    logger.info(`Starting class update: ${className}`);
 
     try {
       // Update class with source code
@@ -107,7 +101,7 @@ export async function handleUpdateClass(connection: AbapConnection, args: Update
       // Get updated session state after update
 
 
-      handlerLogger.info(`✅ UpdateClass completed: ${className}`);
+      logger.info(`✅ UpdateClass completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -120,7 +114,7 @@ export async function handleUpdateClass(connection: AbapConnection, args: Update
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating class ${className}: ${error?.message || error}`);
+      logger.error(`Error updating class ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update class: ${error.message || String(error)}`;

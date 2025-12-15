@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, isCloudConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, isCloudConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateProgramLow",
@@ -63,7 +62,8 @@ interface UpdateProgramArgs {
  *
  * Uses CrudClient.updateProgram - low-level single method call
  */
-export async function handleUpdateProgram(connection: AbapConnection, args: UpdateProgramArgs) {
+export async function handleUpdateProgram(context: HandlerContext, args: UpdateProgramArgs) {
+  const { connection, logger } = context;
   try {
     const {
       program_name,
@@ -83,22 +83,16 @@ export async function handleUpdateProgram(connection: AbapConnection, args: Upda
       return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateProgram',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const programName = program_name.toUpperCase();
 
-    handlerLogger.info(`Starting program update: ${programName}`);
+    logger.info(`Starting program update: ${programName}`);
 
     try {
       // Update program with source code
@@ -112,7 +106,7 @@ export async function handleUpdateProgram(connection: AbapConnection, args: Upda
       // Get updated session state after update
 
 
-      handlerLogger.info(`✅ UpdateProgram completed: ${programName}`);
+      logger.info(`✅ UpdateProgram completed: ${programName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -125,7 +119,7 @@ export async function handleUpdateProgram(connection: AbapConnection, args: Upda
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating program ${programName}: ${error?.message || error}`);
+      logger.error(`Error updating program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update program: ${error.message || String(error)}`;

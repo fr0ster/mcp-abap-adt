@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "LockDataElementLow",
@@ -53,7 +52,8 @@ interface LockDataElementArgs {
  *
  * Uses CrudClient.lockDataElement - low-level single method call
  */
-export async function handleLockDataElement(connection: AbapConnection, args: LockDataElementArgs) {
+export async function handleLockDataElement(context: HandlerContext, args: LockDataElementArgs) {
+  const { connection, logger } = context;
   try {
     const {
       data_element_name,
@@ -67,11 +67,6 @@ export async function handleLockDataElement(connection: AbapConnection, args: Lo
     }
 
         const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleLockDataElement',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -81,7 +76,7 @@ export async function handleLockDataElement(connection: AbapConnection, args: Lo
 
     const dataElementName = data_element_name.toUpperCase();
 
-    handlerLogger.info(`Starting data element lock: ${dataElementName}`);
+    logger.info(`Starting data element lock: ${dataElementName}`);
 
     try {
       // Lock data element
@@ -89,14 +84,14 @@ export async function handleLockDataElement(connection: AbapConnection, args: Lo
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {
-        handlerLogger.error(`Lock did not return a lock handle for data element ${dataElementName}`);
+        logger.error(`Lock did not return a lock handle for data element ${dataElementName}`);
         throw new Error(`Lock did not return a lock handle for data element ${dataElementName}`);
       }
 
       // Get updated session state after lock
 
 
-      handlerLogger.info(`✅ LockDataElement completed: ${dataElementName}`);
+      logger.info(`✅ LockDataElement completed: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -110,7 +105,7 @@ export async function handleLockDataElement(connection: AbapConnection, args: Lo
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error locking data element ${dataElementName}: ${error?.message || error}`);
+      logger.error(`Error locking data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock data element: ${error.message || String(error)}`;

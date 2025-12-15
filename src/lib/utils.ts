@@ -8,16 +8,12 @@ import {
   getTimeout,
   getTimeoutConfig,
 } from "@mcp-abap-adt/connection";
-import { encodeSapObjectName } from "@mcp-abap-adt/adt-clients";
 import { loggerAdapter } from "./loggerAdapter";
 import { logger, connectionManagerLogger } from "./logger";
 import { notifyConnectionResetListeners, registerConnectionResetHook } from "./connectionEvents";
 import { AsyncLocalStorage } from "async_hooks";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
-import * as path from "path";
-import * as os from "os";
-import { AuthBroker } from "@mcp-abap-adt/auth-broker";
 
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues

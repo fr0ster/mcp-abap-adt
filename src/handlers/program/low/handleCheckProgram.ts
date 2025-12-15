@@ -6,10 +6,9 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse, isCloudConnection  } from '../../../lib/utils';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse, isCloudConnection } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CheckProgramLow",
@@ -54,7 +53,8 @@ interface CheckProgramArgs {
  *
  * Uses CrudClient.checkProgram - low-level single method call
  */
-export async function handleCheckProgram(connection: AbapConnection, args: CheckProgramArgs) {
+export async function handleCheckProgram(context: HandlerContext, args: CheckProgramArgs) {
+  const { connection, logger } = context;
   try {
     const {
       program_name,
@@ -72,11 +72,7 @@ export async function handleCheckProgram(connection: AbapConnection, args: Check
       return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCheckProgram',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -87,7 +83,7 @@ export async function handleCheckProgram(connection: AbapConnection, args: Check
 
     const programName = program_name.toUpperCase();
 
-    handlerLogger.info(`Starting program check: ${programName}`);
+    logger.info(`Starting program check: ${programName}`);
 
     try {
       // Check program
@@ -104,8 +100,8 @@ export async function handleCheckProgram(connection: AbapConnection, args: Check
       // Get updated session state after check
 
 
-      handlerLogger.info(`✅ CheckProgram completed: ${programName}`);
-      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger.info(`✅ CheckProgram completed: ${programName}`);
+      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -121,7 +117,7 @@ export async function handleCheckProgram(connection: AbapConnection, args: Check
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error checking program ${programName}: ${error?.message || error}`);
+      logger.error(`Error checking program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check program: ${error.message || String(error)}`;

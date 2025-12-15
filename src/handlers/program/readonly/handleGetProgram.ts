@@ -1,8 +1,7 @@
-import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
+import { McpError, ErrorCode } from '../../../lib/utils';
 import * as z from 'zod';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "GetProgram",
@@ -12,28 +11,25 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-export async function handleGetProgram(connection: AbapConnection, args: any) {
-  const handlerLogger = getHandlerLogger(
-    'handleGetProgram',
-    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-  );
+export async function handleGetProgram(context: HandlerContext, args: any) {
+  const { logger } = context;
   try {
     if (!args?.program_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Program name is required');
     }
 
-    handlerLogger.info(`Reading program ${args.program_name}`);
+    logger.info(`Reading program ${args.program_name}`);
 
     // Create client
-    const client = new ReadOnlyClient(connection);
+    const client = new ReadOnlyClient(context.connection);
     const result = await client.readProgram(args.program_name);
-    handlerLogger.debug(`Successfully read program ${args.program_name}`);
+    logger.debug(`Successfully read program ${args.program_name}`);
     return {
       isError: false,
       content: [{ type: "json", json: result }],
     };
   } catch (error) {
-    handlerLogger.error(`Failed to read program ${args?.program_name || ''}`, error as any);
+    logger.error(`Failed to read program ${args?.program_name || ''}`, error as any);
     return {
       isError: true,
       content: [

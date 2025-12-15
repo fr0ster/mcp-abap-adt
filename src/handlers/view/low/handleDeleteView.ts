@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "DeleteViewLow",
@@ -39,7 +38,8 @@ interface DeleteViewArgs {
  *
  * Uses CrudClient.deleteView - low-level single method call
  */
-export async function handleDeleteView(connection: AbapConnection, args: DeleteViewArgs) {
+export async function handleDeleteView(context: HandlerContext, args: DeleteViewArgs) {
+  const { connection, logger } = context;
   try {
     const {
       view_name,
@@ -51,14 +51,10 @@ export async function handleDeleteView(connection: AbapConnection, args: DeleteV
       return return_error(new Error('view_name is required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleDeleteView',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
     const viewName = view_name.toUpperCase();
 
-    handlerLogger.info(`Starting view deletion: ${viewName}`);
+    logger.info(`Starting view deletion: ${viewName}`);
 
     try {
       // Delete view
@@ -69,7 +65,7 @@ export async function handleDeleteView(connection: AbapConnection, args: DeleteV
         throw new Error(`Delete did not return a response for view ${viewName}`);
       }
 
-      handlerLogger.info(`✅ DeleteView completed successfully: ${viewName}`);
+      logger.info(`✅ DeleteView completed successfully: ${viewName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -81,7 +77,7 @@ export async function handleDeleteView(connection: AbapConnection, args: DeleteV
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error deleting view ${viewName}: ${error?.message || error}`);
+      logger.error(`Error deleting view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete view: ${error.message || String(error)}`;

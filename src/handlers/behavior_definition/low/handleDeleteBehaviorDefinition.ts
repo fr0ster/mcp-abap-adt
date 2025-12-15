@@ -5,11 +5,10 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
+import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "DeleteBehaviorDefinitionLow",
@@ -40,7 +39,8 @@ interface DeleteBehaviorDefinitionArgs {
  *
  * Uses CrudClient.deleteBehaviorDefinition - low-level single method call
  */
-export async function handleDeleteBehaviorDefinition(connection: AbapConnection, args: DeleteBehaviorDefinitionArgs) {
+export async function handleDeleteBehaviorDefinition(context: HandlerContext, args: DeleteBehaviorDefinitionArgs) {
+  const { connection, logger } = context;
   try {
     const {
       name,
@@ -52,15 +52,10 @@ export async function handleDeleteBehaviorDefinition(connection: AbapConnection,
       return return_error(new Error('name is required'));
     }
 
-    const handlerLogger = getHandlerLogger(
-      'handleDeleteBehaviorDefinition',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
     const bdefName = name.toUpperCase();
 
-    handlerLogger.info(`Starting behavior definition deletion: ${bdefName}`);
+    logger.info(`Starting behavior definition deletion: ${bdefName}`);
 
     try {
       // Delete behavior definition - using types from adt-clients
@@ -75,7 +70,7 @@ export async function handleDeleteBehaviorDefinition(connection: AbapConnection,
         throw new Error(`Delete did not return a response for behavior definition ${bdefName}`);
       }
 
-      handlerLogger.info(`✅ DeleteBehaviorDefinition completed successfully: ${bdefName}`);
+      logger.info(`✅ DeleteBehaviorDefinition completed successfully: ${bdefName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -87,7 +82,7 @@ export async function handleDeleteBehaviorDefinition(connection: AbapConnection,
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error deleting behavior definition ${bdefName}: ${error?.message || error}`);
+      logger.error(`Error deleting behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete behavior definition: ${error.message || String(error)}`;

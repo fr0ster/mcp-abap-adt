@@ -1,11 +1,9 @@
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { McpError, ErrorCode, return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
+import { McpError, ErrorCode } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import { handleGetClass } from '../../class/readonly/handleGetClass';
 import { handleGetFunction } from '../../function/readonly/handleGetFunction';
 import { handleGetInterface } from '../../interface/readonly/handleGetInterface';
-import { handleGetObjectInfo } from './handleGetObjectInfo';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
     name: "GetAbapSystemSymbols",
     description: "[read-only] Resolve ABAP symbols from semantic analysis with SAP system information including types, scopes, descriptions, and packages.",
@@ -412,14 +410,14 @@ class SimpleAbapSemanticAnalyzer {
 }
 
 class AbapSystemSymbolResolver {
-    public async resolveSymbols(connection: AbapConnection, symbols: AbapSymbolInfo[]): Promise<{ resolvedSymbols: AbapSymbolInfo[], stats: any }> {
+    public async resolveSymbols(context: HandlerContext, symbols: AbapSymbolInfo[]): Promise<{ resolvedSymbols: AbapSymbolInfo[], stats: any }> {
         const resolvedSymbols: AbapSymbolInfo[] = [];
         let resolvedCount = 0;
         let failedCount = 0;
 
         for (const symbol of symbols) {
             try {
-                const resolved = await this.resolveSymbol(connection, symbol);
+                const resolved = await this.resolveSymbol(context, symbol);
                 resolvedSymbols.push(resolved);
                 if (resolved.systemInfo?.exists) {
                     resolvedCount++;
@@ -449,17 +447,17 @@ class AbapSystemSymbolResolver {
         return { resolvedSymbols, stats };
     }
 
-    private async resolveSymbol(connection: AbapConnection, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
+    private async resolveSymbol(context: HandlerContext, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
         try {
             switch (symbol.type) {
                 case 'class':
-                    return await this.resolveClassSymbol(connection, symbol);
+                    return await this.resolveClassSymbol(context, symbol);
                 case 'function':
-                    return await this.resolveFunctionSymbol(connection, symbol);
+                    return await this.resolveFunctionSymbol(context, symbol);
                 case 'interface':
-                    return await this.resolveInterfaceSymbol(connection, symbol);
+                    return await this.resolveInterfaceSymbol(context, symbol);
                 default:
-                    return await this.resolveGenericSymbol(connection, symbol);
+                    return await this.resolveGenericSymbol(context, symbol);
             }
         } catch (error) {
             return {
@@ -472,9 +470,10 @@ class AbapSystemSymbolResolver {
         }
     }
 
-    private async resolveClassSymbol(connection: AbapConnection, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
+    private async resolveClassSymbol(context: HandlerContext, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
+        const { connection, logger } = context;
         try {
-            const classInfo = await handleGetClass(connection, { class_name: symbol.name });
+            const classInfo = await handleGetClass(context, { class_name: symbol.name });
             if (!classInfo || classInfo.isError || !classInfo.content || classInfo.content.length === 0) {
                 return {
                     ...symbol,
@@ -516,9 +515,9 @@ class AbapSystemSymbolResolver {
         }
     }
 
-    private async resolveFunctionSymbol(connection: AbapConnection, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
+    private async resolveFunctionSymbol(context: HandlerContext, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
         try {
-            const functionInfo = await handleGetFunction(connection, { function_name: symbol.name });
+            const functionInfo = await handleGetFunction(context, { function_name: symbol.name });
             if (!functionInfo || functionInfo.isError || !functionInfo.content || functionInfo.content.length === 0) {
                 return {
                     ...symbol,
@@ -557,9 +556,9 @@ class AbapSystemSymbolResolver {
         }
     }
 
-    private async resolveInterfaceSymbol(connection: AbapConnection, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
+    private async resolveInterfaceSymbol(context: HandlerContext, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
         try {
-            const interfaceInfo = await handleGetInterface(connection, { interface_name: symbol.name });
+            const interfaceInfo = await handleGetInterface(context, { interface_name: symbol.name });
 
             if (!interfaceInfo || interfaceInfo.isError || !interfaceInfo.content || interfaceInfo.content.length === 0) {
                 return {
@@ -602,7 +601,7 @@ class AbapSystemSymbolResolver {
         }
     }
 
-    private async resolveGenericSymbol(connection: AbapConnection, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
+    private async resolveGenericSymbol(context: HandlerContext, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
         try {
             // For generic symbols, we don't have a specific handler
             // Return symbol with basic system info indicating it exists locally
@@ -628,16 +627,13 @@ class AbapSystemSymbolResolver {
     }
 }
 
-export async function handleGetAbapSystemSymbols(connection: AbapConnection, args: any) {
-    const handlerLogger = getHandlerLogger(
-      'handleGetAbapSystemSymbols',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+export async function handleGetAbapSystemSymbols(context: HandlerContext, args: any) {
+    const { logger } = context;
     try {
         if (!args?.code) {
             throw new McpError(ErrorCode.InvalidParams, 'ABAP code is required');
         }
-        handlerLogger.debug('Running semantic analysis and system symbol resolution');
+        logger.debug('Running semantic analysis and system symbol resolution');
 
         // First, perform semantic analysis
         const analyzer = new SimpleAbapSemanticAnalyzer();
@@ -645,8 +641,8 @@ export async function handleGetAbapSystemSymbols(connection: AbapConnection, arg
 
         // Then, resolve symbols with SAP system information
         const resolver = new AbapSystemSymbolResolver();
-        const { resolvedSymbols, stats } = await resolver.resolveSymbols(connection, semanticResult.symbols);
-        handlerLogger.info(`Resolved ${stats.resolvedSymbols}/${stats.totalSymbols} symbols from system`);
+        const { resolvedSymbols, stats } = await resolver.resolveSymbols(context, semanticResult.symbols);
+        logger.info(`Resolved ${stats.resolvedSymbols}/${stats.totalSymbols} symbols from system`);
 
         const result: AbapSystemSymbolsResult = {
             symbols: resolvedSymbols,
@@ -667,13 +663,13 @@ export async function handleGetAbapSystemSymbols(connection: AbapConnection, arg
         };
 
         if (args.filePath) {
-            handlerLogger.debug(`Writing system symbol resolution result to file: ${args.filePath}`);
+            logger.debug(`Writing system symbol resolution result to file: ${args.filePath}`);
             writeResultToFile(JSON.stringify(result, null, 2), args.filePath);
         }
 
         return response;
     } catch (error) {
-        handlerLogger.error('Failed to resolve ABAP system symbols', error as any);
+        logger.error('Failed to resolve ABAP system symbols', error as any);
         return {
             isError: true,
             content: [

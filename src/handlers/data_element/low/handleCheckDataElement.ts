@@ -5,11 +5,10 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CheckDataElementLow",
@@ -54,7 +53,8 @@ interface CheckDataElementArgs {
  *
  * Uses CrudClient.checkDataElement - low-level single method call
  */
-export async function handleCheckDataElement(connection: AbapConnection, args: CheckDataElementArgs) {
+export async function handleCheckDataElement(context: HandlerContext, args: CheckDataElementArgs) {
+  const { connection, logger } = context;
   try {
     const {
       data_element_name,
@@ -67,11 +67,7 @@ export async function handleCheckDataElement(connection: AbapConnection, args: C
       return return_error(new Error('data_element_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCheckDataElement',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -82,7 +78,7 @@ export async function handleCheckDataElement(connection: AbapConnection, args: C
 
     const dataElementName = data_element_name.toUpperCase();
 
-    handlerLogger.info(`Starting data element check: ${dataElementName}`);
+    logger.info(`Starting data element check: ${dataElementName}`);
 
     try {
       // Check data element
@@ -99,8 +95,8 @@ export async function handleCheckDataElement(connection: AbapConnection, args: C
       // Get updated session state after check
 
 
-      handlerLogger.info(`✅ CheckDataElement completed: ${dataElementName}`);
-      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger.info(`✅ CheckDataElement completed: ${dataElementName}`);
+      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -116,7 +112,7 @@ export async function handleCheckDataElement(connection: AbapConnection, args: C
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error checking data element ${dataElementName}: ${error?.message || error}`);
+      logger.error(`Error checking data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check data element: ${error.message || String(error)}`;

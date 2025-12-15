@@ -8,12 +8,11 @@
  * Note: No validation step - lock will fail if domain doesn't exist
  */
 
-import { McpError, ErrorCode, AxiosResponse  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, safeCheckOperation } from '../../../lib/utils';
+import { return_error, return_response, safeCheckOperation } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateDomain",
@@ -125,8 +124,9 @@ interface DomainArgs {
  * Uses DomainBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleUpdateDomain(connection: AbapConnection, args: DomainArgs) {
-    try {
+export async function handleUpdateDomain(context: HandlerContext, args: DomainArgs) {
+  const { connection, logger } = context;
+  try {
     if (!args?.domain_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Domain name is required');
     }
@@ -138,15 +138,9 @@ export async function handleUpdateDomain(connection: AbapConnection, args: Domai
     validateTransportRequest(args.package_name, args.transport_request);
 
     const typedArgs = args as DomainArgs;
-            // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
     const domainName = typedArgs.domain_name.toUpperCase();
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateDomain',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
 
-    handlerLogger.info(`Starting domain update: ${domainName}`);
+    logger.info(`Starting domain update: ${domainName}`);
 
     try {
       // Create client
@@ -181,7 +175,7 @@ export async function handleUpdateDomain(connection: AbapConnection, args: Domai
             () => client.checkDomain({ domainName }),
             domainName,
             {
-              debug: (message: string) => handlerLogger.debug(message)
+              debug: (message: string) => logger.debug(message)
             }
           );
         } catch (checkError: any) {
@@ -204,7 +198,7 @@ export async function handleUpdateDomain(connection: AbapConnection, args: Domai
         try {
           await client.unlockDomain({ domainName }, lockHandle);
         } catch (unlockError) {
-          handlerLogger.error(`Failed to unlock domain after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+          logger.error(`Failed to unlock domain after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
         }
         throw error;
       }
@@ -229,7 +223,7 @@ export async function handleUpdateDomain(connection: AbapConnection, args: Domai
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating domain ${domainName}: ${error?.message || error}`);
+      logger.error(`Error updating domain ${domainName}: ${error?.message || error}`);
 
       // Handle specific error cases
       if (error.message?.includes('not found') || error.response?.status === 404) {
@@ -265,18 +259,10 @@ export async function handleUpdateDomain(connection: AbapConnection, args: Domai
     try {
       if (connection) {
         connection.reset();
-        const handlerLogger = getHandlerLogger(
-          'handleUpdateDomain',
-          process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-        );
-        handlerLogger.debug('Reset domain connection after use');
+        logger.debug('Reset domain connection after use');
       }
     } catch (resetError: any) {
-      const handlerLogger = getHandlerLogger(
-        'handleUpdateDomain',
-        process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-      );
-      handlerLogger.error(`Failed to reset domain connection: ${resetError?.message || resetError}`);
-    }
+      logger.error(`Failed to reset domain connection: ${resetError?.message || resetError}`);
+      }
   }
 }

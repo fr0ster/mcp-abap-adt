@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
+import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "DeleteTableLow",
@@ -39,7 +38,8 @@ interface DeleteTableArgs {
  *
  * Uses CrudClient.deleteTable - low-level single method call
  */
-export async function handleDeleteTable(connection: AbapConnection, args: DeleteTableArgs) {
+export async function handleDeleteTable(context: HandlerContext, args: DeleteTableArgs) {
+  const { connection, logger } = context;
   try {
     const {
       table_name,
@@ -51,14 +51,11 @@ export async function handleDeleteTable(connection: AbapConnection, args: Delete
       return return_error(new Error('table_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleDeleteTable',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
+
     const tableName = table_name.toUpperCase();
 
-    handlerLogger.info(`Starting table deletion: ${tableName}`);
+    logger.info(`Starting table deletion: ${tableName}`);
 
     try {
       // Delete table
@@ -69,7 +66,7 @@ export async function handleDeleteTable(connection: AbapConnection, args: Delete
         throw new Error(`Delete did not return a response for table ${tableName}`);
       }
 
-      handlerLogger.info(`✅ DeleteTable completed successfully: ${tableName}`);
+      logger.info(`✅ DeleteTable completed successfully: ${tableName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -81,7 +78,7 @@ export async function handleDeleteTable(connection: AbapConnection, args: Delete
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error deleting table ${tableName}:`, error);
+      logger.error(`Error deleting table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to delete table: ${error.message || String(error)}`;

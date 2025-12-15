@@ -45,15 +45,16 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
 import { handleGetInclude } from '../../include/readonly/handleGetInclude';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 /**
  * handleGetProgFullCode: returns full code for program (report) or function group with all includes.
  * @param args { name: string, type: "PROG/P" | "FUGR" }
  */
-export async function handleGetProgFullCode(connection: AbapConnection, args: { name: string; type: string }) {
+export async function handleGetProgFullCode(context: HandlerContext, args: { name: string; type: string }) {
+  const { connection } = context;
   const { name, type } = args;
   const typeUpper = type.toUpperCase();
 
@@ -63,7 +64,7 @@ export async function handleGetProgFullCode(connection: AbapConnection, args: { 
     collected.add(objectName);
 
     // Try to get include source
-    const includeResult = await handleGetInclude(connection, { include_name: objectName });
+    const includeResult = await handleGetInclude(context, { include_name: objectName });
     let code: string | null = null;
     if (Array.isArray(includeResult?.content) && includeResult.content.length > 0) {
       const c = includeResult.content[0];
@@ -158,7 +159,7 @@ export async function handleGetProgFullCode(connection: AbapConnection, args: { 
         for (const incName of all) {
           if (!codeObjects.some(obj => obj.OBJECT_TYPE === 'PROG/I' && obj.OBJECT_NAME === incName)) {
             // Get code for each include
-            const incResult = await handleGetInclude(connection, { include_name: incName });
+            const incResult = await handleGetInclude(context, { include_name: incName });
             let incCode: string | null = null;
             if (Array.isArray(incResult?.content) && incResult.content.length > 0) {
               const c = incResult.content[0];
@@ -222,7 +223,7 @@ export async function handleGetProgFullCode(connection: AbapConnection, args: { 
         for (const incName of all) {
           if (!codeObjects.some(obj => obj.OBJECT_TYPE === 'PROG/I' && obj.OBJECT_NAME === incName)) {
             // Get code for each include
-            const incResult = await handleGetInclude(connection, { include_name: incName });
+            const incResult = await handleGetInclude(context, { include_name: incName });
             let incCode: string | null = null;
             if (Array.isArray(incResult?.content) && incResult.content.length > 0) {
               const c = incResult.content[0];

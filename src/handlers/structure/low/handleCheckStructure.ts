@@ -6,10 +6,9 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CheckStructureLow",
@@ -65,7 +64,8 @@ interface CheckStructureArgs {
  *
  * Uses CrudClient.checkStructure - low-level single method call
  */
-export async function handleCheckStructure(connection: AbapConnection, args: CheckStructureArgs) {
+export async function handleCheckStructure(context: HandlerContext, args: CheckStructureArgs) {
+  const { connection, logger } = context;
   try {
     const {
       structure_name,
@@ -80,10 +80,7 @@ export async function handleCheckStructure(connection: AbapConnection, args: Che
       return return_error(new Error('structure_name is required'));
     }
 
-        const handlerLogger = getHandlerLogger(
-      'handleCheckStructure',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+
     const client = new CrudClient(connection);
 
     // Restore session state if provided
@@ -100,7 +97,7 @@ export async function handleCheckStructure(connection: AbapConnection, args: Che
       ? version.toLowerCase() as 'active' | 'inactive'
       : 'inactive';
 
-    handlerLogger.info(`Starting structure check: ${structureName} (version: ${checkVersion}) ${ddl_code ? '(with new code)' : '(saved version)'}`);
+    logger.info(`Starting structure check: ${structureName} (version: ${checkVersion}) ${ddl_code ? '(with new code)' : '(saved version)'}`);
 
     try {
       // Check structure with optional source code (for validating new/unsaved code)
@@ -118,9 +115,9 @@ export async function handleCheckStructure(connection: AbapConnection, args: Che
       // Get updated session state after check
 
 
-      handlerLogger.info(`✅ CheckStructure completed: ${structureName}`);
-      handlerLogger.info(`   Status: ${checkResult.status}`);
-      handlerLogger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger.info(`✅ CheckStructure completed: ${structureName}`);
+      logger.info(`   Status: ${checkResult.status}`);
+      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -137,7 +134,7 @@ export async function handleCheckStructure(connection: AbapConnection, args: Che
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error checking structure ${structureName}:`, error);
+      logger.error(`Error checking structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to check structure: ${error.message || String(error)}`;

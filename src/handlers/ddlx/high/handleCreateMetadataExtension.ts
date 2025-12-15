@@ -6,9 +6,9 @@ import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { getHandlerLogger, noopLogger } from '
+import { AbapConnection } from '@mcp-abap-adt/connection';../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
     name: "CreateMetadataExtension",
     description: "Create a new ABAP Metadata Extension (DDLX) in SAP system.",
@@ -48,11 +48,9 @@ interface CreateMetadataExtensionArgs {
     activate?: boolean;
 }
 
-export async function handleCreateMetadataExtension(params: any) {
+export async function handleCreateMetadataExtension(connection: AbapConnection, params: any) {
     const args: CreateMetadataExtensionArgs = params;
-    let connection: any = null;
-
-    if (!args.name || !args.package_name) {
+        if (!args.name || !args.package_name) {
         return return_error(new Error("Missing required parameters"));
     }
 
@@ -65,7 +63,6 @@ export async function handleCreateMetadataExtension(params: any) {
     const name = args.name.toUpperCase();
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
     const handlerLogger = getHandlerLogger(
       'handleCreateMetadataExtension',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

@@ -5,7 +5,8 @@ export const TOOL_DEFINITION = {
     type: "object",
     properties: {
       parent_name: { type: "string", description: "[read-only] Parent object name" },
-      parent_tech_name: { type: "string", description: "[read-only] Parent technical name" },
+      parent_tech_name: { type: "str
+import { AbapConnection } from '@mcp-abap-adt/connection';ing", description: "[read-only] Parent technical name" },
       parent_type: { type: "string", description: "[read-only] Parent object type" },
       node_id: { type: "string", description: "[read-only] Node ID" },
       format: { type: "string", description: "[read-only] Output format: 'raw' or 'parsed'" },
@@ -19,7 +20,6 @@ import { McpError, ErrorCode, fetchNodeStructure, return_error, return_response,
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 
-import { getManagedConnection } from '../../../lib/utils';
 /**
  * Parses XML response to extract object names from node structure
  * @param xmlData XML response data
@@ -66,7 +66,7 @@ function parseObjectNamesFromXml(xmlData: string): Array<{
     return objects;
 }
 
-export async function handleGetObjectsByType(args: any) {
+export async function handleGetObjectsByType(connection: AbapConnection, args: any) {
     try {
     const handlerLogger = getHandlerLogger(
       'handleGetObjectsByType',

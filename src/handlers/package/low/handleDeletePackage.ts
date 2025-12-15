@@ -5,8 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { ection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -44,7 +45,7 @@ interface DeletePackageArgs {
  *
  * Uses CrudClient.deletePackage - low-level single method call
  */
-export async function handleDeletePackage(args: DeletePackageArgs) {
+export async function handleDeletePackage(connection: AbapConnection, args: DeletePackageArgs) {
   try {
     const {
       package_name,
@@ -62,12 +63,8 @@ export async function handleDeletePackage(args: DeletePackageArgs) {
     // Note: force_new_connection parameter is deprecated and ignored
     // All connections now use the same session management
     // To force a new session, restart the MCP server
-    const connection = getManagedConnection();
-
-    const client = new CrudClient(connection);
-    await connection.connect();
-
-    const handlerLogger = getHandlerLogger(
+        const client = new CrudClient(connection);
+        const handlerLogger = getHandlerLogger(
       'handleDeletePackage',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );

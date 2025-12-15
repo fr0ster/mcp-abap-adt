@@ -5,7 +5,7 @@ import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import type { Logger } from '@mcp-abap-adt/logger';
 
 
-import { getManagedConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
   "name": "GetSqlQuery",
   "description": "[read-only] Execute freestyle SQL queries via SAP ADT Data Preview API.",
@@ -151,7 +151,7 @@ function parseSqlQueryXml(xmlData: string, sqlQuery: string, rowNumber: number, 
  * @param args - Tool arguments containing sql_query and optional row_number parameter
  * @returns Response with parsed SQL query results or error
  */
-export async function handleGetSqlQuery(args: any) {
+export async function handleGetSqlQuery(connection: AbapConnection, args: any) {
     const handlerLogger = getHandlerLogger(
       'handleGetSqlQuery',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

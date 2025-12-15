@@ -1,10 +1,10 @@
 /**
- * UpdateClass Handler - Update existing ABAP class source code (optional activation)
+ * UpdateClass Handler - Update existing ABAP class source code (opti
+import { AbapConnection } from '@mcp-abap-adt/connection';onal activation)
  *
  * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
 
-import { AxiosResponse, getManagedConnection } from '../../../lib/utils';
 import {
   return_error,
   return_response,
@@ -35,7 +35,7 @@ interface UpdateClassArgs {
   activate?: boolean;
 }
 
-export async function handleUpdateClass(params: UpdateClassArgs) {
+export async function handleUpdateClass(connection: AbapConnection, params: UpdateClassArgs) {
   const args: UpdateClassArgs = params;
 
   if (!args.class_name || !args.source_code) {
@@ -50,11 +50,9 @@ export async function handleUpdateClass(params: UpdateClassArgs) {
   handlerLogger.info(`Starting UpdateClass for ${className} (activate=${args.activate === true})`);
 
   // Connection setup
-  let connection: any = null;
-  try {
+    try {
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
     handlerLogger.debug(`Created separate connection for handler call: ${className}`);
   } catch (connectionError: any) {
     const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);

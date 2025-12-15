@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient
+import { AbapConnection } from '@mcp-abap-adt/connection'; } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -53,7 +53,7 @@ interface CheckInterfaceArgs {
  *
  * Uses CrudClient.checkInterface - low-level single method call
  */
-export async function handleCheckInterface(args: CheckInterfaceArgs) {
+export async function handleCheckInterface(connection: AbapConnection, args: CheckInterfaceArgs) {
   try {
     const {
       interface_name,
@@ -66,8 +66,7 @@ export async function handleCheckInterface(args: CheckInterfaceArgs) {
       return return_error(new Error('interface_name is required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleCheckInterface',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -78,8 +77,7 @@ export async function handleCheckInterface(args: CheckInterfaceArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const interfaceName = interface_name.toUpperCase();
 

@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { ClassBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
@@ -53,7 +54,7 @@ interface LockBehaviorImplementationArgs {
  *
  * Uses CrudClient.lockClass - BehaviorImplementation extends ClassBuilder
  */
-export async function handleLockBehaviorImplementation(args: LockBehaviorImplementationArgs) {
+export async function handleLockBehaviorImplementation(connection: AbapConnection, args: LockBehaviorImplementationArgs) {
   try {
     const {
       class_name,
@@ -66,16 +67,14 @@ export async function handleLockBehaviorImplementation(args: LockBehaviorImpleme
       return return_error(new Error('class_name is required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const className = class_name.toUpperCase();
     const handlerLogger = getHandlerLogger(

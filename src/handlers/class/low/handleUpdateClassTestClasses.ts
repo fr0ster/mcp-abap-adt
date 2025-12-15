@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, g
+import { AbapConnection } from '@mcp-abap-adt/connection';etManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -57,7 +58,7 @@ interface UpdateClassTestClassesArgs {
   };
 }
 
-export async function handleUpdateClassTestClasses(args: UpdateClassTestClassesArgs) {
+export async function handleUpdateClassTestClasses(connection: AbapConnection, args: UpdateClassTestClassesArgs) {
   try {
     const {
       class_name,
@@ -75,14 +76,12 @@ export async function handleUpdateClassTestClasses(args: UpdateClassTestClassesA
       'handleUpdateClassTestClasses',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
-      await connection.connect();
-    }
+          }
 
     const className = class_name.toUpperCase();
     handlerLogger.info(`Starting test classes update for: ${className}`);

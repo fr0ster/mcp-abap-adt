@@ -9,13 +9,13 @@
 
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger as baseLogger } from '../../../lib/utils';
-import { validateTransportRequest } from '../../../utils/transportValidation.js';
+import { validateTransportRequest  } from '../../../utils/transportValidation.js';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "CreateBehaviorImplementation",
   description: "Create a new ABAP behavior implementation class for a behavior definition. Behavior implementations contain the business logic for RAP entities. Uses stateful session for proper lock management.",
@@ -70,13 +70,12 @@ interface CreateBehaviorImplementationArgs {
  *
  * Uses CrudClient.createBehaviorImplementation - full workflow
  */
-export async function handleCreateBehaviorImplementation(args: CreateBehaviorImplementationArgs) {
+export async function handleCreateBehaviorImplementation(connection: AbapConnection, args: CreateBehaviorImplementationArgs) {
   const handlerLogger = getHandlerLogger(
     'handleCreateBehaviorImplementation',
     process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
   );
-  let connection: any = null;
-  try {
+    try {
     // Validate required parameters
     if (!args?.class_name) {
       return return_error(new Error('class_name is required'));
@@ -98,7 +97,6 @@ export async function handleCreateBehaviorImplementation(args: CreateBehaviorImp
     const typedArgs = args as CreateBehaviorImplementationArgs;
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
     const className = typedArgs.class_name.toUpperCase();
     const behaviorDefinition = typedArgs.behavior_definition.toUpperCase();
 

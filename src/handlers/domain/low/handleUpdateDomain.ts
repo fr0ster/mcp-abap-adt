@@ -5,8 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { onInConnection } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -63,7 +64,7 @@ interface UpdateDomainArgs {
  *
  * Uses CrudClient.updateDomain - low-level single method call
  */
-export async function handleUpdateDomain(args: UpdateDomainArgs) {
+export async function handleUpdateDomain(connection: AbapConnection, args: UpdateDomainArgs) {
   try {
     const {
       domain_name,
@@ -78,8 +79,7 @@ export async function handleUpdateDomain(args: UpdateDomainArgs) {
       return return_error(new Error('domain_name, properties, and lock_handle are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleUpdateDomain',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -97,8 +97,7 @@ export async function handleUpdateDomain(args: UpdateDomainArgs) {
     } else {
       handlerLogger.debug('No session provided, creating new connection (may fail if domain is locked)');
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     try {
       // Update domain with properties

@@ -6,7 +6,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, restoreSessionInConnection  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
@@ -47,7 +48,7 @@ interface LockObjectArgs {
   };
 }
 
-export async function handleLockObject(args: LockObjectArgs) {
+export async function handleLockObject(connection: AbapConnection, args: LockObjectArgs) {
   try {
     const handlerLogger = getHandlerLogger(
       'handleLockObject',
@@ -66,14 +67,12 @@ export async function handleLockObject(args: LockObjectArgs) {
       return return_error(new Error(`Invalid object_type. Must be one of: ${validTypes.join(', ')}`));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
-      await connection.connect();
-    }
+          }
 
     const desiredSessionId = session_id || generateSessionId();
     const objectName = object_name.toUpperCase();

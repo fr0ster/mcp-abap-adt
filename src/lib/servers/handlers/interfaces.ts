@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { AbapConnection } from "@mcp-abap-adt/connection";
 
 /**
  * Tool definition structure
@@ -10,9 +11,11 @@ export interface ToolDefinition {
 }
 
 /**
- * Tool handler function type
+ * Tool handler function type with connection injection
+ * Connection is injected automatically by BaseMcpServer.registerHandlers()
+ * and is NOT part of MCP tool signature
  */
-export type ToolHandler = (args: any) => Promise<any>;
+export type ToolHandler = (connection: AbapConnection, args: any) => Promise<any>;
 
 /**
  * Handler registration entry

@@ -5,7 +5,8 @@
  * This handler updates function group metadata (description).
  *
  * Uses low-level updateFunctionGroup function from @mcp-abap-adt/adt-clients.
- * Session and lock management handled internally.
+ * Session and lock management handled internally
+import { AbapConnection } from '@mcp-abap-adt/connection';.
  *
  * Workflow: lock -> get current -> update metadata -> unlock
  */
@@ -13,9 +14,9 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger as baseLogger } from '../../../lib/utils';
 import { CrudClient, ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "UpdateFunctionGroup",
   description: "Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don't have source code to update directly. Uses stateful session with proper lock/unlock mechanism.",
@@ -51,9 +52,8 @@ interface UpdateFunctionGroupArgs {
  * Uses low-level updateFunctionGroup function
  * Session and lock management handled internally
  */
-export async function handleUpdateFunctionGroup(args: UpdateFunctionGroupArgs) {
-  let connection: any = null;
-  try {
+export async function handleUpdateFunctionGroup(connection: AbapConnection, args: UpdateFunctionGroupArgs) {
+    try {
     const {
       function_group_name,
       description,
@@ -67,7 +67,6 @@ export async function handleUpdateFunctionGroup(args: UpdateFunctionGroupArgs) {
 
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
     const functionGroupName = function_group_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleUpdateFunctionGroup',

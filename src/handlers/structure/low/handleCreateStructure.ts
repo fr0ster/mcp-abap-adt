@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { InConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -75,7 +76,7 @@ interface CreateStructureArgs {
  *
  * Uses CrudClient.createStructure - low-level single method call
  */
-export async function handleCreateStructure(args: CreateStructureArgs) {
+export async function handleCreateStructure(connection: AbapConnection, args: CreateStructureArgs) {
   try {
     const {
       structure_name,
@@ -91,8 +92,7 @@ export async function handleCreateStructure(args: CreateStructureArgs) {
       return return_error(new Error('structure_name, description, and package_name are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleCreateStructureLow',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -103,8 +103,7 @@ export async function handleCreateStructure(args: CreateStructureArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const structureName = structure_name.toUpperCase();
 

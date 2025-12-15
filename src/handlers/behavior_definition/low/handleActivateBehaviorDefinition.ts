@@ -6,8 +6,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import
+import { AbapConnection } from '@mcp-abap-adt/connection'; { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -54,7 +54,7 @@ interface ActivateBehaviorDefinitionArgs {
  *
  * Uses CrudClient.activateBehaviorDefinition - low-level single method call
  */
-export async function handleActivateBehaviorDefinition(args: ActivateBehaviorDefinitionArgs) {
+export async function handleActivateBehaviorDefinition(connection: AbapConnection, args: ActivateBehaviorDefinitionArgs) {
   try {
     const {
       name,
@@ -72,16 +72,14 @@ export async function handleActivateBehaviorDefinition(args: ActivateBehaviorDef
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const behaviorDefinitionName = name.toUpperCase();
 

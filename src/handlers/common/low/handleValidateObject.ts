@@ -5,7 +5,8 @@
  * Connection management handled internally.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, logErrorSafely, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationRespon
+import { AbapConnection } from '@mcp-abap-adt/connection';se, logErrorSafely, restoreSessionInConnection } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -84,7 +85,7 @@ interface ValidateObjectArgs {
  * Uses validateObjectName from @mcp-abap-adt/adt-clients/core for all operations
  * Connection management handled internally
  */
-export async function handleValidateObject(args: ValidateObjectArgs) {
+export async function handleValidateObject(connection: AbapConnection, args: ValidateObjectArgs) {
   try {
     const handlerLogger = getHandlerLogger(
       'handleValidateObject',
@@ -114,16 +115,14 @@ export async function handleValidateObject(args: ValidateObjectArgs) {
       return return_error(new Error(`Invalid object_type. Must be one of: ${validTypes.join(', ')}`));
     }
 
-    const connection = getManagedConnection();
-    const validationClient = new CrudClient(connection);
+        const validationClient = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const objectName = object_name.toUpperCase();
 

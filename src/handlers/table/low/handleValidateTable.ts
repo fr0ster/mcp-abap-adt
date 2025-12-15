@@ -4,8 +4,8 @@
  * Uses validateTableName from @mcp-abap-adt/adt-clients/core/table for table-specific validation.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } fr
+import { AbapConnection } from '@mcp-abap-adt/connection';om '@mcp-abap-adt/adt-clients';
 import type { TableBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -60,7 +60,7 @@ interface ValidateTableArgs extends Pick<TableBuilderConfig, 'tableName' | 'pack
 /**
  * Main handler for ValidateTable MCP tool
  */
-export async function handleValidateTable(args: ValidateTableArgs) {
+export async function handleValidateTable(connection: AbapConnection, args: ValidateTableArgs) {
   try {
     const {
       table_name,
@@ -74,8 +74,7 @@ export async function handleValidateTable(args: ValidateTableArgs) {
       return return_error(new Error('table_name, package_name, and description are required'));
     }
 
-    const connection = getManagedConnection();
-    const handlerLogger = getHandlerLogger(
+        const handlerLogger = getHandlerLogger(
       'handleValidateTable',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
@@ -85,8 +84,7 @@ export async function handleValidateTable(args: ValidateTableArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const tableName = table_name.toUpperCase();
 

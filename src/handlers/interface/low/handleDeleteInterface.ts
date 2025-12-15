@@ -5,8 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { edConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -39,7 +40,7 @@ interface DeleteInterfaceArgs {
  *
  * Uses CrudClient.deleteInterface - low-level single method call
  */
-export async function handleDeleteInterface(args: DeleteInterfaceArgs) {
+export async function handleDeleteInterface(connection: AbapConnection, args: DeleteInterfaceArgs) {
   try {
     const {
       interface_name,
@@ -51,8 +52,7 @@ export async function handleDeleteInterface(args: DeleteInterfaceArgs) {
       return return_error(new Error('interface_name is required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const interfaceName = interface_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleDeleteInterface',

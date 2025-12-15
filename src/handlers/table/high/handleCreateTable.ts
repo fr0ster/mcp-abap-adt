@@ -8,13 +8,13 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, safeCheckOperation } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, safeCheckOperation  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "CreateTable",
   description: "Create a new ABAP table via the ADT API using provided DDL. Mirrors Eclipse ADT behaviour with status/check runs, lock handling, activation and verification.",
@@ -61,7 +61,7 @@ interface CreateTableArgs {
  * Uses TableBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateTable(args: CreateTableArgs): Promise<any> {
+export async function handleCreateTable(connection: AbapConnection, args: CreateTableArgs): Promise<any> {
   try {
     const createTableArgs = args as CreateTableArgs;
 
@@ -87,20 +87,6 @@ export async function handleCreateTable(args: CreateTableArgs): Promise<any> {
     );
 
     handlerLogger.info(`Starting table creation: ${tableName}`);
-
-    // Create a separate connection for this handler call (not using getManagedConnection)
-    let connection: any = null;
-    try {
-      // Get configuration from environment variables
-            // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
-            // Create connection directly for this handler call
-      // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
-    } catch (connectionError: any) {
-      const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
-      throw new McpError(ErrorCode.InternalError, `Failed to create connection: ${errorMessage}`);
-    }
 
     try {
       // Create client

@@ -5,7 +5,8 @@
  * Must reuse session_id and lock_handle from LockObject.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, g
+import { AbapConnection } from '@mcp-abap-adt/connection';etManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -45,7 +46,7 @@ interface UnlockObjectArgs {
   };
 }
 
-export async function handleUnlockObject(args: UnlockObjectArgs) {
+export async function handleUnlockObject(connection: AbapConnection, args: UnlockObjectArgs) {
   try {
     const handlerLogger = getHandlerLogger(
       'handleUnlockObject',
@@ -64,14 +65,12 @@ export async function handleUnlockObject(args: UnlockObjectArgs) {
       return return_error(new Error(`Invalid object_type. Must be one of: ${validTypes.join(', ')}`));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     if (session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
-      await connection.connect();
-    }
+          }
 
     const objectName = object_name.toUpperCase();
 

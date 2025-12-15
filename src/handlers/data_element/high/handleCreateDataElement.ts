@@ -8,12 +8,11 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, safeCheckOperation } from '../../../lib/utils';
-import { validateTransportRequest } from '../../../utils/transportValidation.js';
+import { return_error, return_response, logger as baseLogger, safeCheckOperation  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection'; validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "CreateDataElement",
   description: "Create a new ABAP data element in SAP system with all required steps: create, activate, and verify.",
@@ -120,7 +119,7 @@ interface DataElementArgs {
  * Uses DataElementBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateDataElement(args: DataElementArgs) {
+export async function handleCreateDataElement(connection: AbapConnection, args: DataElementArgs) {
   try {
     // Validate required parameters
     if (!args?.data_element_name) {
@@ -139,8 +138,7 @@ export async function handleCreateDataElement(args: DataElementArgs) {
     const typedArgs = args as DataElementArgs;
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const connection = getManagedConnection();
-    const dataElementName = typedArgs.data_element_name.toUpperCase();
+        const dataElementName = typedArgs.data_element_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleCreateDataElement',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

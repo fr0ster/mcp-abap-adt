@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clie
+import { AbapConnection } from '@mcp-abap-adt/connection';nts';
 import type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -79,7 +79,7 @@ interface CreateBehaviorDefinitionArgs {
  *
  * Uses CrudClient.createBehaviorDefinition - low-level single method call
  */
-export async function handleCreateBehaviorDefinition(args: CreateBehaviorDefinitionArgs) {
+export async function handleCreateBehaviorDefinition(connection: AbapConnection, args: CreateBehaviorDefinitionArgs) {
   try {
     const {
       name,
@@ -98,16 +98,14 @@ export async function handleCreateBehaviorDefinition(args: CreateBehaviorDefinit
       return return_error(new Error('name, description, package_name, root_entity, and implementation_type are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const handlerLogger = getHandlerLogger(
       'handleCreateBehaviorDefinition',

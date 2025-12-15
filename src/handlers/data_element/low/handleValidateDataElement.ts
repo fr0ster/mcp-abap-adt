@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationRespons
+import { AbapConnection } from '@mcp-abap-adt/connection';e, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -62,7 +63,7 @@ interface ValidateDataElementArgs {
  *
  * Uses CrudClient.validateDataElement - low-level single method call
  */
-export async function handleValidateDataElement(args: ValidateDataElementArgs) {
+export async function handleValidateDataElement(connection: AbapConnection, args: ValidateDataElementArgs) {
   try {
     const {
       data_element_name,
@@ -77,8 +78,7 @@ export async function handleValidateDataElement(args: ValidateDataElementArgs) {
       return return_error(new Error('data_element_name, package_name, and description are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleValidateDataElement',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -89,8 +89,7 @@ export async function handleValidateDataElement(args: ValidateDataElementArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const dataElementName = data_element_name.toUpperCase();
 

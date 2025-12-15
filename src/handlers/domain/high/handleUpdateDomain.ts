@@ -8,13 +8,12 @@
  * Note: No validation step - lock will fail if domain doesn't exist
  */
 
-import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, safeCheckOperation } from '../../../lib/utils';
+import { McpError, ErrorCode, AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';aseLogger, safeCheckOperation } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "UpdateDomain",
   description: `Update an existing ABAP domain in SAP system.
@@ -125,9 +124,8 @@ interface DomainArgs {
  * Uses DomainBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleUpdateDomain(args: DomainArgs) {
-  let connection: any = null;
-  try {
+export async function handleUpdateDomain(connection: AbapConnection, args: DomainArgs) {
+    try {
     if (!args?.domain_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Domain name is required');
     }
@@ -141,7 +139,6 @@ export async function handleUpdateDomain(args: DomainArgs) {
     const typedArgs = args as DomainArgs;
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
     const domainName = typedArgs.domain_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleUpdateDomain',

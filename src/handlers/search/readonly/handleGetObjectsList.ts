@@ -4,7 +4,8 @@ export const TOOL_DEFINITION = {
   inputSchema: {
     type: "object",
     properties: {
-      parent_name: { type: "string", description: "[read-only] Parent object name" },
+      parent_name: { type: "string", de
+import { AbapConnection } from '@mcp-abap-adt/connection';scription: "[read-only] Parent object name" },
       parent_tech_name: { type: "string", description: "[read-only] Parent technical name" },
       parent_type: { type: "string", description: "[read-only] Parent object type (e.g. PROG/P, FUGR)" },
       with_short_descriptions: { type: "boolean", description: "[read-only] Include short descriptions (default: true)" }
@@ -19,7 +20,6 @@ import { McpError, ErrorCode, fetchNodeStructure, return_error, logger as baseLo
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 
-import { getManagedConnection } from '../../../lib/utils';
 /**
  * Parses every SEU_ADT_REPOSITORY_OBJ_NODE element from the XML and returns objects with the required fields
  */
@@ -118,7 +118,7 @@ async function collectValidObjectsStrict(
  * Main handler for GetObjectsListStrict
  * @param args { parent_name, parent_tech_name, parent_type, with_short_descriptions }
  */
-export async function handleGetObjectsList(args: any) {
+export async function handleGetObjectsList(connection: AbapConnection, args: any) {
     try {
     const handlerLogger = getHandlerLogger(
       'handleGetObjectsList',

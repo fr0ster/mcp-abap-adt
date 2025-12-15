@@ -2,9 +2,8 @@ import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, return_response, encodeSapObjectName, logger as baseLogger } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import * as z from 'zod';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-
-import { getManagedConnection } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
   name: "GetInclude",
   description: "[read-only] Retrieve source code of a specific ABAP include file.",
@@ -13,7 +12,7 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-export async function handleGetInclude(args: any) {
+export async function handleGetInclude(connection: AbapConnection, args: any) {
     try {
         const handlerLogger = getHandlerLogger(
           'handleGetInclude',

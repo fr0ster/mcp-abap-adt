@@ -2,8 +2,8 @@
  * ActivateObject Handler - Universal ABAP Object Activation via ADT API
  */
 
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { getHandlerLogger, noopLogger } from '../../../lib/handle
+import { AbapConnection } from '@mcp-abap-adt/connection';rLogger';
 import { CrudClient, ObjectReference } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -40,7 +40,7 @@ interface ActivateObjectArgs {
   preaudit?: boolean;
 }
 
-export async function handleActivateObject(params: ActivateObjectArgs) {
+export async function handleActivateObject(connection: AbapConnection, params: ActivateObjectArgs) {
   try {
     const handlerLogger = getHandlerLogger(
       'handleActivateObject',
@@ -53,8 +53,7 @@ export async function handleActivateObject(params: ActivateObjectArgs) {
       return return_error(new Error("Missing required parameter: objects (must be non-empty array)"));
     }
 
-    const connection = getManagedConnection();
-    const preaudit = args.preaudit !== false; // default true
+        const preaudit = args.preaudit !== false; // default true
     const client = new CrudClient(connection);
 
     handlerLogger.info(`Starting activation of ${args.objects.length} object(s)`);

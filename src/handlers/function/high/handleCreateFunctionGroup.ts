@@ -8,11 +8,10 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, parseValidationResponse } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, parseValidationResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { getManagedConnection } from '../../../lib/utils.js';
-
 export const TOOL_DEFINITION = {
   name: "CreateFunctionGroup",
   description: "Create a new ABAP function group in SAP system. Function groups serve as containers for function modules. Uses stateful session for proper lock management.",
@@ -58,9 +57,8 @@ interface CreateFunctionGroupArgs {
  * Uses FunctionGroupBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
-  let connection: any = null;
-  try {
+export async function handleCreateFunctionGroup(connection: AbapConnection, args: CreateFunctionGroupArgs) {
+    try {
     // Validate required parameters
     if (!args?.function_group_name) {
       return return_error(new Error('function_group_name is required'));
@@ -75,18 +73,13 @@ export async function handleCreateFunctionGroup(args: CreateFunctionGroupArgs) {
 
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const connection = getManagedConnection();
-    const functionGroupName = typedArgs.function_group_name.toUpperCase();
+        const functionGroupName = typedArgs.function_group_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleCreateFunctionGroup',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
 
     handlerLogger.info(`Starting function group creation: ${functionGroupName}`);
-
-    // NOTE: Do NOT call connection.connect() here
-    // getManagedConnection() already calls connect() when creating connection
-    // Connection will be established automatically on first request if needed
 
     try {
       // Create client

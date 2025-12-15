@@ -7,14 +7,14 @@
  * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger as baseLogger, safeCheckOperation } from '../../../lib/utils';
+import { AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { ion } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "CreateInterface",
   description: "Create a new ABAP interface in SAP system with source code. Interfaces define method signatures, events, and types for implementation by classes. Uses stateful session for proper lock management.",
@@ -81,7 +81,7 @@ ENDINTERFACE.`;
  * Uses InterfaceBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by client
  */
-export async function handleCreateInterface(args: CreateInterfaceArgs) {
+export async function handleCreateInterface(connection: AbapConnection, args: CreateInterfaceArgs) {
   const handlerLogger = getHandlerLogger(
     'handleCreateInterface',
     process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -107,16 +107,12 @@ export async function handleCreateInterface(args: CreateInterfaceArgs) {
 
     handlerLogger.info(`Starting interface creation: ${interfaceName}`);
 
-    // Create a separate connection for this handler call (not using getManagedConnection)
-    let connection: any = null;
-    try {
+            try {
       // Get configuration from environment variables
             // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
             // Create connection directly for this handler call
       // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
-
       handlerLogger.debug(`[CreateInterface] Created separate connection for handler call: ${interfaceName}`);
     } catch (connectionError: any) {
       const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);

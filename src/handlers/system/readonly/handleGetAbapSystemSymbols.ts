@@ -4,9 +4,8 @@ import { handleGetClass } from '../../class/readonly/handleGetClass';
 import { handleGetFunction } from '../../function/readonly/handleGetFunction';
 import { handleGetInterface } from '../../interface/readonly/handleGetInterface';
 import { handleGetObjectInfo } from './handleGetObjectInfo';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-
-import { getManagedConnection } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
     name: "GetAbapSystemSymbols",
     description: "[read-only] Resolve ABAP symbols from semantic analysis with SAP system information including types, scopes, descriptions, and packages.",
@@ -636,7 +635,7 @@ class AbapSystemSymbolResolver {
     }
 }
 
-export async function handleGetAbapSystemSymbols(args: any) {
+export async function handleGetAbapSystemSymbols(connection: AbapConnection, args: any) {
     const handlerLogger = getHandlerLogger(
       'handleGetAbapSystemSymbols',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

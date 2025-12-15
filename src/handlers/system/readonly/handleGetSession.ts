@@ -3,9 +3,9 @@
  *
  * Returns session ID and session state (cookies, CSRF token) that can be passed
  * to other handlers to maintain the same session and lock handle across operations.
+import { AbapConnection } from '@mcp-abap-adt/connection';
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -33,7 +33,7 @@ interface GetSessionArgs {
  *
  * Returns session ID and session state that can be reused in other handlers
  */
-export async function handleGetSession(args: GetSessionArgs) {
+export async function handleGetSession(connection: AbapConnection, args: GetSessionArgs) {
   const handlerLogger = getHandlerLogger(
     'handleGetSession',
     process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -41,13 +41,10 @@ export async function handleGetSession(args: GetSessionArgs) {
   try {
     const { force_new = false } = args as GetSessionArgs;
 
-    const connection = getManagedConnection();
-    handlerLogger.debug(`Connecting managed session${force_new ? ' (force new)' : ''}...`);
+        handlerLogger.debug(`Connecting managed session${force_new ? ' (force new)' : ''}...`);
 
     // Ensure connection is established (get cookies and CSRF token)
-    await connection.connect();
-
-    // Generate new session ID
+        // Generate new session ID
     const sessionId = generateSessionId();
 
     // Session state management is now handled by auth-broker

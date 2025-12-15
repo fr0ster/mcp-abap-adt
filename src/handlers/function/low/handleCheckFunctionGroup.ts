@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import 
+import { AbapConnection } from '@mcp-abap-adt/connection';{ CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -53,7 +53,7 @@ interface CheckFunctionGroupArgs {
  *
  * Uses CrudClient.checkFunctionGroup - low-level single method call
  */
-export async function handleCheckFunctionGroup(args: CheckFunctionGroupArgs) {
+export async function handleCheckFunctionGroup(connection: AbapConnection, args: CheckFunctionGroupArgs) {
   try {
     const {
       function_group_name,
@@ -66,8 +66,7 @@ export async function handleCheckFunctionGroup(args: CheckFunctionGroupArgs) {
       return return_error(new Error('function_group_name is required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleCheckFunctionGroup',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -78,8 +77,7 @@ export async function handleCheckFunctionGroup(args: CheckFunctionGroupArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const functionGroupName = function_group_name.toUpperCase();
 

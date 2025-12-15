@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, logErrorSafely, restoreSessionInConnection } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-ab
+import { AbapConnection } from '@mcp-abap-adt/connection';ap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import type { PackageBuilderConfig } from '@mcp-abap-adt/adt-clients';
 
@@ -91,7 +91,7 @@ interface CreatePackageArgs {
  *
  * Uses CrudClient.createPackage - low-level single method call
  */
-export async function handleCreatePackage(args: CreatePackageArgs) {
+export async function handleCreatePackage(connection: AbapConnection, args: CreatePackageArgs) {
   try {
     const {
       package_name,
@@ -111,8 +111,7 @@ export async function handleCreatePackage(args: CreatePackageArgs) {
       return return_error(new Error('package_name, super_package, and description are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleCreatePackageLow',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -123,8 +122,7 @@ export async function handleCreatePackage(args: CreatePackageArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();

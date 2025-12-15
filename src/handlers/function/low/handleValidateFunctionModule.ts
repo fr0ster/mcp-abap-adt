@@ -5,7 +5,8 @@
  * Requires function group name.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { ssionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { FunctionModuleBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
@@ -61,7 +62,7 @@ interface ValidateFunctionModuleArgs {
 /**
  * Main handler for ValidateFunctionModule MCP tool
  */
-export async function handleValidateFunctionModule(args: ValidateFunctionModuleArgs) {
+export async function handleValidateFunctionModule(connection: AbapConnection, args: ValidateFunctionModuleArgs) {
   try {
     const {
       function_group_name,
@@ -75,8 +76,7 @@ export async function handleValidateFunctionModule(args: ValidateFunctionModuleA
       return return_error(new Error('function_group_name and function_module_name are required'));
     }
 
-    const connection = getManagedConnection();
-    const handlerLogger = getHandlerLogger(
+        const handlerLogger = getHandlerLogger(
       'handleValidateFunctionModule',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
@@ -86,8 +86,7 @@ export async function handleValidateFunctionModule(args: ValidateFunctionModuleA
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const functionGroupName = function_group_name.toUpperCase();
     const functionModuleName = function_module_name.toUpperCase();

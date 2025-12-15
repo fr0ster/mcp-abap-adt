@@ -1,10 +1,8 @@
 import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, encodeSapObjectName } from '../../../lib/utils';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-
-
-import { getManagedConnection } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
   "name": "GetWhereUsed",
   "description": "[read-only] Retrieve where-used references for ABAP objects via ADT usageReferences.",
@@ -379,7 +377,7 @@ function parseWhereUsedResponse(xmlData: string): WhereUsedReference[] {
  * - enhancementspot, enhs, enho
  * - enhancementimpl, enhi
  */
-export async function handleGetWhereUsed(args: WhereUsedArgs) {
+export async function handleGetWhereUsed(connection: AbapConnection, args: WhereUsedArgs) {
     const handlerLogger = getHandlerLogger(
       'handleGetWhereUsed',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

@@ -3,8 +3,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clie
+import { AbapConnection } from '@mcp-abap-adt/connection';nts';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
@@ -17,9 +17,8 @@ export const TOOL_DEFINITION = {
     }
 } as const;
 
-export async function handleGetInactiveObjects(params: any) {
-    const connection = getManagedConnection();
-    const handlerLogger = getHandlerLogger(
+export async function handleGetInactiveObjects(connection: AbapConnection, params: any) {
+        const handlerLogger = getHandlerLogger(
       'handleGetInactiveObjects',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );

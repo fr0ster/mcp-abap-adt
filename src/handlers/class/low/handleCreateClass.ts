@@ -6,7 +6,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -88,7 +89,7 @@ interface CreateClassArgs {
  *
  * Uses CrudClient.createClass - low-level single method call
  */
-export async function handleCreateClass(args: CreateClassArgs) {
+export async function handleCreateClass(connection: AbapConnection, args: CreateClassArgs) {
   try {
     const {
       class_name,
@@ -112,9 +113,7 @@ export async function handleCreateClass(args: CreateClassArgs) {
       'handleCreateClass',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
-    const connection = getManagedConnection();
-
-    // Check if connection can refresh token (for debugging)
+        // Check if connection can refresh token (for debugging)
     const connectionWithRefresh = connection as any;
     if (process.env.DEBUG_HANDLERS === 'true' && connectionWithRefresh.canRefreshToken) {
       const canRefresh = connectionWithRefresh.canRefreshToken();
@@ -122,11 +121,6 @@ export async function handleCreateClass(args: CreateClassArgs) {
     }
 
     const client = new CrudClient(connection);
-
-    // NOTE: Do NOT call connection.connect() here
-    // getManagedConnection() already calls connect() when creating connection
-    // Calling connect() again can trigger unnecessary token refresh attempts
-    // Connection will be established automatically on first request if needed
 
     const className = class_name.toUpperCase();
 
@@ -151,7 +145,7 @@ export async function handleCreateClass(args: CreateClassArgs) {
       }
 
       // Get updated session state after create
-      
+
 
       handlerLogger.info(`✅ CreateClass completed: ${className}`);
 

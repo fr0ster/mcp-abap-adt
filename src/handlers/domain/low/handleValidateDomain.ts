@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { onInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -62,7 +63,7 @@ interface ValidateDomainArgs {
  *
  * Uses CrudClient.validateDomain - low-level single method call
  */
-export async function handleValidateDomain(args: ValidateDomainArgs) {
+export async function handleValidateDomain(connection: AbapConnection, args: ValidateDomainArgs) {
   try {
     const {
       domain_name,
@@ -77,8 +78,7 @@ export async function handleValidateDomain(args: ValidateDomainArgs) {
       return return_error(new Error('domain_name, package_name, and description are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleValidateDomain',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -89,8 +89,7 @@ export async function handleValidateDomain(args: ValidateDomainArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const domainName = domain_name.toUpperCase();
 

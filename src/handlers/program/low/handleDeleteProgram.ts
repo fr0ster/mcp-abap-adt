@@ -5,8 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, isCloudConnection } from '../../../lib/utils';
+import { AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { ection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -39,7 +40,7 @@ interface DeleteProgramArgs {
  *
  * Uses CrudClient.deleteProgram - low-level single method call
  */
-export async function handleDeleteProgram(args: DeleteProgramArgs) {
+export async function handleDeleteProgram(connection: AbapConnection, args: DeleteProgramArgs) {
   try {
     const {
       program_name,
@@ -56,8 +57,7 @@ export async function handleDeleteProgram(args: DeleteProgramArgs) {
       return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleDeleteProgram',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

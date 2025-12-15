@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';er, getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -39,7 +39,7 @@ interface DeleteFunctionGroupArgs {
  *
  * Uses CrudClient.deleteFunctionGroup - low-level single method call
  */
-export async function handleDeleteFunctionGroup(args: DeleteFunctionGroupArgs) {
+export async function handleDeleteFunctionGroup(connection: AbapConnection, args: DeleteFunctionGroupArgs) {
   try {
     const {
       function_group_name,
@@ -51,8 +51,7 @@ export async function handleDeleteFunctionGroup(args: DeleteFunctionGroupArgs) {
       return return_error(new Error('function_group_name is required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const functionGroupName = function_group_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleDeleteFunctionGroup',

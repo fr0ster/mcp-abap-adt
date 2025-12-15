@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } fro
+import { AbapConnection } from '@mcp-abap-adt/connection';m '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -52,7 +53,7 @@ interface LockTableArgs {
  *
  * Uses CrudClient.lockTable - low-level single method call
  */
-export async function handleLockTable(args: LockTableArgs) {
+export async function handleLockTable(connection: AbapConnection, args: LockTableArgs) {
   try {
     const {
       table_name,
@@ -65,8 +66,7 @@ export async function handleLockTable(args: LockTableArgs) {
       return return_error(new Error('table_name is required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleLockTable',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -77,8 +77,7 @@ export async function handleLockTable(args: LockTableArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const tableName = table_name.toUpperCase();
 

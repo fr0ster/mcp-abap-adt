@@ -1,10 +1,8 @@
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
 import { fetchNodeStructure, return_error, logger as baseLogger } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-
-
-import { getManagedConnection } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
   "name": "GetIncludesList",
   "description": "[read-only] Recursively discover and list ALL include files within an ABAP program or include.",
@@ -128,7 +126,7 @@ function parseIncludeNamesFromXml(xmlData: string): string[] {
     return [...new Set(includeNames)]; // Remove duplicates
 }
 
-export async function handleGetIncludesList(args: any) {
+export async function handleGetIncludesList(connection: AbapConnection, args: any) {
     try {
         const handlerLogger = getHandlerLogger(
           'handleGetIncludesList',

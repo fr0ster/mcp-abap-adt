@@ -7,12 +7,12 @@
  * Workflow: validate -> lock -> update -> check -> unlock -> (activate)
  */
 
-import { AxiosResponse } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { e } from '../../../lib/utils';
 import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "UpdateFunctionModule",
   description: "Update source code of an existing ABAP function module. Locks the function module, uploads new source code, and unlocks. Optionally activates after update. Use this to modify existing function modules without re-creating metadata.",
@@ -59,9 +59,8 @@ interface UpdateFunctionModuleArgs {
  * Uses FunctionModuleBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleUpdateFunctionModule(args: UpdateFunctionModuleArgs): Promise<any> {
-  let connection: any = null;
-  try {
+export async function handleUpdateFunctionModule(connection: AbapConnection, args: UpdateFunctionModuleArgs): Promise<any> {
+    try {
     // Validate inputs
     if (!args.function_module_name || args.function_module_name.length > 30) {
       return return_error(new Error("Function module name is required and must not exceed 30 characters"));
@@ -75,7 +74,6 @@ export async function handleUpdateFunctionModule(args: UpdateFunctionModuleArgs)
 
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
     const functionGroupName = args.function_group_name.toUpperCase();
     const functionModuleName = args.function_module_name.toUpperCase();
     const handlerLogger = getHandlerLogger(

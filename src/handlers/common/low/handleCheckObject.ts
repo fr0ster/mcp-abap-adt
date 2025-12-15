@@ -3,8 +3,8 @@
  * Uses CrudClient check methods per object type.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger
+import { AbapConnection } from '@mcp-abap-adt/connection';';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 
@@ -44,7 +44,7 @@ interface CheckObjectArgs {
   };
 }
 
-export async function handleCheckObject(args: CheckObjectArgs) {
+export async function handleCheckObject(connection: AbapConnection, args: CheckObjectArgs) {
   try {
     const handlerLogger = getHandlerLogger(
       'handleCheckObject',
@@ -66,14 +66,12 @@ export async function handleCheckObject(args: CheckObjectArgs) {
     const validVersions = ['active', 'inactive'];
     const checkVersion = validVersions.includes(version.toLowerCase()) ? version.toLowerCase() as 'active' | 'inactive' : 'active';
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
-      await connection.connect();
-    }
+          }
 
     const objectName = object_name.toUpperCase();
     handlerLogger.info(`Starting object check: ${objectName} (type: ${objectType}, version: ${checkVersion})`);

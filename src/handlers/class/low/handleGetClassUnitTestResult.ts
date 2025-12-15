@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConn
+import { AbapConnection } from '@mcp-abap-adt/connection';ection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -58,7 +59,7 @@ interface GetResultArgs {
   };
 }
 
-export async function handleGetClassUnitTestResult(args: GetResultArgs) {
+export async function handleGetClassUnitTestResult(connection: AbapConnection, args: GetResultArgs) {
   try {
     const {
       run_id,
@@ -76,14 +77,12 @@ export async function handleGetClassUnitTestResult(args: GetResultArgs) {
       'handleGetClassUnitTestResult',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
-      await connection.connect();
-    }
+          }
 
     handlerLogger.info(`Fetching ABAP Unit result for run ${run_id}`);
 

@@ -1,9 +1,7 @@
 import { McpError, ErrorCode } from '../../../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, logger, encodeSapObjectName } from '../../../lib/utils';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
-
-
-import { getManagedConnection } from '../../../lib/utils';
+import { writeResultToFile  } from '../../../lib/writeResultToFile';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
   "name": "GetEnhancementImpl",
   "description": "[read-only] Retrieve source code of a specific enhancement implementation by its name and enhancement spot.",
@@ -91,7 +89,7 @@ function parseEnhancementSourceFromXml(xmlData: string): string {
  *   - If implementation not found: enhancement_spot, enhancement_name, status as 'not_found', a message, spot_metadata, and raw_xml of the spot.
  *   - In case of error: an error object with details about the failure.
  */
-export async function handleGetEnhancementImpl(args: any) {
+export async function handleGetEnhancementImpl(connection: AbapConnection, args: any) {
     try {
         logger.info('handleGetEnhancementByName called with args:', args);
         

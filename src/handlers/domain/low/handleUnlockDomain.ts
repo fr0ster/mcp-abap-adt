@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { ion } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -57,7 +58,7 @@ interface UnlockDomainArgs {
  *
  * Uses CrudClient.unlockDomain - low-level single method call
  */
-export async function handleUnlockDomain(args: UnlockDomainArgs) {
+export async function handleUnlockDomain(connection: AbapConnection, args: UnlockDomainArgs) {
   try {
     const {
       domain_name,
@@ -71,8 +72,7 @@ export async function handleUnlockDomain(args: UnlockDomainArgs) {
       return return_error(new Error('domain_name, lock_handle, and session_id are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleUnlockDomain',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -101,8 +101,7 @@ export async function handleUnlockDomain(args: UnlockDomainArgs) {
     } else {
       handlerLogger.warn('No session state provided (may fail if domain is locked)');
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     handlerLogger.info(`Starting domain unlock: ${domainName} (session: ${session_id.substring(0, 8)}...)`);
 

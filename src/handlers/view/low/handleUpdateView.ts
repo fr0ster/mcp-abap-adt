@@ -6,7 +6,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, restoreSessionInConnection  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -63,7 +64,7 @@ interface UpdateViewArgs {
  *
  * Uses CrudClient.updateView - low-level single method call
  */
-export async function handleUpdateView(args: UpdateViewArgs) {
+export async function handleUpdateView(connection: AbapConnection, args: UpdateViewArgs) {
   try {
     const {
       view_name,
@@ -83,16 +84,14 @@ export async function handleUpdateView(args: UpdateViewArgs) {
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const viewName = view_name.toUpperCase();
 

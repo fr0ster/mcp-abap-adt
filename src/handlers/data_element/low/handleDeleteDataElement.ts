@@ -5,8 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { tManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -39,7 +40,7 @@ interface DeleteDataElementArgs {
  *
  * Uses CrudClient.deleteDataElement - low-level single method call
  */
-export async function handleDeleteDataElement(args: DeleteDataElementArgs) {
+export async function handleDeleteDataElement(connection: AbapConnection, args: DeleteDataElementArgs) {
   try {
     const {
       data_element_name,
@@ -51,8 +52,7 @@ export async function handleDeleteDataElement(args: DeleteDataElementArgs) {
       return return_error(new Error('data_element_name is required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const dataElementName = data_element_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleDeleteDataElement',

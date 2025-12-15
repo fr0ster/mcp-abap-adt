@@ -1,9 +1,7 @@
 import { McpError, ErrorCode } from '../../../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, logger, encodeSapObjectName } from '../../../lib/utils';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
-
-
-import { getManagedConnection } from '../../../lib/utils';
+import { writeResultToFile  } from '../../../lib/writeResultToFile';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
   "name": "GetEnhancementSpot",
   "description": "[read-only] Retrieve metadata and list of implementations for a specific enhancement spot.",
@@ -108,7 +106,7 @@ function parseEnhancementSpotMetadata(xmlData: string): any {
  *   - raw_xml: The raw XML response from the ADT API for debugging purposes.
  *   - In case of error, an error object with details about the failure.
  */
-export async function handleGetEnhancementSpot(args: any) {
+export async function handleGetEnhancementSpot(connection: AbapConnection, args: any) {
     try {
         logger.info('handleGetEnhancementSpot called with args:', args);
         

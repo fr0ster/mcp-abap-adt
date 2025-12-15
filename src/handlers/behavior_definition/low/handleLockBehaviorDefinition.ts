@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { t } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -53,7 +53,7 @@ interface LockBehaviorDefinitionArgs {
  *
  * Uses CrudClient.lockBehaviorDefinition - low-level single method call
  */
-export async function handleLockBehaviorDefinition(args: LockBehaviorDefinitionArgs) {
+export async function handleLockBehaviorDefinition(connection: AbapConnection, args: LockBehaviorDefinitionArgs) {
   try {
     const {
       name,
@@ -71,16 +71,14 @@ export async function handleLockBehaviorDefinition(args: LockBehaviorDefinitionA
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const bdefName = name.toUpperCase();
 

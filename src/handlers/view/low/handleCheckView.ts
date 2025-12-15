@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-a
+import { AbapConnection } from '@mcp-abap-adt/connection';bap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -64,7 +64,7 @@ interface CheckViewArgs {
  *
  * Uses CrudClient.checkView - low-level single method call
  */
-export async function handleCheckView(args: CheckViewArgs) {
+export async function handleCheckView(connection: AbapConnection, args: CheckViewArgs) {
   try {
     const {
       view_name,
@@ -79,16 +79,14 @@ export async function handleCheckView(args: CheckViewArgs) {
       return return_error(new Error('view_name is required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const viewName = view_name.toUpperCase();
 

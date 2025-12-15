@@ -8,12 +8,12 @@
  * - Change history
  */
 
-import { McpError, ErrorCode } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { rCode } from '../../../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, return_response } from '../../../lib/utils';
 import { getHandlerLogger } from '../../../lib/handlerLogger';
 import { XMLParser } from 'fast-xml-parser';
 
-import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: "GetTransport",
   description: "[read-only] Retrieve ABAP transport request information including metadata, included objects, and status from SAP system.",
@@ -145,7 +145,7 @@ function parseTransportXml(xmlData: string, includeObjects: boolean = true, incl
 /**
  * Main handler for GetTransport MCP tool
  */
-export async function handleGetTransport(args: GetTransportArgs) {
+export async function handleGetTransport(connection: AbapConnection, args: GetTransportArgs) {
   const handlerLogger = getHandlerLogger('handleGetTransport');
   try {
     // Validate required parameters

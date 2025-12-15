@@ -2,10 +2,8 @@ import { McpError, ErrorCode, AxiosResponse, logger as baseLogger } from '../../
 import { makeAdtRequestWithTimeout, return_error, return_response, encodeSapObjectName } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-
-
-import { getManagedConnection } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
   "name": "GetTransaction",
   "description": "[read-only] Retrieve ABAP transaction details.",
@@ -48,7 +46,7 @@ function parseTransactionXml(xml: string) {
     return { raw: result };
 }
 
-export async function handleGetTransaction(args: any) {
+export async function handleGetTransaction(connection: AbapConnection, args: any) {
     const handlerLogger = getHandlerLogger(
       'handleGetTransaction',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

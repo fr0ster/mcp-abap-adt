@@ -1,8 +1,7 @@
-import { McpError, ErrorCode, getManagedConnection } from '../../../lib/utils';
-import { return_error, return_response } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
+import { McpError, ErrorCode } from '../../../lib/utils';
 import * as z from 'zod';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: "GetProgram",
@@ -12,30 +11,12 @@ export const TOOL_DEFINITION = {
   }
 } as const;
 
-interface GetProgramArgs {
-  [key: string]: any;
-}
+export async function handleGetProgram(connection: AbapConnection, args: any) {
+  if (!args?.program_name) {
+    throw new McpError(ErrorCode.InvalidParams, 'Program name is required');
+  }
 
-
-export async function handleGetProgram(args: GetProgramArgs) {
-    try {
-        if (!args?.program_name) {
-            throw new McpError(ErrorCode.InvalidParams, 'Program name is required');
-        }
-        const connection = getManagedConnection();
-        const client = new CrudClient(connection);
-        await client.readProgram(args.program_name);
-        const response = client.getReadResult();
-        if (!response) {
-            throw new McpError(ErrorCode.InternalError, 'Failed to read program');
-        }
-        const plainText = response.data;
-        if (args.filePath) {
-            writeResultToFile(plainText, args.filePath);
-        }
-        return return_response(response);
-    }
-    catch (error) {
-        return return_error(error);
-    }
+  // Create client
+  const client = new ReadOnlyClient(connection);
+  return await client.readProgram(args.program_name);
 }

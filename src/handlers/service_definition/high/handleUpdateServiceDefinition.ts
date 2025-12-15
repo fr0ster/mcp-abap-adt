@@ -8,12 +8,12 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger as baseLogger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger as baseLogger, safeCheckOperation, isAlreadyExistsError  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "UpdateServiceDefinition",
   description: "Update source code of an existing ABAP service definition. Uses stateful session with proper lock/unlock mechanism.",
@@ -54,9 +54,8 @@ interface UpdateServiceDefinitionArgs {
  * Uses CrudClient for all operations
  * Session and lock management handled internally by client
  */
-export async function handleUpdateServiceDefinition(args: UpdateServiceDefinitionArgs) {
-  let connection: any = null;
-  try {
+export async function handleUpdateServiceDefinition(connection: AbapConnection, args: UpdateServiceDefinitionArgs) {
+    try {
     const handlerLogger = getHandlerLogger(
       "handleUpdateServiceDefinition",
       process.env.DEBUG_HANDLERS === "true" ? baseLogger : noopLogger
@@ -75,7 +74,6 @@ export async function handleUpdateServiceDefinition(args: UpdateServiceDefinitio
 
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
     const serviceDefinitionName = service_definition_name.toUpperCase();
 
     handlerLogger.info(`Starting service definition source update: ${serviceDefinitionName}`);

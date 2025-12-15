@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { essionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -57,7 +58,7 @@ interface UnlockDataElementArgs {
  *
  * Uses CrudClient.unlockDataElement - low-level single method call
  */
-export async function handleUnlockDataElement(args: UnlockDataElementArgs) {
+export async function handleUnlockDataElement(connection: AbapConnection, args: UnlockDataElementArgs) {
   try {
     const {
       data_element_name,
@@ -71,8 +72,7 @@ export async function handleUnlockDataElement(args: UnlockDataElementArgs) {
       return return_error(new Error('data_element_name, lock_handle, and session_id are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleUnlockDataElement',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -83,8 +83,7 @@ export async function handleUnlockDataElement(args: UnlockDataElementArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const dataElementName = data_element_name.toUpperCase();
 

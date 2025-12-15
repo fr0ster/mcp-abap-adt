@@ -7,12 +7,11 @@
  * Workflow: create
  */
 
-import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
+import { McpError, ErrorCode, AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';nse, logger as baseLogger } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "CreateTransport",
   description: "Create a new ABAP transport request in SAP system for development objects.",
@@ -56,7 +55,7 @@ interface CreateTransportArgs {
  * Uses TransportBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateTransport(args: CreateTransportArgs) {
+export async function handleCreateTransport(connection: AbapConnection, args: CreateTransportArgs) {
   try {
     const handlerLogger = getHandlerLogger(
       "handleCreateTransport",
@@ -70,9 +69,7 @@ export async function handleCreateTransport(args: CreateTransportArgs) {
     const typedArgs = args as CreateTransportArgs;
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const connection = getManagedConnection();
-
-    handlerLogger.info(`Starting transport creation: ${typedArgs.description}`);
+        handlerLogger.info(`Starting transport creation: ${typedArgs.description}`);
 
     try {
       // Create client

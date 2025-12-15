@@ -9,12 +9,11 @@
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger as baseLogger, logErrorSafely } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-
+import { AbapConnection } from '@mcp-abap-adt/connection';adt/adt-clients';
 import type { PackageBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { getManagedConnection } from '../../../lib/utils.js';
-
 export const TOOL_DEFINITION = {
   name: "CreatePackage",
   description: "Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.",
@@ -48,7 +47,7 @@ interface CreatePackageArgs {
  * Uses PackageBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreatePackage(args: CreatePackageArgs) {
+export async function handleCreatePackage(connection: AbapConnection, args: CreatePackageArgs) {
   try {
     // Validate required parameters
     if (!args?.package_name) {
@@ -62,8 +61,7 @@ export async function handleCreatePackage(args: CreatePackageArgs) {
 
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const connection = getManagedConnection();
-    const packageName = typedArgs.package_name.toUpperCase();
+        const packageName = typedArgs.package_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleCreatePackage',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

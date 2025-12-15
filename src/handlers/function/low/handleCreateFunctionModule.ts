@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection
+import { AbapConnection } from '@mcp-abap-adt/connection';, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -72,7 +73,7 @@ interface CreateFunctionModuleArgs {
  *
  * Uses CrudClient.createFunctionModule - low-level single method call
  */
-export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs) {
+export async function handleCreateFunctionModule(connection: AbapConnection, args: CreateFunctionModuleArgs) {
   try {
     const {
       function_module_name,
@@ -89,8 +90,7 @@ export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs)
       return return_error(new Error('function_module_name, function_group_name, description, and package_name are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleCreateFunctionModule',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -101,8 +101,7 @@ export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs)
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();

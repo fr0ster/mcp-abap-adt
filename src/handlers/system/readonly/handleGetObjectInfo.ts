@@ -3,9 +3,8 @@ import { makeAdtRequestWithTimeout } from '../../../lib/utils';
 import convert from 'xml-js';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 import { XMLParser } from 'fast-xml-parser';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-
-import { getManagedConnection } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
   name: "GetObjectInfo",
   description: "[read-only] Return ABAP object tree: root, group nodes, and terminal leaves up to maxDepth. Enrich each node via SearchObject if enrich=true. Group nodes are included for hierarchy. Each node has node_type: root, point, end.",
@@ -185,7 +184,7 @@ async function buildTree(
   return resultNode;
 }
 
-export async function handleGetObjectInfo(args: { parent_type: string; parent_name: string; maxDepth?: number; enrich?: boolean }) {
+export async function handleGetObjectInfo(connection: AbapConnection, args: { parent_type: string; parent_name: string; maxDepth?: number; enrich?: boolean }) {
   const handlerLogger = getHandlerLogger(
     'handleGetObjectInfo',
     process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

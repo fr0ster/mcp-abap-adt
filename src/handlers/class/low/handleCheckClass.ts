@@ -5,7 +5,8 @@
  * Supports checking existing classes or hypothetical source code.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { tion } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
@@ -62,7 +63,7 @@ interface CheckClassArgs {
 /**
  * Main handler for CheckClass MCP tool
  */
-export async function handleCheckClass(args: CheckClassArgs) {
+export async function handleCheckClass(connection: AbapConnection, args: CheckClassArgs) {
   try {
     const {
       class_name,
@@ -84,15 +85,12 @@ export async function handleCheckClass(args: CheckClassArgs) {
       'handleCheckClass',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
-    const connection = getManagedConnection();
-
-    // Restore session state if provided
+        // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const className = class_name.toUpperCase();
 

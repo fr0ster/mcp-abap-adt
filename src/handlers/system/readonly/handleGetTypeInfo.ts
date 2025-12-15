@@ -2,10 +2,8 @@ import { McpError, ErrorCode, AxiosResponse, logger as baseLogger } from '../../
 import { makeAdtRequestWithTimeout, return_error, return_response, encodeSapObjectName } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-
-
-import { getManagedConnection } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
   "name": "GetTypeInfo",
   "description": "[read-only] Retrieve ABAP type information.",
@@ -70,7 +68,7 @@ function parseTypeInfoXml(xml: string) {
     return { raw: result };
 }
 
-export async function handleGetTypeInfo(args: any) {
+export async function handleGetTypeInfo(connection: AbapConnection, args: any) {
     const handlerLogger = getHandlerLogger(
       'handleGetTypeInfo',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

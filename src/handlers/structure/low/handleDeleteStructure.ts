@@ -5,8 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { edConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -39,7 +40,7 @@ interface DeleteStructureArgs {
  *
  * Uses CrudClient.deleteStructure - low-level single method call
  */
-export async function handleDeleteStructure(args: DeleteStructureArgs) {
+export async function handleDeleteStructure(connection: AbapConnection, args: DeleteStructureArgs) {
   try {
     const {
       structure_name,
@@ -51,8 +52,7 @@ export async function handleDeleteStructure(args: DeleteStructureArgs) {
       return return_error(new Error('structure_name is required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleDeleteStructure',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

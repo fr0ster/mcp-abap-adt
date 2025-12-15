@@ -5,8 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { oreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -58,7 +59,7 @@ interface LockFunctionModuleArgs {
  *
  * Uses CrudClient.lockFunctionModule - low-level single method call
  */
-export async function handleLockFunctionModule(args: LockFunctionModuleArgs) {
+export async function handleLockFunctionModule(connection: AbapConnection, args: LockFunctionModuleArgs) {
   try {
     const {
       function_module_name,
@@ -72,8 +73,7 @@ export async function handleLockFunctionModule(args: LockFunctionModuleArgs) {
       return return_error(new Error('function_module_name and function_group_name are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleLockFunctionModule',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -84,8 +84,7 @@ export async function handleLockFunctionModule(args: LockFunctionModuleArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();

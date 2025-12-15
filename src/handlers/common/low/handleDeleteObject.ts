@@ -3,8 +3,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { getHandlerLogger, noopLogger } from '../../../lib/hand
+import { AbapConnection } from '@mcp-abap-adt/connection';lerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
@@ -29,7 +29,7 @@ interface DeleteObjectArgs {
   transport_request?: string;
 }
 
-export async function handleDeleteObject(args: DeleteObjectArgs) {
+export async function handleDeleteObject(connection: AbapConnection, args: DeleteObjectArgs) {
   try {
     const handlerLogger = getHandlerLogger(
       'handleDeleteObject',
@@ -42,8 +42,7 @@ export async function handleDeleteObject(args: DeleteObjectArgs) {
       return return_error(new Error('object_name and object_type are required'));
     }
 
-    const connection = getManagedConnection();
-    const crudClient = new CrudClient(connection);
+        const crudClient = new CrudClient(connection);
     const objectName = object_name.toUpperCase();
     const objectType = object_type.toLowerCase();
 

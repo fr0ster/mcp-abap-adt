@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, parseValidationResponse, restoreSessionInConnection  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
@@ -68,7 +69,7 @@ interface ValidateBehaviorImplementationArgs {
  *
  * Uses CrudClient.validateBehaviorImplementation - low-level single method call
  */
-export async function handleValidateBehaviorImplementation(args: ValidateBehaviorImplementationArgs) {
+export async function handleValidateBehaviorImplementation(connection: AbapConnection, args: ValidateBehaviorImplementationArgs) {
   try {
     const {
       class_name,
@@ -84,16 +85,14 @@ export async function handleValidateBehaviorImplementation(args: ValidateBehavio
       return return_error(new Error('class_name, behavior_definition, package_name, and description are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const handlerLogger = getHandlerLogger(
       'handleValidateBehaviorImplementation',
@@ -121,7 +120,7 @@ export async function handleValidateBehaviorImplementation(args: ValidateBehavio
       const result = parseValidationResponse(validationResponse);
 
       // Get updated session state after validation
-      
+
 
       handlerLogger.info(`✅ ValidateBehaviorImplementation completed: ${className}`);
       handlerLogger.info(`   Valid: ${result.valid}, Message: ${result.message}`);

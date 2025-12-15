@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, isCloudConnection, restoreSessionInConnection } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } fro
+import { AbapConnection } from '@mcp-abap-adt/connection';m '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -53,7 +53,7 @@ interface CheckProgramArgs {
  *
  * Uses CrudClient.checkProgram - low-level single method call
  */
-export async function handleCheckProgram(args: CheckProgramArgs) {
+export async function handleCheckProgram(connection: AbapConnection, args: CheckProgramArgs) {
   try {
     const {
       program_name,
@@ -71,8 +71,7 @@ export async function handleCheckProgram(args: CheckProgramArgs) {
       return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleCheckProgram',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -83,8 +82,7 @@ export async function handleCheckProgram(args: CheckProgramArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const programName = program_name.toUpperCase();
 

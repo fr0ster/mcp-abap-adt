@@ -5,9 +5,9 @@
 import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { getHandlerLogger, noopLogger } from '
+import { AbapConnection } from '@mcp-abap-adt/connection';../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
     name: "UpdateBehaviorDefinition",
     description: "Update source code of an ABAP Behavior Definition.",
@@ -42,7 +42,7 @@ interface UpdateBehaviorDefinitionArgs {
     activate?: boolean;
 }
 
-export async function handleUpdateBehaviorDefinition(params: any) {
+export async function handleUpdateBehaviorDefinition(connection: AbapConnection, params: any) {
     const args: UpdateBehaviorDefinitionArgs = params;
 
     if (!args.name || !args.source_code) {
@@ -52,8 +52,7 @@ export async function handleUpdateBehaviorDefinition(params: any) {
     const name = args.name.toUpperCase();
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const connection = getManagedConnection();
-    const handlerLogger = getHandlerLogger(
+        const handlerLogger = getHandlerLogger(
       'handleUpdateBehaviorDefinition',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );

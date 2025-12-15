@@ -1,8 +1,7 @@
 import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-
-import { getManagedConnection } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
   name: "GetAbapSemanticAnalysis",
   description: "[read-only] Perform semantic analysis on ABAP code and return symbols, types, scopes, and dependencies.",
@@ -392,7 +391,7 @@ class SimpleAbapSemanticAnalyzer {
     }
 }
 
-export async function handleGetAbapSemanticAnalysis(args: any) {
+export async function handleGetAbapSemanticAnalysis(connection: AbapConnection, args: any) {
     const handlerLogger = getHandlerLogger(
       'handleGetAbapSemanticAnalysis',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

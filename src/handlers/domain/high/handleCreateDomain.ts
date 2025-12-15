@@ -8,12 +8,11 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, logErrorSafely, safeCheckOperation } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, logger as baseLogger, logErrorSafely, safeCheckOperation  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';etHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { validateTransportRequest } from '../../../utils/transportValidation';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "CreateDomain",
   description: "Create a new ABAP domain in SAP system with all required steps: lock, create, check, unlock, activate, and verify.",
@@ -120,7 +119,7 @@ interface DomainArgs {
  * Uses DomainBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateDomain(args: DomainArgs) {
+export async function handleCreateDomain(connection: AbapConnection, args: DomainArgs) {
   try {
     // Validate required parameters
     if (!args?.domain_name) {
@@ -136,8 +135,7 @@ export async function handleCreateDomain(args: DomainArgs) {
     const typedArgs = args as DomainArgs;
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const connection = getManagedConnection();
-    const domainName = typedArgs.domain_name.toUpperCase();
+        const domainName = typedArgs.domain_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleCreateDomain',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

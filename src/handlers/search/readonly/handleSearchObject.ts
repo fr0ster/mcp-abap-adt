@@ -1,8 +1,8 @@
-import { McpError, ErrorCode, return_response, getManagedConnection, logger as baseLogger } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import { SharedBuilder } from '@mcp-abap-adt/adt-clients';
 import type { SearchObjectsParams } from '@mcp-abap-adt/adt-clients';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 
 export const TOOL_DEFINITION = {
   name: "SearchObject",
@@ -34,7 +34,7 @@ function detectAdtSearchError(response: any): { isError: boolean, content: any[]
   return null;
 }
 
-export async function handleSearchObject(args: any) {
+export async function handleSearchObject(connection: AbapConnection, args: any) {
   try {
     const handlerLogger = getHandlerLogger(
       'handleSearchObject',
@@ -47,8 +47,7 @@ export async function handleSearchObject(args: any) {
     }
 
     // Use SharedBuilder from @mcp-abap-adt/adt-clients
-    const connection = getManagedConnection();
-    const sharedBuilder = new SharedBuilder(connection);
+        const sharedBuilder = new SharedBuilder(connection);
 
     const searchParams: SearchObjectsParams = {
       query: object_name,

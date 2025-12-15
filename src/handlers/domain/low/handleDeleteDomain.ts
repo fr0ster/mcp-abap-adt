@@ -5,8 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { ion } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -39,7 +40,7 @@ interface DeleteDomainArgs {
  *
  * Uses CrudClient.deleteDomain - low-level single method call
  */
-export async function handleDeleteDomain(args: DeleteDomainArgs) {
+export async function handleDeleteDomain(connection: AbapConnection, args: DeleteDomainArgs) {
   try {
     const {
       domain_name,
@@ -51,8 +52,7 @@ export async function handleDeleteDomain(args: DeleteDomainArgs) {
       return return_error(new Error('domain_name is required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const domainName = domain_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleDeleteDomain',

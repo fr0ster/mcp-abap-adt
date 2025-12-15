@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedCo
+import { AbapConnection } from '@mcp-abap-adt/connection';nnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -119,7 +120,7 @@ interface RunClassUnitTestsArgs {
   };
 }
 
-export async function handleRunClassUnitTests(args: RunClassUnitTestsArgs) {
+export async function handleRunClassUnitTests(connection: AbapConnection, args: RunClassUnitTestsArgs) {
   try {
     const {
       tests,
@@ -150,14 +151,12 @@ export async function handleRunClassUnitTests(args: RunClassUnitTestsArgs) {
       'handleRunClassUnitTests',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
-      await connection.connect();
-    }
+          }
 
     const mappedScope: ScopeOptions | undefined = scope
       ? {

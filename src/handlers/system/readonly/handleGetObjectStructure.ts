@@ -2,9 +2,9 @@
 
 import { makeAdtRequestWithTimeout, logger as baseLogger } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { getHandlerLogger, noopLogger } from '../../..
+import { AbapConnection } from '@mcp-abap-adt/connection';/lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: "GetObjectStructure",
   description: "[read-only] Retrieve ADT object structure as a compact JSON tree.",
@@ -57,7 +57,7 @@ function serializeTree(tree: any[], indent: string = ''): string {
   return result;
 }
 
-export async function handleGetObjectStructure(args: any) {
+export async function handleGetObjectStructure(connection: AbapConnection, args: any) {
   const handlerLogger = getHandlerLogger(
     'handleGetObjectStructure',
     process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

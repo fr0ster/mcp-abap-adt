@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationR
+import { AbapConnection } from '@mcp-abap-adt/connection';esponse, restoreSessionInConnection } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -57,7 +58,7 @@ interface ValidateFunctionGroupArgs {
  *
  * Uses CrudClient.validateFunctionGroup - low-level single method call
  */
-export async function handleValidateFunctionGroup(args: ValidateFunctionGroupArgs) {
+export async function handleValidateFunctionGroup(connection: AbapConnection, args: ValidateFunctionGroupArgs) {
   try {
     const {
       function_group_name,
@@ -71,8 +72,7 @@ export async function handleValidateFunctionGroup(args: ValidateFunctionGroupArg
       return return_error(new Error('function_group_name is required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleValidateFunctionGroup',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -83,8 +83,7 @@ export async function handleValidateFunctionGroup(args: ValidateFunctionGroupArg
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const functionGroupName = function_group_name.toUpperCase();
 

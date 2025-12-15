@@ -7,13 +7,12 @@
  * Workflow: validate -> create -> lock -> update -> check -> unlock -> (activate)
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
+import { AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';s baseLogger } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "CreateFunctionModule",
   description: "Create a new ABAP function module within an existing function group. Uses stateful session with LOCK/UNLOCK workflow for source code upload.",
@@ -65,9 +64,8 @@ interface CreateFunctionModuleArgs {
  * Uses FunctionModuleBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs) {
-  let connection: any = null;
-  try {
+export async function handleCreateFunctionModule(connection: AbapConnection, args: CreateFunctionModuleArgs) {
+    try {
     // Validate required parameters
     if (!args?.function_group_name) {
       return return_error(new Error('function_group_name is required'));
@@ -91,7 +89,6 @@ export async function handleCreateFunctionModule(args: CreateFunctionModuleArgs)
     const typedArgs = args as CreateFunctionModuleArgs;
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
     const functionGroupName = typedArgs.function_group_name.toUpperCase();
     const functionModuleName = typedArgs.function_module_name.toUpperCase();
     const handlerLogger = getHandlerLogger(

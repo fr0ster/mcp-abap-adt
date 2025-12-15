@@ -1,8 +1,7 @@
 import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-
-import { getManagedConnection } from '../../../lib/utils';
+import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
   name: "GetAbapAST",
   description: "[read-only] Parse ABAP code and return AST (Abstract Syntax Tree) in JSON format.",
@@ -152,7 +151,7 @@ class SimpleAbapASTGenerator {
     }
 }
 
-export async function handleGetAbapAST(args: any) {
+export async function handleGetAbapAST(connection: AbapConnection, args: any) {
     const handlerLogger = getHandlerLogger(
       'handleGetAbapAST',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

@@ -1,9 +1,7 @@
 import { McpError, ErrorCode } from '../../../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, return_response, logger, encodeSapObjectName, fetchNodeStructure } from '../../../lib/utils';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
-
-
-import { getManagedConnection } from '../../../lib/utils';
+import { writeResultToFile  } from '../../../lib/writeResultToFile';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
   "name": "GetEnhancements",
   "description": "[read-only] Retrieve a list of enhancements for a given ABAP object.",
@@ -503,7 +501,7 @@ function filterMinimalEnhancements(response: any): any {
  *   - max_includes: Optional maximum number of includes to process (default: 50)
  * @returns Response with parsed enhancement data or error
  */
-export async function handleGetEnhancements(args: any) {
+export async function handleGetEnhancements(connection: AbapConnection, args: any) {
     try {
         logger.info('handleGetEnhancements called with args:', args);
         

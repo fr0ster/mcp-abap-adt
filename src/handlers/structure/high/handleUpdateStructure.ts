@@ -7,13 +7,12 @@
  * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger as baseLogger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import { AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';ctName, logger as baseLogger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "UpdateStructure",
   description: "Update DDL source code of an existing ABAP structure. Locks the structure, uploads new DDL source, and unlocks. Optionally activates after update. Use this to modify existing structures without re-creating metadata.",
@@ -55,7 +54,7 @@ interface UpdateStructureArgs {
  * Uses StructureBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleUpdateStructure(args: UpdateStructureArgs) {
+export async function handleUpdateStructure(connection: AbapConnection, args: UpdateStructureArgs) {
   try {
     const {
       structure_name,
@@ -78,16 +77,12 @@ export async function handleUpdateStructure(args: UpdateStructureArgs) {
 
     handlerLogger.info(`Starting structure source update: ${structureName}`);
 
-    // Create a separate connection for this handler call (not using getManagedConnection)
-    let connection: any = null;
-    try {
+            try {
       // Get configuration from environment variables
             // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
             // Create connection directly for this handler call
       // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
-
       handlerLogger.debug(`[UpdateStructure] Created separate connection for handler call: ${structureName}`);
     } catch (connectionError: any) {
       const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);

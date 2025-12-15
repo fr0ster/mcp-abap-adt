@@ -5,7 +5,8 @@
  * Supports package, description, and superclass validation.
  */
 
-import { AxiosResponse, return_error, return_response, logger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_res
+import { AbapConnection } from '@mcp-abap-adt/connection';ponse, logger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger } from '../../../lib/handlerLogger';
 
@@ -65,7 +66,7 @@ interface ValidateClassArgs {
 /**
  * Main handler for ValidateClass MCP tool
  */
-export async function handleValidateClass(args: ValidateClassArgs) {
+export async function handleValidateClass(connection: AbapConnection, args: ValidateClassArgs) {
   try {
     const {
       class_name,
@@ -80,15 +81,12 @@ export async function handleValidateClass(args: ValidateClassArgs) {
       return return_error(new Error('class_name, package_name, and description are required'));
     }
 
-    const connection = getManagedConnection();
-
-    // Restore session state if provided
+        // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const className = class_name.toUpperCase();
 

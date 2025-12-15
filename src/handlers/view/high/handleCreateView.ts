@@ -1,5 +1,6 @@
 /**
- * CreateView Handler - CDS/Classic View Creation via ADT API
+ * CreateView Handler - CDS/Classic View Creati
+import { AbapConnection } from '@mcp-abap-adt/connection';on via ADT API
  *
  * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
@@ -17,7 +18,6 @@ import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "CreateView",
   description: "Create CDS View or Classic View in SAP using DDL syntax. Both types use the same API workflow, differing only in DDL content (CDS has @AbapCatalog.sqlViewName and other annotations).",
@@ -44,7 +44,7 @@ interface CreateViewArgs {
   activate?: boolean;
 }
 
-export async function handleCreateView(params: any) {
+export async function handleCreateView(connection: AbapConnection, params: any) {
   const args: CreateViewArgs = params;
 
   if (!args.view_name || !args.ddl_source || !args.package_name) {
@@ -65,11 +65,9 @@ export async function handleCreateView(params: any) {
   handlerLogger.info(`Starting view creation: ${viewName} (activate=${args.activate !== false})`);
 
   // Connection setup
-  let connection: any = null;
-  try {
+    try {
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
     handlerLogger.debug(`Created separate connection for handler call: ${viewName}`);
   } catch (connectionError: any) {
     const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);

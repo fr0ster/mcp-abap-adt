@@ -8,12 +8,12 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/ut
+import { AbapConnection } from '@mcp-abap-adt/connection';ils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "UpdateDataElement",
   description: `Update an existing ABAP data element in SAP system.
@@ -139,7 +139,7 @@ interface DataElementArgs {
  * Uses DataElementBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleUpdateDataElement(args: DataElementArgs) {
+export async function handleUpdateDataElement(connection: AbapConnection, args: DataElementArgs) {
   try {
     if (!args?.data_element_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Data element name is required');
@@ -154,8 +154,7 @@ export async function handleUpdateDataElement(args: DataElementArgs) {
     const typedArgs = args as DataElementArgs;
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const connection = getManagedConnection();
-    const dataElementName = typedArgs.data_element_name.toUpperCase();
+        const dataElementName = typedArgs.data_element_name.toUpperCase();
     const handlerLogger = getHandlerLogger(
       'handleUpdateDataElement',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

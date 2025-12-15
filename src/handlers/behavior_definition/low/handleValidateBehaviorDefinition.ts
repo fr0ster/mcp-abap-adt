@@ -5,9 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionValidationParams, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
+import type { Behavi
+import { AbapConnection } from '@mcp-abap-adt/connection';orDefinitionBuilderConfig, BehaviorDefinitionValidationParams, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
@@ -74,7 +74,7 @@ interface ValidateBehaviorDefinitionArgs {
  *
  * Uses CrudClient.validateBehaviorDefinition - low-level single method call
  */
-export async function handleValidateBehaviorDefinition(args: ValidateBehaviorDefinitionArgs) {
+export async function handleValidateBehaviorDefinition(connection: AbapConnection, args: ValidateBehaviorDefinitionArgs) {
   try {
     const {
       name,
@@ -91,16 +91,14 @@ export async function handleValidateBehaviorDefinition(args: ValidateBehaviorDef
       return return_error(new Error('name, root_entity, implementation_type, package_name, and description are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const handlerLogger = getHandlerLogger(
       'handleValidateBehaviorDefinition',

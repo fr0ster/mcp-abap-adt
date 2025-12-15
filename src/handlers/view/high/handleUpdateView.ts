@@ -1,5 +1,6 @@
 /**
- * UpdateView Handler - Update existing CDS/Classic view DDL source
+ * UpdateView Handler - Update existing CDS/Cla
+import { AbapConnection } from '@mcp-abap-adt/connection';ssic view DDL source
  *
  * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
@@ -16,7 +17,6 @@ import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "UpdateView",
   description: "Update DDL source code of an existing CDS View or Classic View. Locks the view, checks new code, uploads new DDL source, unlocks, and optionally activates.",
@@ -37,7 +37,7 @@ interface UpdateViewArgs {
   activate?: boolean;
 }
 
-export async function handleUpdateView(params: any) {
+export async function handleUpdateView(connection: AbapConnection, params: any) {
   const args: UpdateViewArgs = params;
 
   if (!args.view_name || !args.ddl_source) {
@@ -52,11 +52,9 @@ export async function handleUpdateView(params: any) {
   handlerLogger.info(`Starting view source update: ${viewName} (activate=${args.activate === true})`);
 
   // Connection setup
-  let connection: any = null;
-  try {
+    try {
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
     handlerLogger.debug(`Created separate connection for handler call: ${viewName}`);
   } catch (connectionError: any) {
     const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);

@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } fro
+import { AbapConnection } from '@mcp-abap-adt/connection';m '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -52,7 +53,7 @@ interface LockClassArgs {
  *
  * Uses CrudClient.lockClass - low-level single method call
  */
-export async function handleLockClass(args: LockClassArgs) {
+export async function handleLockClass(connection: AbapConnection, args: LockClassArgs) {
   try {
     const {
       class_name,
@@ -69,16 +70,14 @@ export async function handleLockClass(args: LockClassArgs) {
       'handleLockClass',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const className = class_name.toUpperCase();
 

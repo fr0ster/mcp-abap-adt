@@ -5,8 +5,8 @@
  * Requires session_id for stateful operations.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
-import { generateSessionId } from '../../../lib/sessionUtils';
+import { generateSessionId } from '../../.
+import { AbapConnection } from '@mcp-abap-adt/connection';./lib/sessionUtils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
@@ -69,7 +69,7 @@ interface CheckTableArgs {
 /**
  * Main handler for CheckTable MCP tool
  */
-export async function handleCheckTable(args: CheckTableArgs) {
+export async function handleCheckTable(connection: AbapConnection, args: CheckTableArgs) {
   try {
     const {
       table_name,
@@ -94,8 +94,7 @@ export async function handleCheckTable(args: CheckTableArgs) {
       ? version.toLowerCase() as 'active' | 'inactive' | 'new'
       : 'new';
 
-    const connection = getManagedConnection();
-    const handlerLogger = getHandlerLogger(
+        const handlerLogger = getHandlerLogger(
       'handleCheckTable',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
@@ -105,8 +104,7 @@ export async function handleCheckTable(args: CheckTableArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     // Use provided session_id or generate new one (required for table check)
     const sessionId = session_id || generateSessionId();

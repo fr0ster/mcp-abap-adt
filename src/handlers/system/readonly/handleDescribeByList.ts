@@ -1,6 +1,7 @@
 export const TOOL_DEFINITION = {
   name: "DescribeByList",
-  description: "[read-only] Batch description for a list of ABAP objects. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE, STRUCTURE, etc.",
+  description: "[read-only] Batch description for a list of ABAP objects. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE,
+import { AbapConnection } from '@mcp-abap-adt/connection'; STRUCTURE, etc.",
   inputSchema: {
     type: "object",
     properties: {
@@ -25,13 +26,12 @@ import { handleSearchObject } from "../../search/readonly/handleSearchObject";
 import { logger as baseLogger } from "../../../lib/utils";
 import { getHandlerLogger, noopLogger } from "../../../lib/handlerLogger";
 
-import { getManagedConnection } from '../../../lib/utils';
 /**
  * DescribeByListArray handler.
  * @param args { objects: Array<{ name: string, type?: string }> }
  * @returns Result of handleDetectObjectTypeList with objects
  */
-export async function handleDescribeByList(args: any) {
+export async function handleDescribeByList(connection: AbapConnection, args: any) {
   const handlerLogger = getHandlerLogger(
     'handleDescribeByList',
     process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

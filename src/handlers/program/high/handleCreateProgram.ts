@@ -7,11 +7,11 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger as baseLogger, parseValidationResponse, safeCheckOperation, isCloudConnection } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser } from 'fast-xml-p
+import { AbapConnection } from '@mcp-abap-adt/connection';arser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "CreateProgram",
   description: "Create a new ABAP program (report) in SAP system with source code. Supports executable programs, includes, module pools. Uses stateful session for proper lock management.",
@@ -122,7 +122,7 @@ START-OF-SELECTION.
   }
 }
 
-export async function handleCreateProgram(params: any) {
+export async function handleCreateProgram(connection: AbapConnection, params: any) {
   const args: CreateProgramArgs = params;
 
   // Validate required parameters
@@ -150,11 +150,9 @@ export async function handleCreateProgram(params: any) {
   handlerLogger.info(`Starting program creation: ${programName} (activate=${args.activate !== false})`);
 
   // Connection setup
-  let connection: any = null;
-  try {
+    try {
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
     handlerLogger.debug(`Created separate connection for handler call: ${programName}`);
   } catch (connectionError: any) {
     const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);

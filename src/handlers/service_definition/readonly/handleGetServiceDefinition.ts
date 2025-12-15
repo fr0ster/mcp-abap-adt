@@ -1,9 +1,9 @@
-import { McpError, ErrorCode, return_response, getManagedConnection, logger as baseLogger } from '../../../lib/utils';
 import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import * as z from 'zod';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 
 export const TOOL_DEFINITION = {
   name: "GetServiceDefinition",
@@ -49,7 +49,7 @@ function parseServiceDefinitionXml(xml: string) {
   return { raw: result };
 }
 
-export async function handleGetServiceDefinition(args: any): Promise<{ isError: boolean; content: Array<{ type: string; text?: string; json?: any }> }> {
+export async function handleGetServiceDefinition(connection: AbapConnection, args: any): Promise<{ isError: boolean; content: Array<{ type: string; text?: string; json?: any }> }> {
   try {
     const handlerLogger = getHandlerLogger(
       'handleGetServiceDefinition',
@@ -59,8 +59,7 @@ export async function handleGetServiceDefinition(args: any): Promise<{ isError: 
     if (!args?.service_definition_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Service definition name is required');
     }
-    const connection = getManagedConnection();
-    const client = new ReadOnlyClient(connection);
+        const client = new ReadOnlyClient(connection);
     await client.readServiceDefinition(args.service_definition_name);
     const config = client.getServiceDefinitionReadResult();
     const response = client.getReadResult();

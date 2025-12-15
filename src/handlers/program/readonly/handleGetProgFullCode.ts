@@ -3,7 +3,8 @@
  *
  * Description for MCP server:
  * Name: Get full code for program or function group
- * Description: Returns the full code for a given ABAP program (report) or function group, including all includes. The main object (report or function group) always comes first in the response, followed by all child includes in tree traversal order.
+ * Description: Returns the full code for a given ABAP program (report) or function gr
+import { AbapConnection } from '@mcp-abap-adt/connection';oup, including all includes. The main object (report or function group) always comes first in the response, followed by all child includes in tree traversal order.
  *
  * Parameters:
  * - name: technical name of the program or function group (string, e.g., "/CBY/MM_INVENTORY") — required
@@ -49,12 +50,11 @@ import { handleGetProgram } from './handleGetProgram';
 import { handleGetFunctionGroup } from '../../function/readonly/handleGetFunctionGroup';
 import { handleGetInclude } from '../../include/readonly/handleGetInclude';
 
-import { getManagedConnection } from '../../../lib/utils';
 /**
  * handleGetProgFullCode: returns full code for program (report) or function group with all includes.
  * @param args { name: string, type: "PROG/P" | "FUGR" }
  */
-export async function handleGetProgFullCode(args: { name: string; type: string }) {
+export async function handleGetProgFullCode(connection: AbapConnection, args: { name: string; type: string }) {
   const { name, type } = args;
   const typeUpper = type.toUpperCase();
 

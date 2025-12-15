@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-a
+import { AbapConnection } from '@mcp-abap-adt/connection';dt/adt-clients';
 import type { TableBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -66,7 +66,7 @@ interface CreateTableArgs extends Pick<TableBuilderConfig, 'tableName' | 'packag
  *
  * Uses CrudClient.createTable - low-level single method call
  */
-export async function handleCreateTable(args: CreateTableArgs) {
+export async function handleCreateTable(connection: AbapConnection, args: CreateTableArgs) {
   try {
     const {
       table_name,
@@ -81,8 +81,7 @@ export async function handleCreateTable(args: CreateTableArgs) {
       return return_error(new Error('table_name and package_name are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleCreateTableLow',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -93,8 +92,7 @@ export async function handleCreateTable(args: CreateTableArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const tableName = table_name.toUpperCase();
 

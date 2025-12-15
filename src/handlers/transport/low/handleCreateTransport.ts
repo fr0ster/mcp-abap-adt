@@ -5,8 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { getManagedConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -40,7 +41,7 @@ interface CreateTransportArgs {
  *
  * Uses CrudClient.createTransport - low-level single method call
  */
-export async function handleCreateTransport(args: CreateTransportArgs) {
+export async function handleCreateTransport(connection: AbapConnection, args: CreateTransportArgs) {
   try {
     const handlerLogger = getHandlerLogger(
       "handleCreateTransportLow",
@@ -56,13 +57,10 @@ export async function handleCreateTransport(args: CreateTransportArgs) {
       return return_error(new Error('description is required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     // Ensure connection is established
-    await connection.connect();
-
-    handlerLogger.info(`Starting transport creation: ${description}`);
+        handlerLogger.info(`Starting transport creation: ${description}`);
 
     try {
       // Create transport

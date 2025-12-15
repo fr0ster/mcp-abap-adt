@@ -9,12 +9,11 @@
 
 import { return_error, return_response, encodeSapObjectName, logger as baseLogger } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser  } from 'fast-xml-parser';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { ServiceDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { getManagedConnection } from '../../../lib/utils.js';
-
 export const TOOL_DEFINITION = {
   name: "CreateServiceDefinition",
   description: "Create a new ABAP service definition for OData services. Service definitions define the structure and behavior of OData services. Uses stateful session for proper lock management.",
@@ -64,9 +63,8 @@ interface CreateServiceDefinitionArgs {
  *
  * Uses CrudClient.createServiceDefinition
  */
-export async function handleCreateServiceDefinition(args: CreateServiceDefinitionArgs) {
-  let connection: any = null;
-  const handlerLogger = getHandlerLogger(
+export async function handleCreateServiceDefinition(connection: AbapConnection, args: CreateServiceDefinitionArgs) {
+    const handlerLogger = getHandlerLogger(
     'handleCreateServiceDefinition',
     process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
   );
@@ -90,7 +88,6 @@ export async function handleCreateServiceDefinition(args: CreateServiceDefinitio
 
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
     const serviceDefinitionName = typedArgs.service_definition_name.toUpperCase();
 
     handlerLogger.info(`Starting service definition creation: ${serviceDefinitionName}`);

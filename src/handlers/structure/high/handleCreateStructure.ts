@@ -7,13 +7,13 @@
  * Workflow: validate -> create -> lock -> check (inactive version) -> unlock -> (activate)
  */
 
-import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, safeCheckOperation } from '../../../lib/utils';
+import { McpError, ErrorCode, AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { ation } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "CreateStructure",
   description: "Create a new ABAP structure in SAP system with fields and type references. Includes create, activate, and verify steps.",
@@ -144,7 +144,7 @@ interface CreateStructureArgs {
  * Uses StructureBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateStructure(args: CreateStructureArgs): Promise<any> {
+export async function handleCreateStructure(connection: AbapConnection, args: CreateStructureArgs): Promise<any> {
   try {
     const createStructureArgs = args as CreateStructureArgs;
 
@@ -172,16 +172,12 @@ export async function handleCreateStructure(args: CreateStructureArgs): Promise<
 
     handlerLogger.info(`Starting structure creation: ${structureName}`);
 
-    // Create a separate connection for this handler call (not using getManagedConnection)
-    let connection: any = null;
-    try {
+            try {
       // Get configuration from environment variables
             // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
             // Create connection directly for this handler call
       // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
-
       handlerLogger.debug(`[CreateStructure] Created separate connection for handler call: ${structureName}`);
     } catch (connectionError: any) {
       const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);

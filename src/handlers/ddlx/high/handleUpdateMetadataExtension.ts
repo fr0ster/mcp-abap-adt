@@ -5,9 +5,9 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { getHandlerLogger, noopLogger } from '..
+import { AbapConnection } from '@mcp-abap-adt/connection';/../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
     name: "UpdateMetadataExtension",
     description: "Update source code of an ABAP Metadata Extension.",
@@ -42,18 +42,15 @@ interface UpdateMetadataExtensionArgs {
     activate?: boolean;
 }
 
-export async function handleUpdateMetadataExtension(params: any) {
+export async function handleUpdateMetadataExtension(connection: AbapConnection, params: any) {
     const args: UpdateMetadataExtensionArgs = params;
-    let connection: any = null;
-
-    if (!args.name || !args.source_code) {
+        if (!args.name || !args.source_code) {
         return return_error(new Error("Missing required parameters"));
     }
 
     const name = args.name.toUpperCase();
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
     const handlerLogger = getHandlerLogger(
       'handleUpdateMetadataExtension',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

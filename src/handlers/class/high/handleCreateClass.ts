@@ -13,8 +13,8 @@ import {
 } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getManagedConnection } from '../../../lib/utils';
+import { CrudClient  } from '@mcp-abap-adt/adt-clients';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
@@ -70,7 +70,7 @@ CLASS ${className} IMPLEMENTATION.
 ENDCLASS.`;
 }
 
-export async function handleCreateClass(params: CreateClassArgs) {
+export async function handleCreateClass(connection: AbapConnection, params: CreateClassArgs) {
   const args = params;
 
   if (!args.class_name || !args.package_name) {
@@ -89,18 +89,6 @@ export async function handleCreateClass(params: CreateClassArgs) {
     process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
   );
   handlerLogger.info(`Starting class creation: ${className} (activate=${args.activate !== false})`);
-
-  // Connection setup
-  let connection: any = null;
-    try {
-    connection = getManagedConnection();
-    await connection.connect();
-    handlerLogger.debug(`Created separate connection for handler call: ${className}`);
-  } catch (connectionError: any) {
-    const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
-    handlerLogger.error(`Failed to create connection: ${errorMessage}`);
-    return return_error(new Error(`Failed to create connection: ${errorMessage}`));
-  }
 
   try {
     const sourceCode = args.source_code || generateClassTemplate(className, args.description || className);
@@ -270,11 +258,9 @@ export async function handleCreateClass(params: CreateClassArgs) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       return return_error(new Error(errorMessage));
     }
-  } finally {
-    try {
-      connection?.reset?.();
-    } catch {
-      // ignore
-    }
+  } catch (error: any) {
+    // Generic outer catch
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return return_error(new Error(errorMessage));
   }
 }

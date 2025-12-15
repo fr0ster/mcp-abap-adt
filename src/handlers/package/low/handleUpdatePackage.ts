@@ -6,7 +6,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, restoreSessionInConnection  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -68,7 +69,7 @@ interface UpdatePackageArgs {
  *
  * Uses CrudClient.updatePackage - low-level single method call
  */
-export async function handleUpdatePackage(args: UpdatePackageArgs) {
+export async function handleUpdatePackage(connection: AbapConnection, args: UpdatePackageArgs) {
   try {
     const {
       package_name,
@@ -84,8 +85,7 @@ export async function handleUpdatePackage(args: UpdatePackageArgs) {
       return return_error(new Error('package_name, super_package, updated_description, and lock_handle are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleUpdatePackage',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -98,8 +98,7 @@ export async function handleUpdatePackage(args: UpdatePackageArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
@@ -120,7 +119,7 @@ export async function handleUpdatePackage(args: UpdatePackageArgs) {
       }
 
       // Get updated session state after update
-      
+
 
       handlerLogger.info(`✅ UpdatePackage completed: ${packageName}`);
 

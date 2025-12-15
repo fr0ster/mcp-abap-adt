@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { toreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -62,7 +63,7 @@ interface ValidateInterfaceArgs {
  *
  * Uses CrudClient.validateInterface - low-level single method call
  */
-export async function handleValidateInterface(args: ValidateInterfaceArgs) {
+export async function handleValidateInterface(connection: AbapConnection, args: ValidateInterfaceArgs) {
   try {
     const {
       interface_name,
@@ -77,8 +78,7 @@ export async function handleValidateInterface(args: ValidateInterfaceArgs) {
       return return_error(new Error('interface_name, package_name, and description are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleValidateInterface',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -89,8 +89,7 @@ export async function handleValidateInterface(args: ValidateInterfaceArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const interfaceName = interface_name.toUpperCase();
 

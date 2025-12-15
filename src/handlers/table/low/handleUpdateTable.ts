@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { nConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -67,7 +68,7 @@ interface UpdateTableArgs {
  *
  * Uses CrudClient.updateTable - low-level single method call
  */
-export async function handleUpdateTable(args: UpdateTableArgs) {
+export async function handleUpdateTable(connection: AbapConnection, args: UpdateTableArgs) {
   try {
     const {
       table_name,
@@ -83,8 +84,7 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
       return return_error(new Error('table_name, ddl_code, and lock_handle are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleUpdateTable',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -95,8 +95,7 @@ export async function handleUpdateTable(args: UpdateTableArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const tableName = table_name.toUpperCase();
 

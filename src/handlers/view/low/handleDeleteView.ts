@@ -6,7 +6,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, getManagedConnection } 
+import { AbapConnection } from '@mcp-abap-adt/connection';from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -39,7 +40,7 @@ interface DeleteViewArgs {
  *
  * Uses CrudClient.deleteView - low-level single method call
  */
-export async function handleDeleteView(args: DeleteViewArgs) {
+export async function handleDeleteView(connection: AbapConnection, args: DeleteViewArgs) {
   try {
     const {
       view_name,
@@ -55,8 +56,7 @@ export async function handleDeleteView(args: DeleteViewArgs) {
       'handleDeleteView',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const viewName = view_name.toUpperCase();
 
     handlerLogger.info(`Starting view deletion: ${viewName}`);

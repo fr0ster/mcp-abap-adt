@@ -5,9 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AxiosResponse  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { dClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -40,7 +40,7 @@ interface DeleteBehaviorDefinitionArgs {
  *
  * Uses CrudClient.deleteBehaviorDefinition - low-level single method call
  */
-export async function handleDeleteBehaviorDefinition(args: DeleteBehaviorDefinitionArgs) {
+export async function handleDeleteBehaviorDefinition(connection: AbapConnection, args: DeleteBehaviorDefinitionArgs) {
   try {
     const {
       name,
@@ -57,8 +57,7 @@ export async function handleDeleteBehaviorDefinition(args: DeleteBehaviorDefinit
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const bdefName = name.toUpperCase();
 
     handlerLogger.info(`Starting behavior definition deletion: ${bdefName}`);

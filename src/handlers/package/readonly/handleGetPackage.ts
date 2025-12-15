@@ -4,7 +4,7 @@ import convert from 'xml-js';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import * as z from 'zod';
 
-import { getManagedConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
   name: "GetPackage",
   description: "[read-only] Retrieve ABAP package details.",
@@ -18,7 +18,7 @@ interface GetPackageArgs {
   filePath?: string;
 }
 
-export async function handleGetPackage(args: GetPackageArgs) {
+export async function handleGetPackage(connection: AbapConnection, args: GetPackageArgs) {
     try {
         if (!args?.package_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Package name is required');

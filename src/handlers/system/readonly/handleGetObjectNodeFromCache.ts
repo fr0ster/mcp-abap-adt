@@ -3,7 +3,8 @@ export const TOOL_DEFINITION = {
   description: "[read-only] Returns a node from the in-memory objects list cache by OBJECT_TYPE, OBJECT_NAME, TECH_NAME, and expands OBJECT_URI if present.",
   inputSchema: {
     type: "object",
-    properties: {
+    properties: 
+import { AbapConnection } from '@mcp-abap-adt/connection';{
       object_type: { type: "string", description: "[read-only] Object type" },
       object_name: { type: "string", description: "[read-only] Object name" },
       tech_name: { type: "string", description: "[read-only] Technical name" }
@@ -18,12 +19,11 @@ import { objectsListCache } from '../../../lib/getObjectsListCache';
 import { makeAdtRequest, logger as baseLogger } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils';
 /**
  * @param args { object_type, object_name, tech_name }
  * @returns cached node including object_uri_response when OBJECT_URI exists
  */
-export async function handleGetObjectNodeFromCache(args: any) {
+export async function handleGetObjectNodeFromCache(connection: AbapConnection, args: any) {
     const handlerLogger = getHandlerLogger(
       'handleGetObjectNodeFromCache',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

@@ -6,7 +6,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, parseValidationResponse, restoreSessionInConnection  } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -63,7 +64,7 @@ interface ValidateViewArgs {
  *
  * Uses CrudClient.validateView - low-level single method call
  */
-export async function handleValidateView(args: ValidateViewArgs) {
+export async function handleValidateView(connection: AbapConnection, args: ValidateViewArgs) {
   const handlerLogger = getHandlerLogger(
     'handleValidateView',
     process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -82,16 +83,14 @@ export async function handleValidateView(args: ValidateViewArgs) {
       return return_error(new Error('view_name, package_name, and description are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const viewName = view_name.toUpperCase();
 

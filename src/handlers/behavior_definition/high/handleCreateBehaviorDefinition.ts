@@ -6,9 +6,9 @@ import { return_error, return_response, logger as baseLogger } from '../../../li
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { getHandlerLogger, noopLogger } from
+import { AbapConnection } from '@mcp-abap-adt/connection'; '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
     name: "CreateBehaviorDefinition",
     description: "Create a new ABAP Behavior Definition (BDEF) in SAP system.",
@@ -59,7 +59,7 @@ interface CreateBehaviorDefinitionArgs {
     activate?: boolean;
 }
 
-export async function handleCreateBehaviorDefinition(params: any) {
+export async function handleCreateBehaviorDefinition(connection: AbapConnection, params: any) {
     const args: CreateBehaviorDefinitionArgs = params;
 
     if (!args.name || !args.package_name || !args.root_entity || !args.implementation_type) {
@@ -75,8 +75,7 @@ export async function handleCreateBehaviorDefinition(params: any) {
    const name = args.name.toUpperCase();
    // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const connection = getManagedConnection();
-   const handlerLogger = getHandlerLogger(
+       const handlerLogger = getHandlerLogger(
      'handleCreateBehaviorDefinition',
      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
    );

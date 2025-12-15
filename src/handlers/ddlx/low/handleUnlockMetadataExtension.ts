@@ -5,7 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedCo
+import { AbapConnection } from '@mcp-abap-adt/connection';nnection, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -57,7 +58,7 @@ interface UnlockMetadataExtensionArgs {
  *
  * Uses CrudClient.unlockMetadataExtension - low-level single method call
  */
-export async function handleUnlockMetadataExtension(args: UnlockMetadataExtensionArgs) {
+export async function handleUnlockMetadataExtension(connection: AbapConnection, args: UnlockMetadataExtensionArgs) {
   try {
     const {
       name,
@@ -71,8 +72,7 @@ export async function handleUnlockMetadataExtension(args: UnlockMetadataExtensio
       return return_error(new Error('name, lock_handle, and session_id are required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleUnlockMetadataExtension',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -83,8 +83,7 @@ export async function handleUnlockMetadataExtension(args: UnlockMetadataExtensio
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const ddlxName = name.toUpperCase();
 

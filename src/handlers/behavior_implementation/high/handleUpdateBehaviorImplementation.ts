@@ -8,13 +8,13 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger as baseLogger, safeCheckOperation } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName, logger as baseLogger, safeCheckOperation } from '../../../lib/
+import { AbapConnection } from '@mcp-abap-adt/connection';utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
-import { getManagedConnection } from '../../../lib/utils.js';
 export const TOOL_DEFINITION = {
   name: "UpdateBehaviorImplementation",
   description: "Update source code of an existing ABAP behavior implementation class. Updates both main source (with FOR BEHAVIOR OF clause) and implementations include. Uses stateful session with proper lock/unlock mechanism.",
@@ -60,7 +60,7 @@ interface UpdateBehaviorImplementationArgs {
  * Uses CrudClient for all operations
  * Session and lock management handled internally by client
  */
-export async function handleUpdateBehaviorImplementation(args: UpdateBehaviorImplementationArgs) {
+export async function handleUpdateBehaviorImplementation(connection: AbapConnection, args: UpdateBehaviorImplementationArgs) {
   try {
     const {
       class_name,
@@ -73,16 +73,13 @@ export async function handleUpdateBehaviorImplementation(args: UpdateBehaviorImp
       'handleUpdateBehaviorImplementation',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
-    let connection: any = null;
-
-    // Validation
+        // Validation
     if (!class_name || !behavior_definition || !implementation_code) {
       return return_error(new Error('class_name, behavior_definition, and implementation_code are required'));
     }
 
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    connection = getManagedConnection();
     const className = class_name.toUpperCase();
     const behaviorDefinition = behavior_definition.toUpperCase();
 

@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '
+import { AbapConnection } from '@mcp-abap-adt/connection';@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -53,7 +53,7 @@ interface CheckDomainArgs {
  *
  * Uses CrudClient.checkDomain - low-level single method call
  */
-export async function handleCheckDomain(args: CheckDomainArgs) {
+export async function handleCheckDomain(connection: AbapConnection, args: CheckDomainArgs) {
   try {
     const {
       domain_name,
@@ -66,8 +66,7 @@ export async function handleCheckDomain(args: CheckDomainArgs) {
       return return_error(new Error('domain_name is required'));
     }
 
-    const connection = getManagedConnection();
-    const client = new CrudClient(connection);
+        const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleCheckDomain',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -78,8 +77,7 @@ export async function handleCheckDomain(args: CheckDomainArgs) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-      await connection.connect();
-    }
+          }
 
     const domainName = domain_name.toUpperCase();
 

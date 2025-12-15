@@ -7,10 +7,10 @@
 
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger as baseLogger, restoreSessionInConnection  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "LockObjectLow",
@@ -48,7 +48,8 @@ interface LockObjectArgs {
   };
 }
 
-export async function handleLockObject(connection: AbapConnection, args: LockObjectArgs) {
+export async function handleLockObject(context: HandlerContext, args: LockObjectArgs) {
+  const { connection, logger } = context;
   try {
     const handlerLogger = getHandlerLogger(
       'handleLockObject',
@@ -77,7 +78,7 @@ export async function handleLockObject(connection: AbapConnection, args: LockObj
     const desiredSessionId = session_id || generateSessionId();
     const objectName = object_name.toUpperCase();
 
-    handlerLogger.info(`Starting object lock: ${objectName} (type: ${objectType}, session: ${desiredSessionId.substring(0, 8)}...)`);
+    logger.info(`Starting object lock: ${objectName} (type: ${objectType}, session: ${desiredSessionId.substring(0, 8)}...)`);
 
     try {
       let lockHandle: string | undefined;
@@ -144,8 +145,8 @@ export async function handleLockObject(connection: AbapConnection, args: LockObj
         throw new Error(`Lock did not return a lock handle for object ${objectName}`);
       }
 
-      handlerLogger.info(`✅ LockObject completed: ${objectName}`);
-      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger.info(`✅ LockObject completed: ${objectName}`);
+      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -160,7 +161,7 @@ export async function handleLockObject(connection: AbapConnection, args: LockObj
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error locking object ${objectName}:`, error);
+      logger.error(`Error locking object ${objectName}:`, error);
 
       let errorMessage = `Failed to lock object: ${error.message || String(error)}`;
 

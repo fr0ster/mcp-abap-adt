@@ -9,6 +9,7 @@ import { AxiosResponse, return_error, return_response, logger as baseLogger, res
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CreateMetadataExtensionLow",
@@ -73,7 +74,8 @@ interface CreateMetadataExtensionArgs {
  *
  * Uses CrudClient.createMetadataExtension - low-level single method call
  */
-export async function handleCreateMetadataExtension(connection: AbapConnection, args: CreateMetadataExtensionArgs) {
+export async function handleCreateMetadataExtension(context: HandlerContext, args: CreateMetadataExtensionArgs) {
+  const { connection, logger } = context;
   try {
     const {
       name,

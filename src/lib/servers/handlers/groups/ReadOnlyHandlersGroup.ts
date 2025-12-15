@@ -1,6 +1,5 @@
 import { BaseHandlerGroup } from "../base/BaseHandlerGroup.js";
 import { HandlerEntry } from "../interfaces.js";
-import { AbapConnection } from "@mcp-abap-adt/connection";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 
 // Import readonly handlers
@@ -35,6 +34,13 @@ import { handleGetView } from "../../../../handlers/view/readonly/handleGetView"
 import { handleGetServiceDefinition } from "../../../../handlers/service_definition/readonly/handleGetServiceDefinition";
 import { handleGetSession } from "../../../../handlers/system/readonly/handleGetSession";
 import { handleGetInactiveObjects } from "../../../../handlers/system/readonly/handleGetInactiveObjects";
+import { handleGetAdtTypes } from "../../../../handlers/system/readonly/handleGetAllTypes";
+import { handleGetObjectStructure } from "../../../../handlers/system/readonly/handleGetObjectStructure";
+import { handleGetObjectsList } from "../../../../handlers/search/readonly/handleGetObjectsList";
+import { handleGetObjectsByType } from "../../../../handlers/search/readonly/handleGetObjectsByType";
+import { handleGetProgFullCode } from "../../../../handlers/program/readonly/handleGetProgFullCode";
+import { handleGetObjectNodeFromCache } from "../../../../handlers/system/readonly/handleGetObjectNodeFromCache";
+import { handleDescribeByList } from "../../../../handlers/system/readonly/handleDescribeByList";
 
 // Import TOOL_DEFINITION from handlers
 import { TOOL_DEFINITION as GetProgram_Tool } from "../../../../handlers/program/readonly/handleGetProgram";
@@ -68,6 +74,13 @@ import { TOOL_DEFINITION as GetView_Tool } from "../../../../handlers/view/reado
 import { TOOL_DEFINITION as GetServiceDefinition_Tool } from "../../../../handlers/service_definition/readonly/handleGetServiceDefinition";
 import { TOOL_DEFINITION as GetSession_Tool } from "../../../../handlers/system/readonly/handleGetSession";
 import { TOOL_DEFINITION as GetInactiveObjects_Tool } from "../../../../handlers/system/readonly/handleGetInactiveObjects";
+import { TOOL_DEFINITION as GetAdtTypes_Tool } from "../../../../handlers/system/readonly/handleGetAllTypes";
+import { TOOL_DEFINITION as GetObjectStructure_Tool } from "../../../../handlers/system/readonly/handleGetObjectStructure";
+import { TOOL_DEFINITION as GetObjectsList_Tool } from "../../../../handlers/search/readonly/handleGetObjectsList";
+import { TOOL_DEFINITION as GetObjectsByType_Tool } from "../../../../handlers/search/readonly/handleGetObjectsByType";
+import { TOOL_DEFINITION as GetProgFullCode_Tool } from "../../../../handlers/program/readonly/handleGetProgFullCode";
+import { TOOL_DEFINITION as GetObjectNodeFromCache_Tool } from "../../../../handlers/system/readonly/handleGetObjectNodeFromCache";
+import { TOOL_DEFINITION as DescribeByList_Tool } from "../../../../handlers/system/readonly/handleDescribeByList";
 
 /**
  * Handler group for all readonly (read-only) handlers
@@ -87,7 +100,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetProgram_Tool.description,
           inputSchema: GetProgram_Tool.inputSchema,
         },
-        handler: handleGetProgram,
+        handler: (args: any) => { return handleGetProgram(this.context, args); },
       },
       {
         toolDefinition: {
@@ -95,7 +108,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetClass_Tool.description,
           inputSchema: GetClass_Tool.inputSchema,
         },
-        handler: handleGetClass,
+        handler: (args: any) => { return handleGetClass(this.context, args); },
       },
       {
         toolDefinition: {
@@ -103,7 +116,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetFunction_Tool.description,
           inputSchema: GetFunction_Tool.inputSchema,
         },
-        handler: handleGetFunction,
+        handler: (args: any) => { return handleGetFunction(this.context, args); },
       },
       {
         toolDefinition: {
@@ -111,7 +124,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetFunctionGroup_Tool.description,
           inputSchema: GetFunctionGroup_Tool.inputSchema,
         },
-        handler: handleGetFunctionGroup,
+        handler: (args: any) => { return handleGetFunctionGroup(this.context, args); },
       },
       {
         toolDefinition: {
@@ -119,7 +132,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetTable_Tool.description,
           inputSchema: GetTable_Tool.inputSchema,
         },
-        handler: handleGetTable,
+        handler: (args: any) => { return handleGetTable(this.context, args); },
       },
       {
         toolDefinition: {
@@ -127,7 +140,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetStructure_Tool.description,
           inputSchema: GetStructure_Tool.inputSchema,
         },
-        handler: handleGetStructure,
+        handler: (args: any) => { return handleGetStructure(this.context, args); },
       },
       {
         toolDefinition: {
@@ -135,7 +148,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetTableContents_Tool.description,
           inputSchema: GetTableContents_Tool.inputSchema,
         },
-        handler: handleGetTableContents,
+        handler: (args: any) => { return handleGetTableContents(this.context, args); },
       },
       {
         toolDefinition: {
@@ -143,7 +156,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetPackage_Tool.description,
           inputSchema: GetPackage_Tool.inputSchema,
         },
-        handler: handleGetPackage,
+        handler: (args: any) => { return handleGetPackage(this.context, args); },
       },
       {
         toolDefinition: {
@@ -151,7 +164,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetInclude_Tool.description,
           inputSchema: GetInclude_Tool.inputSchema,
         },
-        handler: handleGetInclude,
+        handler: (args: any) => { return handleGetInclude(this.context, args); },
       },
       {
         toolDefinition: {
@@ -159,7 +172,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetIncludesList_Tool.description,
           inputSchema: GetIncludesList_Tool.inputSchema,
         },
-        handler: handleGetIncludesList,
+        handler: (args: any) => { return handleGetIncludesList(this.context, args); },
       },
       {
         toolDefinition: {
@@ -167,7 +180,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetTypeInfo_Tool.description,
           inputSchema: GetTypeInfo_Tool.inputSchema,
         },
-        handler: handleGetTypeInfo,
+        handler: (args: any) => { return handleGetTypeInfo(this.context, args); },
       },
       {
         toolDefinition: {
@@ -175,7 +188,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetInterface_Tool.description,
           inputSchema: GetInterface_Tool.inputSchema,
         },
-        handler: handleGetInterface,
+        handler: (args: any) => { return handleGetInterface(this.context, args); },
       },
       {
         toolDefinition: {
@@ -183,7 +196,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetTransaction_Tool.description,
           inputSchema: GetTransaction_Tool.inputSchema,
         },
-        handler: handleGetTransaction,
+        handler: (args: any) => { return handleGetTransaction(this.context, args); },
       },
       {
         toolDefinition: {
@@ -191,7 +204,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: SearchObject_Tool.description,
           inputSchema: SearchObject_Tool.inputSchema,
         },
-        handler: handleSearchObject,
+        handler: (args: any) => { return handleSearchObject(this.context, args); },
       },
       {
         toolDefinition: {
@@ -199,7 +212,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetEnhancements_Tool.description,
           inputSchema: GetEnhancements_Tool.inputSchema,
         },
-        handler: handleGetEnhancements,
+        handler: (args: any) => { return handleGetEnhancements(this.context, args); },
       },
       {
         toolDefinition: {
@@ -207,7 +220,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetEnhancementSpot_Tool.description,
           inputSchema: GetEnhancementSpot_Tool.inputSchema,
         },
-        handler: handleGetEnhancementSpot,
+        handler: (args: any) => { return handleGetEnhancementSpot(this.context, args); },
       },
       {
         toolDefinition: {
@@ -215,7 +228,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetEnhancementImpl_Tool.description,
           inputSchema: GetEnhancementImpl_Tool.inputSchema,
         },
-        handler: handleGetEnhancementImpl,
+        handler: (args: any) => { return handleGetEnhancementImpl(this.context, args); },
       },
       {
         toolDefinition: {
@@ -223,7 +236,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetBdef_Tool.description,
           inputSchema: GetBdef_Tool.inputSchema,
         },
-        handler: handleGetBdef,
+        handler: (args: any) => { return handleGetBdef(this.context, args); },
       },
       {
         toolDefinition: {
@@ -231,7 +244,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetSqlQuery_Tool.description,
           inputSchema: GetSqlQuery_Tool.inputSchema,
         },
-        handler: handleGetSqlQuery,
+        handler: (args: any) => { return handleGetSqlQuery(this.context, args); },
       },
       {
         toolDefinition: {
@@ -239,7 +252,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetWhereUsed_Tool.description,
           inputSchema: GetWhereUsed_Tool.inputSchema,
         },
-        handler: handleGetWhereUsed,
+        handler: (args: any) => { return handleGetWhereUsed(this.context, args); },
       },
       {
         toolDefinition: {
@@ -247,11 +260,11 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetObjectInfo_Tool.description,
           inputSchema: GetObjectInfo_Tool.inputSchema,
         },
-        handler: async (connection: AbapConnection, args: any) => {
+        handler: (args: any) => {
           if (!args || typeof args !== "object") {
             throw new McpError(ErrorCode.InvalidParams, "Missing or invalid arguments for GetObjectInfo");
           }
-          return await handleGetObjectInfo(connection, args as { parent_type: string; parent_name: string });
+          return handleGetObjectInfo(this.context, args as { parent_type: string; parent_name: string });
         },
       },
       {
@@ -260,7 +273,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetAbapAST_Tool.description,
           inputSchema: GetAbapAST_Tool.inputSchema,
         },
-        handler: handleGetAbapAST,
+        handler: (args: any) => { return handleGetAbapAST(this.context, args); },
       },
       {
         toolDefinition: {
@@ -268,7 +281,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetAbapSemanticAnalysis_Tool.description,
           inputSchema: GetAbapSemanticAnalysis_Tool.inputSchema,
         },
-        handler: handleGetAbapSemanticAnalysis,
+        handler: (args: any) => { return handleGetAbapSemanticAnalysis(this.context, args); },
       },
       {
         toolDefinition: {
@@ -276,7 +289,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetAbapSystemSymbols_Tool.description,
           inputSchema: GetAbapSystemSymbols_Tool.inputSchema,
         },
-        handler: handleGetAbapSystemSymbols,
+        handler: (args: any) => { return handleGetAbapSystemSymbols(this.context, args); },
       },
       {
         toolDefinition: {
@@ -284,7 +297,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetDomain_Tool.description,
           inputSchema: GetDomain_Tool.inputSchema,
         },
-        handler: handleGetDomain,
+        handler: (args: any) => { return handleGetDomain(this.context, args); },
       },
       {
         toolDefinition: {
@@ -292,7 +305,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetDataElement_Tool.description,
           inputSchema: GetDataElement_Tool.inputSchema,
         },
-        handler: handleGetDataElement,
+        handler: (args: any) => { return handleGetDataElement(this.context, args); },
       },
       {
         toolDefinition: {
@@ -300,7 +313,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetTransport_Tool.description,
           inputSchema: GetTransport_Tool.inputSchema,
         },
-        handler: handleGetTransport,
+        handler: (args: any) => { return handleGetTransport(this.context, args); },
       },
       {
         toolDefinition: {
@@ -308,7 +321,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetView_Tool.description,
           inputSchema: GetView_Tool.inputSchema,
         },
-        handler: handleGetView,
+        handler: (args: any) => { return handleGetView(this.context, args); },
       },
       {
         toolDefinition: {
@@ -316,7 +329,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetServiceDefinition_Tool.description,
           inputSchema: GetServiceDefinition_Tool.inputSchema,
         },
-        handler: handleGetServiceDefinition,
+        handler: (args: any) => { return handleGetServiceDefinition(this.context, args); },
       },
       {
         toolDefinition: {
@@ -324,7 +337,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetSession_Tool.description,
           inputSchema: GetSession_Tool.inputSchema,
         },
-        handler: handleGetSession,
+        handler: (args: any) => { return handleGetSession(this.context, args); },
       },
       {
         toolDefinition: {
@@ -332,115 +345,77 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
           description: GetInactiveObjects_Tool.description,
           inputSchema: GetInactiveObjects_Tool.inputSchema,
         },
-        handler: handleGetInactiveObjects,
+        handler: (args: any) => { return handleGetInactiveObjects(this.context, args); },
       },
       // Dynamic import tools
       {
         toolDefinition: {
-          name: "GetAdtTypes",
-          description: "Get all ADT types available in the system",
-          inputSchema: { type: "object", properties: {}, required: [] },
+          name: GetAdtTypes_Tool.name,
+          description: GetAdtTypes_Tool.description,
+          inputSchema: GetAdtTypes_Tool.inputSchema,
         },
-        handler: async (connection: AbapConnection, args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleGetAllTypes.js")).handleGetAdtTypes(connection, args);
-        },
-      },
-      {
-        toolDefinition: {
-          name: "GetObjectStructure",
-          description: "Get object structure with includes hierarchy",
-          inputSchema: {
-            type: "object",
-            properties: {
-              object_name: { type: "string" },
-              object_type: { type: "string" },
-            },
-            required: ["object_name", "object_type"],
-          },
-        },
-        handler: async (connection: AbapConnection, args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleGetObjectStructure.js")).handleGetObjectStructure(connection, args);
+        handler: (args: any) => {
+          return handleGetAdtTypes(this.context, args);
         },
       },
       {
         toolDefinition: {
-          name: "GetObjectsList",
-          description: "Get list of objects by package",
-          inputSchema: {
-            type: "object",
-            properties: { package_name: { type: "string" } },
-            required: ["package_name"],
-          },
+          name: GetObjectStructure_Tool.name,
+          description: GetObjectStructure_Tool.description,
+          inputSchema: GetObjectStructure_Tool.inputSchema,
         },
-        handler: async (connection: AbapConnection, args: any) => {
-          return await (await import("../../../../handlers/search/readonly/handleGetObjectsList.js")).handleGetObjectsList(connection, args);
+        handler: (args: any) => {
+          return handleGetObjectStructure(this.context, args);
+        },
+      },
+      {
+        toolDefinition: {
+          name: GetObjectsList_Tool.name,
+          description: GetObjectsList_Tool.description,
+          inputSchema: GetObjectsList_Tool.inputSchema,
+        },
+        handler: (args: any) => {
+          return handleGetObjectsList(this.context, args);
         },
       },
       {
         toolDefinition: {
           name: "GetObjectsByType",
           description: "Get objects by type",
-          inputSchema: {
-            type: "object",
-            properties: {
-              object_type: { type: "string" },
-              package_name: { type: "string" },
-            },
-            required: ["object_type"],
-          },
+          inputSchema: GetObjectsByType_Tool.inputSchema,
         },
-        handler: async (connection: AbapConnection, args: any) => {
-          return await (await import("../../../../handlers/search/readonly/handleGetObjectsByType.js")).handleGetObjectsByType(connection, args);
+        handler: (args: any) => {
+          return handleGetObjectsByType(this.context, args);
         },
       },
       {
         toolDefinition: {
-          name: "GetProgFullCode",
-          description: "Get full program code with includes",
-          inputSchema: {
-            type: "object",
-            properties: { program_name: { type: "string" } },
-            required: ["program_name"],
-          },
+          name: GetProgFullCode_Tool.name,
+          description: GetProgFullCode_Tool.description,
+          inputSchema: GetProgFullCode_Tool.inputSchema,
         },
-        handler: async (connection: AbapConnection, args: any) => {
-          return await (await import("../../../../handlers/program/readonly/handleGetProgFullCode.js")).handleGetProgFullCode(connection, args);
+        handler: (args: any) => {
+          return handleGetProgFullCode(this.context, args);
         },
       },
       {
         toolDefinition: {
-          name: "GetObjectNodeFromCache",
-          description: "Get object node from cache",
-          inputSchema: {
-            type: "object",
-            properties: {
-              object_name: { type: "string" },
-              object_type: { type: "string" },
-            },
-            required: ["object_name", "object_type"],
-          },
+          name: GetObjectNodeFromCache_Tool.name,
+          description: GetObjectNodeFromCache_Tool.description,
+          inputSchema: GetObjectNodeFromCache_Tool.inputSchema,
         },
-        handler: async (connection: AbapConnection, args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(connection, args);
+        handler: (args: any) => {
+          return handleGetObjectNodeFromCache(this.context, args);
         },
       },
       {
         toolDefinition: {
-          name: "DescribeByList",
-          description: "Describe objects by list",
-          inputSchema: {
-            type: "object",
-            properties: {
-              objects: {
-                type: "array",
-                items: { type: "string" },
-              },
-            },
-            required: ["objects"],
-          },
+          name: DescribeByList_Tool.name,
+          description: DescribeByList_Tool.description,
+          inputSchema: DescribeByList_Tool.inputSchema,
         },
-        handler: async (connection: AbapConnection, args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleDescribeByList.js")).handleDescribeByList(connection, args);
+        handler: (args: any) => {
+          return handleDescribeByList(this.context, args);
         },
       },
     ];

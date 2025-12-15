@@ -65,6 +65,7 @@ import { logger } from "./lib/logger";
 
 // --- ENV FILE LOADING LOGIC ---
 import fs from "fs";
+import { HandlerContext } from "./lib/handlers/interfaces";
 
 /**
  * Display help message
@@ -2158,10 +2159,10 @@ export class mcp_abap_adt_server {
   /**
    * Creates a new McpServer instance with all handlers registered
    * Used for SSE sessions where each session needs its own server instance
-   * @param connection - AbapConnection instance to use for handlers
+   * @param context - HandlerContext instance to use for handlers
    * @private
    */
-  private createMcpServerForSession(connection: AbapConnection): McpServer {
+  private createMcpServerForSession(context: HandlerContext): McpServer {
     const server = new McpServer({
       name: "mcp-abap-adt",
       version: "0.1.0"
@@ -2169,7 +2170,7 @@ export class mcp_abap_adt_server {
 
     // Register all tools using McpHandlers
     const handlers = new McpHandlers();
-    handlers.RegisterAllToolsOnServer(server, connection);
+    handlers.RegisterAllToolsOnServer(server, context);
 
     return server;
   }
@@ -2179,9 +2180,9 @@ export class mcp_abap_adt_server {
    * @param connection - AbapConnection instance to use for handlers
    * @private
    */
-  private setupMcpServerHandlers(connection: AbapConnection) {
+  private setupMcpServerHandlers(context: HandlerContext) {
     // Register all tools using McpHandlers
-    this.mcpHandlers.RegisterAllToolsOnServer(this.mcpServer, connection);
+    this.mcpHandlers.RegisterAllToolsOnServer(this.mcpServer, context);
   }
 
   private setupSignalHandlers() {
@@ -2311,7 +2312,7 @@ export class mcp_abap_adt_server {
       );
 
       // Setup handlers with connection
-      this.setupMcpServerHandlers(connection);
+      this.setupMcpServerHandlers({ connection, logger: loggerAdapter });
 
       // Simple stdio setup like reference implementation
       const transport = new StdioServerTransport();
@@ -2621,7 +2622,7 @@ export class mcp_abap_adt_server {
 
           // Register all tools using McpHandlers
           const handlers = new McpHandlers();
-          handlers.RegisterAllToolsOnServer(requestServer, connection);
+          handlers.RegisterAllToolsOnServer(requestServer, { connection, logger: loggerAdapter });
 
           // KEY MOMENT: Create new StreamableHTTP transport for each request (like the SDK example)
           // SDK automatically handles:
@@ -2822,7 +2823,7 @@ export class mcp_abap_adt_server {
         );
 
         // Create new McpServer instance for this session (like the working example)
-        const server = this.createMcpServerForSession(connection);
+        const server = this.createMcpServerForSession({ connection, logger: loggerAdapter });
 
         // Create SSE transport
         const transport = new SSEServerTransport(postEndpoint, res, {

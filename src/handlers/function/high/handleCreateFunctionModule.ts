@@ -62,7 +62,8 @@ interface CreateFunctionModuleArgs {
  * Uses FunctionModuleBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateFunctionModule(connection: AbapConnection, args: CreateFunctionModuleArgs) {
+export async function handleCreateFunctionModule(context: HandlerContext, args: CreateFunctionModuleArgs) {
+  const { connection, logger } = context;
     try {
     // Validate required parameters
     if (!args?.function_group_name) {
@@ -75,26 +76,13 @@ export async function handleCreateFunctionModule(connection: AbapConnection, arg
       return return_error(new Error('source_code is required'));
     }
 
-    // Validate transport_request: required for non-$TMP packages
-    // Note: package_name is not available for function modules (inherited from function group)
-    // Skip validation for now - function group should handle transport request validation
-    // try {
-    //   validateTransportRequest(args.package_name, args.transport_request);
-    // } catch (error) {
-    //   return return_error(error as Error);
-    // }
-
     const typedArgs = args as CreateFunctionModuleArgs;
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
     const functionGroupName = typedArgs.function_group_name.toUpperCase();
     const functionModuleName = typedArgs.function_module_name.toUpperCase();
-    const handlerLogger = getHandlerLogger(
-      'handleCreateFunctionModule',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
 
-    handlerLogger.info(`Starting function module creation: ${functionModuleName} in ${functionGroupName}`);
+    logger.info(`Starting function module creation: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       // Create client
@@ -138,7 +126,7 @@ export async function handleCreateFunctionModule(connection: AbapConnection, arg
         await client.activateFunctionModule({ functionModuleName, functionGroupName });
       }
 
-      handlerLogger.info(`✅ CreateFunctionModule completed successfully: ${functionModuleName}`);
+      logger.info(`✅ CreateFunctionModule completed successfully: ${functionModuleName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -152,7 +140,7 @@ export async function handleCreateFunctionModule(connection: AbapConnection, arg
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating function module ${functionModuleName}: ${error?.message || error}`);
+      logger.error(`Error creating function module ${functionModuleName}: ${error?.message || error}`);
 
       // Check if function module already exists
       if (error.message?.includes('already exists') || error.response?.status === 409) {
@@ -180,18 +168,10 @@ export async function handleCreateFunctionModule(connection: AbapConnection, arg
     try {
       if (connection) {
         connection.reset();
-        const handlerLogger = getHandlerLogger(
-          'handleCreateFunctionModule',
-          process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-        );
-        handlerLogger.debug('Reset function module connection after use');
+        logger.debug('Reset function module connection after use');
       }
     } catch (resetError: any) {
-      const handlerLogger = getHandlerLogger(
-        'handleCreateFunctionModule',
-        process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-      );
-      handlerLogger.error(`Failed to reset function module connection: ${resetError?.message || resetError}`);
+      logger.error(`Failed to reset function module connection: ${resetError?.message || resetError}`);
     }
   }
 }

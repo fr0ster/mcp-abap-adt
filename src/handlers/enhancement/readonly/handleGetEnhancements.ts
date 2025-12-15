@@ -1,3 +1,4 @@
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 import { McpError, ErrorCode } from '../../../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, return_response, logger, encodeSapObjectName, fetchNodeStructure } from '../../../lib/utils';
 import { writeResultToFile  } from '../../../lib/writeResultToFile';
@@ -53,29 +54,29 @@ export interface EnhancementResponse {
  */
 export function parseEnhancementsFromXml(xmlData: string): EnhancementImplementation[] {
     const enhancements: EnhancementImplementation[] = [];
-    
+
     try {
         // Extract <enh:source> elements which contain the base64 encoded enhancement source code
         const sourceRegex = /<enh:source[^>]*>([^<]*)<\/enh:source>/g;
         let match;
         let index = 0;
-        
+
         while ((match = sourceRegex.exec(xmlData)) !== null) {
             const enhancement: EnhancementImplementation = {
                 name: `enhancement_${index + 1}`, // Default name if not found in attributes
                 type: 'enhancement',
             };
-            
+
             // Try to find enhancement name and type from parent elements or attributes
             const sourceStart = match.index;
-            
+
             // Look backwards for parent enhancement element with name/type attributes
             const beforeSource = xmlData.substring(0, sourceStart);
-            
+
             // Try multiple patterns to find enhancement name
             // Pattern 1: adtcore:name attribute
             let enhNameMatch = beforeSource.match(/adtcore:name="([^"]*)"[^>]*$/);
-            // Pattern 2: enh:name attribute  
+            // Pattern 2: enh:name attribute
             if (!enhNameMatch) {
                 enhNameMatch = beforeSource.match(/enh:name="([^"]*)"[^>]*$/);
             }
@@ -91,7 +92,7 @@ export function parseEnhancementsFromXml(xmlData: string): EnhancementImplementa
                     enhNameMatch = [enhImplMatch[0], enhImplMatch[1]];
                 }
             }
-            
+
             // Try multiple patterns to find enhancement type
             let enhTypeMatch = beforeSource.match(/adtcore:type="([^"]*)"[^>]*$/);
             if (!enhTypeMatch) {
@@ -100,14 +101,14 @@ export function parseEnhancementsFromXml(xmlData: string): EnhancementImplementa
             if (!enhTypeMatch) {
                 enhTypeMatch = beforeSource.match(/type="([^"]*)"[^>]*$/);
             }
-            
+
             if (enhNameMatch && enhNameMatch[1]) {
                 enhancement.name = enhNameMatch[1];
             }
             if (enhTypeMatch && enhTypeMatch[1]) {
                 enhancement.type = enhTypeMatch[1];
             }
-            
+
             // Extract and decode the base64 source code
             const base64Source = match[1];
             if (base64Source) {
@@ -120,14 +121,14 @@ export function parseEnhancementsFromXml(xmlData: string): EnhancementImplementa
                     enhancement.sourceCode = base64Source; // Keep original if decode fails
                 }
             }
-            
+
             enhancements.push(enhancement);
             index++;
         }
-        
+
         logger.info(`Parsed ${enhancements.length} enhancement implementations`);
         return enhancements;
-        
+
     } catch (parseError) {
         logger.error('Failed to parse enhancement XML:', parseError);
         return [];
@@ -140,15 +141,15 @@ export function parseEnhancementsFromXml(xmlData: string): EnhancementImplementa
  * @param manualProgramContext - Optional manual program context for includes
  * @returns Object with type, basePath, and context (if needed)
  */
-async function determineObjectTypeAndPath(objectName: string, manualProgramContext?: string): Promise<{type: 'program' | 'include' | 'class', basePath: string, context?: string}> {
+async function determineObjectTypeAndPath(connection: AbapConnection, objectName: string, manualProgramContext?: string): Promise<{type: 'program' | 'include' | 'class', basePath: string, context?: string}> {
     try {
         // First try as a class
         const classUrl = `/sap/bc/adt/oo/classes/${encodeSapObjectName(objectName)}`;
         try {
-            const response = await makeAdtRequestWithTimeout(classUrl, 'GET', 'csrf', {
+            const response = await makeAdtRequestWithTimeout(connection, classUrl, 'GET', 'csrf', {
                 'Accept': 'application/vnd.sap.adt.oo.classes.v4+xml'
             });
-            
+
             if (response.status === 200) {
                 logger.info(`${objectName} is a class`);
                 return {
@@ -160,14 +161,14 @@ async function determineObjectTypeAndPath(objectName: string, manualProgramConte
             // If class request fails, try as program
             logger.info(`${objectName} is not a class, trying as program...`);
         }
-        
+
         // Try as a program
         const programUrl = `/sap/bc/adt/programs/programs/${encodeSapObjectName(objectName)}`;
         try {
-            const response = await makeAdtRequestWithTimeout(programUrl, 'GET', 'csrf', {
+            const response = await makeAdtRequestWithTimeout(connection, programUrl, 'GET', 'csrf', {
                 'Accept': 'application/vnd.sap.adt.programs.v3+xml'
             });
-            
+
             if (response.status === 200) {
                 logger.info(`${objectName} is a program`);
                 return {
@@ -179,18 +180,18 @@ async function determineObjectTypeAndPath(objectName: string, manualProgramConte
             // If program request fails, try as include
             logger.info(`${objectName} is not a program, trying as include...`);
         }
-        
+
         // Try as include
         const includeUrl = `/sap/bc/adt/programs/includes/${encodeSapObjectName(objectName)}`;
-        const response = await makeAdtRequestWithTimeout(includeUrl, 'GET', 'csrf', {
+        const response = await makeAdtRequestWithTimeout(connection, includeUrl, 'GET', 'csrf', {
             'Accept': 'application/vnd.sap.adt.programs.includes.v2+xml'
         });
-        
+
         if (response.status === 200) {
             logger.info(`${objectName} is an include`);
-            
+
             let context: string;
-            
+
             // Use manual program context if provided
             if (manualProgramContext) {
                 context = `/sap/bc/adt/programs/programs/${manualProgramContext}`;
@@ -199,37 +200,37 @@ async function determineObjectTypeAndPath(objectName: string, manualProgramConte
                 // Auto-determine context from metadata
                 const xmlData = response.data;
                 const contextMatch = xmlData.match(/include:contextRef[^>]+adtcore:uri="([^"]+)"/);
-                
+
                 if (contextMatch && contextMatch[1]) {
                     context = contextMatch[1];
                     logger.info(`Found auto-determined context for include ${objectName}: ${context}`);
                 } else {
                     throw new McpError(
-                        ErrorCode.InvalidParams, 
+                        ErrorCode.InvalidParams,
                         `Could not determine parent program context for include: ${objectName}. No contextRef found in metadata. Consider providing the 'program' parameter manually.`
                     );
                 }
             }
-            
+
             return {
                 type: 'include',
                 basePath: `/sap/bc/adt/programs/includes/${encodeSapObjectName(objectName)}/source/main/enhancements/elements`,
                 context: context
             };
         }
-        
+
         throw new McpError(
-            ErrorCode.InvalidParams, 
+            ErrorCode.InvalidParams,
             `Could not determine object type for: ${objectName}. Object is neither a valid class, program, nor include.`
         );
-        
+
     } catch (error) {
         if (error instanceof McpError) {
             throw error;
         }
         logger.error(`Failed to determine object type for ${objectName}:`, error);
         throw new McpError(
-            ErrorCode.InvalidParams, 
+            ErrorCode.InvalidParams,
             `Failed to determine object type for: ${objectName}. ${error instanceof Error ? error.message : String(error)}`
         );
     }
@@ -242,20 +243,20 @@ async function determineObjectTypeAndPath(objectName: string, manualProgramConte
  */
 function parseIncludesFromXml(xmlData: string): Array<{name: string, node_id: string, label: string}> {
     const includes: Array<{name: string, node_id: string, label: string}> = [];
-    
+
     try {
         // Simple regex-based parsing for XML
         // Look for OBJECT_TYPE entries that contain "PROG/I" (includes)
         const objectTypeRegex = /<SEU_ADT_OBJECT_TYPE_INFO>(.*?)<\/SEU_ADT_OBJECT_TYPE_INFO>/gs;
         const matches = xmlData.match(objectTypeRegex);
-        
+
         if (matches) {
             for (const match of matches) {
                 // Check if this is an include type
                 if (match.includes('<OBJECT_TYPE>PROG/I</OBJECT_TYPE>')) {
                     const nodeIdMatch = match.match(/<NODE_ID>(\d+)<\/NODE_ID>/);
                     const labelMatch = match.match(/<OBJECT_TYPE_LABEL>(.*?)<\/OBJECT_TYPE_LABEL>/);
-                    
+
                     if (nodeIdMatch && labelMatch) {
                         includes.push({
                             name: 'PROG/I',
@@ -269,7 +270,7 @@ function parseIncludesFromXml(xmlData: string): Array<{name: string, node_id: st
     } catch (error) {
         logger.warn('Error parsing XML for includes:', error);
     }
-    
+
     return includes;
 }
 
@@ -280,12 +281,12 @@ function parseIncludesFromXml(xmlData: string): Array<{name: string, node_id: st
  */
 function parseIncludeNamesFromXml(xmlData: string): string[] {
     const includeNames: string[] = [];
-    
+
     try {
         // Look for SEU_ADT_REPOSITORY_OBJ_NODE entries with OBJECT_TYPE PROG/I
         const nodeRegex = /<SEU_ADT_REPOSITORY_OBJ_NODE>(.*?)<\/SEU_ADT_REPOSITORY_OBJ_NODE>/gs;
         const nodeMatches = xmlData.match(nodeRegex);
-        
+
         if (nodeMatches) {
             for (const nodeMatch of nodeMatches) {
                 // Check if this node is for includes (PROG/I)
@@ -301,7 +302,7 @@ function parseIncludeNamesFromXml(xmlData: string): string[] {
                 }
             }
         }
-        
+
         // If no nodes found, try alternative parsing for OBJECT_NAME tags
         if (includeNames.length === 0) {
             const objectNameRegex = /<OBJECT_NAME>([^<]+)<\/OBJECT_NAME>/g;
@@ -317,7 +318,7 @@ function parseIncludeNamesFromXml(xmlData: string): string[] {
     } catch (error) {
         logger.warn('Error parsing XML for include names:', error);
     }
-    
+
     return [...new Set(includeNames)]; // Remove duplicates
 }
 
@@ -327,7 +328,8 @@ function parseIncludeNamesFromXml(xmlData: string): string[] {
  * @param objectType - Type of the object ('program' | 'include' | 'class')
  * @returns Array of include names
  */
-async function getIncludesListInternal(objectName: string, objectType: 'program' | 'include' | 'class'): Promise<string[]> {
+async function getIncludesListInternal(context: HandlerContext, objectName: string, objectType: 'program' | 'include' | 'class'): Promise<string[]> {
+    const { connection, logger } = context;
     try {
         // Classes don't have includes in the traditional sense
         if (objectType === 'class') {
@@ -350,13 +352,14 @@ async function getIncludesListInternal(objectName: string, objectType: 'program'
         // Step 1: Get root node structure to find includes node (with timeout)
         const rootResponse = await Promise.race([
             fetchNodeStructure(
+                connection,
                 parentName.toUpperCase(),
                 parentTechName.toUpperCase(),
                 parentType,
                 '000000', // Root node
                 true // with descriptions
             ),
-            new Promise<never>((_, reject) => 
+            new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error(`Timeout: Failed to get root node structure for ${objectName} within 10000ms`)), 10000)
             )
         ]);
@@ -364,7 +367,7 @@ async function getIncludesListInternal(objectName: string, objectType: 'program'
         // Step 2: Parse response to find includes node ID
         const includesInfo = parseIncludesFromXml(rootResponse.data);
         const includesNode = includesInfo.find(info => info.name === 'PROG/I');
-        
+
         if (!includesNode) {
             logger.info(`No includes node found for ${objectType} '${objectName}'`);
             return [];
@@ -373,20 +376,21 @@ async function getIncludesListInternal(objectName: string, objectType: 'program'
         // Step 3: Get includes list using the found node ID (with timeout)
         const includesResponse = await Promise.race([
             fetchNodeStructure(
+                connection,
                 parentName.toUpperCase(),
                 parentTechName.toUpperCase(),
                 parentType,
                 includesNode.node_id,
                 true // with descriptions
             ),
-            new Promise<never>((_, reject) => 
+            new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error(`Timeout: Failed to get includes list for ${objectName} within 10000ms`)), 10000)
             )
         ]);
 
         // Step 4: Parse the includes response to extract include names
         const includeNames = parseIncludeNamesFromXml(includesResponse.data);
-        
+
         logger.info(`Found ${includeNames.length} includes for ${objectType} '${objectName}' using SAP ADT API`);
         return includeNames;
 
@@ -402,36 +406,36 @@ async function getIncludesListInternal(objectName: string, objectType: 'program'
  * @param manualProgramContext - Optional manual program context for includes
  * @returns Enhancement response for the single object
  */
-async function getEnhancementsForSingleObject(objectName: string, manualProgramContext?: string): Promise<EnhancementResponse> {
+async function getEnhancementsForSingleObject(connection: AbapConnection, objectName: string, manualProgramContext?: string): Promise<EnhancementResponse> {
     logger.info(`Getting enhancements for single object: ${objectName}`, manualProgramContext ? `with manual program context: ${manualProgramContext}` : '');
-    
+
     // Determine object type and get appropriate path and context
-    const objectInfo = await determineObjectTypeAndPath(objectName, manualProgramContext);
-    
+    const objectInfo = await determineObjectTypeAndPath(connection, objectName, manualProgramContext);
+
     // Build URL based on object type
     let url = objectInfo.basePath;
-    
+
     // Add context parameter only for includes
     if (objectInfo.type === 'include' && objectInfo.context) {
         url += `?context=${encodeURIComponent(objectInfo.context)}`;
         logger.info(`Using context for include: ${objectInfo.context}`);
     }
-    
+
     logger.info(`Final enhancement URL: ${url}`);
-    
-    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
-    
+
+    const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
+
     if (response.status === 200 && response.data) {
         // Parse the XML to extract enhancement implementations
         const enhancements = parseEnhancementsFromXml(response.data);
-        
+
         const enhancementResponse: EnhancementResponse = {
             object_name: objectName,
             object_type: objectInfo.type,
             context: objectInfo.context,
             enhancements: enhancements
         };
-        
+
         return enhancementResponse;
     } else {
         throw new McpError(ErrorCode.InternalError, `Failed to retrieve enhancements for ${objectName}. Status: ${response.status}`);
@@ -453,12 +457,12 @@ function filterMinimalEnhancements(response: any): any {
                     name: enh.name,
                     type: enh.type,
                     // Include source code only if it's short (< 500 chars) or first 200 chars
-                    sourceCode: enh.sourceCode ? 
-                        (enh.sourceCode.length <= 500 ? enh.sourceCode : enh.sourceCode.substring(0, 200) + '...[truncated]') 
+                    sourceCode: enh.sourceCode ?
+                        (enh.sourceCode.length <= 500 ? enh.sourceCode : enh.sourceCode.substring(0, 200) + '...[truncated]')
                         : undefined
                 }))
             }));
-        
+
         return {
             ...response,
             detailed: false,
@@ -472,11 +476,11 @@ function filterMinimalEnhancements(response: any): any {
         const filteredEnhancements = response.enhancements ? response.enhancements.map((enh: any) => ({
             name: enh.name,
             type: enh.type,
-            sourceCode: enh.sourceCode ? 
-                (enh.sourceCode.length <= 500 ? enh.sourceCode : enh.sourceCode.substring(0, 200) + '...[truncated]') 
+            sourceCode: enh.sourceCode ?
+                (enh.sourceCode.length <= 500 ? enh.sourceCode : enh.sourceCode.substring(0, 200) + '...[truncated]')
                 : undefined
         })) : [];
-        
+
         return {
             object_name: response.object_name,
             object_type: response.object_type,
@@ -491,47 +495,48 @@ function filterMinimalEnhancements(response: any): any {
 /**
  * Handler to retrieve enhancement implementations for ABAP programs/includes
  * Automatically determines if object is a program or include and handles accordingly
- * 
+ *
  * @param args - Tool arguments containing:
  *   - object_name: Name of the ABAP object
- *   - program: Optional manual program context for includes  
+ *   - program: Optional manual program context for includes
  *   - include_nested: Optional boolean - if true, also searches enhancements in all nested includes
  *   - detailed: Optional boolean - if false (default), returns minimal info; if true, returns full details including raw XML
  *   - timeout: Optional timeout in milliseconds for each ADT request (default: 30000ms = 30s)
  *   - max_includes: Optional maximum number of includes to process (default: 50)
  * @returns Response with parsed enhancement data or error
  */
-export async function handleGetEnhancements(connection: AbapConnection, args: any) {
+export async function handleGetEnhancements(context: HandlerContext, args: any) {
+  const { connection, logger } = context;
     try {
         logger.info('handleGetEnhancements called with args:', args);
-        
+
         if (!args?.object_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Object name is required');
         }
-        
+
         const objectName = args.object_name;
         const manualProgram = args.program; // Optional manual program context for includes
         const includeNested = args.include_nested === true; // Optional boolean for recursive include search
         const isDetailed = args.detailed === true; // Optional boolean for detailed output
-        
+
         // Simple timeout logic: one timeout for all ADT requests
         const requestTimeout = args.timeout ? parseInt(args.timeout, 10) : 30000; // Timeout for each ADT request (default: 30s)
         const maxIncludes = args.max_includes ? parseInt(args.max_includes, 10) : 50; // Maximum number of includes to process
-        
+
         logger.info(`Getting enhancements for object: ${objectName}`, {
             manualProgram: manualProgram || '(not provided)',
             includeNested: includeNested,
             requestTimeout: requestTimeout,
             maxIncludes: maxIncludes
         });
-        
+
         // Get enhancements for the main object
-        const mainEnhancementResponse = await getEnhancementsForSingleObject(objectName, manualProgram);
-        
+        const mainEnhancementResponse = await getEnhancementsForSingleObject(connection, objectName, manualProgram);
+
         if (!includeNested) {
             // Return only main object enhancements
             let response = mainEnhancementResponse;
-            
+
             // Apply filtering if not detailed
             if (!isDetailed) {
                 response = filterMinimalEnhancements(response);
@@ -539,7 +544,7 @@ export async function handleGetEnhancements(connection: AbapConnection, args: an
                 // Add detailed flag for consistency
                 response = { ...response, detailed: true };
             }
-            
+
 const result = {
     isError: false,
     content: [
@@ -554,50 +559,50 @@ const result = {
             }
             return result;
         }
-        
+
         // If include_nested is true, also get enhancements from all nested includes
         logger.info('Searching for nested includes and their enhancements...');
-        
+
         // Simplified nested processing - no recursion, just flat list
         const processNestedIncludes = async () => {
             // Get flat list of all includes using the optimized GetIncludesList logic
-            let includesList = await getIncludesListInternal(objectName, mainEnhancementResponse.object_type);
-            
+            let includesList = await getIncludesListInternal(context, objectName, mainEnhancementResponse.object_type);
+
             logger.info(`Found ${includesList.length} includes (flat list, no recursion):`, includesList);
-            
+
             // Limit the number of includes to process to avoid timeout
             if (includesList.length > maxIncludes) {
                 logger.warn(`Too many includes found (${includesList.length}). Limiting to first ${maxIncludes} includes to avoid timeout.`);
                 includesList = includesList.slice(0, maxIncludes);
             }
-            
+
             // Collect all enhancement responses
             const allEnhancementResponses: EnhancementResponse[] = [mainEnhancementResponse];
-            
+
             // Simple sequential processing with individual timeouts
             for (const includeName of includesList) {
                 try {
                     logger.info(`Getting enhancements for include: ${includeName}`);
-                    
+
                     // Create a promise with individual timeout for each include
-                    const includeEnhancementsPromise = getEnhancementsForSingleObject(includeName, manualProgram);
-                    
+                    const includeEnhancementsPromise = getEnhancementsForSingleObject(connection, includeName, manualProgram);
+
                     const includeEnhancements = await createPromiseWithTimeout(
                         includeEnhancementsPromise,
                         requestTimeout,
                         `Timeout: Failed to get enhancements for include ${includeName} within ${requestTimeout}ms`
                     );
-                    
+
                     allEnhancementResponses.push(includeEnhancements);
                 } catch (error) {
                     logger.warn(`Failed to get enhancements for include ${includeName}:`, error);
                     // Continue with other includes even if one fails
                 }
             }
-            
+
             return allEnhancementResponses;
         };
-        
+
         // Execute nested processing without total timeout - each request has its own timeout
         let allEnhancementResponses: EnhancementResponse[];
         try {
@@ -629,7 +634,7 @@ const result = {
             }
             return fallbackResult;
         }
-        
+
         // Create combined response
         let combinedResponse: any = {
             main_object: {
@@ -641,7 +646,7 @@ const result = {
             total_enhancements_found: allEnhancementResponses.reduce((sum, resp) => sum + resp.enhancements.length, 0),
             objects: allEnhancementResponses
         };
-        
+
         // Apply filtering if not detailed
         if (!isDetailed) {
             combinedResponse = filterMinimalEnhancements(combinedResponse);
@@ -649,7 +654,7 @@ const result = {
             // Add detailed flag for consistency
             combinedResponse = { ...combinedResponse, detailed: true };
         }
-        
+
 const result = {
     isError: false,
     content: [
@@ -663,7 +668,7 @@ const result = {
             writeResultToFile(JSON.stringify(result, null, 2), args.filePath);
         }
         return result;
-        
+
     } catch (error) {
         // MCP-compliant error response: always return content[] with type "text"
         return {
@@ -691,13 +696,13 @@ function createPromiseWithTimeout<T>(
     errorMessage: string
 ): Promise<T> {
     let timeoutId: NodeJS.Timeout;
-    
+
     const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutId = setTimeout(() => {
             reject(new Error(errorMessage));
         }, timeoutMs);
     });
-    
+
     return Promise.race([
         promise.then(result => {
             // Clear timeout when main promise resolves successfully

@@ -57,7 +57,8 @@ interface ActivateFunctionModuleArgs {
  *
  * Uses CrudClient.activateFunctionModule - low-level single method call
  */
-export async function handleActivateFunctionModule(connection: AbapConnection, args: ActivateFunctionModuleArgs) {
+export async function handleActivateFunctionModule(context: HandlerContext, args: ActivateFunctionModuleArgs) {
+  const { connection, logger } = context;
   try {
     const {
       function_module_name,
@@ -74,23 +75,18 @@ export async function handleActivateFunctionModule(connection: AbapConnection, a
       return return_error(new Error('function_group_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleActivateFunctionModule',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
+    const client = new CrudClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    handlerLogger.info(`Starting function module activation: ${functionModuleName} in group ${functionGroupName}`);
+    logger.info(`Starting function module activation: ${functionModuleName} in group ${functionGroupName}`);
 
     try {
       // Activate function module
@@ -108,8 +104,8 @@ export async function handleActivateFunctionModule(connection: AbapConnection, a
       // Get updated session state after activation
 
 
-      handlerLogger.info(`✅ ActivateFunctionModule completed: ${functionModuleName}`);
-      handlerLogger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
+      logger.info(`✅ ActivateFunctionModule completed: ${functionModuleName}`);
+      logger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -133,7 +129,7 @@ export async function handleActivateFunctionModule(connection: AbapConnection, a
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error activating function module ${functionModuleName}: ${error?.message || error}`);
+      logger.error(`Error activating function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate function module: ${error.message || String(error)}`;

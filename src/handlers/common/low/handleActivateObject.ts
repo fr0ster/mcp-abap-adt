@@ -6,6 +6,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient, ObjectReference } from '@mcp-abap-adt/adt-clients';
 import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ActivateObjectLow",
@@ -41,7 +42,8 @@ interface ActivateObjectArgs {
   preaudit?: boolean;
 }
 
-export async function handleActivateObject(connection: AbapConnection, params: ActivateObjectArgs) {
+export async function handleActivateObject(context: HandlerContext, params: ActivateObjectArgs) {
+  const { connection, logger } = context;
   try {
     const handlerLogger = getHandlerLogger(
       'handleActivateObject',

@@ -151,6 +151,7 @@ export async function handleGetIncludesList(context: HandlerContext, args: any) 
         // Step 1: Get root node structure to find includes node (with timeout)
         const rootResponse = await Promise.race([
             fetchNodeStructure(
+                connection,
                 parentName.toUpperCase(),
                 parentTechName.toUpperCase(),
                 parentType,
@@ -183,6 +184,7 @@ export async function handleGetIncludesList(context: HandlerContext, args: any) 
         // Step 3: Get includes list using the found node ID (with timeout)
         const includesResponse = await Promise.race([
             fetchNodeStructure(
+                connection,
                 parentName.toUpperCase(),
                 parentTechName.toUpperCase(),
                 parentType,

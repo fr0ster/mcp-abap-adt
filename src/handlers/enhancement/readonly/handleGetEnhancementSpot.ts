@@ -1,3 +1,4 @@
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 import { McpError, ErrorCode } from '../../../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, logger, encodeSapObjectName } from '../../../lib/utils';
 import { writeResultToFile  } from '../../../lib/writeResultToFile';
@@ -97,7 +98,7 @@ function parseEnhancementSpotMetadata(xmlData: string): any {
  * This function uses the SAP ADT API endpoint to fetch details about an enhancement spot,
  * regardless of whether it has any implementations. It is designed to provide information
  * about the spot's existence, description, type, and status.
- * 
+ *
  * @param args - Tool arguments containing:
  *   - enhancement_spot: Name of the enhancement spot (e.g., 'enhoxhh'). This is a required parameter.
  * @returns Response object containing:
@@ -106,36 +107,37 @@ function parseEnhancementSpotMetadata(xmlData: string): any {
  *   - raw_xml: The raw XML response from the ADT API for debugging purposes.
  *   - In case of error, an error object with details about the failure.
  */
-export async function handleGetEnhancementSpot(connection: AbapConnection, args: any) {
+export async function handleGetEnhancementSpot(context: HandlerContext, args: any) {
+  const { connection, logger } = context;
     try {
         logger.info('handleGetEnhancementSpot called with args:', args);
-        
+
         if (!args?.enhancement_spot) {
             throw new McpError(ErrorCode.InvalidParams, 'Enhancement spot is required');
         }
-        
+
         const enhancementSpot = args.enhancement_spot;
-        
+
         logger.info(`Getting metadata for enhancement spot: ${enhancementSpot}`);
-        
+
         // Build the ADT URL for the specific enhancement spot (Eclipse uses /sap/bc/adt/enhancements/enhsxsb/{spot_name})
         const url = `/sap/bc/adt/enhancements/enhsxsb/${encodeSapObjectName(enhancementSpot)}`;
-        
+
         logger.info(`Enhancement spot URL: ${url}`);
-        
-        const response = await makeAdtRequestWithTimeout(url, 'GET', 'default', {
+
+        const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default', {
             'Accept': 'application/vnd.sap.adt.enhancements.v1+xml'
         });
-        
+
         if (response.status === 200 && response.data) {
             // Parse the XML to extract metadata
             const metadata = parseEnhancementSpotMetadata(response.data);
-            
+
             const enhancementSpotResponse: EnhancementSpotResponse = {
                 enhancement_spot: enhancementSpot,
                 metadata: metadata
             };
-            
+
             const result = {
                 isError: false,
                 content: [
@@ -151,11 +153,11 @@ export async function handleGetEnhancementSpot(connection: AbapConnection, args:
             return result;
         } else {
             throw new McpError(
-                ErrorCode.InternalError, 
+                ErrorCode.InternalError,
                 `Failed to retrieve metadata for enhancement spot ${enhancementSpot}. Status: ${response.status}`
             );
         }
-        
+
     } catch (error) {
         // MCP-compliant error response: always return content[] with type "text"
         return {

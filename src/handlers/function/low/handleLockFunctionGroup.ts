@@ -52,7 +52,8 @@ interface LockFunctionGroupArgs {
  *
  * Uses CrudClient.lockFunctionGroup - low-level single method call
  */
-export async function handleLockFunctionGroup(connection: AbapConnection, args: LockFunctionGroupArgs) {
+export async function handleLockFunctionGroup(context: HandlerContext, args: LockFunctionGroupArgs) {
+  const { connection, logger } = context;
   try {
     const {
       function_group_name,
@@ -65,22 +66,18 @@ export async function handleLockFunctionGroup(connection: AbapConnection, args: 
       return return_error(new Error('function_group_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleLockFunctionGroup',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const functionGroupName = function_group_name.toUpperCase();
 
-    handlerLogger.info(`Starting function group lock: ${functionGroupName}`);
+    logger.info(`Starting function group lock: ${functionGroupName}`);
 
     try {
       // Lock function group
@@ -92,10 +89,10 @@ export async function handleLockFunctionGroup(connection: AbapConnection, args: 
       }
 
       // Get updated session state after lock
-      
 
-      handlerLogger.info(`✅ LockFunctionGroup completed: ${functionGroupName}`);
-      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+
+      logger.info(`✅ LockFunctionGroup completed: ${functionGroupName}`);
+      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -109,7 +106,7 @@ export async function handleLockFunctionGroup(connection: AbapConnection, args: 
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error locking function group ${functionGroupName}: ${error?.message || error}`);
+      logger.error(`Error locking function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock function group: ${error.message || String(error)}`;

@@ -2,15 +2,16 @@ import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
 import { AbapConnection } from '@mcp-abap-adt/connection';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   name: "GetAbapSemanticAnalysis",
   description: "[read-only] Perform semantic analysis on ABAP code and return symbols, types, scopes, and dependencies.",
   inputSchema: {
     type: "object",
     properties: {
-      code: { 
-        type: "string", 
-        description: "ABAP source code to analyze" 
+      code: {
+        type: "string",
+        description: "ABAP source code to analyze"
       },
       filePath: {
         type: "string",
@@ -107,7 +108,7 @@ class SimpleAbapSemanticAnalyzer {
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
             const lineNumber = i + 1;
-            
+
             if (line === '' || line.startsWith('*') || line.startsWith('"')) {
                 continue; // Skip empty lines and comments
             }
@@ -166,7 +167,7 @@ class SimpleAbapSemanticAnalyzer {
         if (methodMatch) {
             const methodName = methodMatch[2].toUpperCase();
             const isStatic = methodMatch[1] === 'class-methods';
-            
+
             this.addSymbol({
                 name: methodName,
                 type: 'method',
@@ -324,7 +325,7 @@ class SimpleAbapSemanticAnalyzer {
             endLine: startLine, // Will be updated when scope is popped
             parent: this.currentScope !== 'global' ? this.currentScope : undefined
         };
-        
+
         this.scopes.push(scope);
         this.currentScope = name;
     }
@@ -334,7 +335,7 @@ class SimpleAbapSemanticAnalyzer {
         if (currentScopeInfo) {
             currentScopeInfo.endLine = endLine;
         }
-        
+
         // Find parent scope
         const parentScope = this.scopes.find(s => s.name === currentScopeInfo?.parent);
         this.currentScope = parentScope?.name || 'global';
@@ -365,11 +366,11 @@ class SimpleAbapSemanticAnalyzer {
 
     private extractMethodParameters(line: string): AbapParameterInfo[] {
         const parameters: AbapParameterInfo[] = [];
-        
+
         // This is a simplified parameter extraction
         // In a real implementation, this would be more sophisticated
         const paramTypes = ['importing', 'exporting', 'changing', 'returning'];
-        
+
         for (const paramType of paramTypes) {
             const regex = new RegExp(`${paramType}\\s+([a-zA-Z0-9_\\s,]+)`, 'gi');
             const match = regex.exec(line);
@@ -386,12 +387,13 @@ class SimpleAbapSemanticAnalyzer {
                 }
             }
         }
-        
+
         return parameters;
     }
 }
 
-export async function handleGetAbapSemanticAnalysis(connection: AbapConnection, args: any) {
+export async function handleGetAbapSemanticAnalysis(context: HandlerContext, args: any) {
+    const { connection, logger } = context;
     const handlerLogger = getHandlerLogger(
       'handleGetAbapSemanticAnalysis',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

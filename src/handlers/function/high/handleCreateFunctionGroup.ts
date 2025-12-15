@@ -55,8 +55,9 @@ interface CreateFunctionGroupArgs {
  * Uses FunctionGroupBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateFunctionGroup(connection: AbapConnection, args: CreateFunctionGroupArgs) {
-    try {
+export async function handleCreateFunctionGroup(context: HandlerContext, args: CreateFunctionGroupArgs) {
+  const { connection, logger } = context;
+  try {
     // Validate required parameters
     if (!args?.function_group_name) {
       return return_error(new Error('function_group_name is required'));
@@ -71,13 +72,9 @@ export async function handleCreateFunctionGroup(connection: AbapConnection, args
 
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-        const functionGroupName = typedArgs.function_group_name.toUpperCase();
-    const handlerLogger = getHandlerLogger(
-      'handleCreateFunctionGroup',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const functionGroupName = typedArgs.function_group_name.toUpperCase();
 
-    handlerLogger.info(`Starting function group creation: ${functionGroupName}`);
+    logger.info(`Starting function group creation: ${functionGroupName}`);
 
     try {
       // Create client
@@ -85,7 +82,7 @@ export async function handleCreateFunctionGroup(connection: AbapConnection, args
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Validate
-      handlerLogger.info(`Validating function group: ${functionGroupName} with package: ${typedArgs.package_name}`);
+      logger.info(`Validating function group: ${functionGroupName} with package: ${typedArgs.package_name}`);
       try {
         await client.validateFunctionGroup({
           functionGroupName,
@@ -100,7 +97,7 @@ export async function handleCreateFunctionGroup(connection: AbapConnection, args
           : JSON.stringify(validationError.response?.data || '');
 
         if (errorData.includes('Kerberos library not loaded')) {
-          handlerLogger.warn(`Function group validation returned Kerberos error, but proceeding with creation: ${functionGroupName}`);
+          logger.warn(`Function group validation returned Kerberos error, but proceeding with creation: ${functionGroupName}`);
           // Continue with creation - this is a known issue with FunctionGroup validation
         } else {
           // If validation throws an error, try to parse the response if available
@@ -109,13 +106,13 @@ export async function handleCreateFunctionGroup(connection: AbapConnection, args
             const validationResult = parseValidationResponse(validationResponse);
             if (validationResult && !validationResult.valid) {
               const errorMessage = validationResult.message || 'Unknown validation error';
-              handlerLogger.error(`Function group validation failed: ${functionGroupName} - ${errorMessage}`);
+              logger.error(`Function group validation failed: ${functionGroupName} - ${errorMessage}`);
               return return_error(new Error(`Function group validation failed: ${errorMessage}`));
             }
           }
           // If we can't parse the error, return generic error
           const errorMessage = validationError.message || 'Unknown validation error';
-          handlerLogger.error(`Function group validation failed: ${functionGroupName} - ${errorMessage}`);
+          logger.error(`Function group validation failed: ${functionGroupName} - ${errorMessage}`);
           return return_error(new Error(`Function group validation failed: ${errorMessage}`));
         }
       }
@@ -159,18 +156,18 @@ export async function handleCreateFunctionGroup(connection: AbapConnection, args
           : JSON.stringify(validationResponse.data || '');
 
         if (errorData.includes('Kerberos library not loaded') || errorMessage.includes('Kerberos library not loaded')) {
-          handlerLogger.warn(`Function group validation returned Kerberos error, but proceeding with creation: ${functionGroupName}`);
+          logger.warn(`Function group validation returned Kerberos error, but proceeding with creation: ${functionGroupName}`);
           // Continue with creation - this is a known issue with FunctionGroup validation
         } else {
-          handlerLogger.error(`Function group validation failed: ${functionGroupName} - ${errorMessage} (status: ${validationResponse.status})`);
+          logger.error(`Function group validation failed: ${functionGroupName} - ${errorMessage} (status: ${validationResponse.status})`);
           return return_error(new Error(`Function group validation failed: ${errorMessage}`));
         }
       }
 
-      handlerLogger.info(`✅ Function group validation passed: ${functionGroupName}`);
+      logger.info(`✅ Function group validation passed: ${functionGroupName}`);
 
       // Create
-      handlerLogger.info(`Creating function group: ${functionGroupName}`);
+      logger.info(`Creating function group: ${functionGroupName}`);
       await client.createFunctionGroup({
         functionGroupName,
         description: typedArgs.description || functionGroupName,
@@ -183,7 +180,7 @@ export async function handleCreateFunctionGroup(connection: AbapConnection, args
         await client.activateFunctionGroup({ functionGroupName });
       }
 
-      handlerLogger.info(`✅ CreateFunctionGroup completed successfully: ${functionGroupName}`);
+      logger.info(`✅ CreateFunctionGroup completed successfully: ${functionGroupName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -197,8 +194,8 @@ export async function handleCreateFunctionGroup(connection: AbapConnection, args
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating function group ${functionGroupName}: ${error?.message || error}`);
-      handlerLogger.debug(`Error details: ${JSON.stringify({
+      logger.error(`Error creating function group ${functionGroupName}: ${error?.message || error}`);
+      logger.debug(`Error details: ${JSON.stringify({
         message: error.message,
         status: error.response?.status,
         statusText: error.response?.statusText
@@ -242,10 +239,10 @@ export async function handleCreateFunctionGroup(connection: AbapConnection, args
           : JSON.stringify(error.response.data || '');
 
         if (errorData.includes('Kerberos library not loaded') ||
-            errorData.includes('Business partner') ||
-            detailedError.includes('Kerberos library not loaded') ||
-            detailedError.includes('Business partner')) {
-          handlerLogger.warn(`Function group creation returned known SAP error, but object may have been created: ${functionGroupName}`);
+          errorData.includes('Business partner') ||
+          detailedError.includes('Kerberos library not loaded') ||
+          detailedError.includes('Business partner')) {
+          logger.warn(`Function group creation returned known SAP error, but object may have been created: ${functionGroupName}`);
           // Check if object was actually created by trying to get it
           // For now, we'll assume it was created and return success
           // This is a known issue with FunctionGroup creation in SAP
@@ -261,7 +258,7 @@ export async function handleCreateFunctionGroup(connection: AbapConnection, args
           } as AxiosResponse);
         }
 
-        handlerLogger.error(`Function group creation failed with 400: ${functionGroupName}`);
+        logger.error(`Function group creation failed with 400: ${functionGroupName}`);
         return return_error(new Error(detailedError));
       }
 
@@ -277,17 +274,9 @@ export async function handleCreateFunctionGroup(connection: AbapConnection, args
   } finally {
     try {
       connection.reset();
-      const handlerLogger = getHandlerLogger(
-        'handleCreateFunctionGroup',
-        process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-      );
-      handlerLogger.debug('Reset function group connection after use');
+      logger.debug('Reset function group connection after use');
     } catch (resetError: any) {
-      const handlerLogger = getHandlerLogger(
-        'handleCreateFunctionGroup',
-        process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-      );
-      handlerLogger.error(`Failed to reset function group connection: ${resetError?.message || resetError}`);
+      logger.error(`Failed to reset function group connection: ${resetError?.message || resetError}`);
     }
   }
 }

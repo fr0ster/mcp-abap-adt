@@ -6,6 +6,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "DeleteObjectLow",
@@ -29,7 +30,8 @@ interface DeleteObjectArgs {
   transport_request?: string;
 }
 
-export async function handleDeleteObject(connection: AbapConnection, args: DeleteObjectArgs) {
+export async function handleDeleteObject(context: HandlerContext, args: DeleteObjectArgs) {
+  const { connection, logger } = context;
   try {
     const handlerLogger = getHandlerLogger(
       'handleDeleteObject',
@@ -42,7 +44,7 @@ export async function handleDeleteObject(connection: AbapConnection, args: Delet
       return return_error(new Error('object_name and object_type are required'));
     }
 
-        const crudClient = new CrudClient(connection);
+    const crudClient = new CrudClient(connection);
     const objectName = object_name.toUpperCase();
     const objectType = object_type.toLowerCase();
 

@@ -8,6 +8,7 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { AbapConnection } from '@mcp-abap-adt/connection';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
     name: "CreateMetadataExtension",
     description: "Create a new ABAP Metadata Extension (DDLX) in SAP system.",
@@ -47,7 +48,8 @@ interface CreateMetadataExtensionArgs {
     activate?: boolean;
 }
 
-export async function handleCreateMetadataExtension(connection: AbapConnection, params: any) {
+export async function handleCreateMetadataExtension(context: HandlerContext, params: any) {
+    const { connection, logger } = context;
     const args: CreateMetadataExtensionArgs = params;
         if (!args.name || !args.package_name) {
         return return_error(new Error("Missing required parameters"));

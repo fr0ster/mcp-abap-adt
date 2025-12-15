@@ -5,10 +5,10 @@
  * Low-level handler: single method call.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CreateTransportLow",
@@ -40,7 +40,8 @@ interface CreateTransportArgs {
  *
  * Uses CrudClient.createTransport - low-level single method call
  */
-export async function handleCreateTransport(connection: AbapConnection, args: CreateTransportArgs) {
+export async function handleCreateTransport(context: HandlerContext, args: CreateTransportArgs) {
+  const { connection, logger } = context;
   try {
     const handlerLogger = getHandlerLogger(
       "handleCreateTransportLow",
@@ -59,7 +60,7 @@ export async function handleCreateTransport(connection: AbapConnection, args: Cr
         const client = new CrudClient(connection);
 
     // Ensure connection is established
-        handlerLogger.info(`Starting transport creation: ${description}`);
+        logger.info(`Starting transport creation: ${description}`);
 
     try {
       // Create transport
@@ -70,7 +71,7 @@ export async function handleCreateTransport(connection: AbapConnection, args: Cr
         throw new Error(`Create did not return a response for transport`);
       }
 
-      handlerLogger.info(`✅ CreateTransport completed`);
+      logger.info(`✅ CreateTransport completed`);
 
       return return_response({
         data: JSON.stringify({
@@ -82,7 +83,7 @@ export async function handleCreateTransport(connection: AbapConnection, args: Cr
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating transport:`, error);
+      logger.error(`Error creating transport:`, error);
 
       // Parse error message
       let errorMessage = `Failed to create transport: ${error.message || String(error)}`;

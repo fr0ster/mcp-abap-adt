@@ -32,7 +32,7 @@ export async function handleGetPackage(context: HandlerContext, args: GetPackage
             withShortDescriptions: true
         };
 
-        const package_structure_response = await makeAdtRequestWithTimeout(nodeContentsUrl, 'POST', 'default', undefined, nodeContentsParams);
+        const package_structure_response = await makeAdtRequestWithTimeout(connection, nodeContentsUrl, 'POST', 'default', undefined, nodeContentsParams);
         const result = convert.xml2js(package_structure_response.data, {compact: true});
 
         const nodes = result["asx:abap"]?.["asx:values"]?.DATA?.TREE_CONTENT?.SEU_ADT_REPOSITORY_OBJ_NODE || [];

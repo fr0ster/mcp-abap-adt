@@ -7,13 +7,12 @@
  * Workflow: validate -> create -> (activate)
  */
 
-import { return_error, return_response, encodeSapObjectName, logger as baseLogger } from '../../../lib/utils';
+import { return_error, return_response, encodeSapObjectName } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
-import { XMLParser  } from 'fast-xml-parser';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { ServiceDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   name: "CreateServiceDefinition",
   description: "Create a new ABAP service definition for OData services. Service definitions define the structure and behavior of OData services. Uses stateful session for proper lock management.",
@@ -63,11 +62,8 @@ interface CreateServiceDefinitionArgs {
  *
  * Uses CrudClient.createServiceDefinition
  */
-export async function handleCreateServiceDefinition(connection: AbapConnection, args: CreateServiceDefinitionArgs) {
-    const handlerLogger = getHandlerLogger(
-    'handleCreateServiceDefinition',
-    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-  );
+export async function handleCreateServiceDefinition(context: HandlerContext, args: CreateServiceDefinitionArgs) {
+  const { connection, logger } = context;
   try {
     // Validate required parameters
     if (!args?.service_definition_name) {
@@ -90,7 +86,7 @@ export async function handleCreateServiceDefinition(connection: AbapConnection, 
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
     const serviceDefinitionName = typedArgs.service_definition_name.toUpperCase();
 
-    handlerLogger.info(`Starting service definition creation: ${serviceDefinitionName}`);
+    logger.info(`Starting service definition creation: ${serviceDefinitionName}`);
 
     try {
       // Create client
@@ -141,7 +137,7 @@ export async function handleCreateServiceDefinition(connection: AbapConnection, 
         }
       }
 
-      handlerLogger.info(`✅ CreateServiceDefinition completed successfully: ${serviceDefinitionName}`);
+      logger.info(`✅ CreateServiceDefinition completed successfully: ${serviceDefinitionName}`);
 
       // Return success result
       const stepsCompleted = ['validate', 'create'];
@@ -172,7 +168,7 @@ export async function handleCreateServiceDefinition(connection: AbapConnection, 
       });
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating service definition ${serviceDefinitionName}:`, error);
+      logger.error(`Error creating service definition ${serviceDefinitionName}:`, error);
 
       // Check if service definition already exists
       if (error.message?.includes('already exists') || error.response?.status === 409) {
@@ -188,14 +184,14 @@ export async function handleCreateServiceDefinition(connection: AbapConnection, 
       try {
         if (connection) {
           connection.reset();
-          handlerLogger.debug('Reset service definition connection after use');
+          logger.debug('Reset service definition connection after use');
         }
       } catch (resetError: any) {
-        handlerLogger.error(`Failed to reset service definition connection: ${resetError?.message || resetError}`);
+        logger.error(`Failed to reset service definition connection: ${resetError?.message || resetError}`);
       }
     }
   } catch (error: any) {
-    handlerLogger.error('CreateServiceDefinition handler error:', error);
+    logger.error('CreateServiceDefinition handler error:', error);
     return return_error(error);
   }
 }

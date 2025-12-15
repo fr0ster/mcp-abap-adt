@@ -31,7 +31,8 @@
 
 import * as crypto from 'crypto';
 import { AxiosResponse } from 'axios';
-import { makeAdtRequestWithTimeout, getBaseUrl } from './utils';
+import { makeAdtRequestWithTimeout } from './utils';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 
 /**
  * Generate unique session ID for ADT stateful operations
@@ -119,6 +120,7 @@ export function generateRequestId(): string {
  * ```
  */
 export async function makeAdtRequestWithSession(
+  connection: IAbapConnection,
   url: string,
   method: string,
   sessionId: string,
@@ -126,7 +128,7 @@ export async function makeAdtRequestWithSession(
   additionalHeaders?: Record<string, string>
 ): Promise<AxiosResponse> {
   // Resolve to full URL if relative path provided
-  const baseUrl = await getBaseUrl();
+  const baseUrl = await connection.getBaseUrl();
   const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
 
   // Generate unique request ID for this specific request
@@ -142,7 +144,7 @@ export async function makeAdtRequestWithSession(
   };
 
   // Make request using standard timeout handling
-  return makeAdtRequestWithTimeout(fullUrl, method, 'default', data, undefined, headers);
+  return makeAdtRequestWithTimeout(connection, fullUrl, method, 'default', data, undefined, headers);
 }
 
 /**
@@ -159,13 +161,14 @@ export async function makeAdtRequestWithSession(
  * @returns Promise with Axios response
  */
 export async function makeAdtRequestStateless(
+  connection: IAbapConnection,
   url: string,
   method: string,
   sessionId: string,
   data?: any,
   additionalHeaders?: Record<string, string>
 ): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl();
+  const baseUrl = await connection.getBaseUrl();
   const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
 
   const requestId = generateRequestId();
@@ -176,5 +179,5 @@ export async function makeAdtRequestStateless(
     ...additionalHeaders
   };
 
-  return makeAdtRequestWithTimeout(fullUrl, method, 'default', data, undefined, headers);
+  return makeAdtRequestWithTimeout(connection, fullUrl, method, 'default', data, undefined, headers);
 }

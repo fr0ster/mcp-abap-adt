@@ -6,9 +6,9 @@
  */
 
 import { AxiosResponse, return_error, return_response, logger as baseLogger, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ValidateMetadataExtensionLow",
@@ -55,7 +55,8 @@ interface ValidateMetadataExtensionArgs {
  *
  * Uses CrudClient.validateMetadataExtension - low-level single method call
  */
-export async function handleValidateMetadataExtension(connection: AbapConnection, args: ValidateMetadataExtensionArgs) {
+export async function handleValidateMetadataExtension(context: HandlerContext, args: ValidateMetadataExtensionArgs) {
+  const { connection, logger } = context;
   try {
     const {
       name,
@@ -70,22 +71,18 @@ export async function handleValidateMetadataExtension(connection: AbapConnection
       return return_error(new Error('name, description, and package_name are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleValidateMetadataExtension',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const ddlxName = name.toUpperCase();
 
-    handlerLogger.info(`Starting metadata extension validation: ${ddlxName}`);
+    logger.info(`Starting metadata extension validation: ${ddlxName}`);
 
     try {
       // Validate metadata extension
@@ -103,7 +100,7 @@ export async function handleValidateMetadataExtension(connection: AbapConnection
       // Get updated session state after validation
 
 
-      handlerLogger.info(`✅ ValidateMetadataExtension completed: ${ddlxName} (valid=${result.valid})`);
+      logger.info(`✅ ValidateMetadataExtension completed: ${ddlxName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +116,7 @@ export async function handleValidateMetadataExtension(connection: AbapConnection
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error validating metadata extension ${ddlxName}:`, error);
+      logger.error(`Error validating metadata extension ${ddlxName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to validate metadata extension: ${error.message || String(error)}`;

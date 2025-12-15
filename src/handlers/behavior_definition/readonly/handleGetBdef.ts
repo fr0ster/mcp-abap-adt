@@ -57,7 +57,7 @@ export async function handleGetBdef(context: HandlerContext, args: any) {
         // Always use the simple, direct endpoint as in the Python code
         const endpoint = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(bdefName)}/source/main`;
         logger.info(`Requesting BDEF source from: ${endpoint}`);
-        const response = await makeAdtRequestWithTimeout(endpoint, 'GET', 'default', {
+        const response = await makeAdtRequestWithTimeout(connection, endpoint, 'GET', 'default', undefined, undefined, {
             'Accept': 'text/plain'
         });
 

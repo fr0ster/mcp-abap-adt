@@ -20,6 +20,7 @@ export const TOOL_DEFINITION = {
 import { McpError, ErrorCode, fetchNodeStructure, return_error, logger as baseLogger } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 /**
  * Parses every SEU_ADT_REPOSITORY_OBJ_NODE element from the XML and returns objects with the required fields
@@ -76,6 +77,7 @@ function parseNodeIds(xmlData: string): string[] {
  * Recursively walks the ADT node structure and returns only valid objects
  */
 async function collectValidObjectsStrict(
+    connection: AbapConnection,
     parent_name: string,
     parent_tech_name: string,
     parent_type: string,
@@ -87,6 +89,7 @@ async function collectValidObjectsStrict(
     visited.add(node_id);
 
     const response = await fetchNodeStructure(
+        connection,
         parent_name,
         parent_tech_name,
         parent_type,
@@ -102,6 +105,7 @@ async function collectValidObjectsStrict(
     const nodeIds = parseNodeIds(xml);
     for (const childNodeId of nodeIds) {
         const childObjects = await collectValidObjectsStrict(
+            connection,
             parent_name,
             parent_tech_name,
             parent_type,
@@ -119,7 +123,8 @@ async function collectValidObjectsStrict(
  * Main handler for GetObjectsListStrict
  * @param args { parent_name, parent_tech_name, parent_type, with_short_descriptions }
  */
-export async function handleGetObjectsList(connection: AbapConnection, args: any) {
+export async function handleGetObjectsList(context: HandlerContext, args: any) {
+    const { connection, logger } = context;
     try {
     const handlerLogger = getHandlerLogger(
       'handleGetObjectsList',
@@ -142,6 +147,7 @@ export async function handleGetObjectsList(connection: AbapConnection, args: any
 
     // Begin traversal from node_id '000000' (the root node)
         const objects = await collectValidObjectsStrict(
+            connection,
             parent_name.toUpperCase(),
             parent_tech_name.toUpperCase(),
             parent_type,

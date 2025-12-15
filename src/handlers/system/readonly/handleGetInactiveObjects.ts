@@ -6,6 +6,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
     name: "GetInactiveObjects",
@@ -17,7 +18,8 @@ export const TOOL_DEFINITION = {
     }
 } as const;
 
-export async function handleGetInactiveObjects(connection: AbapConnection, params: any) {
+export async function handleGetInactiveObjects(context: HandlerContext, params: any) {
+    const { connection, logger } = context;
         const handlerLogger = getHandlerLogger(
       'handleGetInactiveObjects',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

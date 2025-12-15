@@ -62,7 +62,8 @@ interface CheckFunctionModuleArgs {
 /**
  * Main handler for CheckFunctionModule MCP tool
  */
-export async function handleCheckFunctionModule(connection: AbapConnection, args: CheckFunctionModuleArgs) {
+export async function handleCheckFunctionModule(context: HandlerContext, args: CheckFunctionModuleArgs) {
+  const { connection, logger } = context;
   try {
     const {
       function_group_name,
@@ -80,11 +81,6 @@ export async function handleCheckFunctionModule(connection: AbapConnection, args
       ? version.toLowerCase() as 'active' | 'inactive'
       : 'active';
 
-        const handlerLogger = getHandlerLogger(
-      'handleCheckFunctionModule',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -95,7 +91,7 @@ export async function handleCheckFunctionModule(connection: AbapConnection, args
     const functionGroupName = function_group_name.toUpperCase();
     const functionModuleName = function_module_name.toUpperCase();
 
-    handlerLogger.info(`Starting function module check: ${functionModuleName} in group ${functionGroupName} (version: ${checkVersion})`);
+    logger.info(`Starting function module check: ${functionModuleName} in group ${functionGroupName} (version: ${checkVersion})`);
 
     try {
       const client = new CrudClient(connection);
@@ -109,10 +105,10 @@ export async function handleCheckFunctionModule(connection: AbapConnection, args
       const checkResult = parseCheckRunResponse(response);
 
       // Get updated session state after check
-      
 
-      handlerLogger.info(`✅ CheckFunctionModule completed: ${functionModuleName}`);
-      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+
+      logger.info(`✅ CheckFunctionModule completed: ${functionModuleName}`);
+      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -130,7 +126,7 @@ export async function handleCheckFunctionModule(connection: AbapConnection, args
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error checking function module ${functionModuleName}: ${error?.message || error}`);
+      logger.error(`Error checking function module ${functionModuleName}: ${error?.message || error}`);
 
       let errorMessage = `Failed to check function module: ${error.message || String(error)}`;
 

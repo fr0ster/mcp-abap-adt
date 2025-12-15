@@ -18,18 +18,15 @@ export const TOOL_DEFINITION = {
 // handleGetObjectNodeFromCache returns a cached node by OBJECT_TYPE, OBJECT_NAME, and TECH_NAME, expanding OBJECT_URI when available
 
 import { objectsListCache } from '../../../lib/getObjectsListCache';
-import { makeAdtRequest, logger as baseLogger } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { makeAdtRequest } from '../../../lib/utils';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 /**
  * @param args { object_type, object_name, tech_name }
  * @returns cached node including object_uri_response when OBJECT_URI exists
  */
-export async function handleGetObjectNodeFromCache(connection: AbapConnection, args: any) {
-    const handlerLogger = getHandlerLogger(
-      'handleGetObjectNodeFromCache',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+export async function handleGetObjectNodeFromCache(context: HandlerContext, args: any) {
+    const { connection, logger } = context;
     const { object_type, object_name, tech_name } = args;
     if (!object_type || !object_name || !tech_name) {
         return {
@@ -48,7 +45,7 @@ export async function handleGetObjectNodeFromCache(connection: AbapConnection, a
         ) || null;
     }
     if (!node) {
-        handlerLogger.debug(`Node ${object_type}/${object_name}/${tech_name} not found in cache`);
+        logger.debug(`Node ${object_type}/${object_name}/${tech_name} not found in cache`);
         return {
             isError: true,
             content: [{ type: 'text', text: 'Node not found in cache' }]
@@ -69,7 +66,7 @@ export async function handleGetObjectNodeFromCache(connection: AbapConnection, a
         };
         try {
             const endpoint = buildEndpoint(node.OBJECT_URI);
-            const resp = await makeAdtRequest(endpoint, 'GET', 15000);
+            const resp = await makeAdtRequest(connection, endpoint, 'GET', 15000);
             node.object_uri_response = typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data);
 
             // Persist the fetched OBJECT_URI payload back into the cache entry
@@ -84,11 +81,11 @@ export async function handleGetObjectNodeFromCache(connection: AbapConnection, a
                 objectsListCache.setCache(cache);
             }
         } catch (e) {
-            handlerLogger.error('Failed to expand OBJECT_URI from cache', e as any);
+            logger.error('Failed to expand OBJECT_URI from cache', e as any);
             node.object_uri_response = `ERROR: ${e instanceof Error ? e.message : String(e)}`;
         }
     }
-    handlerLogger.info(`Returning cached node for ${object_type}/${object_name}/${tech_name}`);
+    logger.info(`Returning cached node for ${object_type}/${object_name}/${tech_name}`);
     return {
         content: [{ type: 'json', json: node }]
     };

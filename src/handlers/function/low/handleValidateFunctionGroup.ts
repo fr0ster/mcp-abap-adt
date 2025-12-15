@@ -57,7 +57,8 @@ interface ValidateFunctionGroupArgs {
  *
  * Uses CrudClient.validateFunctionGroup - low-level single method call
  */
-export async function handleValidateFunctionGroup(connection: AbapConnection, args: ValidateFunctionGroupArgs) {
+export async function handleValidateFunctionGroup(context: HandlerContext, args: ValidateFunctionGroupArgs) {
+  const { connection, logger } = context;
   try {
     const {
       function_group_name,
@@ -72,10 +73,6 @@ export async function handleValidateFunctionGroup(connection: AbapConnection, ar
     }
 
         const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleValidateFunctionGroup',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -86,7 +83,7 @@ export async function handleValidateFunctionGroup(connection: AbapConnection, ar
 
     const functionGroupName = function_group_name.toUpperCase();
 
-    handlerLogger.info(`Starting function group validation: ${functionGroupName}`);
+    logger.info(`Starting function group validation: ${functionGroupName}`);
 
     try {
       // Validate function group
@@ -105,7 +102,7 @@ export async function handleValidateFunctionGroup(connection: AbapConnection, ar
       // Get updated session state after validation
 
 
-      handlerLogger.info(`✅ ValidateFunctionGroup completed: ${functionGroupName} (valid=${result.valid})`);
+      logger.info(`✅ ValidateFunctionGroup completed: ${functionGroupName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -121,7 +118,7 @@ export async function handleValidateFunctionGroup(connection: AbapConnection, ar
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error validating function group ${functionGroupName}: ${error?.message || error}`);
+      logger.error(`Error validating function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate function group: ${error.message || String(error)}`;

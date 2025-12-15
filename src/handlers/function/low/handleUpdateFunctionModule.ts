@@ -67,7 +67,8 @@ interface UpdateFunctionModuleArgs {
  *
  * Uses CrudClient.updateFunctionModule - low-level single method call
  */
-export async function handleUpdateFunctionModule(connection: AbapConnection, args: UpdateFunctionModuleArgs) {
+export async function handleUpdateFunctionModule(context: HandlerContext, args: UpdateFunctionModuleArgs) {
+  const { connection, logger } = context;
   try {
     const {
       function_module_name,
@@ -83,23 +84,18 @@ export async function handleUpdateFunctionModule(connection: AbapConnection, arg
       return return_error(new Error('function_module_name, function_group_name, source_code, and lock_handle are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateFunctionModuleLow',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
+    const client = new CrudClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    handlerLogger.info(`Starting function module update: ${functionModuleName} in ${functionGroupName}`);
+    logger.info(`Starting function module update: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       // Update function module with source code
@@ -113,7 +109,7 @@ export async function handleUpdateFunctionModule(connection: AbapConnection, arg
       // Get updated session state after update
 
 
-      handlerLogger.info(`✅ UpdateFunctionModule completed: ${functionModuleName}`);
+      logger.info(`✅ UpdateFunctionModule completed: ${functionModuleName}`);
 
       // Get lock handle from builder (it should still be there after update)
       const lockHandleFromBuilder = client.getLockHandle();
@@ -131,7 +127,7 @@ export async function handleUpdateFunctionModule(connection: AbapConnection, arg
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating function module ${functionModuleName}: ${error?.message || error}`);
+      logger.error(`Error updating function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update function module: ${error.message || String(error)}`;

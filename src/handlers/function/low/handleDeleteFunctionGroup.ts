@@ -38,7 +38,8 @@ interface DeleteFunctionGroupArgs {
  *
  * Uses CrudClient.deleteFunctionGroup - low-level single method call
  */
-export async function handleDeleteFunctionGroup(connection: AbapConnection, args: DeleteFunctionGroupArgs) {
+export async function handleDeleteFunctionGroup(context: HandlerContext, args: DeleteFunctionGroupArgs) {
+  const { connection, logger } = context;
   try {
     const {
       function_group_name,
@@ -50,14 +51,9 @@ export async function handleDeleteFunctionGroup(connection: AbapConnection, args
       return return_error(new Error('function_group_name is required'));
     }
 
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
     const functionGroupName = function_group_name.toUpperCase();
-    const handlerLogger = getHandlerLogger(
-      'handleDeleteFunctionGroup',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
-    handlerLogger.info(`Starting function group deletion: ${functionGroupName}`);
+    logger.info(`Starting function group deletion: ${functionGroupName}`);
 
     try {
       // Delete function group
@@ -68,7 +64,7 @@ export async function handleDeleteFunctionGroup(connection: AbapConnection, args
         throw new Error(`Delete did not return a response for function group ${functionGroupName}`);
       }
 
-      handlerLogger.info(`✅ DeleteFunctionGroup completed successfully: ${functionGroupName}`);
+      logger.info(`✅ DeleteFunctionGroup completed successfully: ${functionGroupName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -80,7 +76,7 @@ export async function handleDeleteFunctionGroup(connection: AbapConnection, args
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error deleting function group ${functionGroupName}: ${error?.message || error}`);
+      logger.error(`Error deleting function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete function group: ${error.message || String(error)}`;

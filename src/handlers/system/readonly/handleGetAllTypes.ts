@@ -4,6 +4,7 @@ import { makeAdtRequestWithTimeout, logger as baseLogger } from '../../../lib/ut
 import { XMLParser } from 'fast-xml-parser';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { AbapConnection } from '@mcp-abap-adt/connection';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   name: "GetAdtTypes",
   description: "[read-only] Retrieve all valid ADT object types.",
@@ -73,14 +74,15 @@ function extractNamedItems(xml: string) {
   return items;
 }
 
-export async function handleGetAdtTypes(connection: AbapConnection, args: any) {
+export async function handleGetAdtTypes(context: HandlerContext, args: any) {
+  const { connection, logger } = context;
   const handlerLogger = getHandlerLogger(
     'handleGetAdtTypes',
     process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
   );
   try {
     const url = `/sap/bc/adt/repository/informationsystem/objecttypes?maxItemCount=999&name=*&data=usedByProvider`;
-    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+    const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
     handlerLogger.info('Fetched ADT object types list');
     const items = extractNamedItems(response.data);
     return {

@@ -19,7 +19,7 @@ export async function handleGetInclude(context: HandlerContext, args: any) {
     }
     const url = `/sap/bc/adt/programs/includes/${encodeSapObjectName(args.include_name)}/source/main`;
     logger.info(`Fetching include: ${args.include_name}`);
-    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+    const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
     const plainText = response.data;
     if (args.filePath) {
       writeResultToFile(plainText, args.filePath);

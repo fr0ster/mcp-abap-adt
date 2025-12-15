@@ -3,6 +3,7 @@ import { makeAdtRequestWithTimeout, return_error, encodeSapObjectName } from '..
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
 import { AbapConnection } from '@mcp-abap-adt/connection';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   "name": "GetWhereUsed",
   "description": "[read-only] Retrieve where-used references for ABAP objects via ADT usageReferences.",
@@ -147,12 +148,12 @@ function buildObjectUri(objectName: string, objectType: string): string {
 /**
  * Resolves object identifier to human-readable name using quickSearch API
  */
-async function resolveObjectIdentifier(objectIdentifier: string): Promise<string | null> {
+async function resolveObjectIdentifier(connection: AbapConnection, objectIdentifier: string): Promise<string | null> {
     try {
         const query = encodeURIComponent(`${objectIdentifier}*`);
         const endpoint = `/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${query}&maxResults=1`;
 
-        const response = await makeAdtRequestWithTimeout(endpoint, 'GET', 'default');
+        const response = await makeAdtRequestWithTimeout(connection, endpoint, 'GET', 'default');
 
         // Parse XML response to extract description
         const descriptionMatch = response.data.match(/adtcore:description="([^"]*)"/);
@@ -199,7 +200,7 @@ function isInternalClassStructure(ref: WhereUsedReference): boolean {
 /**
  * Enhances references with resolved names for better readability
  */
-async function enhanceReferencesWithNames(references: WhereUsedReference[]): Promise<WhereUsedReference[]> {
+async function enhanceReferencesWithNames(connection: AbapConnection, references: WhereUsedReference[]): Promise<WhereUsedReference[]> {
     const enhancedReferences = [...references];
 
     // Process references that have cryptic names but objectIdentifiers
@@ -208,7 +209,7 @@ async function enhanceReferencesWithNames(references: WhereUsedReference[]): Pro
 
         // If name is empty or cryptic and we have objectIdentifier, try to resolve it
         if (ref.objectIdentifier && (!ref.name || ref.name.length === 0)) {
-            const resolvedName = await resolveObjectIdentifier(ref.objectIdentifier);
+            const resolvedName = await resolveObjectIdentifier(connection, ref.objectIdentifier);
             if (resolvedName) {
                 enhancedReferences[i] = {
                     ...ref,
@@ -377,7 +378,8 @@ function parseWhereUsedResponse(xmlData: string): WhereUsedReference[] {
  * - enhancementspot, enhs, enho
  * - enhancementimpl, enhi
  */
-export async function handleGetWhereUsed(connection: AbapConnection, args: WhereUsedArgs) {
+export async function handleGetWhereUsed(context: HandlerContext, args: WhereUsedArgs) {
+    const { connection, logger } = context;
     const handlerLogger = getHandlerLogger(
       'handleGetWhereUsed',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -400,13 +402,14 @@ export async function handleGetWhereUsed(connection: AbapConnection, args: Where
         const objectUri = buildObjectUri(typedArgs.object_name, typedArgs.object_type);
 
         // 2. Prepare the usageReferences request
-        const endpoint = `/sap/bc/adt/repository/informationsystem/usageReferences?uri=${encodeURIComponent(objectUri)}`;
+        const url = `/sap/bc/adt/repository/informationsystem/usageReferences?uri=${encodeURIComponent(objectUri)}`;
 
         const requestBody = '<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/></usagereferences:usageReferenceRequest>';
 
         // 3. Make the POST request
         const response = await makeAdtRequestWithTimeout(
-            endpoint,
+            connection,
+            url,
             'POST',
             'default',
             requestBody

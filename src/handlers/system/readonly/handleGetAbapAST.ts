@@ -2,15 +2,16 @@ import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
 import { AbapConnection } from '@mcp-abap-adt/connection';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   name: "GetAbapAST",
   description: "[read-only] Parse ABAP code and return AST (Abstract Syntax Tree) in JSON format.",
   inputSchema: {
     type: "object",
     properties: {
-      code: { 
-        type: "string", 
-        description: "ABAP source code to parse" 
+      code: {
+        type: "string",
+        description: "ABAP source code to parse"
       },
       filePath: {
         type: "string",
@@ -39,7 +40,7 @@ class SimpleAbapASTGenerator {
                 dataDeclarations: this.findDataDeclarations(code),
                 forms: this.findForms(code)
             };
-            
+
             return ast;
         } catch (error) {
             throw new Error(`Failed to parse ABAP code: ${error instanceof Error ? error.message : String(error)}`);
@@ -49,10 +50,10 @@ class SimpleAbapASTGenerator {
     private analyzeStructures(code: string): any[] {
         const structures: any[] = [];
         const lines = code.split('\n');
-        
+
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim().toLowerCase();
-            
+
             if (line.startsWith('class ')) {
                 structures.push({
                     type: 'class',
@@ -79,7 +80,7 @@ class SimpleAbapASTGenerator {
                 });
             }
         }
-        
+
         return structures;
     }
 
@@ -93,7 +94,7 @@ class SimpleAbapASTGenerator {
         const classRegex = /class\s+([a-zA-Z0-9_]+)\s+(definition|implementation)/gi;
         const classes: any[] = [];
         let match;
-        
+
         while ((match = classRegex.exec(code)) !== null) {
             classes.push({
                 name: match[1],
@@ -101,7 +102,7 @@ class SimpleAbapASTGenerator {
                 position: match.index
             });
         }
-        
+
         return classes;
     }
 
@@ -109,14 +110,14 @@ class SimpleAbapASTGenerator {
         const methodRegex = /methods?\s+([a-zA-Z0-9_]+)/gi;
         const methods: any[] = [];
         let match;
-        
+
         while ((match = methodRegex.exec(code)) !== null) {
             methods.push({
                 name: match[1],
                 position: match.index
             });
         }
-        
+
         return methods;
     }
 
@@ -124,14 +125,14 @@ class SimpleAbapASTGenerator {
         const dataRegex = /data:?\s+([a-zA-Z0-9_]+)/gi;
         const declarations: any[] = [];
         let match;
-        
+
         while ((match = dataRegex.exec(code)) !== null) {
             declarations.push({
                 name: match[1],
                 position: match.index
             });
         }
-        
+
         return declarations;
     }
 
@@ -139,19 +140,20 @@ class SimpleAbapASTGenerator {
         const formRegex = /form\s+([a-zA-Z0-9_]+)/gi;
         const forms: any[] = [];
         let match;
-        
+
         while ((match = formRegex.exec(code)) !== null) {
             forms.push({
                 name: match[1],
                 position: match.index
             });
         }
-        
+
         return forms;
     }
 }
 
-export async function handleGetAbapAST(connection: AbapConnection, args: any) {
+export async function handleGetAbapAST(context: HandlerContext, args: any) {
+    const { connection, logger } = context;
     const handlerLogger = getHandlerLogger(
       'handleGetAbapAST',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

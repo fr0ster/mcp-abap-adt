@@ -5,22 +5,22 @@ import { handleGetFunction } from '../../function/readonly/handleGetFunction';
 import { handleGetInterface } from '../../interface/readonly/handleGetInterface';
 import { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
-    name: "GetAbapSystemSymbols",
-    description: "[read-only] Resolve ABAP symbols from semantic analysis with SAP system information including types, scopes, descriptions, and packages.",
-    inputSchema: {
-        type: "object",
-        properties: {
-            code: {
-                type: "string",
-                description: "ABAP source code to analyze and resolve symbols for"
-            },
-            filePath: {
-                type: "string",
-                description: "Optional file path to write the result to"
-            }
-        },
-        required: ["code"]
-    }
+  name: "GetAbapSystemSymbols",
+  description: "[read-only] Resolve ABAP symbols from semantic analysis with SAP system information including types, scopes, descriptions, and packages.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      code: {
+        type: "string",
+        description: "ABAP source code to analyze and resolve symbols for"
+      },
+      filePath: {
+        type: "string",
+        description: "Optional file path to write the result to"
+      }
+    },
+    required: ["code"]
+  }
 } as const;
 
 interface AbapSymbolInfo {

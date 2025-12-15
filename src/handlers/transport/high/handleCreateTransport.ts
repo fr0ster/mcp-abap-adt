@@ -8,10 +8,11 @@
  */
 
 import { McpError, ErrorCode  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
+
 export const TOOL_DEFINITION = {
   name: "CreateTransport",
   description: "Create a new ABAP transport request in SAP system for development objects.",
@@ -55,7 +56,8 @@ interface CreateTransportArgs {
  * Uses TransportBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateTransport(connection: AbapConnection, args: CreateTransportArgs) {
+export async function handleCreateTransport(context: HandlerContext, args: CreateTransportArgs) {
+  const { connection, logger } = context;
   try {
     const handlerLogger = getHandlerLogger(
       "handleCreateTransport",

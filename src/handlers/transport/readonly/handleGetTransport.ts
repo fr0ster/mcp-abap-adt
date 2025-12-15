@@ -12,6 +12,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { McpError, ErrorCode, makeAdtRequestWithTimeout, return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { XMLParser } from 'fast-xml-parser';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "GetTransport",
@@ -144,7 +145,8 @@ function parseTransportXml(xmlData: string, includeObjects: boolean = true, incl
 /**
  * Main handler for GetTransport MCP tool
  */
-export async function handleGetTransport(connection: AbapConnection, args: GetTransportArgs) {
+export async function handleGetTransport(context: HandlerContext, args: GetTransportArgs) {
+  const { connection, logger } = context;
   const handlerLogger = getHandlerLogger('handleGetTransport');
   try {
     // Validate required parameters
@@ -176,7 +178,7 @@ export async function handleGetTransport(connection: AbapConnection, args: GetTr
     handlerLogger.debug(`GET from: ${url}`);
 
     // Get transport request
-    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default', null, undefined, headers);
+    const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default', undefined, undefined, headers);
 
     handlerLogger.debug(`GetTransport response status: ${response.status}`);
 

@@ -57,7 +57,8 @@ interface LockFunctionModuleArgs {
  *
  * Uses CrudClient.lockFunctionModule - low-level single method call
  */
-export async function handleLockFunctionModule(connection: AbapConnection, args: LockFunctionModuleArgs) {
+export async function handleLockFunctionModule(context: HandlerContext, args: LockFunctionModuleArgs) {
+  const { connection, logger } = context;
   try {
     const {
       function_module_name,
@@ -71,23 +72,18 @@ export async function handleLockFunctionModule(connection: AbapConnection, args:
       return return_error(new Error('function_module_name and function_group_name are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleLockFunctionModule',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
+    const client = new CrudClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    handlerLogger.info(`Starting function module lock: ${functionModuleName} in ${functionGroupName}`);
+    logger.info(`Starting function module lock: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       // Lock function module
@@ -99,10 +95,10 @@ export async function handleLockFunctionModule(connection: AbapConnection, args:
       }
 
       // Get updated session state after lock
-      
 
-      handlerLogger.info(`✅ LockFunctionModule completed: ${functionModuleName}`);
-      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+
+      logger.info(`✅ LockFunctionModule completed: ${functionModuleName}`);
+      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -117,7 +113,7 @@ export async function handleLockFunctionModule(connection: AbapConnection, args:
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error locking function module ${functionModuleName}: ${error?.message || error}`);
+      logger.error(`Error locking function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock function module: ${error.message || String(error)}`;

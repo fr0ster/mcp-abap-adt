@@ -62,7 +62,8 @@ interface UnlockFunctionModuleArgs {
  *
  * Uses CrudClient.unlockFunctionModule - low-level single method call
  */
-export async function handleUnlockFunctionModule(connection: AbapConnection, args: UnlockFunctionModuleArgs) {
+export async function handleUnlockFunctionModule(context: HandlerContext, args: UnlockFunctionModuleArgs) {
+  const { connection, logger } = context;
   try {
     const {
       function_module_name,
@@ -77,23 +78,18 @@ export async function handleUnlockFunctionModule(connection: AbapConnection, arg
       return return_error(new Error('function_module_name, function_group_name, lock_handle, and session_id are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUnlockFunctionModule',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
+    const client = new CrudClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    handlerLogger.info(`Starting function module unlock: ${functionModuleName} in ${functionGroupName} (session: ${session_id.substring(0, 8)}...)`);
+    logger.info(`Starting function module unlock: ${functionModuleName} in ${functionGroupName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock function module
@@ -103,7 +99,7 @@ export async function handleUnlockFunctionModule(connection: AbapConnection, arg
       // Get updated session state after unlock
 
 
-      handlerLogger.info(`✅ UnlockFunctionModule completed: ${functionModuleName}`);
+      logger.info(`✅ UnlockFunctionModule completed: ${functionModuleName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -117,7 +113,7 @@ export async function handleUnlockFunctionModule(connection: AbapConnection, arg
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error unlocking function module ${functionModuleName}: ${error?.message || error}`);
+      logger.error(`Error unlocking function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock function module: ${error.message || String(error)}`;

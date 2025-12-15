@@ -43,7 +43,8 @@ interface DeleteFunctionModuleArgs {
  *
  * Uses CrudClient.deleteFunctionModule - low-level single method call
  */
-export async function handleDeleteFunctionModule(connection: AbapConnection, args: DeleteFunctionModuleArgs) {
+export async function handleDeleteFunctionModule(context: HandlerContext, args: DeleteFunctionModuleArgs) {
+  const { connection, logger } = context;
   try {
     const {
       function_module_name,
@@ -59,12 +60,7 @@ export async function handleDeleteFunctionModule(connection: AbapConnection, arg
         const client = new CrudClient(connection);
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
-    const handlerLogger = getHandlerLogger(
-      'handleDeleteFunctionModule',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
-    handlerLogger.info(`Starting function module deletion: ${functionModuleName} in ${functionGroupName}`);
+    logger.info(`Starting function module deletion: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       // Delete function module
@@ -75,7 +71,7 @@ export async function handleDeleteFunctionModule(connection: AbapConnection, arg
         throw new Error(`Delete did not return a response for function module ${functionModuleName}`);
       }
 
-      handlerLogger.info(`✅ DeleteFunctionModule completed successfully: ${functionModuleName}`);
+      logger.info(`✅ DeleteFunctionModule completed successfully: ${functionModuleName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -88,7 +84,7 @@ export async function handleDeleteFunctionModule(connection: AbapConnection, arg
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error deleting function module ${functionModuleName}: ${error?.message || error}`);
+      logger.error(`Error deleting function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete function module: ${error.message || String(error)}`;

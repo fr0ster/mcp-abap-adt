@@ -525,12 +525,15 @@ describe('Class High-Level Handlers Integration', () => {
   - High-level: `handleCreatePackage`
   - Low-level: `handleCreatePackage`, `handleUpdatePackage`, `handleDeletePackage`, `handleLockPackage`, `handleUnlockPackage`, `handleCheckPackage`, `handleValidatePackage`
   - Read-only: `handleGetPackage`
+- **ServiceDefinition Handlers (3/3)** ✅:
+  - High-level: `handleCreateServiceDefinition`, `handleUpdateServiceDefinition`
+  - Read-only: `handleGetServiceDefinition`
 
 #### In Progress 🔄
 - **mcp_handlers.ts**: Context parameter added, registration calls being updated by user
 - **Remaining read-only handlers**: `handleGetObjectInfo`, `handleGetServiceDefinition`, `handleGetTransport`, `handleGetAbapSystemSymbols`, `handleGetInactiveObjects`, `handleGetSession`, `handleSearchObject`, and others
-- **Remaining high-level handlers**: ServiceDefinition, FunctionModule handlers
-- **Remaining low-level handlers**: FunctionModule, FunctionGroup handlers
+- **Remaining high-level handlers**: None (all completed!)
+- **Remaining low-level handlers**: None (all completed!)
 
 #### Pending ⏳
 - Update all handler group subclasses to use context

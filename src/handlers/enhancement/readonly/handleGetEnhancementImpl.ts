@@ -1,3 +1,4 @@
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 import { McpError, ErrorCode } from '../../../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, logger, encodeSapObjectName } from '../../../lib/utils';
 import { writeResultToFile  } from '../../../lib/writeResultToFile';
@@ -41,11 +42,11 @@ export interface EnhancementByNameResponse {
 function parseEnhancementSourceFromXml(xmlData: string): string {
     try {
         // Look for source code in various possible formats
-        
+
         // Try to find base64 encoded source in <source> or similar tags
         const base64SourceRegex = /<(?:source|enh:source)[^>]*>([^<]*)<\/(?:source|enh:source)>/;
         const base64Match = xmlData.match(base64SourceRegex);
-        
+
         if (base64Match && base64Match[1]) {
             try {
                 // Decode base64 source code
@@ -55,19 +56,19 @@ function parseEnhancementSourceFromXml(xmlData: string): string {
                 logger.warn('Failed to decode base64 source code:', decodeError);
             }
         }
-        
+
         // Try to find plain text source code
         const textSourceRegex = /<(?:source|enh:source)[^>]*>\s*<!\[CDATA\[(.*?)\]\]>\s*<\/(?:source|enh:source)>/s;
         const textMatch = xmlData.match(textSourceRegex);
-        
+
         if (textMatch && textMatch[1]) {
             return textMatch[1];
         }
-        
+
         // If no specific source tags found, return the entire XML as fallback
         logger.warn('Could not find source code in expected format, returning raw XML');
         return xmlData;
-        
+
     } catch (parseError) {
         logger.error('Failed to parse enhancement source XML:', parseError);
         return xmlData; // Return raw XML as fallback
@@ -80,7 +81,7 @@ function parseEnhancementSourceFromXml(xmlData: string): string {
  * This function uses the SAP ADT API endpoint to fetch the source code of a specific enhancement
  * implementation within a given enhancement spot. If the implementation is not found, it falls back
  * to retrieving metadata about the enhancement spot itself to provide context about the failure.
- * 
+ *
  * @param args - Tool arguments containing:
  *   - enhancement_spot: Name of the enhancement spot (e.g., 'enhoxhh'). This is a required parameter.
  *   - enhancement_name: Name of the specific enhancement implementation (e.g., 'zpartner_update_pai'). This is a required parameter.
@@ -89,41 +90,42 @@ function parseEnhancementSourceFromXml(xmlData: string): string {
  *   - If implementation not found: enhancement_spot, enhancement_name, status as 'not_found', a message, spot_metadata, and raw_xml of the spot.
  *   - In case of error: an error object with details about the failure.
  */
-export async function handleGetEnhancementImpl(connection: AbapConnection, args: any) {
+export async function handleGetEnhancementImpl(context: HandlerContext, args: any) {
+  const { connection, logger } = context;
     try {
         logger.info('handleGetEnhancementByName called with args:', args);
-        
+
         if (!args?.enhancement_spot) {
             throw new McpError(ErrorCode.InvalidParams, 'Enhancement spot is required');
         }
-        
+
         if (!args?.enhancement_name) {
             throw new McpError(ErrorCode.InvalidParams, 'Enhancement name is required');
         }
-        
+
         const enhancementSpot = args.enhancement_spot;
         const enhancementName = args.enhancement_name;
-        
+
         logger.info(`Getting enhancement: ${enhancementName} from spot: ${enhancementSpot}`);
-        
+
         // Build the ADT URL for the specific enhancement
         // Format: /sap/bc/adt/enhancements/{enhancement_spot}/{enhancement_name}/source/main
         const url = `/sap/bc/adt/enhancements/${encodeSapObjectName(enhancementSpot)}/${encodeSapObjectName(enhancementName)}/source/main`;
-        
+
         logger.info(`Enhancement URL: ${url}`);
-        
-        const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
-        
+
+        const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
+
         if (response.status === 200 && response.data) {
             // Parse the XML to extract source code
             const sourceCode = parseEnhancementSourceFromXml(response.data);
-            
+
             const enhancementResponse: EnhancementByNameResponse = {
                 enhancement_spot: enhancementSpot,
                 enhancement_name: enhancementName,
                 source_code: sourceCode
             };
-            
+
             const result = {
                 isError: false,
                 content: [
@@ -142,11 +144,11 @@ export async function handleGetEnhancementImpl(connection: AbapConnection, args:
             // Fallback to retrieve metadata about the enhancement spot
             const spotUrl = `/sap/bc/adt/enhancements/${encodeSapObjectName(enhancementSpot)}`;
             logger.info(`Fallback enhancement spot URL: ${spotUrl}`);
-            
-            const spotResponse = await makeAdtRequestWithTimeout(spotUrl, 'GET', 'default', {
+
+            const spotResponse = await makeAdtRequestWithTimeout(connection, spotUrl, 'GET', 'default', {
                 'Accept': 'application/vnd.sap.adt.enhancements.v1+xml'
             });
-            
+
             if (spotResponse.status === 200 && spotResponse.data) {
                 // Parse metadata if possible
                 const metadata: { description?: string } = {};
@@ -154,7 +156,7 @@ export async function handleGetEnhancementImpl(connection: AbapConnection, args:
                 if (descriptionMatch && descriptionMatch[1]) {
                     metadata.description = descriptionMatch[1];
                 }
-                
+
             const fallbackResult = {
                 isError: false,
                 content: [
@@ -176,12 +178,12 @@ export async function handleGetEnhancementImpl(connection: AbapConnection, args:
             return fallbackResult;
             } else {
                 throw new McpError(
-                    ErrorCode.InternalError, 
+                    ErrorCode.InternalError,
                     `Failed to retrieve enhancement ${enhancementName} from spot ${enhancementSpot}. Status: ${response.status}. Fallback to retrieve spot metadata also failed. Status: ${spotResponse.status}`
                 );
             }
         }
-        
+
     } catch (error) {
         // MCP-compliant error response: always return content[] with type "text"
         return {

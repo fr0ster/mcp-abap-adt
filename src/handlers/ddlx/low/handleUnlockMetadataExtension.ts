@@ -6,9 +6,9 @@
  */
 
 import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UnlockMetadataExtensionLow",
@@ -58,7 +58,8 @@ interface UnlockMetadataExtensionArgs {
  *
  * Uses CrudClient.unlockMetadataExtension - low-level single method call
  */
-export async function handleUnlockMetadataExtension(connection: AbapConnection, args: UnlockMetadataExtensionArgs) {
+export async function handleUnlockMetadataExtension(context: HandlerContext, args: UnlockMetadataExtensionArgs) {
+  const { connection, logger } = context;
   try {
     const {
       name,

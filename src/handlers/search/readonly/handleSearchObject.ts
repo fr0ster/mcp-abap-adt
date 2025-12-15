@@ -1,9 +1,8 @@
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { SharedBuilder } from '@mcp-abap-adt/adt-clients';
 import type { SearchObjectsParams } from '@mcp-abap-adt/adt-clients';
-import { McpError, ErrorCode, return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
+import { McpError, ErrorCode, return_response } from '../../../lib/utils';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "SearchObject",
@@ -35,13 +34,9 @@ function detectAdtSearchError(response: any): { isError: boolean, content: any[]
   return null;
 }
 
-export async function handleSearchObject(connection: AbapConnection, args: any) {
+export async function handleSearchObject(context: HandlerContext, args: any) {
+  const { connection, logger } = context;
   try {
-    const handlerLogger = getHandlerLogger(
-      'handleSearchObject',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     const { object_name, object_type, maxResults } = args;
     if (!object_name) {
       throw new McpError(ErrorCode.InvalidParams, 'object_name is required');
@@ -59,7 +54,7 @@ export async function handleSearchObject(connection: AbapConnection, args: any) 
       searchParams.objectType = object_type;
     }
 
-    handlerLogger.info(`Searching objects: query=${object_name}${object_type ? ` type=${object_type}` : ''}`);
+    logger.info(`Searching objects: query=${object_name}${object_type ? ` type=${object_type}` : ''}`);
     await sharedBuilder.search(searchParams);
     const response = sharedBuilder.getSearchResult();
 

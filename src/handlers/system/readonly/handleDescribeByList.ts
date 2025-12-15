@@ -25,18 +25,15 @@ export const TOOL_DEFINITION = {
 
 import { handleSearchObject } from "../../search/readonly/handleSearchObject";
 import { logger as baseLogger } from "../../../lib/utils";
-import { getHandlerLogger, noopLogger } from "../../../lib/handlerLogger";
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 /**
  * DescribeByListArray handler.
  * @param args { objects: Array<{ name: string, type?: string }> }
  * @returns Result of handleDetectObjectTypeList with objects
  */
-export async function handleDescribeByList(connection: AbapConnection, args: any) {
-  const handlerLogger = getHandlerLogger(
-    'handleDescribeByList',
-    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-  );
+export async function handleDescribeByList(context: HandlerContext, args: any) {
+  const { connection, logger } = context;
   const objects = args?.objects;
   if (!args || !Array.isArray(objects) || objects.length === 0) {
     const err = new Error("Missing or invalid parameters: objects (array) is required and must not be empty.");
@@ -51,12 +48,12 @@ export async function handleDescribeByList(connection: AbapConnection, args: any
     };
     throw err;
   }
-  handlerLogger.info(`Describing ${objects.length} objects via search`);
+  logger.info(`Describing ${objects.length} objects via search`);
   const results: any[] = [];
   try {
     for (const obj of objects) {
       let type = obj.type;
-      let res = await handleSearchObject(connection, { object_name: obj.name, object_type: type });
+      let res = await handleSearchObject(context, { object_name: obj.name, object_type: type });
       let parsed;
       try {
         parsed = typeof res === "string" ? JSON.parse(res) : res;
@@ -72,7 +69,7 @@ export async function handleDescribeByList(connection: AbapConnection, args: any
         }
 
         if (tryWithoutType) {
-          res = await handleSearchObject(connection, { object_name: obj.name });
+          res = await handleSearchObject(context, { object_name: obj.name });
           parsed = typeof res === "string" ? JSON.parse(res) : res;
           // If it still fails or comes back empty, skip this object
           if (
@@ -128,7 +125,7 @@ export async function handleDescribeByList(connection: AbapConnection, args: any
       content: results
     };
   } catch (e) {
-    handlerLogger.error('Failed to describe objects list', e as any);
+    logger.error('Failed to describe objects list', e as any);
     return { isError: true, content: [] };
   }
 }

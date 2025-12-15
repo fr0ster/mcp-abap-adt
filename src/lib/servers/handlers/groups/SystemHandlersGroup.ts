@@ -13,6 +13,11 @@ import { handleGetAbapSemanticAnalysis } from "../../../../handlers/system/reado
 import { handleGetAbapSystemSymbols } from "../../../../handlers/system/readonly/handleGetAbapSystemSymbols";
 import { handleGetSession } from "../../../../handlers/system/readonly/handleGetSession";
 import { handleGetInactiveObjects } from "../../../../handlers/system/readonly/handleGetInactiveObjects";
+import { handleGetAdtTypes } from "../../../../handlers/system/readonly/handleGetAllTypes";
+import { handleGetObjectStructure } from "../../../../handlers/system/readonly/handleGetObjectStructure.js";
+import { handleGetObjectNodeFromCache } from "../../../../handlers/system/readonly/handleGetObjectNodeFromCache.js";
+import { handleDescribeByList } from "../../../../handlers/system/readonly/handleDescribeByList.js";
+
 
 // Import TOOL_DEFINITION from handlers
 import { TOOL_DEFINITION as GetTypeInfo_Tool } from "../../../../handlers/system/readonly/handleGetTypeInfo";
@@ -25,6 +30,10 @@ import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from "../../../../han
 import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from "../../../../handlers/system/readonly/handleGetAbapSystemSymbols";
 import { TOOL_DEFINITION as GetSession_Tool } from "../../../../handlers/system/readonly/handleGetSession";
 import { TOOL_DEFINITION as GetInactiveObjects_Tool } from "../../../../handlers/system/readonly/handleGetInactiveObjects";
+import { TOOL_DEFINITION as GetAdtTypes_Tool } from "../../../../handlers/system/readonly/handleGetAllTypes";
+import { TOOL_DEFINITION as GetObjectStructure_Tool } from "../../../../handlers/system/readonly/handleGetObjectStructure";
+import { TOOL_DEFINITION as GetObjectNodeFromCache_Tool } from "../../../../handlers/system/readonly/handleGetObjectNodeFromCache";
+import { TOOL_DEFINITION as DescribeByList_Tool } from "../../../../handlers/system/readonly/handleDescribeByList";
 
 /**
  * Handler group for all system-related handlers
@@ -76,11 +85,11 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           description: GetObjectInfo_Tool.description,
           inputSchema: GetObjectInfo_Tool.inputSchema,
         },
-        handler: async (connection: AbapConnection, args: any) => {
+        handler: async (args: any) => {
           if (!args || typeof args !== "object") {
             throw new Error("Missing or invalid arguments for GetObjectInfo");
           }
-          return await handleGetObjectInfo(connection, args as { parent_type: string; parent_name: string });
+          return await handleGetObjectInfo(this.context, args as { parent_type: string; parent_name: string });
         },
       },
       {
@@ -126,69 +135,42 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
       // Dynamic import handlers
       {
         toolDefinition: {
-          name: "GetAdtTypes",
-          description: "Get all ADT types available in the system",
-          inputSchema: {
-            type: "object",
-            properties: {},
-            required: [],
-          },
+          name: GetAdtTypes_Tool.name,
+          description: GetAdtTypes_Tool.description,
+          inputSchema: GetAdtTypes_Tool.inputSchema,
         },
-        handler: async (connection: AbapConnection, args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleGetAllTypes.js")).handleGetAdtTypes(connection, args);
+        handler: (args: any) => {
+          return handleGetAdtTypes(this.context, args);
         },
       },
       {
         toolDefinition: {
-          name: "GetObjectStructure",
-          description: "Get object structure with includes hierarchy",
-          inputSchema: {
-            type: "object",
-            properties: {
-              object_name: { type: "string" },
-              object_type: { type: "string" },
-            },
-            required: ["object_name", "object_type"],
-          },
+          name: GetObjectStructure_Tool.name,
+          description: GetObjectStructure_Tool.description,
+          inputSchema: GetObjectStructure_Tool.inputSchema,
         },
-        handler: async (connection: AbapConnection, args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleGetObjectStructure.js")).handleGetObjectStructure(connection, args);
+        handler: (args: any) => {
+          return handleGetObjectStructure(this.context, args);
         },
       },
       {
         toolDefinition: {
-          name: "GetObjectNodeFromCache",
-          description: "Get object node from cache",
-          inputSchema: {
-            type: "object",
-            properties: {
-              object_name: { type: "string" },
-              object_type: { type: "string" },
-            },
-            required: ["object_name", "object_type"],
-          },
+          name: GetObjectNodeFromCache_Tool.name,
+          description: GetObjectNodeFromCache_Tool.description,
+          inputSchema: GetObjectNodeFromCache_Tool.inputSchema,
         },
-        handler: async (connection: AbapConnection, args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleGetObjectNodeFromCache.js")).handleGetObjectNodeFromCache(connection, args);
+        handler: (args: any) => {
+          return handleGetObjectNodeFromCache(this.context, args);
         },
       },
       {
         toolDefinition: {
-          name: "DescribeByList",
-          description: "Describe objects by list",
-          inputSchema: {
-            type: "object",
-            properties: {
-              objects: {
-                type: "array",
-                items: { type: "string" },
-              },
-            },
-            required: ["objects"],
-          },
+          name: DescribeByList_Tool.name,
+          description: DescribeByList_Tool.description,
+          inputSchema: DescribeByList_Tool.inputSchema,
         },
-        handler: async (connection: AbapConnection, args: any) => {
-          return await (await import("../../../../handlers/system/readonly/handleDescribeByList.js")).handleDescribeByList(connection, args);
+        handler: (args: any) => {
+          return handleDescribeByList(this.context, args);
         },
       },
     ];

@@ -3,9 +3,13 @@ import { HandlerEntry } from "../interfaces.js";
 
 // Import search handlers
 import { handleSearchObject } from "../../../../handlers/search/readonly/handleSearchObject";
+import { handleGetObjectsList } from "../../../../handlers/search/readonly/handleGetObjectsList";
+import { handleGetObjectsByType } from "../../../../handlers/search/readonly/handleGetObjectsByType";
 
 // Import TOOL_DEFINITION from handlers
 import { TOOL_DEFINITION as SearchObject_Tool } from "../../../../handlers/search/readonly/handleSearchObject";
+import { TOOL_DEFINITION as GetObjectsList_Tool } from "../../../../handlers/search/readonly/handleGetObjectsList";
+import { TOOL_DEFINITION as GetObjectsByType_Tool } from "../../../../handlers/search/readonly/handleGetObjectsByType";
 
 /**
  * Handler group for all search-related handlers
@@ -30,35 +34,22 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
       // Dynamic import handlers
       {
         toolDefinition: {
-          name: "GetObjectsList",
-          description: "Get list of objects by package",
-          inputSchema: {
-            type: "object",
-            properties: {
-              package_name: { type: "string" },
-            },
-            required: ["package_name"],
-          },
+          name: GetObjectsList_Tool.name,
+          description: GetObjectsList_Tool.description,
+          inputSchema: GetObjectsList_Tool.inputSchema,
         },
-        handler: async (args: any) => {
-          return await (await import("../../../../handlers/search/readonly/handleGetObjectsList.js")).handleGetObjectsList(this.connection, args);
+        handler: (args: any) => {
+          return handleGetObjectsList(this.context, args);
         },
       },
       {
         toolDefinition: {
-          name: "GetObjectsByType",
-          description: "Get objects by type",
-          inputSchema: {
-            type: "object",
-            properties: {
-              object_type: { type: "string" },
-              package_name: { type: "string" },
-            },
-            required: ["object_type"],
-          },
+          name: GetObjectsByType_Tool.name,
+          description: GetObjectsByType_Tool.description,
+          inputSchema: GetObjectsByType_Tool.inputSchema,
         },
-        handler: async (args: any) => {
-          return await (await import("../../../../handlers/search/readonly/handleGetObjectsByType.js")).handleGetObjectsByType(this.connection, args);
+        handler: (args: any) => {
+          return handleGetObjectsByType(this.context, args);
         },
       },
     ];

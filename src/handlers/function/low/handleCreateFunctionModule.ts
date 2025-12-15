@@ -72,7 +72,8 @@ interface CreateFunctionModuleArgs {
  *
  * Uses CrudClient.createFunctionModule - low-level single method call
  */
-export async function handleCreateFunctionModule(connection: AbapConnection, args: CreateFunctionModuleArgs) {
+export async function handleCreateFunctionModule(context: HandlerContext, args: CreateFunctionModuleArgs) {
+  const { connection, logger } = context;
   try {
     const {
       function_module_name,
@@ -89,23 +90,18 @@ export async function handleCreateFunctionModule(connection: AbapConnection, arg
       return return_error(new Error('function_module_name, function_group_name, description, and package_name are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCreateFunctionModule',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
+    const client = new CrudClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    handlerLogger.info(`Starting function module creation: ${functionModuleName} in ${functionGroupName}`);
+    logger.info(`Starting function module creation: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       // Create function module
@@ -126,7 +122,7 @@ export async function handleCreateFunctionModule(connection: AbapConnection, arg
       // Get updated session state after create
 
 
-      handlerLogger.info(`✅ CreateFunctionModule completed: ${functionModuleName}`);
+      logger.info(`✅ CreateFunctionModule completed: ${functionModuleName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -143,7 +139,7 @@ export async function handleCreateFunctionModule(connection: AbapConnection, arg
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating function module ${functionModuleName}: ${error?.message || error}`);
+      logger.error(`Error creating function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create function module: ${error.message || String(error)}`;

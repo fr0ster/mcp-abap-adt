@@ -10,6 +10,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { logErrorSafely } from '../../../lib/utils';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ValidateObjectLow",
@@ -86,7 +87,8 @@ interface ValidateObjectArgs {
  * Uses validateObjectName from @mcp-abap-adt/adt-clients/core for all operations
  * Connection management handled internally
  */
-export async function handleValidateObject(connection: AbapConnection, args: ValidateObjectArgs) {
+export async function handleValidateObject(context: HandlerContext, args: ValidateObjectArgs) {
+  const { connection, logger } = context;
   try {
     const handlerLogger = getHandlerLogger(
       'handleValidateObject',
@@ -127,7 +129,7 @@ export async function handleValidateObject(connection: AbapConnection, args: Val
 
     const objectName = object_name.toUpperCase();
 
-    handlerLogger.info(`Starting object validation: ${objectName} (type: ${object_type})`);
+    logger.info(`Starting object validation: ${objectName} (type: ${object_type})`);
 
     try {
 
@@ -315,8 +317,8 @@ export async function handleValidateObject(connection: AbapConnection, args: Val
       // Get updated session state after validation
 
 
-      handlerLogger.info(`✅ ValidateObject completed: ${objectName}`);
-      handlerLogger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      logger.info(`✅ ValidateObject completed: ${objectName}`);
+      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
         data: JSON.stringify({
@@ -333,7 +335,7 @@ export async function handleValidateObject(connection: AbapConnection, args: Val
       } as AxiosResponse);
 
     } catch (error: any) {
-      logErrorSafely(handlerLogger, `ValidateObject ${objectName}`, error);
+      logErrorSafely(logger, `ValidateObject ${objectName}`, error);
 
       // Parse error message
       let errorMessage = `Failed to validate object: ${error.message || String(error)}`;

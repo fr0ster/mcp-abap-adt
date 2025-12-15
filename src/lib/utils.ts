@@ -729,6 +729,7 @@ export async function getAuthHeaders() {
  * @returns Promise with the response
  */
 export async function makeAdtRequestWithTimeout(
+  connection: AbapConnection,
   url: string,
   method: string,
   timeoutType: 'default' | 'csrf' | 'long' | number = 'default',
@@ -737,7 +738,7 @@ export async function makeAdtRequestWithTimeout(
   headers?: Record<string, string>
 ) {
   const timeout = getTimeout(timeoutType);
-  return makeAdtRequest(url, method, timeout, data, params, headers);
+  return makeAdtRequest(connection, url, method, timeout, data, params, headers);
 }
 
 /**
@@ -745,6 +746,7 @@ export async function makeAdtRequestWithTimeout(
  * @deprecated Use getReadOnlyClient().fetchNodeStructure() instead
  */
 export async function fetchNodeStructure(
+  connection: AbapConnection,
   parentName: string,
   parentTechName: string,
   parentType: string,
@@ -758,6 +760,7 @@ export async function fetchNodeStructure(
 }
 
 export async function makeAdtRequest(
+  connection: AbapConnection,
   url: string,
   method: string,
   timeout: number,
@@ -765,7 +768,7 @@ export async function makeAdtRequest(
   params?: any,
   headers?: Record<string, string>
 ) {
-  return getManagedConnection().makeAdtRequest({ url, method, timeout, data, params, headers });
+  return connection.makeAdtRequest({ url, method, timeout, data, params, headers });
 }
 
 /**

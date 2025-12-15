@@ -20,6 +20,7 @@ export const TOOL_DEFINITION = {
 import { McpError, ErrorCode, fetchNodeStructure, return_error, return_response, logger as baseLogger } from '../../../lib/utils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 /**
  * Parses XML response to extract object names from node structure
@@ -67,7 +68,8 @@ function parseObjectNamesFromXml(xmlData: string): Array<{
     return objects;
 }
 
-export async function handleGetObjectsByType(connection: AbapConnection, args: any) {
+export async function handleGetObjectsByType(context: HandlerContext, args: any) {
+    const { connection, logger } = context;
     try {
     const handlerLogger = getHandlerLogger(
       'handleGetObjectsByType',
@@ -96,7 +98,7 @@ export async function handleGetObjectsByType(connection: AbapConnection, args: a
         const outputFormat = format || 'parsed'; // 'raw' or 'parsed'
 
         // Get specific node structure
-        const response = await fetchNodeStructure(
+        const response = await fetchNodeStructure(connection,
             parent_name.toUpperCase(),
             parent_tech_name.toUpperCase(),
             parent_type,

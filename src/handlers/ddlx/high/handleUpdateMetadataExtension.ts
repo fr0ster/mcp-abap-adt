@@ -2,11 +2,10 @@
  * UpdateMetadataExtension Handler - ABAP Metadata Extension Update via ADT API
  */
 
-import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
     name: "UpdateMetadataExtension",
     description: "Update source code of an ABAP Metadata Extension.",
@@ -41,7 +40,8 @@ interface UpdateMetadataExtensionArgs {
     activate?: boolean;
 }
 
-export async function handleUpdateMetadataExtension(connection: AbapConnection, params: any) {
+export async function handleUpdateMetadataExtension(context: HandlerContext, params: any) {
+    const { connection, logger } = context;
     const args: UpdateMetadataExtensionArgs = params;
         if (!args.name || !args.source_code) {
         return return_error(new Error("Missing required parameters"));

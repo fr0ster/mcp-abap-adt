@@ -10,6 +10,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "DeleteMetadataExtensionLow",
@@ -40,7 +41,8 @@ interface DeleteMetadataExtensionArgs {
  *
  * Uses CrudClient.deleteMetadataExtension - low-level single method call
  */
-export async function handleDeleteMetadataExtension(connection: AbapConnection, args: DeleteMetadataExtensionArgs) {
+export async function handleDeleteMetadataExtension(context: HandlerContext, args: DeleteMetadataExtensionArgs) {
+  const { connection, logger } = context;
   try {
     const {
       name,
@@ -54,12 +56,8 @@ export async function handleDeleteMetadataExtension(connection: AbapConnection, 
 
         const client = new CrudClient(connection);
     const ddlxName = name.toUpperCase();
-    const handlerLogger = getHandlerLogger(
-      'handleDeleteMetadataExtension',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
 
-    handlerLogger.info(`Starting metadata extension deletion: ${ddlxName}`);
+    logger.info(`Starting metadata extension deletion: ${ddlxName}`);
 
     try {
       // Delete metadata extension
@@ -70,7 +68,7 @@ export async function handleDeleteMetadataExtension(connection: AbapConnection, 
         throw new Error(`Delete did not return a response for metadata extension ${ddlxName}`);
       }
 
-      handlerLogger.info(`✅ DeleteMetadataExtension completed successfully: ${ddlxName}`);
+      logger.info(`✅ DeleteMetadataExtension completed successfully: ${ddlxName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -82,7 +80,7 @@ export async function handleDeleteMetadataExtension(connection: AbapConnection, 
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error deleting metadata extension ${ddlxName}: ${error?.message || error}`);
+      logger.error(`Error deleting metadata extension ${ddlxName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete metadata extension: ${error.message || String(error)}`;

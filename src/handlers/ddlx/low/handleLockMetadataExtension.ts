@@ -9,6 +9,7 @@ import { AxiosResponse, return_error, return_response, logger as baseLogger, res
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "LockMetadataExtensionLow",
@@ -53,7 +54,8 @@ interface LockMetadataExtensionArgs {
  *
  * Uses CrudClient.lockMetadataExtension - low-level single method call
  */
-export async function handleLockMetadataExtension(connection: AbapConnection, args: LockMetadataExtensionArgs) {
+export async function handleLockMetadataExtension(context: HandlerContext, args: LockMetadataExtensionArgs) {
+  const { connection, logger } = context;
   try {
     const {
       name,
@@ -67,10 +69,6 @@ export async function handleLockMetadataExtension(connection: AbapConnection, ar
     }
 
         const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleLockMetadataExtension',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -81,7 +79,7 @@ export async function handleLockMetadataExtension(connection: AbapConnection, ar
 
     const ddlxName = name.toUpperCase();
 
-      handlerLogger.info(`Starting metadata extension lock: ${ddlxName}`);
+      logger.info(`Starting metadata extension lock: ${ddlxName}`);
 
     try {
       // Lock metadata extension
@@ -95,8 +93,8 @@ export async function handleLockMetadataExtension(connection: AbapConnection, ar
       // Get updated session state after lock
 
 
-      handlerLogger.info(`✅ LockMetadataExtension completed: ${ddlxName}`);
-      handlerLogger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger.info(`✅ LockMetadataExtension completed: ${ddlxName}`);
+      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -110,7 +108,7 @@ export async function handleLockMetadataExtension(connection: AbapConnection, ar
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error locking metadata extension ${ddlxName}: ${error?.message || error}`);
+      logger.error(`Error locking metadata extension ${ddlxName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock metadata extension: ${error.message || String(error)}`;

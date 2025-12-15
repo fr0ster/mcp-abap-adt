@@ -67,7 +67,8 @@ interface CreateFunctionGroupArgs {
  *
  * Uses CrudClient.createFunctionGroup - low-level single method call
  */
-export async function handleCreateFunctionGroup(connection: AbapConnection, args: CreateFunctionGroupArgs) {
+export async function handleCreateFunctionGroup(context: HandlerContext, args: CreateFunctionGroupArgs) {
+  const { connection, logger } = context;
   try {
     const {
       function_group_name,
@@ -83,22 +84,17 @@ export async function handleCreateFunctionGroup(connection: AbapConnection, args
       return return_error(new Error('function_group_name, description, and package_name are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCreateFunctionGroup',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
+    const client = new CrudClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const functionGroupName = function_group_name.toUpperCase();
 
-    handlerLogger.info(`Starting function group creation: ${functionGroupName}`);
+    logger.info(`Starting function group creation: ${functionGroupName}`);
 
     try {
       // Create function group
@@ -117,7 +113,7 @@ export async function handleCreateFunctionGroup(connection: AbapConnection, args
       // Get updated session state after create
 
 
-      handlerLogger.info(`✅ CreateFunctionGroup completed: ${functionGroupName}`);
+      logger.info(`✅ CreateFunctionGroup completed: ${functionGroupName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -133,7 +129,7 @@ export async function handleCreateFunctionGroup(connection: AbapConnection, args
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating function group ${functionGroupName}: ${error?.message || error}`);
+      logger.error(`Error creating function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create function group: ${error.message || String(error)}`;

@@ -6,9 +6,9 @@
  */
 
 import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UnlockObjectLow",
@@ -46,7 +46,8 @@ interface UnlockObjectArgs {
   };
 }
 
-export async function handleUnlockObject(connection: AbapConnection, args: UnlockObjectArgs) {
+export async function handleUnlockObject(context: HandlerContext, args: UnlockObjectArgs) {
+  const { connection, logger } = context;
   try {
     const handlerLogger = getHandlerLogger(
       'handleUnlockObject',
@@ -74,7 +75,7 @@ export async function handleUnlockObject(connection: AbapConnection, args: Unloc
 
     const objectName = object_name.toUpperCase();
 
-    handlerLogger.info(`Starting object unlock: ${objectName} (session: ${session_id.substring(0, 8)}...)`);
+    logger.info(`Starting object unlock: ${objectName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       switch (objectType) {
@@ -122,7 +123,7 @@ export async function handleUnlockObject(connection: AbapConnection, args: Unloc
 
 
 
-      handlerLogger.info(`✅ UnlockObject completed: ${objectName}`);
+      logger.info(`✅ UnlockObject completed: ${objectName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -136,7 +137,7 @@ export async function handleUnlockObject(connection: AbapConnection, args: Unloc
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error unlocking object ${objectName}:`, error);
+      logger.error(`Error unlocking object ${objectName}:`, error);
 
       let errorMessage = `Failed to unlock object: ${error.message || String(error)}`;
 

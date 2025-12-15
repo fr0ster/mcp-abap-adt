@@ -9,6 +9,7 @@ import { AxiosResponse, return_error, return_response, logger as baseLogger, res
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateMetadataExtensionLow",
@@ -63,7 +64,8 @@ interface UpdateMetadataExtensionArgs {
  *
  * Uses CrudClient.updateMetadataExtension - low-level single method call
  */
-export async function handleUpdateMetadataExtension(connection: AbapConnection, args: UpdateMetadataExtensionArgs) {
+export async function handleUpdateMetadataExtension(context: HandlerContext, args: UpdateMetadataExtensionArgs) {
+  const { connection, logger } = context;
   try {
     const {
       name,
@@ -78,22 +80,18 @@ export async function handleUpdateMetadataExtension(connection: AbapConnection, 
       return return_error(new Error('name, source_code, and lock_handle are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateMetadataExtension',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const metadataExtensionName = name.toUpperCase();
 
-    handlerLogger.info(`Starting metadata extension update: ${metadataExtensionName}`);
+    logger.info(`Starting metadata extension update: ${metadataExtensionName}`);
 
     try {
       // Update metadata extension with source code
@@ -110,7 +108,7 @@ export async function handleUpdateMetadataExtension(connection: AbapConnection, 
       // Get updated session state after update
 
 
-      handlerLogger.info(`✅ UpdateMetadataExtension completed: ${metadataExtensionName}`);
+      logger.info(`✅ UpdateMetadataExtension completed: ${metadataExtensionName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -123,7 +121,7 @@ export async function handleUpdateMetadataExtension(connection: AbapConnection, 
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating metadata extension ${metadataExtensionName}: ${error?.message || error}`);
+      logger.error(`Error updating metadata extension ${metadataExtensionName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update metadata extension: ${error.message || String(error)}`;

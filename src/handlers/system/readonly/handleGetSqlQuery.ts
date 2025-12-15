@@ -6,6 +6,7 @@ import type { Logger } from '@mcp-abap-adt/logger';
 
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   "name": "GetSqlQuery",
   "description": "[read-only] Execute freestyle SQL queries via SAP ADT Data Preview API.",
@@ -57,21 +58,21 @@ function parseSqlQueryXml(xmlData: string, sqlQuery: string, rowNumber: number, 
         // Extract basic information
         const totalRowsMatch = xmlData.match(/<dataPreview:totalRows>(\d+)<\/dataPreview:totalRows>/);
         const totalRows = totalRowsMatch ? parseInt(totalRowsMatch[1]) : 0;
-        
+
         const queryTimeMatch = xmlData.match(/<dataPreview:queryExecutionTime>([\d.]+)<\/dataPreview:queryExecutionTime>/);
         const queryExecutionTime = queryTimeMatch ? parseFloat(queryTimeMatch[1]) : 0;
-        
+
         // Extract column metadata
         const columns: Array<{name: string, type: string, description?: string, length?: number}> = [];
         const columnMatches = xmlData.match(/<dataPreview:metadata[^>]*>/g);
-        
+
         if (columnMatches) {
             columnMatches.forEach(match => {
                 const nameMatch = match.match(/dataPreview:name="([^"]+)"/);
                 const typeMatch = match.match(/dataPreview:type="([^"]+)"/);
                 const descMatch = match.match(/dataPreview:description="([^"]+)"/);
                 const lengthMatch = match.match(/dataPreview:length="(\d+)"/);
-                
+
                 if (nameMatch) {
                     columns.push({
                         name: nameMatch[1],
@@ -82,22 +83,22 @@ function parseSqlQueryXml(xmlData: string, sqlQuery: string, rowNumber: number, 
                 }
             });
         }
-        
+
         // Extract row data
         const rows: Array<Record<string, any>> = [];
-        
+
         // Find all column sections
         const columnSections = xmlData.match(/<dataPreview:columns>.*?<\/dataPreview:columns>/gs);
-        
+
         if (columnSections && columnSections.length > 0) {
             // Extract data for each column
             const columnData: Record<string, (string | null)[]> = {};
-            
+
             columnSections.forEach((section, index) => {
                 if (index < columns.length) {
                     const columnName = columns[index].name;
                     const dataMatches = section.match(/<dataPreview:data[^>]*>(.*?)<\/dataPreview:data>/g);
-                    
+
                     if (dataMatches) {
                         columnData[columnName] = dataMatches.map(match => {
                             const content = match.replace(/<[^>]+>/g, '');
@@ -108,10 +109,10 @@ function parseSqlQueryXml(xmlData: string, sqlQuery: string, rowNumber: number, 
                     }
                 }
             });
-            
+
             // Convert column-based data to row-based data
             const maxRowCount = Math.max(...Object.values(columnData).map(arr => arr.length), 0);
-            
+
             for (let rowIndex = 0; rowIndex < maxRowCount; rowIndex++) {
                 const row: Record<string, any> = {};
                 columns.forEach(column => {
@@ -121,7 +122,7 @@ function parseSqlQueryXml(xmlData: string, sqlQuery: string, rowNumber: number, 
                 rows.push(row);
             }
         }
-        
+
         return {
             sql_query: sqlQuery,
             row_number: rowNumber,
@@ -130,10 +131,10 @@ function parseSqlQueryXml(xmlData: string, sqlQuery: string, rowNumber: number, 
             columns,
             rows
         };
-        
+
     } catch (parseError) {
         handlerLogger.error('Failed to parse SQL query XML:', parseError as any);
-        
+
         // Return basic structure on parse error
         return {
             sql_query: sqlQuery,
@@ -147,45 +148,46 @@ function parseSqlQueryXml(xmlData: string, sqlQuery: string, rowNumber: number, 
 
 /**
  * Handler to execute freestyle SQL queries via SAP ADT Data Preview API
- * 
+ *
  * @param args - Tool arguments containing sql_query and optional row_number parameter
  * @returns Response with parsed SQL query results or error
  */
-export async function handleGetSqlQuery(connection: AbapConnection, args: any) {
+export async function handleGetSqlQuery(context: HandlerContext, args: any) {
+    const { connection, logger } = context;
     const handlerLogger = getHandlerLogger(
       'handleGetSqlQuery',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
     );
     try {
         handlerLogger.info('handleGetSqlQuery called');
-        
+
         if (!args?.sql_query) {
             throw new McpError(ErrorCode.InvalidParams, 'SQL query is required');
         }
-        
+
         const sqlQuery = args.sql_query;
         const rowNumber = args.row_number || 100; // Default to 100 rows if not specified
-        
+
         handlerLogger.info(`Executing SQL query (rows=${rowNumber})`);
-        
+
         // Build URL for freestyle data preview with rowNumber parameter
         const url = `/sap/bc/adt/datapreview/freestyle?rowNumber=${rowNumber}`;
-        
+
         handlerLogger.debug(`Making SQL query request to: ${url}`);
-        
+
         // Execute POST request with SQL query in body
-        const response = await makeAdtRequestWithTimeout(url, 'POST', 'long', sqlQuery);
-        
+        const response = await makeAdtRequestWithTimeout(connection, url, 'POST', 'long', sqlQuery);
+
         if (response.status === 200 && response.data) {
             handlerLogger.info('SQL query request completed successfully');
-            
+
             // Parse the XML response
             const parsedData = parseSqlQueryXml(response.data, sqlQuery, rowNumber, handlerLogger);
-            
+
             handlerLogger.debug(
               `Parsed SQL query data: rows=${parsedData.rows.length}/${parsedData.total_rows ?? 0}, columns=${parsedData.columns.length}`
             );
-            
+
             const result = {
                 isError: false,
                 content: [
@@ -203,7 +205,7 @@ export async function handleGetSqlQuery(connection: AbapConnection, args: any) {
         } else {
             throw new McpError(ErrorCode.InternalError, `Failed to execute SQL query. Status: ${response.status}`);
         }
-        
+
     } catch (error) {
         handlerLogger.error('Failed to execute SQL query', error as any);
         // MCP-compliant error response: always return content[] with type "text"

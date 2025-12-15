@@ -10,6 +10,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CheckMetadataExtensionLow",
@@ -54,7 +55,8 @@ interface CheckMetadataExtensionArgs {
  *
  * Uses CrudClient.checkMetadataExtension - low-level single method call
  */
-export async function handleCheckMetadataExtension(connection: AbapConnection, args: CheckMetadataExtensionArgs) {
+export async function handleCheckMetadataExtension(context: HandlerContext, args: CheckMetadataExtensionArgs) {
+  const { connection, logger } = context;
   try {
     const {
       name,
@@ -68,10 +70,6 @@ export async function handleCheckMetadataExtension(connection: AbapConnection, a
     }
 
         const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCheckMetadataExtension',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -82,7 +80,7 @@ export async function handleCheckMetadataExtension(connection: AbapConnection, a
 
     const ddlxName = name.toUpperCase();
 
-    handlerLogger.info(`Starting metadata extension check: ${ddlxName}`);
+    logger.info(`Starting metadata extension check: ${ddlxName}`);
 
     try {
       // Check metadata extension
@@ -99,8 +97,8 @@ export async function handleCheckMetadataExtension(connection: AbapConnection, a
       // Get updated session state after check
 
 
-      handlerLogger.info(`✅ CheckMetadataExtension completed: ${ddlxName}`);
-      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger.info(`✅ CheckMetadataExtension completed: ${ddlxName}`);
+      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -116,7 +114,7 @@ export async function handleCheckMetadataExtension(connection: AbapConnection, a
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error checking metadata extension ${ddlxName}: ${error?.message || error}`);
+      logger.error(`Error checking metadata extension ${ddlxName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check metadata extension: ${error.message || String(error)}`;

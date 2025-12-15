@@ -1,10 +1,9 @@
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
-import { McpError, ErrorCode, return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
+import { McpError, ErrorCode, return_error, return_response, AxiosResponse } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import * as z from 'zod';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "GetServiceDefinition",
@@ -50,69 +49,31 @@ function parseServiceDefinitionXml(xml: string) {
   return { raw: result };
 }
 
-export async function handleGetServiceDefinition(connection: AbapConnection, args: any): Promise<{ isError: boolean; content: Array<{ type: string; text?: string; json?: any }> }> {
+export async function handleGetServiceDefinition(context: HandlerContext, args: any): Promise<{ isError: boolean; content: Array<{ type: string; text?: string; json?: any }> }> {
+  const { connection, logger } = context;
   try {
-    const handlerLogger = getHandlerLogger(
-      'handleGetServiceDefinition',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     if (!args?.service_definition_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Service definition name is required');
     }
-        const client = new ReadOnlyClient(connection);
-    await client.readServiceDefinition(args.service_definition_name);
-    const config = client.getServiceDefinitionReadResult();
-    const response = client.getReadResult();
+    const client = new ReadOnlyClient(connection);
+    const response =  await client.readServiceDefinition(args.service_definition_name);
 
     if (!response) {
       throw new McpError(ErrorCode.InternalError, 'Failed to read service definition');
     }
 
-    handlerLogger.info(`Read service definition ${args.service_definition_name.toUpperCase()}`);
+    logger.info(`Read service definition ${args.service_definition_name.toUpperCase()}`);
 
     // Parse XML responses; otherwise return the payload unchanged
-    if (typeof response.data === 'string' && response.data.trim().startsWith('<?xml')) {
-      const parsed = parseServiceDefinitionXml(response.data);
-      const result = {
-        isError: false,
-        content: [
-          {
-            type: "json",
-            json: {
-              ...parsed,
-              config: config || null,
-              raw_xml: response.data
-            }
-          }
-        ]
-      };
-      if (args.filePath) {
-        writeResultToFile(result, args.filePath);
-      }
-      return result;
-    } else {
-      const plainResult = return_response(response);
-      if (args.filePath) {
-        writeResultToFile(plainResult, args.filePath);
-      }
-      return plainResult;
-    }
+    return return_response({
+      data: JSON.stringify(response, null, 2),
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config: {} as any
+    });
   } catch (error) {
-    const handlerLogger = getHandlerLogger(
-      'handleGetServiceDefinition',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-    handlerLogger.error(`Error reading service definition ${args?.service_definition_name || ''}: ${error instanceof Error ? error.message : String(error)}`);
-    // MCP-compliant error response: always return content[] with type "text"
-    return {
-      isError: true,
-      content: [
-        {
-          type: "text",
-          text: `ADT error: ${String(error)}`
-        }
-      ]
-    };
+    logger.error(`Error reading service definition ${args?.service_definition_name || ''}: ${error instanceof Error ? error.message : String(error)}`);
+    return return_error(new Error(`Error reading service definition ${args?.service_definition_name || ''}: ${error instanceof Error ? error.message : String(error)}`));
   }
 }

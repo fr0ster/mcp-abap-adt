@@ -50,7 +50,8 @@ interface UpdateFunctionGroupArgs {
  * Uses low-level updateFunctionGroup function
  * Session and lock management handled internally
  */
-export async function handleUpdateFunctionGroup(connection: AbapConnection, args: UpdateFunctionGroupArgs) {
+export async function handleUpdateFunctionGroup(context: HandlerContext, args: UpdateFunctionGroupArgs) {
+  const { connection, logger } = context;
     try {
     const {
       function_group_name,
@@ -66,12 +67,7 @@ export async function handleUpdateFunctionGroup(connection: AbapConnection, args
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
     const functionGroupName = function_group_name.toUpperCase();
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateFunctionGroup',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
-    handlerLogger.info(`Starting function group metadata update: ${functionGroupName}`);
+    logger.info(`Starting function group metadata update: ${functionGroupName}`);
 
     try {
       // Use CrudClient for lock/unlock
@@ -124,7 +120,7 @@ export async function handleUpdateFunctionGroup(connection: AbapConnection, args
         // Unlock
         await crudClient.unlockFunctionGroup({ functionGroupName }, lockHandle);
 
-        handlerLogger.info(`✅ UpdateFunctionGroup completed successfully: ${functionGroupName}`);
+        logger.info(`✅ UpdateFunctionGroup completed successfully: ${functionGroupName}`);
 
         // Return success result
         const result = {
@@ -150,14 +146,14 @@ export async function handleUpdateFunctionGroup(connection: AbapConnection, args
           try {
             await crudClient.unlockFunctionGroup({ functionGroupName }, lockHandle);
           } catch (unlockError) {
-            handlerLogger.error(`Failed to unlock function group after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+            logger.error(`Failed to unlock function group after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
           }
         }
         throw error;
       }
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating function group metadata ${functionGroupName}: ${error?.message || error}`);
+      logger.error(`Error updating function group metadata ${functionGroupName}: ${error?.message || error}`);
 
       // Check if function group not found
       if (error.message?.includes('not found') || error.response?.status === 404) {
@@ -177,18 +173,10 @@ export async function handleUpdateFunctionGroup(connection: AbapConnection, args
     try {
       if (connection) {
         connection.reset();
-        const handlerLogger = getHandlerLogger(
-          'handleUpdateFunctionGroup',
-          process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-        );
-        handlerLogger.debug('Reset function group connection after use');
+        logger.debug('Reset function group connection after use');
       }
     } catch (resetError: any) {
-      const handlerLogger = getHandlerLogger(
-        'handleUpdateFunctionGroup',
-        process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-      );
-      handlerLogger.error(`Failed to reset function group connection: ${resetError?.message || resetError}`);
+      logger.error(`Failed to reset function group connection: ${resetError?.message || resetError}`);
     }
   }
 }

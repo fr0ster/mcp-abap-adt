@@ -4,6 +4,7 @@ import convert from 'xml-js';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 import { XMLParser } from 'fast-xml-parser';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   name: "GetObjectInfo",
   description: "[read-only] Return ABAP object tree: root, group nodes, and terminal leaves up to maxDepth. Enrich each node via SearchObject if enrich=true. Group nodes are included for hierarchy. Each node has node_type: root, point, end.",
@@ -26,7 +27,7 @@ function getDefaultDepth(parent_type: string): number {
   return 1;
 }
 
-async function fetchNodeStructureRaw(parent_type: string, parent_name: string, node_id?: string) {
+async function fetchNodeStructureRaw(connection: AbapConnection, parent_type: string, parent_name: string, node_id?: string) {
   // Pass only the endpoint path; the connection prepends baseUrl internally.
   const url = `/sap/bc/adt/repository/nodestructure`;
   const params: any = {
@@ -35,19 +36,20 @@ async function fetchNodeStructureRaw(parent_type: string, parent_name: string, n
     withShortDescriptions: true
   };
   if (node_id) params.node_id = node_id;
-  const response = await makeAdtRequestWithTimeout(url, 'POST', 'default', undefined, params);
+  const response = await makeAdtRequestWithTimeout(connection, url, 'POST', 'default', undefined, params);
   const result = convert.xml2js(response.data, { compact: true });
   let nodes = result["asx:abap"]?.["asx:values"]?.DATA?.TREE_CONTENT?.SEU_ADT_REPOSITORY_OBJ_NODE || [];
   if (!Array.isArray(nodes)) nodes = [nodes];
   return nodes;
 }
 
-async function enrichNodeWithSearchObject(connection: AbapConnection, objectType: string, objectName: string, fallbackDescription?: string) {
+async function enrichNodeWithSearchObject(context: HandlerContext, objectType: string, objectName: string, fallbackDescription?: string) {
+  const { connection, logger } = context;
   let packageName = undefined;
   let description = fallbackDescription;
   let type = objectType;
   try {
-    const searchResult = await handleSearchObject(connection, {
+      const searchResult = await handleSearchObject(context, {
       query: objectName,
       object_type: objectType,
       maxResults: 1
@@ -109,7 +111,7 @@ function getNodeType(node: any, depth: number): 'root' | 'point' | 'end' {
 }
 
 async function buildTree(
-  connection: AbapConnection,
+  context: HandlerContext,
   objectType: string,
   objectName: string,
   depth: number,
@@ -117,16 +119,17 @@ async function buildTree(
   enrich: boolean,
   node_id: string = ''
 ): Promise<any> {
+  const { connection, logger } = context;
   // 1. Enrich root node
   let enrichment: any = { packageName: undefined, description: undefined, type: objectType };
   if (enrich) {
-    enrichment = await enrichNodeWithSearchObject(connection, objectType, objectName);
+    enrichment = await enrichNodeWithSearchObject(context, objectType, objectName);
   }
   // 2. Get children if depth < maxDepth
   let children: any[] = [];
   if (depth < maxDepth) {
     // Use node_id "0000" for the root; for others keep the actual NODE_ID
-    const nodes = await fetchNodeStructureRaw(objectType, objectName, depth === 0 ? "0000" : node_id);
+    const nodes = await fetchNodeStructureRaw(connection, objectType, objectName, depth === 0 ? "0000" : node_id);
     for (const node of nodes) {
       // When the next level hits the maximum depth, only include terminal leaves
       if (depth + 1 === maxDepth) {
@@ -143,7 +146,7 @@ async function buildTree(
         if (isGroupNode(node)) {
           // Group node: recurse, attach its children
           const groupChildren = await buildTree(
-            connection,
+            context,
             getText(node, 'OBJECT_TYPE'),
             getText(node, 'OBJECT_NAME'),
             depth + 1,
@@ -185,7 +188,7 @@ async function buildTree(
   return resultNode;
 }
 
-export async function handleGetObjectInfo(connection: AbapConnection, args: { parent_type: string; parent_name: string; maxDepth?: number; enrich?: boolean }) {
+export async function handleGetObjectInfo(context: HandlerContext, args: { parent_type: string; parent_name: string; maxDepth?: number; enrich?: boolean }) {
   const handlerLogger = getHandlerLogger(
     'handleGetObjectInfo',
     process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -200,7 +203,7 @@ export async function handleGetObjectInfo(connection: AbapConnection, args: { pa
       ? args.maxDepth as number
       : getDefaultDepth(args.parent_type);
     const enrich = typeof args.enrich === 'boolean' ? args.enrich : true;
-    const result = await buildTree(connection, args.parent_type, args.parent_name, 0, maxDepth ?? getDefaultDepth(args.parent_type), enrich);
+    const result = await buildTree(context, args.parent_type, args.parent_name, 0, maxDepth ?? getDefaultDepth(args.parent_type), enrich);
     handlerLogger.debug(`Object tree built with depth ${maxDepth} (enrich=${enrich})`);
     return {
       isError: false,

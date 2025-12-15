@@ -61,7 +61,8 @@ interface ValidateFunctionModuleArgs {
 /**
  * Main handler for ValidateFunctionModule MCP tool
  */
-export async function handleValidateFunctionModule(connection: AbapConnection, args: ValidateFunctionModuleArgs) {
+export async function handleValidateFunctionModule(context: HandlerContext, args: ValidateFunctionModuleArgs) {
+  const { connection, logger } = context;
   try {
     const {
       function_group_name,
@@ -75,11 +76,6 @@ export async function handleValidateFunctionModule(connection: AbapConnection, a
       return return_error(new Error('function_group_name and function_module_name are required'));
     }
 
-        const handlerLogger = getHandlerLogger(
-      'handleValidateFunctionModule',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -90,7 +86,7 @@ export async function handleValidateFunctionModule(connection: AbapConnection, a
     const functionGroupName = function_group_name.toUpperCase();
     const functionModuleName = function_module_name.toUpperCase();
 
-    handlerLogger.info(`Starting function module validation: ${functionModuleName} in group ${functionGroupName}`);
+    logger.info(`Starting function module validation: ${functionModuleName} in group ${functionGroupName}`);
 
     try {
       const client = new CrudClient(connection);
@@ -108,7 +104,7 @@ export async function handleValidateFunctionModule(connection: AbapConnection, a
       // Get updated session state after validation
 
 
-      handlerLogger.info(`✅ ValidateFunctionModule completed: ${functionModuleName} (valid=${result.valid}, msg=${result.message || 'N/A'})`);
+      logger.info(`✅ ValidateFunctionModule completed: ${functionModuleName} (valid=${result.valid}, msg=${result.message || 'N/A'})`);
 
       return return_response({
         data: JSON.stringify({
@@ -126,7 +122,7 @@ export async function handleValidateFunctionModule(connection: AbapConnection, a
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error validating function module ${functionModuleName}: ${error?.message || error}`);
+      logger.error(`Error validating function module ${functionModuleName}: ${error?.message || error}`);
 
       let errorMessage = `Failed to validate function module: ${error.message || String(error)}`;
 

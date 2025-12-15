@@ -7,12 +7,10 @@
  * Workflow: lock -> update -> check -> unlock -> (activate)
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, logger as baseLogger, safeCheckOperation, isAlreadyExistsError  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse, return_error, return_response, encodeSapObjectName, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UpdateServiceDefinition",
@@ -54,12 +52,9 @@ interface UpdateServiceDefinitionArgs {
  * Uses CrudClient for all operations
  * Session and lock management handled internally by client
  */
-export async function handleUpdateServiceDefinition(connection: AbapConnection, args: UpdateServiceDefinitionArgs) {
-    try {
-    const handlerLogger = getHandlerLogger(
-      "handleUpdateServiceDefinition",
-      process.env.DEBUG_HANDLERS === "true" ? baseLogger : noopLogger
-    );
+export async function handleUpdateServiceDefinition(context: HandlerContext, args: UpdateServiceDefinitionArgs) {
+  const { connection, logger } = context;
+  try {
     const {
       service_definition_name,
       source_code,
@@ -76,7 +71,7 @@ export async function handleUpdateServiceDefinition(connection: AbapConnection, 
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
     const serviceDefinitionName = service_definition_name.toUpperCase();
 
-    handlerLogger.info(`Starting service definition source update: ${serviceDefinitionName}`);
+    logger.info(`Starting service definition source update: ${serviceDefinitionName}`);
 
     try {
       // Create client
@@ -103,7 +98,7 @@ export async function handleUpdateServiceDefinition(connection: AbapConnection, 
             () => client.checkServiceDefinition({ serviceDefinitionName }),
             serviceDefinitionName,
             {
-              debug: (message: string) => handlerLogger.debug(`[UpdateServiceDefinition] ${message}`)
+              debug: (message: string) => logger.debug(`[UpdateServiceDefinition] ${message}`)
             }
           );
         } catch (checkError: any) {
@@ -126,7 +121,7 @@ export async function handleUpdateServiceDefinition(connection: AbapConnection, 
         try {
           await client.unlockServiceDefinition({ serviceDefinitionName: serviceDefinitionName }, lockHandle);
         } catch (unlockError) {
-          handlerLogger.error('Failed to unlock service definition after error:', unlockError);
+          logger.error('Failed to unlock service definition after error:', unlockError);
         }
         throw error;
       }
@@ -148,7 +143,7 @@ export async function handleUpdateServiceDefinition(connection: AbapConnection, 
         }
       }
 
-      handlerLogger.info(`✅ UpdateServiceDefinition completed successfully: ${serviceDefinitionName}`);
+      logger.info(`✅ UpdateServiceDefinition completed successfully: ${serviceDefinitionName}`);
 
       // Return success result
       const stepsCompleted = ['lock', 'update', 'check', 'unlock'];
@@ -179,7 +174,7 @@ export async function handleUpdateServiceDefinition(connection: AbapConnection, 
       });
 
     } catch (error: any) {
-      handlerLogger.error(`Error updating service definition source ${serviceDefinitionName}:`, error);
+      logger.error(`Error updating service definition source ${serviceDefinitionName}:`, error);
 
       const errorMessage = error.response?.data
         ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
@@ -190,10 +185,10 @@ export async function handleUpdateServiceDefinition(connection: AbapConnection, 
       try {
         if (connection) {
           connection.reset();
-          handlerLogger.debug('Reset service definition connection after use');
+          logger.debug('Reset service definition connection after use');
         }
       } catch (resetError: any) {
-        handlerLogger.error(`Failed to reset service definition connection: ${resetError?.message || resetError}`);
+        logger.error(`Failed to reset service definition connection: ${resetError?.message || resetError}`);
       }
     }
 

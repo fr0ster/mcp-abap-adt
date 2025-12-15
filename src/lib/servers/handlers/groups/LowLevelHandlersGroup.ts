@@ -308,15 +308,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ActivateObject_Tool.description,
           inputSchema: ActivateObject_Tool.inputSchema,
         },
-        handler: handleActivateObject,
-      },
-      {
-        toolDefinition: {
-          name: DeleteObject_Tool.name,
-          description: DeleteObject_Tool.description,
-          inputSchema: DeleteObject_Tool.inputSchema,
-        },
-        handler: handleDeleteObject,
+        handler: (args: any) => { return handleActivateObject(this.context, args) },
       },
       {
         toolDefinition: {
@@ -324,7 +316,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CheckObject_Tool.description,
           inputSchema: CheckObject_Tool.inputSchema,
         },
-        handler: handleCheckObject,
+        handler: (args: any) => { return handleCheckObject(this.context, args) },
       },
       {
         toolDefinition: {
@@ -332,7 +324,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ValidateObject_Tool.description,
           inputSchema: ValidateObject_Tool.inputSchema,
         },
-        handler: handleValidateObject,
+        handler: (args: any) => { return handleValidateObject(this.context, args) },
       },
       {
         toolDefinition: {
@@ -340,7 +332,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: LockObject_Tool.description,
           inputSchema: LockObject_Tool.inputSchema,
         },
-        handler: handleLockObject,
+        handler: (args: any) => { return handleLockObject(this.context, args) },
       },
       {
         toolDefinition: {
@@ -348,7 +340,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UnlockObject_Tool.description,
           inputSchema: UnlockObject_Tool.inputSchema,
         },
-        handler: handleUnlockObject,
+        handler: (args: any) => { return handleUnlockObject(this.context, args) },
       },
       // Package low-level handlers
       {
@@ -357,7 +349,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdatePackage_Tool.description,
           inputSchema: UpdatePackage_Tool.inputSchema,
         },
-        handler: handleUpdatePackage,
+        handler: (args: any) => { return handleUpdatePackage(this.context, args) },
       },
       {
         toolDefinition: {
@@ -365,7 +357,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UnlockPackage_Tool.description,
           inputSchema: UnlockPackage_Tool.inputSchema,
         },
-        handler: handleUnlockPackage,
+        handler: (args: any) => { return handleUnlockPackage(this.context, args) },
       },
       {
         toolDefinition: {
@@ -373,7 +365,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CheckPackage_Tool.description,
           inputSchema: CheckPackage_Tool.inputSchema,
         },
-        handler: handleCheckPackage,
+        handler: (args: any) => { return handleCheckPackage(this.context, args) },
       },
       {
         toolDefinition: {
@@ -381,7 +373,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: DeletePackage_Tool.description,
           inputSchema: DeletePackage_Tool.inputSchema,
         },
-        handler: handleDeletePackage,
+        handler: (args: any) => { return handleDeletePackage(this.context, args) },
       },
       {
         toolDefinition: {
@@ -389,7 +381,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: LockPackage_Tool.description,
           inputSchema: LockPackage_Tool.inputSchema,
         },
-        handler: handleLockPackage,
+        handler: (args: any) => { return handleLockPackage(this.context, args) },
       },
       {
         toolDefinition: {
@@ -397,7 +389,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ValidatePackage_Tool.description,
           inputSchema: ValidatePackage_Tool.inputSchema,
         },
-        handler: handleValidatePackage,
+        handler: (args: any) => { return handleValidatePackage(this.context, args) },
       },
       {
         toolDefinition: {
@@ -405,7 +397,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CreatePackageLow_Tool.description,
           inputSchema: CreatePackageLow_Tool.inputSchema,
         },
-        handler: handleCreatePackageLow,
+        handler: (args: any) => { return handleCreatePackageLow(this.context, args) },
       },
       // Domain low-level handlers
       {
@@ -414,7 +406,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateDomainLow_Tool.description,
           inputSchema: UpdateDomainLow_Tool.inputSchema,
         },
-        handler: handleUpdateDomain,
+        handler: (args: any) => { return handleUpdateDomain(this.context, args) },
       },
       {
         toolDefinition: {
@@ -422,7 +414,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CheckDomain_Tool.description,
           inputSchema: CheckDomain_Tool.inputSchema,
         },
-        handler: handleCheckDomain,
+        handler: (args: any) => { return handleCheckDomain(this.context, args) },
       },
       {
         toolDefinition: {
@@ -430,7 +422,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteDomain_Tool.description,
           inputSchema: DeleteDomain_Tool.inputSchema,
         },
-        handler: handleDeleteDomain,
+        handler: (args: any) => { return handleDeleteDomain(this.context, args) },
       },
       {
         toolDefinition: {
@@ -438,7 +430,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: LockDomain_Tool.description,
           inputSchema: LockDomain_Tool.inputSchema,
         },
-        handler: handleLockDomain,
+        handler: (args: any) => { return handleLockDomain(this.context, args) },
       },
       {
         toolDefinition: {
@@ -446,7 +438,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UnlockDomain_Tool.description,
           inputSchema: UnlockDomain_Tool.inputSchema,
         },
-        handler: handleUnlockDomain,
+        handler: (args: any) => { return handleUnlockDomain(this.context, args) },
       },
       {
         toolDefinition: {
@@ -454,7 +446,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ValidateDomain_Tool.description,
           inputSchema: ValidateDomain_Tool.inputSchema,
         },
-        handler: handleValidateDomain,
+        handler: (args: any) => { return handleValidateDomain(this.context, args) },
       },
       {
         toolDefinition: {
@@ -462,7 +454,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateDomainLow_Tool.description,
           inputSchema: CreateDomainLow_Tool.inputSchema,
         },
-        handler: handleCreateDomainLow,
+        handler: (args: any) => { return handleCreateDomainLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -470,7 +462,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ActivateDomain_Tool.description,
           inputSchema: ActivateDomain_Tool.inputSchema,
         },
-        handler: handleActivateDomain,
+        handler: (args: any) => { return handleActivateDomain(this.context, args) },
       },
       // DataElement low-level handlers
       {
@@ -479,7 +471,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateDataElementLow_Tool.description,
           inputSchema: UpdateDataElementLow_Tool.inputSchema,
         },
-        handler: handleUpdateDataElement,
+        handler: (args: any) => { return handleUpdateDataElement(this.context, args) },
       },
       {
         toolDefinition: {
@@ -487,7 +479,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CheckDataElement_Tool.description,
           inputSchema: CheckDataElement_Tool.inputSchema,
         },
-        handler: handleCheckDataElement,
+        handler: (args: any) => { return handleCheckDataElement(this.context, args) },
       },
       {
         toolDefinition: {
@@ -495,7 +487,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteDataElement_Tool.description,
           inputSchema: DeleteDataElement_Tool.inputSchema,
         },
-        handler: handleDeleteDataElement,
+        handler: (args: any) => { return handleDeleteDataElement(this.context, args) },
       },
       {
         toolDefinition: {
@@ -503,7 +495,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: LockDataElement_Tool.description,
           inputSchema: LockDataElement_Tool.inputSchema,
         },
-        handler: handleLockDataElement,
+        handler: (args: any) => { return handleLockDataElement(this.context, args) },
       },
       {
         toolDefinition: {
@@ -511,7 +503,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UnlockDataElement_Tool.description,
           inputSchema: UnlockDataElement_Tool.inputSchema,
         },
-        handler: handleUnlockDataElement,
+        handler: (args: any) => { return handleUnlockDataElement(this.context, args) },
       },
       {
         toolDefinition: {
@@ -519,7 +511,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ValidateDataElement_Tool.description,
           inputSchema: ValidateDataElement_Tool.inputSchema,
         },
-        handler: handleValidateDataElement,
+        handler: (args: any) => { return handleValidateDataElement(this.context, args) },
       },
       {
         toolDefinition: {
@@ -527,7 +519,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateDataElementLow_Tool.description,
           inputSchema: CreateDataElementLow_Tool.inputSchema,
         },
-        handler: handleCreateDataElementLow,
+        handler: (args: any) => { return handleCreateDataElementLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -535,7 +527,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ActivateDataElement_Tool.description,
           inputSchema: ActivateDataElement_Tool.inputSchema,
         },
-        handler: handleActivateDataElement,
+        handler: (args: any) => { return handleActivateDataElement(this.context, args) },
       },
       // Transport low-level handlers
       {
@@ -544,7 +536,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateTransportLow_Tool.description,
           inputSchema: CreateTransportLow_Tool.inputSchema,
         },
-        handler: handleCreateTransportLow,
+        handler: (args: any) => { return handleCreateTransportLow(this.context, args) },
       },
       // Table low-level handlers
       {
@@ -553,7 +545,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateTableLow_Tool.description,
           inputSchema: UpdateTableLow_Tool.inputSchema,
         },
-        handler: handleUpdateTableLow,
+        handler: (args: any) => { return handleUpdateTableLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -561,7 +553,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteTable_Tool.description,
           inputSchema: DeleteTable_Tool.inputSchema,
         },
-        handler: handleDeleteTable,
+        handler: (args: any) => { return handleDeleteTable(this.context, args) },
       },
       {
         toolDefinition: {
@@ -569,7 +561,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: LockTable_Tool.description,
           inputSchema: LockTable_Tool.inputSchema,
         },
-        handler: handleLockTable,
+        handler: (args: any) => { return handleLockTable(this.context, args) },
       },
       {
         toolDefinition: {
@@ -577,7 +569,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UnlockTable_Tool.description,
           inputSchema: UnlockTable_Tool.inputSchema,
         },
-        handler: handleUnlockTable,
+        handler: (args: any) => { return handleUnlockTable(this.context, args) },
       },
       {
         toolDefinition: {
@@ -585,7 +577,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateTableLow_Tool.description,
           inputSchema: CreateTableLow_Tool.inputSchema,
         },
-        handler: handleCreateTableLow,
+        handler: (args: any) => { return handleCreateTableLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -593,7 +585,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CheckTable_Tool.description,
           inputSchema: CheckTable_Tool.inputSchema,
         },
-        handler: handleCheckTable,
+        handler: (args: any) => { return handleCheckTable(this.context, args) },
       },
       {
         toolDefinition: {
@@ -601,7 +593,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ValidateTable_Tool.description,
           inputSchema: ValidateTable_Tool.inputSchema,
         },
-        handler: handleValidateTable,
+        handler: (args: any) => { return handleValidateTable(this.context, args) },
       },
       {
         toolDefinition: {
@@ -609,7 +601,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ActivateTable_Tool.description,
           inputSchema: ActivateTable_Tool.inputSchema,
         },
-        handler: handleActivateTable,
+        handler: (args: any) => { return handleActivateTable(this.context, args) },
       },
       // Structure low-level handlers
       {
@@ -618,7 +610,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateStructureLow_Tool.description,
           inputSchema: UpdateStructureLow_Tool.inputSchema,
         },
-        handler: handleUpdateStructureLow,
+        handler: (args: any) => { return handleUpdateStructureLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -626,7 +618,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CheckStructure_Tool.description,
           inputSchema: CheckStructure_Tool.inputSchema,
         },
-        handler: handleCheckStructure,
+        handler: (args: any) => { return handleCheckStructure(this.context, args) },
       },
       {
         toolDefinition: {
@@ -634,7 +626,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteStructure_Tool.description,
           inputSchema: DeleteStructure_Tool.inputSchema,
         },
-        handler: handleDeleteStructure,
+        handler: (args: any) => { return handleDeleteStructure(this.context, args) },
       },
       {
         toolDefinition: {
@@ -642,7 +634,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: LockStructure_Tool.description,
           inputSchema: LockStructure_Tool.inputSchema,
         },
-        handler: handleLockStructure,
+        handler: (args: any) => { return handleLockStructure(this.context, args) },
       },
       {
         toolDefinition: {
@@ -650,7 +642,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UnlockStructure_Tool.description,
           inputSchema: UnlockStructure_Tool.inputSchema,
         },
-        handler: handleUnlockStructure,
+        handler: (args: any) => { return handleUnlockStructure(this.context, args) },
       },
       {
         toolDefinition: {
@@ -658,7 +650,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ValidateStructure_Tool.description,
           inputSchema: ValidateStructure_Tool.inputSchema,
         },
-        handler: handleValidateStructure,
+        handler: (args: any) => { return handleValidateStructure(this.context, args) },
       },
       {
         toolDefinition: {
@@ -666,7 +658,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateStructureLow_Tool.description,
           inputSchema: CreateStructureLow_Tool.inputSchema,
         },
-        handler: handleCreateStructureLow,
+        handler: (args: any) => { return handleCreateStructureLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -674,7 +666,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ActivateStructure_Tool.description,
           inputSchema: ActivateStructure_Tool.inputSchema,
         },
-        handler: handleActivateStructure,
+        handler: (args: any) => { return handleActivateStructure(this.context, args) },
       },
       // View low-level handlers
       {
@@ -683,7 +675,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateView_Tool.description,
           inputSchema: UpdateView_Tool.inputSchema,
         },
-        handler: handleUpdateViewLow,
+        handler: (args: any) => { return handleUpdateViewLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -691,7 +683,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CheckView_Tool.description,
           inputSchema: CheckView_Tool.inputSchema,
         },
-        handler: handleCheckView,
+        handler: (args: any) => { return handleCheckView(this.context, args) },
       },
       {
         toolDefinition: {
@@ -699,7 +691,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteView_Tool.description,
           inputSchema: DeleteView_Tool.inputSchema,
         },
-        handler: handleDeleteView,
+        handler: (args: any) => { return handleDeleteView(this.context, args) },
       },
       {
         toolDefinition: {
@@ -707,7 +699,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: LockView_Tool.description,
           inputSchema: LockView_Tool.inputSchema,
         },
-        handler: handleLockView,
+        handler: (args: any) => { return handleLockView(this.context, args) },
       },
       {
         toolDefinition: {
@@ -715,7 +707,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UnlockView_Tool.description,
           inputSchema: UnlockView_Tool.inputSchema,
         },
-        handler: handleUnlockView,
+        handler: (args: any) => { return handleUnlockView(this.context, args) },
       },
       {
         toolDefinition: {
@@ -723,7 +715,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ValidateView_Tool.description,
           inputSchema: ValidateView_Tool.inputSchema,
         },
-        handler: handleValidateView,
+        handler: (args: any) => { return handleValidateView(this.context, args) },
       },
       {
         toolDefinition: {
@@ -731,7 +723,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateViewLow_Tool.description,
           inputSchema: CreateViewLow_Tool.inputSchema,
         },
-        handler: handleCreateViewLow,
+        handler: (args: any) => { return handleCreateViewLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -739,7 +731,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ActivateView_Tool.description,
           inputSchema: ActivateView_Tool.inputSchema,
         },
-        handler: handleActivateView,
+        handler: (args: any) => { return handleActivateView(this.context, args) },
       },
       // Class low-level handlers
       {
@@ -748,7 +740,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateClass_Tool.description,
           inputSchema: UpdateClass_Tool.inputSchema,
         },
-        handler: handleUpdateClassLow,
+        handler: (args: any) => { return handleUpdateClassLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -756,7 +748,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteClass_Tool.description,
           inputSchema: DeleteClass_Tool.inputSchema,
         },
-        handler: handleDeleteClass,
+        handler: (args: any) => { return handleDeleteClass(this.context, args) },
       },
       {
         toolDefinition: {
@@ -764,7 +756,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: LockClass_Tool.description,
           inputSchema: LockClass_Tool.inputSchema,
         },
-        handler: handleLockClass,
+        handler: (args: any) => { return handleLockClass(this.context, args) },
       },
       {
         toolDefinition: {
@@ -772,7 +764,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UnlockClass_Tool.description,
           inputSchema: UnlockClass_Tool.inputSchema,
         },
-        handler: handleUnlockClass,
+        handler: (args: any) => { return handleUnlockClass(this.context, args) },
       },
       {
         toolDefinition: {
@@ -780,7 +772,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateClassLow_Tool.description,
           inputSchema: CreateClassLow_Tool.inputSchema,
         },
-        handler: handleCreateClassLow,
+        handler: (args: any) => { return handleCreateClassLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -788,7 +780,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ValidateClass_Tool.description,
           inputSchema: ValidateClass_Tool.inputSchema,
         },
-        handler: handleValidateClass,
+        handler: (args: any) => { return handleValidateClass(this.context, args) },
       },
       {
         toolDefinition: {
@@ -796,7 +788,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CheckClass_Tool.description,
           inputSchema: CheckClass_Tool.inputSchema,
         },
-        handler: handleCheckClass,
+        handler: (args: any) => { return handleCheckClass(this.context, args) },
       },
       {
         toolDefinition: {
@@ -804,7 +796,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ActivateClass_Tool.description,
           inputSchema: ActivateClass_Tool.inputSchema,
         },
-        handler: handleActivateClass,
+        handler: (args: any) => { return handleActivateClass(this.context, args) },
       },
       {
         toolDefinition: {
@@ -812,7 +804,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: LockClassTestClasses_Tool.description,
           inputSchema: LockClassTestClasses_Tool.inputSchema,
         },
-        handler: handleLockClassTestClasses,
+        handler: (args: any) => { return handleLockClassTestClasses(this.context, args) },
       },
       {
         toolDefinition: {
@@ -820,7 +812,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UnlockClassTestClasses_Tool.description,
           inputSchema: UnlockClassTestClasses_Tool.inputSchema,
         },
-        handler: handleUnlockClassTestClasses,
+        handler: (args: any) => { return handleUnlockClassTestClasses(this.context, args) },
       },
       {
         toolDefinition: {
@@ -828,7 +820,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateClassTestClasses_Tool.description,
           inputSchema: UpdateClassTestClasses_Tool.inputSchema,
         },
-        handler: handleUpdateClassTestClasses,
+        handler: (args: any) => { return handleUpdateClassTestClasses(this.context, args) },
       },
       {
         toolDefinition: {
@@ -836,7 +828,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ActivateClassTestClasses_Tool.description,
           inputSchema: ActivateClassTestClasses_Tool.inputSchema,
         },
-        handler: handleActivateClassTestClasses,
+        handler: (args: any) => { return handleActivateClassTestClasses(this.context, args) },
       },
       {
         toolDefinition: {
@@ -844,7 +836,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: RunClassUnitTests_Tool.description,
           inputSchema: RunClassUnitTests_Tool.inputSchema,
         },
-        handler: handleRunClassUnitTests,
+        handler: (args: any) => { return handleRunClassUnitTests(this.context, args) },
       },
       {
         toolDefinition: {
@@ -852,7 +844,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: GetClassUnitTestStatus_Tool.description,
           inputSchema: GetClassUnitTestStatus_Tool.inputSchema,
         },
-        handler: handleGetClassUnitTestStatus,
+        handler: (args: any) => { return handleGetClassUnitTestStatus(this.context, args) },
       },
       {
         toolDefinition: {
@@ -860,7 +852,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: GetClassUnitTestResult_Tool.description,
           inputSchema: GetClassUnitTestResult_Tool.inputSchema,
         },
-        handler: handleGetClassUnitTestResult,
+        handler: (args: any) => { return handleGetClassUnitTestResult(this.context, args) },
       },
       // Program low-level handlers
       {
@@ -869,7 +861,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateProgram_Tool.description,
           inputSchema: UpdateProgram_Tool.inputSchema,
         },
-        handler: handleUpdateProgramLow,
+        handler: (args: any) => { return handleUpdateProgramLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -877,7 +869,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CheckProgram_Tool.description,
           inputSchema: CheckProgram_Tool.inputSchema,
         },
-        handler: handleCheckProgram,
+        handler: (args: any) => { return handleCheckProgram(this.context, args) },
       },
       {
         toolDefinition: {
@@ -885,7 +877,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteProgram_Tool.description,
           inputSchema: DeleteProgram_Tool.inputSchema,
         },
-        handler: handleDeleteProgram,
+        handler: (args: any) => { return handleDeleteProgram(this.context, args) },
       },
       {
         toolDefinition: {
@@ -893,7 +885,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: LockProgram_Tool.description,
           inputSchema: LockProgram_Tool.inputSchema,
         },
-        handler: handleLockProgram,
+        handler: (args: any) => { return handleLockProgram(this.context, args) },
       },
       {
         toolDefinition: {
@@ -901,7 +893,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UnlockProgram_Tool.description,
           inputSchema: UnlockProgram_Tool.inputSchema,
         },
-        handler: handleUnlockProgram,
+        handler: (args: any) => { return handleUnlockProgram(this.context, args) },
       },
       {
         toolDefinition: {
@@ -909,7 +901,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ValidateProgram_Tool.description,
           inputSchema: ValidateProgram_Tool.inputSchema,
         },
-        handler: handleValidateProgram,
+        handler: (args: any) => { return handleValidateProgram(this.context, args) },
       },
       {
         toolDefinition: {
@@ -917,7 +909,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateProgramLow_Tool.description,
           inputSchema: CreateProgramLow_Tool.inputSchema,
         },
-        handler: handleCreateProgramLow,
+        handler: (args: any) => { return handleCreateProgramLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -925,7 +917,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ActivateProgram_Tool.description,
           inputSchema: ActivateProgram_Tool.inputSchema,
         },
-        handler: handleActivateProgram,
+        handler: (args: any) => { return handleActivateProgram(this.context, args) },
       },
       // Interface low-level handlers
       {
@@ -934,7 +926,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateInterface_Tool.description,
           inputSchema: UpdateInterface_Tool.inputSchema,
         },
-        handler: handleUpdateInterfaceLow,
+        handler: (args: any) => { return handleUpdateInterfaceLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -942,7 +934,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CheckInterface_Tool.description,
           inputSchema: CheckInterface_Tool.inputSchema,
         },
-        handler: handleCheckInterface,
+        handler: (args: any) => { return handleCheckInterface(this.context, args) },
       },
       {
         toolDefinition: {
@@ -950,7 +942,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteInterface_Tool.description,
           inputSchema: DeleteInterface_Tool.inputSchema,
         },
-        handler: handleDeleteInterface,
+        handler: (args: any) => { return handleDeleteInterface(this.context, args) },
       },
       {
         toolDefinition: {
@@ -958,7 +950,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: LockInterface_Tool.description,
           inputSchema: LockInterface_Tool.inputSchema,
         },
-        handler: handleLockInterface,
+        handler: (args: any) => { return handleLockInterface(this.context, args) },
       },
       {
         toolDefinition: {
@@ -966,7 +958,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UnlockInterface_Tool.description,
           inputSchema: UnlockInterface_Tool.inputSchema,
         },
-        handler: handleUnlockInterface,
+        handler: (args: any) => { return handleUnlockInterface(this.context, args) },
       },
       {
         toolDefinition: {
@@ -974,7 +966,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ValidateInterface_Tool.description,
           inputSchema: ValidateInterface_Tool.inputSchema,
         },
-        handler: handleValidateInterface,
+        handler: (args: any) => { return handleValidateInterface(this.context, args) },
       },
       {
         toolDefinition: {
@@ -982,7 +974,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateInterfaceLow_Tool.description,
           inputSchema: CreateInterfaceLow_Tool.inputSchema,
         },
-        handler: handleCreateInterfaceLow,
+        handler: (args: any) => { return handleCreateInterfaceLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -990,7 +982,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ActivateInterface_Tool.description,
           inputSchema: ActivateInterface_Tool.inputSchema,
         },
-        handler: handleActivateInterface,
+        handler: (args: any) => { return handleActivateInterface(this.context, args) },
       },
       // Function low-level handlers
       {
@@ -999,7 +991,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CheckFunctionGroup_Tool.description,
           inputSchema: CheckFunctionGroup_Tool.inputSchema,
         },
-        handler: handleCheckFunctionGroup,
+        handler: (args: any) => { return handleCheckFunctionGroup(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1007,7 +999,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteFunctionGroup_Tool.description,
           inputSchema: DeleteFunctionGroup_Tool.inputSchema,
         },
-        handler: handleDeleteFunctionGroup,
+        handler: (args: any) => { return handleDeleteFunctionGroup(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1015,7 +1007,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteFunctionModule_Tool.description,
           inputSchema: DeleteFunctionModule_Tool.inputSchema,
         },
-        handler: handleDeleteFunctionModule,
+        handler: (args: any) => { return handleDeleteFunctionModule(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1023,7 +1015,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: LockFunctionGroup_Tool.description,
           inputSchema: LockFunctionGroup_Tool.inputSchema,
         },
-        handler: handleLockFunctionGroup,
+        handler: (args: any) => { return handleLockFunctionGroup(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1031,7 +1023,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: LockFunctionModule_Tool.description,
           inputSchema: LockFunctionModule_Tool.inputSchema,
         },
-        handler: handleLockFunctionModule,
+        handler: (args: any) => { return handleLockFunctionModule(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1039,7 +1031,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UnlockFunctionGroup_Tool.description,
           inputSchema: UnlockFunctionGroup_Tool.inputSchema,
         },
-        handler: handleUnlockFunctionGroup,
+        handler: (args: any) => { return handleUnlockFunctionGroup(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1047,7 +1039,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UnlockFunctionModule_Tool.description,
           inputSchema: UnlockFunctionModule_Tool.inputSchema,
         },
-        handler: handleUnlockFunctionModule,
+        handler: (args: any) => { return handleUnlockFunctionModule(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1055,7 +1047,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ValidateFunctionGroup_Tool.description,
           inputSchema: ValidateFunctionGroup_Tool.inputSchema,
         },
-        handler: handleValidateFunctionGroup,
+        handler: (args: any) => { return handleValidateFunctionGroup(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1063,7 +1055,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateFunctionGroupLow_Tool.description,
           inputSchema: CreateFunctionGroupLow_Tool.inputSchema,
         },
-        handler: handleCreateFunctionGroupLow,
+        handler: (args: any) => { return handleCreateFunctionGroupLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1071,7 +1063,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateFunctionModuleLow_Tool.description,
           inputSchema: CreateFunctionModuleLow_Tool.inputSchema,
         },
-        handler: handleCreateFunctionModuleLow,
+        handler: (args: any) => { return handleCreateFunctionModuleLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1079,7 +1071,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateFunctionModule_Tool.description,
           inputSchema: UpdateFunctionModule_Tool.inputSchema,
         },
-        handler: handleUpdateFunctionModuleLow,
+        handler: (args: any) => { return handleUpdateFunctionModuleLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1087,7 +1079,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ValidateFunctionModule_Tool.description,
           inputSchema: ValidateFunctionModule_Tool.inputSchema,
         },
-        handler: handleValidateFunctionModule,
+        handler: (args: any) => { return handleValidateFunctionModule(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1095,7 +1087,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CheckFunctionModule_Tool.description,
           inputSchema: CheckFunctionModule_Tool.inputSchema,
         },
-        handler: handleCheckFunctionModule,
+        handler: (args: any) => { return handleCheckFunctionModule(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1103,7 +1095,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ActivateFunctionModule_Tool.description,
           inputSchema: ActivateFunctionModule_Tool.inputSchema,
         },
-        handler: handleActivateFunctionModule,
+        handler: (args: any) => { return handleActivateFunctionModule(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1111,7 +1103,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ActivateFunctionGroup_Tool.description,
           inputSchema: ActivateFunctionGroup_Tool.inputSchema,
         },
-        handler: handleActivateFunctionGroup,
+        handler: (args: any) => { return handleActivateFunctionGroup(this.context, args) },
       },
       // BehaviorDefinition low-level handlers
       {
@@ -1120,7 +1112,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CheckBehaviorDefinition_Tool.description,
           inputSchema: CheckBehaviorDefinition_Tool.inputSchema,
         },
-        handler: handleCheckBehaviorDefinition,
+        handler: (args: any) => { return handleCheckBehaviorDefinition(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1128,7 +1120,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteBehaviorDefinition_Tool.description,
           inputSchema: DeleteBehaviorDefinition_Tool.inputSchema,
         },
-        handler: handleDeleteBehaviorDefinition,
+        handler: (args: any) => { return handleDeleteBehaviorDefinition(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1136,7 +1128,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: LockBehaviorDefinition_Tool.description,
           inputSchema: LockBehaviorDefinition_Tool.inputSchema,
         },
-        handler: handleLockBehaviorDefinition,
+        handler: (args: any) => { return handleLockBehaviorDefinition(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1144,7 +1136,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UnlockBehaviorDefinition_Tool.description,
           inputSchema: UnlockBehaviorDefinition_Tool.inputSchema,
         },
-        handler: handleUnlockBehaviorDefinition,
+        handler: (args: any) => { return handleUnlockBehaviorDefinition(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1152,7 +1144,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ValidateBehaviorDefinition_Tool.description,
           inputSchema: ValidateBehaviorDefinition_Tool.inputSchema,
         },
-        handler: handleValidateBehaviorDefinition,
+        handler: (args: any) => { return handleValidateBehaviorDefinition(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1160,7 +1152,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateBehaviorDefinitionLow_Tool.description,
           inputSchema: CreateBehaviorDefinitionLow_Tool.inputSchema,
         },
-        handler: handleCreateBehaviorDefinitionLow,
+        handler: (args: any) => { return handleCreateBehaviorDefinitionLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1168,7 +1160,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateBehaviorDefinitionLow_Tool.description,
           inputSchema: UpdateBehaviorDefinitionLow_Tool.inputSchema,
         },
-        handler: handleUpdateBehaviorDefinitionLow,
+        handler: (args: any) => { return handleUpdateBehaviorDefinitionLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1176,7 +1168,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ActivateBehaviorDefinition_Tool.description,
           inputSchema: ActivateBehaviorDefinition_Tool.inputSchema,
         },
-        handler: handleActivateBehaviorDefinition,
+        handler: (args: any) => { return handleActivateBehaviorDefinition(this.context, args) },
       },
       // MetadataExtension low-level handlers
       {
@@ -1185,7 +1177,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CheckMetadataExtension_Tool.description,
           inputSchema: CheckMetadataExtension_Tool.inputSchema,
         },
-        handler: handleCheckMetadataExtension,
+        handler: (args: any) => { return handleCheckMetadataExtension(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1193,7 +1185,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteMetadataExtension_Tool.description,
           inputSchema: DeleteMetadataExtension_Tool.inputSchema,
         },
-        handler: handleDeleteMetadataExtension,
+        handler: (args: any) => { return handleDeleteMetadataExtension(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1201,7 +1193,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: LockMetadataExtension_Tool.description,
           inputSchema: LockMetadataExtension_Tool.inputSchema,
         },
-        handler: handleLockMetadataExtension,
+        handler: (args: any) => { return handleLockMetadataExtension(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1209,7 +1201,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UnlockMetadataExtension_Tool.description,
           inputSchema: UnlockMetadataExtension_Tool.inputSchema,
         },
-        handler: handleUnlockMetadataExtension,
+        handler: (args: any) => { return handleUnlockMetadataExtension(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1217,7 +1209,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ValidateMetadataExtension_Tool.description,
           inputSchema: ValidateMetadataExtension_Tool.inputSchema,
         },
-        handler: handleValidateMetadataExtension,
+        handler: (args: any) => { return handleValidateMetadataExtension(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1225,7 +1217,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateMetadataExtensionLow_Tool.description,
           inputSchema: CreateMetadataExtensionLow_Tool.inputSchema,
         },
-        handler: handleCreateMetadataExtensionLow,
+        handler: (args: any) => { return handleCreateMetadataExtensionLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1233,7 +1225,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateMetadataExtensionLow_Tool.description,
           inputSchema: UpdateMetadataExtensionLow_Tool.inputSchema,
         },
-        handler: handleUpdateMetadataExtensionLow,
+        handler: (args: any) => { return handleUpdateMetadataExtensionLow(this.context, args) },
       },
       {
         toolDefinition: {
@@ -1241,7 +1233,7 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           description: ActivateMetadataExtension_Tool.description,
           inputSchema: ActivateMetadataExtension_Tool.inputSchema,
         },
-        handler: handleActivateMetadataExtension,
+        handler: (args: any) => { return handleActivateMetadataExtension(this.context, args) },
       },
     ];
   }

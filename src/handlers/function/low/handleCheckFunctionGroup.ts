@@ -52,7 +52,8 @@ interface CheckFunctionGroupArgs {
  *
  * Uses CrudClient.checkFunctionGroup - low-level single method call
  */
-export async function handleCheckFunctionGroup(connection: AbapConnection, args: CheckFunctionGroupArgs) {
+export async function handleCheckFunctionGroup(context: HandlerContext, args: CheckFunctionGroupArgs) {
+  const { connection, logger } = context;
   try {
     const {
       function_group_name,
@@ -65,22 +66,17 @@ export async function handleCheckFunctionGroup(connection: AbapConnection, args:
       return return_error(new Error('function_group_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCheckFunctionGroup',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
+    const client = new CrudClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const functionGroupName = function_group_name.toUpperCase();
 
-    handlerLogger.info(`Starting function group check: ${functionGroupName}`);
+    logger.info(`Starting function group check: ${functionGroupName}`);
 
     try {
       // Check function group
@@ -97,8 +93,8 @@ export async function handleCheckFunctionGroup(connection: AbapConnection, args:
       // Get updated session state after check
 
 
-      handlerLogger.info(`✅ CheckFunctionGroup completed: ${functionGroupName}`);
-      handlerLogger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger.info(`✅ CheckFunctionGroup completed: ${functionGroupName}`);
+      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -114,7 +110,7 @@ export async function handleCheckFunctionGroup(connection: AbapConnection, args:
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error checking function group ${functionGroupName}: ${error?.message || error}`);
+      logger.error(`Error checking function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check function group: ${error.message || String(error)}`;

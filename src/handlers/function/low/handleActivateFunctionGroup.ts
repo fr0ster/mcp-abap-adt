@@ -52,7 +52,8 @@ interface ActivateFunctionGroupArgs {
  *
  * Uses CrudClient.activateFunctionGroup - low-level single method call
  */
-export async function handleActivateFunctionGroup(connection: AbapConnection, args: ActivateFunctionGroupArgs) {
+export async function handleActivateFunctionGroup(context: HandlerContext, args: ActivateFunctionGroupArgs) {
+  const { connection, logger } = context;
   try {
     const {
       function_group_name,
@@ -65,22 +66,17 @@ export async function handleActivateFunctionGroup(connection: AbapConnection, ar
       return return_error(new Error('function_group_name is required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleActivateFunctionGroup',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
+    const client = new CrudClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const functionGroupName = function_group_name.toUpperCase();
 
-    handlerLogger.info(`Starting function group activation: ${functionGroupName}`);
+    logger.info(`Starting function group activation: ${functionGroupName}`);
 
     try {
       // Activate function group
@@ -98,8 +94,8 @@ export async function handleActivateFunctionGroup(connection: AbapConnection, ar
       // Get updated session state after activation
 
 
-      handlerLogger.info(`✅ ActivateFunctionGroup completed: ${functionGroupName}`);
-      handlerLogger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
+      logger.info(`✅ ActivateFunctionGroup completed: ${functionGroupName}`);
+      logger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -122,7 +118,7 @@ export async function handleActivateFunctionGroup(connection: AbapConnection, ar
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error activating function group ${functionGroupName}: ${error?.message || error}`);
+      logger.error(`Error activating function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate function group: ${error.message || String(error)}`;

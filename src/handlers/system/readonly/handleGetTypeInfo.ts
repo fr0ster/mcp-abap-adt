@@ -91,7 +91,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
     try {
         logger.info(`Fetching domain info for type ${args.type_name}`);
         const url = `/sap/bc/adt/ddic/domains/${encodeSapObjectName(args.type_name)}/source/main`;
-        const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+        const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
         const result = {
             isError: false,
             content: [
@@ -108,7 +108,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
         try {
             logger.debug(`Domain lookup failed for ${args.type_name}, trying data element`);
             const url = `/sap/bc/adt/ddic/dataelements/${encodeSapObjectName(args.type_name)}`;
-            const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+            const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
             const result = {
                 isError: false,
                 content: [
@@ -125,7 +125,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
             try {
                 logger.debug(`Data element lookup failed for ${args.type_name}, trying table type`);
                 const url = `/sap/bc/adt/ddic/tabletypes/${encodeSapObjectName(args.type_name)}`;
-                const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+                const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
                 const result = {
                     isError: false,
                     content: [
@@ -143,7 +143,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
                     logger.debug(`Table type lookup failed for ${args.type_name}, trying repository information system`);
                     const uri = encodeURIComponent(`/sap/bc/adt/ddic/domains/${args.type_name.toLowerCase()}`);
                     const url = `/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${uri}`;
-                    const response = await makeAdtRequestWithTimeout(url, 'GET', 'default');
+                    const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
                         const result = {
                             isError: false,
                             content: [

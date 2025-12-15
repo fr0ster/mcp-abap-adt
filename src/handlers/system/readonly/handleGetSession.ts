@@ -9,6 +9,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "GetSession",
@@ -34,7 +35,8 @@ interface GetSessionArgs {
  *
  * Returns session ID and session state that can be reused in other handlers
  */
-export async function handleGetSession(connection: AbapConnection, args: GetSessionArgs) {
+export async function handleGetSession(context: HandlerContext, args: GetSessionArgs) {
+  const { connection, logger } = context;
   const handlerLogger = getHandlerLogger(
     'handleGetSession',
     process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger

@@ -36,9 +36,12 @@ import {
   resolvePackageName,
   resolveTransportRequest,
   loadTestEnv,
-  getCleanupAfter
+  getCleanupAfter,
+  getSapConfigFromEnv
 } from '../helpers/configHelpers';
 import { createTestLogger } from '../helpers/loggerHelpers';
+import { generateSessionId } from '../../../lib/sessionUtils';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -46,11 +49,33 @@ import { createTestLogger } from '../helpers/loggerHelpers';
 const testLogger = createTestLogger('bdef-high');
 
 describe('BehaviorDefinition High-Level Handlers Integration', () => {
+  let connection: AbapConnection;
   let session: SessionInfo | null = null;
   let hasConfig = false;
 
   beforeAll(async () => {
     try {
+      // Get configuration from environment variables
+      const config = getSapConfigFromEnv();
+
+      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
+      const connectionLogger = {
+        debug: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {},
+        info: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {},
+        warn: process.env.DEBUG_CONNECTORS === 'true' ? console.warn : () => {},
+        error: process.env.DEBUG_CONNECTORS === 'true' ? console.error : () => {},
+        csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {}
+      };
+
+      // Create connection directly (same as in adt-clients tests)
+      connection = createAbapConnection(config, connectionLogger);
+
+      // Connect to get session state
+      await connection.connect();
+
+      // Generate session ID
+      const sessionId = generateSessionId();
+
       // Get initial session
       session = await getTestSession();
       hasConfig = true;
@@ -107,7 +132,7 @@ describe('BehaviorDefinition High-Level Handlers Integration', () => {
       testLogger.info(`📦 High Create: Creating ${bdefName}...`);
       let createResponse;
       try {
-        createResponse = await handleCreateBehaviorDefinition({
+        createResponse = await handleCreateBehaviorDefinition(connection, {
           name: bdefName,
           description,
           package_name: packageName,
@@ -143,7 +168,7 @@ describe('BehaviorDefinition High-Level Handlers Integration', () => {
 
       let updateResponse;
       try {
-        updateResponse = await handleUpdateBehaviorDefinition({
+        updateResponse = await handleUpdateBehaviorDefinition(connection, {
           name: bdefName,
           source_code: updatedSourceCode,
           transport_request: transportRequest,
@@ -179,7 +204,7 @@ describe('BehaviorDefinition High-Level Handlers Integration', () => {
 
           // Delete only if cleanup_after is true
         if (shouldCleanup) {
-          const deleteResponse = await handleDeleteBehaviorDefinition({
+          const deleteResponse = await handleDeleteBehaviorDefinition(connection, {
             name: bdefName,
             transport_request: transportRequest
           });

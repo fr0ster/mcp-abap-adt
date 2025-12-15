@@ -177,7 +177,8 @@ describe('Class Low-Level Handlers Integration', () => {
           debugLog('PRE_CHECK', `Class ${className} exists and can be read`);
         } else {
           // Class might exist but be corrupted/locked (error reading it)
-          const errorText = readResponse.content[0]?.text || '';
+          const contentItem = readResponse.content[0];
+          const errorText = (contentItem && 'text' in contentItem) ? contentItem.text : '';
           const errorLower = errorText.toLowerCase();
 
           // If error is 404, class doesn't exist
@@ -202,7 +203,7 @@ describe('Class Low-Level Handlers Integration', () => {
       if (classExists) {
         try {
           debugLog('PRE_CLEANUP', `Attempting to delete existing class ${className} before test`);
-          const preDeleteResponse = await handleDeleteClass({
+          const preDeleteResponse = await handleDeleteClass(connection, {
             class_name: className,
             transport_request: transportRequest
           });
@@ -218,10 +219,11 @@ describe('Class Low-Level Handlers Integration', () => {
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
               try {
-                const readResponse = await handleGetClass({ class_name: className });
+                const readResponse = await handleGetClass(connection, { class_name: className });
 
                 if (readResponse.isError) {
-                  const errorText = readResponse.content[0]?.text || '';
+                  const contentItem = readResponse.content[0];
+                  const errorText = (contentItem && 'text' in contentItem) ? contentItem.text : '';
                   if (errorText.includes('404') || errorText.includes('not found') || errorText.includes('does not exist')) {
                     deletionVerified = true;
                     debugLog('PRE_CLEANUP', `Deletion verified for ${className} (attempt ${attempt}/${maxRetries})`);
@@ -251,7 +253,9 @@ describe('Class Low-Level Handlers Integration', () => {
               // Keep classExists = true to let validation handle it
             }
           } else {
-            debugLog('PRE_CLEANUP', `Delete returned error (class may be locked/corrupted): ${preDeleteResponse.content[0]?.text || 'Unknown'}`);
+            const contentItem = preDeleteResponse.content[0];
+            const errorText = (contentItem && 'text' in contentItem) ? contentItem.text : 'Unknown';
+            debugLog('PRE_CLEANUP', `Delete returned error (class may be locked/corrupted): ${errorText}`);
             // If delete fails, class still exists - will be handled by validation
           }
         } catch (preDeleteError: any) {
@@ -273,7 +277,7 @@ describe('Class Low-Level Handlers Integration', () => {
           session_id: session.session_id,
           has_session_state: !!session.session_state
         });
-        const validateResponse = await handleValidateClass({
+        const validateResponse = await handleValidateClass(connection, {
           class_name: className,
           package_name: packageName,
           description,
@@ -315,7 +319,7 @@ describe('Class Low-Level Handlers Integration', () => {
           has_session_state: !!session.session_state
         });
         logFlow('create', { className, packageName, transportRequest });
-        const createResponse = await handleCreateClass({
+        const createResponse = await handleCreateClass(connection, {
           class_name: className,
           description,
           package_name: packageName,
@@ -351,15 +355,17 @@ describe('Class Low-Level Handlers Integration', () => {
         if (verifyDelay > 0) {
           await delay(verifyDelay);
         }
-        let verifyResponse = await handleGetClass({ class_name: className });
+        let verifyResponse = await handleGetClass(connection, { class_name: className });
         if (verifyResponse.isError) {
           // Retry once after an extra delay to handle eventual consistency
           const retryDelay = getOperationDelay('create_verify_retry', testCase) || 1000;
           await delay(retryDelay);
-          verifyResponse = await handleGetClass({ class_name: className });
+          verifyResponse = await handleGetClass(connection, { class_name: className });
         }
         if (verifyResponse.isError) {
-          throw new Error(`Create verification failed: ${verifyResponse.content[0]?.text || 'Object not found'}`);
+          const contentItem = verifyResponse.content[0];
+          const errorText = (contentItem && 'text' in contentItem) ? contentItem.text : 'Object not found';
+          throw new Error(`Create verification failed: ${errorText}`);
         }
 
         // Wait for creation to settle
@@ -372,7 +378,7 @@ describe('Class Low-Level Handlers Integration', () => {
           session_state_cookies: session.session_state?.cookies?.substring(0, 50) + '...'
         });
         logFlow('lock', { className, session: session.session_id });
-        const lockResponse = await handleLockClass({
+        const lockResponse = await handleLockClass(connection, {
           class_name: className,
           session_id: session.session_id,
           session_state: session.session_state
@@ -435,7 +441,7 @@ CLASS ${className.toLowerCase()} IMPLEMENTATION.
   ENDMETHOD.
 ENDCLASS.`;
 
-        const checkResponse = await handleCheckClass({
+        const checkResponse = await handleCheckClass(connection, {
           class_name: className,
           source_code: sourceCode,
           version: 'inactive',
@@ -484,7 +490,7 @@ ENDCLASS.`;
           });
           logFlow('update', { className, lockHandle });
 
-          const updateResponse = await handleUpdateClass({
+          const updateResponse = await handleUpdateClass(connection, {
           class_name: className,
           source_code: sourceCode,
           lock_handle: lockHandle,
@@ -521,7 +527,7 @@ ENDCLASS.`;
           session_state_csrf: lockSession.session_state?.csrf_token?.substring(0, 20) + '...'
         });
         logFlow('unlock', { className, lockHandle });
-        const unlockResponse = await handleUnlockClass({
+        const unlockResponse = await handleUnlockClass(connection, {
           class_name: className,
           lock_handle: lockHandle,
           session_id: lockSession.session_id,  // ← From Lock response
@@ -555,7 +561,7 @@ ENDCLASS.`;
           has_session_state: !!session.session_state
         });
         logFlow('activate', { className });
-        const activateResponse = await handleActivateClass({
+        const activateResponse = await handleActivateClass(connection, {
           class_name: className,
           session_id: session.session_id,
           session_state: session.session_state
@@ -587,7 +593,7 @@ ENDCLASS.`;
               lock_handle: lockHandle,
               session_id: lockSession.session_id
             });
-            await handleUnlockClass({
+            await handleUnlockClass(connection, {
               class_name: className,
               lock_handle: lockHandle,
               session_id: lockSession.session_id,
@@ -643,7 +649,7 @@ ENDCLASS.`;
                   has_lock_handle: !!lockHandle
                 });
 
-                await handleUnlockClass({
+                await handleUnlockClass(connection, {
                   class_name: className,
                   lock_handle: lockHandle,
                   session_id: lockSession.session_id,
@@ -665,8 +671,8 @@ ENDCLASS.`;
             }
 
             // Delete class only if cleanup_after is true
-            if (shouldCleanup) {
-              const deleteResponse = await handleDeleteClass({
+            if (shouldCleanup && connection) {
+              const deleteResponse = await handleDeleteClass(connection, {
                 class_name: className,
                 transport_request: transportRequest
               });

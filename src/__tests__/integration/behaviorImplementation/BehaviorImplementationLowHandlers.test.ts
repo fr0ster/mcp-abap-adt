@@ -46,6 +46,8 @@ import {
 } from '../helpers/configHelpers';
 import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 import { createTestLogger } from '../helpers/loggerHelpers';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { generateSessionId } from '../../../lib/sessionUtils';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -55,9 +57,12 @@ const testLogger = createTestLogger('bimpl-low');
 describe('BehaviorImplementation Low-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;
   let hasConfig = false;
-
+  let connection: AbapConnection;
   beforeAll(async () => {
     try {
+      connection = getManagedConnection();
+      await connection.connect();
+      const sessionId = generateSessionId();
       session = await getTestSession();
       hasConfig = true;
     } catch (error) {
@@ -121,7 +126,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
       try {
         // Step 1: Validate
         testLogger.info(`🔍 Step 1: Validating ${className}...`);
-        const validateResponse = await handleValidateBehaviorImplementation({
+        const validateResponse = await handleValidateBehaviorImplementation(connection, {
           class_name: className,
           behavior_definition: behaviorDefinition,
           package_name: packageName,
@@ -159,7 +164,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
         if (transportRequest) {
           createArgs.transport_request = transportRequest;
         }
-        const createResponse = await handleCreateClass(createArgs);
+        const createResponse = await handleCreateClass(connection, createArgs);
 
         if (createResponse.isError) {
           const errorMsg = createResponse.content[0]?.text || 'Unknown error';
@@ -183,7 +188,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         // Step 3: Check
         testLogger.info(`🔍 Step 3: Checking ${className}...`);
-        const checkResponse = await handleCheckClass({
+        const checkResponse = await handleCheckClass(connection, {
           class_name: className,
           session_id: session.session_id,
           session_state: session.session_state
@@ -201,7 +206,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         // Step 4: Lock
         testLogger.info(`🔒 Step 4: Locking ${className}...`);
-        const lockResponse = await handleLockBehaviorImplementation({
+        const lockResponse = await handleLockBehaviorImplementation(connection, {
           class_name: className,
           session_id: session.session_id,
           session_state: session.session_state
@@ -238,12 +243,6 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
         const implementationCode = testCase.params.implementation_code;
 
         // Update main source with "FOR BEHAVIOR OF" clause first
-        const connection = getManagedConnection();
-        connection.setSessionState({
-          cookies: lockSession.session_state?.cookies || null,
-          csrfToken: lockSession.session_state?.csrf_token || null,
-          cookieStore: lockSession.session_state?.cookie_store || {}
-        });
         const client = new CrudClient(connection);
 
         // Update main source with "FOR BEHAVIOR OF"
@@ -266,7 +265,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         // Step 6: Unlock
         testLogger.info(`🔓 Step 6: Unlocking ${className}...`);
-        const unlockResponse = await handleUnlockClass({
+        const unlockResponse = await handleUnlockClass(connection, {
           class_name: className,
           lock_handle: lockHandle,
           session_id: lockSession.session_id,
@@ -286,7 +285,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         // Step 7: Activate
         testLogger.info(`⚡ Step 7: Activating ${className}...`);
-        const activateResponse = await handleActivateClass({
+        const activateResponse = await handleActivateClass(connection, {
           class_name: className,
           session_id: session.session_id,
           session_state: session.session_state
@@ -322,7 +321,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
             // Always unlock (unlock is always performed)
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
-                await handleUnlockClass({
+                await handleUnlockClass(connection, {
                   class_name: className,
                   lock_handle: lockHandleForCleanup,
                   session_id: lockSessionForCleanup.session_id,
@@ -336,7 +335,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
             // Delete only if cleanup_after is true
             if (shouldCleanup) {
               await delay(1000);
-              const deleteResponse = await handleDeleteClass({
+              const deleteResponse = await handleDeleteClass(connection, {
                 class_name: className,
                 transport_request: transportRequest
               });

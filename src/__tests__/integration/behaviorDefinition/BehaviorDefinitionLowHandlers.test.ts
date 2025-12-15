@@ -32,11 +32,12 @@ import {
   debugLog
 } from '../helpers/testHelpers';
 import {
-  getTestSession,
+  createTestConnectionAndSession,
   updateSessionFromResponse,
   extractLockSession,
   SessionInfo
 } from '../helpers/sessionHelpers';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import {
   getEnabledTestCase,
   getTimeout,
@@ -55,12 +56,12 @@ import { createTestLogger } from '../helpers/loggerHelpers';
 const testLogger = createTestLogger('bdef-low');
 
 describe('BehaviorDefinition Low-Level Handlers Integration', () => {
-  let session: SessionInfo | null = null;
   let hasConfig = false;
 
   beforeAll(async () => {
+    // Load environment variables
     try {
-      session = await getTestSession();
+      await loadTestEnv();
       hasConfig = true;
     } catch (error) {
       testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -73,7 +74,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
     let testBdefName: string | null = null;
 
     beforeEach(async () => {
-      if (!hasConfig || !session) {
+      if (!hasConfig) {
         return;
       }
 
@@ -86,14 +87,26 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
     });
 
     it('should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate', async () => {
-      if (!hasConfig || !session || !testCase || !testBdefName) {
+      if (!hasConfig || !testCase || !testBdefName) {
         debugLog('TEST_SKIP', 'Skipping test: No configuration or test case', {
           hasConfig,
-          hasSession: !!session,
           hasTestCase: !!testCase,
           hasTestBdefName: !!testBdefName
         });
         testLogger.info('⏭️  Skipping test: No configuration or test case');
+        return;
+      }
+
+      // Create connection and session for this test
+      let connection: AbapConnection | null = null;
+      let session: SessionInfo | null = null;
+      try {
+        const { connection: testConnection, session: testSession } = await createTestConnectionAndSession();
+        connection = testConnection;
+        session = testSession;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        testLogger.warn(`⚠️ Skipping test: Failed to create connection ${errorMessage}`);
         return;
       }
 
@@ -128,7 +141,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
       try {
         // Step 1: Validate
         testLogger.info(`🔍 Step 1: Validating ${bdefName}...`);
-        const validateResponse = await handleValidateBehaviorDefinition({
+        const validateResponse = await handleValidateBehaviorDefinition(connection, {
           name: bdefName,
           root_entity: rootEntity,
           implementation_type: implementationType,
@@ -170,7 +183,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
         if (transportRequest) {
           createArgs.transport_request = transportRequest;
         }
-        const createResponse = await handleCreateBehaviorDefinition(createArgs);
+        const createResponse = await handleCreateBehaviorDefinition(connection, createArgs);
 
         if (createResponse.isError) {
           const errorMsg = createResponse.content[0]?.text || 'Unknown error';
@@ -194,7 +207,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
 
         // Step 3: Lock
         testLogger.info(`🔒 Step 3: Locking ${bdefName}...`);
-        const lockResponse = await handleLockBehaviorDefinition({
+        const lockResponse = await handleLockBehaviorDefinition(connection, {
           name: bdefName,
           session_id: session.session_id,
           session_state: session.session_state
@@ -230,7 +243,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
         }
         const sourceCode = testCase.params.source_code;
 
-        const updateResponse = await handleUpdateBehaviorDefinition({
+        const updateResponse = await handleUpdateBehaviorDefinition(connection, {
           name: bdefName,
           source_code: sourceCode,
           lock_handle: lockHandle,
@@ -251,7 +264,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
 
         // Step 5: Unlock
         testLogger.info(`🔓 Step 5: Unlocking ${bdefName}...`);
-        const unlockResponse = await handleUnlockBehaviorDefinition({
+        const unlockResponse = await handleUnlockBehaviorDefinition(connection, {
           name: bdefName,
           lock_handle: lockHandle,
           session_id: lockSession.session_id,
@@ -272,7 +285,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
 
         // Step 6: Activate
         testLogger.info(`⚡ Step 6: Activating ${bdefName}...`);
-        const activateResponse = await handleActivateBehaviorDefinition({
+        const activateResponse = await handleActivateBehaviorDefinition(connection, {
           name: bdefName,
           session_id: session.session_id,
           session_state: session.session_state
@@ -304,9 +317,9 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
             const shouldCleanup = getCleanupAfter(testCase);
 
             // Always unlock (unlock is always performed)
-            if (lockHandleForCleanup && lockSessionForCleanup) {
+            if (lockHandleForCleanup && lockSessionForCleanup && connection) {
               try {
-                await handleUnlockBehaviorDefinition({
+                await handleUnlockBehaviorDefinition(connection, {
                   name: bdefName,
                   lock_handle: lockHandleForCleanup,
                   session_id: lockSessionForCleanup.session_id,
@@ -321,7 +334,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
             if (shouldCleanup) {
               await delay(1000);
 
-              const deleteResponse = await handleDeleteBehaviorDefinition({
+              const deleteResponse = await handleDeleteBehaviorDefinition(connection, {
                 name: bdefName,
                 transport_request: transportRequest
               });

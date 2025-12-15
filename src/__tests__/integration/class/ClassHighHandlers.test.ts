@@ -134,18 +134,20 @@ ENDCLASS.`;
       const sessionId = generateSessionId();
 
       // Get session state directly from connection
-      const sessionState = connection.getSessionState();
+      const connectionAny = connection as any;
+      const cookies = connectionAny.getCookies?.() || '';
+      const csrfToken = connectionAny.getCsrfToken?.() || '';
 
-      if (!sessionState) {
+      if (!cookies || !csrfToken) {
         throw new Error('Failed to get session state. Connection may not be properly initialized.');
       }
 
       session = {
         session_id: sessionId,
         session_state: {
-          cookies: sessionState.cookies || '',
-          csrf_token: sessionState.csrfToken || '',
-          cookie_store: sessionState.cookieStore || {}
+          cookies: cookies || '',
+          csrf_token: csrfToken || '',
+          cookie_store: {}
         }
       };
 
@@ -189,7 +191,7 @@ ENDCLASS.`;
           activate: true
         });
 
-        const resp = await handleCreateClass({
+        const resp = await handleCreateClass(connection, {
           class_name: className,
           description,
           package_name: packageName,
@@ -322,7 +324,7 @@ ENDCLASS.`;
           activate: true
         });
 
-        updateResponse = await handleUpdateClass({
+        updateResponse = await handleUpdateClass(connection, {
           class_name: className,
           source_code: updatedSourceCode,
           activate: true
@@ -456,7 +458,7 @@ ENDCLASS.`;
           // Delete class only if cleanup_after is true
           if (shouldCleanup) {
             try {
-              const deleteResponse = await handleDeleteClass({
+              const deleteResponse = await handleDeleteClass(connection, {
                 class_name: className,
                 transport_request: transportRequest
               });

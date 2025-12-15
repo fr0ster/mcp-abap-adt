@@ -35,9 +35,12 @@ import {
   resolvePackageName,
   resolveTransportRequest,
   loadTestEnv,
-  getCleanupAfter
+  getCleanupAfter,
+  getSapConfigFromEnv
 } from '../helpers/configHelpers';
 import { createTestLogger } from '../helpers/loggerHelpers';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
+import { generateSessionId } from '../../../lib/sessionUtils';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -47,9 +50,31 @@ const testLogger = createTestLogger('bimpl-high');
 describe('BehaviorImplementation High-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;
   let hasConfig = false;
+  let connection: AbapConnection;
 
   beforeAll(async () => {
     try {
+      // Get configuration from environment variables
+      const config = getSapConfigFromEnv();
+
+      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
+      const connectionLogger = {
+        debug: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {},
+        info: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {},
+        warn: process.env.DEBUG_CONNECTORS === 'true' ? console.warn : () => {},
+        error: process.env.DEBUG_CONNECTORS === 'true' ? console.error : () => {},
+        csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {}
+      };
+
+      // Create connection directly (same as in adt-clients tests)
+      connection = createAbapConnection(config, connectionLogger);
+
+      // Connect to get session state
+      await connection.connect();
+
+      // Generate session ID
+      const sessionId = generateSessionId();
+
       // Get initial session
       session = await getTestSession();
       hasConfig = true;
@@ -112,7 +137,7 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
         if (sourceCode) {
           createArgs.implementation_code = sourceCode;
         }
-        createResponse = await handleCreateBehaviorImplementation(createArgs);
+        createResponse = await handleCreateBehaviorImplementation(connection, createArgs);
       } catch (error: any) {
         const errorMsg = error.message || String(error);
         // If behavior implementation already exists or validation error, skip test
@@ -141,7 +166,7 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
 
         let updateResponse;
         try {
-          updateResponse = await handleUpdateBehaviorImplementation({
+          updateResponse = await handleUpdateBehaviorImplementation(connection, {
             class_name: className,
             behavior_definition: behaviorDefinition,
             implementation_code: updatedImplementationCode,
@@ -181,7 +206,7 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
 
           // Delete only if cleanup_after is true
           if (shouldCleanup) {
-            const deleteResponse = await handleDeleteClass({
+            const deleteResponse = await handleDeleteClass(connection, {
               class_name: className,
               transport_request: transportRequest
             });

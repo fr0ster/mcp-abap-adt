@@ -20,14 +20,8 @@ import { handleUpdateMetadataExtension } from '../../../handlers/ddlx/low/handle
 import { handleUnlockMetadataExtension } from '../../../handlers/ddlx/low/handleUnlockMetadataExtension';
 import { handleActivateMetadataExtension } from '../../../handlers/ddlx/low/handleActivateMetadataExtension';
 import { handleDeleteMetadataExtension } from '../../../handlers/ddlx/low/handleDeleteMetadataExtension';
-
-import {
-  parseHandlerResponse,
-  extractLockHandle,
-  delay,
-  debugLog,
-  logTestStep
-} from '../helpers/testHelpers';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
+import { parseHandlerResponse, extractLockHandle, delay, debugLog } from '../helpers/testHelpers';
 import {
   getTestSession,
   updateSessionFromResponse,
@@ -41,8 +35,13 @@ import {
   resolvePackageName,
   resolveTransportRequest,
   loadTestEnv,
-  getCleanupAfter
+  getCleanupAfter,
+  getSapConfigFromEnv
 } from '../helpers/configHelpers';
+import {
+  createDiagnosticsTracker
+} from '../helpers/persistenceHelpers';
+import { generateSessionId } from '../../../lib/sessionUtils';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -50,9 +49,30 @@ import {
 describe('MetadataExtension Low-Level Handlers Integration', () => {
   let session: SessionInfo | null = null;
   let hasConfig = false;
-
+  let connection: AbapConnection;
   beforeAll(async () => {
     try {
+      // Get configuration from environment variables
+      const config = getSapConfigFromEnv();
+
+      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
+      const connectionLogger = {
+        debug: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {},
+        info: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {},
+        warn: process.env.DEBUG_CONNECTORS === 'true' ? console.warn : () => {},
+        error: process.env.DEBUG_CONNECTORS === 'true' ? console.error : () => {},
+        csrfToken: process.env.DEBUG_CONNECTORS === 'true' ? console.log : () => {}
+      };
+
+      // Create connection directly (same as in adt-clients tests)
+      connection = createAbapConnection(config, connectionLogger);
+
+      // Connect to get session state
+      await connection.connect();
+
+      // Generate session ID
+      const sessionId = generateSessionId();
+
       session = await getTestSession();
       hasConfig = true;
     } catch (error) {
@@ -108,7 +128,7 @@ describe('MetadataExtension Low-Level Handlers Integration', () => {
       try {
         // Step 1: Validate
         console.log(`🔍 Step 1: Validating ${ddlxName}...`);
-        const validateResponse = await handleValidateMetadataExtension({
+        const validateResponse = await handleValidateMetadataExtension(connection, {
         name: ddlxName,
         description: description,
         package_name: packageName,
@@ -134,7 +154,7 @@ describe('MetadataExtension Low-Level Handlers Integration', () => {
 
         // Step 2: Create
         console.log(`📦 Step 2: Creating ${ddlxName}...`);
-        const createResponse = await handleCreateMetadataExtension({
+        const createResponse = await handleCreateMetadataExtension(connection, {
           name: ddlxName,
           description,
           package_name: packageName,
@@ -163,7 +183,7 @@ describe('MetadataExtension Low-Level Handlers Integration', () => {
 
         // Step 3: Lock
         console.log(`🔒 Step 3: Locking ${ddlxName}...`);
-        const lockResponse = await handleLockMetadataExtension({
+        const lockResponse = await handleLockMetadataExtension(connection, {
           name: ddlxName,
           session_id: session.session_id,
           session_state: session.session_state
@@ -199,7 +219,7 @@ annotate view ${testCase.params.view_name || 'ZI_VIEW'} with {
   @EndUserText.label: '${description}'
 }`;
 
-        const updateResponse = await handleUpdateMetadataExtension({
+        const updateResponse = await handleUpdateMetadataExtension(connection, {
           name: ddlxName,
           source_code: sourceCode,
           lock_handle: lockHandle,
@@ -220,7 +240,7 @@ annotate view ${testCase.params.view_name || 'ZI_VIEW'} with {
 
         // Step 5: Unlock
         console.log(`🔓 Step 5: Unlocking ${ddlxName}...`);
-        const unlockResponse = await handleUnlockMetadataExtension({
+        const unlockResponse = await handleUnlockMetadataExtension(connection, {
           name: ddlxName,
           lock_handle: lockHandle,
           session_id: lockSession.session_id,
@@ -241,7 +261,7 @@ annotate view ${testCase.params.view_name || 'ZI_VIEW'} with {
 
         // Step 6: Activate
         console.log(`⚡ Step 6: Activating ${ddlxName}...`);
-        const activateResponse = await handleActivateMetadataExtension({
+        const activateResponse = await handleActivateMetadataExtension(connection, {
           name: ddlxName,
           session_id: session.session_id,
           session_state: session.session_state
@@ -273,7 +293,7 @@ annotate view ${testCase.params.view_name || 'ZI_VIEW'} with {
             // Always unlock (unlock is always performed)
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
-                await handleUnlockMetadataExtension({
+                await handleUnlockMetadataExtension(connection, {
                   name: ddlxName,
                   lock_handle: lockHandleForCleanup,
                   session_id: lockSessionForCleanup.session_id,
@@ -287,7 +307,7 @@ annotate view ${testCase.params.view_name || 'ZI_VIEW'} with {
             // Delete only if cleanup_after is true
             if (shouldCleanup) {
               await delay(1000);
-              const deleteResponse = await handleDeleteMetadataExtension({
+              const deleteResponse = await handleDeleteMetadataExtension(connection, {
                 name: ddlxName,
                 transport_request: transportRequest
               });

@@ -368,7 +368,7 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
           const shouldCleanup = getCleanupAfter(testCase);
 
           if (shouldCleanup && classCreated) {
-            const deleteResponse = await handleDeleteClass({
+            const deleteResponse = await handleDeleteClass(connection, {
               class_name: className,
               transport_request: transportRequest
             });

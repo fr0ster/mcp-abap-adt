@@ -14,181 +14,43 @@
  * Run: npm test -- --testPathPattern=integration/structure
  */
 
-import { handleGetSession } from '../../../handlers/system/readonly/handleGetSession';
 import { handleCreateStructure } from '../../../handlers/structure/high/handleCreateStructure';
 import { handleUpdateStructure } from '../../../handlers/structure/high/handleUpdateStructure';
 import { handleDeleteStructure } from '../../../handlers/structure/low/handleDeleteStructure';
 
-import {
-  parseHandlerResponse,
-  delay,
-  debugLog
-} from '../helpers/testHelpers';
-import {
-  getTestSession,
-  updateSessionFromResponse,
-  SessionInfo
-} from '../helpers/sessionHelpers';
-import {
-  getEnabledTestCase,
-  getTimeout,
-  getOperationDelay,
-  resolvePackageName,
-  resolveTransportRequest,
-  loadTestEnv,
-  getCleanupAfter
-} from '../helpers/configHelpers';
-import { createTestLogger } from '../helpers/loggerHelpers';
-
-// Load environment variables
-// loadTestEnv will be called in beforeAll
-
-const testLogger = createTestLogger('structure-high');
-
+import { HighTester } from '../helpers/testers/HighTester';
+import { getTimeout } from '../helpers/configHelpers';
 
 describe('Structure High-Level Handlers Integration', () => {
-  let session: SessionInfo | null = null;
-  let hasConfig = false;
+  let tester: HighTester;
 
   beforeAll(async () => {
-    try {
-      // Get initial session
-      session = await getTestSession();
-      hasConfig = true;
-    } catch (error) {
-      if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
-        testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+    tester = new HighTester(
+      'create_structure',
+      'builder_structure',
+      'structure-high',
+      {
+        create: handleCreateStructure,
+        update: handleUpdateStructure,
+        delete: handleDeleteStructure
       }
-      hasConfig = false;
-    }
+    );
+    await tester.beforeAll();
+  });
+
+  afterAll(async () => {
+    await tester.afterAll();
+  });
+
+  beforeEach(async () => {
+    await tester.beforeEach();
+  });
+
+  afterEach(async () => {
+    await tester.afterEach();
   });
 
   it('should test all Structure high-level handlers', async () => {
-    if (!hasConfig || !session) {
-      testLogger.info('⏭️  Skipping test: No configuration or session');
-      return;
-    }
-
-    // Get test case configuration
-    const testCase = getEnabledTestCase('create_structure', 'builder_structure');
-    if (!testCase) {
-      testLogger.info('⏭️  Skipping test: No test case configuration');
-      return;
-    }
-
-    const structureName = testCase.params.structure_name;
-    const packageName = resolvePackageName(testCase);
-    const transportRequest = resolveTransportRequest(testCase);
-    const description = testCase.params.description || `Test structure for high-level handler`;
-    const fields = testCase.params.fields || [
-      { name: 'FIELD1', description: 'First field', data_type: 'CHAR', length: 10 },
-      { name: 'FIELD2', description: 'Second field', data_type: 'CHAR', length: 20 }
-    ];
-
-    try {
-      // Step 1: Test CreateStructure (High-Level)
-      debugLog('CREATE', `Starting high-level structure creation for ${structureName}`, {
-        session_id: session.session_id,
-        package_name: packageName,
-        description
-      });
-
-      let createResponse;
-      try {
-        createResponse = await handleCreateStructure({
-          structure_name: structureName,
-          description,
-          package_name: packageName,
-          transport_request: transportRequest,
-          fields
-        });
-      } catch (error: any) {
-        const errorMsg = error.message || String(error);
-        // If structure already exists, that's okay - we'll skip test
-        if (errorMsg.includes('already exists') || errorMsg.includes('InvalidObjName')) {
-          testLogger.info(`⏭️  Structure ${structureName} already exists, skipping test`);
-          return;
-        }
-        throw error;
-      }
-
-      if (createResponse.isError) {
-        const errorMsg = createResponse.content[0]?.text || 'Unknown error';
-        throw new Error(`Create failed: ${errorMsg}`);
-      }
-
-      const createData = parseHandlerResponse(createResponse);
-      expect(createData.success).toBe(true);
-      expect(createData.structure_name).toBe(structureName);
-
-      debugLog('CREATE', 'High-level structure creation completed successfully', {
-        structure_name: createData.structure_name,
-        success: createData.success
-      });
-
-      await delay(getOperationDelay('create', testCase));
-      testLogger.info(`✅ High-level structure creation completed successfully for ${structureName}`);
-
-      // Step 2: Test UpdateStructure (High-Level)
-      if (testCase.params.update_ddl_code) {
-        debugLog('UPDATE', `Starting high-level structure update for ${structureName}`, {
-          session_id: session.session_id
-        });
-
-        const updateResponse = await handleUpdateStructure({
-          structure_name: structureName,
-          ddl_code: testCase.params.update_ddl_code,
-          transport_request: transportRequest,
-          activate: true
-        });
-
-        if (updateResponse.isError) {
-          const errorMsg = updateResponse.content[0]?.text || 'Unknown error';
-          throw new Error(`Update failed: ${errorMsg}`);
-        }
-
-        const updateData = parseHandlerResponse(updateResponse);
-        expect(updateData.success).toBe(true);
-        expect(updateData.structure_name).toBe(structureName);
-
-        debugLog('UPDATE', 'High-level structure update completed successfully', {
-          structure_name: updateData.structure_name,
-          success: updateData.success
-        });
-
-        await delay(getOperationDelay('update', testCase));
-        testLogger.info(`✅ High-level structure update completed successfully for ${structureName}`);
-      }
-
-    } catch (error: any) {
-      testLogger.error(`❌ Test failed: ${error.message}`);
-      throw error;
-    } finally {
-      // Cleanup: Optionally delete test structure
-      if (session && structureName) {
-        try {
-          const shouldCleanup = getCleanupAfter(testCase);
-
-          // Delete only if cleanup_after is true
-          if (shouldCleanup) {
-            const deleteResponse = await handleDeleteStructure({
-              structure_name: structureName,
-              transport_request: transportRequest
-            });
-
-            if (!deleteResponse.isError) {
-              testLogger.info(`🧹 Cleaned up test structure: ${structureName}`);
-            } else {
-              const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-              testLogger.warn(`⚠️  Failed to delete structure ${structureName}: ${errorMsg}`);
-            }
-          } else {
-            testLogger.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${structureName}`);
-          }
-        } catch (cleanupError) {
-          testLogger.warn(`⚠️  Failed to cleanup test structure ${structureName}: ${cleanupError}`);
-        }
-      }
-    }
+    await tester.run();
   }, getTimeout('long'));
 });

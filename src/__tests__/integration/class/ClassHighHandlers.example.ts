@@ -1,17 +1,13 @@
 /**
- * Integration tests for Class High-Level Handlers
- *
- * Tests all high-level handlers for Class module:
- * - CreateClass (high-level) - handles create, lock, update, check, unlock, activate
- * - UpdateClass (high-level) - handles lock, update, check, unlock, activate
- *
- * Enable debug logs:
- *   DEBUG_TESTS=true         - Test execution logs
- *   DEBUG_HANDLERS=true     - Handler logs
- *   DEBUG_ADT_LIBS=true      - Library logs
- *   DEBUG_CONNECTORS=true    - Connection logs
- *
- * Run: npm test -- --testPathPattern=integration/class
+ * Example: How to use HighTester with workflow functions (lambda approach)
+ * 
+ * This shows how tests can define workflow functions (lambdas) that call handlers
+ * with logging, while tester provides all infrastructure (connection, session, logger, etc.)
+ * 
+ * This approach allows:
+ * - Tests to define custom handler call logic
+ * - Tests to add custom logging
+ * - Tester to provide all common infrastructure (connection, session, logger, params, etc.)
  */
 
 import { handleCreateClass } from '../../../handlers/class/high/handleCreateClass';
@@ -24,7 +20,7 @@ import type { TesterContext } from '../helpers/testers/types';
 import { parseHandlerResponse, extractErrorMessage, delay } from '../helpers/testHelpers';
 import { updateSessionFromResponse } from '../helpers/sessionHelpers';
 
-describe('Class High-Level Handlers Integration', () => {
+describe('Class High-Level Handlers Integration (Example with Workflow Functions)', () => {
   let tester: HighTester;
 
   beforeAll(async () => {
@@ -36,11 +32,7 @@ describe('Class High-Level Handlers Integration', () => {
         // Lambda that calls create handler with logging
         create: async (context: TesterContext) => {
           const { connection, session, logger, objectName, params, packageName, transportRequest } = context;
-
-          if (!objectName) {
-            throw new Error('objectName is required for create');
-          }
-
+          
           logger.info(`   • create: ${objectName}`);
 
           const sourceCode = params.source_code || '';
@@ -51,18 +43,15 @@ describe('Class High-Level Handlers Integration', () => {
             activate: true,
             ...(transportRequest && { transport_request: transportRequest }),
             ...(params.description && { description: params.description }),
-            ...(params.superclass && { superclass: params.superclass })
+            ...(params.superclass && { superclass: params.superclass }),
+            session_id: session.session_id,
+            session_state: session.session_state
           };
-
-          // Log create args for debugging (without full source_code)
-          logger.debug(`Create args: ${JSON.stringify({ ...createArgs, source_code: sourceCode ? `${sourceCode.length} chars` : 'empty' }, null, 2)}`);
 
           let createResponse;
           try {
             createResponse = await handleCreateClass(connection, createArgs);
           } catch (error: any) {
-            // If handler throws an error directly (not wrapped in response)
-            logger.error(`Handler threw error: ${error.message || String(error)}`);
             if (error.message?.includes('404')) {
               await delay(1000);
               createResponse = await handleCreateClass(connection, createArgs);
@@ -73,40 +62,11 @@ describe('Class High-Level Handlers Integration', () => {
 
           if (createResponse.isError) {
             const errorMsg = extractErrorMessage(createResponse);
-            // Log full error details for debugging
-            const errorDetails = JSON.stringify(createResponse.content, null, 2);
-            logger.debug(`Create error details: ${errorDetails}`);
-
-            // Try to extract more detailed error message
-            let detailedError = errorMsg;
-            if (createResponse.content && createResponse.content.length > 0) {
-              const firstContent = createResponse.content[0];
-              if (firstContent.text) {
-                detailedError = firstContent.text;
-              } else if (firstContent.json) {
-                detailedError = JSON.stringify(firstContent.json);
-              }
+            if (errorMsg.includes('already exists') || errorMsg.includes('ExceptionResourceAlreadyExists')) {
+              logger.info(`⏭️  SKIP: Object already exists: ${errorMsg}`);
+              throw new Error(`SKIP: ${errorMsg}`);
             }
-
-            if (detailedError.includes('already exists') ||
-                detailedError.includes('ExceptionResourceAlreadyExists') ||
-                detailedError.includes('ResourceAlreadyExists')) {
-              logger.info(`⏭️  SKIP: Object already exists: ${detailedError}`);
-              throw new Error(`SKIP: ${detailedError}`);
-            }
-
-            // 400 errors during validation might indicate object already exists or invalid name
-            // Try to check if it's a validation error that we should skip
-            if (detailedError.includes('400') || detailedError.includes('status code 400')) {
-              logger.warn(`⚠️  Create failed with 400 error (might be validation or already exists): ${detailedError}`);
-              // For now, treat 400 as a skip condition to avoid test failures
-              // In production, you might want to check if object exists first
-              logger.info(`⏭️  SKIP: Validation failed or object might already exist: ${detailedError}`);
-              throw new Error(`SKIP: ${detailedError}`);
-            }
-
-            logger.error(`Create failed with error: ${detailedError}`);
-            throw new Error(`Create failed: ${detailedError}`);
+            throw new Error(`Create failed: ${errorMsg}`);
           }
 
           const createData = parseHandlerResponse(createResponse);
@@ -116,39 +76,27 @@ describe('Class High-Level Handlers Integration', () => {
 
           logger.success(`✅ create: ${objectName} completed successfully`);
           updateSessionFromResponse(session, createData);
-
+          
           return createData;
         },
 
         // Lambda that calls update handler with logging
         update: async (context: TesterContext) => {
           const { connection, session, logger, objectName, params } = context;
-
-          if (!objectName) {
-            throw new Error('objectName is required for update');
-          }
-
+          
           logger.info(`   • update: ${objectName}`);
 
-          // Use update_source_code if provided, otherwise modify original source_code
-          let updatedSourceCode = params.update_source_code;
+          const updatedSourceCode = params.update_source_code;
           if (!updatedSourceCode) {
-            const originalSourceCode = params.source_code || '';
-            // Simple modification: add a comment or method to indicate update
-            updatedSourceCode = originalSourceCode.replace(
-              /PUBLIC SECTION\./,
-              'PUBLIC SECTION.\n    " Updated via MCP ABAP ADT test'
-            );
-            if (updatedSourceCode === originalSourceCode) {
-              // If no replacement happened, append a comment at the end
-              updatedSourceCode = originalSourceCode + '\n    " Updated via MCP ABAP ADT test';
-            }
+            throw new Error('update_source_code is required');
           }
 
           const updateResponse = await handleUpdateClass(connection, {
             class_name: objectName,
             source_code: updatedSourceCode,
-            activate: true
+            activate: true,
+            session_id: session.session_id,
+            session_state: session.session_state
           });
 
           if (updateResponse.isError) {
@@ -162,18 +110,14 @@ describe('Class High-Level Handlers Integration', () => {
           }
 
           logger.success(`✅ update: ${objectName} completed successfully`);
-
+          
           return updateData;
         },
 
         // Lambda that calls delete handler with logging
         delete: async (context: TesterContext) => {
           const { connection, logger, objectName, transportRequest } = context;
-
-          if (!objectName) {
-            throw new Error('objectName is required for delete');
-          }
-
+          
           logger.info(`   • delete: ${objectName}`);
 
           const deleteResponse = await handleDeleteClass(connection, {

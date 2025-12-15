@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import type { Logger } from '@mcp-abap-adt/logger';
-import { LogLevel } from '@mcp-abap-adt/logger';
+import { LogLevel, DefaultLogger } from '@mcp-abap-adt/logger';
 
-type LoggerWithExtras = Logger & {
+export type LoggerWithExtras = Logger & {
   browserAuth: (message: string) => void;
   refresh: (message: string) => void;
   success: (message: string) => void;
@@ -99,6 +99,7 @@ const resolvedLogLevel = process.env.TEST_LOG_SILENT === 'true' ? null : resolve
 
 /**
  * Create a prefixed test logger for integration tests.
+ * Uses DefaultLogger from @mcp-abap-adt/logger package for beautiful formatted output with icons.
  * - Honors TEST_LOG_LEVEL (error|warn|info|debug); DEBUG_* → debug.
  * - Optional file sink via TEST_LOG_FILE=/tmp/adt-tests.log.
  */
@@ -109,32 +110,33 @@ export function createTestLogger(category: string): LoggerWithExtras {
 
   const level = resolvedLogLevel;
   const prefix = formatPrefix(category);
+  const baseLogger = new DefaultLogger(level);
 
-  const emit = (messageLevel: LogLevel, write: (msg: string) => void) => (message: string) => {
+  const emit = (messageLevel: LogLevel, fn: (msg: string) => void) => (message: string) => {
     if (level < messageLevel) return;
     const line = `${prefix} ${message}`;
-    write(line);
+    fn(line);
     if (appendToFile) {
       appendToFile(`[${new Date().toISOString()}] ${line}`);
     }
   };
 
-  const info = emit(LogLevel.INFO, msg => console.info(msg));
-  const debug = emit(LogLevel.DEBUG, msg => console.info(msg.startsWith('[DEBUG]') ? msg : `[DEBUG] ${msg}`));
-  const warn = emit(LogLevel.WARN, msg => console.warn(`[WARN] ${msg}`));
-  const error = emit(LogLevel.ERROR, msg => console.error(msg));
+  const info = emit(LogLevel.INFO, msg => baseLogger.info(msg));
+  const debug = emit(LogLevel.DEBUG, msg => baseLogger.debug(msg));
+  const warn = emit(LogLevel.WARN, msg => baseLogger.warn(msg));
+  const error = emit(LogLevel.ERROR, msg => baseLogger.error(msg));
 
   return {
     info,
     debug,
     warn,
     error,
-    browserAuth: emit(LogLevel.INFO, msg => console.info(`🌐 ${msg}`)),
-    refresh: emit(LogLevel.INFO, msg => console.info(`🔄 ${msg}`)),
-    success: emit(LogLevel.INFO, msg => console.info(`✅ ${msg}`)),
-    browserUrl: emit(LogLevel.INFO, msg => console.info(`🔗 ${msg}`)),
-    browserOpening: emit(LogLevel.DEBUG, msg => console.info(`🌐 ${msg}`)),
-    testSkip: emit(LogLevel.INFO, msg => console.info(`⏭️  ${msg}`)),
+    browserAuth: emit(LogLevel.INFO, msg => baseLogger.info(`🌐 ${msg}`)),
+    refresh: emit(LogLevel.INFO, msg => baseLogger.info(`🔄 ${msg}`)),
+    success: emit(LogLevel.INFO, msg => baseLogger.info(`✅ ${msg}`)),
+    browserUrl: emit(LogLevel.INFO, msg => baseLogger.info(`🔗 ${msg}`)),
+    browserOpening: emit(LogLevel.DEBUG, msg => baseLogger.debug(`🌐 ${msg}`)),
+    testSkip: emit(LogLevel.INFO, msg => baseLogger.info(`⏭️  ${msg}`)),
   };
 }
 

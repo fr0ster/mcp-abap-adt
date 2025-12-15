@@ -14,181 +14,65 @@
  * Run: npm test -- --testPathPattern=integration/serviceDefinition
  */
 
-import { handleGetSession } from '../../../handlers/system/readonly/handleGetSession';
 import { handleCreateServiceDefinition } from '../../../handlers/service_definition/high/handleCreateServiceDefinition';
 import { handleUpdateServiceDefinition } from '../../../handlers/service_definition/high/handleUpdateServiceDefinition';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getManagedConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 
-import {
-  parseHandlerResponse,
-  delay,
-  debugLog
-} from '../helpers/testHelpers';
-import {
-  getTestSession,
-  updateSessionFromResponse,
-  SessionInfo
-} from '../helpers/sessionHelpers';
-import {
-  getEnabledTestCase,
-  getTimeout,
-  getOperationDelay,
-  resolvePackageName,
-  resolveTransportRequest,
-  loadTestEnv,
-  getCleanupAfter
-} from '../helpers/configHelpers';
-import { createTestLogger } from '../helpers/loggerHelpers';
+import { HighTester } from '../helpers/testers/HighTester';
+import { getTimeout } from '../helpers/configHelpers';
 
-// Load environment variables
-// loadTestEnv will be called in beforeAll
-
-const testLogger = createTestLogger('service-high');
-
+// Wrapper for delete since there's no handler for deleteServiceDefinition
+async function deleteServiceDefinitionWrapper(connection: AbapConnection, args: any): Promise<any> {
+  try {
+    const client = new CrudClient(connection);
+    await client.deleteServiceDefinition(
+      { serviceDefinitionName: args.service_definition_name },
+      args.transport_request
+    );
+    return {
+      isError: false,
+      content: [{ type: 'text', text: 'Service definition deleted successfully' }]
+    };
+  } catch (error: any) {
+    return {
+      isError: true,
+      content: [{ type: 'text', text: error?.message || String(error) }]
+    };
+  }
+}
 
 describe('ServiceDefinition High-Level Handlers Integration', () => {
-  let session: SessionInfo | null = null;
-  let hasConfig = false;
+  let tester: HighTester;
 
   beforeAll(async () => {
-    try {
-      // Get initial session
-      session = await getTestSession();
-      hasConfig = true;
-    } catch (error) {
-      testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    tester = new HighTester(
+      'create_service_definition',
+      'builder_service_definition',
+      'service-high',
+      {
+        create: handleCreateServiceDefinition,
+        update: handleUpdateServiceDefinition,
+        delete: deleteServiceDefinitionWrapper
+      }
+    );
+    await tester.beforeAll();
+  });
+
+  afterAll(async () => {
+    await tester.afterAll();
+  });
+
+  beforeEach(async () => {
+    await tester.beforeEach();
+  });
+
+  afterEach(async () => {
+    await tester.afterEach();
   });
 
   it('should test all ServiceDefinition high-level handlers', async () => {
-    if (!hasConfig || !session) {
-      testLogger.info('⏭️  Skipping test: No configuration or session');
-      return;
-    }
-
-    // Get test case configuration
-    const testCase = getEnabledTestCase('create_service_definition', 'builder_service_definition');
-    if (!testCase) {
-      testLogger.info('⏭️  Skipping test: No test case configuration');
-      return;
-    }
-
-    const serviceDefinitionName = testCase.params.service_definition_name;
-    const packageName = resolvePackageName(testCase);
-    const transportRequest = resolveTransportRequest(testCase);
-    const description = testCase.params.description || `Test service definition for high-level handler`;
-    const sourceCode = testCase.params.source_code || `service definition ${serviceDefinitionName.toLowerCase()} {
-  expose ${serviceDefinitionName.toLowerCase()}_entity;
-}`;
-
-    try {
-      // Step 1: Test CreateServiceDefinition (High-Level)
-      debugLog('CREATE', `Starting high-level service definition creation for ${serviceDefinitionName}`, {
-        session_id: session.session_id,
-        package_name: packageName,
-        description
-      });
-
-      let createResponse;
-      try {
-        createResponse = await handleCreateServiceDefinition({
-          service_definition_name: serviceDefinitionName,
-          description,
-          package_name: packageName,
-          transport_request: transportRequest,
-          source_code: sourceCode,
-          activate: true
-        });
-      } catch (error: any) {
-        const errorMsg = error.message || String(error);
-        // If service definition already exists, that's okay - we'll skip test
-        if (errorMsg.includes('already exists') || errorMsg.includes('InvalidObjName')) {
-          testLogger.info(`⏭️  Service Definition ${serviceDefinitionName} already exists, skipping test`);
-          return;
-        }
-        throw error;
-      }
-
-      if (createResponse.isError) {
-        const errorMsg = createResponse.content[0]?.text || 'Unknown error';
-        throw new Error(`Create failed: ${errorMsg}`);
-      }
-
-      const createData = parseHandlerResponse(createResponse);
-      expect(createData.success).toBe(true);
-      expect(createData.service_definition_name).toBe(serviceDefinitionName);
-
-      debugLog('CREATE', 'High-level service definition creation completed successfully', {
-        service_definition_name: createData.service_definition_name,
-        success: createData.success
-      });
-
-      await delay(getOperationDelay('create', testCase));
-      testLogger.info(`✅ High-level service definition creation completed successfully for ${serviceDefinitionName}`);
-
-      // Step 2: Test UpdateServiceDefinition (High-Level)
-      if (testCase.params.update_source_code) {
-        debugLog('UPDATE', `Starting high-level service definition update for ${serviceDefinitionName}`, {
-          session_id: session.session_id
-        });
-
-        const updateResponse = await handleUpdateServiceDefinition({
-          service_definition_name: serviceDefinitionName,
-          source_code: testCase.params.update_source_code,
-          transport_request: transportRequest,
-          activate: true
-        });
-
-        if (updateResponse.isError) {
-          const errorMsg = updateResponse.content[0]?.text || 'Unknown error';
-          throw new Error(`Update failed: ${errorMsg}`);
-        }
-
-        const updateData = parseHandlerResponse(updateResponse);
-        expect(updateData.success).toBe(true);
-        expect(updateData.service_definition_name).toBe(serviceDefinitionName);
-
-        debugLog('UPDATE', 'High-level service definition update completed successfully', {
-          service_definition_name: updateData.service_definition_name,
-          success: updateData.success
-        });
-
-        await delay(getOperationDelay('update', testCase));
-        testLogger.success(`✅ High-level service definition update completed successfully for ${serviceDefinitionName}`);
-      }
-
-    } catch (error: any) {
-      testLogger.error(`❌ Test failed: ${error.message}`);
-      throw error;
-    } finally {
-      // Cleanup: Optionally delete test service definition
-      if (session && serviceDefinitionName) {
-        try {
-          const shouldCleanup = getCleanupAfter(testCase);
-
-          // Delete only if cleanup_after is true
-          if (shouldCleanup) {
-            try {
-              const connection = getManagedConnection();
-              const client = new CrudClient(connection);
-              await client.deleteServiceDefinition(
-                { serviceDefinitionName },
-                transportRequest
-              );
-          testLogger.info(`🧹 Cleaned up test service definition: ${serviceDefinitionName}`);
-            } catch (deleteError: any) {
-              const errorMsg = deleteError.message || String(deleteError);
-              testLogger.warn(`⚠️  Failed to delete service definition ${serviceDefinitionName}: ${errorMsg}`);
-            }
-          } else {
-            testLogger.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${serviceDefinitionName}`);
-          }
-        } catch (cleanupError) {
-          testLogger.warn(`⚠️  Failed to cleanup test service definition ${serviceDefinitionName}: ${cleanupError}`);
-        }
-      }
-    }
+    await tester.run();
   }, getTimeout('long'));
 });

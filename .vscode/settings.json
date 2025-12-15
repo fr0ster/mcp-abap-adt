@@ -41,6 +41,8 @@
     "behaviordefinitions",
     "behaviorimplementationlowhandlers",
     "behaviour",
+    "bimp",
+    "bimpl",
     "carrid",
     "cdsview",
     "checkmessages",

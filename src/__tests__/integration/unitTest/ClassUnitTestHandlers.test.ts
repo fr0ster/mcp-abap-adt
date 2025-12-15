@@ -36,11 +36,12 @@ import {
   debugLog
 } from '../helpers/testHelpers';
 import {
-  getTestSession,
+  createTestConnectionAndSession,
   updateSessionFromResponse,
   extractLockSession,
   SessionInfo
 } from '../helpers/sessionHelpers';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import {
   getEnabledTestCase,
   getTimeout,
@@ -56,6 +57,7 @@ import { createTestLogger } from '../helpers/loggerHelpers';
 const testLogger = createTestLogger('class-unittest');
 
 describe('Class Unit Test Handlers Integration', () => {
+  let connection: AbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
 
@@ -64,8 +66,10 @@ describe('Class Unit Test Handlers Integration', () => {
       // Load environment variables and refresh tokens if needed
       await loadTestEnv();
 
-      // Get initial session
-      session = await getTestSession();
+      // Create connection and session
+      const { connection: testConnection, session: testSession } = await createTestConnectionAndSession();
+      connection = testConnection;
+      session = testSession;
       hasConfig = true;
     } catch (error) {
       if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
@@ -96,7 +100,7 @@ describe('Class Unit Test Handlers Integration', () => {
     });
 
     it('should execute full workflow: Lock → Update → Unlock → Activate → Run → GetStatus → GetResult', async () => {
-      if (!hasConfig || !session || !testCase || !containerClassName || !testClassName) {
+      if (!hasConfig || !connection || !session || !testCase || !containerClassName || !testClassName) {
         debugLog('TEST_SKIP', 'Skipping test: No configuration or test case', {
           hasConfig,
           hasSession: !!session,
@@ -145,7 +149,7 @@ ENDCLASS.`;
           session_id: session.session_id,
           has_session_state: !!session.session_state
         });
-        const lockResponse = await handleLockClassTestClasses({
+        const lockResponse = await handleLockClassTestClasses(connection, {
           class_name: containerClass,
           session_id: session.session_id,
           session_state: session.session_state
@@ -187,7 +191,7 @@ ENDCLASS.`;
           session_id: testClassesLockSession.session_id,
           testClassSourceLength: testClassSource.length
         });
-        const updateResponse = await handleUpdateClassTestClasses({
+        const updateResponse = await handleUpdateClassTestClasses(connection, {
           class_name: containerClass,
           test_class_source: testClassSource,
           lock_handle: testClassesLockHandle!,
@@ -213,7 +217,7 @@ ENDCLASS.`;
           lock_handle: testClassesLockHandle,
           session_id: testClassesLockSession.session_id
         });
-        const unlockResponse = await handleUnlockClassTestClasses({
+        const unlockResponse = await handleUnlockClassTestClasses(connection, {
           class_name: containerClass,
           lock_handle: testClassesLockHandle!,
           session_id: testClassesLockSession.session_id,
@@ -242,7 +246,7 @@ ENDCLASS.`;
           session_id: session.session_id,
           test_class: testClass
         });
-        const activateResponse = await handleActivateClassTestClasses({
+        const activateResponse = await handleActivateClassTestClasses(connection, {
           class_name: containerClass,
           test_class_name: testClass,
           session_id: session.session_id,
@@ -268,7 +272,7 @@ ENDCLASS.`;
           container_class: containerClass,
           test_class: testClass
         });
-        const runResponse = await handleRunClassUnitTests({
+        const runResponse = await handleRunClassUnitTests(connection, {
           tests: [{
             container_class: containerClass,
             test_class: testClass
@@ -304,7 +308,7 @@ ENDCLASS.`;
             session_id: session.session_id,
             run_id: runId
           });
-          const statusResponse = await handleGetClassUnitTestStatus({
+          const statusResponse = await handleGetClassUnitTestStatus(connection, {
             run_id: runId,
             session_id: session.session_id,
             session_state: session.session_state
@@ -333,7 +337,7 @@ ENDCLASS.`;
             session_id: session.session_id,
             run_id: runId
           });
-          const resultResponse = await handleGetClassUnitTestResult({
+          const resultResponse = await handleGetClassUnitTestResult(connection, {
             run_id: runId,
             session_id: session.session_id,
             session_state: session.session_state
@@ -369,7 +373,7 @@ ENDCLASS.`;
               lock_handle: testClassesLockHandle,
               session_id: testClassesLockSession.session_id
             });
-            await handleUnlockClassTestClasses({
+            await handleUnlockClassTestClasses(connection, {
               class_name: containerClass!,
               lock_handle: testClassesLockHandle,
               session_id: testClassesLockSession.session_id,
@@ -402,7 +406,7 @@ ENDCLASS.`;
                   lock_handle: testClassesLockHandle,
                   session_id: testClassesLockSession.session_id
                 });
-                await handleUnlockClassTestClasses({
+                await handleUnlockClassTestClasses(connection, {
                   class_name: containerClass,
                   lock_handle: testClassesLockHandle,
                   session_id: testClassesLockSession.session_id,

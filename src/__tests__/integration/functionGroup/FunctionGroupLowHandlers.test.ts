@@ -27,11 +27,12 @@ import {
   debugLog
 } from '../helpers/testHelpers';
 import {
-  getTestSession,
+  createTestConnectionAndSession,
   updateSessionFromResponse,
   extractLockSession,
   SessionInfo
 } from '../helpers/sessionHelpers';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import {
   getEnabledTestCase,
   getTimeout,
@@ -47,12 +48,15 @@ import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 // loadTestEnv will be called in beforeAll
 
 describe('FunctionGroup Low-Level Handlers Integration', () => {
+  let connection: AbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
 
   beforeAll(async () => {
     try {
-      session = await getTestSession();
+      const { connection: testConnection, session: testSession } = await createTestConnectionAndSession();
+      connection = testConnection;
+      session = testSession;
       hasConfig = true;
     } catch (error) {
       if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
@@ -80,9 +84,10 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
     });
 
     it('should execute full workflow: Validate → Create → Lock → Unlock → Activate', async () => {
-      if (!hasConfig || !session || !testCase || !testFunctionGroupName) {
+      if (!hasConfig || !connection || !session || !testCase || !testFunctionGroupName) {
         debugLog('TEST_SKIP', 'Skipping test: No configuration or test case', {
           hasConfig,
+          hasConnection: !!connection,
           hasSession: !!session,
           hasTestCase: !!testCase,
           hasTestFunctionGroupName: !!testFunctionGroupName
@@ -121,7 +126,7 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
           description: description,
           has_session: !!(session.session_id && session.session_state)
         });
-        const validateResponse = await handleValidateFunctionGroup({
+        const validateResponse = await handleValidateFunctionGroup(connection, {
           function_group_name: functionGroupName,
           description: description,
           session_id: session.session_id,
@@ -183,7 +188,7 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
           transport_request: transportRequest,
           has_session: !!(session.session_id && session.session_state)
         });
-        const createResponse = await handleCreateFunctionGroup({
+        const createResponse = await handleCreateFunctionGroup(connection, {
           function_group_name: functionGroupName,
           description,
           package_name: packageName,
@@ -231,7 +236,7 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
           function_group_name: functionGroupName,
           has_session: !!(session.session_id && session.session_state)
         });
-        const lockResponse = await handleLockFunctionGroup({
+        const lockResponse = await handleLockFunctionGroup(connection, {
           function_group_name: functionGroupName,
           session_id: session.session_id,
           session_state: session.session_state
@@ -283,7 +288,7 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
           lock_handle: lockHandle,
           has_session: !!(lockSession.session_id && lockSession.session_state)
         });
-        const unlockResponse = await handleUnlockFunctionGroup({
+        const unlockResponse = await handleUnlockFunctionGroup(connection, {
           function_group_name: functionGroupName,
           lock_handle: lockHandle,
           session_id: lockSession.session_id,
@@ -323,7 +328,7 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
           function_group_name: functionGroupName,
           has_session: !!(session.session_id && session.session_state)
         });
-        const activateResponse = await handleActivateFunctionGroup({
+        const activateResponse = await handleActivateFunctionGroup(connection, {
           function_group_name: functionGroupName,
           session_id: session.session_id,
           session_state: session.session_state
@@ -400,7 +405,7 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
             // Always unlock (unlock is always performed)
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
-                await handleUnlockFunctionGroup({
+                await handleUnlockFunctionGroup(connection, {
                   function_group_name: functionGroupName,
                   lock_handle: lockHandleForCleanup,
                   session_id: lockSessionForCleanup.session_id,
@@ -415,7 +420,7 @@ describe('FunctionGroup Low-Level Handlers Integration', () => {
             if (shouldCleanup) {
               await delay(1000);
 
-              const deleteResponse = await handleDeleteFunctionGroup({
+              const deleteResponse = await handleDeleteFunctionGroup(connection, {
                 function_group_name: functionGroupName,
                 transport_request: transportRequest
               });

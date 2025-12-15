@@ -11,7 +11,6 @@ import {
   logger as baseLogger,
   safeCheckOperation
 } from '../../../lib/utils';
-import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import { CrudClient  } from '@mcp-abap-adt/adt-clients';
 import { AbapConnection } from '@mcp-abap-adt/connection';
@@ -75,12 +74,6 @@ export async function handleCreateClass(connection: AbapConnection, params: Crea
 
   if (!args.class_name || !args.package_name) {
     return return_error(new Error("Missing required parameters: class_name and package_name"));
-  }
-
-  try {
-    validateTransportRequest(args.package_name, args.transport_request);
-  } catch (error) {
-    return return_error(error as Error);
   }
 
   const className = args.class_name.toUpperCase();

@@ -24,10 +24,11 @@ import {
   debugLog
 } from '../helpers/testHelpers';
 import {
-  getTestSession,
+  createTestConnectionAndSession,
   updateSessionFromResponse,
   SessionInfo
 } from '../helpers/sessionHelpers';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import {
   getEnabledTestCase,
   getTimeout,
@@ -43,13 +44,15 @@ import {
 
 
 describe('Package High-Level Handlers Integration', () => {
+  let connection: AbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
 
   beforeAll(async () => {
     try {
-      // Get initial session
-      session = await getTestSession();
+      const { connection: testConnection, session: testSession } = await createTestConnectionAndSession();
+      connection = testConnection;
+      session = testSession;
       hasConfig = true;
     } catch (error) {
       if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
@@ -60,8 +63,8 @@ describe('Package High-Level Handlers Integration', () => {
   });
 
   it('should test all Package high-level handlers', async () => {
-    if (!hasConfig || !session) {
-      console.log('⏭️  Skipping test: No configuration or session');
+    if (!hasConfig || !connection || !session) {
+      console.log('⏭️  Skipping test: No configuration, connection or session');
       return;
     }
 
@@ -100,7 +103,7 @@ describe('Package High-Level Handlers Integration', () => {
           transport_request: transportRequest,
           application_component: testCase.params.application_component
         };
-        createResponse = await handleCreatePackage(createArgs);
+        createResponse = await handleCreatePackage(connection, createArgs);
       } catch (error: any) {
         const errorMsg = error.message || String(error);
         const errorMsgLower = errorMsg.toLowerCase();
@@ -157,7 +160,7 @@ describe('Package High-Level Handlers Integration', () => {
             await delay(getOperationDelay('delete', testCase));
 
             console.log(`🧹 Cleanup: Deleting test package ${packageName}...`);
-            const deleteResponse = await handleDeletePackage({
+            const deleteResponse = await handleDeletePackage(connection, {
               package_name: packageName,
               transport_request: transportRequest,
               force_new_connection: true

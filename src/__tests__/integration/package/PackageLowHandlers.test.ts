@@ -26,7 +26,7 @@ import {
   logTestStep
 } from '../helpers/testHelpers';
 import {
-  getTestSession,
+  createTestConnectionAndSession,
   updateSessionFromResponse,
   extractLockSession,
   SessionInfo
@@ -42,30 +42,30 @@ import {
   getCleanupAfter
 } from '../helpers/configHelpers';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getManagedConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { createDiagnosticsTracker } from '../helpers/persistenceHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
 
 describe('Package Low-Level Handlers Integration', () => {
+  let connection: AbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
   let defaultPackageExists = false;
 
   beforeAll(async () => {
     try {
-      session = await getTestSession();
+      const { connection: testConnection, session: testSession } = await createTestConnectionAndSession();
+      connection = testConnection;
+      session = testSession;
       hasConfig = true;
 
       // Pre-check: Verify default_package exists (required for package tests)
       const config = loadTestConfig();
       const defaultPackage = config.environment?.default_package;
-      if (defaultPackage) {
+      if (defaultPackage && connection) {
         try {
-          const connection = getManagedConnection();
-          // Ensure connection is established (connect() is idempotent)
-          await connection.connect();
           const client = new CrudClient(connection);
           const defaultPackageCheck = await client.checkPackage({
             packageName: defaultPackage.trim(),
@@ -117,8 +117,8 @@ describe('Package Low-Level Handlers Integration', () => {
     });
 
     it('should execute full workflow: Validate → Create → Lock → Unlock', async () => {
-      if (!hasConfig || !session || !testCase || !testPackageName) {
-        console.log('⏭️  Skipping test: No configuration or test case');
+      if (!hasConfig || !connection || !session || !testCase || !testPackageName) {
+        console.log('⏭️  Skipping test: No configuration, connection or test case');
         return;
       }
 
@@ -145,10 +145,10 @@ describe('Package Low-Level Handlers Integration', () => {
       try {
         // Step 1: Validate
         logTestStep('validate');
-        if (!session) {
-          throw new Error('Session is null');
+        if (!session || !connection) {
+          throw new Error('Session or connection is null');
         }
-        const validateResponse = await handleValidatePackage({
+        const validateResponse = await handleValidatePackage(connection, {
           package_name: packageName,
           super_package: superPackage,
           session_id: session.session_id,
@@ -205,7 +205,7 @@ describe('Package Low-Level Handlers Integration', () => {
           createArgs.transport_layer = testCase.params.transport_layer;
         }
 
-        const createResponse = await handleCreatePackage(createArgs);
+        const createResponse = await handleCreatePackage(connection, createArgs);
 
         if (createResponse.isError) {
           const errorMsg = createResponse.content[0]?.text || 'Unknown error';
@@ -228,7 +228,7 @@ describe('Package Low-Level Handlers Integration', () => {
         if (!session) {
           throw new Error('Session is null');
         }
-        const lockResponse = await handleLockPackage({
+        const lockResponse = await handleLockPackage(connection, {
           package_name: packageName,
           super_package: superPackage || '',
           session_id: session.session_id,
@@ -267,7 +267,7 @@ describe('Package Low-Level Handlers Integration', () => {
 
         // Step 4: Unlock
         logTestStep('unlock');
-        const unlockResponse = await handleUnlockPackage({
+        const unlockResponse = await handleUnlockPackage(connection, {
           package_name: packageName,
           super_package: superPackage, // Required for package unlock
           lock_handle: lockHandle,
@@ -324,7 +324,7 @@ describe('Package Low-Level Handlers Integration', () => {
             // Always unlock (unlock is always performed)
             if (lockHandleForCleanup && lockSessionForCleanup) {
               try {
-                await handleUnlockPackage({
+                await handleUnlockPackage(connection, {
                   package_name: packageName,
                   super_package: superPackage, // Required for package unlock
                   lock_handle: lockHandleForCleanup,
@@ -343,7 +343,7 @@ describe('Package Low-Level Handlers Integration', () => {
               // For delete, force a new connection to bypass cache
               // Even if package was unlocked, it may still be locked in the cached connection
               console.log(`🧹 Cleanup: Deleting package ${packageName}...`);
-              const deleteResponse = await handleDeletePackage({
+              const deleteResponse = await handleDeletePackage(connection, {
                 package_name: packageName,
                 transport_request: transportRequest,
                 force_new_connection: true

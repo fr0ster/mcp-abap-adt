@@ -25,10 +25,11 @@ import {
   debugLog
 } from '../helpers/testHelpers';
 import {
-  getTestSession,
+  createTestConnectionAndSession,
   updateSessionFromResponse,
   SessionInfo
 } from '../helpers/sessionHelpers';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import {
   getEnabledTestCase,
   getTimeout,
@@ -44,13 +45,15 @@ import {
 
 
 describe('MetadataExtension High-Level Handlers Integration', () => {
+  let connection: AbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
 
   beforeAll(async () => {
     try {
-      // Get initial session
-      session = await getTestSession();
+      const { connection: testConnection, session: testSession } = await createTestConnectionAndSession();
+      connection = testConnection;
+      session = testSession;
       hasConfig = true;
     } catch (error) {
       if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
@@ -61,8 +64,8 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
   });
 
   it('should test all MetadataExtension high-level handlers', async () => {
-    if (!hasConfig || !session) {
-      console.log('⏭️  Skipping test: No configuration or session');
+    if (!hasConfig || !connection || !session) {
+      console.log('⏭️  Skipping test: No configuration, connection or session');
       return;
     }
 
@@ -87,7 +90,7 @@ annotate view ZI_TEST_ENTITY with {
       console.log(`📦 High Create: Creating ${ddlxName}...`);
       let createResponse;
       try {
-        createResponse = await handleCreateMetadataExtension({
+        createResponse = await handleCreateMetadataExtension(connection, {
           name: ddlxName,
           description,
           package_name: packageName,
@@ -100,13 +103,13 @@ annotate view ZI_TEST_ENTITY with {
         if (errorMsg.includes('already exists') || errorMsg.includes('does already exist') || errorMsg.includes('ResourceAlreadyExists')) {
           console.log(`⚠️  MetadataExtension ${ddlxName} appears to exist, attempting cleanup...`);
           try {
-            await handleDeleteMetadataExtension({
+            await handleDeleteMetadataExtension(connection, {
               name: ddlxName,
               transport_request: transportRequest
             });
             console.log(`🧹 Cleaned up existing metadata extension ${ddlxName}, retrying create...`);
             // Retry create after cleanup
-            createResponse = await handleCreateMetadataExtension({
+            createResponse = await handleCreateMetadataExtension(connection, {
               name: ddlxName,
               description,
               package_name: packageName,
@@ -152,7 +155,7 @@ annotate view ZI_TEST_ENTITY with {
 
       let updateResponse;
       try {
-        updateResponse = await handleUpdateMetadataExtension({
+        updateResponse = await handleUpdateMetadataExtension(connection, {
           name: ddlxName,
           source_code: updatedSourceCode,
           transport_request: transportRequest,
@@ -193,7 +196,7 @@ annotate view ZI_TEST_ENTITY with {
 
           // Delete only if cleanup_after is true
           if (shouldCleanup) {
-            const deleteResponse = await handleDeleteMetadataExtension({
+            const deleteResponse = await handleDeleteMetadataExtension(connection, {
               name: ddlxName,
               transport_request: transportRequest
             });

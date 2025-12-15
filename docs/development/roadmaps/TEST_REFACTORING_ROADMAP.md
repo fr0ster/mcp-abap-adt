@@ -29,97 +29,113 @@ BaseTester (abstract)
 ## Implementation Phases
 
 ### Phase 1: BaseTester Foundation
-- [ ] Create `BaseTester` abstract class
-  - [ ] Constructor with test name, log prefix, handler name
-  - [ ] `beforeAll()` - load config, create connection via AuthBroker
-  - [ ] `afterAll()` - cleanup
-  - [ ] `beforeEach()` - prepare test case
-  - [ ] `afterEach()` - cleanup test artifacts
-  - [ ] Properties: `connection`, `session`, `hasConfig`, `testCase`
-  - [ ] Method: `createConnection()` - uses `createTestConnectionAndSession()`
-  - [ ] Method: `loadTestConfig()` - wrapper for config helpers
-  - [ ] Method: `getLogger()` - returns logger with prefix
+- [x] Create `BaseTester` abstract class
+  - [x] Constructor with test name, log prefix, handler name, optional paramsGroupName
+  - [x] `beforeAll()` - load config, create connection via AuthBroker
+  - [x] `afterAll()` - cleanup
+  - [x] `beforeEach()` - prepare test case, resolve params from group if paramsGroupName provided
+  - [x] `afterEach()` - cleanup test artifacts
+  - [x] Properties: `connection`, `session`, `hasConfig`, `testCase`, `testParams`
+  - [x] Method: `createConnection()` - uses `createTestConnectionAndSession()`
+  - [x] Method: `loadTestConfig()` - wrapper for config helpers
+  - [x] Method: `getLogger()` - returns logger with prefix
+  - [x] Method: `resolveParamsFromGroup()` - resolves parameters from YAML group (supports both test case level and global level)
+  - [x] Method: `getTestParams()` - returns resolved test parameters
 
 ### Phase 2: LowTester Implementation
-- [ ] Create `LowTester` class extending `BaseTester`
-  - [ ] Constructor accepts handler name, test case name
-  - [ ] `run()` method - executes full workflow:
-    - [ ] Validate → Create → Lock → Update → Unlock → Activate
-  - [ ] Method: `runValidate()` - calls handler with connection
-  - [ ] Method: `runCreate()` - calls handler with connection
-  - [ ] Method: `runLock()` - calls handler with connection
-  - [ ] Method: `runUpdate()` - calls handler with connection
-  - [ ] Method: `runUnlock()` - calls handler with connection
-  - [ ] Method: `runActivate()` - calls handler with connection
-  - [ ] Method: `runDelete()` - cleanup handler call
-  - [ ] Method: `cleanup()` - unlock and delete if needed
-  - [ ] Track: `lockHandle`, `lockSession`, `objectWasCreated`
+- [x] Create `LowTester` class extending `BaseTester`
+  - [x] Constructor accepts handler name, test case name, handlers object
+  - [x] `run()` method - executes full workflow:
+    - [x] Validate → Create → Lock → Update → Unlock → Activate
+  - [x] Method: `runValidate()` - calls handler with connection
+  - [x] Method: `runCreate()` - calls handler with connection
+  - [x] Method: `runLock()` - calls handler with connection
+  - [x] Method: `runUpdate()` - calls handler with connection
+  - [x] Method: `runUnlock()` - calls handler with connection
+  - [x] Method: `runActivate()` - calls handler with connection
+  - [x] Method: `runDelete()` - cleanup handler call
+  - [x] Method: `cleanup()` - unlock and delete if needed
+  - [x] Track: `lockHandle`, `lockSession`, `objectWasCreated`
 
 ### Phase 3: HighTester Implementation
-- [ ] Create `HighTester` class extending `BaseTester`
-  - [ ] Constructor accepts handler name, test case name
-  - [ ] `run()` method - executes high-level workflow:
-    - [ ] Create (with full source code)
-    - [ ] Update (with modified source code)
-  - [ ] Method: `runCreate()` - calls high-level create handler
-  - [ ] Method: `runUpdate()` - calls high-level update handler
-  - [ ] Method: `runDelete()` - cleanup handler call
-  - [ ] Handle source code management internally
+- [x] Create `HighTester` class extending `BaseTester`
+  - [x] Constructor accepts handler name, test case name, handlers object
+  - [x] `run()` method - executes high-level workflow:
+    - [x] Create (with full source code)
+    - [x] Update (with modified source code)
+  - [x] Method: `runCreate()` - calls high-level create handler
+  - [x] Method: `runUpdate()` - calls high-level update handler
+  - [x] Method: `runDelete()` - cleanup handler call
+  - [x] Handle source code management internally
 
 ### Phase 4: ReadOnlyTester Implementation
-- [ ] Create `ReadOnlyTester` class extending `BaseTester`
-  - [ ] Constructor accepts handler name, test case name
-  - [ ] `run()` method - executes read-only operations:
-    - [ ] Get object info
-    - [ ] Validate response format
-  - [ ] Method: `runGet()` - calls read-only handler
-  - [ ] Method: `validateResponse()` - checks MCP response format
-  - [ ] No cleanup needed (read-only)
+- [x] Create `ReadOnlyTester` class extending `BaseTester`
+  - [x] Constructor accepts handler name, test case name, handler function
+  - [x] `run()` method - executes read-only operations:
+    - [x] Get object info
+    - [x] Validate response format
+  - [x] Method: `runGet()` - calls read-only handler
+  - [x] Method: `validateResponse()` - checks MCP response format
+  - [x] No cleanup needed (read-only)
 
 ### Phase 5: Refactor Existing Tests
-- [ ] Refactor `BehaviorDefinitionLowHandlers.test.ts`
-  - [ ] Replace test structure with `LowTester`
-  - [ ] Use `tester.run()` instead of manual workflow
+- [x] Refactor `BehaviorDefinitionLowHandlers.test.ts`
+  - [x] Replace test structure with `LowTester`
+  - [x] Use `tester.run()` instead of manual workflow
 - [ ] Refactor `BehaviorDefinitionHighHandlers.test.ts`
   - [ ] Replace with `HighTester`
-- [ ] Refactor `ClassLowHandlers.test.ts`
-  - [ ] Replace with `LowTester`
-- [ ] Refactor `ClassHighHandlers.test.ts`
-  - [ ] Replace with `HighTester`
-- [ ] Refactor `DataElementLowHandlers.test.ts`
-  - [ ] Replace with `LowTester`
-- [ ] Refactor `DataElementHighHandlers.test.ts`
-  - [ ] Replace with `HighTester`
-- [ ] Refactor `DomainLowHandlers.test.ts`
-  - [ ] Replace with `LowTester`
-- [ ] Refactor `DomainHighHandlers.test.ts`
-  - [ ] Replace with `HighTester`
-- [ ] Refactor `FunctionModuleLowHandlers.test.ts`
-  - [ ] Replace with `LowTester`
-- [ ] Refactor `FunctionHighHandlers.test.ts`
-  - [ ] Replace with `HighTester`
-- [ ] Refactor `InterfaceLowHandlers.test.ts`
-  - [ ] Replace with `LowTester`
-- [ ] Refactor `InterfaceHighHandlers.test.ts`
-  - [ ] Replace with `HighTester`
-- [ ] Refactor `ProgramLowHandlers.test.ts`
-  - [ ] Replace with `LowTester`
-- [ ] Refactor `StructureLowHandlers.test.ts`
-  - [ ] Replace with `LowTester`
-- [ ] Refactor `StructureHighHandlers.test.ts`
-  - [ ] Replace with `HighTester`
-- [ ] Refactor `TableLowHandlers.test.ts`
-  - [ ] Replace with `LowTester`
-- [ ] Refactor `ViewLowHandlers.test.ts`
-  - [ ] Replace with `LowTester`
-- [ ] Refactor `ViewHighHandlers.test.ts`
-  - [ ] Replace with `HighTester`
-- [ ] Refactor `MetadataExtensionLowHandlers.test.ts`
-  - [ ] Replace with `LowTester`
+- [x] Refactor `ClassLowHandlers.test.ts`
+  - [x] Replace with `LowTester`
+- [x] Refactor `ClassHighHandlers.test.ts`
+  - [x] Replace with `HighTester`
+- [x] Refactor `DataElementLowHandlers.test.ts`
+  - [x] Replace with `LowTester`
+- [x] Refactor `DataElementHighHandlers.test.ts`
+  - [x] Replace with `HighTester`
+- [x] Refactor `DomainLowHandlers.test.ts`
+  - [x] Replace with `LowTester`
+- [x] Refactor `DomainHighHandlers.test.ts`
+  - [x] Replace with `HighTester`
+- [x] Refactor `FunctionModuleLowHandlers.test.ts`
+  - [x] Replace with `LowTester`
+- [x] Fix `FunctionHighHandlers.test.ts`
+  - [x] Add connection parameter to all handler calls
+- [x] Fix `FunctionGroupLowHandlers.test.ts`
+  - [x] Add connection parameter to all handler calls
+- [x] Refactor `InterfaceLowHandlers.test.ts`
+  - [x] Replace with `LowTester`
+- [x] Refactor `InterfaceHighHandlers.test.ts`
+  - [x] Replace with `HighTester`
+- [x] Refactor `ProgramLowHandlers.test.ts`
+  - [x] Replace with `LowTester`
+- [x] Refactor `StructureLowHandlers.test.ts`
+  - [x] Replace with `LowTester`
+- [x] Refactor `StructureHighHandlers.test.ts`
+  - [x] Replace with `HighTester`
+- [x] Refactor `TableLowHandlers.test.ts`
+  - [x] Replace with `LowTester`
+- [x] Refactor `ViewLowHandlers.test.ts`
+  - [x] Replace with `LowTester`
+- [x] Refactor `ViewHighHandlers.test.ts`
+  - [x] Replace with `HighTester`
+- [x] Refactor `MetadataExtensionLowHandlers.test.ts`
+  - [x] Replace with `LowTester`
+- [x] Fix `MetadataExtensionHighHandlers.test.ts`
+  - [x] Add connection parameter to all handler calls
+- [x] Fix `PackageHighHandlers.test.ts`
+  - [x] Add connection parameter to all handler calls
+- [x] Fix `PackageLowHandlers.test.ts`
+  - [x] Add connection parameter to all handler calls
+- [x] Refactor `ProgramHighHandlers.test.ts`
+  - [x] Replace with `HighTester`
+- [x] Fix `ServiceDefinitionHighHandlers.test.ts`
+  - [x] Add connection parameter to all handler calls
+- [x] Refactor `TableHighHandlers.test.ts`
+  - [x] Replace with `HighTester`
 - [ ] Refactor `BehaviorImplementationLowHandlers.test.ts`
-  - [ ] Replace with `LowTester`
-- [ ] Refactor `BehaviorImplementationHighHandlers.test.ts`
-  - [ ] Replace with `HighTester`
+  - [ ] Replace with `LowTester` (Note: Uses handleCreateClass, handleCheckClass, handleLockBehaviorImplementation, handleUnlockClass, handleActivateClass, handleDeleteClass - may need custom workflow)
+- [x] Refactor `BehaviorImplementationHighHandlers.test.ts`
+  - [x] Replace with `HighTester`
 - [ ] Refactor read-only tests (if any)
   - [ ] Replace with `ReadOnlyTester`
 
@@ -131,6 +147,47 @@ BaseTester (abstract)
 - [ ] Verify logging prefixes work
 - [ ] Fix any remaining issues
 - [ ] Update documentation
+
+### Phase 7: Convert Tests to Workflow Functions (Lambdas)
+**Goal**: Convert all tests that use direct handler functions to use workflow functions (lambdas) that receive `TesterContext`. This allows tests to define custom handler call logic and logging while tester provides all infrastructure.
+
+**Benefits**:
+- Tests define custom handler invocation logic
+- Tests can add custom logging per step
+- Tester provides all common infrastructure (connection, session, logger, params, etc.)
+- Better separation of concerns
+
+**Reference**: See `ClassHighHandlers.example.ts` for example implementation.
+
+#### High-Level Tests (HighTester)
+- [x] Convert `ClassHighHandlers.test.ts` to workflow functions
+- [ ] Convert `DataElementHighHandlers.test.ts` to workflow functions
+- [ ] Convert `DomainHighHandlers.test.ts` to workflow functions
+- [ ] Convert `InterfaceHighHandlers.test.ts` to workflow functions
+- [ ] Convert `ProgramHighHandlers.test.ts` to workflow functions
+- [ ] Convert `StructureHighHandlers.test.ts` to workflow functions
+- [ ] Convert `TableHighHandlers.test.ts` to workflow functions
+- [ ] Convert `ViewHighHandlers.test.ts` to workflow functions
+- [ ] Convert `BehaviorDefinitionHighHandlers.test.ts` to workflow functions
+- [ ] Convert `BehaviorImplementationHighHandlers.test.ts` to workflow functions
+- [ ] Convert `ServiceDefinitionHighHandlers.test.ts` to workflow functions
+
+#### Low-Level Tests (LowTester)
+- [ ] Convert `ClassLowHandlers.test.ts` to workflow functions
+- [ ] Convert `DataElementLowHandlers.test.ts` to workflow functions
+- [ ] Convert `DomainLowHandlers.test.ts` to workflow functions
+- [ ] Convert `InterfaceLowHandlers.test.ts` to workflow functions
+- [ ] Convert `ProgramLowHandlers.test.ts` to workflow functions
+- [ ] Convert `StructureLowHandlers.test.ts` to workflow functions
+- [ ] Convert `TableLowHandlers.test.ts` to workflow functions
+- [ ] Convert `ViewLowHandlers.test.ts` to workflow functions
+- [ ] Convert `BehaviorDefinitionLowHandlers.test.ts` to workflow functions
+- [ ] Convert `FunctionModuleLowHandlers.test.ts` to workflow functions
+- [ ] Convert `MetadataExtensionLowHandlers.test.ts` to workflow functions
+- [ ] Convert `BehaviorImplementationLowHandlers.test.ts` to workflow functions (if using LowTester)
+
+#### Read-Only Tests (ReadOnlyTester)
+- [ ] Convert read-only tests to workflow functions (if any)
 
 ## File Structure
 
@@ -175,7 +232,7 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
 });
 ```
 
-### HighTester Example
+### HighTester Example (Old Style - Direct Handler Functions)
 ```typescript
 describe('Class High-Level Handlers Integration', () => {
   let tester: HighTester;
@@ -184,7 +241,12 @@ describe('Class High-Level Handlers Integration', () => {
     tester = new HighTester(
       'class_high',
       'create_and_update',
-      'class-high'
+      'class-high',
+      {
+        create: handleCreateClass,
+        update: handleUpdateClass,
+        delete: handleDeleteClass
+      }
     );
     await tester.beforeAll();
   });
@@ -194,6 +256,58 @@ describe('Class High-Level Handlers Integration', () => {
   });
 });
 ```
+
+### HighTester Example (New Style - Workflow Functions / Lambdas)
+```typescript
+import type { TesterContext } from '../helpers/testers/types';
+
+describe('Class High-Level Handlers Integration', () => {
+  let tester: HighTester;
+
+  beforeAll(async () => {
+    tester = new HighTester(
+      'create_class',
+      'builder_class',
+      'class-high',
+      {
+        // Lambda that calls create handler with logging
+        create: async (context: TesterContext) => {
+          const { connection, session, logger, objectName, params, packageName, transportRequest } = context;
+          
+          logger.info(`   • create: ${objectName}`);
+
+          const createResponse = await handleCreateClass(connection, {
+            class_name: objectName,
+            package_name: packageName,
+            source_code: params.source_code,
+            activate: true,
+            ...(transportRequest && { transport_request: transportRequest }),
+            session_id: session.session_id,
+            session_state: session.session_state
+          });
+
+          // Handle response, update session, log success
+          // ...
+          return createData;
+        },
+        update: async (context: TesterContext) => {
+          // Similar pattern for update
+        },
+        delete: async (context: TesterContext) => {
+          // Similar pattern for delete
+        }
+      }
+    );
+    await tester.beforeAll();
+  });
+
+  it('should test all Class high-level handlers', async () => {
+    await tester.run();
+  });
+});
+```
+
+**See**: `src/__tests__/integration/class/ClassHighHandlers.example.ts` for complete example.
 
 ## Benefits
 

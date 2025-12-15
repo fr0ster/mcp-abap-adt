@@ -30,10 +30,11 @@ import {
   debugLog
 } from '../helpers/testHelpers';
 import {
-  getTestSession,
+  createTestConnectionAndSession,
   updateSessionFromResponse,
   SessionInfo
 } from '../helpers/sessionHelpers';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import {
   getEnabledTestCase,
   getTimeout,
@@ -52,13 +53,16 @@ const testLogger = createTestLogger('function-high');
 
 
 describe('Function High-Level Handlers Integration', () => {
+  let connection: AbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
 
   beforeAll(async () => {
     try {
-      // Get initial session
-      session = await getTestSession();
+      // Create connection and session
+      const { connection: testConnection, session: testSession } = await createTestConnectionAndSession();
+      connection = testConnection;
+      session = testSession;
       hasConfig = true;
     } catch (error) {
       if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
@@ -69,8 +73,8 @@ describe('Function High-Level Handlers Integration', () => {
   });
 
   it('should test all Function high-level handlers', async () => {
-    if (!hasConfig || !session) {
-      testLogger.info('⏭️  Skipping test: No configuration or session');
+    if (!hasConfig || !connection || !session) {
+      testLogger.info('⏭️  Skipping test: No configuration, connection or session');
       return;
     }
 
@@ -111,7 +115,7 @@ describe('Function High-Level Handlers Integration', () => {
       // High-level handler does validation internally, but we check the result
       testLogger.info(`📦 High Create: Creating function group ${functionGroupName}...`);
       testLogger.info(`📦 High Create: Package: ${packageName}, Transport: ${transportRequest || '(empty)'}`);
-      const createFGResponse = await handleCreateFunctionGroup({
+      const createFGResponse = await handleCreateFunctionGroup(connection, {
           function_group_name: functionGroupName,
           description: functionGroupDescription,
           package_name: packageName,
@@ -131,7 +135,7 @@ describe('Function High-Level Handlers Integration', () => {
       // Step 2: UpdateFunctionGroup (High-Level)
       if (functionGroupCase.params.update_description) {
         testLogger.info(`📝 High Update: Updating function group ${functionGroupName}...`);
-        const updateFGResponse = await handleUpdateFunctionGroup({
+        const updateFGResponse = await handleUpdateFunctionGroup(connection, {
           function_group_name: functionGroupName,
           description: functionGroupCase.params.update_description,
           transport_request: transportRequest
@@ -148,7 +152,7 @@ describe('Function High-Level Handlers Integration', () => {
 
       // Step 3: CreateFunctionModule (High-Level)
       testLogger.info(`📦 High Create: Creating function module ${functionModuleName}...`);
-      const createFMResponse = await handleCreateFunctionModule({
+      const createFMResponse = await handleCreateFunctionModule(connection, {
           function_group_name: functionGroupName,
           function_module_name: functionModuleName,
           description: functionModuleDescription,
@@ -168,7 +172,7 @@ describe('Function High-Level Handlers Integration', () => {
 
       // Step 4: UpdateFunctionModule (High-Level)
       testLogger.info(`📝 High Update: Updating function module ${functionModuleName}...`);
-      const updateFMResponse = await handleUpdateFunctionModule({
+      const updateFMResponse = await handleUpdateFunctionModule(connection, {
           function_group_name: functionGroupName,
           function_module_name: functionModuleName,
           source_code: updatedSourceCode,
@@ -192,7 +196,7 @@ describe('Function High-Level Handlers Integration', () => {
         try {
           // Delete function module only if cleanup_after is true
           if (shouldCleanup) {
-            const deleteFMResponse = await handleDeleteFunctionModule({
+            const deleteFMResponse = await handleDeleteFunctionModule(connection, {
               function_module_name: functionModuleName,
               function_group_name: functionGroupName,
               transport_request: transportRequest
@@ -216,7 +220,7 @@ describe('Function High-Level Handlers Integration', () => {
         try {
           // Delete function group only if cleanup_after is true
           if (shouldCleanup) {
-            const deleteFGResponse = await handleDeleteFunctionGroup({
+            const deleteFGResponse = await handleDeleteFunctionGroup(connection, {
               function_group_name: functionGroupName,
               transport_request: transportRequest
             });

@@ -41,7 +41,7 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
           },
         },
         handler: async (args: any) => {
-          return await (await import("../../../../handlers/search/readonly/handleGetObjectsList.js")).handleGetObjectsList(args);
+          return await (await import("../../../../handlers/search/readonly/handleGetObjectsList.js")).handleGetObjectsList(this.connection, args);
         },
       },
       {
@@ -58,7 +58,7 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
           },
         },
         handler: async (args: any) => {
-          return await (await import("../../../../handlers/search/readonly/handleGetObjectsByType.js")).handleGetObjectsByType(args);
+          return await (await import("../../../../handlers/search/readonly/handleGetObjectsByType.js")).handleGetObjectsByType(this.connection, args);
         },
       },
     ];

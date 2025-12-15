@@ -42,12 +42,12 @@ async function fetchNodeStructureRaw(parent_type: string, parent_name: string, n
   return nodes;
 }
 
-async function enrichNodeWithSearchObject(objectType: string, objectName: string, fallbackDescription?: string) {
+async function enrichNodeWithSearchObject(connection: AbapConnection, objectType: string, objectName: string, fallbackDescription?: string) {
   let packageName = undefined;
   let description = fallbackDescription;
   let type = objectType;
   try {
-    const searchResult = await handleSearchObject({
+    const searchResult = await handleSearchObject(connection, {
       query: objectName,
       object_type: objectType,
       maxResults: 1
@@ -109,6 +109,7 @@ function getNodeType(node: any, depth: number): 'root' | 'point' | 'end' {
 }
 
 async function buildTree(
+  connection: AbapConnection,
   objectType: string,
   objectName: string,
   depth: number,
@@ -119,7 +120,7 @@ async function buildTree(
   // 1. Enrich root node
   let enrichment: any = { packageName: undefined, description: undefined, type: objectType };
   if (enrich) {
-    enrichment = await enrichNodeWithSearchObject(objectType, objectName);
+    enrichment = await enrichNodeWithSearchObject(connection, objectType, objectName);
   }
   // 2. Get children if depth < maxDepth
   let children: any[] = [];
@@ -142,6 +143,7 @@ async function buildTree(
         if (isGroupNode(node)) {
           // Group node: recurse, attach its children
           const groupChildren = await buildTree(
+            connection,
             getText(node, 'OBJECT_TYPE'),
             getText(node, 'OBJECT_NAME'),
             depth + 1,
@@ -198,7 +200,7 @@ export async function handleGetObjectInfo(connection: AbapConnection, args: { pa
       ? args.maxDepth as number
       : getDefaultDepth(args.parent_type);
     const enrich = typeof args.enrich === 'boolean' ? args.enrich : true;
-    const result = await buildTree(args.parent_type, args.parent_name, 0, maxDepth ?? getDefaultDepth(args.parent_type), enrich);
+    const result = await buildTree(connection, args.parent_type, args.parent_name, 0, maxDepth ?? getDefaultDepth(args.parent_type), enrich);
     handlerLogger.debug(`Object tree built with depth ${maxDepth} (enrich=${enrich})`);
     return {
       isError: false,

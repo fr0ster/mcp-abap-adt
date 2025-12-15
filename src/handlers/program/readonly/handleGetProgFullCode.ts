@@ -46,8 +46,7 @@ export const TOOL_DEFINITION = {
 } as const;
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
-import { handleGetProgram } from './handleGetProgram';
-import { handleGetFunctionGroup } from '../../function/readonly/handleGetFunctionGroup';
+import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
 import { handleGetInclude } from '../../include/readonly/handleGetInclude';
 
 /**
@@ -94,20 +93,33 @@ export async function handleGetProgFullCode(connection: AbapConnection, args: { 
     let codeObjects: any[] = [];
     if (typeUpper === 'PROG/P') {
       // Get main program code
-      const progResult = await handleGetProgram(connection, { program_name: name });
+      const client = new ReadOnlyClient(connection);
+      await client.readProgram(name);
+      const progResult = client.getProgramReadResult();
       let progCode: string | null = null;
-      let debug = { handleGetProgram: progResult };
-      if (Array.isArray(progResult?.content) && progResult.content.length > 0) {
-        const c = progResult.content[0];
-        if (c.type === 'text' && 'text' in c) progCode = c.text as string;
+
+      // Get source code from IProgramConfig
+      if (progResult?.sourceCode) {
+        progCode = progResult.sourceCode;
+      } else {
+        // Fallback: try to get from raw readResult
+        const rawResult = client.getReadResult();
+        if (rawResult?.data) {
+          if (typeof rawResult.data === 'string') {
+            progCode = rawResult.data;
+          } else {
+            progCode = JSON.stringify(rawResult.data);
+          }
+        }
       }
-      if (typeof progCode !== 'string') {
+
+      if (typeof progCode !== 'string' || progCode === '') {
         return {
           isError: true,
           content: [
             {
               type: 'text',
-              text: `No program code found for ${name}. Debug: ${JSON.stringify(debug, null, 2)}`
+              text: `No program code found for ${name}. Result: ${progResult ? 'exists but no sourceCode' : 'undefined'}`
             }
           ]
         };
@@ -162,11 +174,30 @@ export async function handleGetProgFullCode(connection: AbapConnection, args: { 
       }
     } else if (typeUpper === 'FUGR') {
       // Get function group main code
-      const fgResult = await handleGetFunctionGroup(connection, { function_group: name });
+      const client = new ReadOnlyClient(connection);
+      await client.readFunctionGroup(name);
       let fgCode: string | null = null;
-      if (Array.isArray(fgResult?.content) && fgResult.content.length > 0) {
-        const c = fgResult.content[0];
-        if (c.type === 'text' && 'text' in c) fgCode = c.text as string;
+
+      // FunctionGroupConfig doesn't have sourceCode field, need to get from raw readResult
+      const rawResult = client.getReadResult();
+      if (rawResult?.data) {
+        if (typeof rawResult.data === 'string') {
+          fgCode = rawResult.data;
+        } else {
+          fgCode = JSON.stringify(rawResult.data);
+        }
+      }
+
+      if (typeof fgCode !== 'string') {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: `No function group code found for ${name}. Result: ${rawResult ? 'exists but no data' : 'undefined'}`
+            }
+          ]
+        };
       }
       codeObjects.push({
         OBJECT_TYPE: 'FUGR',

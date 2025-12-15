@@ -86,6 +86,7 @@
     "EACCES",
     "EBELN",
     "ENDCLASS",
+    "endform",
     "ENDFUNCTION",
     "ENDINTERFACE",
     "ENDMETHOD",

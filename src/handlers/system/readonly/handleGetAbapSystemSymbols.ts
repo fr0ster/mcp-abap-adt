@@ -412,14 +412,14 @@ class SimpleAbapSemanticAnalyzer {
 }
 
 class AbapSystemSymbolResolver {
-    public async resolveSymbols(symbols: AbapSymbolInfo[]): Promise<{ resolvedSymbols: AbapSymbolInfo[], stats: any }> {
+    public async resolveSymbols(connection: AbapConnection, symbols: AbapSymbolInfo[]): Promise<{ resolvedSymbols: AbapSymbolInfo[], stats: any }> {
         const resolvedSymbols: AbapSymbolInfo[] = [];
         let resolvedCount = 0;
         let failedCount = 0;
 
         for (const symbol of symbols) {
             try {
-                const resolved = await this.resolveSymbol(symbol);
+                const resolved = await this.resolveSymbol(connection, symbol);
                 resolvedSymbols.push(resolved);
                 if (resolved.systemInfo?.exists) {
                     resolvedCount++;
@@ -449,17 +449,17 @@ class AbapSystemSymbolResolver {
         return { resolvedSymbols, stats };
     }
 
-    private async resolveSymbol(symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
+    private async resolveSymbol(connection: AbapConnection, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
         try {
             switch (symbol.type) {
                 case 'class':
-                    return await this.resolveClassSymbol(symbol);
+                    return await this.resolveClassSymbol(connection, symbol);
                 case 'function':
-                    return await this.resolveFunctionSymbol(symbol);
+                    return await this.resolveFunctionSymbol(connection, symbol);
                 case 'interface':
-                    return await this.resolveInterfaceSymbol(symbol);
+                    return await this.resolveInterfaceSymbol(connection, symbol);
                 default:
-                    return await this.resolveGenericSymbol(symbol);
+                    return await this.resolveGenericSymbol(connection, symbol);
             }
         } catch (error) {
             return {
@@ -472,11 +472,10 @@ class AbapSystemSymbolResolver {
         }
     }
 
-    private async resolveClassSymbol(symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
+    private async resolveClassSymbol(connection: AbapConnection, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
         try {
-            const classInfo = await handleGetClass({ class_name: symbol.name });
-
-            if (classInfo.isError) {
+            const classInfo = await handleGetClass(connection, { class_name: symbol.name });
+            if (!classInfo) {
                 return {
                     ...symbol,
                     systemInfo: {
@@ -485,29 +484,14 @@ class AbapSystemSymbolResolver {
                     }
                 };
             }
-
-            // Parse the response to extract information
-            const responseText = (classInfo.content[0] as any)?.text || '';
-            let classData;
-
-            try {
-                classData = JSON.parse(responseText);
-            } catch {
-                // If not JSON, treat as plain text
-                classData = { source: responseText };
-            }
-
             return {
                 ...symbol,
                 systemInfo: {
                     exists: true,
                     objectType: 'CLAS',
-                    description: classData.description || `ABAP Class ${symbol.name}`,
-                    package: classData.package || 'Unknown',
-                    methods: classData.methods || [],
-                    interfaces: classData.interfaces || [],
-                    superClass: classData.superClass,
-                    attributes: classData.attributes || []
+                    description: classInfo.description || `ABAP Class ${symbol.name}`,
+                    package: classInfo.packageName || 'Unknown',
+                    superClass: classInfo.superclass || '',
                 }
             };
         } catch (error) {
@@ -521,38 +505,24 @@ class AbapSystemSymbolResolver {
         }
     }
 
-    private async resolveFunctionSymbol(symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
+    private async resolveFunctionSymbol(connection: AbapConnection, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
         try {
-            const functionInfo = await handleGetFunction({ function_name: symbol.name });
-
-            if (functionInfo.isError) {
+            const functionInfo = await handleGetFunction(connection, { function_name: symbol.name });
+            if (!functionInfo) {
                 return {
                     ...symbol,
-                    systemInfo: {
-                        exists: false,
-                        error: 'Function not found in SAP system'
-                    }
+                    systemInfo: { exists: false, error: 'Function not found in SAP system' }
                 };
             }
-
-            const responseText = (functionInfo.content[0] as any)?.text || '';
-            let functionData;
-
-            try {
-                functionData = JSON.parse(responseText);
-            } catch {
-                functionData = { source: responseText };
-            }
-
             return {
                 ...symbol,
                 systemInfo: {
                     exists: true,
                     objectType: 'FUNC',
-                    description: functionData.description || `ABAP Function ${symbol.name}`,
-                    package: functionData.package || 'Unknown',
-                    techName: functionData.name || symbol.name
-                }
+                    description: functionInfo.description || `ABAP Function ${symbol.name}`,
+                    package: functionInfo.packageName || 'Unknown',
+                    techName: functionInfo.functionModuleName || ''
+                } as AbapSystemInfo
             };
         } catch (error) {
             return {
@@ -560,16 +530,16 @@ class AbapSystemSymbolResolver {
                 systemInfo: {
                     exists: false,
                     error: error instanceof Error ? error.message : String(error)
-                }
+                } as AbapSystemInfo
             };
         }
     }
 
-    private async resolveInterfaceSymbol(symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
+    private async resolveInterfaceSymbol(connection: AbapConnection, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
         try {
-            const interfaceInfo = await handleGetInterface({ interface_name: symbol.name });
+            const interfaceInfo = await handleGetInterface(connection, { interface_name: symbol.name });
 
-            if (interfaceInfo.isError) {
+            if (!interfaceInfo) {
                 return {
                     ...symbol,
                     systemInfo: {
@@ -579,24 +549,14 @@ class AbapSystemSymbolResolver {
                 };
             }
 
-            const responseText = (interfaceInfo.content[0] as any)?.text || '';
-            let interfaceData;
-
-            try {
-                interfaceData = JSON.parse(responseText);
-            } catch {
-                interfaceData = { source: responseText };
-            }
-
             return {
                 ...symbol,
                 systemInfo: {
                     exists: true,
                     objectType: 'INTF',
-                    description: interfaceData.description || `ABAP Interface ${symbol.name}`,
-                    package: interfaceData.package || 'Unknown',
-                    methods: interfaceData.methods || []
-                }
+                    description: interfaceInfo.description || `ABAP Interface ${symbol.name}`,
+                    package: interfaceInfo.packageName || 'Unknown'
+                } as AbapSystemInfo
             };
         } catch (error) {
             return {
@@ -604,12 +564,12 @@ class AbapSystemSymbolResolver {
                 systemInfo: {
                     exists: false,
                     error: error instanceof Error ? error.message : String(error)
-                }
+                } as AbapSystemInfo
             };
         }
     }
 
-    private async resolveGenericSymbol(symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
+    private async resolveGenericSymbol(connection: AbapConnection, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
         try {
             // For generic symbols, we don't have a specific handler
             // Return symbol with basic system info indicating it exists locally
@@ -621,7 +581,7 @@ class AbapSystemSymbolResolver {
                     description: `Local ${symbol.type} ${symbol.name}`,
                     package: 'LOCAL',
                     error: 'No system resolution available for this symbol type'
-                }
+                } as AbapSystemInfo
             };
         } catch (error) {
             return {
@@ -629,7 +589,7 @@ class AbapSystemSymbolResolver {
                 systemInfo: {
                     exists: false,
                     error: error instanceof Error ? error.message : String(error)
-                }
+                } as AbapSystemInfo
             };
         }
     }
@@ -652,7 +612,7 @@ export async function handleGetAbapSystemSymbols(connection: AbapConnection, arg
 
         // Then, resolve symbols with SAP system information
         const resolver = new AbapSystemSymbolResolver();
-        const { resolvedSymbols, stats } = await resolver.resolveSymbols(semanticResult.symbols);
+        const { resolvedSymbols, stats } = await resolver.resolveSymbols(connection, semanticResult.symbols);
         handlerLogger.info(`Resolved ${stats.resolvedSymbols}/${stats.totalSymbols} symbols from system`);
 
         const result: AbapSystemSymbolsResult = {

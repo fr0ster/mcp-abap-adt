@@ -475,7 +475,7 @@ class AbapSystemSymbolResolver {
     private async resolveClassSymbol(connection: AbapConnection, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
         try {
             const classInfo = await handleGetClass(connection, { class_name: symbol.name });
-            if (!classInfo) {
+            if (!classInfo || classInfo.isError || !classInfo.content || classInfo.content.length === 0) {
                 return {
                     ...symbol,
                     systemInfo: {
@@ -484,14 +484,25 @@ class AbapSystemSymbolResolver {
                     }
                 };
             }
+            const contentItem = classInfo.content[0];
+            if (!contentItem || !('json' in contentItem)) {
+                return {
+                    ...symbol,
+                    systemInfo: {
+                        exists: false,
+                        error: 'Invalid response format from GetClass'
+                    }
+                };
+            }
+            const classData = contentItem.json;
             return {
                 ...symbol,
                 systemInfo: {
                     exists: true,
                     objectType: 'CLAS',
-                    description: classInfo.content[0].json?.description || `ABAP Class ${symbol.name}`,
-                    package: classInfo.content[0].json?.packageName || 'Unknown',
-                    superClass: classInfo.content[0].json?.superclass || '',
+                    description: classData?.description || `ABAP Class ${symbol.name}`,
+                    package: classData?.packageName || 'Unknown',
+                    superClass: classData?.superclass || '',
                 }
             };
         } catch (error) {
@@ -508,20 +519,31 @@ class AbapSystemSymbolResolver {
     private async resolveFunctionSymbol(connection: AbapConnection, symbol: AbapSymbolInfo): Promise<AbapSymbolInfo> {
         try {
             const functionInfo = await handleGetFunction(connection, { function_name: symbol.name });
-            if (!functionInfo) {
+            if (!functionInfo || functionInfo.isError || !functionInfo.content || functionInfo.content.length === 0) {
                 return {
                     ...symbol,
                     systemInfo: { exists: false, error: 'Function not found in SAP system' }
                 };
             }
+            const contentItem = functionInfo.content[0];
+            if (!contentItem || !('json' in contentItem)) {
+                return {
+                    ...symbol,
+                    systemInfo: {
+                        exists: false,
+                        error: 'Invalid response format from GetFunction'
+                    }
+                };
+            }
+            const functionData = contentItem.json;
             return {
                 ...symbol,
                 systemInfo: {
                     exists: true,
                     objectType: 'FUNC',
-                    description: functionInfo.content[0].json?.description || `ABAP Function ${symbol.name}`,
-                    package: functionInfo.content[0].json?.packageName || 'Unknown',
-                    techName: functionInfo.content[0].json?.functionModuleName || ''
+                    description: functionData?.description || `ABAP Function ${symbol.name}`,
+                    package: functionData?.packageName || 'Unknown',
+                    techName: functionData?.functionModuleName || ''
                 } as AbapSystemInfo
             };
         } catch (error) {
@@ -539,7 +561,7 @@ class AbapSystemSymbolResolver {
         try {
             const interfaceInfo = await handleGetInterface(connection, { interface_name: symbol.name });
 
-            if (!interfaceInfo) {
+            if (!interfaceInfo || interfaceInfo.isError || !interfaceInfo.content || interfaceInfo.content.length === 0) {
                 return {
                     ...symbol,
                     systemInfo: {
@@ -549,13 +571,24 @@ class AbapSystemSymbolResolver {
                 };
             }
 
+            const contentItem = interfaceInfo.content[0];
+            if (!contentItem || !('json' in contentItem)) {
+                return {
+                    ...symbol,
+                    systemInfo: {
+                        exists: false,
+                        error: 'Invalid response format from GetInterface'
+                    }
+                };
+            }
+            const interfaceData = contentItem.json;
             return {
                 ...symbol,
                 systemInfo: {
                     exists: true,
                     objectType: 'INTF',
-                    description: interfaceInfo.content[0].json?.description || `ABAP Interface ${symbol.name}`,
-                    package: interfaceInfo.content[0].json?.packageName || 'Unknown'
+                    description: interfaceData?.description || `ABAP Interface ${symbol.name}`,
+                    package: interfaceData?.packageName || 'Unknown'
                 } as AbapSystemInfo
             };
         } catch (error) {

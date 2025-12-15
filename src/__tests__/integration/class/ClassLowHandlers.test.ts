@@ -167,7 +167,7 @@ describe('Class Low-Level Handlers Integration', () => {
       let classExists = false;
       try {
         debugLog('PRE_CHECK', `Checking if class ${className} exists`);
-        const readResponse = await handleGetClass({
+        const readResponse = await handleGetClass(connection, {
           class_name: className
         });
 

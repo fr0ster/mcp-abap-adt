@@ -6,10 +6,11 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import type { Behavi
-import { AbapConnection } from '@mcp-abap-adt/connection';orDefinitionBuilderConfig, BehaviorDefinitionValidationParams, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
+import type { BehaviorDefinitionValidationParams, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-
+import { return_error, return_response, logger as baseLogger, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: "ValidateBehaviorDefinitionLow",
   description: "[low-level] Validate an ABAP behavior definition name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.",

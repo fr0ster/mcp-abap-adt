@@ -5,12 +5,12 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import
-import { AbapConnection } from '@mcp-abap-adt/connection'; { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-
+import { return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: "ActivateBehaviorDefinitionLow",
   description: "[low-level] Activate an ABAP behavior definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.",

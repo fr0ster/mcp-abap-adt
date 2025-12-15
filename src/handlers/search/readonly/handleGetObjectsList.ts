@@ -1,11 +1,12 @@
+import { AbapConnection } from '@mcp-abap-adt/connection';
+
 export const TOOL_DEFINITION = {
   name: "GetObjectsList",
   description: "[read-only] Recursively retrieves all valid ABAP repository objects for a given parent (program, function group, etc.) including nested includes.",
   inputSchema: {
     type: "object",
     properties: {
-      parent_name: { type: "string", de
-import { AbapConnection } from '@mcp-abap-adt/connection';scription: "[read-only] Parent object name" },
+      parent_name: { type: "string", description: "[read-only] Parent object name" },
       parent_tech_name: { type: "string", description: "[read-only] Parent technical name" },
       parent_type: { type: "string", description: "[read-only] Parent object type (e.g. PROG/P, FUGR)" },
       with_short_descriptions: { type: "boolean", description: "[read-only] Include short descriptions (default: true)" }

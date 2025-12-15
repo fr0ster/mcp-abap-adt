@@ -6,9 +6,10 @@
  */
 
 import { AxiosResponse  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';, restoreSessionInConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: "UnlockFunctionModuleLow",
@@ -102,7 +103,7 @@ export async function handleUnlockFunctionModule(connection: AbapConnection, arg
       await client.unlockFunctionModule({ functionModuleName: functionModuleName, functionGroupName: functionGroupName }, lock_handle);
 
       // Get updated session state after unlock
-      
+
 
       handlerLogger.info(`✅ UnlockFunctionModule completed: ${functionModuleName}`);
 

@@ -5,10 +5,11 @@
  * Connection management handled internally.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, parseValidationRespon
-import { AbapConnection } from '@mcp-abap-adt/connection';se, logErrorSafely, restoreSessionInConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, parseValidationResponse, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { logErrorSafely } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: "ValidateObjectLow",

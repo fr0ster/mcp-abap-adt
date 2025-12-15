@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '
-import { AbapConnection } from '@mcp-abap-adt/connection';@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 

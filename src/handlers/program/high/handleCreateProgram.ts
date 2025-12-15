@@ -7,8 +7,8 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, encodeSapObjectName, logger as baseLogger, parseValidationResponse, safeCheckOperation, isCloudConnection } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
-import { XMLParser } from 'fast-xml-p
-import { AbapConnection } from '@mcp-abap-adt/connection';arser';
+import { XMLParser } from 'fast-xml-parser';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 

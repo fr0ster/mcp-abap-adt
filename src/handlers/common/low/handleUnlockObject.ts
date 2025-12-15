@@ -5,8 +5,8 @@
  * Must reuse session_id and lock_handle from LockObject.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, g
-import { AbapConnection } from '@mcp-abap-adt/connection';etManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 

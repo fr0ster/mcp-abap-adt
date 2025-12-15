@@ -5,8 +5,8 @@
  * Supports package, description, and superclass validation.
  */
 
-import { AxiosResponse, return_error, return_res
-import { AbapConnection } from '@mcp-abap-adt/connection';ponse, logger, getManagedConnection, parseValidationResponse, restoreSessionInConnection } from '../../../lib/utils';
+import { return_error, return_response, logger, parseValidationResponse, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger } from '../../../lib/handlerLogger';
 

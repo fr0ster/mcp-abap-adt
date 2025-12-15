@@ -1,7 +1,8 @@
+import { AbapConnection } from '@mcp-abap-adt/connection';
+
 export const TOOL_DEFINITION = {
   name: "DescribeByList",
-  description: "[read-only] Batch description for a list of ABAP objects. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE,
-import { AbapConnection } from '@mcp-abap-adt/connection'; STRUCTURE, etc.",
+  description: "[read-only] Batch description for a list of ABAP objects. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE, STRUCTURE, etc.",
   inputSchema: {
     type: "object",
     properties: {
@@ -55,7 +56,7 @@ export async function handleDescribeByList(connection: AbapConnection, args: any
   try {
     for (const obj of objects) {
       let type = obj.type;
-      let res = await handleSearchObject({ object_name: obj.name, object_type: type });
+      let res = await handleSearchObject(connection, { object_name: obj.name, object_type: type });
       let parsed;
       try {
         parsed = typeof res === "string" ? JSON.parse(res) : res;
@@ -71,7 +72,7 @@ export async function handleDescribeByList(connection: AbapConnection, args: any
         }
 
         if (tryWithoutType) {
-          res = await handleSearchObject({ object_name: obj.name });
+          res = await handleSearchObject(connection, { object_name: obj.name });
           parsed = typeof res === "string" ? JSON.parse(res) : res;
           // If it still fails or comes back empty, skip this object
           if (

@@ -9,10 +9,10 @@
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger as baseLogger, safeCheckOperation  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection'; validateTransportRequest } from '../../../utils/transportValidation.js';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-
+import { validateTransportRequest } from '../../../utils/transportValidation.js';
 export const TOOL_DEFINITION = {
   name: "CreateDataElement",
   description: "Create a new ABAP data element in SAP system with all required steps: create, activate, and verify.",

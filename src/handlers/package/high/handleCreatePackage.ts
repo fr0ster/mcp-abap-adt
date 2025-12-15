@@ -9,8 +9,8 @@
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger as baseLogger, logErrorSafely } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-
-import { AbapConnection } from '@mcp-abap-adt/connection';adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import type { PackageBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';

@@ -4,10 +4,12 @@
  * Uses validateTableName from @mcp-abap-adt/adt-clients/core/table for table-specific validation.
  */
 
-import { CrudClient } fr
-import { AbapConnection } from '@mcp-abap-adt/connection';om '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import type { TableBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import { parseValidationResponse } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: "ValidateTableLow",

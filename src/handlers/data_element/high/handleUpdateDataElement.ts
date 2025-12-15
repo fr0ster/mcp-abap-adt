@@ -8,8 +8,8 @@
  */
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/ut
-import { AbapConnection } from '@mcp-abap-adt/connection';ils';
+import { return_error, return_response, logger as baseLogger, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';

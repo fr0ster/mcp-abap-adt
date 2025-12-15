@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedCon
-import { AbapConnection } from '@mcp-abap-adt/connection';nection, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -82,7 +82,7 @@ export async function handleLockClassTestClasses(connection: AbapConnection, arg
         throw new Error(`Lock did not return a test classes lock handle for class ${className}`);
       }
 
-      
+
 
       handlerLogger.info(`✅ LockClassTestClasses completed: ${className}`);
 

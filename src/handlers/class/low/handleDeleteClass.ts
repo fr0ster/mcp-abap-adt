@@ -5,11 +5,10 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection'; } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-
 export const TOOL_DEFINITION = {
   name: "DeleteClassLow",
   description: "[low-level] Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for $TMP objects.",

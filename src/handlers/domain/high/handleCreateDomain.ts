@@ -9,9 +9,10 @@
 
 import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger as baseLogger, logErrorSafely, safeCheckOperation  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';etHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { validateTransportRequest } from '../../../utils/transportValidation';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {
   name: "CreateDomain",

@@ -3,8 +3,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { CrudClient } from '@mcp-abap-adt/adt-clie
-import { AbapConnection } from '@mcp-abap-adt/connection';nts';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
 export const TOOL_DEFINITION = {

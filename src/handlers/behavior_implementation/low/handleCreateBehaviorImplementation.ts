@@ -5,8 +5,8 @@
  * Low-level handler: full workflow (create, lock, update main source, update implementations, unlock, activate).
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getM
-import { AbapConnection } from '@mcp-abap-adt/connection';anagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';

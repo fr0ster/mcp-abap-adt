@@ -5,10 +5,11 @@
  * Low-level handler: single method call.
  */
 
-import { CrudClient } fro
-import { AbapConnection } from '@mcp-abap-adt/connection';m '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: "CheckPackageLow",
@@ -72,7 +73,7 @@ export async function handleCheckPackage(connection: AbapConnection, args: Check
       return return_error(new Error('package_name and super_package are required'));
     }
 
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
     const handlerLogger = getHandlerLogger(
       'handleCheckPackage',
       process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
@@ -83,7 +84,7 @@ export async function handleCheckPackage(connection: AbapConnection, args: Check
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();

@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { return_error, return_response, logger as baseLogger, getManagedConn
-import { AbapConnection } from '@mcp-abap-adt/connection';ection, restoreSessionInConnection } from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 

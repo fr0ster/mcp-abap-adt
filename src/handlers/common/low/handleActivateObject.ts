@@ -2,8 +2,8 @@
  * ActivateObject Handler - Universal ABAP Object Activation via ADT API
  */
 
-import { getHandlerLogger, noopLogger } from '../../../lib/handle
-import { AbapConnection } from '@mcp-abap-adt/connection';rLogger';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient, ObjectReference } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {

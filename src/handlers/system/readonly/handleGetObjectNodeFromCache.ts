@@ -1,10 +1,12 @@
+import { AbapConnection } from '@mcp-abap-adt/connection';
+
 export const TOOL_DEFINITION = {
   name: "GetObjectNodeFromCache",
   description: "[read-only] Returns a node from the in-memory objects list cache by OBJECT_TYPE, OBJECT_NAME, TECH_NAME, and expands OBJECT_URI if present.",
   inputSchema: {
     type: "object",
-    properties: 
-import { AbapConnection } from '@mcp-abap-adt/connection';{
+    properties:
+{
       object_type: { type: "string", description: "[read-only] Object type" },
       object_name: { type: "string", description: "[read-only] Object name" },
       tech_name: { type: "string", description: "[read-only] Technical name" }

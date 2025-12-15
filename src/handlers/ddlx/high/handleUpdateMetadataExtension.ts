@@ -5,9 +5,8 @@
 import { AxiosResponse } from '../../../lib/utils';
 import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '..
-import { AbapConnection } from '@mcp-abap-adt/connection';/../../lib/handlerLogger';
-
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
     name: "UpdateMetadataExtension",
     description: "Update source code of an ABAP Metadata Extension.",

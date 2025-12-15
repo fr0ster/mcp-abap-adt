@@ -2,9 +2,8 @@
 
 import { makeAdtRequestWithTimeout, logger as baseLogger } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
-import { getHandlerLogger, noopLogger } from '../../../lib
-import { AbapConnection } from '@mcp-abap-adt/connection';/handlerLogger';
-
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
   name: "GetAdtTypes",
   description: "[read-only] Retrieve all valid ADT object types.",

@@ -3,8 +3,9 @@
  * Uses CrudClient check methods per object type.
  */
 
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger
-import { AbapConnection } from '@mcp-abap-adt/connection';';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 

@@ -6,8 +6,8 @@
  */
 
 import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } 
-import { AbapConnection } from '@mcp-abap-adt/connection';from '../../../lib/utils';
+import { return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
@@ -96,7 +96,7 @@ export async function handleLockDomain(connection: AbapConnection, args: LockDom
         throw new Error(`Lock did not return a lock handle for domain ${domainName}`);
       }
 
-      
+
 
       // Get actual session ID from connection (may be different from input if new session was created)
       const actualSessionId = connection.getSessionId() || session_id || null;

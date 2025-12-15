@@ -5,10 +5,10 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';edConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: "UpdateFunctionModuleLow",
@@ -112,7 +112,7 @@ export async function handleUpdateFunctionModule(connection: AbapConnection, arg
       }
 
       // Get updated session state after update
-      
+
 
       handlerLogger.info(`✅ UpdateFunctionModule completed: ${functionModuleName}`);
 

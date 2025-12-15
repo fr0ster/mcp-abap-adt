@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnect
-import { AbapConnection } from '@mcp-abap-adt/connection';ion, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, logger as baseLogger, getManagedConnection, restoreSessionInConnection } from '../../../lib/utils';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
 
@@ -97,7 +97,7 @@ export async function handleActivateFunctionGroup(connection: AbapConnection, ar
       const success = activationResult.activated && activationResult.checked;
 
       // Get updated session state after activation
-      
+
 
       handlerLogger.info(`✅ ActivateFunctionGroup completed: ${functionGroupName}`);
       handlerLogger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);

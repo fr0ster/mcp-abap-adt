@@ -6,8 +6,9 @@ import { return_error, return_response, logger as baseLogger } from '../../../li
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionImplementationType } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from
-import { AbapConnection } from '@mcp-abap-adt/connection'; '../../../lib/handlerLogger';
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
+
 
 export const TOOL_DEFINITION = {
     name: "CreateBehaviorDefinition",

@@ -2,9 +2,8 @@
 
 import { makeAdtRequestWithTimeout, logger as baseLogger } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
-import { getHandlerLogger, noopLogger } from '../../..
-import { AbapConnection } from '@mcp-abap-adt/connection';/lib/handlerLogger';
-
+import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 export const TOOL_DEFINITION = {
   name: "GetObjectStructure",
   description: "[read-only] Retrieve ADT object structure as a compact JSON tree.",

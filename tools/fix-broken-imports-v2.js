@@ -74,6 +74,57 @@ function fixBrokenImports(filePath) {
     return `import { ${imports.trim()} } from '${cleanPath}';\nimport { AbapConnection } from '@mcp-abap-adt/connection';\n`;
   });
 
+  // Pattern 7: import { ... } from\nimport { AbapConnection } from '@mcp-abap-adt/connection'; '...';
+  // Where the import statement is split across lines with AbapConnection in between
+  content = content.replace(/import\s*\{\s*([^}]+)\s*\}\s*from\s*\nimport\s*\{\s*AbapConnection\s*\}\s*from\s*['"]@mcp-abap-adt\/connection['"];([^\n]+)/g, (match, imports, fromPath) => {
+    modified = true;
+    const cleanPath = fromPath.replace(/['"];?\s*$/, '').trim();
+    return `import { ${imports.trim()} } from '${cleanPath}';\nimport { AbapConnection } from '@mcp-abap-adt/connection';\n`;
+  });
+
+  // Pattern 8: import { ... } from '...\nimport { AbapConnection } from '@mcp-abap-adt/connection';...';
+  // More aggressive pattern to catch remaining cases
+  content = content.replace(/import\s*\{\s*([^}]+)\s*\}\s*from\s*['"]([^'"]*)\s*\nimport\s*\{\s*AbapConnection\s*\}\s*from\s*['"]@mcp-abap-adt\/connection['"];([^\n'"]+)/g, (match, imports, fromPath1, fromPath2) => {
+    modified = true;
+    const cleanPath = (fromPath1 + fromPath2).replace(/['"];?\s*$/, '').trim();
+    return `import { ${imports.trim()} } from '${cleanPath}';\nimport { AbapConnection } from '@mcp-abap-adt/connection';\n`;
+  });
+
+  // Pattern 9: Handle cases where import statement has no quotes and AbapConnection is inserted
+  content = content.replace(/import\s*\{\s*([^}]+)\s*\}\s*from\s*([^\n]*)\nimport\s*\{\s*AbapConnection\s*\}\s*from\s*['"]@mcp-abap-adt\/connection['"];([^\n]+)/g, (match, imports, fromPath1, fromPath2) => {
+    // Only fix if it looks like a broken import (has path-like content)
+    if (fromPath2.match(/['"]/)) {
+      modified = true;
+      const cleanPath = (fromPath1 + fromPath2).replace(/['"];?\s*$/, '').trim();
+      return `import { ${imports.trim()} } from '${cleanPath}';\nimport { AbapConnection } from '@mcp-abap-adt/connection';\n`;
+    }
+    return match;
+  });
+
+  // Pattern 10: import { ... } fro\nimport { AbapConnection } from '@mcp-abap-adt/connection';m '...';
+  content = content.replace(/import\s*\{\s*([^}]+)\s*\}\s*from\s*([a-z]+)\nimport\s*\{\s*AbapConnection\s*\}\s*from\s*['"]@mcp-abap-adt\/connection['"];([a-z])\s*['"]([^'"]+)['"];?\s*\n/g, (match, imports, fromPart1, fromPart2, fromPath) => {
+    modified = true;
+    return `import { ${imports.trim()} } from '${fromPart1}${fromPart2}${fromPath}';\nimport { AbapConnection } from '@mcp-abap-adt/connection';\n`;
+  });
+
+  // Pattern 11: import\nimport { AbapConnection } from '@mcp-abap-adt/connection'; { ... } from '...';
+  content = content.replace(/import\s*\nimport\s*\{\s*AbapConnection\s*\}\s*from\s*['"]@mcp-abap-adt\/connection['"];\s*\{\s*([^}]+)\s*\}\s*from\s*['"]([^'"]+)['"];?\s*\n/g, (match, imports, fromPath) => {
+    modified = true;
+    return `import { ${imports.trim()} } from '${fromPath}';\nimport { AbapConnection } from '@mcp-abap-adt/connection';\n`;
+  });
+
+  // Pattern 12: import type { ...\nimport { AbapConnection } from '@mcp-abap-adt/connection';... } from '...';
+  content = content.replace(/import\s+type\s*\{\s*([^}]*)\nimport\s*\{\s*AbapConnection\s*\}\s*from\s*['"]@mcp-abap-adt\/connection['"];([^}]+)\s*\}\s*from\s*['"]([^'"]+)['"];?\s*\n/g, (match, typePart1, typePart2, fromPath) => {
+    modified = true;
+    return `import type { ${typePart1.trim()}${typePart2.trim()} } from '${fromPath}';\nimport { AbapConnection } from '@mcp-abap-adt/connection';\n`;
+  });
+
+  // Pattern 13: import { ... }\nimport { AbapConnection } from '@mcp-abap-adt/connection'; } from '...';
+  content = content.replace(/import\s*\{\s*([^}]+)\s*\}\s*\nimport\s*\{\s*AbapConnection\s*\}\s*from\s*['"]@mcp-abap-adt\/connection['"];\s*\}\s*from\s*['"]([^'"]+)['"];?\s*\n/g, (match, imports, fromPath) => {
+    modified = true;
+    return `import { ${imports.trim()} } from '${fromPath}';\nimport { AbapConnection } from '@mcp-abap-adt/connection';\n`;
+  });
+
   if (modified && content !== originalContent) {
     fs.writeFileSync(filePath, content, 'utf8');
     console.log(`Fixed: ${path.relative(process.cwd(), filePath)}`);

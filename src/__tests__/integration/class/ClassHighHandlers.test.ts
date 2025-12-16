@@ -18,195 +18,180 @@ import { handleCreateClass } from '../../../handlers/class/high/handleCreateClas
 import { handleUpdateClass } from '../../../handlers/class/high/handleUpdateClass';
 import { handleDeleteClass } from '../../../handlers/class/low/handleDeleteClass';
 
-import { HighTester } from '../helpers/testers/HighTester';
+import { LambdaTester } from '../helpers/testers/LambdaTester';
 import { getTimeout } from '../helpers/configHelpers';
-import type { TesterContext } from '../helpers/testers/types';
-import { parseHandlerResponse, extractErrorMessage, delay } from '../helpers/testHelpers';
+import type { LambdaTesterContext } from '../helpers/testers/types';
+import { parseHandlerResponse, extractErrorMessage, createHandlerContext } from '../helpers/testHelpers';
 import { updateSessionFromResponse } from '../helpers/sessionHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 describe('Class High-Level Handlers Integration', () => {
-  let tester: HighTester;
+  let tester: LambdaTester;
+  const logger = createTestLogger('class-high');
 
   beforeAll(async () => {
-    tester = new HighTester(
+    tester = new LambdaTester(
       'create_class',
       'builder_class',
       'class-high',
-      {
-        // Lambda that calls create handler with logging
-        create: async (context: TesterContext) => {
-          const { connection, session, logger, objectName, params, packageName, transportRequest } = context;
+      'builder_class'
+    );
+    await tester.beforeAll(
+      async (context: LambdaTesterContext) => {
+        // Basic setup - connection is already created in tester
+      },
+      // Cleanup lambda - will be called by tester after checking YAML params
+      async (context: LambdaTesterContext) => {
+        const { connection, objectName, transportRequest } = context;
+        if (!objectName) return;
 
-          if (!objectName) {
-            throw new Error('objectName is required for create');
-          }
-
-          logger?.info(`   • create: ${objectName}`);
-
-          const sourceCode = params.source_code || '';
-          const createArgs = {
-            class_name: objectName,
-            package_name: packageName,
-            source_code: sourceCode,
-            activate: true,
-            ...(transportRequest && { transport_request: transportRequest }),
-            ...(params.description && { description: params.description }),
-            ...(params.superclass && { superclass: params.superclass })
-          };
-
-          // Log create args for debugging (without full source_code)
-          logger?.debug(`Create args: ${JSON.stringify({ ...createArgs, source_code: sourceCode ? `${sourceCode.length} chars` : 'empty' }, null, 2)}`);
-
-          let createResponse;
-          try {
-            createResponse = await handleCreateClass({ connection, logger }, createArgs);
-          } catch (error: any) {
-            // If handler throws an error directly (not wrapped in response)
-            logger?.error(`Handler threw error: ${error.message || String(error)}`);
-            if (error.message?.includes('404')) {
-              await delay(1000);
-              createResponse = await handleCreateClass({ connection, logger }, createArgs);
-            } else {
-              throw error;
-            }
-          }
-
-          if (createResponse.isError) {
-            const errorMsg = extractErrorMessage(createResponse);
-            // Log full error details for debugging
-            const errorDetails = JSON.stringify(createResponse.content, null, 2);
-            logger?.debug(`Create error details: ${errorDetails}`);
-
-            // Try to extract more detailed error message
-            let detailedError = errorMsg;
-            if (createResponse.content && createResponse.content.length > 0) {
-              const firstContent = createResponse.content[0];
-              if (firstContent.text) {
-                detailedError = firstContent.text;
-              } else if (firstContent.json) {
-                detailedError = JSON.stringify(firstContent.json);
-              }
-            }
-
-            if (detailedError.includes('already exists') ||
-                detailedError.includes('ExceptionResourceAlreadyExists') ||
-                detailedError.includes('ResourceAlreadyExists')) {
-              logger?.info(`⏭️  SKIP: Object already exists: ${detailedError}`);
-              throw new Error(`SKIP: ${detailedError}`);
-            }
-
-            // 400 errors during validation might indicate object already exists or invalid name
-            // Try to check if it's a validation error that we should skip
-            if (detailedError.includes('400') || detailedError.includes('status code 400')) {
-              logger?.warn(`⚠️  Create failed with 400 error (might be validation or already exists): ${detailedError}`);
-              // For now, treat 400 as a skip condition to avoid test failures
-              // In production, you might want to check if object exists first
-              logger?.info(`⏭️  SKIP: Validation failed or object might already exist: ${detailedError}`);
-              throw new Error(`SKIP: ${detailedError}`);
-            }
-
-            logger?.error(`Create failed with error: ${detailedError}`);
-            throw new Error(`Create failed: ${detailedError}`);
-          }
-
-          const createData = parseHandlerResponse(createResponse);
-          if (!createData.success) {
-            throw new Error(`Create failed: ${JSON.stringify(createData)}`);
-          }
-
-          logger?.success(`✅ create: ${objectName} completed successfully`);
-          updateSessionFromResponse(session, createData);
-
-          return createData;
-        },
-
-        // Lambda that calls update handler with logging
-        update: async (context: TesterContext) => {
-          const { connection, session, logger, objectName, params } = context;
-
-          if (!objectName) {
-            throw new Error('objectName is required for update');
-          }
-
-          logger?.info(`   • update: ${objectName}`);
-
-          // Use update_source_code if provided, otherwise modify original source_code
-          let updatedSourceCode = params.update_source_code;
-          if (!updatedSourceCode) {
-            const originalSourceCode = params.source_code || '';
-            // Simple modification: add a comment or method to indicate update
-            updatedSourceCode = originalSourceCode.replace(
-              /PUBLIC SECTION\./,
-              'PUBLIC SECTION.\n    " Updated via MCP ABAP ADT test'
-            );
-            if (updatedSourceCode === originalSourceCode) {
-              // If no replacement happened, append a comment at the end
-              updatedSourceCode = originalSourceCode + '\n    " Updated via MCP ABAP ADT test';
-            }
-          }
-
-          const updateResponse = await handleUpdateClass({ connection, logger }, {
-            class_name: objectName,
-            source_code: updatedSourceCode,
-            activate: true
-          });
-
-          if (updateResponse.isError) {
-            const errorMsg = extractErrorMessage(updateResponse);
-            throw new Error(`Update failed: ${errorMsg}`);
-          }
-
-          const updateData = parseHandlerResponse(updateResponse);
-          if (!updateData.success) {
-            throw new Error(`Update failed: ${JSON.stringify(updateData)}`);
-          }
-
-          logger?.success(`✅ update: ${objectName} completed successfully`);
-
-          return updateData;
-        },
-
-        // Lambda that calls delete handler with logging
-        delete: async (context: TesterContext) => {
-          const { connection, logger, objectName, transportRequest } = context;
-
-          if (!objectName) {
-            throw new Error('objectName is required for delete');
-          }
-
-          logger?.info(`   • delete: ${objectName}`);
-
-          const deleteResponse = await handleDeleteClass({ connection: connection, logger }, {
+        logger?.info(`   • cleanup: delete ${objectName}`);
+        try {
+          const deleteLogger = createTestLogger('class-high-delete');
+          const deleteCtx = createHandlerContext({ connection, logger: deleteLogger });
+          const deleteResponse = await handleDeleteClass(deleteCtx, {
             class_name: objectName,
             ...(transportRequest && { transport_request: transportRequest })
           });
-
           if (deleteResponse.isError) {
             const errorMsg = extractErrorMessage(deleteResponse);
             logger?.warn(`Delete failed (ignored in cleanup): ${errorMsg}`);
-            return;
+          } else {
+            logger?.success(`✅ cleanup: deleted ${objectName} successfully`);
           }
-
-          logger?.success(`✅ delete: ${objectName} completed successfully`);
+        } catch (error: any) {
+          logger?.warn(`Cleanup delete error (ignored): ${error.message || String(error)}`);
         }
       }
     );
-    await tester.beforeAll();
-  });
-
-  afterAll(async () => {
-    await tester.afterAll();
-  });
-
-  beforeEach(async () => {
-    await tester.beforeEach();
-  });
+  }, getTimeout('long'));
 
   afterEach(async () => {
+    // cleanupAfter is automatically called by tester.afterEach()
+    // It checks YAML params and calls cleanup lambda if needed
     await tester.afterEach();
   });
 
   it('should test all Class high-level handlers', async () => {
-    await tester.run();
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection, session, objectName, params, packageName, transportRequest } = context;
+
+      expect(objectName).toBeDefined();
+      expect(objectName).not.toBe('');
+
+      // Step 1: Create
+      logger?.info(`   • create: ${objectName}`);
+      const createLogger = createTestLogger('class-high-create');
+      const createCtx = createHandlerContext({ connection, logger: createLogger });
+      const sourceCode = params.source_code || '';
+      const createResponse = await handleCreateClass(createCtx, {
+        class_name: objectName,
+        package_name: packageName,
+        source_code: sourceCode,
+        activate: true,
+        ...(transportRequest && { transport_request: transportRequest }),
+        ...(params.description && { description: params.description }),
+        ...(params.superclass && { superclass: params.superclass })
+      });
+
+      expect(createResponse.isError).toBe(false);
+      if (createResponse.isError) {
+        const errorMsg = extractErrorMessage(createResponse);
+        // Try to extract more detailed error information
+        let detailedError = errorMsg;
+        if (createResponse.content && createResponse.content.length > 0) {
+          const firstContent = createResponse.content[0];
+          if (firstContent.type === 'json') {
+            detailedError = JSON.stringify(firstContent.text, null, 2);
+            createLogger?.error(`Create error details: ${detailedError}`);
+          } else if (firstContent.text) {
+            detailedError = firstContent.text;
+            createLogger?.error(`Create error: ${detailedError}`);
+          }
+        }
+        // Log full response for debugging
+        createLogger?.error(`Full error response: ${JSON.stringify(createResponse.content, null, 2)}`);
+        fail(`Create failed: ${detailedError}`);
+      }
+
+      const createData = parseHandlerResponse(createResponse);
+      expect(createData.success).toBe(true);
+      expect(createData.data).toBeDefined();
+
+      // Check for errors from state.errors (warnings/errors that occurred during creation)
+      if (createData.errors && Array.isArray(createData.errors) && createData.errors.length > 0) {
+        logger?.warn(`⚠️ Create completed with ${createData.errors.length} error(s)/warning(s):`);
+        createData.errors.forEach((err: any) => {
+          logger?.warn(`  - [${err.method || 'unknown'}]: ${err.error || String(err)}`);
+        });
+        // Log errors but don't fail test - these are warnings from state.errors
+        // They indicate non-critical issues (e.g., warnings during check)
+      }
+
+      logger?.success(`✅ create: ${objectName} completed successfully`);
+      updateSessionFromResponse(session, createData);
+
+      // Wait a bit after creation before update to ensure object is ready
+      // Use delay from YAML config (operation_delays.create or default) via context
+      const delay = context.getOperationDelay('create');
+      logger?.info(`   • waiting ${delay}ms after creation before update...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      // Step 2: Update
+      logger?.info(`   • update: ${objectName}`);
+      const updateLogger = createTestLogger('class-high-update');
+      const updateCtx = createHandlerContext({ connection, logger: updateLogger });
+      let updatedSourceCode = params.update_source_code;
+      if (!updatedSourceCode) {
+        const originalSourceCode = params.source_code || '';
+        updatedSourceCode = originalSourceCode.replace(
+          /PUBLIC SECTION\./,
+          'PUBLIC SECTION.\n    " Updated via MCP ABAP ADT test'
+        );
+        if (updatedSourceCode === originalSourceCode) {
+          updatedSourceCode = originalSourceCode + '\n    " Updated via MCP ABAP ADT test';
+        }
+      }
+
+      const updateResponse = await handleUpdateClass(updateCtx, {
+        class_name: objectName!,
+        source_code: updatedSourceCode,
+        activate: true
+      });
+
+      expect(updateResponse.isError).toBe(false);
+      if (updateResponse.isError) {
+        const errorMsg = extractErrorMessage(updateResponse);
+        // Try to extract more detailed error information
+        let detailedError = errorMsg;
+        if (updateResponse.content && updateResponse.content.length > 0) {
+          const firstContent = updateResponse.content[0];
+          if (firstContent.type === 'json') {
+            detailedError = JSON.stringify(firstContent.text, null, 2);
+            updateLogger?.error(`Update error details: ${detailedError}`);
+          } else if (firstContent.text) {
+            detailedError = firstContent.text;
+            updateLogger?.error(`Update error: ${detailedError}`);
+          }
+        }
+        fail(`Update failed: ${detailedError}`);
+      }
+
+      const updateData = parseHandlerResponse(updateResponse);
+      expect(updateData.success).toBe(true);
+      // handleUpdateClass returns data at root level, not in data field
+      expect(updateData.class_name).toBeDefined();
+
+      // Check for errors from state.errors (warnings/errors that occurred during update)
+      if (updateData.errors && Array.isArray(updateData.errors) && updateData.errors.length > 0) {
+        logger?.warn(`⚠️ Update completed with ${updateData.errors.length} error(s)/warning(s):`);
+        updateData.errors.forEach((err: any) => {
+          logger?.warn(`  - [${err.method || 'unknown'}]: ${err.error || String(err)}`);
+        });
+        // Log errors but don't fail test - these are warnings from state.errors
+      }
+
+      logger?.success(`✅ update: ${objectName} completed successfully`);
+    });
   }, getTimeout('long'));
 });

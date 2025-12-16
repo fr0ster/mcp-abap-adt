@@ -155,6 +155,11 @@ export async function handleUpdateClass(context: HandlerContext, params: UpdateC
 
       return return_error(new Error(errorMessage));
     }
+  } catch (error: any) {
+    // Generic outer catch for unexpected errors (e.g., connection issues)
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger?.error(`Unexpected error in UpdateClass handler: ${className} - ${errorMessage}`);
+    return return_error(new Error(errorMessage));
   } finally {
     try {
       connection?.reset?.();

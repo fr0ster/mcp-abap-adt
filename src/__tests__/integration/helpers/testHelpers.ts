@@ -6,6 +6,9 @@
 import { AxiosError } from 'axios';
 import { isAlreadyCheckedError, isAlreadyExistsError } from '../../../lib/utils';
 import { createTestLogger } from './loggerHelpers';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { LoggerWithExtras } from './loggerHelpers';
 
 /**
  * Parse handler response content
@@ -200,4 +203,27 @@ export function shouldSkipDueToExistingObject(
   }
 
   return false;
+}
+
+/**
+ * Create HandlerContext from TesterContext
+ * Logger is included only if DEBUG_HANDLERS=true
+ * 
+ * @param context - TesterContext from workflow function
+ * @returns HandlerContext with connection and optional logger
+ */
+export function createHandlerContext(context: {
+  connection: IAbapConnection;
+  logger: LoggerWithExtras;
+}): HandlerContext {
+  const handlerContext: HandlerContext = {
+    connection: context.connection,
+  };
+
+  // Include logger only if DEBUG_HANDLERS is enabled
+  if (process.env.DEBUG_HANDLERS === 'true') {
+    handlerContext.logger = context.logger as unknown as ILogger;
+  }
+
+  return handlerContext;
 }

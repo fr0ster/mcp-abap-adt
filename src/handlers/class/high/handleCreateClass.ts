@@ -8,11 +8,10 @@ import { AxiosResponse } from '../../../lib/utils';
 import {
   return_error,
   return_response,
-  logger as baseLogger,
-  safeCheckOperation
+  logger as baseLogger
 } from '../../../lib/utils';
-import { XMLParser } from 'fast-xml-parser';
-import { CrudClient  } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
@@ -82,174 +81,125 @@ export async function handleCreateClass(context: HandlerContext, params: CreateC
   try {
     const sourceCode = args.source_code || generateClassTemplate(className, args.description || className);
     const shouldActivate = args.activate !== false; // default true
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection, logger);
+    const adtClass = client.getClass();
 
+    // Use AdtClass.create() which handles the full workflow automatically:
+    // validate → create → check → lock → check(inactive) → update → unlock → check → activate
+    // AdtClass.create() handles cleanup (unlock) in its catch block, so we should let errors propagate
+    logger?.info(`Creating class with AdtClass: ${className}`);
+
+    let state;
     try {
-      // Validate
-      logger?.debug(`Validating class: ${className}`);
-      try {
-        await client.validateClass({
+      state = await adtClass.create(
+        {
           className,
           packageName: args.package_name,
-          description: args.description || className
-        });
-        logger?.debug(`Class validation passed: ${className}`);
-      } catch (validateError: any) {
-        const errorMessage = validateError instanceof Error ? validateError.message : String(validateError);
-        logger?.error(`Class validation failed: ${className} - ${errorMessage}`);
-        throw new Error(`Class validation failed: ${errorMessage}`);
-      }
-
-      // Create
-      logger?.debug(`Creating class: ${className}`);
-      await client.createClass({
-        className,
-        description: args.description || className,
-        packageName: args.package_name,
-        transportRequest: args.transport_request,
-        superclass: args.superclass,
-        final: args.final || false,
-        abstract: args.abstract || false,
-        createProtected: args.create_protected || false
-      });
-
-      const createResult = client.getCreateResult();
-      if (!createResult || (createResult.status !== 201 && createResult.status !== 200)) {
-        const errorData = createResult?.data
-          ? (typeof createResult.data === 'string' ? createResult.data.substring(0, 500) : JSON.stringify(createResult.data).substring(0, 500))
-          : 'Unknown error';
-        throw new Error(`Class creation failed with status ${createResult?.status || 'unknown'}: ${errorData}`);
-      }
-      logger?.info(`Class created: ${className}`);
-
-      // Lock
-      logger?.debug(`Locking class: ${className}`);
-      await client.lockClass({ className: className });
-      const lockHandle = client.getLockHandle();
-      logger?.debug(`Class locked: ${className} (handle=${lockHandle ? lockHandle.substring(0, 8) + '...' : 'none'})`);
-
-      try {
-        // Check new code before update
-        logger?.debug(`Checking new code before update: ${className}`);
-        let checkNewCodePassed = false;
-        try {
-          await safeCheckOperation(
-            () => client.checkClass({ className: className }, 'inactive', sourceCode),
-            className,
-            {
-              debug: (message: string) => logger?.debug(message)
-            }
-          );
-          checkNewCodePassed = true;
-          logger?.debug(`New code check passed: ${className}`);
-        } catch (checkError: any) {
-          if ((checkError as any).isAlreadyChecked) {
-            logger?.debug(`Class ${className} was already checked - continuing`);
-            checkNewCodePassed = true;
-          } else {
-            logger?.error(`New code check failed: ${className} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
-            throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
-          }
+          transportRequest: args.transport_request,
+          description: args.description || className,
+          superclass: args.superclass,
+          final: args.final || false,
+          abstract: args.abstract || false,
+          createProtected: args.create_protected || false,
+          sourceCode: sourceCode
+        },
+        {
+          activateOnCreate: shouldActivate
         }
+      );
+    } catch (createError: any) {
+      // AdtClass.create() already handles cleanup (unlock) in its catch block before throwing
+      // Check if validation failed with 400 (object might already exist)
+      if (createError.code === AdtObjectErrorCodes.VALIDATION_FAILED && createError.status === 400) {
+        const errorText = createError.message?.toLowerCase() || '';
+        const isAlreadyExists = errorText.includes('already exists') ||
+          errorText.includes('exceptionresourcealreadyexists') ||
+          errorText.includes('resourcealreadyexists');
 
-        // Update only if check passed
-        if (checkNewCodePassed) {
-          logger?.debug(`Updating class source code: ${className}`);
-          await client.updateClass({ className: className, sourceCode: sourceCode }, lockHandle);
-          logger?.info(`Class source code updated: ${className}`);
-        } else {
-          logger?.warn(`Skipping update - new code check failed: ${className}`);
-        }
-
-        // Unlock (mandatory)
-        logger?.debug(`Unlocking class: ${className}`);
-        await client.unlockClass({ className: className }, lockHandle);
-        logger?.info(`Class unlocked: ${className}`);
-
-        // Check inactive version (after unlock)
-        logger?.debug(`Checking inactive version: ${className}`);
-        try {
-          await safeCheckOperation(
-            () => client.checkClass({ className: className }, 'inactive'),
-            className,
-            {
-              debug: (message: string) => logger?.debug(message)
-            }
-          );
-          logger?.debug(`Inactive version check completed: ${className}`);
-        } catch (checkError: any) {
-          if ((checkError as any).isAlreadyChecked) {
-            logger?.debug(`Class ${className} was already checked - continuing`);
-          } else {
-            logger?.warn(`Inactive version check had issues: ${className} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
-          }
-        }
-
-        // Activate if requested
-        if (shouldActivate) {
-          logger?.debug(`Activating class: ${className}`);
+        if (isAlreadyExists) {
+          logger?.warn(`Class ${className} already exists - validation returned 400, checking if object exists`);
+          // Try to read existing class to confirm it exists
+          // Note: No cleanup needed here since validation failed before object creation
           try {
-            await client.activateClass({ className: className });
-            logger?.info(`Class activated: ${className}`);
-          } catch (activationError: any) {
-            logger?.error(`Activation failed: ${className} - ${activationError instanceof Error ? activationError.message : String(activationError)}`);
-            throw new Error(`Activation failed: ${activationError instanceof Error ? activationError.message : String(activationError)}`);
+            const existingState = await adtClass.read({ className }, 'active');
+            if (existingState) {
+              logger?.info(`Class ${className} already exists and is active`);
+              return return_response({
+                data: JSON.stringify({
+                  success: true,
+                  data: {
+                    class_name: className,
+                    package_name: args.package_name,
+                    transport_request: args.transport_request || null,
+                    activated: true
+                  },
+                  class_name: className,
+                  package_name: args.package_name,
+                  transport_request: args.transport_request || null,
+                  activated: true,
+                  already_exists: true,
+                  message: `Class ${className} already exists`
+                }, null, 2)
+              } as AxiosResponse);
+            }
+          } catch (readError: any) {
+            // Class doesn't exist or can't be read - validation error might be something else
+            logger?.warn(`Class ${className} validation failed with 400 but object doesn't exist - treating as validation error`);
+            // Continue to throw original createError below
           }
-        } else {
-          logger?.debug(`Skipping activation for: ${className}`);
         }
-
-        logger?.info(`CreateClass completed successfully: ${className}`);
-
-        return return_response({
-          data: JSON.stringify({
-            success: true,
-            class_name: className,
-            package_name: args.package_name,
-            transport_request: args.transport_request || null,
-            activated: shouldActivate,
-            message: `Class ${className} created${shouldActivate ? ' and activated' : ''} successfully`
-          }, null, 2)
-        } as AxiosResponse);
-
-      } catch (workflowError: any) {
-        // On error, ensure we attempt unlock
-        try {
-          const lockHandle = client.getLockHandle();
-          if (lockHandle) {
-            logger?.warn(`Attempting unlock after error for class ${className}`);
-            await client.unlockClass({ className: className }, lockHandle);
-            logger?.warn(`Unlocked class after error: ${className}`);
-          }
-        } catch (unlockError: any) {
-          logger?.error(`Failed to unlock class after error: ${className} - ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
-        }
-
-        // Parse error message
-        let errorMessage = workflowError instanceof Error ? workflowError.message : String(workflowError);
-
-        // Attempt to parse ADT XML error
-        try {
-          const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
-          const errorData = workflowError?.response?.data ? parser.parse(workflowError.response.data) : null;
-          const errorMsg = errorData?.['exc:exception']?.message?.['#text'] || errorData?.['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch {
-          // ignore parse errors
-        }
-
-        return return_error(new Error(errorMessage));
       }
-    } catch (error: any) {
-      // Generic outer catch
-      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Re-throw error - AdtClass.create() already handled cleanup (unlock) before throwing
+      // Log error with code if available (from AdtClass error handling)
+      if (createError.code) {
+        logger?.error(`Class creation failed with code ${createError.code}: ${className} - ${createError.message || String(createError)}`);
+      } else {
+        logger?.error(`Class creation failed: ${className} - ${createError.message || String(createError)}`);
+      }
+
+      const errorMessage = createError instanceof Error ? createError.message : String(createError);
       return return_error(new Error(errorMessage));
     }
+
+    const errorCount = state.errors?.length || 0;
+    const errors = state.errors?.map(err => ({
+      method: err.method,
+      error: err.error.message || String(err.error),
+      timestamp: err.timestamp?.toISOString() || new Date().toISOString()
+    })) || [];
+
+    if (errorCount > 0) {
+      logger?.warn(`CreateClass completed with ${errorCount} error(s): ${className}`);
+      errors.forEach(err => {
+        logger?.warn(`  - [${err.method}]: ${err.error}`);
+      });
+    } else {
+      logger?.info(`CreateClass completed successfully: ${className}`);
+    }
+
+    return return_response({
+      data: JSON.stringify({
+        success: true,
+        data: {
+          class_name: className,
+          package_name: args.package_name,
+          transport_request: args.transport_request || null,
+          activated: shouldActivate,
+          errors: errors
+        },
+        class_name: className,
+        package_name: args.package_name,
+        transport_request: args.transport_request || null,
+        activated: shouldActivate,
+        errors: errors,
+        message: `Class ${className} created${shouldActivate ? ' and activated' : ''} successfully${errorCount > 0 ? ` (with ${errorCount} error(s))` : ''}`
+      }, null, 2)
+    } as AxiosResponse);
   } catch (error: any) {
-    // Generic outer catch
+    // Generic outer catch for unexpected errors (e.g., connection issues)
     const errorMessage = error instanceof Error ? error.message : String(error);
+    logger?.error(`Unexpected error in CreateClass handler: ${className} - ${errorMessage}`);
     return return_error(new Error(errorMessage));
   }
 }

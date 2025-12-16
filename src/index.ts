@@ -26,10 +26,8 @@ import {
   HEADER_SAP_UAA_CLIENT_SECRET,
   HEADER_AUTHORIZATION,
 } from "@mcp-abap-adt/interfaces";
-import type { ISessionStore, IServiceKeyStore } from "@mcp-abap-adt/interfaces";
-import { getPlatformStoresAsync } from "./lib/stores";
+import { AuthBrokerFactory } from "./lib/authBrokerFactory";
 import { getPlatformPaths } from "./lib/stores/platformPaths";
-import { BtpTokenProvider } from "@mcp-abap-adt/auth-providers";
 import { defaultLogger } from "@mcp-abap-adt/logger";
 import {
   buildRuntimeConfig,
@@ -1032,18 +1030,11 @@ export class mcp_abap_adt_server {
     transport: SSEServerTransport;
   }>();
 
-  // AuthBroker instances map for destination-based authentication (lazy initialization)
-  // Key: `${destination || 'default'}::${clientKey || 'global'}`, Value: AuthBroker instance
-  private authBrokers = new Map<string, AuthBroker>();
+  // AuthBroker factory for creating and managing AuthBroker instances
+  private authBrokerFactory: AuthBrokerFactory;
 
   // Path to .env file (used to create SessionStore when --mcp is not specified)
   private readonly envFilePath?: string;
-
-  private buildAuthBrokerKey(destination?: string, clientKey?: string): string {
-    const destPart = destination || 'default';
-    const clientPart = clientKey || 'global';
-    return `${destPart}::${clientPart}`;
-  }
 
   /**
    * Initialize default broker on server startup (for stdio/SSE transports)
@@ -1095,120 +1086,7 @@ export class mcp_abap_adt_server {
    * If destination is not specified, uses default destination
    */
   private async getOrCreateAuthBroker(destination?: string, clientKey?: string): Promise<AuthBroker | undefined> {
-    // Only for HTTP/streamable-http, stdio, and SSE transports
-    const isHttpTransport = this.transportConfig.type === "streamable-http";
-    const isStdioTransport = this.transportConfig.type === "stdio";
-    const isSseTransport = this.transportConfig.type === "sse";
-    if (!isHttpTransport && !isStdioTransport && !isSseTransport) {
-      return undefined;
-    }
-
-    // If destination not specified, use default destination
-    const actualDestination = destination || this.defaultDestination;
-
-    // Get custom path from command line argument or environment variable
-    const customPath = authBrokerPath ? path.resolve(authBrokerPath) : undefined;
-
-    const brokerKey = this.buildAuthBrokerKey(actualDestination, clientKey);
-
-    // Get or create AuthBroker for specific destination/client
-    if (!this.authBrokers.has(brokerKey)) {
-      try {
-        logger?.debug("Creating AuthBroker for destination", {
-          type: "AUTH_BROKER_CREATE_START",
-          destination: actualDestination || 'default',
-          clientKey: clientKey || 'global',
-          platform: process.platform,
-          unsafe: unsafe,
-        });
-
-        // Use async version to auto-detect store type based on service key format
-        // For .env case (destination='default' and no service key), we need to create broker with only sessionStore
-        let sessionStore: ISessionStore;
-        let serviceKeyStore: IServiceKeyStore;
-        let storeType: 'abap' | 'btp';
-
-        // If --mcp is not specified and .env file exists, create SessionStore from .env file directory
-        if (!this.defaultMcpDestination && this.envFilePath) {
-          // Get directory where .env file is located
-          const envFileDir = path.dirname(this.envFilePath);
-
-          // Use getPlatformStoresAsync with .env file directory as custom path
-          // This will create SessionStore in the same directory as .env file
-          const stores = await getPlatformStoresAsync(envFileDir, unsafe, actualDestination);
-          serviceKeyStore = stores.serviceKeyStore;
-          sessionStore = stores.sessionStore;
-          storeType = stores.storeType;
-
-          logger?.debug("Created SessionStore from .env file directory", {
-            type: "SESSION_STORE_FROM_ENV",
-            envFilePath: this.envFilePath,
-            envFileDir,
-            destination: actualDestination || 'default',
-            storeType,
-            unsafe,
-          });
-        } else {
-          // Use default platform stores (from service keys directory)
-          const stores = await getPlatformStoresAsync(customPath, unsafe, actualDestination);
-          serviceKeyStore = stores.serviceKeyStore;
-          sessionStore = stores.sessionStore;
-          storeType = stores.storeType;
-        }
-        logger?.debug("Platform stores created", {
-          type: "PLATFORM_STORES_CREATED",
-          destination: actualDestination || 'default',
-          clientKey: clientKey || 'global',
-          platform: process.platform,
-          unsafe: unsafe,
-          storeType: storeType,
-          sessionStoreType: unsafe ? 'FileSessionStore' : 'SafeSessionStore (in-memory)',
-        });
-
-        // Determine token provider based on store type
-        // ABAP and BTP use BtpTokenProvider (browser-based OAuth2)
-        // For now, always use BtpTokenProvider (XSUAA format can use BTP stores)
-        const tokenProvider = new BtpTokenProvider();
-
-        const authBroker = new AuthBroker(
-          {
-            serviceKeyStore,
-            sessionStore,
-            tokenProvider,
-          },
-          'system',
-          defaultLogger
-        );
-        this.authBrokers.set(brokerKey, authBroker);
-        logger?.info("AuthBroker created for destination", {
-          type: "AUTH_BROKER_CREATED",
-          destination: actualDestination || 'default',
-          clientKey: clientKey || 'global',
-          platform: process.platform,
-        });
-      } catch (error) {
-        logger?.error("Failed to create AuthBroker for destination", {
-          type: "AUTH_BROKER_CREATE_FAILED",
-          destination: actualDestination || 'default',
-          clientKey: clientKey || 'global',
-          platform: process.platform,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-        return undefined;
-      }
-    }
-    const authBroker = this.authBrokers.get(brokerKey);
-    if (!authBroker) {
-      logger?.error("AuthBroker not found in map after creation", {
-        type: "AUTH_BROKER_NOT_FOUND",
-        destination: actualDestination || 'default',
-        clientKey: clientKey || 'global',
-        mapSize: this.authBrokers.size,
-        mapKeys: Array.from(this.authBrokers.keys()).slice(0, 20),
-      });
-    }
-    return authBroker;
+    return this.authBrokerFactory.getOrCreateAuthBroker(destination, clientKey);
   }
 
   private async applyAuthHeaders(headers?: IncomingHttpHeaders, sessionId?: string, clientKey?: string) {
@@ -1845,6 +1723,17 @@ export class mcp_abap_adt_server {
     this.registerSignalHandlers = options?.registerSignalHandlers ?? true;
     this.defaultMcpDestination = defaultMcpDestination;
     this.envFilePath = envFilePath; // Store .env file path for SessionStore creation
+
+    // Initialize AuthBroker factory
+    this.authBrokerFactory = new AuthBrokerFactory({
+      defaultMcpDestination: this.defaultMcpDestination,
+      defaultDestination: this.defaultDestination,
+      envFilePath: this.envFilePath,
+      authBrokerPath,
+      unsafe,
+      transportType: transportType,
+      logger,
+    });
 
     this.mcpHandlers = new McpHandlers();
 

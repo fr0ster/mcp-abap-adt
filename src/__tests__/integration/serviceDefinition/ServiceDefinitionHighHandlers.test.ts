@@ -17,16 +17,15 @@
 import { handleCreateServiceDefinition } from '../../../handlers/service_definition/high/handleCreateServiceDefinition';
 import { handleUpdateServiceDefinition } from '../../../handlers/service_definition/high/handleUpdateServiceDefinition';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getManagedConnection } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 import { HighTester } from '../helpers/testers/HighTester';
 import { getTimeout } from '../helpers/configHelpers';
 
 // Wrapper for delete since there's no handler for deleteServiceDefinition
-async function deleteServiceDefinitionWrapper(connection: AbapConnection, args: any): Promise<any> {
+async function deleteServiceDefinitionWrapper(context: HandlerContext, args: any): Promise<any> {
   try {
-    const client = new CrudClient(connection);
+    const client = new CrudClient(context.connection);
     await client.deleteServiceDefinition(
       { serviceDefinitionName: args.service_definition_name },
       args.transport_request

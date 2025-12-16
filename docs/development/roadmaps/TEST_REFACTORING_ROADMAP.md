@@ -1,195 +1,116 @@
 # Test Refactoring Roadmap
 
 ## Goal
-Refactor integration tests to use a unified base class hierarchy (`BaseTester` → `HighTester`/`LowTester`/`ReadOnlyTester`) for consistent test behavior, connection management, and logging.
+Refactor integration tests to use a unified `LambdaTester` class that provides common infrastructure (connection, session, logger, params) and executes test logic via lambdas. This allows tests to define custom workflow logic while sharing common infrastructure.
 
 ## Architecture
 
-### Class Hierarchy
+### Unified LambdaTester
 ```
-BaseTester (abstract)
-├── HighTester
-├── LowTester
-└── ReadOnlyTester
+LambdaTester (single class for all test types)
 ```
 
-### BaseTester Responsibilities
-- Connection management (via AuthBroker or .env)
-- Session management
-- Lifecycle hooks (`beforeAll`, `afterAll`, `beforeEach`, `afterEach`)
-- Common test utilities
-- Logging with prefixes
-- Configuration loading
+### LambdaTester Responsibilities
+- **Constructor**: Loads test parameters from YAML, creates connection, sets up logger
+  - Parameters: `handlerName`, `testCaseName`, `logPrefix`, `paramsGroupName`
+  - Loads `.env` via `loadTestEnv()`
+  - Loads YAML config via `loadTestConfig()` and `getEnabledTestCase()`
+  - Resolves parameters from `paramsGroupName` or `testCase.params`
+  - Sets `hasConfig = true` if parameters loaded successfully
+  - Creates connection via `createTestConnectionAndSession()`
+  - Creates logger via `createTestLogger(logPrefix)`
+  - Resolves `objectName`, `packageName`, `transportRequest`
+- **Lifecycle methods** (all accept lambdas):
+  - `beforeAll(lambda, cleanupAfter?)` - Initializes tester, then executes lambda; stores cleanup lambda
+  - `afterAll(lambda)` - Executes cleanup lambda
+  - `beforeEach(lambda)` - Executes setup lambda before each test
+  - `afterEach(lambda)` - Executes cleanup lambda after each test
+- **run(lambda)** - Executes test lambda with context
+- **Context provides**:
+  - `connection`, `session`, `logger` (for tests)
+  - `objectName`, `params`, `packageName`, `transportRequest`
+  - `cleanupAfter()` - Method that checks YAML params, then calls cleanup lambda from test
 
-### HighTester/LowTester/ReadOnlyTester
-- Specific test patterns for each handler type
-- `run()` method to execute test workflow
-- Handler-specific assertions and validations
+### Test Lambda Responsibilities
+- Define custom workflow logic (create, update, delete, etc.)
+- Decide what messages to log
+- Pass logger to handlers via `createHandlerContext()` (if `DEBUG_HANDLERS=true`)
+- Handle errors and skip conditions
 
 ## Implementation Phases
 
-### Phase 1: BaseTester Foundation
-- [x] Create `BaseTester` abstract class
-  - [x] Constructor with test name, log prefix, handler name, optional paramsGroupName
-  - [x] `beforeAll()` - load config, create connection via AuthBroker
-  - [x] `afterAll()` - cleanup
-  - [x] `beforeEach()` - prepare test case, resolve params from group if paramsGroupName provided
-  - [x] `afterEach()` - cleanup test artifacts
-  - [x] Properties: `connection`, `session`, `hasConfig`, `testCase`, `testParams`
-  - [x] Method: `createConnection()` - uses `createTestConnectionAndSession()`
-  - [x] Method: `loadTestConfig()` - wrapper for config helpers
-  - [x] Method: `getLogger()` - returns logger with prefix
-  - [x] Method: `resolveParamsFromGroup()` - resolves parameters from YAML group (supports both test case level and global level)
-  - [x] Method: `getTestParams()` - returns resolved test parameters
+### Phase 1: LambdaTester Foundation ✅
+- [x] Create `LambdaTester` class
+  - [x] Constructor: `handlerName`, `testCaseName`, `logPrefix`, `paramsGroupName`
+  - [x] `init()` method - loads config, creates connection, sets up context:
+    - [x] Load `.env` via `loadTestEnv()`
+    - [x] Load YAML config via `loadTestConfig()` and `getEnabledTestCase()`
+    - [x] Resolve parameters from `paramsGroupName` or `testCase.params`
+    - [x] Set `hasConfig = true` if parameters loaded successfully
+    - [x] Create connection via `createTestConnectionAndSession()`
+    - [x] Create logger via `createTestLogger(logPrefix)`
+    - [x] Resolve `objectName`, `packageName`, `transportRequest`
+    - [x] Create context with `cleanupAfter()` method
+  - [x] `beforeAll(lambda, cleanupAfter?)` - initializes tester, stores cleanup lambda, executes lambda
+  - [x] `afterAll(lambda)` - executes cleanup lambda
+  - [x] `beforeEach(lambda)` - executes setup lambda
+  - [x] `afterEach(lambda)` - executes cleanup lambda
+  - [x] `run(lambda)` - executes test lambda with context
+  - [x] `cleanupAfter()` - checks YAML params via `getCleanupAfter()`, then calls cleanup lambda from test
+  - [x] Context type: `LambdaTesterContext` with `cleanupAfter: () => Promise<void>`
 
-### Phase 2: LowTester Implementation
-- [x] Create `LowTester` class extending `BaseTester`
-  - [x] Constructor accepts handler name, test case name, handlers object
-  - [x] `run()` method - executes full workflow:
-    - [x] Validate → Create → Lock → Update → Unlock → Activate
-  - [x] Method: `runValidate()` - calls handler with connection
-  - [x] Method: `runCreate()` - calls handler with connection
-  - [x] Method: `runLock()` - calls handler with connection
-  - [x] Method: `runUpdate()` - calls handler with connection
-  - [x] Method: `runUnlock()` - calls handler with connection
-  - [x] Method: `runActivate()` - calls handler with connection
-  - [x] Method: `runDelete()` - cleanup handler call
-  - [x] Method: `cleanup()` - unlock and delete if needed
-  - [x] Track: `lockHandle`, `lockSession`, `objectWasCreated`
+### Phase 2: Convert Tests to LambdaTester
+- [x] Refactor `ClassHighHandlers.test.ts` ✅
+  - [x] Replace with `LambdaTester`
+  - [x] Define lambdas for `beforeAll`, `afterAll`, `beforeEach`, `afterEach`, `run`
+  - [x] Pass `cleanupAfter` lambda to `beforeAll`
+  - [x] Use `createHandlerContext()` to pass logger to handlers (if `DEBUG_HANDLERS=true`)
+- [ ] Convert remaining test files to use `LambdaTester` with lambdas:
+  - [ ] High-level tests (13 files):
+    - [ ] `DataElementHighHandlers.test.ts`
+    - [ ] `DomainHighHandlers.test.ts`
+    - [ ] `InterfaceHighHandlers.test.ts`
+    - [ ] `ProgramHighHandlers.test.ts`
+    - [ ] `StructureHighHandlers.test.ts`
+    - [ ] `TableHighHandlers.test.ts`
+    - [ ] `ViewHighHandlers.test.ts`
+    - [ ] `BehaviorDefinitionHighHandlers.test.ts`
+    - [ ] `BehaviorImplementationHighHandlers.test.ts`
+    - [ ] `ServiceDefinitionHighHandlers.test.ts`
+    - [ ] `FunctionHighHandlers.test.ts`
+    - [ ] `MetadataExtensionHighHandlers.test.ts`
+    - [ ] `PackageHighHandlers.test.ts`
+  - [ ] Low-level tests (14 files):
+    - [ ] `ClassLowHandlers.test.ts`
+    - [ ] `DataElementLowHandlers.test.ts`
+    - [ ] `DomainLowHandlers.test.ts`
+    - [ ] `InterfaceLowHandlers.test.ts`
+    - [ ] `ProgramLowHandlers.test.ts`
+    - [ ] `StructureLowHandlers.test.ts`
+    - [ ] `TableLowHandlers.test.ts`
+    - [ ] `ViewLowHandlers.test.ts`
+    - [ ] `BehaviorDefinitionLowHandlers.test.ts`
+    - [ ] `FunctionModuleLowHandlers.test.ts`
+    - [ ] `MetadataExtensionLowHandlers.test.ts`
+    - [ ] `BehaviorImplementationLowHandlers.test.ts`
+    - [ ] `FunctionGroupLowHandlers.test.ts`
+    - [ ] `PackageLowHandlers.test.ts`
+  - [ ] Read-only tests (if any)
+  - [ ] Other tests:
+    - [ ] `ClassUnitTestHandlers.test.ts` (if applicable)
+    - [ ] `ClassCrudClientDirect.test.ts` (if applicable)
 
-### Phase 3: HighTester Implementation
-- [x] Create `HighTester` class extending `BaseTester`
-  - [x] Constructor accepts handler name, test case name, handlers object
-  - [x] `run()` method - executes high-level workflow:
-    - [x] Create (with full source code)
-    - [x] Update (with modified source code)
-  - [x] Method: `runCreate()` - calls high-level create handler
-  - [x] Method: `runUpdate()` - calls high-level update handler
-  - [x] Method: `runDelete()` - cleanup handler call
-  - [x] Handle source code management internally
-
-### Phase 4: ReadOnlyTester Implementation
-- [x] Create `ReadOnlyTester` class extending `BaseTester`
-  - [x] Constructor accepts handler name, test case name, handler function
-  - [x] `run()` method - executes read-only operations:
-    - [x] Get object info
-    - [x] Validate response format
-  - [x] Method: `runGet()` - calls read-only handler
-  - [x] Method: `validateResponse()` - checks MCP response format
-  - [x] No cleanup needed (read-only)
-
-### Phase 5: Refactor Existing Tests
-- [x] Refactor `BehaviorDefinitionLowHandlers.test.ts`
-  - [x] Replace test structure with `LowTester`
-  - [x] Use `tester.run()` instead of manual workflow
-- [ ] Refactor `BehaviorDefinitionHighHandlers.test.ts`
-  - [ ] Replace with `HighTester`
-- [x] Refactor `ClassLowHandlers.test.ts`
-  - [x] Replace with `LowTester`
-- [x] Refactor `ClassHighHandlers.test.ts`
-  - [x] Replace with `HighTester`
-- [x] Refactor `DataElementLowHandlers.test.ts`
-  - [x] Replace with `LowTester`
-- [x] Refactor `DataElementHighHandlers.test.ts`
-  - [x] Replace with `HighTester`
-- [x] Refactor `DomainLowHandlers.test.ts`
-  - [x] Replace with `LowTester`
-- [x] Refactor `DomainHighHandlers.test.ts`
-  - [x] Replace with `HighTester`
-- [x] Refactor `FunctionModuleLowHandlers.test.ts`
-  - [x] Replace with `LowTester`
-- [x] Fix `FunctionHighHandlers.test.ts`
-  - [x] Add connection parameter to all handler calls
-- [x] Fix `FunctionGroupLowHandlers.test.ts`
-  - [x] Add connection parameter to all handler calls
-- [x] Refactor `InterfaceLowHandlers.test.ts`
-  - [x] Replace with `LowTester`
-- [x] Refactor `InterfaceHighHandlers.test.ts`
-  - [x] Replace with `HighTester`
-- [x] Refactor `ProgramLowHandlers.test.ts`
-  - [x] Replace with `LowTester`
-- [x] Refactor `StructureLowHandlers.test.ts`
-  - [x] Replace with `LowTester`
-- [x] Refactor `StructureHighHandlers.test.ts`
-  - [x] Replace with `HighTester`
-- [x] Refactor `TableLowHandlers.test.ts`
-  - [x] Replace with `LowTester`
-- [x] Refactor `ViewLowHandlers.test.ts`
-  - [x] Replace with `LowTester`
-- [x] Refactor `ViewHighHandlers.test.ts`
-  - [x] Replace with `HighTester`
-- [x] Refactor `MetadataExtensionLowHandlers.test.ts`
-  - [x] Replace with `LowTester`
-- [x] Fix `MetadataExtensionHighHandlers.test.ts`
-  - [x] Add connection parameter to all handler calls
-- [x] Fix `PackageHighHandlers.test.ts`
-  - [x] Add connection parameter to all handler calls
-- [x] Fix `PackageLowHandlers.test.ts`
-  - [x] Add connection parameter to all handler calls
-- [x] Refactor `ProgramHighHandlers.test.ts`
-  - [x] Replace with `HighTester`
-- [x] Fix `ServiceDefinitionHighHandlers.test.ts`
-  - [x] Add connection parameter to all handler calls
-- [x] Refactor `TableHighHandlers.test.ts`
-  - [x] Replace with `HighTester`
-- [ ] Refactor `BehaviorImplementationLowHandlers.test.ts`
-  - [ ] Replace with `LowTester` (Note: Uses handleCreateClass, handleCheckClass, handleLockBehaviorImplementation, handleUnlockClass, handleActivateClass, handleDeleteClass - may need custom workflow)
-- [x] Refactor `BehaviorImplementationHighHandlers.test.ts`
-  - [x] Replace with `HighTester`
-- [ ] Refactor read-only tests (if any)
-  - [ ] Replace with `ReadOnlyTester`
-
-### Phase 6: Testing & Validation
+### Phase 3: Testing & Validation
 - [ ] Run all refactored tests
 - [ ] Verify connection creation via AuthBroker works
 - [ ] Verify session management works correctly
-- [ ] Verify cleanup works correctly
+- [ ] Verify cleanup works correctly (via `cleanupAfter` lambda)
 - [ ] Verify logging prefixes work
+- [ ] Verify `createHandlerContext()` passes logger correctly (if `DEBUG_HANDLERS=true`)
 - [ ] Fix any remaining issues
 - [ ] Update documentation
 
-### Phase 7: Convert Tests to Workflow Functions (Lambdas)
-**Goal**: Convert all tests that use direct handler functions to use workflow functions (lambdas) that receive `TesterContext`. This allows tests to define custom handler call logic and logging while tester provides all infrastructure.
-
-**Benefits**:
-- Tests define custom handler invocation logic
-- Tests can add custom logging per step
-- Tester provides all common infrastructure (connection, session, logger, params, etc.)
-- Better separation of concerns
-
-**Reference**: See `ClassHighHandlers.example.ts` for example implementation.
-
-#### High-Level Tests (HighTester)
-- [x] Convert `ClassHighHandlers.test.ts` to workflow functions
-- [ ] Convert `DataElementHighHandlers.test.ts` to workflow functions
-- [ ] Convert `DomainHighHandlers.test.ts` to workflow functions
-- [ ] Convert `InterfaceHighHandlers.test.ts` to workflow functions
-- [ ] Convert `ProgramHighHandlers.test.ts` to workflow functions
-- [ ] Convert `StructureHighHandlers.test.ts` to workflow functions
-- [ ] Convert `TableHighHandlers.test.ts` to workflow functions
-- [ ] Convert `ViewHighHandlers.test.ts` to workflow functions
-- [ ] Convert `BehaviorDefinitionHighHandlers.test.ts` to workflow functions
-- [ ] Convert `BehaviorImplementationHighHandlers.test.ts` to workflow functions
-- [ ] Convert `ServiceDefinitionHighHandlers.test.ts` to workflow functions
-
-#### Low-Level Tests (LowTester)
-- [ ] Convert `ClassLowHandlers.test.ts` to workflow functions
-- [ ] Convert `DataElementLowHandlers.test.ts` to workflow functions
-- [ ] Convert `DomainLowHandlers.test.ts` to workflow functions
-- [ ] Convert `InterfaceLowHandlers.test.ts` to workflow functions
-- [ ] Convert `ProgramLowHandlers.test.ts` to workflow functions
-- [ ] Convert `StructureLowHandlers.test.ts` to workflow functions
-- [ ] Convert `TableLowHandlers.test.ts` to workflow functions
-- [ ] Convert `ViewLowHandlers.test.ts` to workflow functions
-- [ ] Convert `BehaviorDefinitionLowHandlers.test.ts` to workflow functions
-- [ ] Convert `FunctionModuleLowHandlers.test.ts` to workflow functions
-- [ ] Convert `MetadataExtensionLowHandlers.test.ts` to workflow functions
-- [ ] Convert `BehaviorImplementationLowHandlers.test.ts` to workflow functions (if using LowTester)
-
-#### Read-Only Tests (ReadOnlyTester)
-- [ ] Convert read-only tests to workflow functions (if any)
-
-### Phase 8: Refactor Handlers to Use Context Instead of Connection
+### Phase 4: Refactor Handlers to Use Context Instead of Connection
 **Goal**: Replace `connection: AbapConnection` parameter with `context: HandlerContext` in all handlers. The context will contain `connection` and `logger`, providing better structure and enabling consistent logging across all handlers.
 
 **Benefits**:
@@ -357,8 +278,11 @@ interface HandlerContext {
 
 #### Update Handler Calls
 - [x] Update MCP server handler registration to pass context ✅ (BaseHandlerGroup.registerToolOnServer calls handler with this.context)
-- [ ] Update test workflow functions to pass context
-- [ ] Update direct handler calls in tests
+- [x] Create `createHandlerContext` helper function ✅ (in testHelpers.ts, includes logger only if DEBUG_HANDLERS=true)
+- [x] Update test workflow functions to use `createHandlerContext` helper
+  - [x] Update `ClassHighHandlers.test.ts` ✅ (converted to LambdaTester with lambdas)
+  - [x] Update `ClassHighHandlers.example.ts` ✅
+  - [ ] Convert remaining tests to `LambdaTester` with lambdas (see Phase 2)
 - [ ] Update any internal handler-to-handler calls
 
 #### Update Handler Internals
@@ -374,125 +298,93 @@ interface HandlerContext {
 src/__tests__/integration/
 ├── helpers/
 │   ├── testHelpers.ts (existing)
+│   │   └── createHandlerContext() - creates HandlerContext with optional logger (if DEBUG_HANDLERS=true)
 │   ├── sessionHelpers.ts (existing)
 │   ├── configHelpers.ts (existing)
 │   └── testers/
-│       ├── BaseTester.ts (new)
-│       ├── LowTester.ts (new)
-│       ├── HighTester.ts (new)
-│       └── ReadOnlyTester.ts (new)
+│       ├── LambdaTester.ts (unified tester for all test types)
+│       └── types.ts
+│           └── LambdaTesterContext - context interface with cleanupAfter method
 └── [domain]/
-    └── [Domain][Type]Handlers.test.ts (refactored to use testers)
+    └── [Domain][Type]Handlers.test.ts (refactored to use LambdaTester with lambdas)
 ```
 
 ## Example Usage
 
-### LowTester Example
+### LambdaTester Example
 ```typescript
-describe('BehaviorDefinition Low-Level Handlers Integration', () => {
-  let tester: LowTester;
-
-  beforeAll(async () => {
-    tester = new LowTester(
-      'behavior_definition_low',
-      'full_workflow',
-      'bdef-low'
-    );
-    await tester.beforeAll();
-  });
-
-  afterAll(async () => {
-    await tester.afterAll();
-  });
-
-  it('should execute full workflow', async () => {
-    await tester.run();
-  });
-});
-```
-
-### HighTester Example (Old Style - Direct Handler Functions)
-```typescript
-describe('Class High-Level Handlers Integration', () => {
-  let tester: HighTester;
-
-  beforeAll(async () => {
-    tester = new HighTester(
-      'class_high',
-      'create_and_update',
-      'class-high',
-      {
-        create: handleCreateClass,
-        update: handleUpdateClass,
-        delete: handleDeleteClass
-      }
-    );
-    await tester.beforeAll();
-  });
-
-  it('should create and update class', async () => {
-    await tester.run();
-  });
-});
-```
-
-### HighTester Example (New Style - Workflow Functions / Lambdas)
-```typescript
-import type { TesterContext } from '../helpers/testers/types';
+import type { LambdaTesterContext } from '../helpers/testers/types';
+import { createHandlerContext } from '../helpers/testHelpers';
+import { createTestLogger } from '../helpers/loggerHelpers';
 
 describe('Class High-Level Handlers Integration', () => {
-  let tester: HighTester;
+  let tester: LambdaTester;
+  const logger = createTestLogger('class-high'); // Logger created in test scope
 
   beforeAll(async () => {
-    tester = new HighTester(
+    tester = new LambdaTester(
       'create_class',
       'builder_class',
       'class-high',
-      {
-        // Lambda that calls create handler with logging
-        create: async (context: TesterContext) => {
-          const { connection, session, logger, objectName, params, packageName, transportRequest } = context;
-
-          logger.info(`   • create: ${objectName}`);
-
-          const createResponse = await handleCreateClass(connection, {
-            class_name: objectName,
-            package_name: packageName,
-            source_code: params.source_code,
-            activate: true,
-            ...(transportRequest && { transport_request: transportRequest }),
-            session_id: session.session_id,
-            session_state: session.session_state
-          });
-
-          // Handle response, update session, log success
-          // ...
-          return createData;
-        },
-        update: async (context: TesterContext) => {
-          // Similar pattern for update
-        },
-        delete: async (context: TesterContext) => {
-          // Similar pattern for delete
-        }
+      'builder_class' // paramsGroupName
+    );
+    await tester.beforeAll(
+      async (context: LambdaTesterContext) => {
+        // Additional setup if needed
+      },
+      // Cleanup lambda - will be called by tester after checking YAML params
+      async (context: LambdaTesterContext) => {
+        const { connection, objectName, transportRequest } = context;
+        if (!objectName) return;
+        
+        // Logger captured from closure
+        const handlerContext = createHandlerContext({ connection, logger });
+        await handleDeleteClass(handlerContext, {
+          class_name: objectName,
+          ...(transportRequest && { transport_request: transportRequest })
+        });
       }
     );
-    await tester.beforeAll();
+  });
+
+  afterEach(async () => {
+    await tester.afterEach(async (context: LambdaTesterContext) => {
+      // cleanupAfter checks YAML params, then calls cleanup lambda
+      await context.cleanupAfter();
+    });
   });
 
   it('should test all Class high-level handlers', async () => {
-    await tester.run();
+    await tester.run(async (context: LambdaTesterContext) => {
+      const { connection, session, objectName, params, packageName, transportRequest } = context;
+      
+      // Test decides what to log
+      logger?.info(`   • create: ${objectName}`);
+      
+      // Test decides whether to pass logger to handlers (via createHandlerContext)
+      const handlerContext = createHandlerContext({ connection, logger });
+      const createResponse = await handleCreateClass(handlerContext, {
+        class_name: objectName,
+        package_name: packageName,
+        source_code: params.source_code,
+        activate: true,
+        ...(transportRequest && { transport_request: transportRequest })
+      });
+      
+      // Handle response, log results, etc.
+      // ...
+    });
   });
 });
 ```
 
-**See**: `src/__tests__/integration/class/ClassHighHandlers.example.ts` for complete example.
+**See**: `src/__tests__/integration/class/ClassHighHandlers.test.ts` for complete example.
 
 ## Progress Summary
 
-### Phase 8: Handler Context Refactoring Status
+### Phase 4: Handler Context Refactoring Status
 
-**Overall Progress**: ~98% Complete
+**Overall Progress**: ~99% Complete
 
 **Summary**:
 - ✅ All handler signatures updated to use `HandlerContext` (150+ handlers)
@@ -502,7 +394,14 @@ describe('Class High-Level Handlers Integration', () => {
 - ✅ Handler registration infrastructure (mcp_handlers.ts) - all calls use context
 - ✅ All handler group subclasses ready (inherit from BaseHandlerGroup, use context correctly)
 - ✅ Handler group instantiations updated (usage-example.ts, index.ts use context)
-- ⏳ Test workflow functions - pending update to pass context
+- ✅ **LambdaTester Architecture**: Unified tester with lambda-based workflow
+  - ✅ Constructor loads YAML params, creates connection, sets up logger
+  - ✅ Lifecycle methods (`beforeAll`, `afterAll`, `beforeEach`, `afterEach`) accept lambdas
+  - ✅ `run(lambda)` executes test logic
+  - ✅ `cleanupAfter` lambda passed to `beforeAll`, called after YAML param check
+  - ✅ Context provides all infrastructure (connection, session, logger, params, cleanupAfter)
+  - ✅ Logger for handlers passed via `createHandlerContext()` (if `DEBUG_HANDLERS=true`)
+- ⏳ Convert remaining tests to use `LambdaTester` with lambdas
 
 #### Completed ✅
 - **HandlerContext Interface**: Created in `src/lib/handlers/interfaces.ts`
@@ -582,11 +481,19 @@ describe('Class High-Level Handlers Integration', () => {
 - **Remaining low-level handlers**: None (all completed!) ✅
 
 #### Pending ⏳
-- Update test workflow functions to pass context (in progress)
+- Convert remaining tests to use `LambdaTester` with lambdas
 - Update any internal handler-to-handler calls
+
+#### Completed ✅
 - **Logger Cleanup**: ✅ **COMPLETED** - All handlers now use `logger` from `HandlerContext` instead of `handlerLogger`
 - **Handler Group Subclasses**: ✅ **COMPLETED** - All 5 handler group subclasses have all handlers wrapped in lambdas with `this.context`
 - **MCP Server Handler Registration**: ✅ **COMPLETED** - BaseHandlerGroup.registerToolOnServer calls handlers with `this.context`
+- **LambdaTester Architecture**: ✅ **COMPLETED** - Unified tester with lambda-based workflow
+  - ✅ Constructor loads YAML params, creates connection, sets up logger
+  - ✅ Lifecycle methods accept lambdas
+  - ✅ `cleanupAfter` lambda pattern implemented
+  - ✅ Context provides all infrastructure
+  - ✅ `ClassHighHandlers.test.ts` converted to new pattern
 
 ## Benefits
 
@@ -599,10 +506,13 @@ describe('Class High-Level Handlers Integration', () => {
 
 ## Notes
 
-- All testers must use `createTestConnectionAndSession()` from `sessionHelpers.ts`
-- **Current**: Connection is always passed as first argument to handlers
-- **Future (Phase 8)**: Context (with connection and logger) will be passed as first argument to handlers
-- Session state is managed automatically
-- Cleanup is handled automatically in `afterEach`/`afterAll`
-- Test configuration is loaded from `test-config.yaml` via config helpers
-- Cleanup parameters (`skip_cleanup`, `cleanup_after`) from YAML are now properly respected, including parameters from parameter groups
+- **LambdaTester** provides common infrastructure (connection, session, logger, params, cleanupAfter)
+- **Test lambdas** define custom workflow logic (what to log, how to call handlers, etc.)
+- **Logger for handlers**: Created in test scope, passed via `createHandlerContext()` (only if `DEBUG_HANDLERS=true`)
+- **Connection**: Created in `init()` via `createTestConnectionAndSession()` from `sessionHelpers.ts`
+- **Context**: Passed as first argument to handlers (contains connection and optional logger)
+- **Session state**: Managed automatically
+- **Cleanup**: `cleanupAfter` lambda passed to `beforeAll`, called by tester after checking YAML params via `getCleanupAfter()`
+- **Test configuration**: Loaded from `test-config.yaml` via config helpers in constructor/init
+- **Cleanup parameters**: `skip_cleanup`, `cleanup_after` from YAML are checked by tester before calling cleanup lambda
+- **Parameter groups**: Resolved from `paramsGroupName` (supports both test case level and global level)

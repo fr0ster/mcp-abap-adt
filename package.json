@@ -123,7 +123,8 @@
       "!src/**/__tests__/**",
       "!src/**/index.ts"
     ],
-    "maxWorkers": 1
+    "maxWorkers": 1,
+    "testTimeout": 600000
   },
   "private": true
 }

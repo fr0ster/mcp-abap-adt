@@ -1,527 +1,251 @@
 /**
- * LowTester - Test class for low-level handler workflows
+ * LowTester - Compatibility wrapper for LambdaTester
  *
- * Executes full workflow: Validate → Create → Lock → Update → Unlock → Activate
- * Handles cleanup: Unlock → Delete (if needed)
+ * This is a temporary compatibility layer for tests that haven't been migrated yet.
+ * All tests should eventually be migrated to use LambdaTester directly.
+ *
+ * @deprecated Use LambdaTester instead
  */
 
-import { BaseTester } from './BaseTester';
-import {
-  parseHandlerResponse,
-  extractLockHandle,
-  delay,
-  extractErrorMessage
-} from '../testHelpers';
-import {
-  updateSessionFromResponse,
-  extractLockSession,
-  SessionInfo
-} from '../sessionHelpers';
-import { createDiagnosticsTracker } from '../persistenceHelpers';
+import { LambdaTester, type TLambda } from './LambdaTester';
+import type { LambdaTesterContext } from './types';
+import type { HandlerContext } from '../../../../lib/handlers/interfaces';
+import { createHandlerContext, parseHandlerResponse, extractLockHandle } from '../testHelpers';
 
-export type HandlerFunctions = {
-  validate?: (connection: any, args: any) => Promise<any>;
-  create: (connection: any, args: any) => Promise<any>;
-  lock: (connection: any, args: any) => Promise<any>;
-  update: (connection: any, args: any) => Promise<any>;
-  unlock: (connection: any, args: any) => Promise<any>;
-  activate: (connection: any, args: any) => Promise<any>;
-  delete?: (connection: any, args: any) => Promise<any>;
+// Handler function type: (context: HandlerContext, args: any) => Promise<any>
+type HandlerFunction = (context: HandlerContext, args: any) => Promise<any>;
+
+export type LowWorkflowFunctions = {
+  validate?: HandlerFunction;
+  create: HandlerFunction;
+  lock: HandlerFunction;
+  update: HandlerFunction;
+  unlock: HandlerFunction;
+  activate: HandlerFunction;
+  delete?: HandlerFunction;
 };
 
-export class LowTester extends BaseTester {
-  // Handler functions (must be provided by subclass or via constructor)
-  protected handlers: HandlerFunctions;
+/**
+ * @deprecated Use LambdaTester instead
+ */
+export class LowTester extends LambdaTester {
+  private workflowFunctions?: LowWorkflowFunctions;
 
-  // Lock tracking
-  protected lockHandle: string | null = null;
-  protected lockSession: SessionInfo | null = null;
-  protected objectWasCreated: boolean = false;
-
-  // Object name (resolved from test params)
-  protected objectName: string | null = null;
-
-  /**
-   * Constructor
-   * @param handlerName - Name of the handler (e.g., 'create_behavior_definition_low')
-   * @param testCaseName - Name of the test case (e.g., 'full_workflow')
-   * @param logPrefix - Prefix for log messages (e.g., 'bdef-low')
-   * @param handlers - Handler functions for validate, create, lock, update, unlock, activate, delete
-   * @param paramsGroupName - Optional: Name of parameter group in YAML
-   */
   constructor(
     handlerName: string,
     testCaseName: string,
     logPrefix: string,
-    handlers: HandlerFunctions,
-    paramsGroupName?: string
+    workflowFunctions: LowWorkflowFunctions
   ) {
-    super(handlerName, testCaseName, logPrefix, paramsGroupName);
-    this.handlers = handlers;
+    super(handlerName, testCaseName, logPrefix);
+    this.workflowFunctions = workflowFunctions;
   }
 
   /**
-   * Lifecycle: beforeEach
-   * Prepares test case and resolves object name
+   * Initialize tester and optionally set cleanup lambda
+   * Cleanup lambda should be provided by the test, not automatically created
+   * @param cleanupAfter - Optional cleanup lambda (checks YAML params before executing)
    */
-  async beforeEach(): Promise<void> {
-    await super.beforeEach();
-    if (this.testCase) {
-      const params = this.getTestParams();
-      // Try common parameter names for object name
-      this.objectName = params.name || params.class_name || params.interface_name ||
-                        params.function_name || params.program_name || params.table_name ||
-                        params.view_name || params.domain_name || params.data_element_name ||
-                        params.structure_name || params.bdef_name || params.ddlx_name ||
-                        params.bimp_name || null;
+  async beforeAll(cleanupAfter?: TLambda): Promise<void> {
+    await this.init();
+    if (!this.context) {
+      throw new Error('Context not initialized');
+    }
+
+    // Store cleanup lambda if provided by test
+    if (cleanupAfter) {
+      this.cleanupAfterLambda = cleanupAfter;
     }
   }
 
-  /**
-   * Lifecycle: afterEach
-   * Cleanup after each test
-   */
-  async afterEach(): Promise<void> {
-    await this.cleanup();
-    await super.afterEach();
-  }
-
-  /**
-   * Main run method - executes full workflow
-   */
   async run(): Promise<void> {
-    if (this.shouldSkipTest()) {
-      this.logger?.testSkip(`Skipping test: ${this.getSkipReason()}`);
+    if (!this.context) {
+      throw new Error('Tester not initialized. Call beforeAll() first.');
+    }
+
+    if (!this.context.hasConfig) {
+      this.context.logger?.testSkip(`Skipping test: No configuration found`);
       return;
     }
 
-    if (!this.connection || !this.session) {
-      await this.createConnection();
+    if (!this.workflowFunctions) {
+      throw new Error('Workflow functions not provided');
     }
 
-    if (!this.connection || !this.session) {
-      throw new Error('Failed to create connection and session');
-    }
-
-    const params = this.getTestParams();
-    const packageName = this.resolvePackageName();
-    const transportRequest = this.resolveTransportRequest();
-
-    // Initialize diagnostics tracker
-    const diagnosticsTracker = createDiagnosticsTracker(
-      `${this.handlerName}_${this.testCaseName}`,
-      this.testCase,
-      this.session,
-      {
-        handler: this.handlerName,
-        object_name: this.objectName
-      }
-    );
-
-    // Log test start
-    const totalSteps = this.handlers.validate ? 6 : 5;
-    this.logger?.info(`🚀 Starting low-level workflow test for ${this.objectName || 'object'}`);
-    this.logger?.info(`   Workflow steps: ${this.handlers.validate ? 'validate → ' : ''}create → lock → update → unlock → activate`);
+    const handlerContext = createHandlerContext({
+      connection: this.context.connection,
+      logger: this.context.logger
+    });
 
     try {
-      let currentStep = 0;
-      // Step 1: Validate (if handler provided)
-      if (this.handlers.validate) {
-        currentStep = 1;
-        await this.runValidate(params, packageName, currentStep, totalSteps);
+      // Execute workflow in order: validate -> create -> lock -> update -> unlock -> activate
+      if (this.workflowFunctions.validate) {
+        const args = this.buildValidateArgs(this.context);
+        await this.workflowFunctions.validate(handlerContext, args);
       }
 
-      // Step 2: Create
-      currentStep = this.handlers.validate ? 2 : 1;
-      await this.runCreate(params, packageName, transportRequest, currentStep, totalSteps);
+      if (this.workflowFunctions.create) {
+        const args = this.buildCreateArgs(this.context);
+        await this.workflowFunctions.create(handlerContext, args);
+      }
 
-      // Step 3: Lock
-      currentStep = this.handlers.validate ? 3 : 2;
-      await this.runLock(currentStep, totalSteps);
+      if (this.workflowFunctions.lock) {
+        const args = this.buildLockArgs(this.context);
+        const lockResponse = await this.workflowFunctions.lock(handlerContext, args);
+        // Extract and store lock handle for subsequent operations
+        if (lockResponse && !lockResponse.isError) {
+          const lockData = parseHandlerResponse(lockResponse);
+          const lockHandle = extractLockHandle(lockData);
+          if (this.context) {
+            this.context.lockHandle = lockHandle;
+          }
+        }
+      }
 
-      // Step 4: Update
-      currentStep = this.handlers.validate ? 4 : 3;
-      await this.runUpdate(params, currentStep, totalSteps);
+      if (this.workflowFunctions.update) {
+        const args = this.buildUpdateArgs(this.context);
+        await this.workflowFunctions.update(handlerContext, args);
+      }
 
-      // Step 5: Unlock
-      currentStep = this.handlers.validate ? 5 : 4;
-      await this.runUnlock(currentStep, totalSteps);
+      if (this.workflowFunctions.unlock) {
+        const args = this.buildUnlockArgs(this.context);
+        await this.workflowFunctions.unlock(handlerContext, args);
+      }
 
-      // Step 6: Activate
-      currentStep = this.handlers.validate ? 6 : 5;
-      await this.runActivate(currentStep, totalSteps);
-
-      this.logger?.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-      this.logger?.success(`✨ Full workflow completed successfully for ${this.objectName}`);
+      if (this.workflowFunctions.activate) {
+        const args = this.buildActivateArgs(this.context);
+        await this.workflowFunctions.activate(handlerContext, args);
+      }
     } catch (error: any) {
-      this.logger?.error(`❌ Test failed: ${error.message}`);
+      // Check if error is a skip condition
+      if (error.message && error.message.startsWith('SKIP:')) {
+        const skipReason = error.message.replace(/^SKIP:\s*/, '');
+        this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
+        return;
+      }
+
+      this.context.logger?.error(`❌ Test failed: ${error.message}`);
       throw error;
-    } finally {
-      // Persist lock info for diagnostics
-      if (this.lockSession && this.lockHandle) {
-        diagnosticsTracker.persistLock(this.lockSession, this.lockHandle, {
-          object_type: this.getObjectType(),
-          object_name: this.objectName || 'unknown',
-          transport_request: transportRequest
-        });
-      }
     }
   }
 
-  /**
-   * Step 1: Validate
-   */
-  protected async runValidate(params: any, packageName: string, stepNum: number, totalSteps: number): Promise<void> {
-    if (!this.handlers.validate || !this.connection || !this.session) {
-      return;
-    }
-
-    this.logger?.info(`   • validate: ${this.objectName}`);
-
-    const validateArgs = this.buildValidateArgs(params, packageName);
-    const validateResponse = await this.handlers.validate(this.connection, validateArgs);
-
-    if (validateResponse.isError) {
-      const errorMsg = extractErrorMessage(validateResponse);
-      this.logger?.info(`⏭️  Validation error for ${this.objectName}: ${errorMsg}, skipping test`);
-      throw new Error(`Validation failed: ${errorMsg}`);
-    }
-
-    const validateData = parseHandlerResponse(validateResponse);
-
-    if (!validateData.validation_result?.valid) {
-      const message = validateData.validation_result?.message || '';
-      this.logger?.info(`⏭️  Validation failed for ${this.objectName}: ${message}, skipping test`);
-      throw new Error(`Validation failed: ${message}`);
-    }
-
-    this.session = updateSessionFromResponse(this.session, validateData);
-    this.logger?.success(`✅ Step ${stepNum}/${totalSteps}: Validation successful for ${this.objectName}`);
-  }
-
-  /**
-   * Step 2: Create
-   */
-  protected async runCreate(params: any, packageName: string, transportRequest: string | undefined, stepNum: number, totalSteps: number): Promise<void> {
-    if (!this.handlers.create || !this.connection || !this.session) {
-      throw new Error('Create handler or connection/session not available');
-    }
-
-    this.logger?.info(`   • create: ${this.objectName}`);
-
-    const createArgs = this.buildCreateArgs(params, packageName, transportRequest);
-    const createResponse = await this.handlers.create(this.connection, createArgs);
-
-    if (createResponse.isError) {
-      const errorMsg = extractErrorMessage(createResponse);
-      if (errorMsg.includes('already exists') || errorMsg.includes('does already exist')) {
-        this.logger?.info(`⏭️  Object ${this.objectName} already exists, skipping test`);
-        throw new Error(`SKIP: Object already exists: ${errorMsg}`);
-      }
-      throw new Error(`Create failed: ${errorMsg}`);
-    }
-
-    const createData = parseHandlerResponse(createResponse);
-    if (!createData.success) {
-      throw new Error(`Create failed: ${JSON.stringify(createData)}`);
-    }
-
-    this.objectWasCreated = true;
-    this.logger?.success(`✅ Step ${stepNum}/${totalSteps}: Created ${this.objectName} successfully`);
-
-    this.session = updateSessionFromResponse(this.session, createData);
-    await delay(this.getOperationDelay('create'));
-  }
-
-  /**
-   * Step 3: Lock
-   */
-  protected async runLock(stepNum: number, totalSteps: number): Promise<void> {
-    if (!this.handlers.lock || !this.connection || !this.session) {
-      throw new Error('Lock handler or connection/session not available');
-    }
-
-    this.logger?.info(`   • lock: ${this.objectName}`);
-
-    const lockResponse = await this.handlers.lock(this.connection, {
-      ...this.buildLockArgs(),
-      session_id: this.session.session_id,
-      session_state: this.session.session_state
-    });
-
-    if (lockResponse.isError) {
-      const errorMsg = extractErrorMessage(lockResponse);
-      throw new Error(`Lock failed: ${errorMsg}`);
-    }
-
-    const lockData = parseHandlerResponse(lockResponse);
-    this.lockHandle = extractLockHandle(lockData);
-    this.lockSession = extractLockSession(lockData);
-
-    if (!this.lockSession.session_id || !this.lockSession.session_state) {
-      throw new Error('Lock response does not contain valid session information');
-    }
-
-    this.logger?.success(`✅ Step ${stepNum}/${totalSteps}: Locked ${this.objectName} successfully`);
-    await delay(this.getOperationDelay('lock'));
-  }
-
-  /**
-   * Step 4: Update
-   */
-  protected async runUpdate(params: any, stepNum: number, totalSteps: number): Promise<void> {
-    if (!this.handlers.update || !this.connection || !this.lockSession || !this.lockHandle) {
-      throw new Error('Update handler, lock session, or lock handle not available');
-    }
-
-    this.logger?.info(`   • update: ${this.objectName}`);
-
-    const sourceCode = this.getSourceCode(params);
-    if (!sourceCode) {
-      throw new Error('source_code is required in test configuration for update step');
-    }
-
-    const updateResponse = await this.handlers.update(this.connection, {
-      ...this.buildUpdateArgs(params, sourceCode),
-      lock_handle: this.lockHandle,
-      session_id: this.lockSession.session_id,
-      session_state: this.lockSession.session_state
-    });
-
-    if (updateResponse.isError) {
-      const errorMsg = extractErrorMessage(updateResponse);
-      throw new Error(`Update failed: ${errorMsg}`);
-    }
-
-    const updateData = parseHandlerResponse(updateResponse);
-    if (!updateData.success) {
-      throw new Error(`Update failed: ${JSON.stringify(updateData)}`);
-    }
-
-    this.logger?.success(`✅ Step ${stepNum}/${totalSteps}: Updated ${this.objectName} successfully`);
-    await delay(this.getOperationDelay('update'));
-  }
-
-  /**
-   * Step 5: Unlock
-   */
-  protected async runUnlock(stepNum: number, totalSteps: number): Promise<void> {
-    if (!this.handlers.unlock || !this.connection || !this.lockSession || !this.lockHandle) {
-      throw new Error('Unlock handler, lock session, or lock handle not available');
-    }
-
-    this.logger?.info(`   • unlock: ${this.objectName}`);
-
-    const unlockResponse = await this.handlers.unlock(this.connection, {
-      ...this.buildUnlockArgs(),
-      lock_handle: this.lockHandle,
-      session_id: this.lockSession.session_id,
-      session_state: this.lockSession.session_state
-    });
-
-    if (unlockResponse.isError) {
-      const errorMsg = extractErrorMessage(unlockResponse);
-      throw new Error(`Unlock failed: ${errorMsg}`);
-    }
-
-    const unlockData = parseHandlerResponse(unlockResponse);
-    if (!unlockData.success) {
-      throw new Error(`Unlock failed: ${JSON.stringify(unlockData)}`);
-    }
-
-    this.session = updateSessionFromResponse(this.session, unlockData);
-    this.logger?.success(`✅ Step ${stepNum}/${totalSteps}: Unlocked ${this.objectName} successfully`);
-    await delay(this.getOperationDelay('unlock'));
-  }
-
-  /**
-   * Step 6: Activate
-   */
-  protected async runActivate(stepNum: number, totalSteps: number): Promise<void> {
-    if (!this.handlers.activate || !this.connection || !this.session) {
-      throw new Error('Activate handler or connection/session not available');
-    }
-
-    this.logger?.info(`   • activate: ${this.objectName}`);
-
-    const activateResponse = await this.handlers.activate(this.connection, {
-      ...this.buildActivateArgs(),
-      session_id: this.session.session_id,
-      session_state: this.session.session_state
-    });
-
-    if (activateResponse.isError) {
-      const errorMsg = extractErrorMessage(activateResponse);
-      throw new Error(`Activate failed: ${errorMsg}`);
-    }
-
-    const activateData = parseHandlerResponse(activateResponse);
-    if (!activateData.success) {
-      throw new Error(`Activate failed: ${JSON.stringify(activateData)}`);
-    }
-
-    this.logger?.success(`✅ Step ${stepNum}/${totalSteps}: Activated ${this.objectName} successfully`);
-  }
-
-  /**
-   * Cleanup: Unlock and Delete if needed
-   */
-  protected async cleanup(): Promise<void> {
-    if (!this.objectWasCreated) {
-      return;
-    }
-
-    const shouldCleanup = this.getCleanupAfter();
-    if (!shouldCleanup) {
-      return;
-    }
-
-    if (!this.connection) {
-      return;
-    }
-
-    // Always unlock (unlock is always performed)
-    if (this.lockHandle && this.lockSession && this.handlers.unlock) {
-      try {
-        await this.handlers.unlock(this.connection, {
-          ...this.buildUnlockArgs(),
-          lock_handle: this.lockHandle,
-          session_id: this.lockSession.session_id,
-          session_state: this.lockSession.session_state
-        });
-      } catch (unlockError: any) {
-        // Ignore unlock errors during cleanup
-        this.logger?.debug(`Cleanup unlock error (ignored): ${unlockError?.message || String(unlockError)}`);
-      }
-    }
-
-    // Delete if cleanup is enabled
-    if (shouldCleanup && this.handlers.delete) {
-      try {
-        await delay(1000);
-        const transportRequest = this.resolveTransportRequest();
-        await this.handlers.delete(this.connection, {
-          ...this.buildDeleteArgs(),
-          transport_request: transportRequest
-        });
-        this.logger?.debug(`✅ Cleanup: Deleted ${this.objectName}`);
-      } catch (deleteError: any) {
-        // Log but don't fail test on cleanup errors
-        this.logger?.warn(`Cleanup delete error (ignored): ${deleteError?.message || String(deleteError)}`);
-      }
-    }
-  }
-
-  // Helper methods to build handler arguments (can be overridden in subclasses)
-
-  protected buildValidateArgs(params: any, packageName: string): any {
+  private buildValidateArgs(context: LambdaTesterContext): any {
+    const { objectName, params, packageName, transportRequest, session } = context;
+    // Extract object-specific name field (class_name, table_name, etc.)
+    const nameField = this.getNameField();
     return {
-      ...this.getCommonArgs(params, packageName),
-      session_id: this.session!.session_id,
-      session_state: this.session!.session_state
+      [nameField]: objectName,
+      package_name: packageName,
+      description: params.description || objectName,
+      ...(params.superclass && { superclass: params.superclass }),
+      ...(transportRequest && { transport_request: transportRequest }),
+      ...(session?.session_id && { session_id: session.session_id }),
+      ...(session?.session_state && { session_state: session.session_state })
     };
   }
 
-  protected buildCreateArgs(params: any, packageName: string, transportRequest?: string): any {
-    const args: any = {
-      ...this.getCommonArgs(params, packageName),
-      session_id: this.session!.session_id,
-      session_state: this.session!.session_state
-    };
-    if (transportRequest) {
-      args.transport_request = transportRequest;
-    }
-    return args;
-  }
-
-  protected buildLockArgs(): any {
+  private buildCreateArgs(context: LambdaTesterContext): any {
+    const { objectName, params, packageName, transportRequest, session } = context;
+    const nameField = this.getNameField();
     return {
-      [this.getObjectNameKey()]: this.objectName
+      [nameField]: objectName,
+      package_name: packageName,
+      description: params.description || objectName,
+      ...(params.source_code && { source_code: params.source_code }),
+      ...(params.superclass && { superclass: params.superclass }),
+      ...(transportRequest && { transport_request: transportRequest }),
+      ...(session?.session_id && { session_id: session.session_id }),
+      ...(session?.session_state && { session_state: session.session_state })
     };
   }
 
-  protected buildUpdateArgs(params: any, sourceCode: string): any {
+  private buildLockArgs(context: LambdaTesterContext): any {
+    const { objectName, session } = context;
+    const nameField = this.getNameField();
     return {
-      [this.getObjectNameKey()]: this.objectName,
-      source_code: sourceCode
+      [nameField]: objectName,
+      ...(session?.session_id && { session_id: session.session_id }),
+      ...(session?.session_state && { session_state: session.session_state })
     };
   }
 
-  protected buildUnlockArgs(): any {
+  private buildUpdateArgs(context: LambdaTesterContext): any {
+    const { objectName, params, lockHandle, session } = context;
+    const nameField = this.getNameField();
     return {
-      [this.getObjectNameKey()]: this.objectName
+      [nameField]: objectName,
+      source_code: params.source_code || params.update_source_code || '',
+      lock_handle: lockHandle || context.lockHandle,
+      ...(session?.session_id && { session_id: session.session_id }),
+      ...(session?.session_state && { session_state: session.session_state })
     };
   }
 
-  protected buildActivateArgs(): any {
+  private buildUnlockArgs(context: LambdaTesterContext): any {
+    const { objectName, lockHandle, session } = context;
+    const nameField = this.getNameField();
     return {
-      [this.getObjectNameKey()]: this.objectName
+      [nameField]: objectName,
+      lock_handle: lockHandle || context.lockHandle,
+      ...(session?.session_id && { session_id: session.session_id }),
+      ...(session?.session_state && { session_state: session.session_state })
     };
   }
 
-  protected buildDeleteArgs(): any {
+  private buildActivateArgs(context: LambdaTesterContext): any {
+    const { objectName, transportRequest, session } = context;
+    const nameField = this.getNameField();
     return {
-      [this.getObjectNameKey()]: this.objectName
+      [nameField]: objectName,
+      ...(transportRequest && { transport_request: transportRequest }),
+      ...(session?.session_id && { session_id: session.session_id }),
+      ...(session?.session_state && { session_state: session.session_state })
     };
   }
 
-  protected getCommonArgs(params: any, packageName: string): any {
-    const args: any = {
-      [this.getObjectNameKey()]: this.objectName,
-      package_name: packageName
+  private buildDeleteArgs(context: LambdaTesterContext): any {
+    const { objectName, transportRequest, session } = context;
+    const nameField = this.getNameField();
+    return {
+      [nameField]: objectName,
+      ...(transportRequest && { transport_request: transportRequest }),
+      ...(session?.session_id && { session_id: session.session_id }),
+      ...(session?.session_state && { session_state: session.session_state })
     };
-
-    // Add common optional parameters
-    if (params.description) args.description = params.description;
-    if (params.root_entity) args.root_entity = params.root_entity;
-    if (params.implementation_type) {
-      const implType = params.implementation_type;
-      args.implementation_type = implType.charAt(0).toUpperCase() + implType.slice(1).toLowerCase();
-    }
-
-    // Class-specific parameters
-    if (params.superclass) args.superclass = params.superclass;
-    if (params.final !== undefined) args.final = params.final;
-    if (params.abstract !== undefined) args.abstract = params.abstract;
-    if (params.create_protected !== undefined) args.create_protected = params.create_protected;
-
-    return args;
   }
 
-  protected getObjectNameKey(): string {
-    // Determine object name key based on handler name
-    if (this.handlerName.includes('class')) return 'class_name';
-    if (this.handlerName.includes('interface')) return 'interface_name';
-    if (this.handlerName.includes('function')) return 'function_name';
-    if (this.handlerName.includes('program')) return 'program_name';
-    if (this.handlerName.includes('table')) return 'table_name';
-    if (this.handlerName.includes('view')) return 'view_name';
-    if (this.handlerName.includes('domain')) return 'domain_name';
-    if (this.handlerName.includes('data_element')) return 'data_element_name';
-    if (this.handlerName.includes('structure')) return 'structure_name';
-    if (this.handlerName.includes('behavior_definition')) return 'name';
-    if (this.handlerName.includes('behavior_implementation')) return 'class_name';
-    if (this.handlerName.includes('metadata_extension') || this.handlerName.includes('ddlx')) return 'name';
-    return 'name'; // default
+  private getNameField(): string {
+    // Determine name field based on handler name
+    const handlerName = (this as any).handlerName || '';
+    if (handlerName.includes('class')) return 'class_name';
+    if (handlerName.includes('table')) return 'table_name';
+    if (handlerName.includes('view')) return 'view_name';
+    if (handlerName.includes('program')) return 'program_name';
+    if (handlerName.includes('interface')) return 'interface_name';
+    if (handlerName.includes('domain')) return 'domain_name';
+    if (handlerName.includes('data_element')) return 'data_element_name';
+    if (handlerName.includes('structure')) return 'structure_name';
+    if (handlerName.includes('function')) return 'function_name';
+    if (handlerName.includes('behavior_definition')) return 'bdef_name';
+    if (handlerName.includes('behavior_implementation')) return 'bimp_name';
+    if (handlerName.includes('metadata_extension')) return 'ddlx_name';
+    if (handlerName.includes('service_definition')) return 'service_definition_name';
+    return 'name'; // fallback
   }
 
-  protected getObjectType(): string {
-    if (this.handlerName.includes('class')) return 'CLAS';
-    if (this.handlerName.includes('interface')) return 'INTF';
-    if (this.handlerName.includes('function')) return 'FUGR';
-    if (this.handlerName.includes('program')) return 'PROG';
-    if (this.handlerName.includes('table')) return 'TABL';
-    if (this.handlerName.includes('view')) return 'VIEW';
-    if (this.handlerName.includes('domain')) return 'DOMA';
-    if (this.handlerName.includes('data_element')) return 'DTEL';
-    if (this.handlerName.includes('structure')) return 'TABL';
-    if (this.handlerName.includes('behavior_definition')) return 'BDEF';
-    if (this.handlerName.includes('behavior_implementation')) return 'BIMP';
-    if (this.handlerName.includes('metadata_extension') || this.handlerName.includes('ddlx')) return 'DDLX';
-    return 'UNKNOWN';
+  // Compatibility methods - LowTester doesn't use lambdas for lifecycle hooks
+  async afterAll(): Promise<void> {
+    // LowTester compatibility - no lambda needed
   }
 
-  protected getSourceCode(params: any): string | null {
-    return params.source_code || params.implementation_code || null;
+  async beforeEach(): Promise<void> {
+    // LowTester compatibility - no lambda needed
+  }
+
+  async afterEach(): Promise<void> {
+    // LowTester compatibility - cleanup handled by cleanupAfter
+    // Use this.cleanupAfter() to ensure YAML parameter checking works correctly
+    await this.cleanupAfter();
   }
 }
+

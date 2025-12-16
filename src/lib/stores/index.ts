@@ -27,7 +27,7 @@ import * as fs from 'fs';
  * @param destination Destination name to check (optional, for auto-detection)
  * @returns Object with serviceKeyStore and sessionStore instances
  */
-async function detectStoreType(
+export async function detectStoreType(
   directory: string,
   destination?: string
 ): Promise<{ serviceKeyStore: IServiceKeyStore; sessionStore: ISessionStore; storeType: 'abap' | 'btp' }> {

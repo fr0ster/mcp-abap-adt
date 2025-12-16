@@ -2,11 +2,9 @@
  * GetInactiveObjects Handler - Retrieve list of inactive ABAP objects
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
     name: "GetInactiveObjects",
@@ -20,15 +18,10 @@ export const TOOL_DEFINITION = {
 
 export async function handleGetInactiveObjects(context: HandlerContext, params: any) {
     const { connection, logger } = context;
-        const handlerLogger = getHandlerLogger(
-      'handleGetInactiveObjects',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     try {
         const client = new CrudClient(connection);
 
-        handlerLogger.info("Retrieving inactive objects...");
+        logger.info("Retrieving inactive objects...");
         const result = await client.getInactiveObjects();
 
         return return_response({
@@ -44,7 +37,7 @@ export async function handleGetInactiveObjects(context: HandlerContext, params: 
         });
 
     } catch (error: any) {
-        handlerLogger.error("Error retrieving inactive objects:", error);
+        logger.error("Error retrieving inactive objects:", error);
         return return_error(error);
     }
 }

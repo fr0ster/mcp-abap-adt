@@ -1,10 +1,8 @@
 // Handler for retrieving ADT object structure and returning compact JSON tree
 
-import { makeAdtRequestWithTimeout, logger as baseLogger } from '../../../lib/utils';
+import { makeAdtRequestWithTimeout } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   name: "GetObjectStructure",
   description: "[read-only] Retrieve ADT object structure as a compact JSON tree.",
@@ -59,14 +57,10 @@ function serializeTree(tree: any[], indent: string = ''): string {
 
 export async function handleGetObjectStructure(context: HandlerContext, args: any) {
   const { connection, logger } = context;
-  const handlerLogger = getHandlerLogger(
-    'handleGetObjectStructure',
-    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-  );
   try {
     const url = `/sap/bc/adt/repository/objectstructure?objecttype=${encodeURIComponent(args.objecttype)}&objectname=${encodeURIComponent(args.objectname)}`;
     const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
-    handlerLogger.info(`Fetched object structure for ${args.objecttype}/${args.objectname}`);
+    logger.info(`Fetched object structure for ${args.objecttype}/${args.objectname}`);
 
     // Parse XML response
     const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
@@ -101,7 +95,7 @@ export async function handleGetObjectStructure(context: HandlerContext, args: an
       ]
     };
   } catch (error) {
-    handlerLogger.error(`Failed to fetch object structure for ${args?.objecttype}/${args?.objectname}`, error as any);
+    logger.error(`Failed to fetch object structure for ${args?.objecttype}/${args?.objectname}`, error as any);
     return {
       isError: true,
       content: [

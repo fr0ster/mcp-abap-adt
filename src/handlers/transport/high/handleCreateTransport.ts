@@ -7,11 +7,9 @@
  * Workflow: create
  */
 
-import { McpError, ErrorCode  } from '../../../lib/utils';
+import { McpError, ErrorCode, return_error, return_response } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CreateTransport",
@@ -59,10 +57,6 @@ interface CreateTransportArgs {
 export async function handleCreateTransport(context: HandlerContext, args: CreateTransportArgs) {
   const { connection, logger } = context;
   try {
-    const handlerLogger = getHandlerLogger(
-      "handleCreateTransport",
-      process.env.DEBUG_HANDLERS === "true" ? baseLogger : noopLogger
-    );
     // Validate required parameters
     if (!args?.description) {
       throw new McpError(ErrorCode.InvalidParams, 'Transport description is required');
@@ -71,7 +65,7 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
     const typedArgs = args as CreateTransportArgs;
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-        handlerLogger.info(`Starting transport creation: ${typedArgs.description}`);
+    logger.info(`Starting transport creation: ${typedArgs.description}`);
 
     try {
       // Create client
@@ -86,7 +80,7 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
       // Get create result
       const createResult = client.getCreateResult();
 
-      handlerLogger.info(`✅ CreateTransport completed successfully`);
+      logger.info(`✅ CreateTransport completed successfully`);
 
       // Parse response data if available
       let transportInfo: any = {};
@@ -160,7 +154,7 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
       });
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating transport:`, error);
+      logger.error(`Error creating transport:`, error);
 
       const errorMessage = error.response?.data
         ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
@@ -173,9 +167,9 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
     } finally {
       try {
         connection.reset();
-        handlerLogger.debug('Reset transport connection after use');
+        logger.debug('Reset transport connection after use');
       } catch (resetError: any) {
-        handlerLogger.error(`Failed to reset transport connection: ${resetError?.message || resetError}`);
+        logger.error(`Failed to reset transport connection: ${resetError?.message || resetError}`);
       }
     }
 

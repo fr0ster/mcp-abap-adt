@@ -5,12 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse  } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse, return_error, return_response } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "DeleteMetadataExtensionLow",

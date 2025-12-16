@@ -8,11 +8,9 @@
  * - Change history
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { McpError, ErrorCode, makeAdtRequestWithTimeout, return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { McpError, ErrorCode, makeAdtRequestWithTimeout, return_error, return_response, AxiosResponse } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "GetTransport",
@@ -147,7 +145,6 @@ function parseTransportXml(xmlData: string, includeObjects: boolean = true, incl
  */
 export async function handleGetTransport(context: HandlerContext, args: GetTransportArgs) {
   const { connection, logger } = context;
-  const handlerLogger = getHandlerLogger('handleGetTransport');
   try {
     // Validate required parameters
     if (!args?.transport_number) {
@@ -158,8 +155,8 @@ export async function handleGetTransport(context: HandlerContext, args: GetTrans
     const includeObjects = typedArgs.include_objects !== false;
     const includeTasks = typedArgs.include_tasks !== false;
 
-    handlerLogger.debug(`GetTransport: ${typedArgs.transport_number}`);
-    handlerLogger.debug(`Include objects: ${includeObjects}, Include tasks: ${includeTasks}`);
+    logger.debug(`GetTransport: ${typedArgs.transport_number}`);
+    logger.debug(`Include objects: ${includeObjects}, Include tasks: ${includeTasks}`);
 
     let url = `/sap/bc/adt/cts/transportrequests/${typedArgs.transport_number}`;
 
@@ -175,12 +172,12 @@ export async function handleGetTransport(context: HandlerContext, args: GetTrans
       'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
     };
 
-    handlerLogger.debug(`GET from: ${url}`);
+    logger.debug(`GET from: ${url}`);
 
     // Get transport request
     const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default', undefined, undefined, headers);
 
-    handlerLogger.debug(`GetTransport response status: ${response.status}`);
+    logger.debug(`GetTransport response status: ${response.status}`);
 
     // Parse XML response
     const transportData = parseTransportXml(response.data, includeObjects, includeTasks);

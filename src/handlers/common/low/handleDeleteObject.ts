@@ -2,11 +2,9 @@
  * DeleteObject Handler - Delete ABAP objects via ADT API
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "DeleteObjectLow",
@@ -33,11 +31,6 @@ interface DeleteObjectArgs {
 export async function handleDeleteObject(context: HandlerContext, args: DeleteObjectArgs) {
   const { connection, logger } = context;
   try {
-    const handlerLogger = getHandlerLogger(
-      'handleDeleteObject',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     const { object_name, object_type, function_group_name, transport_request } = args as DeleteObjectArgs;
 
     if (!object_name || !object_type) {
@@ -48,7 +41,7 @@ export async function handleDeleteObject(context: HandlerContext, args: DeleteOb
     const objectName = object_name.toUpperCase();
     const objectType = object_type.toLowerCase();
 
-    handlerLogger.info(`Starting object deletion: ${objectName} (type: ${object_type})`);
+    logger.info(`Starting object deletion: ${objectName} (type: ${object_type})`);
 
     try {
       let response;
@@ -129,7 +122,7 @@ export async function handleDeleteObject(context: HandlerContext, args: DeleteOb
         throw new Error(`Delete did not return a response for object ${objectName}`);
       }
 
-      handlerLogger.info(`✅ DeleteObject completed successfully: ${objectName}`);
+      logger.info(`✅ DeleteObject completed successfully: ${objectName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -142,7 +135,7 @@ export async function handleDeleteObject(context: HandlerContext, args: DeleteOb
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error deleting object ${objectName}:`, error);
+      logger.error(`Error deleting object ${objectName}:`, error);
 
       let errorMessage = `Failed to delete object: ${error.message || String(error)}`;
 

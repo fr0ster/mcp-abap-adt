@@ -5,10 +5,9 @@
  * Must reuse session_id and lock_handle from LockObject.
  */
 
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UnlockObjectLow",
@@ -49,11 +48,6 @@ interface UnlockObjectArgs {
 export async function handleUnlockObject(context: HandlerContext, args: UnlockObjectArgs) {
   const { connection, logger } = context;
   try {
-    const handlerLogger = getHandlerLogger(
-      'handleUnlockObject',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     const { object_name, object_type, lock_handle, session_id, session_state } = args as UnlockObjectArgs;
 
     if (!object_name || !object_type || !lock_handle || !session_id) {

@@ -1,8 +1,6 @@
-import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
+import { McpError, ErrorCode } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
-import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   name: "GetAbapAST",
   description: "[read-only] Parse ABAP code and return AST (Abstract Syntax Tree) in JSON format.",
@@ -154,10 +152,6 @@ class SimpleAbapASTGenerator {
 
 export async function handleGetAbapAST(context: HandlerContext, args: any) {
     const { connection, logger } = context;
-    const handlerLogger = getHandlerLogger(
-      'handleGetAbapAST',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
     try {
         if (!args?.code) {
             throw new McpError(ErrorCode.InvalidParams, 'ABAP code is required');
@@ -165,7 +159,7 @@ export async function handleGetAbapAST(context: HandlerContext, args: any) {
 
         const astGenerator = new SimpleAbapASTGenerator();
         const ast = astGenerator.parseToAST(args.code);
-        handlerLogger.debug('Generated AST for provided ABAP code');
+        logger.debug('Generated AST for provided ABAP code');
 
         const result = {
             isError: false,
@@ -178,13 +172,13 @@ export async function handleGetAbapAST(context: HandlerContext, args: any) {
         };
 
         if (args.filePath) {
-            handlerLogger.debug(`Writing AST result to file: ${args.filePath}`);
+            logger.debug(`Writing AST result to file: ${args.filePath}`);
             writeResultToFile(JSON.stringify(ast, null, 2), args.filePath);
         }
 
         return result;
     } catch (error) {
-        handlerLogger.error('Failed to generate ABAP AST', error as any);
+        logger.error('Failed to generate ABAP AST', error as any);
         return {
             isError: true,
             content: [

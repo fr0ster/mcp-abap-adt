@@ -5,11 +5,9 @@
  * to other handlers to maintain the same session and lock handle across operations.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
+import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
 import { generateSessionId } from '../../../lib/sessionUtils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "GetSession",
@@ -37,21 +35,17 @@ interface GetSessionArgs {
  */
 export async function handleGetSession(context: HandlerContext, args: GetSessionArgs) {
   const { connection, logger } = context;
-  const handlerLogger = getHandlerLogger(
-    'handleGetSession',
-    process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-  );
   try {
     const { force_new = false } = args as GetSessionArgs;
 
-        handlerLogger.debug(`Connecting managed session${force_new ? ' (force new)' : ''}...`);
+    logger.debug(`Connecting managed session${force_new ? ' (force new)' : ''}...`);
 
     // Ensure connection is established (get cookies and CSRF token)
         // Generate new session ID
     const sessionId = generateSessionId();
 
     // Session state management is now handled by auth-broker
-    handlerLogger.info(`✅ GetSession completed: session ID ${sessionId.substring(0, 8)}...`);
+    logger.info(`✅ GetSession completed: session ID ${sessionId.substring(0, 8)}...`);
 
     return return_response({
       data: JSON.stringify({
@@ -63,7 +57,7 @@ export async function handleGetSession(context: HandlerContext, args: GetSession
     } as AxiosResponse);
 
   } catch (error: any) {
-    handlerLogger.error('Error getting session:', error);
+    logger.error('Error getting session:', error);
     return return_error(error);
   }
 }

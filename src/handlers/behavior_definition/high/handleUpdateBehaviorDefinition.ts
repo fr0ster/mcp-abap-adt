@@ -2,12 +2,10 @@
  * UpdateBehaviorDefinition Handler - ABAP Behavior Definition Update via ADT API
  */
 
-import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
     name: "UpdateBehaviorDefinition",
     description: "Update source code of an ABAP Behavior Definition.",

@@ -5,10 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "UnlockMetadataExtensionLow",
@@ -73,22 +72,16 @@ export async function handleUnlockMetadataExtension(context: HandlerContext, arg
       return return_error(new Error('name, lock_handle, and session_id are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleUnlockMetadataExtension',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const ddlxName = name.toUpperCase();
 
-    handlerLogger.info(`Starting metadata extension unlock: ${ddlxName} (session: ${session_id.substring(0, 8)}...)`);
+    logger.info(`Starting metadata extension unlock: ${ddlxName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock metadata extension
@@ -102,7 +95,7 @@ export async function handleUnlockMetadataExtension(context: HandlerContext, arg
       // Get updated session state after unlock
 
 
-      handlerLogger.info(`✅ UnlockMetadataExtension completed: ${ddlxName}`);
+      logger.info(`✅ UnlockMetadataExtension completed: ${ddlxName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -115,7 +108,7 @@ export async function handleUnlockMetadataExtension(context: HandlerContext, arg
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error unlocking metadata extension ${ddlxName}: ${error?.message || error}`);
+      logger.error(`Error unlocking metadata extension ${ddlxName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock metadata extension: ${error.message || String(error)}`;

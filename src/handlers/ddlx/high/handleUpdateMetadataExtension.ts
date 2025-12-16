@@ -2,10 +2,9 @@
  * UpdateMetadataExtension Handler - ABAP Metadata Extension Update via ADT API
  */
 
-import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
     name: "UpdateMetadataExtension",
     description: "Update source code of an ABAP Metadata Extension.",
@@ -48,12 +47,6 @@ export async function handleUpdateMetadataExtension(context: HandlerContext, par
     }
 
     const name = args.name.toUpperCase();
-            // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const handlerLogger = getHandlerLogger(
-      'handleUpdateMetadataExtension',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
 
     try {
         const client = new CrudClient(connection);
@@ -99,16 +92,16 @@ export async function handleUpdateMetadataExtension(context: HandlerContext, par
         });
 
     } catch (error: any) {
-        handlerLogger.error(`Error updating DDLX ${name}: ${error?.message || error}`);
+        logger.error(`Error updating DDLX ${name}: ${error?.message || error}`);
         return return_error(error);
     } finally {
         try {
             if (connection) {
                 connection.reset();
-                handlerLogger.debug('Reset metadata extension connection after use');
+                logger.debug('Reset metadata extension connection after use');
             }
         } catch (resetError: any) {
-            handlerLogger.error(`Failed to reset metadata extension connection: ${resetError?.message || resetError}`);
+            logger.error(`Failed to reset metadata extension connection: ${resetError?.message || resetError}`);
         }
     }
 }

@@ -2,11 +2,9 @@
  * ActivateObject Handler - Universal ABAP Object Activation via ADT API
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient, ObjectReference } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ActivateObjectLow",
@@ -45,11 +43,6 @@ interface ActivateObjectArgs {
 export async function handleActivateObject(context: HandlerContext, params: ActivateObjectArgs) {
   const { connection, logger } = context;
   try {
-    const handlerLogger = getHandlerLogger(
-      'handleActivateObject',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     const args = params;
 
     if (!args.objects || !Array.isArray(args.objects) || args.objects.length === 0) {
@@ -59,7 +52,7 @@ export async function handleActivateObject(context: HandlerContext, params: Acti
         const preaudit = args.preaudit !== false; // default true
     const client = new CrudClient(connection);
 
-    handlerLogger.info(`Starting activation of ${args.objects.length} object(s)`);
+    logger.info(`Starting activation of ${args.objects.length} object(s)`);
 
     try {
       const activationObjects = args.objects.map(obj => ({
@@ -67,10 +60,10 @@ export async function handleActivateObject(context: HandlerContext, params: Acti
         name: obj.name.toUpperCase()
       }));
 
-      handlerLogger.debug(`Activating objects: ${activationObjects.map(o => o.name).join(', ')}`);
+      logger.debug(`Activating objects: ${activationObjects.map(o => o.name).join(', ')}`);
 
       const response = await client.activateObjectsGroup(activationObjects, preaudit);
-      handlerLogger.debug(`Activation response status: ${response.status}`);
+      logger.debug(`Activation response status: ${response.status}`);
 
       const activationResult = client.parseActivationResponse(response.data);
       const success = activationResult.activated && activationResult.checked;
@@ -96,7 +89,7 @@ export async function handleActivateObject(context: HandlerContext, params: Acti
           : `Activation completed with ${activationResult.messages.length} message(s)`
       };
 
-      handlerLogger.info(`Activation completed: ${success ? 'SUCCESS' : 'WITH ISSUES'}`);
+      logger.info(`Activation completed: ${success ? 'SUCCESS' : 'WITH ISSUES'}`);
 
       return return_response({
         data: JSON.stringify(result, null, 2),
@@ -107,7 +100,7 @@ export async function handleActivateObject(context: HandlerContext, params: Acti
       });
 
     } catch (error: any) {
-      handlerLogger.error('Error during activation', error);
+      logger.error('Error during activation', error);
 
       let errorMessage: string;
       if (error.response?.data) {

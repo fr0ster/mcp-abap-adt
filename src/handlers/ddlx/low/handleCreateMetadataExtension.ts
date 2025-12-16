@@ -5,11 +5,9 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse, return_error, return_response, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CreateMetadataExtensionLow",
@@ -92,22 +90,16 @@ export async function handleCreateMetadataExtension(context: HandlerContext, arg
       return return_error(new Error('name, description, and package_name are required'));
     }
 
-        const client = new CrudClient(connection);
-    const handlerLogger = getHandlerLogger(
-      'handleCreateMetadataExtension',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-          }
+    }
 
     const ddlxName = name.toUpperCase();
 
-    handlerLogger.info(`Starting metadata extension creation: ${ddlxName}`);
+    logger.info(`Starting metadata extension creation: ${ddlxName}`);
 
     try {
       // Create metadata extension
@@ -126,7 +118,7 @@ export async function handleCreateMetadataExtension(context: HandlerContext, arg
       // Get updated session state after create
 
 
-      handlerLogger.info(`✅ CreateMetadataExtension completed: ${ddlxName}`);
+      logger.info(`✅ CreateMetadataExtension completed: ${ddlxName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -142,7 +134,7 @@ export async function handleCreateMetadataExtension(context: HandlerContext, arg
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error creating metadata extension ${ddlxName}: ${error?.message || error}`);
+      logger.error(`Error creating metadata extension ${ddlxName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create metadata extension: ${error.message || String(error)}`;

@@ -5,12 +5,10 @@
  * Returns lock handle that must be reused with the same session.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection  } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { AxiosResponse, return_error, return_response, restoreSessionInConnection } from '../../../lib/utils';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "LockObjectLow",
@@ -51,11 +49,6 @@ interface LockObjectArgs {
 export async function handleLockObject(context: HandlerContext, args: LockObjectArgs) {
   const { connection, logger } = context;
   try {
-    const handlerLogger = getHandlerLogger(
-      'handleLockObject',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     const { object_name, object_type, super_package, session_id, session_state } = args as LockObjectArgs;
 
     if (!object_name || !object_type) {

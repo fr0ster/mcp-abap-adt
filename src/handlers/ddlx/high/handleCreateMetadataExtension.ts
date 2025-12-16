@@ -2,13 +2,10 @@
  * CreateMetadataExtension Handler - ABAP Metadata Extension Creation via ADT API
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, logger as baseLogger } from '../../../lib/utils';
+import { AxiosResponse, return_error, return_response } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
     name: "CreateMetadataExtension",
     description: "Create a new ABAP Metadata Extension (DDLX) in SAP system.",
@@ -62,14 +59,8 @@ export async function handleCreateMetadataExtension(context: HandlerContext, par
     }
 
     const name = args.name.toUpperCase();
-            // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const handlerLogger = getHandlerLogger(
-      'handleCreateMetadataExtension',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
 
-    handlerLogger.info(`Starting DDLX creation: ${name}`);
+    logger.info(`Starting DDLX creation: ${name}`);
 
     try {
         const client = new CrudClient(connection);
@@ -103,7 +94,7 @@ export async function handleCreateMetadataExtension(context: HandlerContext, par
           try {
             await client.unlockMetadataExtension({ name: name }, lockHandle);
           } catch (unlockError) {
-            handlerLogger.error(`Failed to unlock metadata extension after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+            logger.error(`Failed to unlock metadata extension after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
           }
           // Principle 2: first error and exit
           throw error;
@@ -128,16 +119,16 @@ export async function handleCreateMetadataExtension(context: HandlerContext, par
         });
 
     } catch (error: any) {
-        handlerLogger.error(`Error creating DDLX ${name}: ${error?.message || error}`);
+        logger.error(`Error creating DDLX ${name}: ${error?.message || error}`);
         return return_error(error);
     } finally {
         try {
             if (connection) {
                 connection.reset();
-                handlerLogger.debug('Reset metadata extension connection after use');
+                logger.debug('Reset metadata extension connection after use');
             }
         } catch (resetError: any) {
-            handlerLogger.error(`Failed to reset metadata extension connection: ${resetError?.message || resetError}`);
+            logger.error(`Failed to reset metadata extension connection: ${resetError?.message || resetError}`);
         }
     }
 }

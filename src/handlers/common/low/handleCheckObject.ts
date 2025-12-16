@@ -4,10 +4,9 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
+import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CheckObjectLow",
@@ -48,11 +47,6 @@ interface CheckObjectArgs {
 export async function handleCheckObject(context: HandlerContext, args: CheckObjectArgs) {
   const { connection, logger } = context;
   try {
-    const handlerLogger = getHandlerLogger(
-      'handleCheckObject',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     const { object_name, object_type, version = 'active', session_id, session_state } = args as CheckObjectArgs;
 
     if (!object_name || !object_type) {
@@ -76,7 +70,7 @@ export async function handleCheckObject(context: HandlerContext, args: CheckObje
           }
 
     const objectName = object_name.toUpperCase();
-    handlerLogger.info(`Starting object check: ${objectName} (type: ${objectType}, version: ${checkVersion})`);
+    logger.info(`Starting object check: ${objectName} (type: ${objectType}, version: ${checkVersion})`);
 
     try {
       switch (objectType) {
@@ -125,9 +119,9 @@ export async function handleCheckObject(context: HandlerContext, args: CheckObje
       const checkResult = parseCheckRunResponse(response);
 
 
-      handlerLogger.info(`✅ CheckObject completed: ${objectName}`);
-      handlerLogger.info(`   Status: ${checkResult.status}`);
-      handlerLogger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger.info(`✅ CheckObject completed: ${objectName}`);
+      logger.info(`   Status: ${checkResult.status}`);
+      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -145,7 +139,7 @@ export async function handleCheckObject(context: HandlerContext, args: CheckObje
       } as AxiosResponse);
 
     } catch (error: any) {
-      handlerLogger.error(`Error checking object ${objectName}:`, error);
+      logger.error(`Error checking object ${objectName}:`, error);
 
       let errorMessage = `Failed to check object: ${error.message || String(error)}`;
 

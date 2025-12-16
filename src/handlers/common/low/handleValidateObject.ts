@@ -5,12 +5,9 @@
  * Connection management handled internally.
  */
 
-import { return_error, return_response, logger as baseLogger, parseValidationResponse, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
+import { return_error, return_response, parseValidationResponse, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { logErrorSafely } from '../../../lib/utils';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "ValidateObjectLow",
@@ -90,11 +87,6 @@ interface ValidateObjectArgs {
 export async function handleValidateObject(context: HandlerContext, args: ValidateObjectArgs) {
   const { connection, logger } = context;
   try {
-    const handlerLogger = getHandlerLogger(
-      'handleValidateObject',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
-
     const {
       object_name,
       object_type,
@@ -335,7 +327,7 @@ export async function handleValidateObject(context: HandlerContext, args: Valida
       } as AxiosResponse);
 
     } catch (error: any) {
-      logErrorSafely(logger, `ValidateObject ${objectName}`, error);
+      logger.error(`ValidateObject ${objectName}`, error);
 
       // Parse error message
       let errorMessage = `Failed to validate object: ${error.message || String(error)}`;

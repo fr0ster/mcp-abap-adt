@@ -1,8 +1,6 @@
-import { McpError, ErrorCode, logger as baseLogger } from '../../../lib/utils';
+import { McpError, ErrorCode } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
-import { getHandlerLogger, noopLogger  } from '../../../lib/handlerLogger';
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   name: "GetAbapSemanticAnalysis",
   description: "[read-only] Perform semantic analysis on ABAP code and return symbols, types, scopes, and dependencies.",
@@ -394,15 +392,11 @@ class SimpleAbapSemanticAnalyzer {
 
 export async function handleGetAbapSemanticAnalysis(context: HandlerContext, args: any) {
     const { connection, logger } = context;
-    const handlerLogger = getHandlerLogger(
-      'handleGetAbapSemanticAnalysis',
-      process.env.DEBUG_HANDLERS === 'true' ? baseLogger : noopLogger
-    );
     try {
         if (!args?.code) {
             throw new McpError(ErrorCode.InvalidParams, 'ABAP code is required');
         }
-        handlerLogger.debug('Running semantic analysis for provided ABAP code');
+        logger.debug('Running semantic analysis for provided ABAP code');
 
         const analyzer = new SimpleAbapSemanticAnalyzer();
         const analysis = analyzer.analyze(args.code);
@@ -418,13 +412,13 @@ export async function handleGetAbapSemanticAnalysis(context: HandlerContext, arg
         };
 
         if (args.filePath) {
-            handlerLogger.debug(`Writing semantic analysis result to file: ${args.filePath}`);
+            logger.debug(`Writing semantic analysis result to file: ${args.filePath}`);
             writeResultToFile(JSON.stringify(analysis, null, 2), args.filePath);
         }
 
         return result;
     } catch (error) {
-        handlerLogger.error('Failed to perform ABAP semantic analysis', error as any);
+        logger.error('Failed to perform ABAP semantic analysis', error as any);
         return {
             isError: true,
             content: [

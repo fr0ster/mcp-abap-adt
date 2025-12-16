@@ -6,9 +6,8 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
-import { getHandlerLogger, noopLogger } from '../../../lib/handlerLogger';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: "CreateTransportLow",
@@ -43,10 +42,6 @@ interface CreateTransportArgs {
 export async function handleCreateTransport(context: HandlerContext, args: CreateTransportArgs) {
   const { connection, logger } = context;
   try {
-    const handlerLogger = getHandlerLogger(
-      "handleCreateTransportLow",
-      process.env.DEBUG_HANDLERS === "true" ? baseLogger : noopLogger
-    );
     const {
       description,
       transport_type

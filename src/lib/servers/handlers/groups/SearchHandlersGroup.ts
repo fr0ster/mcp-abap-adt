@@ -29,7 +29,7 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
           description: SearchObject_Tool.description,
           inputSchema: SearchObject_Tool.inputSchema,
         },
-        handler: handleSearchObject,
+        handler: (args: any) => handleSearchObject(this.context, args),
       },
       // Dynamic import handlers
       {
@@ -39,7 +39,7 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
           inputSchema: GetObjectsList_Tool.inputSchema,
         },
         handler: (args: any) => {
-          return handleGetObjectsList(this.context, args);
+          return handleGetObjectsList(this.context, args as { object_type: string });
         },
       },
       {
@@ -49,7 +49,7 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
           inputSchema: GetObjectsByType_Tool.inputSchema,
         },
         handler: (args: any) => {
-          return handleGetObjectsByType(this.context, args);
+          return handleGetObjectsByType(this.context, args as { object_type: string });
         },
       },
     ];

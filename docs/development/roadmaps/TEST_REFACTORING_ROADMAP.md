@@ -334,29 +334,29 @@ interface HandlerContext {
   - [x] Change constructor to accept `context: HandlerContext` instead of `connection: AbapConnection`
   - [x] Update `registerToolOnServer` method to pass `context` instead of `this.connection` to handlers
   - [x] Store context instead of connection as class property
-  - [ ] Update all handler group subclasses (in progress by user):
-    - [ ] `ReadOnlyHandlersGroup`
-    - [ ] `HighLevelHandlersGroup`
-    - [ ] `LowLevelHandlersGroup`
-    - [ ] `SystemHandlersGroup`
-    - [ ] `SearchHandlersGroup`
-    - [ ] Any other handler group classes
+  - [x] Update all handler group subclasses: ✅ (All completed - they inherit from BaseHandlerGroup which uses context)
+    - [x] `ReadOnlyHandlersGroup` ✅ (all handlers wrapped in lambdas with `this.context`)
+    - [x] `HighLevelHandlersGroup` ✅ (all handlers wrapped in lambdas with `this.context`)
+    - [x] `LowLevelHandlersGroup` ✅ (all handlers wrapped in lambdas with `this.context`)
+    - [x] `SystemHandlersGroup` ✅ (all handlers wrapped in lambdas with `this.context`, removed unused AbapConnection import)
+    - [x] `SearchHandlersGroup` ✅ (all handlers wrapped in lambdas with `this.context`)
+    - [x] No other handler group classes found
 - [x] Update `mcp_handlers.ts`:
   - [x] Create `HandlerContext` with connection and logger before registering handlers (context passed as parameter)
-  - [ ] Update all `registerToolOnServer` calls (hundreds of calls) to pass `context` instead of `connection` (in progress by user)
-  - [ ] Update pattern: `handler(connection, args)` → `handler(context, args)`
-  - [ ] Ensure logger is created with appropriate category/prefix for each handler group
-- [ ] Update handler group instantiations:
-  - [ ] Update `usage-example.ts` to pass context instead of connection
-  - [ ] Update any other files that instantiate handler groups
-  - [ ] Update `index.ts` or main server file if it creates handler groups
-- [ ] Update any other handler registry files:
-  - [ ] Check for other files that register handlers directly (not through groups)
-  - [ ] Update to use context pattern
-  - [ ] Ensure consistent logger creation across all registration points
+  - [x] Update all `registerToolOnServer` calls to pass `context` instead of `connection` ✅ (all calls use `context` parameter)
+  - [x] Update pattern: `handler(connection, args)` → `handler(context, args)` ✅
+  - [x] Ensure logger is created with appropriate category/prefix for each handler group ✅
+- [x] Update handler group instantiations: ✅ (All completed)
+  - [x] Update `usage-example.ts` to pass context instead of connection ✅
+  - [x] Update any other files that instantiate handler groups ✅
+  - [x] Update `index.ts` or main server file if it creates handler groups ✅ (mcp_handlers.ts uses context)
+- [x] Update any other handler registry files: ✅
+  - [x] Check for other files that register handlers directly (not through groups) ✅ (mcp_handlers.ts uses context)
+  - [x] Update to use context pattern ✅
+  - [x] Ensure consistent logger creation across all registration points ✅
 
 #### Update Handler Calls
-- [ ] Update MCP server handler registration to pass context
+- [x] Update MCP server handler registration to pass context ✅ (BaseHandlerGroup.registerToolOnServer calls handler with this.context)
 - [ ] Update test workflow functions to pass context
 - [ ] Update direct handler calls in tests
 - [ ] Update any internal handler-to-handler calls
@@ -492,14 +492,16 @@ describe('Class High-Level Handlers Integration', () => {
 
 ### Phase 8: Handler Context Refactoring Status
 
-**Overall Progress**: ~95% Complete
+**Overall Progress**: ~98% Complete
 
 **Summary**:
 - ✅ All handler signatures updated to use `HandlerContext` (150+ handlers)
 - ✅ All handlers use `logger` from context (Logger Cleanup completed - 30 files)
 - ✅ HandlerContext interface created and exported
 - ✅ BaseHandlerGroup updated to use context
-- 🔄 Handler registration infrastructure (mcp_handlers.ts) - in progress by user
+- ✅ Handler registration infrastructure (mcp_handlers.ts) - all calls use context
+- ✅ All handler group subclasses ready (inherit from BaseHandlerGroup, use context correctly)
+- ✅ Handler group instantiations updated (usage-example.ts, index.ts use context)
 - ⏳ Test workflow functions - pending update to pass context
 
 #### Completed ✅
@@ -573,16 +575,18 @@ describe('Class High-Level Handlers Integration', () => {
   - `handleGetObjectStructure`, `handleGetAllTypes`, `handleGetInactiveObjects`, `handleGetSession`, `handleGetTransaction`, `handleGetWhereUsed`, `handleGetAbapSemanticAnalysis`, `handleGetAbapAST`, `handleGetSqlQuery`, `handleDescribeByList`, `handleGetObjectNodeFromCache`
 
 #### In Progress 🔄
-- **mcp_handlers.ts**: Context parameter added, registration calls being updated by user
+- **mcp_handlers.ts**: ✅ All registration calls use context parameter
+- **Handler Groups**: ✅ All handlers wrapped in lambdas with `this.context` (SystemHandlersGroup updated by user)
 - **Remaining read-only handlers**: None (all 30+ completed!) ✅
 - **Remaining high-level handlers**: None (all completed!) ✅
 - **Remaining low-level handlers**: None (all completed!) ✅
 
 #### Pending ⏳
-- Update all handler group subclasses to use context (user is working on this)
 - Update test workflow functions to pass context (in progress)
 - Update any internal handler-to-handler calls
 - **Logger Cleanup**: ✅ **COMPLETED** - All handlers now use `logger` from `HandlerContext` instead of `handlerLogger`
+- **Handler Group Subclasses**: ✅ **COMPLETED** - All 5 handler group subclasses have all handlers wrapped in lambdas with `this.context`
+- **MCP Server Handler Registration**: ✅ **COMPLETED** - BaseHandlerGroup.registerToolOnServer calls handlers with `this.context`
 
 ## Benefits
 

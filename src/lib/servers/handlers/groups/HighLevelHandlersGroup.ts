@@ -83,7 +83,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreatePackage_Tool.description,
           inputSchema: CreatePackage_Tool.inputSchema,
         },
-        handler: handleCreatePackage,
+        handler: (args: any) => handleCreatePackage(this.context, args),
       },
       {
         toolDefinition: {
@@ -91,7 +91,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateDomain_Tool.description,
           inputSchema: CreateDomain_Tool.inputSchema,
         },
-        handler: handleCreateDomain,
+        handler: (args: any) => handleCreateDomain(this.context, args),
       },
       {
         toolDefinition: {
@@ -99,7 +99,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateDomainHigh_Tool.description,
           inputSchema: UpdateDomainHigh_Tool.inputSchema,
         },
-        handler: handleUpdateDomainHigh,
+        handler: (args: any) => handleUpdateDomainHigh(this.context, args),
       },
       {
         toolDefinition: {
@@ -107,7 +107,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateDataElement_Tool.description,
           inputSchema: CreateDataElement_Tool.inputSchema,
         },
-        handler: handleCreateDataElement,
+        handler: (args: any) => handleCreateDataElement(this.context, args),
       },
       {
         toolDefinition: {
@@ -115,7 +115,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateDataElementHigh_Tool.description,
           inputSchema: UpdateDataElementHigh_Tool.inputSchema,
         },
-        handler: handleUpdateDataElementHigh,
+        handler: (args: any) => handleUpdateDataElementHigh(this.context, args),
       },
       {
         toolDefinition: {
@@ -123,7 +123,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateTransport_Tool.description,
           inputSchema: CreateTransport_Tool.inputSchema,
         },
-        handler: handleCreateTransport,
+        handler: (args: any) => handleCreateTransport(this.context, args),
       },
       {
         toolDefinition: {
@@ -131,7 +131,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateTable_Tool.description,
           inputSchema: CreateTable_Tool.inputSchema,
         },
-        handler: handleCreateTable,
+        handler: (args: any) => handleCreateTable(this.context, args),
       },
       {
         toolDefinition: {
@@ -139,7 +139,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateTableHigh_Tool.description,
           inputSchema: UpdateTableHigh_Tool.inputSchema,
         },
-        handler: handleUpdateTableHigh,
+        handler: (args: any) => handleUpdateTableHigh(this.context, args),
       },
       {
         toolDefinition: {
@@ -147,7 +147,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateStructure_Tool.description,
           inputSchema: CreateStructure_Tool.inputSchema,
         },
-        handler: handleCreateStructure,
+        handler: (args: any) => handleCreateStructure(this.context, args),
       },
       {
         toolDefinition: {
@@ -155,7 +155,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateStructureHigh_Tool.description,
           inputSchema: UpdateStructureHigh_Tool.inputSchema,
         },
-        handler: handleUpdateStructureHigh,
+        handler: (args: any) => handleUpdateStructureHigh(this.context, args),
       },
       {
         toolDefinition: {
@@ -163,7 +163,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateView_Tool.description,
           inputSchema: CreateView_Tool.inputSchema,
         },
-        handler: handleCreateView,
+        handler: (args: any) => handleCreateView(this.context, args),
       },
       {
         toolDefinition: {
@@ -171,7 +171,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateViewHigh_Tool.description,
           inputSchema: UpdateViewHigh_Tool.inputSchema,
         },
-        handler: handleUpdateViewHigh,
+        handler: (args: any) => handleUpdateViewHigh(this.context, args),
       },
       {
         toolDefinition: {
@@ -179,7 +179,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateServiceDefinition_Tool.description,
           inputSchema: CreateServiceDefinition_Tool.inputSchema,
         },
-        handler: handleCreateServiceDefinition,
+        handler: (args: any) => handleCreateServiceDefinition(this.context, args),
       },
       {
         toolDefinition: {
@@ -187,7 +187,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateServiceDefinition_Tool.description,
           inputSchema: UpdateServiceDefinition_Tool.inputSchema,
         },
-        handler: handleUpdateServiceDefinition,
+        handler: (args: any) => handleUpdateServiceDefinition(this.context, args),
       },
       {
         toolDefinition: {
@@ -195,7 +195,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateClass_Tool.description,
           inputSchema: CreateClass_Tool.inputSchema,
         },
-        handler: handleCreateClass,
+        handler: (args: any) => handleCreateClass(this.context, args),
       },
       {
         toolDefinition: {
@@ -203,7 +203,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateClassHigh_Tool.description,
           inputSchema: UpdateClassHigh_Tool.inputSchema,
         },
-        handler: handleUpdateClassHigh,
+        handler: (args: any) => handleUpdateClassHigh(this.context, args),
       },
       {
         toolDefinition: {
@@ -211,7 +211,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateProgram_Tool.description,
           inputSchema: CreateProgram_Tool.inputSchema,
         },
-        handler: handleCreateProgram,
+        handler: (args: any) => handleCreateProgram(this.context, args),
       },
       {
         toolDefinition: {
@@ -219,7 +219,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateProgramHigh_Tool.description,
           inputSchema: UpdateProgramHigh_Tool.inputSchema,
         },
-        handler: handleUpdateProgramHigh,
+        handler: (args: any) => handleUpdateProgramHigh(this.context, args),
       },
       {
         toolDefinition: {
@@ -227,7 +227,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateInterface_Tool.description,
           inputSchema: CreateInterface_Tool.inputSchema,
         },
-        handler: handleCreateInterface,
+        handler: (args: any) => handleCreateInterface(this.context, args),
       },
       {
         toolDefinition: {
@@ -235,7 +235,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateInterfaceHigh_Tool.description,
           inputSchema: UpdateInterfaceHigh_Tool.inputSchema,
         },
-        handler: handleUpdateInterfaceHigh,
+        handler: (args: any) => handleUpdateInterfaceHigh(this.context, args),
       },
       {
         toolDefinition: {
@@ -243,7 +243,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateFunctionGroup_Tool.description,
           inputSchema: CreateFunctionGroup_Tool.inputSchema,
         },
-        handler: handleCreateFunctionGroup,
+        handler: (args: any) => handleCreateFunctionGroup(this.context, args),
       },
       {
         toolDefinition: {
@@ -251,7 +251,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateFunctionGroup_Tool.description,
           inputSchema: UpdateFunctionGroup_Tool.inputSchema,
         },
-        handler: handleUpdateFunctionGroup,
+        handler: (args: any) => handleUpdateFunctionGroup(this.context, args),
       },
       {
         toolDefinition: {
@@ -259,7 +259,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateFunctionModule_Tool.description,
           inputSchema: CreateFunctionModule_Tool.inputSchema,
         },
-        handler: handleCreateFunctionModule,
+        handler: (args: any) => handleCreateFunctionModule(this.context, args),
       },
       {
         toolDefinition: {
@@ -267,7 +267,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateFunctionModuleHigh_Tool.description,
           inputSchema: UpdateFunctionModuleHigh_Tool.inputSchema,
         },
-        handler: handleUpdateFunctionModuleHigh,
+        handler: (args: any) => handleUpdateFunctionModuleHigh(this.context, args),
       },
       {
         toolDefinition: {
@@ -275,7 +275,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateBdef_Tool.description,
           inputSchema: CreateBdef_Tool.inputSchema,
         },
-        handler: handleCreateBehaviorDefinition,
+        handler: (args: any) => handleCreateBehaviorDefinition(this.context, args),
       },
       {
         toolDefinition: {
@@ -283,7 +283,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateBdef_Tool.description,
           inputSchema: UpdateBdef_Tool.inputSchema,
         },
-        handler: handleUpdateBehaviorDefinitionHigh,
+        handler: (args: any) => handleUpdateBehaviorDefinitionHigh(this.context, args),
       },
       {
         toolDefinition: {
@@ -291,7 +291,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateBehaviorImplementation_Tool.description,
           inputSchema: CreateBehaviorImplementation_Tool.inputSchema,
         },
-        handler: handleCreateBehaviorImplementation,
+        handler: (args: any) => handleCreateBehaviorImplementation(this.context, args),
       },
       {
         toolDefinition: {
@@ -299,7 +299,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateBehaviorImplementation_Tool.description,
           inputSchema: UpdateBehaviorImplementation_Tool.inputSchema,
         },
-        handler: handleUpdateBehaviorImplementation,
+        handler: (args: any) => handleUpdateBehaviorImplementation(this.context, args),
       },
       {
         toolDefinition: {
@@ -307,7 +307,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateDdlx_Tool.description,
           inputSchema: CreateDdlx_Tool.inputSchema,
         },
-        handler: handleCreateMetadataExtension,
+        handler: (args: any) => handleCreateMetadataExtension(this.context, args),
       },
       {
         toolDefinition: {
@@ -315,7 +315,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateDdlx_Tool.description,
           inputSchema: UpdateDdlx_Tool.inputSchema,
         },
-        handler: handleUpdateMetadataExtensionHigh,
+        handler: (args: any) => handleUpdateMetadataExtensionHigh(this.context, args),
       },
     ];
   }

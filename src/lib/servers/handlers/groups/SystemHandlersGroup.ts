@@ -1,6 +1,5 @@
 import { BaseHandlerGroup } from "../base/BaseHandlerGroup.js";
 import { HandlerEntry } from "../interfaces.js";
-import { AbapConnection } from "@mcp-abap-adt/connection";
 
 // Import system handlers
 import { handleGetTypeInfo } from "../../../../handlers/system/readonly/handleGetTypeInfo";
@@ -53,7 +52,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           description: GetTypeInfo_Tool.description,
           inputSchema: GetTypeInfo_Tool.inputSchema,
         },
-        handler: handleGetTypeInfo,
+        handler: (args: any) => handleGetTypeInfo(this.context, args),
       },
       {
         toolDefinition: {
@@ -61,7 +60,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           description: GetTransaction_Tool.description,
           inputSchema: GetTransaction_Tool.inputSchema,
         },
-        handler: handleGetTransaction,
+        handler: (args: any) => handleGetTransaction(this.context, args),
       },
       {
         toolDefinition: {
@@ -69,7 +68,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           description: GetSqlQuery_Tool.description,
           inputSchema: GetSqlQuery_Tool.inputSchema,
         },
-        handler: handleGetSqlQuery,
+        handler: (args: any) => handleGetSqlQuery(this.context, args),
       },
       {
         toolDefinition: {
@@ -77,7 +76,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           description: GetWhereUsed_Tool.description,
           inputSchema: GetWhereUsed_Tool.inputSchema,
         },
-        handler: handleGetWhereUsed,
+        handler: (args: any) => handleGetWhereUsed(this.context, args),
       },
       {
         toolDefinition: {
@@ -98,7 +97,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           description: GetAbapAST_Tool.description,
           inputSchema: GetAbapAST_Tool.inputSchema,
         },
-        handler: handleGetAbapAST,
+        handler: (args: any) => handleGetAbapAST(this.context, args),
       },
       {
         toolDefinition: {
@@ -106,7 +105,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           description: GetAbapSemanticAnalysis_Tool.description,
           inputSchema: GetAbapSemanticAnalysis_Tool.inputSchema,
         },
-        handler: handleGetAbapSemanticAnalysis,
+        handler: (args: any) => handleGetAbapSemanticAnalysis(this.context, args),
       },
       {
         toolDefinition: {
@@ -114,7 +113,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           description: GetAbapSystemSymbols_Tool.description,
           inputSchema: GetAbapSystemSymbols_Tool.inputSchema,
         },
-        handler: handleGetAbapSystemSymbols,
+        handler: (args: any) => handleGetAbapSystemSymbols(this.context, args),
       },
       {
         toolDefinition: {
@@ -122,7 +121,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           description: GetSession_Tool.description,
           inputSchema: GetSession_Tool.inputSchema,
         },
-        handler: handleGetSession,
+        handler: (args: any) => handleGetSession(this.context, args),
       },
       {
         toolDefinition: {
@@ -130,7 +129,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           description: GetInactiveObjects_Tool.description,
           inputSchema: GetInactiveObjects_Tool.inputSchema,
         },
-        handler: handleGetInactiveObjects,
+        handler: (args: any) => handleGetInactiveObjects(this.context, args),
       },
       // Dynamic import handlers
       {
@@ -140,7 +139,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           inputSchema: GetAdtTypes_Tool.inputSchema,
         },
         handler: (args: any) => {
-          return handleGetAdtTypes(this.context, args);
+          return handleGetAdtTypes(this.context, args as { type_name: string });
         },
       },
       {
@@ -150,7 +149,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           inputSchema: GetObjectStructure_Tool.inputSchema,
         },
         handler: (args: any) => {
-          return handleGetObjectStructure(this.context, args);
+          return handleGetObjectStructure(this.context, args as { object_type: string; object_name: string });
         },
       },
       {
@@ -160,7 +159,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           inputSchema: GetObjectNodeFromCache_Tool.inputSchema,
         },
         handler: (args: any) => {
-          return handleGetObjectNodeFromCache(this.context, args);
+          return handleGetObjectNodeFromCache(this.context, args as { object_type: string; object_name: string } | { object_type: string; object_name: string; cache_type: string } );
         },
       },
       {
@@ -170,7 +169,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           inputSchema: DescribeByList_Tool.inputSchema,
         },
         handler: (args: any) => {
-          return handleDescribeByList(this.context, args);
+          return handleDescribeByList(this.context, args as { object_type: string; object_name: string } | { object_type: string; object_name: string; cache_type: string } );
         },
       },
     ];

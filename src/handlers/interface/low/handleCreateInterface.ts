@@ -93,7 +93,7 @@ export async function handleCreateInterface(context: HandlerContext, args: Creat
 
     const interfaceName = interface_name.toUpperCase();
 
-    logger.info(`Starting interface creation: ${interfaceName}`);
+    logger?.info(`Starting interface creation: ${interfaceName}`);
 
     try {
       // Create interface
@@ -112,7 +112,7 @@ export async function handleCreateInterface(context: HandlerContext, args: Creat
       // Get updated session state after create
 
 
-      logger.info(`✅ CreateInterface completed: ${interfaceName}`);
+      logger?.info(`✅ CreateInterface completed: ${interfaceName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -128,7 +128,7 @@ export async function handleCreateInterface(context: HandlerContext, args: Creat
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating interface ${interfaceName}: ${error?.message || error}`);
+      logger?.error(`Error creating interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create interface: ${error.message || String(error)}`;

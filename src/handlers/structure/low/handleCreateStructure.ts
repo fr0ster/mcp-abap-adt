@@ -103,7 +103,7 @@ export async function handleCreateStructure(context: HandlerContext, args: Creat
 
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure creation: ${structureName}`);
+    logger?.info(`Starting structure creation: ${structureName}`);
 
     try {
       // Create structure
@@ -123,7 +123,7 @@ export async function handleCreateStructure(context: HandlerContext, args: Creat
       // Get updated session state after create
 
 
-      logger.info(`✅ CreateStructure completed: ${structureName}`);
+      logger?.info(`✅ CreateStructure completed: ${structureName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -139,7 +139,7 @@ export async function handleCreateStructure(context: HandlerContext, args: Creat
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating structure ${structureName}:`, error);
+      logger?.error(`Error creating structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to create structure: ${error.message || String(error)}`;

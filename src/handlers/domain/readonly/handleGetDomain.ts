@@ -18,18 +18,18 @@ export async function handleGetDomain(context: HandlerContext, args: any) {
       throw new McpError(ErrorCode.InvalidParams, 'Domain name is required');
     }
 
-    logger.info(`Reading domain ${args.domain_name}`);
+    logger?.info(`Reading domain ${args.domain_name}`);
 
     // Create client
     const client = new ReadOnlyClient(connection);
     const result = await client.readDomain(args.domain_name);
-    logger.debug(`Successfully read domain ${args.domain_name}`);
+    logger?.debug(`Successfully read domain ${args.domain_name}`);
     return {
       isError: false,
       content: [{ type: "json", json: result }],
     };
   } catch (error) {
-    logger.error(`Failed to read domain ${args?.domain_name || ''}`, error as any);
+    logger?.error(`Failed to read domain ${args?.domain_name || ''}`, error as any);
     return {
       isError: true,
       content: [

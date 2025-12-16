@@ -21,7 +21,7 @@ export async function handleGetInactiveObjects(context: HandlerContext, params: 
     try {
         const client = new CrudClient(connection);
 
-        logger.info("Retrieving inactive objects...");
+        logger?.info("Retrieving inactive objects...");
         const result = await client.getInactiveObjects();
 
         return return_response({
@@ -37,7 +37,7 @@ export async function handleGetInactiveObjects(context: HandlerContext, params: 
         });
 
     } catch (error: any) {
-        logger.error("Error retrieving inactive objects:", error);
+        logger?.error("Error retrieving inactive objects:", error);
         return return_error(error);
     }
 }

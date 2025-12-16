@@ -70,7 +70,7 @@ export async function handleCheckObject(context: HandlerContext, args: CheckObje
           }
 
     const objectName = object_name.toUpperCase();
-    logger.info(`Starting object check: ${objectName} (type: ${objectType}, version: ${checkVersion})`);
+    logger?.info(`Starting object check: ${objectName} (type: ${objectType}, version: ${checkVersion})`);
 
     try {
       switch (objectType) {
@@ -119,9 +119,9 @@ export async function handleCheckObject(context: HandlerContext, args: CheckObje
       const checkResult = parseCheckRunResponse(response);
 
 
-      logger.info(`✅ CheckObject completed: ${objectName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.info(`✅ CheckObject completed: ${objectName}`);
+      logger?.info(`   Status: ${checkResult.status}`);
+      logger?.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -139,7 +139,7 @@ export async function handleCheckObject(context: HandlerContext, args: CheckObje
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking object ${objectName}:`, error);
+      logger?.error(`Error checking object ${objectName}:`, error);
 
       let errorMessage = `Failed to check object: ${error.message || String(error)}`;
 

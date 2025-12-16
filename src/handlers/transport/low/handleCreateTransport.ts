@@ -55,7 +55,7 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
         const client = new CrudClient(connection);
 
     // Ensure connection is established
-        logger.info(`Starting transport creation: ${description}`);
+        logger?.info(`Starting transport creation: ${description}`);
 
     try {
       // Create transport
@@ -66,7 +66,7 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
         throw new Error(`Create did not return a response for transport`);
       }
 
-      logger.info(`✅ CreateTransport completed`);
+      logger?.info(`✅ CreateTransport completed`);
 
       return return_response({
         data: JSON.stringify({
@@ -78,7 +78,7 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating transport:`, error);
+      logger?.error(`Error creating transport:`, error);
 
       // Parse error message
       let errorMessage = `Failed to create transport: ${error.message || String(error)}`;

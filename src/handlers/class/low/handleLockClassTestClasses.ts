@@ -68,7 +68,7 @@ export async function handleLockClassTestClasses(context: HandlerContext, args: 
           }
 
     const className = class_name.toUpperCase();
-    logger.info(`Starting test classes lock for: ${className}`);
+    logger?.info(`Starting test classes lock for: ${className}`);
 
     try {
       await client.lockTestClasses({ className });
@@ -80,7 +80,7 @@ export async function handleLockClassTestClasses(context: HandlerContext, args: 
 
 
 
-      logger.info(`✅ LockClassTestClasses completed: ${className}`);
+      logger?.info(`✅ LockClassTestClasses completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -93,7 +93,7 @@ export async function handleLockClassTestClasses(context: HandlerContext, args: 
         }, null, 2)
       } as AxiosResponse);
     } catch (error: any) {
-      logger.error(`Error locking test classes for ${className}: ${error?.message || error}`);
+      logger?.error(`Error locking test classes for ${className}: ${error?.message || error}`);
       const reason = error?.response?.status === 404
         ? `Class ${className} not found.`
         : error?.response?.status === 409

@@ -90,7 +90,7 @@ export async function handleCheckClass(context: HandlerContext, args: CheckClass
 
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting class check: ${className} (version: ${checkVersion}, has source: ${!!source_code})`);
+    logger?.info(`Starting class check: ${className} (version: ${checkVersion}, has source: ${!!source_code})`);
 
     try {
       const client = new CrudClient(connection);
@@ -106,9 +106,9 @@ export async function handleCheckClass(context: HandlerContext, args: CheckClass
       // Get updated session state after check
 
 
-      logger.info(`✅ CheckClass completed: ${className}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.info(`✅ CheckClass completed: ${className}`);
+      logger?.info(`   Status: ${checkResult.status}`);
+      logger?.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -125,7 +125,7 @@ export async function handleCheckClass(context: HandlerContext, args: CheckClass
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking class ${className}: ${error?.message || error}`);
+      logger?.error(`Error checking class ${className}: ${error?.message || error}`);
 
       let errorMessage = `Failed to check class: ${error.message || String(error)}`;
 

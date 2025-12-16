@@ -633,7 +633,7 @@ export async function handleGetAbapSystemSymbols(context: HandlerContext, args: 
         if (!args?.code) {
             throw new McpError(ErrorCode.InvalidParams, 'ABAP code is required');
         }
-        logger.debug('Running semantic analysis and system symbol resolution');
+        logger?.debug('Running semantic analysis and system symbol resolution');
 
         // First, perform semantic analysis
         const analyzer = new SimpleAbapSemanticAnalyzer();
@@ -642,7 +642,7 @@ export async function handleGetAbapSystemSymbols(context: HandlerContext, args: 
         // Then, resolve symbols with SAP system information
         const resolver = new AbapSystemSymbolResolver();
         const { resolvedSymbols, stats } = await resolver.resolveSymbols(context, semanticResult.symbols);
-        logger.info(`Resolved ${stats.resolvedSymbols}/${stats.totalSymbols} symbols from system`);
+        logger?.info(`Resolved ${stats.resolvedSymbols}/${stats.totalSymbols} symbols from system`);
 
         const result: AbapSystemSymbolsResult = {
             symbols: resolvedSymbols,
@@ -663,13 +663,13 @@ export async function handleGetAbapSystemSymbols(context: HandlerContext, args: 
         };
 
         if (args.filePath) {
-            logger.debug(`Writing system symbol resolution result to file: ${args.filePath}`);
+            logger?.debug(`Writing system symbol resolution result to file: ${args.filePath}`);
             writeResultToFile(JSON.stringify(result, null, 2), args.filePath);
         }
 
         return response;
     } catch (error) {
-        logger.error('Failed to resolve ABAP system symbols', error as any);
+        logger?.error('Failed to resolve ABAP system symbols', error as any);
         return {
             isError: true,
             content: [

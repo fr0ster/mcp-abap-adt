@@ -112,7 +112,7 @@ export async function handleCreateProgram(context: HandlerContext, args: CreateP
 
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program creation: ${programName}`);
+    logger?.info(`Starting program creation: ${programName}`);
 
     try {
       // Create program
@@ -133,7 +133,7 @@ export async function handleCreateProgram(context: HandlerContext, args: CreateP
       // Get updated session state after create
 
 
-      logger.info(`✅ CreateProgram completed: ${programName}`);
+      logger?.info(`✅ CreateProgram completed: ${programName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -149,7 +149,7 @@ export async function handleCreateProgram(context: HandlerContext, args: CreateP
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating program ${programName}: ${error?.message || error}`);
+      logger?.error(`Error creating program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create program: ${error.message || String(error)}`;

@@ -81,7 +81,7 @@ export async function handleUnlockMetadataExtension(context: HandlerContext, arg
 
     const ddlxName = name.toUpperCase();
 
-    logger.info(`Starting metadata extension unlock: ${ddlxName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(`Starting metadata extension unlock: ${ddlxName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock metadata extension
@@ -95,7 +95,7 @@ export async function handleUnlockMetadataExtension(context: HandlerContext, arg
       // Get updated session state after unlock
 
 
-      logger.info(`✅ UnlockMetadataExtension completed: ${ddlxName}`);
+      logger?.info(`✅ UnlockMetadataExtension completed: ${ddlxName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -108,7 +108,7 @@ export async function handleUnlockMetadataExtension(context: HandlerContext, arg
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking metadata extension ${ddlxName}: ${error?.message || error}`);
+      logger?.error(`Error unlocking metadata extension ${ddlxName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock metadata extension: ${error.message || String(error)}`;

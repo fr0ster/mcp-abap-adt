@@ -77,7 +77,7 @@ export async function handleActivateStructure(context: HandlerContext, args: Act
 
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure activation: ${structureName}`);
+    logger?.info(`Starting structure activation: ${structureName}`);
 
     try {
       // Activate structure
@@ -95,9 +95,9 @@ export async function handleActivateStructure(context: HandlerContext, args: Act
       // Get updated session state after activation
 
 
-      logger.info(`✅ ActivateStructure completed: ${structureName}`);
-      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      logger.info(`   Messages: ${activationResult.messages.length}`);
+      logger?.info(`✅ ActivateStructure completed: ${structureName}`);
+      logger?.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
+      logger?.info(`   Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -120,7 +120,7 @@ export async function handleActivateStructure(context: HandlerContext, args: Act
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating structure ${structureName}:`, error);
+      logger?.error(`Error activating structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to activate structure: ${error.message || String(error)}`;

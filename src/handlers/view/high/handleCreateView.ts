@@ -57,16 +57,16 @@ export async function handleCreateView(context: HandlerContext, params: any) {
   }
 
   const viewName = args.view_name.toUpperCase();
-  logger.info(`Starting view creation: ${viewName} (activate=${args.activate !== false})`);
+  logger?.info(`Starting view creation: ${viewName} (activate=${args.activate !== false})`);
 
   // Connection setup
     try {
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    logger.debug(`Created separate connection for handler call: ${viewName}`);
+    logger?.debug(`Created separate connection for handler call: ${viewName}`);
   } catch (connectionError: any) {
     const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
-    logger.error(`Failed to create connection: ${errorMessage}`);
+    logger?.error(`Failed to create connection: ${errorMessage}`);
     return return_error(new Error(`Failed to create connection: ${errorMessage}`));
   }
 
@@ -75,16 +75,16 @@ export async function handleCreateView(context: HandlerContext, params: any) {
     const shouldActivate = args.activate !== false; // default true
 
     // Validate
-    logger.debug(`Validating view: ${viewName}`);
+    logger?.debug(`Validating view: ${viewName}`);
     await client.validateView({
       viewName,
       packageName: args.package_name,
       description: args.description || viewName
     });
-    logger.debug(`View validation passed: ${viewName}`);
+    logger?.debug(`View validation passed: ${viewName}`);
 
     // Create
-    logger.debug(`Creating view: ${viewName}`);
+    logger?.debug(`Creating view: ${viewName}`);
     await client.createView({
       viewName,
       description: args.description || viewName,
@@ -92,83 +92,83 @@ export async function handleCreateView(context: HandlerContext, params: any) {
       ddlSource: args.ddl_source || '',
       transportRequest: args.transport_request
     });
-    logger.info(`View created: ${viewName}`);
+    logger?.info(`View created: ${viewName}`);
 
     // Lock
-    logger.debug(`Locking view: ${viewName}`);
+    logger?.debug(`Locking view: ${viewName}`);
     await client.lockView({ viewName });
     const lockHandle = client.getLockHandle();
-    logger.debug(`View locked: ${viewName} (handle=${lockHandle ? lockHandle.substring(0, 8) + '...' : 'none'})`);
+    logger?.debug(`View locked: ${viewName} (handle=${lockHandle ? lockHandle.substring(0, 8) + '...' : 'none'})`);
 
     try {
       // Check new code BEFORE update
-      logger.debug(`Checking new DDL code before update: ${viewName}`);
+      logger?.debug(`Checking new DDL code before update: ${viewName}`);
       let checkNewCodePassed = false;
       try {
         await safeCheckOperation(
           () => client.checkView({ viewName }, args.ddl_source, 'inactive'),
           viewName,
           {
-            debug: (message: string) => logger.debug(message)
+            debug: (message: string) => logger?.debug(message)
           }
         );
         checkNewCodePassed = true;
-        logger.debug(`New code check passed: ${viewName}`);
+        logger?.debug(`New code check passed: ${viewName}`);
       } catch (checkError: any) {
         if ((checkError as any).isAlreadyChecked) {
-          logger.debug(`View ${viewName} was already checked - continuing`);
+          logger?.debug(`View ${viewName} was already checked - continuing`);
           checkNewCodePassed = true;
         } else {
-          logger.error(`New code check failed: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+          logger?.error(`New code check failed: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
           throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
         }
       }
 
       // Update (only if check passed)
       if (checkNewCodePassed) {
-        logger.debug(`Updating view DDL source: ${viewName}`);
+        logger?.debug(`Updating view DDL source: ${viewName}`);
         await client.updateView({ viewName, ddlSource: args.ddl_source }, lockHandle);
-        logger.info(`View DDL source updated: ${viewName}`);
+        logger?.info(`View DDL source updated: ${viewName}`);
       } else {
-        logger.warn(`Skipping update - new code check failed: ${viewName}`);
+        logger?.warn(`Skipping update - new code check failed: ${viewName}`);
       }
 
       // Unlock (MANDATORY)
-      logger.debug(`Unlocking view: ${viewName}`);
+      logger?.debug(`Unlocking view: ${viewName}`);
       await client.unlockView({ viewName }, lockHandle);
-      logger.info(`View unlocked: ${viewName}`);
+      logger?.info(`View unlocked: ${viewName}`);
 
       // Check inactive version (after unlock)
-      logger.debug(`Checking inactive version: ${viewName}`);
+      logger?.debug(`Checking inactive version: ${viewName}`);
       try {
         await safeCheckOperation(
           () => client.checkView({ viewName }, undefined, 'inactive'),
           viewName,
           {
-            debug: (message: string) => logger.debug(message)
+            debug: (message: string) => logger?.debug(message)
           }
         );
-        logger.debug(`Inactive version check completed: ${viewName}`);
+        logger?.debug(`Inactive version check completed: ${viewName}`);
       } catch (checkError: any) {
         if ((checkError as any).isAlreadyChecked) {
-          logger.debug(`View ${viewName} was already checked - continuing`);
+          logger?.debug(`View ${viewName} was already checked - continuing`);
         } else {
-          logger.warn(`Inactive version check had issues: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+          logger?.warn(`Inactive version check had issues: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
         }
       }
 
       // Activate if requested
       if (shouldActivate) {
-        logger.debug(`Activating view: ${viewName}`);
+        logger?.debug(`Activating view: ${viewName}`);
         try {
           await client.activateView({ viewName });
-          logger.info(`View activated: ${viewName}`);
+          logger?.info(`View activated: ${viewName}`);
         } catch (activationError: any) {
-          logger.error(`Activation failed: ${viewName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`);
+          logger?.error(`Activation failed: ${viewName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`);
           throw new Error(`Activation failed: ${activationError instanceof Error ? activationError.message : String(activationError)}`);
         }
       } else {
-        logger.debug(`Skipping activation for: ${viewName}`);
+        logger?.debug(`Skipping activation for: ${viewName}`);
       }
 
       // Parse activation warnings if activation was performed
@@ -188,7 +188,7 @@ export async function handleCreateView(context: HandlerContext, params: any) {
         }
       }
 
-      logger.info(`CreateView completed successfully: ${viewName}`);
+      logger?.info(`CreateView completed successfully: ${viewName}`);
 
       const result = {
         success: true,
@@ -215,12 +215,12 @@ export async function handleCreateView(context: HandlerContext, params: any) {
       try {
         const lockHandle = client.getLockHandle();
         if (lockHandle) {
-          logger.warn(`Attempting unlock after error for view ${viewName}`);
+          logger?.warn(`Attempting unlock after error for view ${viewName}`);
           await client.unlockView({ viewName }, lockHandle);
-          logger.warn(`Unlocked view after error: ${viewName}`);
+          logger?.warn(`Unlocked view after error: ${viewName}`);
         }
       } catch (unlockError: any) {
-        logger.error(`Failed to unlock view after error: ${viewName} - ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+        logger?.error(`Failed to unlock view after error: ${viewName} - ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
       }
 
       // Parse error message
@@ -242,7 +242,7 @@ export async function handleCreateView(context: HandlerContext, params: any) {
     }
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error(`Error creating view ${viewName}: ${errorMessage}`);
+    logger?.error(`Error creating view ${viewName}: ${errorMessage}`);
     return return_error(new Error(errorMessage));
   } finally {
     try {

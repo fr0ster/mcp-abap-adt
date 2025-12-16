@@ -18,18 +18,18 @@ export async function handleGetStructure(context: HandlerContext, args: any) {
       throw new McpError(ErrorCode.InvalidParams, 'Structure name is required');
     }
 
-    logger.info(`Reading structure ${args.structure_name}`);
+    logger?.info(`Reading structure ${args.structure_name}`);
 
     // Create client
     const client = new ReadOnlyClient(connection);
     const result = await client.readStructure(args.structure_name);
-    logger.debug(`Successfully read structure ${args.structure_name}`);
+    logger?.debug(`Successfully read structure ${args.structure_name}`);
     return {
       isError: false,
       content: [{ type: "json", json: result }],
     };
   } catch (error) {
-    logger.error(`Failed to read structure ${args?.structure_name || ''}`, error as any);
+    logger?.error(`Failed to read structure ${args?.structure_name || ''}`, error as any);
     return {
       isError: true,
       content: [

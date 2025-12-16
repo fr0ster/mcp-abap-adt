@@ -88,13 +88,13 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Upd
 
     const dataElementName = data_element_name.toUpperCase();
 
-    logger.info(`Starting data element update: ${dataElementName}`);
+    logger?.info(`Starting data element update: ${dataElementName}`);
 
     // Validate required properties
     const packageName = properties.package_name || properties.packageName;
     if (!packageName) {
       const errorMsg = 'Package name is required in properties';
-      logger.error(errorMsg);
+      logger?.error(errorMsg);
       return return_error(new Error(errorMsg));
     }
 
@@ -129,14 +129,14 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Upd
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {
-        logger.error(`Update did not return a response for data element ${dataElementName}`);
+        logger?.error(`Update did not return a response for data element ${dataElementName}`);
         throw new Error(`Update did not return a response for data element ${dataElementName}`);
       }
 
       // Get updated session state after update
 
 
-      logger.info(`✅ UpdateDataElement completed: ${dataElementName}`);
+      logger?.info(`✅ UpdateDataElement completed: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -149,7 +149,7 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Upd
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating data element ${dataElementName}: ${error?.message || error}`);
+      logger?.error(`Error updating data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update data element: ${error.message || String(error)}`;

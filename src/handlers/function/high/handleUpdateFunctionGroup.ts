@@ -67,7 +67,7 @@ export async function handleUpdateFunctionGroup(context: HandlerContext, args: U
             // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
     const functionGroupName = function_group_name.toUpperCase();
-    logger.info(`Starting function group metadata update: ${functionGroupName}`);
+    logger?.info(`Starting function group metadata update: ${functionGroupName}`);
 
     try {
       // Use CrudClient for lock/unlock
@@ -120,7 +120,7 @@ export async function handleUpdateFunctionGroup(context: HandlerContext, args: U
         // Unlock
         await crudClient.unlockFunctionGroup({ functionGroupName }, lockHandle);
 
-        logger.info(`✅ UpdateFunctionGroup completed successfully: ${functionGroupName}`);
+        logger?.info(`✅ UpdateFunctionGroup completed successfully: ${functionGroupName}`);
 
         // Return success result
         const result = {
@@ -146,14 +146,14 @@ export async function handleUpdateFunctionGroup(context: HandlerContext, args: U
           try {
             await crudClient.unlockFunctionGroup({ functionGroupName }, lockHandle);
           } catch (unlockError) {
-            logger.error(`Failed to unlock function group after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+            logger?.error(`Failed to unlock function group after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
           }
         }
         throw error;
       }
 
     } catch (error: any) {
-      logger.error(`Error updating function group metadata ${functionGroupName}: ${error?.message || error}`);
+      logger?.error(`Error updating function group metadata ${functionGroupName}: ${error?.message || error}`);
 
       // Check if function group not found
       if (error.message?.includes('not found') || error.response?.status === 404) {
@@ -173,10 +173,10 @@ export async function handleUpdateFunctionGroup(context: HandlerContext, args: U
     try {
       if (connection) {
         connection.reset();
-        logger.debug('Reset function group connection after use');
+        logger?.debug('Reset function group connection after use');
       }
     } catch (resetError: any) {
-      logger.error(`Failed to reset function group connection: ${resetError?.message || resetError}`);
+      logger?.error(`Failed to reset function group connection: ${resetError?.message || resetError}`);
     }
   }
 }

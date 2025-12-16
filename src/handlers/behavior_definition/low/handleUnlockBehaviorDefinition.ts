@@ -84,7 +84,7 @@ export async function handleUnlockBehaviorDefinition(context: HandlerContext, ar
 
     const bdefName = name.toUpperCase();
 
-    logger.info(`Starting behavior definition unlock: ${bdefName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(`Starting behavior definition unlock: ${bdefName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock behavior definition - using types from adt-clients
@@ -101,7 +101,7 @@ export async function handleUnlockBehaviorDefinition(context: HandlerContext, ar
       // Get updated session state after unlock
 
 
-      logger.info(`✅ UnlockBehaviorDefinition completed: ${bdefName}`);
+      logger?.info(`✅ UnlockBehaviorDefinition completed: ${bdefName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -114,7 +114,7 @@ export async function handleUnlockBehaviorDefinition(context: HandlerContext, ar
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking behavior definition ${bdefName}: ${error?.message || error}`);
+      logger?.error(`Error unlocking behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock behavior definition: ${error.message || String(error)}`;

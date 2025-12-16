@@ -81,7 +81,7 @@ export async function handleUnlockInterface(context: HandlerContext, args: Unloc
 
     const interfaceName = interface_name.toUpperCase();
 
-    logger.info(`Starting interface unlock: ${interfaceName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(`Starting interface unlock: ${interfaceName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock interface
@@ -95,7 +95,7 @@ export async function handleUnlockInterface(context: HandlerContext, args: Unloc
       // Get updated session state after unlock
 
 
-      logger.info(`✅ UnlockInterface completed: ${interfaceName}`);
+      logger?.info(`✅ UnlockInterface completed: ${interfaceName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -108,7 +108,7 @@ export async function handleUnlockInterface(context: HandlerContext, args: Unloc
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking interface ${interfaceName}: ${error?.message || error}`);
+      logger?.error(`Error unlocking interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock interface: ${error.message || String(error)}`;

@@ -78,7 +78,7 @@ export async function handleLockBehaviorImplementation(context: HandlerContext, 
 
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting behavior implementation lock: ${className}`);
+    logger?.info(`Starting behavior implementation lock: ${className}`);
 
     try {
       // Lock class (BehaviorImplementation extends ClassBuilder)
@@ -93,8 +93,8 @@ export async function handleLockBehaviorImplementation(context: HandlerContext, 
       // Get updated session state after lock
 
 
-      logger.info(`✅ LockBehaviorImplementation completed: ${className}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger?.info(`✅ LockBehaviorImplementation completed: ${className}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -108,7 +108,7 @@ export async function handleLockBehaviorImplementation(context: HandlerContext, 
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking behavior implementation ${className}: ${error?.message || error}`);
+      logger?.error(`Error locking behavior implementation ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock behavior implementation: ${error.message || String(error)}`;

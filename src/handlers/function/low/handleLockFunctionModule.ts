@@ -83,7 +83,7 @@ export async function handleLockFunctionModule(context: HandlerContext, args: Lo
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function module lock: ${functionModuleName} in ${functionGroupName}`);
+    logger?.info(`Starting function module lock: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       // Lock function module
@@ -97,8 +97,8 @@ export async function handleLockFunctionModule(context: HandlerContext, args: Lo
       // Get updated session state after lock
 
 
-      logger.info(`✅ LockFunctionModule completed: ${functionModuleName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger?.info(`✅ LockFunctionModule completed: ${functionModuleName}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -113,7 +113,7 @@ export async function handleLockFunctionModule(context: HandlerContext, args: Lo
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking function module ${functionModuleName}: ${error?.message || error}`);
+      logger?.error(`Error locking function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock function module: ${error.message || String(error)}`;

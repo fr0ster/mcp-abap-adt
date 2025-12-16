@@ -77,7 +77,7 @@ export async function handleLockMetadataExtension(context: HandlerContext, args:
 
     const ddlxName = name.toUpperCase();
 
-      logger.info(`Starting metadata extension lock: ${ddlxName}`);
+      logger?.info(`Starting metadata extension lock: ${ddlxName}`);
 
     try {
       // Lock metadata extension
@@ -91,8 +91,8 @@ export async function handleLockMetadataExtension(context: HandlerContext, args:
       // Get updated session state after lock
 
 
-      logger.info(`✅ LockMetadataExtension completed: ${ddlxName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger?.info(`✅ LockMetadataExtension completed: ${ddlxName}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -106,7 +106,7 @@ export async function handleLockMetadataExtension(context: HandlerContext, args:
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking metadata extension ${ddlxName}: ${error?.message || error}`);
+      logger?.error(`Error locking metadata extension ${ddlxName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock metadata extension: ${error.message || String(error)}`;

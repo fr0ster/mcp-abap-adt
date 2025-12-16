@@ -75,7 +75,7 @@ export async function handleActivateClass(context: HandlerContext, args: Activat
 
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting class activation: ${className}`);
+    logger?.info(`Starting class activation: ${className}`);
 
     try {
       // Activate class
@@ -93,9 +93,9 @@ export async function handleActivateClass(context: HandlerContext, args: Activat
       // Get updated session state after activation
 
 
-      logger.info(`✅ ActivateClass completed: ${className}`);
-      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      logger.info(`   Messages: ${activationResult.messages.length}`);
+      logger?.info(`✅ ActivateClass completed: ${className}`);
+      logger?.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
+      logger?.info(`   Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -118,7 +118,7 @@ export async function handleActivateClass(context: HandlerContext, args: Activat
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating class ${className}: ${error?.message || error}`);
+      logger?.error(`Error activating class ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate class: ${error.message || String(error)}`;

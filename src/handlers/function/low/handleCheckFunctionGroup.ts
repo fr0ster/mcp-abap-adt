@@ -76,7 +76,7 @@ export async function handleCheckFunctionGroup(context: HandlerContext, args: Ch
 
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function group check: ${functionGroupName}`);
+    logger?.info(`Starting function group check: ${functionGroupName}`);
 
     try {
       // Check function group
@@ -93,8 +93,8 @@ export async function handleCheckFunctionGroup(context: HandlerContext, args: Ch
       // Get updated session state after check
 
 
-      logger.info(`✅ CheckFunctionGroup completed: ${functionGroupName}`);
-      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.info(`✅ CheckFunctionGroup completed: ${functionGroupName}`);
+      logger?.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -110,7 +110,7 @@ export async function handleCheckFunctionGroup(context: HandlerContext, args: Ch
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking function group ${functionGroupName}: ${error?.message || error}`);
+      logger?.error(`Error checking function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check function group: ${error.message || String(error)}`;

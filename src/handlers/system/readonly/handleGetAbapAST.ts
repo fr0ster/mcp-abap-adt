@@ -159,7 +159,7 @@ export async function handleGetAbapAST(context: HandlerContext, args: any) {
 
         const astGenerator = new SimpleAbapASTGenerator();
         const ast = astGenerator.parseToAST(args.code);
-        logger.debug('Generated AST for provided ABAP code');
+        logger?.debug('Generated AST for provided ABAP code');
 
         const result = {
             isError: false,
@@ -172,13 +172,13 @@ export async function handleGetAbapAST(context: HandlerContext, args: any) {
         };
 
         if (args.filePath) {
-            logger.debug(`Writing AST result to file: ${args.filePath}`);
+            logger?.debug(`Writing AST result to file: ${args.filePath}`);
             writeResultToFile(JSON.stringify(ast, null, 2), args.filePath);
         }
 
         return result;
     } catch (error) {
-        logger.error('Failed to generate ABAP AST', error as any);
+        logger?.error('Failed to generate ABAP AST', error as any);
         return {
             isError: true,
             content: [

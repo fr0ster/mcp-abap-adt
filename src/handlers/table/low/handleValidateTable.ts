@@ -82,7 +82,7 @@ export async function handleValidateTable(context: HandlerContext, args: Validat
 
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table validation: ${tableName}`);
+    logger?.info(`Starting table validation: ${tableName}`);
 
     try {
       const client = new CrudClient(connection);
@@ -101,8 +101,8 @@ export async function handleValidateTable(context: HandlerContext, args: Validat
       // Get updated session state after validation
 
 
-      logger.info(`✅ ValidateTable completed: ${tableName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message || 'N/A'}`);
+      logger?.info(`✅ ValidateTable completed: ${tableName}`);
+      logger?.info(`   Valid: ${result.valid}, Message: ${result.message || 'N/A'}`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +119,7 @@ export async function handleValidateTable(context: HandlerContext, args: Validat
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating table ${tableName}:`, error);
+      logger?.error(`Error validating table ${tableName}:`, error);
 
       let errorMessage = `Failed to validate table: ${error.message || String(error)}`;
 

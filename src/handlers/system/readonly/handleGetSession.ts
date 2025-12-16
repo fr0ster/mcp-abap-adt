@@ -38,14 +38,14 @@ export async function handleGetSession(context: HandlerContext, args: GetSession
   try {
     const { force_new = false } = args as GetSessionArgs;
 
-    logger.debug(`Connecting managed session${force_new ? ' (force new)' : ''}...`);
+    logger?.debug(`Connecting managed session${force_new ? ' (force new)' : ''}...`);
 
     // Ensure connection is established (get cookies and CSRF token)
         // Generate new session ID
     const sessionId = generateSessionId();
 
     // Session state management is now handled by auth-broker
-    logger.info(`✅ GetSession completed: session ID ${sessionId.substring(0, 8)}...`);
+    logger?.info(`✅ GetSession completed: session ID ${sessionId.substring(0, 8)}...`);
 
     return return_response({
       data: JSON.stringify({
@@ -57,7 +57,7 @@ export async function handleGetSession(context: HandlerContext, args: GetSession
     } as AxiosResponse);
 
   } catch (error: any) {
-    logger.error('Error getting session:', error);
+    logger?.error('Error getting session:', error);
     return return_error(error);
   }
 }

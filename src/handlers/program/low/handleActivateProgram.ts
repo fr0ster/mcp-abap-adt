@@ -82,7 +82,7 @@ export async function handleActivateProgram(context: HandlerContext, args: Activ
 
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program activation: ${programName}`);
+    logger?.info(`Starting program activation: ${programName}`);
 
     try {
       // Activate program
@@ -100,8 +100,8 @@ export async function handleActivateProgram(context: HandlerContext, args: Activ
       // Get updated session state after activation
 
 
-      logger.info(`✅ ActivateProgram completed: ${programName}`);
-      logger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
+      logger?.info(`✅ ActivateProgram completed: ${programName}`);
+      logger?.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -124,7 +124,7 @@ export async function handleActivateProgram(context: HandlerContext, args: Activ
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating program ${programName}: ${error?.message || error}`);
+      logger?.error(`Error activating program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate program: ${error.message || String(error)}`;

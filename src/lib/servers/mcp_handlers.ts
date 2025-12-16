@@ -6,7 +6,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import * as z from "zod";
 import type { HandlerContext } from "../handlers/interfaces.js";
-import { getHandlerLogger } from "../handlerLogger.js";
 // dotenv removed - using manual .env parsing for all modes to avoid stdout pollution
 
 // Import handler functions
@@ -189,7 +188,6 @@ import { handleActivateTable } from "../../handlers/table/low/handleActivateTabl
 import { handleActivateView } from "../../handlers/view/low/handleActivateView";
 import { handleActivateBehaviorDefinition } from "../../handlers/behavior_definition/low/handleActivateBehaviorDefinition";
 import { handleActivateMetadataExtension } from "../../handlers/ddlx/low/handleActivateMetadataExtension";
-import { handleGetAdtTypes } from "../../handlers/system/readonly/handleGetAllTypes";
 import { handleGetObjectStructure } from "../../handlers/system/readonly/handleGetObjectStructure";
 import { handleGetObjectsList } from "../../handlers/search/readonly/handleGetObjectsList";
 import { handleGetObjectsByType } from "../../handlers/search/readonly/handleGetObjectsByType";

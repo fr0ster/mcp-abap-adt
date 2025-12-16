@@ -76,7 +76,7 @@ export async function handleLockTable(context: HandlerContext, args: LockTableAr
 
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table lock: ${tableName}`);
+    logger?.info(`Starting table lock: ${tableName}`);
 
     try {
       // Lock table
@@ -90,8 +90,8 @@ export async function handleLockTable(context: HandlerContext, args: LockTableAr
       // Get updated session state after lock
 
 
-      logger.info(`✅ LockTable completed: ${tableName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger?.info(`✅ LockTable completed: ${tableName}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -105,7 +105,7 @@ export async function handleLockTable(context: HandlerContext, args: LockTableAr
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking table ${tableName}:`, error);
+      logger?.error(`Error locking table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to lock table: ${error.message || String(error)}`;

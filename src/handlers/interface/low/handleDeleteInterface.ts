@@ -54,7 +54,7 @@ export async function handleDeleteInterface(context: HandlerContext, args: Delet
     const client = new CrudClient(connection);
     const interfaceName = interface_name.toUpperCase();
 
-    logger.info(`Starting interface deletion: ${interfaceName}`);
+    logger?.info(`Starting interface deletion: ${interfaceName}`);
 
     try {
       // Delete interface
@@ -65,7 +65,7 @@ export async function handleDeleteInterface(context: HandlerContext, args: Delet
         throw new Error(`Delete did not return a response for interface ${interfaceName}`);
       }
 
-      logger.info(`✅ DeleteInterface completed successfully: ${interfaceName}`);
+      logger?.info(`✅ DeleteInterface completed successfully: ${interfaceName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -77,7 +77,7 @@ export async function handleDeleteInterface(context: HandlerContext, args: Delet
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting interface ${interfaceName}: ${error?.message || error}`);
+      logger?.error(`Error deleting interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete interface: ${error.message || String(error)}`;

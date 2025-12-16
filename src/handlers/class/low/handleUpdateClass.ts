@@ -87,7 +87,7 @@ export async function handleUpdateClass(context: HandlerContext, args: UpdateCla
 
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting class update: ${className}`);
+    logger?.info(`Starting class update: ${className}`);
 
     try {
       // Update class with source code
@@ -101,7 +101,7 @@ export async function handleUpdateClass(context: HandlerContext, args: UpdateCla
       // Get updated session state after update
 
 
-      logger.info(`✅ UpdateClass completed: ${className}`);
+      logger?.info(`✅ UpdateClass completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -114,7 +114,7 @@ export async function handleUpdateClass(context: HandlerContext, args: UpdateCla
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating class ${className}: ${error?.message || error}`);
+      logger?.error(`Error updating class ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update class: ${error.message || String(error)}`;

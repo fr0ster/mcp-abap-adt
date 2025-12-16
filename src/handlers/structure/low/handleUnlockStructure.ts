@@ -83,7 +83,7 @@ export async function handleUnlockStructure(context: HandlerContext, args: Unloc
 
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure unlock: ${structureName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(`Starting structure unlock: ${structureName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock structure
@@ -97,7 +97,7 @@ export async function handleUnlockStructure(context: HandlerContext, args: Unloc
       // Get updated session state after unlock
 
 
-      logger.info(`✅ UnlockStructure completed: ${structureName}`);
+      logger?.info(`✅ UnlockStructure completed: ${structureName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -110,7 +110,7 @@ export async function handleUnlockStructure(context: HandlerContext, args: Unloc
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking structure ${structureName}:`, error);
+      logger?.error(`Error unlocking structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to unlock structure: ${error.message || String(error)}`;

@@ -50,12 +50,12 @@ export async function handleGetTransaction(context: HandlerContext, args: any) {
     //     if (!args?.transaction_name) {
     //         throw new McpError(ErrorCode.InvalidParams, 'Transaction name is required');
     //     }
-    //     logger.info(`Fetching transaction info for ${args.transaction_name}`);
+    //     logger?.info(`Fetching transaction info for ${args.transaction_name}`);
     //     const client = new ReadOnlyClient(connection);
     //     const result = await client.readTransaction(args.transaction_name);
     //     return result;
     // } catch (error) {
-    //     logger.error(`Failed to fetch transaction ${args?.transaction_name}`, error as any);
+    //     logger?.error(`Failed to fetch transaction ${args?.transaction_name}`, error as any);
     //     // MCP-compliant error response: always return content[] with type "text"
     //     return {
     //         isError: true,

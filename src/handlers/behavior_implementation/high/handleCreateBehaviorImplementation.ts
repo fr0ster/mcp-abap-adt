@@ -95,7 +95,7 @@ export async function handleCreateBehaviorImplementation(context: HandlerContext
     const className = typedArgs.class_name.toUpperCase();
     const behaviorDefinition = typedArgs.behavior_definition.toUpperCase();
 
-    logger.info(`Starting behavior implementation creation: ${className} for ${behaviorDefinition}`);
+    logger?.info(`Starting behavior implementation creation: ${className} for ${behaviorDefinition}`);
 
     try {
       // Create client
@@ -136,7 +136,7 @@ export async function handleCreateBehaviorImplementation(context: HandlerContext
         }
       }
 
-      logger.info(`✅ CreateBehaviorImplementation completed successfully: ${className}`);
+      logger?.info(`✅ CreateBehaviorImplementation completed successfully: ${className}`);
 
       // Return success result
       const stepsCompleted = ['create', 'lock', 'update_main_source'];
@@ -172,7 +172,7 @@ export async function handleCreateBehaviorImplementation(context: HandlerContext
       });
 
     } catch (error: any) {
-      logger.error(`Error creating behavior implementation ${className}: ${error?.message || error}`);
+      logger?.error(`Error creating behavior implementation ${className}: ${error?.message || error}`);
 
       // Check if behavior implementation already exists
       if (error.message?.includes('already exists') || error.response?.status === 409) {
@@ -202,16 +202,16 @@ export async function handleCreateBehaviorImplementation(context: HandlerContext
       return return_error(new Error(errorMessage));
     }
   } catch (error: any) {
-    logger.error(`CreateBehaviorImplementation handler error: ${error?.message || error}`);
+    logger?.error(`CreateBehaviorImplementation handler error: ${error?.message || error}`);
     return return_error(error);
   } finally {
     try {
       if (connection) {
         connection.reset();
-        logger.debug('Reset behavior implementation connection after use');
+        logger?.debug('Reset behavior implementation connection after use');
       }
     } catch (resetError: any) {
-      logger.error(`Failed to reset behavior implementation connection: ${resetError?.message || resetError}`);
+      logger?.error(`Failed to reset behavior implementation connection: ${resetError?.message || resetError}`);
     }
   }
 }

@@ -155,8 +155,8 @@ export async function handleGetTransport(context: HandlerContext, args: GetTrans
     const includeObjects = typedArgs.include_objects !== false;
     const includeTasks = typedArgs.include_tasks !== false;
 
-    logger.debug(`GetTransport: ${typedArgs.transport_number}`);
-    logger.debug(`Include objects: ${includeObjects}, Include tasks: ${includeTasks}`);
+    logger?.debug(`GetTransport: ${typedArgs.transport_number}`);
+    logger?.debug(`Include objects: ${includeObjects}, Include tasks: ${includeTasks}`);
 
     let url = `/sap/bc/adt/cts/transportrequests/${typedArgs.transport_number}`;
 
@@ -172,12 +172,12 @@ export async function handleGetTransport(context: HandlerContext, args: GetTrans
       'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
     };
 
-    logger.debug(`GET from: ${url}`);
+    logger?.debug(`GET from: ${url}`);
 
     // Get transport request
     const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default', undefined, undefined, headers);
 
-    logger.debug(`GetTransport response status: ${response.status}`);
+    logger?.debug(`GetTransport response status: ${response.status}`);
 
     // Parse XML response
     const transportData = parseTransportXml(response.data, includeObjects, includeTasks);

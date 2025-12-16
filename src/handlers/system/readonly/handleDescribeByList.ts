@@ -48,7 +48,7 @@ export async function handleDescribeByList(context: HandlerContext, args: any) {
     };
     throw err;
   }
-  logger.info(`Describing ${objects.length} objects via search`);
+  logger?.info(`Describing ${objects.length} objects via search`);
   const results: any[] = [];
   try {
     for (const obj of objects) {
@@ -125,7 +125,7 @@ export async function handleDescribeByList(context: HandlerContext, args: any) {
       content: results
     };
   } catch (e) {
-    logger.error('Failed to describe objects list', e as any);
+    logger?.error('Failed to describe objects list', e as any);
     return { isError: true, content: [] };
   }
 }

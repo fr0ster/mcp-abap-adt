@@ -61,7 +61,7 @@ export async function handleDeletePackage(context: HandlerContext, args: DeleteP
 
     const client = new CrudClient(connection);
 
-    logger.info(`Starting package deletion: ${packageName}`);
+    logger?.info(`Starting package deletion: ${packageName}`);
 
     try {
       // Delete package
@@ -72,7 +72,7 @@ export async function handleDeletePackage(context: HandlerContext, args: DeleteP
         throw new Error(`Delete did not return a response for package ${packageName}`);
       }
 
-      logger.info(`✅ DeletePackage completed successfully: ${packageName}`);
+      logger?.info(`✅ DeletePackage completed successfully: ${packageName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -84,7 +84,7 @@ export async function handleDeletePackage(context: HandlerContext, args: DeleteP
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting package ${packageName}: ${error?.message || error}`);
+      logger?.error(`Error deleting package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete package: ${error.message || String(error)}`;

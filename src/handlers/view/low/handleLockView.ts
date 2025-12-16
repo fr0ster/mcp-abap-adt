@@ -77,7 +77,7 @@ export async function handleLockView(context: HandlerContext, args: LockViewArgs
 
     const viewName = view_name.toUpperCase();
 
-    logger.info(`Starting view lock: ${viewName}`);
+    logger?.info(`Starting view lock: ${viewName}`);
 
     try {
       // Lock view
@@ -91,8 +91,8 @@ export async function handleLockView(context: HandlerContext, args: LockViewArgs
       // Get updated session state after lock
 
 
-      logger.info(`✅ LockView completed: ${viewName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger?.info(`✅ LockView completed: ${viewName}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -106,7 +106,7 @@ export async function handleLockView(context: HandlerContext, args: LockViewArgs
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking view ${viewName}: ${error?.message || error}`);
+      logger?.error(`Error locking view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock view: ${error.message || String(error)}`;

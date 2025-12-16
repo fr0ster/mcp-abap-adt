@@ -60,7 +60,7 @@ export async function handleCreateMetadataExtension(context: HandlerContext, par
 
     const name = args.name.toUpperCase();
 
-    logger.info(`Starting DDLX creation: ${name}`);
+    logger?.info(`Starting DDLX creation: ${name}`);
 
     try {
         const client = new CrudClient(connection);
@@ -94,7 +94,7 @@ export async function handleCreateMetadataExtension(context: HandlerContext, par
           try {
             await client.unlockMetadataExtension({ name: name }, lockHandle);
           } catch (unlockError) {
-            logger.error(`Failed to unlock metadata extension after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+            logger?.error(`Failed to unlock metadata extension after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
           }
           // Principle 2: first error and exit
           throw error;
@@ -119,16 +119,16 @@ export async function handleCreateMetadataExtension(context: HandlerContext, par
         });
 
     } catch (error: any) {
-        logger.error(`Error creating DDLX ${name}: ${error?.message || error}`);
+        logger?.error(`Error creating DDLX ${name}: ${error?.message || error}`);
         return return_error(error);
     } finally {
         try {
             if (connection) {
                 connection.reset();
-                logger.debug('Reset metadata extension connection after use');
+                logger?.debug('Reset metadata extension connection after use');
             }
         } catch (resetError: any) {
-            logger.error(`Failed to reset metadata extension connection: ${resetError?.message || resetError}`);
+            logger?.error(`Failed to reset metadata extension connection: ${resetError?.message || resetError}`);
         }
     }
 }

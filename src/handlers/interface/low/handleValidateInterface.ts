@@ -87,7 +87,7 @@ export async function handleValidateInterface(context: HandlerContext, args: Val
 
     const interfaceName = interface_name.toUpperCase();
 
-    logger.info(`Starting interface validation: ${interfaceName}`);
+    logger?.info(`Starting interface validation: ${interfaceName}`);
 
     try {
       // Validate interface
@@ -105,7 +105,7 @@ export async function handleValidateInterface(context: HandlerContext, args: Val
       // Get updated session state after validation
 
 
-      logger.info(`✅ ValidateInterface completed: ${interfaceName} (valid=${result.valid})`);
+      logger?.info(`✅ ValidateInterface completed: ${interfaceName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -121,7 +121,7 @@ export async function handleValidateInterface(context: HandlerContext, args: Val
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating interface ${interfaceName}: ${error?.message || error}`);
+      logger?.error(`Error validating interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate interface: ${error.message || String(error)}`;

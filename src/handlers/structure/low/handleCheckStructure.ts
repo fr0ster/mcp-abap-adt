@@ -97,7 +97,7 @@ export async function handleCheckStructure(context: HandlerContext, args: CheckS
       ? version.toLowerCase() as 'active' | 'inactive'
       : 'inactive';
 
-    logger.info(`Starting structure check: ${structureName} (version: ${checkVersion}) ${ddl_code ? '(with new code)' : '(saved version)'}`);
+    logger?.info(`Starting structure check: ${structureName} (version: ${checkVersion}) ${ddl_code ? '(with new code)' : '(saved version)'}`);
 
     try {
       // Check structure with optional source code (for validating new/unsaved code)
@@ -115,9 +115,9 @@ export async function handleCheckStructure(context: HandlerContext, args: CheckS
       // Get updated session state after check
 
 
-      logger.info(`✅ CheckStructure completed: ${structureName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.info(`✅ CheckStructure completed: ${structureName}`);
+      logger?.info(`   Status: ${checkResult.status}`);
+      logger?.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -134,7 +134,7 @@ export async function handleCheckStructure(context: HandlerContext, args: CheckS
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking structure ${structureName}:`, error);
+      logger?.error(`Error checking structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to check structure: ${error.message || String(error)}`;

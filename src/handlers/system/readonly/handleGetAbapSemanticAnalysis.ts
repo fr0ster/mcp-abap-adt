@@ -396,7 +396,7 @@ export async function handleGetAbapSemanticAnalysis(context: HandlerContext, arg
         if (!args?.code) {
             throw new McpError(ErrorCode.InvalidParams, 'ABAP code is required');
         }
-        logger.debug('Running semantic analysis for provided ABAP code');
+        logger?.debug('Running semantic analysis for provided ABAP code');
 
         const analyzer = new SimpleAbapSemanticAnalyzer();
         const analysis = analyzer.analyze(args.code);
@@ -412,13 +412,13 @@ export async function handleGetAbapSemanticAnalysis(context: HandlerContext, arg
         };
 
         if (args.filePath) {
-            logger.debug(`Writing semantic analysis result to file: ${args.filePath}`);
+            logger?.debug(`Writing semantic analysis result to file: ${args.filePath}`);
             writeResultToFile(JSON.stringify(analysis, null, 2), args.filePath);
         }
 
         return result;
     } catch (error) {
-        logger.error('Failed to perform ABAP semantic analysis', error as any);
+        logger?.error('Failed to perform ABAP semantic analysis', error as any);
         return {
             isError: true,
             content: [

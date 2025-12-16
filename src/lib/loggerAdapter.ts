@@ -14,16 +14,16 @@ import { logger } from "./logger";
  */
 export const loggerAdapter: ILogger = {
   info: (message: string, meta?: any) => {
-    logger.info(message, meta);
+    logger?.info(message, meta);
   },
   error: (message: string, meta?: any) => {
-    logger.error(message, meta);
+    logger?.error(message, meta);
   },
   warn: (message: string, meta?: any) => {
-    logger.warn(message, meta);
+    logger?.warn(message, meta);
   },
   debug: (message: string, meta?: any) => {
-    logger.debug(message, meta);
+    logger?.debug(message, meta);
   },
 };
 

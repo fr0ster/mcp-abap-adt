@@ -93,7 +93,7 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
 
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table creation: ${tableName}`);
+    logger?.info(`Starting table creation: ${tableName}`);
 
     try {
       // Create table
@@ -113,7 +113,7 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
       // Get updated session state after create
 
 
-      logger.info(`✅ CreateTable completed: ${tableName}`);
+      logger?.info(`✅ CreateTable completed: ${tableName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -128,7 +128,7 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating table ${tableName}:`, error);
+      logger?.error(`Error creating table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to create table: ${error.message || String(error)}`;

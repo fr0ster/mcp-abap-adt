@@ -14,10 +14,10 @@ export function getHandlerLogger(category: string, baseLogger: Logger = defaultL
   const wrap = (fn: (msg: string) => void) => (msg: string) => fn(`${prefix} ${msg}`);
 
   return {
-    info: wrap(baseLogger.info.bind(baseLogger)),
-    debug: wrap(baseLogger.debug.bind(baseLogger)),
-    warn: wrap(baseLogger.warn.bind(baseLogger)),
-    error: wrap(baseLogger.error.bind(baseLogger)),
+    info: wrap(baseLogger?.info.bind(baseLogger)),
+    debug: wrap(baseLogger?.debug.bind(baseLogger)),
+    warn: wrap(baseLogger?.warn.bind(baseLogger)),
+    error: wrap(baseLogger?.error.bind(baseLogger)),
   };
 }
 

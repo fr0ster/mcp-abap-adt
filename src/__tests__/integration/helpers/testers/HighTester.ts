@@ -91,7 +91,7 @@ export class HighTester extends BaseTester {
   async run(): Promise<void> {
     // Check basic prerequisites (config, test case) before creating connection
     if (!this.hasConfig || !this.testCase) {
-      this.logger.testSkip(`Skipping test: ${this.getSkipReason()}`);
+      this.logger?.testSkip(`Skipping test: ${this.getSkipReason()}`);
       return;
     }
 
@@ -102,7 +102,7 @@ export class HighTester extends BaseTester {
 
     // Check if connection creation failed
     if (!this.connection || !this.session) {
-      this.logger.testSkip(`Skipping test: ${this.getSkipReason()}`);
+      this.logger?.testSkip(`Skipping test: ${this.getSkipReason()}`);
       return;
     }
 
@@ -115,8 +115,8 @@ export class HighTester extends BaseTester {
     const transportRequest = this.resolveTransportRequest();
 
     // Log test start
-    this.logger.info(`🚀 Starting high-level workflow test for ${this.objectName || 'object'}`);
-    this.logger.info(`   Workflow steps: create → update`);
+    this.logger?.info(`🚀 Starting high-level workflow test for ${this.objectName || 'object'}`);
+    this.logger?.info(`   Workflow steps: create → update`);
 
     try {
       // Get context for workflow functions
@@ -137,17 +137,17 @@ export class HighTester extends BaseTester {
       }
 
       // Log test completion
-      this.logger.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-      this.logger.success(`✨ High-level workflow completed successfully for ${this.objectName}`);
+      this.logger?.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      this.logger?.success(`✨ High-level workflow completed successfully for ${this.objectName}`);
     } catch (error: any) {
       // Check if error is a skip condition
       if (error.message && error.message.startsWith('SKIP:')) {
         const skipReason = error.message.replace(/^SKIP:\s*/, '');
-        this.logger.testSkip(`Skipping test: ${skipReason}`);
+        this.logger?.testSkip(`Skipping test: ${skipReason}`);
         return; // Don't throw, just skip the test
       }
 
-      this.logger.error(`💥 Test failed: ${error.message}`);
+      this.logger?.error(`💥 Test failed: ${error.message}`);
       throw error;
     }
   }
@@ -160,7 +160,7 @@ export class HighTester extends BaseTester {
       throw new Error('Create handler or connection/session not available');
     }
 
-    this.logger.info(`   • create: ${this.objectName}`);
+    this.logger?.info(`   • create: ${this.objectName}`);
 
     // For high-level handlers, source_code might not be required (e.g., DataElement, Domain use type_kind, data_type, etc.)
     const sourceCode = this.getSourceCode(params);
@@ -198,7 +198,7 @@ export class HighTester extends BaseTester {
           ? ' (object already exists)'
           : ' (validation failed)';
         const skipReason = `Create operation for ${this.objectName} failed validation${reason}: ${errorMsg}`;
-        this.logger.info(`⏭️  SKIP: ${skipReason}`);
+        this.logger?.info(`⏭️  SKIP: ${skipReason}`);
         throw new Error(`SKIP: ${skipReason}`);
       }
       throw new Error(`Create failed: ${errorMsg}`);
@@ -210,7 +210,7 @@ export class HighTester extends BaseTester {
     }
 
     this.objectWasCreated = true;
-    this.logger.success(`✅ Step 1: Created ${this.objectName} successfully (high-level)`);
+    this.logger?.success(`✅ Step 1: Created ${this.objectName} successfully (high-level)`);
 
     this.session = updateSessionFromResponse(this.session, createData);
     await delay(this.getOperationDelay('create'));
@@ -224,7 +224,7 @@ export class HighTester extends BaseTester {
       throw new Error('Update handler or connection/session not available');
     }
 
-    this.logger.info(`   • update: ${this.objectName}`);
+    this.logger?.info(`   • update: ${this.objectName}`);
 
     const updatedSourceCode = this.getUpdatedSourceCode(params);
     if (!updatedSourceCode) {
@@ -247,7 +247,7 @@ export class HighTester extends BaseTester {
       throw new Error(`Update failed: ${JSON.stringify(updateData)}`);
     }
 
-    this.logger.success(`✅ Step 2: Updated ${this.objectName} successfully (high-level)`);
+    this.logger?.success(`✅ Step 2: Updated ${this.objectName} successfully (high-level)`);
   }
 
   /**
@@ -281,11 +281,11 @@ export class HighTester extends BaseTester {
       }
       // Only log debug in debug mode
       if (process.env.DEBUG_TESTS === 'true' || process.env.DEBUG_ADT_TESTS === 'true') {
-        this.logger.debug(`✅ Cleanup: Deleted ${this.objectName}`);
+        this.logger?.debug(`✅ Cleanup: Deleted ${this.objectName}`);
       }
     } catch (deleteError: any) {
       // Log but don't fail test on cleanup errors
-      this.logger.warn(`Cleanup delete error (ignored): ${deleteError?.message || String(deleteError)}`);
+      this.logger?.warn(`Cleanup delete error (ignored): ${deleteError?.message || String(deleteError)}`);
     }
   }
 

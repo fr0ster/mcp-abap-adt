@@ -95,7 +95,7 @@ export async function handleUpdateFunctionModule(context: HandlerContext, args: 
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function module update: ${functionModuleName} in ${functionGroupName}`);
+    logger?.info(`Starting function module update: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       // Update function module with source code
@@ -109,7 +109,7 @@ export async function handleUpdateFunctionModule(context: HandlerContext, args: 
       // Get updated session state after update
 
 
-      logger.info(`✅ UpdateFunctionModule completed: ${functionModuleName}`);
+      logger?.info(`✅ UpdateFunctionModule completed: ${functionModuleName}`);
 
       // Get lock handle from builder (it should still be there after update)
       const lockHandleFromBuilder = client.getLockHandle();
@@ -127,7 +127,7 @@ export async function handleUpdateFunctionModule(context: HandlerContext, args: 
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating function module ${functionModuleName}: ${error?.message || error}`);
+      logger?.error(`Error updating function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update function module: ${error.message || String(error)}`;

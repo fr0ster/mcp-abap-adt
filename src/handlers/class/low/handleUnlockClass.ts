@@ -81,7 +81,7 @@ export async function handleUnlockClass(context: HandlerContext, args: UnlockCla
 
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting class unlock: ${className} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(`Starting class unlock: ${className} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock class
@@ -95,7 +95,7 @@ export async function handleUnlockClass(context: HandlerContext, args: UnlockCla
       // Get updated session state after unlock
 
 
-      logger.info(`✅ UnlockClass completed: ${className}`);
+      logger?.info(`✅ UnlockClass completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -108,7 +108,7 @@ export async function handleUnlockClass(context: HandlerContext, args: UnlockCla
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking class ${className}: ${error?.message || error}`);
+      logger?.error(`Error unlocking class ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock class: ${error.message || String(error)}`;

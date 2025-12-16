@@ -156,7 +156,7 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Dat
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
     const dataElementName = typedArgs.data_element_name.toUpperCase();
 
-    logger.info(`Starting data element update: ${dataElementName}`);
+    logger?.info(`Starting data element update: ${dataElementName}`);
 
     try {
       type AdtClientsTypeKind =
@@ -194,7 +194,7 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Dat
           throw validateError;
         }
         // "Already exists" is OK for update - continue
-        logger.info(`Data element ${dataElementName} already exists - this is expected for update operation`);
+        logger?.info(`Data element ${dataElementName} already exists - this is expected for update operation`);
       }
 
       // Lock
@@ -230,7 +230,7 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Dat
             () => client.checkDataElement({ dataElementName }),
             dataElementName,
             {
-              debug: (message: string) => logger.debug(message)
+              debug: (message: string) => logger?.debug(message)
             }
           );
         } catch (checkError: any) {
@@ -253,7 +253,7 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Dat
         try {
           await client.unlockDataElement({ dataElementName: dataElementName }, lockHandle);
         } catch (unlockError) {
-          logger.error(`Failed to unlock data element after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+          logger?.error(`Failed to unlock data element after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
         }
         throw error;
       }
@@ -279,7 +279,7 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Dat
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating data element ${dataElementName}: ${error?.message || error}`);
+      logger?.error(`Error updating data element ${dataElementName}: ${error?.message || error}`);
 
       // Handle specific error cases
       if (error.message?.includes('not found') || error.response?.status === 404) {
@@ -307,9 +307,9 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Dat
     } finally {
       try {
         connection.reset();
-        logger.debug('Reset data element connection after use');
+        logger?.debug('Reset data element connection after use');
       } catch (resetError: any) {
-        logger.error(`Failed to reset data element connection: ${resetError?.message || resetError}`);
+        logger?.error(`Failed to reset data element connection: ${resetError?.message || resetError}`);
       }
     }
 

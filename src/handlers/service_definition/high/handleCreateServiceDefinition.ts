@@ -86,7 +86,7 @@ export async function handleCreateServiceDefinition(context: HandlerContext, arg
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
     const serviceDefinitionName = typedArgs.service_definition_name.toUpperCase();
 
-    logger.info(`Starting service definition creation: ${serviceDefinitionName}`);
+    logger?.info(`Starting service definition creation: ${serviceDefinitionName}`);
 
     try {
       // Create client
@@ -137,7 +137,7 @@ export async function handleCreateServiceDefinition(context: HandlerContext, arg
         }
       }
 
-      logger.info(`✅ CreateServiceDefinition completed successfully: ${serviceDefinitionName}`);
+      logger?.info(`✅ CreateServiceDefinition completed successfully: ${serviceDefinitionName}`);
 
       // Return success result
       const stepsCompleted = ['validate', 'create'];
@@ -168,7 +168,7 @@ export async function handleCreateServiceDefinition(context: HandlerContext, arg
       });
 
     } catch (error: any) {
-      logger.error(`Error creating service definition ${serviceDefinitionName}:`, error);
+      logger?.error(`Error creating service definition ${serviceDefinitionName}:`, error);
 
       // Check if service definition already exists
       if (error.message?.includes('already exists') || error.response?.status === 409) {
@@ -184,14 +184,14 @@ export async function handleCreateServiceDefinition(context: HandlerContext, arg
       try {
         if (connection) {
           connection.reset();
-          logger.debug('Reset service definition connection after use');
+          logger?.debug('Reset service definition connection after use');
         }
       } catch (resetError: any) {
-        logger.error(`Failed to reset service definition connection: ${resetError?.message || resetError}`);
+        logger?.error(`Failed to reset service definition connection: ${resetError?.message || resetError}`);
       }
     }
   } catch (error: any) {
-    logger.error('CreateServiceDefinition handler error:', error);
+    logger?.error('CreateServiceDefinition handler error:', error);
     return return_error(error);
   }
 }

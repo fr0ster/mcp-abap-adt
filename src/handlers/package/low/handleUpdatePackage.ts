@@ -99,7 +99,7 @@ export async function handleUpdatePackage(context: HandlerContext, args: UpdateP
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    logger.info(`Starting package update: ${packageName}`);
+    logger?.info(`Starting package update: ${packageName}`);
 
     try {
       // Update package description
@@ -117,7 +117,7 @@ export async function handleUpdatePackage(context: HandlerContext, args: UpdateP
       // Get updated session state after update
 
 
-      logger.info(`✅ UpdatePackage completed: ${packageName}`);
+      logger?.info(`✅ UpdatePackage completed: ${packageName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -132,7 +132,7 @@ export async function handleUpdatePackage(context: HandlerContext, args: UpdateP
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating package ${packageName}: ${error?.message || error}`);
+      logger?.error(`Error updating package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update package: ${error.message || String(error)}`;

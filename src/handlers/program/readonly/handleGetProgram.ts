@@ -18,18 +18,18 @@ export async function handleGetProgram(context: HandlerContext, args: any) {
       throw new McpError(ErrorCode.InvalidParams, 'Program name is required');
     }
 
-    logger.info(`Reading program ${args.program_name}`);
+    logger?.info(`Reading program ${args.program_name}`);
 
     // Create client
     const client = new ReadOnlyClient(context.connection);
     const result = await client.readProgram(args.program_name);
-    logger.debug(`Successfully read program ${args.program_name}`);
+    logger?.debug(`Successfully read program ${args.program_name}`);
     return {
       isError: false,
       content: [{ type: "json", json: result }],
     };
   } catch (error) {
-    logger.error(`Failed to read program ${args?.program_name || ''}`, error as any);
+    logger?.error(`Failed to read program ${args?.program_name || ''}`, error as any);
     return {
       isError: true,
       content: [

@@ -80,7 +80,7 @@ export async function handleUpdateClassTestClasses(context: HandlerContext, args
           }
 
     const className = class_name.toUpperCase();
-    logger.info(`Starting test classes update for: ${className}`);
+    logger?.info(`Starting test classes update for: ${className}`);
 
     try {
       await client.updateClassTestIncludes({
@@ -90,7 +90,7 @@ export async function handleUpdateClassTestClasses(context: HandlerContext, args
       const updateResult = client.getTestClassUpdateResult();
 
 
-      logger.info(`✅ UpdateClassTestClasses completed: ${className}`);
+      logger?.info(`✅ UpdateClassTestClasses completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -103,7 +103,7 @@ export async function handleUpdateClassTestClasses(context: HandlerContext, args
         }, null, 2)
       } as AxiosResponse);
     } catch (error: any) {
-      logger.error(`Error updating test classes for ${className}: ${error?.message || error}`);
+      logger?.error(`Error updating test classes for ${className}: ${error?.message || error}`);
       const reason = error?.response?.status === 404
         ? `Class ${className} not found.`
         : error?.response?.status === 423

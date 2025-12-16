@@ -83,7 +83,7 @@ export async function handleCheckProgram(context: HandlerContext, args: CheckPro
 
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program check: ${programName}`);
+    logger?.info(`Starting program check: ${programName}`);
 
     try {
       // Check program
@@ -100,8 +100,8 @@ export async function handleCheckProgram(context: HandlerContext, args: CheckPro
       // Get updated session state after check
 
 
-      logger.info(`✅ CheckProgram completed: ${programName}`);
-      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.info(`✅ CheckProgram completed: ${programName}`);
+      logger?.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -117,7 +117,7 @@ export async function handleCheckProgram(context: HandlerContext, args: CheckPro
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking program ${programName}: ${error?.message || error}`);
+      logger?.error(`Error checking program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check program: ${error.message || String(error)}`;

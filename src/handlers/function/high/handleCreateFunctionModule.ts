@@ -82,7 +82,7 @@ export async function handleCreateFunctionModule(context: HandlerContext, args: 
     const functionGroupName = typedArgs.function_group_name.toUpperCase();
     const functionModuleName = typedArgs.function_module_name.toUpperCase();
 
-    logger.info(`Starting function module creation: ${functionModuleName} in ${functionGroupName}`);
+    logger?.info(`Starting function module creation: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       // Create client
@@ -126,7 +126,7 @@ export async function handleCreateFunctionModule(context: HandlerContext, args: 
         await client.activateFunctionModule({ functionModuleName, functionGroupName });
       }
 
-      logger.info(`✅ CreateFunctionModule completed successfully: ${functionModuleName}`);
+      logger?.info(`✅ CreateFunctionModule completed successfully: ${functionModuleName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -140,7 +140,7 @@ export async function handleCreateFunctionModule(context: HandlerContext, args: 
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating function module ${functionModuleName}: ${error?.message || error}`);
+      logger?.error(`Error creating function module ${functionModuleName}: ${error?.message || error}`);
 
       // Check if function module already exists
       if (error.message?.includes('already exists') || error.response?.status === 409) {
@@ -168,10 +168,10 @@ export async function handleCreateFunctionModule(context: HandlerContext, args: 
     try {
       if (connection) {
         connection.reset();
-        logger.debug('Reset function module connection after use');
+        logger?.debug('Reset function module connection after use');
       }
     } catch (resetError: any) {
-      logger.error(`Failed to reset function module connection: ${resetError?.message || resetError}`);
+      logger?.error(`Failed to reset function module connection: ${resetError?.message || resetError}`);
     }
   }
 }

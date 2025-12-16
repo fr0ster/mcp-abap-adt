@@ -75,7 +75,7 @@ export async function handleLockInterface(context: HandlerContext, args: LockInt
 
     const interfaceName = interface_name.toUpperCase();
 
-    logger.info(`Starting interface lock: ${interfaceName}`);
+    logger?.info(`Starting interface lock: ${interfaceName}`);
 
     try {
       // Lock interface
@@ -89,8 +89,8 @@ export async function handleLockInterface(context: HandlerContext, args: LockInt
       // Get updated session state after lock
 
 
-      logger.info(`✅ LockInterface completed: ${interfaceName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger?.info(`✅ LockInterface completed: ${interfaceName}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -104,7 +104,7 @@ export async function handleLockInterface(context: HandlerContext, args: LockInt
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking interface ${interfaceName}: ${error?.message || error}`);
+      logger?.error(`Error locking interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock interface: ${error.message || String(error)}`;

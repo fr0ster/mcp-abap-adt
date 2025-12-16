@@ -89,7 +89,7 @@ export async function handleUpdateView(context: HandlerContext, args: UpdateView
 
     const viewName = view_name.toUpperCase();
 
-    logger.info(`Starting view update: ${viewName}`);
+    logger?.info(`Starting view update: ${viewName}`);
 
     try {
       // Update view with DDL source
@@ -103,7 +103,7 @@ export async function handleUpdateView(context: HandlerContext, args: UpdateView
       // Get updated session state after update
 
 
-      logger.info(`✅ UpdateView completed: ${viewName}`);
+      logger?.info(`✅ UpdateView completed: ${viewName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -116,7 +116,7 @@ export async function handleUpdateView(context: HandlerContext, args: UpdateView
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating view ${viewName}: ${error?.message || error}`);
+      logger?.error(`Error updating view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update view: ${error.message || String(error)}`;

@@ -87,7 +87,7 @@ export async function handleValidateDomain(context: HandlerContext, args: Valida
 
     const domainName = domain_name.toUpperCase();
 
-    logger.info(`Starting domain validation: ${domainName}`);
+    logger?.info(`Starting domain validation: ${domainName}`);
 
     try {
       // Validate domain using CrudClient
@@ -105,7 +105,7 @@ export async function handleValidateDomain(context: HandlerContext, args: Valida
       // Get updated session state after validation
 
 
-      logger.info(`✅ ValidateDomain completed: ${domainName} (valid=${result.valid})`);
+      logger?.info(`✅ ValidateDomain completed: ${domainName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -121,7 +121,7 @@ export async function handleValidateDomain(context: HandlerContext, args: Valida
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating domain ${domainName}: ${error?.message || error}`);
+      logger?.error(`Error validating domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate domain: ${error.message || String(error)}`;

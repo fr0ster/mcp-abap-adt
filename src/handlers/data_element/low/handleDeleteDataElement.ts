@@ -54,7 +54,7 @@ export async function handleDeleteDataElement(context: HandlerContext, args: Del
     const client = new CrudClient(connection);
     const dataElementName = data_element_name.toUpperCase();
 
-    logger.info(`Starting data element deletion: ${dataElementName}`);
+    logger?.info(`Starting data element deletion: ${dataElementName}`);
 
     try {
       // Delete data element
@@ -65,7 +65,7 @@ export async function handleDeleteDataElement(context: HandlerContext, args: Del
         throw new Error(`Delete did not return a response for data element ${dataElementName}`);
       }
 
-      logger.info(`✅ DeleteDataElement completed successfully: ${dataElementName}`);
+      logger?.info(`✅ DeleteDataElement completed successfully: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -77,7 +77,7 @@ export async function handleDeleteDataElement(context: HandlerContext, args: Del
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting data element ${dataElementName}: ${error?.message || error}`);
+      logger?.error(`Error deleting data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete data element: ${error.message || String(error)}`;

@@ -83,7 +83,7 @@ export async function handleLockPackage(context: HandlerContext, args: LockPacka
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    logger.info(`Starting package lock: ${packageName} in ${superPackage}`);
+    logger?.info(`Starting package lock: ${packageName} in ${superPackage}`);
 
     try {
       // Lock package
@@ -101,8 +101,8 @@ export async function handleLockPackage(context: HandlerContext, args: LockPacka
       // Connection.getSessionId() returns the current session ID used by the connection
       const actualSessionId = connection.getSessionId() || session_id || null;
 
-      logger.info(`✅ LockPackage completed: ${packageName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger?.info(`✅ LockPackage completed: ${packageName}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -117,7 +117,7 @@ export async function handleLockPackage(context: HandlerContext, args: LockPacka
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking package ${packageName}: ${error?.message || error}`);
+      logger?.error(`Error locking package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock package: ${error.message || String(error)}`;

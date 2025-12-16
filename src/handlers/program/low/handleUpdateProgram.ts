@@ -92,7 +92,7 @@ export async function handleUpdateProgram(context: HandlerContext, args: UpdateP
 
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program update: ${programName}`);
+    logger?.info(`Starting program update: ${programName}`);
 
     try {
       // Update program with source code
@@ -106,7 +106,7 @@ export async function handleUpdateProgram(context: HandlerContext, args: UpdateP
       // Get updated session state after update
 
 
-      logger.info(`✅ UpdateProgram completed: ${programName}`);
+      logger?.info(`✅ UpdateProgram completed: ${programName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +119,7 @@ export async function handleUpdateProgram(context: HandlerContext, args: UpdateP
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating program ${programName}: ${error?.message || error}`);
+      logger?.error(`Error updating program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update program: ${error.message || String(error)}`;

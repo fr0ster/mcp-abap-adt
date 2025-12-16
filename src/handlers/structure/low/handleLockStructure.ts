@@ -77,7 +77,7 @@ export async function handleLockStructure(context: HandlerContext, args: LockStr
 
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure lock: ${structureName}`);
+    logger?.info(`Starting structure lock: ${structureName}`);
 
     try {
       // Lock structure
@@ -91,8 +91,8 @@ export async function handleLockStructure(context: HandlerContext, args: LockStr
       // Get updated session state after lock
 
 
-      logger.info(`✅ LockStructure completed: ${structureName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger?.info(`✅ LockStructure completed: ${structureName}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -106,7 +106,7 @@ export async function handleLockStructure(context: HandlerContext, args: LockStr
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking structure ${structureName}:`, error);
+      logger?.error(`Error locking structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to lock structure: ${error.message || String(error)}`;

@@ -112,14 +112,14 @@ interface CreateClassArgs {
     const connectionWithRefresh = connection as any;
     if (process.env.DEBUG_HANDLERS === 'true' && connectionWithRefresh.canRefreshToken) {
       const canRefresh = connectionWithRefresh.canRefreshToken();
-      logger.debug(`Connection can refresh token: ${canRefresh}`);
+      logger?.debug(`Connection can refresh token: ${canRefresh}`);
     }
 
     const client = new CrudClient(connection);
 
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting class creation: ${className}`);
+    logger?.info(`Starting class creation: ${className}`);
 
     try {
       // Create class
@@ -142,7 +142,7 @@ interface CreateClassArgs {
       // Get updated session state after create
 
 
-      logger.info(`✅ CreateClass completed: ${className}`);
+      logger?.info(`✅ CreateClass completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -158,7 +158,7 @@ interface CreateClassArgs {
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating class ${className}: ${error.message || String(error)}`);
+      logger?.error(`Error creating class ${className}: ${error.message || String(error)}`);
 
       // Parse error message
       let errorMessage = `Failed to create class: ${error.message || String(error)}`;

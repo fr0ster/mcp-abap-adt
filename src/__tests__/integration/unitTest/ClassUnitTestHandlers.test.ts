@@ -73,7 +73,7 @@ describe('Class Unit Test Handlers Integration', () => {
       hasConfig = true;
     } catch (error) {
       if (process.env.DEBUG_TESTS === 'true' || process.env.FULL_LOG_LEVEL === 'true') {
-        testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+        testLogger?.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       }
       hasConfig = false;
     }
@@ -108,7 +108,7 @@ describe('Class Unit Test Handlers Integration', () => {
           hasContainerClassName: !!containerClassName,
           hasTestClassName: !!testClassName
         });
-        testLogger.info('⏭️  Skipping test: No configuration or test case');
+        testLogger?.info('⏭️  Skipping test: No configuration or test case');
         return;
       }
 
@@ -363,7 +363,7 @@ ENDCLASS.`;
           runId
         });
 
-        testLogger.info(`✅ Full unit test workflow completed successfully for ${containerClass}`);
+        testLogger?.info(`✅ Full unit test workflow completed successfully for ${containerClass}`);
 
       } catch (error: any) {
         // Principle 1: If lock was done, unlock is mandatory
@@ -384,7 +384,7 @@ ENDCLASS.`;
             debugLog('CLEANUP_ON_ERROR', `Failed to unlock test classes ${containerClass} after error`, {
               unlockError: unlockError instanceof Error ? unlockError.message : String(unlockError)
             });
-            testLogger.error('Failed to unlock test classes after error:', unlockError);
+            testLogger?.error('Failed to unlock test classes after error:', unlockError);
           }
         }
 
@@ -392,7 +392,7 @@ ENDCLASS.`;
           error: error.message,
           stack: error.stack?.substring(0, 500)
         });
-        testLogger.error(`❌ Test failed: ${error.message}`);
+        testLogger?.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
         // Cleanup: Unlock is always required if test classes were locked
@@ -413,12 +413,12 @@ ENDCLASS.`;
                   session_state: testClassesLockSession.session_state
                 });
                 debugLog('CLEANUP', `Successfully unlocked test classes ${containerClass} (cleanup)`);
-                testLogger.info(`🔓 Unlocked test classes ${containerClass} (cleanup)`);
+                testLogger?.info(`🔓 Unlocked test classes ${containerClass} (cleanup)`);
               } catch (unlockError: any) {
                 debugLog('CLEANUP', `Failed to unlock test classes ${containerClass} (cleanup)`, {
                   error: unlockError instanceof Error ? unlockError.message : String(unlockError)
                 });
-                testLogger.warn(`⚠️  Failed to unlock test classes ${containerClass} during cleanup: ${unlockError.message || unlockError}`);
+                testLogger?.warn(`⚠️  Failed to unlock test classes ${containerClass} during cleanup: ${unlockError.message || unlockError}`);
               }
             }
 
@@ -428,12 +428,12 @@ ENDCLASS.`;
               test_class: testClass,
               test_classes_locked: testClassesLocked
             });
-            testLogger.info(`⚠️ Deletion excluded for diagnostics - object left for analysis: ${containerClass}`);
+            testLogger?.info(`⚠️ Deletion excluded for diagnostics - object left for analysis: ${containerClass}`);
           } catch (cleanupError) {
             debugLog('CLEANUP_ERROR', `Exception during cleanup: ${cleanupError}`, {
               error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
             });
-            testLogger.warn(`⚠️  Failed to cleanup test class ${containerClass}: ${cleanupError}`);
+            testLogger?.warn(`⚠️  Failed to cleanup test class ${containerClass}: ${cleanupError}`);
           }
         }
 

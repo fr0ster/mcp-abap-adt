@@ -92,7 +92,7 @@ export async function handleUnlockPackage(context: HandlerContext, args: UnlockP
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    logger.info(`Starting package unlock: ${packageName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(`Starting package unlock: ${packageName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Get builder instance and set lockHandle in state before unlock
@@ -115,7 +115,7 @@ export async function handleUnlockPackage(context: HandlerContext, args: UnlockP
       // Get updated session state after unlock
 
 
-      logger.info(`✅ UnlockPackage completed: ${packageName}`);
+      logger?.info(`✅ UnlockPackage completed: ${packageName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -129,7 +129,7 @@ export async function handleUnlockPackage(context: HandlerContext, args: UnlockP
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking package ${packageName}: ${error?.message || error}`);
+      logger?.error(`Error unlocking package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock package: ${error.message || String(error)}`;

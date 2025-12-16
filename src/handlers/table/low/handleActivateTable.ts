@@ -77,7 +77,7 @@ export async function handleActivateTable(context: HandlerContext, args: Activat
 
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table activation: ${tableName}`);
+    logger?.info(`Starting table activation: ${tableName}`);
 
     try {
       // Activate table
@@ -95,9 +95,9 @@ export async function handleActivateTable(context: HandlerContext, args: Activat
       // Get updated session state after activation
 
 
-      logger.info(`✅ ActivateTable completed: ${tableName}`);
-      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      logger.info(`   Messages: ${activationResult.messages.length}`);
+      logger?.info(`✅ ActivateTable completed: ${tableName}`);
+      logger?.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
+      logger?.info(`   Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -120,7 +120,7 @@ export async function handleActivateTable(context: HandlerContext, args: Activat
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating table ${tableName}:`, error);
+      logger?.error(`Error activating table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to activate table: ${error.message || String(error)}`;

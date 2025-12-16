@@ -76,7 +76,7 @@ export async function handleCheckDomain(context: HandlerContext, args: CheckDoma
 
     const domainName = domain_name.toUpperCase();
 
-    logger.info(`Starting domain check: ${domainName}`);
+    logger?.info(`Starting domain check: ${domainName}`);
 
     try {
       // Check domain
@@ -93,8 +93,8 @@ export async function handleCheckDomain(context: HandlerContext, args: CheckDoma
       // Get updated session state after check
 
 
-      logger.info(`✅ CheckDomain completed: ${domainName}`);
-      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.info(`✅ CheckDomain completed: ${domainName}`);
+      logger?.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -110,7 +110,7 @@ export async function handleCheckDomain(context: HandlerContext, args: CheckDoma
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking domain ${domainName}: ${error?.message || error}`);
+      logger?.error(`Error checking domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check domain: ${error.message || String(error)}`;

@@ -53,7 +53,7 @@ export async function handleDeleteClass(context: HandlerContext, args: DeleteCla
     const client = new CrudClient(connection);
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting class deletion: ${className}`);
+    logger?.info(`Starting class deletion: ${className}`);
 
     try {
       // Delete class
@@ -67,7 +67,7 @@ export async function handleDeleteClass(context: HandlerContext, args: DeleteCla
         throw new Error(`Delete did not return a response for class ${className}`);
       }
 
-      logger.info(`✅ DeleteClass completed successfully: ${className}`);
+      logger?.info(`✅ DeleteClass completed successfully: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -79,7 +79,7 @@ export async function handleDeleteClass(context: HandlerContext, args: DeleteCla
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting class ${className}: ${error?.message || error}`);
+      logger?.error(`Error deleting class ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete class: ${error.message || String(error)}`;

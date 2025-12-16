@@ -103,7 +103,7 @@ export async function handleValidateBehaviorDefinition(context: HandlerContext, 
 
     const bdefName = name.toUpperCase();
 
-    logger.info(`Starting behavior definition validation: ${bdefName}`);
+    logger?.info(`Starting behavior definition validation: ${bdefName}`);
 
     try {
       // Validate behavior definition - using BehaviorDefinitionValidationParams from adt-clients
@@ -137,8 +137,8 @@ export async function handleValidateBehaviorDefinition(context: HandlerContext, 
       // Get updated session state after validation
 
 
-      logger.info(`✅ ValidateBehaviorDefinition completed: ${bdefName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      logger?.info(`✅ ValidateBehaviorDefinition completed: ${bdefName}`);
+      logger?.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
         data: JSON.stringify({
@@ -154,7 +154,7 @@ export async function handleValidateBehaviorDefinition(context: HandlerContext, 
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating behavior definition ${bdefName}: ${error?.message || error}`);
+      logger?.error(`Error validating behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate behavior definition: ${error.message || String(error)}`;

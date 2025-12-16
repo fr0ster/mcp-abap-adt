@@ -78,7 +78,7 @@ export async function handleLockBehaviorDefinition(context: HandlerContext, args
 
     const bdefName = name.toUpperCase();
 
-    logger.info(`Starting behavior definition lock: ${bdefName}`);
+    logger?.info(`Starting behavior definition lock: ${bdefName}`);
 
     try {
       // Lock behavior definition - using types from adt-clients
@@ -95,8 +95,8 @@ export async function handleLockBehaviorDefinition(context: HandlerContext, args
       // Get updated session state after lock
 
 
-      logger.info(`✅ LockBehaviorDefinition completed: ${bdefName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger?.info(`✅ LockBehaviorDefinition completed: ${bdefName}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -110,7 +110,7 @@ export async function handleLockBehaviorDefinition(context: HandlerContext, args
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking behavior definition ${bdefName}: ${error?.message || error}`);
+      logger?.error(`Error locking behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock behavior definition: ${error.message || String(error)}`;

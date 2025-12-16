@@ -73,7 +73,7 @@ export async function handleUnlockTable(context: HandlerContext, args: UnlockTab
 
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table unlock: ${tableName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(`Starting table unlock: ${tableName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock table
@@ -87,7 +87,7 @@ export async function handleUnlockTable(context: HandlerContext, args: UnlockTab
       // Get updated session state after unlock
 
 
-      logger.info(`✅ UnlockTable completed: ${tableName}`);
+      logger?.info(`✅ UnlockTable completed: ${tableName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -100,7 +100,7 @@ export async function handleUnlockTable(context: HandlerContext, args: UnlockTab
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking table ${tableName}:`, error);
+      logger?.error(`Error unlocking table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to unlock table: ${error.message || String(error)}`;

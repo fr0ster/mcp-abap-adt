@@ -94,7 +94,7 @@ export async function handleCreateFunctionGroup(context: HandlerContext, args: C
 
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function group creation: ${functionGroupName}`);
+    logger?.info(`Starting function group creation: ${functionGroupName}`);
 
     try {
       // Create function group
@@ -113,7 +113,7 @@ export async function handleCreateFunctionGroup(context: HandlerContext, args: C
       // Get updated session state after create
 
 
-      logger.info(`✅ CreateFunctionGroup completed: ${functionGroupName}`);
+      logger?.info(`✅ CreateFunctionGroup completed: ${functionGroupName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -129,7 +129,7 @@ export async function handleCreateFunctionGroup(context: HandlerContext, args: C
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating function group ${functionGroupName}: ${error?.message || error}`);
+      logger?.error(`Error creating function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create function group: ${error.message || String(error)}`;

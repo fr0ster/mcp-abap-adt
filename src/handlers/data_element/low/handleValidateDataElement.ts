@@ -88,7 +88,7 @@ export async function handleValidateDataElement(context: HandlerContext, args: V
 
     const dataElementName = data_element_name.toUpperCase();
 
-    logger.info(`Starting data element validation: ${dataElementName}`);
+    logger?.info(`Starting data element validation: ${dataElementName}`);
 
     try {
       // Validate data element
@@ -110,7 +110,7 @@ export async function handleValidateDataElement(context: HandlerContext, args: V
       }
 
       if (!validationResponse) {
-        logger.error(`Validation did not return a result for data element ${dataElementName}`);
+        logger?.error(`Validation did not return a result for data element ${dataElementName}`);
         throw new Error('Validation did not return a result');
       }
       const result = parseValidationResponse(validationResponse);
@@ -118,7 +118,7 @@ export async function handleValidateDataElement(context: HandlerContext, args: V
       // Get updated session state after validation
 
 
-      logger.info(`✅ ValidateDataElement completed: ${dataElementName} (valid=${result.valid})`);
+      logger?.info(`✅ ValidateDataElement completed: ${dataElementName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -134,7 +134,7 @@ export async function handleValidateDataElement(context: HandlerContext, args: V
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating data element ${dataElementName}: ${error?.message || error}`);
+      logger?.error(`Error validating data element ${dataElementName}: ${error?.message || error}`);
 
       // If validation endpoint returns 400, try to parse it as validation response
       if (error.response?.status === 400) {

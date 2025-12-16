@@ -81,7 +81,7 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
 
     const tableName = createTableArgs.table_name.toUpperCase();
 
-    logger.info(`Starting table creation: ${tableName}`);
+    logger?.info(`Starting table creation: ${tableName}`);
 
     try {
       // Create client
@@ -110,26 +110,26 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
 
       try {
         // Step 1: Check new code BEFORE update (with ddlCode and version='inactive')
-        logger.info(`[CreateTable] Checking new DDL code before update: ${tableName}`);
+        logger?.info(`[CreateTable] Checking new DDL code before update: ${tableName}`);
         let checkNewCodePassed = false;
         try {
           await safeCheckOperation(
             () => client.checkTable({ tableName }, createTableArgs.ddl_code, 'inactive'),
             tableName,
             {
-              debug: (message: string) => logger.debug(`[CreateTable] ${message}`)
+              debug: (message: string) => logger?.debug(`[CreateTable] ${message}`)
             }
           );
           checkNewCodePassed = true;
-          logger.info(`[CreateTable] New code check passed: ${tableName}`);
+          logger?.info(`[CreateTable] New code check passed: ${tableName}`);
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
           if ((checkError as any).isAlreadyChecked) {
-            logger.info(`[CreateTable] Table ${tableName} was already checked - this is OK, continuing`);
+            logger?.info(`[CreateTable] Table ${tableName} was already checked - this is OK, continuing`);
             checkNewCodePassed = true;
           } else {
             // Real check error - don't update if check failed
-            logger.error(`[CreateTable] New code check failed: ${tableName}`, {
+            logger?.error(`[CreateTable] New code check failed: ${tableName}`, {
               error: checkError instanceof Error ? checkError.message : String(checkError)
             });
             throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
@@ -138,35 +138,35 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
 
         // Step 2: Update (only if check passed)
         if (checkNewCodePassed) {
-          logger.info(`[CreateTable] Updating table with DDL code: ${tableName}`);
+          logger?.info(`[CreateTable] Updating table with DDL code: ${tableName}`);
           await client.updateTable({ tableName, ddlCode: createTableArgs.ddl_code }, lockHandle);
-          logger.info(`[CreateTable] Table source code updated: ${tableName}`);
+          logger?.info(`[CreateTable] Table source code updated: ${tableName}`);
         } else {
-          logger.info(`[CreateTable] Skipping update - new code check failed: ${tableName}`);
+          logger?.info(`[CreateTable] Skipping update - new code check failed: ${tableName}`);
         }
 
         // Step 3: Unlock (MANDATORY after lock)
         await client.unlockTable({ tableName }, lockHandle);
-        logger.info(`[CreateTable] Table unlocked: ${tableName}`);
+        logger?.info(`[CreateTable] Table unlocked: ${tableName}`);
 
         // Step 4: Check inactive version (after unlock)
-        logger.info(`[CreateTable] Checking inactive version: ${tableName}`);
+        logger?.info(`[CreateTable] Checking inactive version: ${tableName}`);
         try {
           await safeCheckOperation(
             () => client.checkTable({ tableName }, undefined, 'inactive'),
             tableName,
             {
-              debug: (message: string) => logger.debug(`[CreateTable] ${message}`)
+              debug: (message: string) => logger?.debug(`[CreateTable] ${message}`)
             }
           );
-          logger.info(`[CreateTable] Inactive version check completed: ${tableName}`);
+          logger?.info(`[CreateTable] Inactive version check completed: ${tableName}`);
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
           if ((checkError as any).isAlreadyChecked) {
-            logger.info(`[CreateTable] Table ${tableName} was already checked - continuing`);
+            logger?.info(`[CreateTable] Table ${tableName} was already checked - continuing`);
           } else {
             // Log warning but don't fail - inactive check is informational
-            logger.warn(`[CreateTable] Inactive version check had issues: ${tableName} | ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+            logger?.warn(`[CreateTable] Inactive version check had issues: ${tableName} | ${checkError instanceof Error ? checkError.message : String(checkError)}`);
           }
         }
 
@@ -179,13 +179,13 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
         try {
           await client.unlockTable({ tableName }, lockHandle);
         } catch (unlockError) {
-          logger.error(`Failed to unlock table after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+          logger?.error(`Failed to unlock table after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
         }
         // Principle 2: first error and exit
         throw error;
       }
 
-      logger.info(`✅ CreateTable completed successfully: ${tableName}`);
+      logger?.info(`✅ CreateTable completed successfully: ${tableName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -199,7 +199,7 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating table ${tableName}: ${error?.message || error}`);
+      logger?.error(`Error creating table ${tableName}: ${error?.message || error}`);
 
       // Check if table already exists
       if (error.message?.includes('already exists') || error.response?.status === 409) {
@@ -223,7 +223,7 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
         try {
           connection.reset();
         } catch (resetError: any) {
-          logger.error(`Failed to reset connection: ${resetError.message || resetError}`);
+          logger?.error(`Failed to reset connection: ${resetError.message || resetError}`);
         }
       }
     }

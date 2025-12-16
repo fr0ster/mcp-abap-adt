@@ -83,7 +83,7 @@ export async function handleValidateFunctionGroup(context: HandlerContext, args:
 
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function group validation: ${functionGroupName}`);
+    logger?.info(`Starting function group validation: ${functionGroupName}`);
 
     try {
       // Validate function group
@@ -102,7 +102,7 @@ export async function handleValidateFunctionGroup(context: HandlerContext, args:
       // Get updated session state after validation
 
 
-      logger.info(`✅ ValidateFunctionGroup completed: ${functionGroupName} (valid=${result.valid})`);
+      logger?.info(`✅ ValidateFunctionGroup completed: ${functionGroupName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -118,7 +118,7 @@ export async function handleValidateFunctionGroup(context: HandlerContext, args:
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating function group ${functionGroupName}: ${error?.message || error}`);
+      logger?.error(`Error validating function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate function group: ${error.message || String(error)}`;

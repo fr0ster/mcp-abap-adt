@@ -82,7 +82,7 @@ export async function handleUpdateDomain(context: HandlerContext, args: UpdateDo
 
     const domainName = domain_name.toUpperCase();
 
-    logger.info(`Starting domain update: ${domainName}`);
+    logger?.info(`Starting domain update: ${domainName}`);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -105,7 +105,7 @@ export async function handleUpdateDomain(context: HandlerContext, args: UpdateDo
       // Get updated session state after update
 
 
-      logger.info(`✅ UpdateDomain completed: ${domainName}`);
+      logger?.info(`✅ UpdateDomain completed: ${domainName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -118,7 +118,7 @@ export async function handleUpdateDomain(context: HandlerContext, args: UpdateDo
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating domain ${domainName}: ${error?.message || error}`);
+      logger?.error(`Error updating domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update domain: ${error.message || String(error)}`;

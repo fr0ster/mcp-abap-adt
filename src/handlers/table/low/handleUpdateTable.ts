@@ -93,7 +93,7 @@ export async function handleUpdateTable(context: HandlerContext, args: UpdateTab
 
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table update: ${tableName}`);
+    logger?.info(`Starting table update: ${tableName}`);
 
     try {
       // Update table with DDL code
@@ -107,7 +107,7 @@ export async function handleUpdateTable(context: HandlerContext, args: UpdateTab
       // Get updated session state after update
 
 
-      logger.info(`✅ UpdateTable completed: ${tableName}`);
+      logger?.info(`✅ UpdateTable completed: ${tableName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -120,7 +120,7 @@ export async function handleUpdateTable(context: HandlerContext, args: UpdateTab
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating table ${tableName}:`, error);
+      logger?.error(`Error updating table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to update table: ${error.message || String(error)}`;

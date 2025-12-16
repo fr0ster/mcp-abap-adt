@@ -67,7 +67,7 @@ describe('BehaviorDefinition High-Level Handlers Integration', () => {
       const connection = createAbapConnection(config, connectionLogger);
       context = { connection, logger: testLogger };
     } catch (error) {
-      testLogger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+      testLogger?.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   }, getTimeout('long'));
@@ -76,7 +76,7 @@ describe('BehaviorDefinition High-Level Handlers Integration', () => {
     // Get test case configuration - use low-level test case as template
     const testCase = getEnabledTestCase('create_behavior_definition_low', 'full_workflow');
     if (!testCase) {
-      testLogger.info('⏭️  Skipping test: No test case configuration');
+      testLogger?.info('⏭️  Skipping test: No test case configuration');
       return;
     }
 
@@ -111,7 +111,7 @@ describe('BehaviorDefinition High-Level Handlers Integration', () => {
 
     try {
       // Step 1: Test CreateBehaviorDefinition (High-Level)
-      testLogger.info(`📦 High Create: Creating ${bdefName}...`);
+      testLogger?.info(`📦 High Create: Creating ${bdefName}...`);
       let createResponse;
       try {
         createResponse = await handleCreateBehaviorDefinition(context, {
@@ -126,23 +126,23 @@ describe('BehaviorDefinition High-Level Handlers Integration', () => {
       } catch (error: any) {
         const errorMsg = error.message || String(error);
         // If behavior definition already exists or validation error, skip test
-        testLogger.info(`⏭️  High Create failed for ${bdefName}: ${errorMsg}, skipping test`);
+        testLogger?.info(`⏭️  High Create failed for ${bdefName}: ${errorMsg}, skipping test`);
           return;
       }
 
       if (createResponse.isError) {
         const errorMsg = createResponse.content[0]?.text || 'Unknown error';
-        testLogger.info(`⏭️  High Create failed for ${bdefName}: ${errorMsg}, skipping test`);
+        testLogger?.info(`⏭️  High Create failed for ${bdefName}: ${errorMsg}, skipping test`);
         return;
       }
 
       const createData = parseHandlerResponse(createResponse);
-      testLogger.success(`✅ High Create: Created ${bdefName} successfully`);
+      testLogger?.success(`✅ High Create: Created ${bdefName} successfully`);
 
       await delay(getOperationDelay('create', testCase));
 
       // Step 2: Test UpdateBehaviorDefinition (High-Level)
-      testLogger.info(`📝 High Update: Updating ${bdefName}...`);
+      testLogger?.info(`📝 High Update: Updating ${bdefName}...`);
       if (!testCase.params.update_source_code) {
         throw new Error('update_source_code is required in test configuration for update step');
       }
@@ -159,24 +159,24 @@ describe('BehaviorDefinition High-Level Handlers Integration', () => {
       } catch (error: any) {
         const errorMsg = error.message || String(error);
         // If update fails, just exit without checks
-          testLogger.info(`⏭️  High Update failed for ${bdefName}: ${errorMsg}, skipping test`);
+          testLogger?.info(`⏭️  High Update failed for ${bdefName}: ${errorMsg}, skipping test`);
           return;
       }
 
       if (updateResponse.isError) {
         const errorMsg = updateResponse.content[0]?.text || 'Unknown error';
-        testLogger.info(`⏭️  High Update failed for ${bdefName}: ${errorMsg}, skipping test`);
+        testLogger?.info(`⏭️  High Update failed for ${bdefName}: ${errorMsg}, skipping test`);
         return;
       }
 
       const updateData = parseHandlerResponse(updateResponse);
-      testLogger.success(`✅ High Update: Updated ${bdefName} successfully`);
+      testLogger?.success(`✅ High Update: Updated ${bdefName} successfully`);
 
     await delay(getOperationDelay('update', testCase));
-    testLogger.success(`✅ Full high-level workflow completed successfully for ${bdefName}`);
+    testLogger?.success(`✅ Full high-level workflow completed successfully for ${bdefName}`);
 
   } catch (error: any) {
-    testLogger.error(`❌ Test failed: ${error.message}`);
+    testLogger?.error(`❌ Test failed: ${error.message}`);
     throw error;
   } finally {
       // Cleanup: Optionally delete test behavior definition
@@ -192,16 +192,16 @@ describe('BehaviorDefinition High-Level Handlers Integration', () => {
           });
 
           if (!deleteResponse.isError) {
-            testLogger.info(`🧹 Cleaned up test behavior definition: ${bdefName}`);
+            testLogger?.info(`🧹 Cleaned up test behavior definition: ${bdefName}`);
           } else {
             const errorMsg = deleteResponse.content[0]?.text || 'Unknown error';
-            testLogger.warn(`⚠️  Failed to delete behavior definition ${bdefName}: ${errorMsg}`);
+            testLogger?.warn(`⚠️  Failed to delete behavior definition ${bdefName}: ${errorMsg}`);
           }
         } else {
-          testLogger.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${bdefName}`);
+          testLogger?.info(`⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${bdefName}`);
         }
       } catch (cleanupError) {
-        testLogger.warn(`⚠️  Failed to cleanup test behavior definition ${bdefName}: ${cleanupError}`);
+        testLogger?.warn(`⚠️  Failed to cleanup test behavior definition ${bdefName}: ${cleanupError}`);
       }
     }
   }

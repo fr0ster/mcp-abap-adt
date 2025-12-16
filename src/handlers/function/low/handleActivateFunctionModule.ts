@@ -86,7 +86,7 @@ export async function handleActivateFunctionModule(context: HandlerContext, args
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function module activation: ${functionModuleName} in group ${functionGroupName}`);
+    logger?.info(`Starting function module activation: ${functionModuleName} in group ${functionGroupName}`);
 
     try {
       // Activate function module
@@ -104,8 +104,8 @@ export async function handleActivateFunctionModule(context: HandlerContext, args
       // Get updated session state after activation
 
 
-      logger.info(`✅ ActivateFunctionModule completed: ${functionModuleName}`);
-      logger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
+      logger?.info(`✅ ActivateFunctionModule completed: ${functionModuleName}`);
+      logger?.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -129,7 +129,7 @@ export async function handleActivateFunctionModule(context: HandlerContext, args
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating function module ${functionModuleName}: ${error?.message || error}`);
+      logger?.error(`Error activating function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate function module: ${error.message || String(error)}`;

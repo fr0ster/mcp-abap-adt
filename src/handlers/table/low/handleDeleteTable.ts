@@ -55,7 +55,7 @@ export async function handleDeleteTable(context: HandlerContext, args: DeleteTab
 
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table deletion: ${tableName}`);
+    logger?.info(`Starting table deletion: ${tableName}`);
 
     try {
       // Delete table
@@ -66,7 +66,7 @@ export async function handleDeleteTable(context: HandlerContext, args: DeleteTab
         throw new Error(`Delete did not return a response for table ${tableName}`);
       }
 
-      logger.info(`✅ DeleteTable completed successfully: ${tableName}`);
+      logger?.info(`✅ DeleteTable completed successfully: ${tableName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -78,7 +78,7 @@ export async function handleDeleteTable(context: HandlerContext, args: DeleteTab
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting table ${tableName}:`, error);
+      logger?.error(`Error deleting table ${tableName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to delete table: ${error.message || String(error)}`;

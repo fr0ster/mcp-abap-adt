@@ -77,10 +77,10 @@ export abstract class BaseTester {
       this.hasConfig = true;
       // Only log debug in debug mode
       if (process.env.DEBUG_TESTS === 'true' || process.env.DEBUG_ADT_TESTS === 'true') {
-        this.logger.debug('Configuration loaded successfully');
+        this.logger?.debug('Configuration loaded successfully');
       }
     } catch (error: any) {
-      this.logger.warn(`⚠️ Skipping tests: No .env file or SAP configuration found: ${error?.message || String(error)}`);
+      this.logger?.warn(`⚠️ Skipping tests: No .env file or SAP configuration found: ${error?.message || String(error)}`);
       this.hasConfig = false;
     }
   }
@@ -93,7 +93,7 @@ export abstract class BaseTester {
     // Override in subclasses if needed
     // Only log debug in debug mode
     if (process.env.DEBUG_TESTS === 'true' || process.env.DEBUG_ADT_TESTS === 'true') {
-      this.logger.debug('afterAll: cleanup completed');
+      this.logger?.debug('afterAll: cleanup completed');
     }
   }
 
@@ -110,7 +110,7 @@ export abstract class BaseTester {
     if (!this.testCase) {
       // Only log debug in debug mode
       if (process.env.DEBUG_TESTS === 'true' || process.env.DEBUG_ADT_TESTS === 'true') {
-        this.logger.debug(`No test case found for ${this.handlerName}/${this.testCaseName}`);
+        this.logger?.debug(`No test case found for ${this.handlerName}/${this.testCaseName}`);
       }
       return;
     }
@@ -119,13 +119,13 @@ export abstract class BaseTester {
     if (this.paramsGroupName) {
       this.testParams = this.resolveParamsFromGroup(this.testCase, this.paramsGroupName);
       if (!this.testParams) {
-        this.logger.warn(`Parameter group "${this.paramsGroupName}" not found in test case`);
+        this.logger?.warn(`Parameter group "${this.paramsGroupName}" not found in test case`);
         // Fallback to direct params
         this.testParams = this.testCase.params;
       } else {
         // Only log debug in debug mode
         if (process.env.DEBUG_TESTS === 'true' || process.env.DEBUG_ADT_TESTS === 'true') {
-          this.logger.debug(`Using parameters from group: ${this.paramsGroupName}`);
+          this.logger?.debug(`Using parameters from group: ${this.paramsGroupName}`);
         }
       }
     } else {
@@ -135,7 +135,7 @@ export abstract class BaseTester {
 
     // Only log debug in debug mode
     if (process.env.DEBUG_TESTS === 'true' || process.env.DEBUG_ADT_TESTS === 'true') {
-      this.logger.debug(`Test case loaded: ${this.testCaseName}`);
+      this.logger?.debug(`Test case loaded: ${this.testCaseName}`);
     }
   }
 
@@ -179,7 +179,7 @@ export abstract class BaseTester {
     // Override in subclasses if needed
     // Only log debug in debug mode
     if (process.env.DEBUG_TESTS === 'true' || process.env.DEBUG_ADT_TESTS === 'true') {
-      this.logger.debug('afterEach: cleanup completed');
+      this.logger?.debug('afterEach: cleanup completed');
     }
   }
 
@@ -198,11 +198,11 @@ export abstract class BaseTester {
       this.session = session;
       // Only log debug in debug mode
       if (process.env.DEBUG_TESTS === 'true' || process.env.DEBUG_ADT_TESTS === 'true') {
-        this.logger.debug('Connection and session created successfully');
+        this.logger?.debug('Connection and session created successfully');
       }
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to create connection: ${errorMessage}`);
+      this.logger?.error(`Failed to create connection: ${errorMessage}`);
       throw error;
     }
   }
@@ -282,7 +282,7 @@ export abstract class BaseTester {
       if (process.env.DEBUG_TESTS === 'true' || process.env.DEBUG_ADT_TESTS === 'true') {
         const skipCleanup = mergedTestCase.params?.skip_cleanup;
         const cleanupAfter = mergedTestCase.params?.cleanup_after;
-        this.logger.debug(`Cleanup check: skip_cleanup=${skipCleanup}, cleanup_after=${cleanupAfter}, result=${result}`);
+        this.logger?.debug(`Cleanup check: skip_cleanup=${skipCleanup}, cleanup_after=${cleanupAfter}, result=${result}`);
       }
       return result;
     }
@@ -292,7 +292,7 @@ export abstract class BaseTester {
       const tc = testCase || this.testCase;
       const skipCleanup = tc?.params?.skip_cleanup;
       const cleanupAfter = tc?.params?.cleanup_after;
-      this.logger.debug(`Cleanup check: skip_cleanup=${skipCleanup}, cleanup_after=${cleanupAfter}, result=${result}`);
+      this.logger?.debug(`Cleanup check: skip_cleanup=${skipCleanup}, cleanup_after=${cleanupAfter}, result=${result}`);
     }
     return result;
   }

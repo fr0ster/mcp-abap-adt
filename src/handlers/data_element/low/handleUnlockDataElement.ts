@@ -82,7 +82,7 @@ export async function handleUnlockDataElement(context: HandlerContext, args: Unl
 
     const dataElementName = data_element_name.toUpperCase();
 
-    logger.info(`Starting data element unlock: ${dataElementName}`);
+    logger?.info(`Starting data element unlock: ${dataElementName}`);
 
     try {
       // Unlock data element
@@ -90,14 +90,14 @@ export async function handleUnlockDataElement(context: HandlerContext, args: Unl
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {
-        logger.error(`Unlock did not return a response for data element ${dataElementName}`);
+        logger?.error(`Unlock did not return a response for data element ${dataElementName}`);
         throw new Error(`Unlock did not return a response for data element ${dataElementName}`);
       }
 
       // Get updated session state after unlock
 
 
-      logger.info(`✅ UnlockDataElement completed: ${dataElementName}`);
+      logger?.info(`✅ UnlockDataElement completed: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -110,7 +110,7 @@ export async function handleUnlockDataElement(context: HandlerContext, args: Unl
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking data element ${dataElementName}: ${error?.message || error}`);
+      logger?.error(`Error unlocking data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock data element: ${error.message || String(error)}`;

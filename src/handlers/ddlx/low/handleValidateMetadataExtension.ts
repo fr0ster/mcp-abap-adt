@@ -81,7 +81,7 @@ export async function handleValidateMetadataExtension(context: HandlerContext, a
 
     const ddlxName = name.toUpperCase();
 
-    logger.info(`Starting metadata extension validation: ${ddlxName}`);
+    logger?.info(`Starting metadata extension validation: ${ddlxName}`);
 
     try {
       // Validate metadata extension
@@ -99,7 +99,7 @@ export async function handleValidateMetadataExtension(context: HandlerContext, a
       // Get updated session state after validation
 
 
-      logger.info(`✅ ValidateMetadataExtension completed: ${ddlxName} (valid=${result.valid})`);
+      logger?.info(`✅ ValidateMetadataExtension completed: ${ddlxName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -115,7 +115,7 @@ export async function handleValidateMetadataExtension(context: HandlerContext, a
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating metadata extension ${ddlxName}:`, error);
+      logger?.error(`Error validating metadata extension ${ddlxName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to validate metadata extension: ${error.message || String(error)}`;

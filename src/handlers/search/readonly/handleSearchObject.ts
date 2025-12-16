@@ -54,7 +54,7 @@ export async function handleSearchObject(context: HandlerContext, args: any) {
       searchParams.objectType = object_type;
     }
 
-    logger.info(`Searching objects: query=${object_name}${object_type ? ` type=${object_type}` : ''}`);
+    logger?.info(`Searching objects: query=${object_name}${object_type ? ` type=${object_type}` : ''}`);
     await sharedBuilder.search(searchParams);
     const response = sharedBuilder.getSearchResult();
 

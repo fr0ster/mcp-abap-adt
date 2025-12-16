@@ -40,6 +40,7 @@ import {
   generateConfigTemplateIfNeeded,
   applyYamlConfigToArgs,
 } from "./lib/yamlConfig";
+import { ILogger } from "@mcp-abap-adt/interfaces";
 
 // Import handler functions
 // Import handler functions
@@ -57,6 +58,7 @@ import { loggerAdapter } from "./lib/loggerAdapter";
 
 // Import logger
 import { logger } from "./lib/logger";
+// import { defaultLogger as logger } from "@mcp-abap-adt/logger";
 
 // Import tool registry
 
@@ -677,7 +679,7 @@ if (!skipEnvAutoload) {
       // .env file specified but not found
       if (isEnvMandatory) {
         // Always write error to stderr (stderr is safe even in stdio mode, unlike stdout)
-        logger.error(".env file not found", { path: envFilePath });
+        logger?.error(".env file not found", { path: envFilePath });
         process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found at: ${envFilePath}\n`);
         process.stderr.write(`[MCP-ENV]   Current working directory: ${process.cwd()}\n`);
         process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' requires .env file.\n`);
@@ -707,7 +709,7 @@ if (!skipEnvAutoload) {
       // Transport explicitly set to stdio/sse but no .env found
       const cwdEnvPath = path.resolve(process.cwd(), ".env");
       // Always write error to stderr (stderr is safe even in stdio mode)
-      logger.error(".env file not found", { path: cwdEnvPath });
+      logger?.error(".env file not found", { path: cwdEnvPath });
       process.stderr.write(`[MCP-ENV] ✗ ERROR: .env file not found in current directory: ${process.cwd()}\n`);
       process.stderr.write(`[MCP-ENV]   Transport mode '${transportType}' requires .env file.\n`);
       process.stderr.write(`[MCP-ENV]   Use --env=/path/to/.env to specify custom location\n`);
@@ -755,7 +757,7 @@ if (!skipEnvAutoload) {
 // Skip logging in stdio mode (MCP protocol requires clean JSON only)
 if (!isStdio) {
   const envLogPath = envFilePath ?? "(skipped)";
-  logger.info("SAP configuration loaded", {
+  logger?.info("SAP configuration loaded", {
     type: "CONFIG_INFO",
     SAP_URL: process.env.SAP_URL,
     SAP_CLIENT: process.env.SAP_CLIENT || "(not set)",
@@ -1056,7 +1058,7 @@ export class mcp_abap_adt_server {
       // Create broker with serviceKeyStore + sessionStore
       const authBroker = await this.getOrCreateAuthBroker(this.defaultMcpDestination, 'global');
       if (authBroker) {
-        logger.info("Default broker initialized with destination from --mcp parameter", {
+        logger?.info("Default broker initialized with destination from --mcp parameter", {
           type: "DEFAULT_BROKER_INITIALIZED",
           destination: this.defaultMcpDestination,
           transport: this.transportConfig.type,
@@ -1071,7 +1073,7 @@ export class mcp_abap_adt_server {
       // For .env case, sessionStore should load from .env file
       const authBroker = await this.getOrCreateAuthBroker('default', 'global');
       if (authBroker) {
-        logger.info("Default broker initialized with .env file", {
+        logger?.info("Default broker initialized with .env file", {
           type: "DEFAULT_BROKER_INITIALIZED_ENV",
           destination: 'default',
           transport: this.transportConfig.type,
@@ -1081,7 +1083,7 @@ export class mcp_abap_adt_server {
       // Scenario C: Neither destination nor .env
       // For stdio: error will be thrown in run() method
       // For SSE/HTTP: no default broker, wait for headers
-      logger.debug("No default destination available (no --mcp parameter and no .env file)", {
+      logger?.debug("No default destination available (no --mcp parameter and no .env file)", {
         type: "NO_DEFAULT_DESTINATION",
         transport: this.transportConfig.type,
       });
@@ -1112,7 +1114,7 @@ export class mcp_abap_adt_server {
     // Get or create AuthBroker for specific destination/client
     if (!this.authBrokers.has(brokerKey)) {
       try {
-        logger.debug("Creating AuthBroker for destination", {
+        logger?.debug("Creating AuthBroker for destination", {
           type: "AUTH_BROKER_CREATE_START",
           destination: actualDestination || 'default',
           clientKey: clientKey || 'global',
@@ -1138,7 +1140,7 @@ export class mcp_abap_adt_server {
           sessionStore = stores.sessionStore;
           storeType = stores.storeType;
 
-          logger.debug("Created SessionStore from .env file directory", {
+          logger?.debug("Created SessionStore from .env file directory", {
             type: "SESSION_STORE_FROM_ENV",
             envFilePath: this.envFilePath,
             envFileDir,
@@ -1153,7 +1155,7 @@ export class mcp_abap_adt_server {
           sessionStore = stores.sessionStore;
           storeType = stores.storeType;
         }
-        logger.debug("Platform stores created", {
+        logger?.debug("Platform stores created", {
           type: "PLATFORM_STORES_CREATED",
           destination: actualDestination || 'default',
           clientKey: clientKey || 'global',
@@ -1178,14 +1180,14 @@ export class mcp_abap_adt_server {
           defaultLogger
         );
         this.authBrokers.set(brokerKey, authBroker);
-        logger.info("AuthBroker created for destination", {
+        logger?.info("AuthBroker created for destination", {
           type: "AUTH_BROKER_CREATED",
           destination: actualDestination || 'default',
           clientKey: clientKey || 'global',
           platform: process.platform,
         });
       } catch (error) {
-        logger.error("Failed to create AuthBroker for destination", {
+        logger?.error("Failed to create AuthBroker for destination", {
           type: "AUTH_BROKER_CREATE_FAILED",
           destination: actualDestination || 'default',
           clientKey: clientKey || 'global',
@@ -1198,7 +1200,7 @@ export class mcp_abap_adt_server {
     }
     const authBroker = this.authBrokers.get(brokerKey);
     if (!authBroker) {
-      logger.error("AuthBroker not found in map after creation", {
+      logger?.error("AuthBroker not found in map after creation", {
         type: "AUTH_BROKER_NOT_FOUND",
         destination: actualDestination || 'default',
         clientKey: clientKey || 'global',
@@ -1217,7 +1219,7 @@ export class mcp_abap_adt_server {
     if (isNonLocalInterface) {
       // Non-local interface: use only what client provides in headers, no default destination
       if (!headers || Object.keys(headers).length === 0) {
-        logger.info("No headers provided - server listening on non-local interface requires all headers from client", {
+        logger?.info("No headers provided - server listening on non-local interface requires all headers from client", {
           type: "NO_HEADERS_NON_LOCAL_INTERFACE",
           sessionId: sessionId?.substring(0, 8),
           hint: `Server is listening on 0.0.0.0 - client must provide all connection parameters in headers. Server will not use default destination for security.`,
@@ -1225,7 +1227,7 @@ export class mcp_abap_adt_server {
         return;
       }
       // Use headers as-is, no default destination
-      logger.debug("Non-local interface: using only client-provided headers", {
+      logger?.debug("Non-local interface: using only client-provided headers", {
         type: "NON_LOCAL_INTERFACE_HEADERS_ONLY",
         sessionId: sessionId?.substring(0, 8),
       });
@@ -1249,7 +1251,7 @@ export class mcp_abap_adt_server {
                     [HEADER_SAP_URL]: connConfig.serviceUrl,
                     [HEADER_SAP_JWT_TOKEN]: jwtToken,
                   };
-                  logger.info("No headers provided, using default destination", {
+                  logger?.info("No headers provided, using default destination", {
                     type: "NO_HEADERS_DEFAULT_DESTINATION_USED",
                     destination: this.defaultDestination,
                     sessionId: sessionId?.substring(0, 8),
@@ -1257,7 +1259,7 @@ export class mcp_abap_adt_server {
                 }
               }
             } catch (error) {
-              logger.warn("Failed to get connection config from default destination", {
+              logger?.warn("Failed to get connection config from default destination", {
                 type: "DEFAULT_DESTINATION_CONFIG_FAILED",
                 destination: this.defaultDestination,
                 sessionId: sessionId?.substring(0, 8),
@@ -1269,7 +1271,7 @@ export class mcp_abap_adt_server {
 
         // If still no headers after trying default destination, log and return
         if (!headers || Object.keys(headers).length === 0) {
-          logger.info("No headers provided in request and no default destination available", {
+          logger?.info("No headers provided in request and no default destination available", {
             type: "NO_HEADERS_PROVIDED",
             sessionId: sessionId?.substring(0, 8),
             hint: `Provide authentication headers (${HEADER_SAP_DESTINATION_SERVICE}, ${HEADER_SAP_URL}, ${HEADER_SAP_AUTH_TYPE}, etc.) or use --mcp parameter or .env file`,
@@ -1282,7 +1284,7 @@ export class mcp_abap_adt_server {
       // Only for local interface
       if (this.defaultDestination && !headers[HEADER_MCP_DESTINATION] && !headers['X-MCP-Destination']) {
         headers[HEADER_MCP_DESTINATION] = this.defaultDestination;
-        logger.info("Using default destination (client didn't specify)", {
+        logger?.info("Using default destination (client didn't specify)", {
           type: "DEFAULT_DESTINATION_APPLIED",
           destination: this.defaultDestination,
           sessionId: sessionId?.substring(0, 8),
@@ -1306,7 +1308,7 @@ export class mcp_abap_adt_server {
       [HEADER_SAP_JWT_TOKEN]: (headersWithDefault[HEADER_SAP_JWT_TOKEN] || headersWithDefault['X-SAP-JWT-Token']) ? '[present]' : undefined,
       [HEADER_SAP_LOGIN]: (headersWithDefault[HEADER_SAP_LOGIN] || headersWithDefault['X-SAP-Login']) ? '[present]' : undefined,
     };
-    logger.info("Processing authentication headers", {
+    logger?.info("Processing authentication headers", {
       type: "AUTH_HEADERS_PROCESSING",
       headers: authHeaders,
       platform: process.platform,
@@ -1322,7 +1324,7 @@ export class mcp_abap_adt_server {
 
     // Log warnings if any
     if (validationResult.warnings.length > 0) {
-      logger.debug("Header validation warnings", {
+      logger?.debug("Header validation warnings", {
         type: "HEADER_VALIDATION_WARNINGS",
         warnings: validationResult.warnings,
         sessionId: sessionId?.substring(0, 8),
@@ -1333,14 +1335,14 @@ export class mcp_abap_adt_server {
     // This is not an error - user may be using .env file or base config
     if (!validationResult.isValid || !validationResult.config) {
       if (validationResult.errors.length > 0) {
-        logger.debug("Header validation failed - will use .env file or base config", {
+        logger?.debug("Header validation failed - will use .env file or base config", {
           type: "HEADER_VALIDATION_FAILED",
           errors: validationResult.errors,
           sessionId: sessionId?.substring(0, 8),
           hint: "No valid headers found. Will use .env file or base config if available.",
         });
       } else {
-        logger.debug("No valid authentication headers found - will use .env file or base config", {
+        logger?.debug("No valid authentication headers found - will use .env file or base config", {
           type: "NO_VALID_AUTH_HEADERS",
           sessionId: sessionId?.substring(0, 8),
           hint: "No headers provided. Will use .env file or base config if available.",
@@ -1356,7 +1358,7 @@ export class mcp_abap_adt_server {
       case AuthMethodPriority.SAP_DESTINATION: {
         // Priority 4: x-sap-destination (uses AuthBroker, URL from destination)
         if (!config.destination) {
-          logger.warn("SAP destination auth requires destination name", {
+          logger?.warn("SAP destination auth requires destination name", {
             type: "SAP_DESTINATION_AUTH_MISSING",
             destination: config.destination,
             sessionId: sessionId?.substring(0, 8),
@@ -1368,7 +1370,7 @@ export class mcp_abap_adt_server {
         const authBroker = await this.getOrCreateAuthBroker(config.destination, clientKey || sessionId);
         if (!authBroker) {
           const errorMessage = `Failed to initialize AuthBroker for destination "${config.destination}". Auth-broker is only available for HTTP/streamable-http transport.`;
-          logger.error(errorMessage, {
+          logger?.error(errorMessage, {
             type: "AUTH_BROKER_NOT_INITIALIZED",
             destination: config.destination,
             sessionId: sessionId?.substring(0, 8),
@@ -1383,7 +1385,7 @@ export class mcp_abap_adt_server {
           // Example: if file is "sk.json", destination must be "sk" (not "SK")
           const connConfig = await authBroker.getConnectionConfig(config.destination);
           if (!connConfig || !connConfig.serviceUrl) {
-            logger.error("Failed to get SAP URL from destination", {
+            logger?.error("Failed to get SAP URL from destination", {
               type: "SAP_DESTINATION_URL_NOT_FOUND",
               destination: config.destination,
               sessionId: sessionId?.substring(0, 8),
@@ -1393,7 +1395,7 @@ export class mcp_abap_adt_server {
           }
           const sapUrl = connConfig.serviceUrl;
 
-          logger.info("SAP URL retrieved from destination", {
+          logger?.info("SAP URL retrieved from destination", {
             type: "SAP_URL_RETRIEVED",
             destination: config.destination,
             url: sapUrl,
@@ -1409,14 +1411,14 @@ export class mcp_abap_adt_server {
 
           this.processJwtConfigUpdate(sapUrl, jwtToken, undefined, config.destination, sessionId);
 
-          logger.info("Updated SAP configuration using SAP destination (AuthBroker)", {
+          logger?.info("Updated SAP configuration using SAP destination (AuthBroker)", {
             type: "SAP_CONFIG_UPDATED_SAP_DESTINATION",
             destination: config.destination,
             url: sapUrl,
             sessionId: sessionId?.substring(0, 8),
           });
         } catch (error) {
-          logger.error("Failed to get token from AuthBroker for SAP destination", {
+          logger?.error("Failed to get token from AuthBroker for SAP destination", {
             type: "AUTH_BROKER_ERROR_SAP_DESTINATION",
             destination: config.destination,
             error: error instanceof Error ? error.message : String(error),
@@ -1429,7 +1431,7 @@ export class mcp_abap_adt_server {
       case AuthMethodPriority.MCP_DESTINATION: {
         // Priority 3: x-mcp-destination (uses AuthBroker, URL from destination or x-sap-url header)
         if (!config.destination) {
-          logger.warn("MCP destination auth requires destination", {
+          logger?.warn("MCP destination auth requires destination", {
             type: "MCP_DESTINATION_AUTH_MISSING",
             destination: config.destination,
             sessionId: sessionId?.substring(0, 8),
@@ -1440,7 +1442,7 @@ export class mcp_abap_adt_server {
         // Get or create AuthBroker for this destination (lazy initialization)
         const authBroker = await this.getOrCreateAuthBroker(config.destination, clientKey || sessionId);
         if (!authBroker) {
-          logger.error("Failed to initialize AuthBroker for MCP destination", {
+          logger?.error("Failed to initialize AuthBroker for MCP destination", {
             type: "AUTH_BROKER_NOT_INITIALIZED",
             destination: config.destination,
             sessionId: sessionId?.substring(0, 8),
@@ -1455,7 +1457,7 @@ export class mcp_abap_adt_server {
           // Note: destination name must exactly match service key filename (case-sensitive)
           const connConfig = await authBroker.getConnectionConfig(config.destination);
           if (!connConfig || !connConfig.serviceUrl) {
-            logger.error("Failed to get SAP URL from destination", {
+            logger?.error("Failed to get SAP URL from destination", {
               type: "MCP_DESTINATION_URL_NOT_FOUND",
               destination: config.destination,
               sessionId: sessionId?.substring(0, 8),
@@ -1465,7 +1467,7 @@ export class mcp_abap_adt_server {
           }
           const sapUrl = connConfig.serviceUrl;
 
-          logger.info("SAP URL retrieved from destination", {
+          logger?.info("SAP URL retrieved from destination", {
             type: "SAP_URL_RETRIEVED",
             destination: config.destination,
             url: sapUrl,
@@ -1481,14 +1483,14 @@ export class mcp_abap_adt_server {
 
           this.processJwtConfigUpdate(sapUrl, jwtToken, undefined, config.destination, sessionId);
 
-          logger.info("Updated SAP configuration using MCP destination (AuthBroker)", {
+          logger?.info("Updated SAP configuration using MCP destination (AuthBroker)", {
             type: "SAP_CONFIG_UPDATED_MCP_DESTINATION",
             destination: config.destination,
             url: sapUrl,
             sessionId: sessionId?.substring(0, 8),
           });
         } catch (error) {
-          logger.error("Failed to get token from AuthBroker for MCP destination", {
+          logger?.error("Failed to get token from AuthBroker for MCP destination", {
             type: "AUTH_BROKER_ERROR_MCP_DESTINATION",
             destination: config.destination,
             error: error instanceof Error ? error.message : String(error),
@@ -1501,7 +1503,7 @@ export class mcp_abap_adt_server {
       case AuthMethodPriority.DIRECT_JWT: {
         // Priority 2: x-sap-jwt-token (direct JWT token)
         if (!config.sapUrl || !config.jwtToken) {
-          logger.warn("Direct JWT auth requires URL and token", {
+          logger?.warn("Direct JWT auth requires URL and token", {
             type: "DIRECT_JWT_AUTH_MISSING",
             sapUrl: config.sapUrl,
             hasToken: !!config.jwtToken,
@@ -1517,7 +1519,7 @@ export class mcp_abap_adt_server {
           sessionId
         );
 
-        logger.info("Updated SAP configuration using direct JWT token", {
+        logger?.info("Updated SAP configuration using direct JWT token", {
           type: "SAP_CONFIG_UPDATED_DIRECT_JWT",
           url: config.sapUrl,
           sessionId: sessionId?.substring(0, 8),
@@ -1528,7 +1530,7 @@ export class mcp_abap_adt_server {
       case AuthMethodPriority.BASIC: {
         // Priority 1: x-sap-login + x-sap-password (basic auth)
         if (!config.sapUrl || !config.username || !config.password) {
-          logger.warn("Basic auth requires URL, username, and password", {
+          logger?.warn("Basic auth requires URL, username, and password", {
             type: "BASIC_AUTH_MISSING",
             sapUrl: config.sapUrl,
             hasUsername: !!config.username,
@@ -1540,7 +1542,7 @@ export class mcp_abap_adt_server {
 
         this.processBasicAuthConfigUpdate(config.sapUrl, config.username, config.password, sessionId);
 
-        logger.info("Updated SAP configuration using basic auth", {
+        logger?.info("Updated SAP configuration using basic auth", {
           type: "SAP_CONFIG_UPDATED_BASIC",
           url: config.sapUrl,
           sessionId: sessionId?.substring(0, 8),
@@ -1549,7 +1551,7 @@ export class mcp_abap_adt_server {
       }
 
       default: {
-        logger.warn("Unknown authentication method priority", {
+        logger?.warn("Unknown authentication method priority", {
           type: "UNKNOWN_AUTH_PRIORITY",
           priority: config.priority,
           sessionId: sessionId?.substring(0, 8),
@@ -1569,7 +1571,7 @@ export class mcp_abap_adt_server {
 
     // Ensure URL has protocol
     if (!/^https?:\/\//.test(cleanedUrl)) {
-      logger.error("Invalid URL format in processJwtConfigUpdate", {
+      logger?.error("Invalid URL format in processJwtConfigUpdate", {
         type: "INVALID_URL_FORMAT",
         originalUrl: sapUrl,
         cleanedUrl: cleanedUrl,
@@ -1583,7 +1585,7 @@ export class mcp_abap_adt_server {
       const urlObj = new URL(cleanedUrl);
       cleanedUrl = urlObj.href.replace(/\/$/, ''); // Remove trailing slash
     } catch (urlError) {
-      logger.error("Failed to parse URL in processJwtConfigUpdate", {
+      logger?.error("Failed to parse URL in processJwtConfigUpdate", {
         type: "URL_PARSE_ERROR",
         url: cleanedUrl,
         error: urlError instanceof Error ? urlError.message : String(urlError),
@@ -1600,7 +1602,7 @@ export class mcp_abap_adt_server {
       try {
         baseConfig = getConfig();
       } catch (error) {
-        logger.warn("Failed to load base SAP config when applying headers", {
+        logger?.warn("Failed to load base SAP config when applying headers", {
           type: "SAP_CONFIG_HEADER_APPLY_FAILED",
           error: error instanceof Error ? error.message : String(error),
         });
@@ -1653,13 +1655,13 @@ export class mcp_abap_adt_server {
     try {
       invalidateConnectionCache();
     } catch (error) {
-      logger.debug("Connection cache invalidation failed", {
+      logger?.debug("Connection cache invalidation failed", {
         type: "CONNECTION_CACHE_INVALIDATION_FAILED",
         error: error instanceof Error ? error.message : String(error),
       });
     }
 
-    logger.info("Updated SAP configuration from HTTP headers (JWT)", {
+    logger?.info("Updated SAP configuration from HTTP headers (JWT)", {
       type: "SAP_CONFIG_UPDATED",
       urlChanged: Boolean(urlChanged),
       authTypeChanged: Boolean(authTypeChanged),
@@ -1678,7 +1680,7 @@ export class mcp_abap_adt_server {
     // Get or create AuthBroker for this destination (lazy initialization)
     const authBroker = await this.getOrCreateAuthBroker(destination, sessionId);
     if (!authBroker) {
-      logger.warn("AuthBroker not available, falling back to direct token", {
+      logger?.warn("AuthBroker not available, falling back to direct token", {
         type: "AUTH_BROKER_NOT_AVAILABLE",
         destination,
         transport: this.transportConfig.type,
@@ -1697,14 +1699,14 @@ export class mcp_abap_adt_server {
       // Process JWT config update with the token from AuthBroker
       this.processJwtConfigUpdate(sapUrl, jwtToken, refreshToken, destination, sessionId);
 
-      logger.info("Updated SAP configuration using AuthBroker (destination-based)", {
+      logger?.info("Updated SAP configuration using AuthBroker (destination-based)", {
         type: "SAP_CONFIG_UPDATED_AUTH_BROKER",
         destination,
         url: sapUrl,
         sessionId: sessionId?.substring(0, 8),
       });
     } catch (error) {
-      logger.error("Failed to get token from AuthBroker", {
+      logger?.error("Failed to get token from AuthBroker", {
         type: "AUTH_BROKER_ERROR",
         destination,
         error: error instanceof Error ? error.message : String(error),
@@ -1719,7 +1721,7 @@ export class mcp_abap_adt_server {
       try {
         baseConfig = getConfig();
       } catch (error) {
-        logger.warn("Failed to load base SAP config when applying headers", {
+        logger?.warn("Failed to load base SAP config when applying headers", {
           type: "SAP_CONFIG_HEADER_APPLY_FAILED",
           error: error instanceof Error ? error.message : String(error),
         });
@@ -1766,13 +1768,13 @@ export class mcp_abap_adt_server {
     try {
       invalidateConnectionCache();
     } catch (error) {
-      logger.debug("Connection cache invalidation failed", {
+      logger?.debug("Connection cache invalidation failed", {
         type: "CONNECTION_CACHE_INVALIDATION_FAILED",
         error: error instanceof Error ? error.message : String(error),
       });
     }
 
-    logger.info("Updated SAP configuration from HTTP headers (Basic)", {
+    logger?.info("Updated SAP configuration from HTTP headers (Basic)", {
       type: "SAP_CONFIG_UPDATED",
       urlChanged: Boolean(urlChanged),
       authTypeChanged: Boolean(authTypeChanged),
@@ -1882,7 +1884,7 @@ export class mcp_abap_adt_server {
             process.stderr.write(`[MCP]   Server will start, but tools will fail until configuration is fixed.\n`);
           }
 
-          logger.warn("SAP config invalid at initialization, will use placeholder", {
+          logger?.warn("SAP config invalid at initialization, will use placeholder", {
             type: "CONFIG_INVALID",
             error: configError instanceof Error ? configError.message : String(configError),
           });
@@ -1894,7 +1896,7 @@ export class mcp_abap_adt_server {
       }
     } catch (error) {
       // If config is not available yet, that's OK - it will be provided later via setSapConfigOverride or DI
-      logger.warn("SAP config not available at initialization, will use runtime config", {
+      logger?.warn("SAP config not available at initialization, will use runtime config", {
         type: "CONFIG_DEFERRED",
         error: error instanceof Error ? error.message : String(error),
       });
@@ -1907,7 +1909,7 @@ export class mcp_abap_adt_server {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       // Always write error to stderr (stderr is safe even in stdio mode)
-      logger.error("Failed to parse transport configuration", {
+      logger?.error("Failed to parse transport configuration", {
         type: "TRANSPORT_CONFIG_ERROR",
         error: message,
       });
@@ -1956,7 +1958,7 @@ export class mcp_abap_adt_server {
 
       if (!fs.existsSync(serviceKeysDir)) {
         fs.mkdirSync(serviceKeysDir, { recursive: true });
-        logger.info("Created service keys directory", {
+        logger?.info("Created service keys directory", {
           type: "SERVICE_KEYS_DIR_CREATED",
           path: serviceKeysDir,
         });
@@ -1964,13 +1966,13 @@ export class mcp_abap_adt_server {
 
       if (!fs.existsSync(sessionsDir)) {
         fs.mkdirSync(sessionsDir, { recursive: true });
-        logger.info("Created sessions directory", {
+        logger?.info("Created sessions directory", {
           type: "SESSIONS_DIR_CREATED",
           path: sessionsDir,
         });
       }
 
-      logger.info("AuthBroker will be initialized lazily when destination is needed", {
+      logger?.info("AuthBroker will be initialized lazily when destination is needed", {
         type: "AUTH_BROKER_LAZY_INIT",
         transport: this.transportConfig.type,
         useAuthBrokerFlag: useAuthBroker,
@@ -1995,7 +1997,7 @@ export class mcp_abap_adt_server {
       console.log('********************************************************************************');
       console.log('');
     } else {
-      logger.info("AuthBroker not available - not needed for this transport type", {
+      logger?.info("AuthBroker not available - not needed for this transport type", {
         type: "AUTH_BROKER_SKIPPED",
         transport: this.transportConfig.type,
         reason: "AuthBroker is only used for HTTP/streamable-http transport. For stdio/SSE, use .env file instead.",
@@ -2003,7 +2005,7 @@ export class mcp_abap_adt_server {
     }
 
     if (this.transportConfig.type === "streamable-http") {
-      logger.info("Transport configured", {
+      logger?.info("Transport configured", {
         type: "TRANSPORT_CONFIG",
         transport: this.transportConfig.type,
         host: this.transportConfig.host,
@@ -2014,7 +2016,7 @@ export class mcp_abap_adt_server {
         enableDnsRebindingProtection: this.transportConfig.enableDnsRebindingProtection,
       });
     } else if (this.transportConfig.type === "sse") {
-      logger.info("Transport configured", {
+      logger?.info("Transport configured", {
         type: "TRANSPORT_CONFIG",
         transport: this.transportConfig.type,
         host: this.transportConfig.host,
@@ -2024,7 +2026,7 @@ export class mcp_abap_adt_server {
         enableDnsRebindingProtection: this.transportConfig.enableDnsRebindingProtection,
       });
     } else {
-      logger.info("Transport configured", {
+      logger?.info("Transport configured", {
         type: "TRANSPORT_CONFIG",
         transport: this.transportConfig.type,
       });
@@ -2044,7 +2046,7 @@ export class mcp_abap_adt_server {
     sessionId?: string,
     destination?: string
   ): Promise<AbapConnection> {
-    logger.info("Creating connection for server", {
+    logger?.info("Creating connection for server", {
       type: "CONNECTION_CREATION_START",
       hasHeaders: !!headers,
       sessionId: sessionId || 'not-provided',
@@ -2054,7 +2056,7 @@ export class mcp_abap_adt_server {
     // Try to get connection from session context first
     const context = sessionContext.getStore();
     if (context?.sapConfig) {
-      logger.info("Using connection from session context", {
+      logger?.info("Using connection from session context", {
         type: "CONNECTION_FROM_SESSION_CONTEXT",
         sessionId: sessionId || 'not-provided',
         url: context.sapConfig.url,
@@ -2073,7 +2075,7 @@ export class mcp_abap_adt_server {
       // Get config from headers (already processed by applyAuthHeaders)
       const config = this.sapConfig;
       if (config && config.url !== "http://placeholder" && config.url !== "http://injected-connection") {
-        logger.info("Using connection from headers", {
+        logger?.info("Using connection from headers", {
           type: "CONNECTION_FROM_HEADERS",
           sessionId: sessionId || 'not-provided',
           url: config.url,
@@ -2090,7 +2092,7 @@ export class mcp_abap_adt_server {
     // If destination provided, create connection via broker
     if (destination) {
       try {
-        logger.info("Attempting to create connection via auth broker", {
+        logger?.info("Attempting to create connection via auth broker", {
           type: "CONNECTION_VIA_BROKER_ATTEMPT",
           destination,
           sessionId: sessionId || 'not-provided',
@@ -2106,7 +2108,7 @@ export class mcp_abap_adt_server {
                 authType: "jwt",
                 jwtToken,
               };
-              logger.info("Using connection from auth broker", {
+              logger?.info("Using connection from auth broker", {
                 type: "CONNECTION_FROM_BROKER",
                 destination,
                 sessionId: sessionId || 'not-provided',
@@ -2122,7 +2124,7 @@ export class mcp_abap_adt_server {
           }
         }
       } catch (error) {
-        logger.warn("Failed to create connection from destination", {
+        logger?.warn("Failed to create connection from destination", {
           type: "CONNECTION_FROM_DESTINATION_FAILED",
           destination,
           error: error instanceof Error ? error.message : String(error),
@@ -2132,7 +2134,7 @@ export class mcp_abap_adt_server {
 
     // Fallback to default config (from .env or constructor)
     if (this.sapConfig && this.sapConfig.url !== "http://placeholder" && this.sapConfig.url !== "http://injected-connection") {
-      logger.info("Using connection from default config (.env or constructor)", {
+      logger?.info("Using connection from default config (.env or constructor)", {
         type: "CONNECTION_FROM_DEFAULT_CONFIG",
         sessionId: sessionId || 'not-provided',
         url: this.sapConfig.url,
@@ -2145,7 +2147,7 @@ export class mcp_abap_adt_server {
       );
     }
 
-    logger.error("Unable to create connection: no valid configuration available", {
+    logger?.error("Unable to create connection: no valid configuration available", {
       type: "CONNECTION_CREATION_FAILED",
       hasHeaders: !!headers,
       sessionId: sessionId || 'not-provided',
@@ -2193,7 +2195,7 @@ export class mcp_abap_adt_server {
           return;
         }
         this.shuttingDown = true;
-        logger.info("Received shutdown signal", {
+        logger?.info("Received shutdown signal", {
           type: "SERVER_SHUTDOWN_SIGNAL",
           signal,
           transport: this.transportConfig.type,
@@ -2211,7 +2213,7 @@ export class mcp_abap_adt_server {
     try {
       await this.mcpServer.close();
     } catch (error) {
-      logger.error("Failed to close MCP server", {
+      logger?.error("Failed to close MCP server", {
         type: "SERVER_SHUTDOWN_ERROR",
         error: error instanceof Error ? error.message : String(error),
       });
@@ -2222,12 +2224,12 @@ export class mcp_abap_adt_server {
       try {
         await session.transport.close();
         session.server.server.close();
-        logger.debug("SSE session closed during shutdown", {
+        logger?.debug("SSE session closed during shutdown", {
           type: "SSE_SESSION_SHUTDOWN",
           sessionId,
         });
       } catch (error) {
-        logger.error("Failed to close SSE session", {
+        logger?.error("Failed to close SSE session", {
           type: "SSE_SHUTDOWN_ERROR",
           error: error instanceof Error ? error.message : String(error),
           sessionId,
@@ -2240,7 +2242,7 @@ export class mcp_abap_adt_server {
       await new Promise<void>((resolve) => {
         this.httpServer?.close((closeError) => {
           if (closeError) {
-            logger.error("Failed to close HTTP server", {
+            logger?.error("Failed to close HTTP server", {
               type: "HTTP_SERVER_SHUTDOWN_ERROR",
               error: closeError instanceof Error ? closeError.message : String(closeError),
             });
@@ -2260,7 +2262,7 @@ export class mcp_abap_adt_server {
       // For stdio: must have destination or .env file (error if neither exists)
       if (!this.defaultMcpDestination && !this.hasEnvFile) {
         const errorMsg = "stdio transport requires either --mcp parameter or .env file";
-        logger.error(errorMsg, {
+        logger?.error(errorMsg, {
           type: "STDIO_NO_DESTINATION_ERROR",
         });
         process.stderr.write(`[MCP] ✗ ERROR: ${errorMsg}\n`);
@@ -2287,7 +2289,7 @@ export class mcp_abap_adt_server {
                 const { registerAuthBroker } = require('./lib/utils');
                 registerAuthBroker(this.defaultDestination, authBroker);
                 this.processJwtConfigUpdate(connConfig.serviceUrl, jwtToken, undefined, this.defaultDestination);
-                logger.info("SAP configuration initialized for stdio transport", {
+                logger?.info("SAP configuration initialized for stdio transport", {
                   type: "STDIO_DESTINATION_INIT",
                   destination: this.defaultDestination,
                   url: connConfig.serviceUrl,
@@ -2296,7 +2298,7 @@ export class mcp_abap_adt_server {
             }
           }
         } catch (error) {
-          logger.warn("Failed to initialize connection with default destination for stdio transport", {
+          logger?.warn("Failed to initialize connection with default destination for stdio transport", {
             type: "STDIO_DESTINATION_INIT_FAILED",
             destination: this.defaultDestination,
             error: error instanceof Error ? error.message : String(error),
@@ -2338,7 +2340,7 @@ export class mcp_abap_adt_server {
               sanitizedHeaders[key] = Array.isArray(value) ? value.join(', ') : (value || '');
             }
           }
-          logger.info("HTTP Request received", {
+          logger?.info("HTTP Request received", {
             type: "HTTP_REQUEST",
             method: req.method,
             url: req.url,
@@ -2351,7 +2353,7 @@ export class mcp_abap_adt_server {
         // Only handle POST requests (like the example)
         if (req.method !== "POST") {
           if (debugHttpEnabled) {
-            logger.warn("HTTP Method not allowed", {
+            logger?.warn("HTTP Method not allowed", {
               type: "HTTP_METHOD_NOT_ALLOWED",
               method: req.method,
               url: req.url,
@@ -2366,7 +2368,7 @@ export class mcp_abap_adt_server {
         const remoteAddress = req.socket.remoteAddress;
         if (this.hasEnvFile && !this.hasSapHeaders(req.headers)) {
           if (!this.isLocalConnection(remoteAddress)) {
-            logger.warn("HTTP: Non-local connection rejected (has .env but no SAP headers)", {
+            logger?.warn("HTTP: Non-local connection rejected (has .env but no SAP headers)", {
               type: "HTTP_NON_LOCAL_REJECTED",
               remoteAddress,
               hasEnvFile: this.hasEnvFile,
@@ -2379,7 +2381,7 @@ export class mcp_abap_adt_server {
 
         // Track client (like the example)
         const clientID = `${req.socket.remoteAddress}:${req.socket.remotePort}`;
-        logger.debug("Client connected", {
+        logger?.debug("Client connected", {
           type: "STREAMABLE_HTTP_CLIENT_CONNECTED",
           clientID,
         });
@@ -2402,7 +2404,7 @@ export class mcp_abap_adt_server {
               this.streamableHttpSessions.delete(key);
               this.streamableHttpSessions.set(clientID, session);
               this.streamableSessionIndex.set(session.sessionId, clientID);
-              logger.debug("Existing session restored", {
+              logger?.debug("Existing session restored", {
                 type: "STREAMABLE_HTTP_SESSION_RESTORED",
                 sessionId: session.sessionId,
                 clientID,
@@ -2422,7 +2424,7 @@ export class mcp_abap_adt_server {
           };
           this.streamableHttpSessions.set(clientID, session);
           this.streamableSessionIndex.set(session.sessionId, clientID);
-          logger.debug("New session created", {
+          logger?.debug("New session created", {
             type: "STREAMABLE_HTTP_SESSION_CREATED",
             sessionId: session.sessionId,
             clientID,
@@ -2432,7 +2434,7 @@ export class mcp_abap_adt_server {
 
         session.requestCount++;
 
-        logger.debug("Request received", {
+        logger?.debug("Request received", {
           type: "STREAMABLE_HTTP_REQUEST",
           sessionId: session.sessionId,
           requestNumber: session.requestCount,
@@ -2450,7 +2452,7 @@ export class mcp_abap_adt_server {
             }
             this.streamableHttpSessions.delete(clientID);
             this.streamableSessionIndex.delete(closedSession.sessionId);
-            logger.debug("Session closed", {
+            logger?.debug("Session closed", {
               type: "STREAMABLE_HTTP_SESSION_CLOSED",
               sessionId: closedSession.sessionId,
               requestCount: closedSession.requestCount,
@@ -2486,7 +2488,7 @@ export class mcp_abap_adt_server {
                     }
                   }
                 }
-                logger.info("MCP Request", {
+                logger?.info("MCP Request", {
                   type: "MCP_REQUEST",
                   method: mcpMethod,
                   jsonrpc: body.jsonrpc,
@@ -2499,7 +2501,7 @@ export class mcp_abap_adt_server {
               // If body is not JSON, pass as string or null
               body = bodyString || null;
               if (debugHttpEnabled) {
-                logger.warn("Failed to parse request body as JSON", {
+                logger?.warn("Failed to parse request body as JSON", {
                   type: "HTTP_BODY_PARSE_ERROR",
                   error: parseError instanceof Error ? parseError.message : String(parseError),
                 });
@@ -2545,13 +2547,13 @@ export class mcp_abap_adt_server {
                   const cleanedConfig = { ...envConfig, url: cleanedUrl };
                   this.sapConfig = cleanedConfig;
                   sessionSapConfig = cleanedConfig;
-                  logger.debug("Reloaded SAP config from .env file for HTTP request", {
+                  logger?.debug("Reloaded SAP config from .env file for HTTP request", {
                     type: "SAP_CONFIG_RELOADED_FROM_ENV",
                     sessionId: session.sessionId,
                     url: cleanedUrl,
                   });
                 } else {
-                  logger.warn("Invalid URL format after cleaning", {
+                  logger?.warn("Invalid URL format after cleaning", {
                     type: "INVALID_URL_AFTER_CLEANING",
                     url: cleanedUrl,
                   });
@@ -2559,7 +2561,7 @@ export class mcp_abap_adt_server {
               }
             } catch (configError) {
               // Config reload failed, continue with existing config
-              logger.debug("Failed to reload config from .env file", {
+              logger?.debug("Failed to reload config from .env file", {
                 type: "SAP_CONFIG_RELOAD_FAILED",
                 error: configError instanceof Error ? configError.message : String(configError),
               });
@@ -2576,7 +2578,7 @@ export class mcp_abap_adt_server {
             if (req.headers[HEADER_SAP_AUTH_TYPE]) providedHeaders[HEADER_SAP_AUTH_TYPE] = String(req.headers[HEADER_SAP_AUTH_TYPE]);
 
             const errorMessage = `No valid SAP configuration available. Please provide authentication headers (${HEADER_SAP_URL}, ${HEADER_SAP_AUTH_TYPE}, etc.) or ensure destination is configured correctly.`;
-            logger.error("No valid SAP configuration available for request", {
+            logger?.error("No valid SAP configuration available for request", {
               type: "NO_VALID_SAP_CONFIG",
               sessionId: session.sessionId,
               method: methodName,
@@ -2645,7 +2647,7 @@ export class mcp_abap_adt_server {
           // Connect transport to new McpServer (like the SDK example)
           await requestServer.connect(transport);
 
-          logger.debug("Transport connected", {
+          logger?.debug("Transport connected", {
             type: "STREAMABLE_HTTP_TRANSPORT_CONNECTED",
             sessionId: session.sessionId,
             clientID,
@@ -2667,13 +2669,13 @@ export class mcp_abap_adt_server {
             }
           );
 
-          logger.debug("Request completed", {
+          logger?.debug("Request completed", {
             type: "STREAMABLE_HTTP_REQUEST_COMPLETED",
             sessionId: session.sessionId,
             clientID,
           });
         } catch (error) {
-          logger.error("Failed to handle HTTP request", {
+          logger?.error("Failed to handle HTTP request", {
             type: "HTTP_REQUEST_ERROR",
             error: error instanceof Error ? error.message : String(error),
             sessionId: session.sessionId,
@@ -2688,7 +2690,7 @@ export class mcp_abap_adt_server {
       });
 
       httpServer.on("clientError", (err, socket) => {
-        logger.error("HTTP client error", {
+        logger?.error("HTTP client error", {
           type: "HTTP_CLIENT_ERROR",
           error: err instanceof Error ? err.message : String(err),
         });
@@ -2697,7 +2699,7 @@ export class mcp_abap_adt_server {
 
       await new Promise<void>((resolve, reject) => {
         const onError = (error: Error) => {
-          logger.error("HTTP server failed to start", {
+          logger?.error("HTTP server failed to start", {
             type: "HTTP_SERVER_ERROR",
             error: error.message,
           });
@@ -2708,7 +2710,7 @@ export class mcp_abap_adt_server {
         httpServer.once("error", onError);
         httpServer.listen(httpConfig.port, httpConfig.host, () => {
           httpServer.off("error", onError);
-          logger.info("HTTP server listening", {
+          logger?.info("HTTP server listening", {
             type: "HTTP_SERVER_LISTENING",
             host: httpConfig.host,
             port: httpConfig.port,
@@ -2741,7 +2743,7 @@ export class mcp_abap_adt_server {
                 const { registerAuthBroker } = require('./lib/utils');
                 registerAuthBroker(this.defaultDestination, authBroker);
                 this.processJwtConfigUpdate(connConfig.serviceUrl, jwtToken, undefined, this.defaultDestination);
-                logger.info("SAP configuration initialized for SSE transport", {
+                logger?.info("SAP configuration initialized for SSE transport", {
                   type: "SSE_DESTINATION_INIT",
                   destination: this.defaultDestination,
                   url: connConfig.serviceUrl,
@@ -2750,7 +2752,7 @@ export class mcp_abap_adt_server {
             }
           }
         } catch (error) {
-          logger.warn("Failed to initialize connection with default destination for SSE transport", {
+          logger?.warn("Failed to initialize connection with default destination for SSE transport", {
             type: "SSE_DESTINATION_INIT_FAILED",
             destination: this.defaultDestination,
             error: error instanceof Error ? error.message : String(error),
@@ -2758,7 +2760,7 @@ export class mcp_abap_adt_server {
         }
       }
     } else {
-      logger.debug("No default destination for SSE transport, will wait for headers", {
+      logger?.debug("No default destination for SSE transport, will wait for headers", {
         type: "SSE_NO_DEFAULT_DESTINATION",
       });
     }
@@ -2777,7 +2779,7 @@ export class mcp_abap_adt_server {
       // SSE: Always restrict to local connections only
       const remoteAddress = req.socket.remoteAddress;
       if (!this.isLocalConnection(remoteAddress)) {
-        logger.warn("SSE: Non-local connection rejected", {
+        logger?.warn("SSE: Non-local connection rejected", {
           type: "SSE_NON_LOCAL_REJECTED",
           remoteAddress,
         });
@@ -2794,7 +2796,7 @@ export class mcp_abap_adt_server {
 
       await this.applyAuthHeaders(req.headers);
 
-      logger.debug("SSE request received", {
+      logger?.debug("SSE request received", {
         type: "SSE_HTTP_REQUEST",
         method: req.method,
         pathname,
@@ -2809,7 +2811,7 @@ export class mcp_abap_adt_server {
       if (req.method === "GET" && streamPathMap.has(pathname)) {
         const postEndpoint = streamPathMap.get(pathname) ?? "/messages";
 
-        logger.debug("SSE client connecting", {
+        logger?.debug("SSE client connecting", {
           type: "SSE_CLIENT_CONNECTING",
           pathname,
           postEndpoint,
@@ -2823,7 +2825,7 @@ export class mcp_abap_adt_server {
         );
 
         // Create new McpServer instance for this session (like the working example)
-        const server = this.createMcpServerForSession({ connection, logger: loggerAdapter });
+        const server = this.createMcpServerForSession({ connection, logger: loggerAdapter as unknown as ILogger });
 
         // Create SSE transport
         const transport = new SSEServerTransport(postEndpoint, res, {
@@ -2833,7 +2835,7 @@ export class mcp_abap_adt_server {
         });
 
         const sessionId = transport.sessionId;
-        logger.info("New SSE session created", {
+        logger?.info("New SSE session created", {
           type: "SSE_SESSION_CREATED",
           sessionId,
           pathname,
@@ -2848,14 +2850,14 @@ export class mcp_abap_adt_server {
         // Connect transport to server (using server.server like in the example)
         try {
           await server.server.connect(transport);
-          logger.info("SSE transport connected", {
+          logger?.info("SSE transport connected", {
             type: "SSE_CONNECTION_READY",
             sessionId,
             pathname,
             postEndpoint,
           });
         } catch (error) {
-          logger.error("Failed to connect SSE transport", {
+          logger?.error("Failed to connect SSE transport", {
             type: "SSE_CONNECT_ERROR",
             error: error instanceof Error ? error.message : String(error),
             sessionId,
@@ -2871,7 +2873,7 @@ export class mcp_abap_adt_server {
 
         // Cleanup on connection close
         res.on("close", () => {
-          logger.info("SSE connection closed", {
+          logger?.info("SSE connection closed", {
             type: "SSE_CONNECTION_CLOSED",
             sessionId,
             pathname,
@@ -2881,7 +2883,7 @@ export class mcp_abap_adt_server {
         });
 
         transport.onerror = (error) => {
-          logger.error("SSE transport error", {
+          logger?.error("SSE transport error", {
             type: "SSE_TRANSPORT_ERROR",
             error: error instanceof Error ? error.message : String(error),
             sessionId,
@@ -2902,14 +2904,14 @@ export class mcp_abap_adt_server {
           sessionId = req.headers["x-session-id"] as string | undefined;
         }
 
-        logger.debug("SSE POST request received", {
+        logger?.debug("SSE POST request received", {
           type: "SSE_POST_REQUEST",
           sessionId,
           pathname,
         });
 
         if (!sessionId || !this.sseSessions.has(sessionId)) {
-          logger.error("Invalid or missing SSE session", {
+          logger?.error("Invalid or missing SSE session", {
             type: "SSE_INVALID_SESSION",
             sessionId,
           });
@@ -2948,12 +2950,12 @@ export class mcp_abap_adt_server {
           // Handle POST message through transport (like the working example)
           await transport.handlePostMessage(req, res, body);
 
-          logger.debug("SSE POST request processed", {
+          logger?.debug("SSE POST request processed", {
             type: "SSE_POST_PROCESSED",
             sessionId,
           });
         } catch (error) {
-          logger.error("Failed to handle SSE POST message", {
+          logger?.error("Failed to handle SSE POST message", {
             type: "SSE_POST_ERROR",
             error: error instanceof Error ? error.message : String(error),
             sessionId,
@@ -2982,7 +2984,7 @@ export class mcp_abap_adt_server {
     });
 
     httpServer.on("clientError", (err, socket) => {
-      logger.error("SSE HTTP client error", {
+      logger?.error("SSE HTTP client error", {
         type: "SSE_HTTP_CLIENT_ERROR",
         error: err instanceof Error ? err.message : String(err),
       });
@@ -2991,7 +2993,7 @@ export class mcp_abap_adt_server {
 
     await new Promise<void>((resolve, reject) => {
       const onError = (error: Error) => {
-        logger.error("SSE HTTP server failed to start", {
+        logger?.error("SSE HTTP server failed to start", {
           type: "SSE_HTTP_SERVER_ERROR",
           error: error.message,
         });
@@ -3002,7 +3004,7 @@ export class mcp_abap_adt_server {
       httpServer.once("error", onError);
       httpServer.listen(sseConfig.port, sseConfig.host, () => {
         httpServer.off("error", onError);
-        logger.info("SSE HTTP server listening", {
+        logger?.info("SSE HTTP server listening", {
           type: "SSE_HTTP_SERVER_LISTENING",
           host: sseConfig.host,
           port: sseConfig.port,
@@ -3020,7 +3022,7 @@ export class mcp_abap_adt_server {
 if (process.env.MCP_SKIP_AUTO_START !== "true") {
   const server = new mcp_abap_adt_server();
   server.run().catch((error) => {
-    logger.error("Fatal error while running MCP server", {
+    logger?.error("Fatal error while running MCP server", {
       type: "SERVER_FATAL_ERROR",
       error: error instanceof Error ? error.message : String(error),
     });

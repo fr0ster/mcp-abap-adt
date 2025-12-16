@@ -93,7 +93,7 @@ export async function handleCreateDomain(context: HandlerContext, args: CreateDo
 
     const domainName = domain_name.toUpperCase();
 
-    logger.info(`Starting domain creation: ${domainName}`);
+    logger?.info(`Starting domain creation: ${domainName}`);
 
     try {
       // Create domain
@@ -112,7 +112,7 @@ export async function handleCreateDomain(context: HandlerContext, args: CreateDo
       // Get updated session state after create
 
 
-      logger.info(`✅ CreateDomain completed: ${domainName}`);
+      logger?.info(`✅ CreateDomain completed: ${domainName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -128,7 +128,7 @@ export async function handleCreateDomain(context: HandlerContext, args: CreateDo
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating domain ${domainName}: ${error?.message || error}`);
+      logger?.error(`Error creating domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create domain: ${error.message || String(error)}`;

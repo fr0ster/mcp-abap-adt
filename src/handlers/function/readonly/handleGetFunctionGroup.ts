@@ -18,18 +18,18 @@ export async function handleGetFunctionGroup(context: HandlerContext, args: any)
       throw new McpError(ErrorCode.InvalidParams, 'Function Group is required');
     }
 
-    logger.info(`Reading function group ${args.function_group}`);
+    logger?.info(`Reading function group ${args.function_group}`);
 
     // Create client
     const client = new ReadOnlyClient(connection);
     const result = await client.readFunctionGroup(args.function_group);
-    logger.debug(`Successfully read function group ${args.function_group}`);
+    logger?.debug(`Successfully read function group ${args.function_group}`);
     return {
       isError: false,
       content: [{ type: "json", json: result }],
     };
   } catch (error) {
-    logger.error(`Failed to read function group ${args?.function_group || ''}`, error as any);
+    logger?.error(`Failed to read function group ${args?.function_group || ''}`, error as any);
     return {
       isError: true,
       content: [

@@ -60,7 +60,7 @@ export async function handleGetObjectStructure(context: HandlerContext, args: an
   try {
     const url = `/sap/bc/adt/repository/objectstructure?objecttype=${encodeURIComponent(args.objecttype)}&objectname=${encodeURIComponent(args.objectname)}`;
     const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
-    logger.info(`Fetched object structure for ${args.objecttype}/${args.objectname}`);
+    logger?.info(`Fetched object structure for ${args.objecttype}/${args.objectname}`);
 
     // Parse XML response
     const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
@@ -95,7 +95,7 @@ export async function handleGetObjectStructure(context: HandlerContext, args: an
       ]
     };
   } catch (error) {
-    logger.error(`Failed to fetch object structure for ${args?.objecttype}/${args?.objectname}`, error as any);
+    logger?.error(`Failed to fetch object structure for ${args?.objecttype}/${args?.objectname}`, error as any);
     return {
       isError: true,
       content: [

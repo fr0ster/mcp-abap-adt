@@ -193,14 +193,14 @@ export async function handleGetObjectInfo(context: HandlerContext, args: { paren
     if (!args?.parent_type || !args?.parent_name) {
       throw new McpError(ErrorCode.InvalidParams, 'parent_type and parent_name are required');
     }
-    logger.info(`Building object info tree for ${args.parent_type}/${args.parent_name}`);
+    logger?.info(`Building object info tree for ${args.parent_type}/${args.parent_name}`);
     // Determine the default depth if none is provided
     const maxDepth = Number.isInteger(args.maxDepth)
       ? args.maxDepth as number
       : getDefaultDepth(args.parent_type);
     const enrich = typeof args.enrich === 'boolean' ? args.enrich : true;
     const result = await buildTree(context, args.parent_type, args.parent_name, 0, maxDepth ?? getDefaultDepth(args.parent_type), enrich);
-    logger.debug(`Object tree built with depth ${maxDepth} (enrich=${enrich})`);
+    logger?.debug(`Object tree built with depth ${maxDepth} (enrich=${enrich})`);
     return {
       isError: false,
       content: [
@@ -211,7 +211,7 @@ export async function handleGetObjectInfo(context: HandlerContext, args: { paren
       ]
     };
   } catch (error) {
-    logger.error(`Failed to build object info for ${args?.parent_type}/${args?.parent_name}`, error as any);
+    logger?.error(`Failed to build object info for ${args?.parent_type}/${args?.parent_name}`, error as any);
     return {
       isError: true,
       content: [

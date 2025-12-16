@@ -56,7 +56,7 @@ describe('Program High-Level Handlers Integration', () => {
     // Skip test on cloud - programs are not available on cloud systems
     if (isCloudConnection()) {
       const logger = createTestLogger('program-high');
-      logger.info('⏭️  Skipping test: Programs are not available on cloud systems');
+      logger?.info('⏭️  Skipping test: Programs are not available on cloud systems');
       return;
     }
     await tester.run();

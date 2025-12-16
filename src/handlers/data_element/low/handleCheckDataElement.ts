@@ -78,7 +78,7 @@ export async function handleCheckDataElement(context: HandlerContext, args: Chec
 
     const dataElementName = data_element_name.toUpperCase();
 
-    logger.info(`Starting data element check: ${dataElementName}`);
+    logger?.info(`Starting data element check: ${dataElementName}`);
 
     try {
       // Check data element
@@ -95,8 +95,8 @@ export async function handleCheckDataElement(context: HandlerContext, args: Chec
       // Get updated session state after check
 
 
-      logger.info(`✅ CheckDataElement completed: ${dataElementName}`);
-      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.info(`✅ CheckDataElement completed: ${dataElementName}`);
+      logger?.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -112,7 +112,7 @@ export async function handleCheckDataElement(context: HandlerContext, args: Chec
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking data element ${dataElementName}: ${error?.message || error}`);
+      logger?.error(`Error checking data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check data element: ${error.message || String(error)}`;

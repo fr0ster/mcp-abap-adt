@@ -99,7 +99,7 @@ export async function handleCreateMetadataExtension(context: HandlerContext, arg
 
     const ddlxName = name.toUpperCase();
 
-    logger.info(`Starting metadata extension creation: ${ddlxName}`);
+    logger?.info(`Starting metadata extension creation: ${ddlxName}`);
 
     try {
       // Create metadata extension
@@ -118,7 +118,7 @@ export async function handleCreateMetadataExtension(context: HandlerContext, arg
       // Get updated session state after create
 
 
-      logger.info(`✅ CreateMetadataExtension completed: ${ddlxName}`);
+      logger?.info(`✅ CreateMetadataExtension completed: ${ddlxName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -134,7 +134,7 @@ export async function handleCreateMetadataExtension(context: HandlerContext, arg
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating metadata extension ${ddlxName}: ${error?.message || error}`);
+      logger?.error(`Error creating metadata extension ${ddlxName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create metadata extension: ${error.message || String(error)}`;

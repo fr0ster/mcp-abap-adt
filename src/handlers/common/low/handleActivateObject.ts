@@ -52,7 +52,7 @@ export async function handleActivateObject(context: HandlerContext, params: Acti
         const preaudit = args.preaudit !== false; // default true
     const client = new CrudClient(connection);
 
-    logger.info(`Starting activation of ${args.objects.length} object(s)`);
+    logger?.info(`Starting activation of ${args.objects.length} object(s)`);
 
     try {
       const activationObjects = args.objects.map(obj => ({
@@ -60,10 +60,10 @@ export async function handleActivateObject(context: HandlerContext, params: Acti
         name: obj.name.toUpperCase()
       }));
 
-      logger.debug(`Activating objects: ${activationObjects.map(o => o.name).join(', ')}`);
+      logger?.debug(`Activating objects: ${activationObjects.map(o => o.name).join(', ')}`);
 
       const response = await client.activateObjectsGroup(activationObjects, preaudit);
-      logger.debug(`Activation response status: ${response.status}`);
+      logger?.debug(`Activation response status: ${response.status}`);
 
       const activationResult = client.parseActivationResponse(response.data);
       const success = activationResult.activated && activationResult.checked;
@@ -89,7 +89,7 @@ export async function handleActivateObject(context: HandlerContext, params: Acti
           : `Activation completed with ${activationResult.messages.length} message(s)`
       };
 
-      logger.info(`Activation completed: ${success ? 'SUCCESS' : 'WITH ISSUES'}`);
+      logger?.info(`Activation completed: ${success ? 'SUCCESS' : 'WITH ISSUES'}`);
 
       return return_response({
         data: JSON.stringify(result, null, 2),
@@ -100,7 +100,7 @@ export async function handleActivateObject(context: HandlerContext, params: Acti
       });
 
     } catch (error: any) {
-      logger.error('Error during activation', error);
+      logger?.error('Error during activation', error);
 
       let errorMessage: string;
       if (error.response?.data) {

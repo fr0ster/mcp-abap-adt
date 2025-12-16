@@ -392,7 +392,7 @@ export async function handleGetWhereUsed(context: HandlerContext, args: WhereUse
 
     // Accept any object_type, validation is now handled in buildObjectUri
     const typedArgs = args as WhereUsedArgs;
-    logger.info(`Resolving where-used list for ${typedArgs.object_type}/${typedArgs.object_name}`);
+    logger?.info(`Resolving where-used list for ${typedArgs.object_type}/${typedArgs.object_name}`);
 
     // 1. Build the object URI
     const objectUri = buildObjectUri(typedArgs.object_name, typedArgs.object_type);
@@ -410,7 +410,7 @@ export async function handleGetWhereUsed(context: HandlerContext, args: WhereUse
       'default',
       requestBody
     );
-    logger.debug(`Where-used ADT call completed for ${objectUri}`);
+    logger?.debug(`Where-used ADT call completed for ${objectUri}`);
 
     // 5. Parse the XML response
     const allReferences = parseWhereUsedResponse(response.data);
@@ -460,7 +460,7 @@ export async function handleGetWhereUsed(context: HandlerContext, args: WhereUse
     return result;
 
   } catch (error) {
-    logger.error('Failed to resolve where-used references', error as any);
+    logger?.error('Failed to resolve where-used references', error as any);
     // MCP-compliant error response: always return content[] with type "text"
     return {
       isError: true,

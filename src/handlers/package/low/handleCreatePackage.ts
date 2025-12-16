@@ -122,7 +122,7 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    logger.info(`Starting package creation: ${packageName} in ${superPackage}`);
+    logger?.info(`Starting package creation: ${packageName} in ${superPackage}`);
 
     try {
       // Create package - build config object with proper typing
@@ -159,7 +159,7 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
       // Get updated session state after create
 
 
-      logger.info(`✅ CreatePackage completed: ${packageName}`);
+      logger?.info(`✅ CreatePackage completed: ${packageName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -179,7 +179,7 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`CreatePackage ${packageName}`, error);
+      logger?.error(`CreatePackage ${packageName}`, error);
 
       // Check for authentication errors (expired tokens)
       if (error.message?.includes('Refresh token has expired') ||

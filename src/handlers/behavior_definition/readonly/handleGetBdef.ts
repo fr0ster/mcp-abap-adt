@@ -43,7 +43,7 @@ export interface BdefResponse {
 export async function handleGetBdef(context: HandlerContext, args: any) {
     const { connection, logger } = context;
     try {
-        logger.info('handleGetBdef called with args:', args);
+        logger?.info('handleGetBdef called with args:', args);
 
         if (!args?.bdef_name) {
             throw new McpError(ErrorCode.InvalidParams, 'BDEF name is required');
@@ -52,11 +52,11 @@ export async function handleGetBdef(context: HandlerContext, args: any) {
         const bdefName = args.bdef_name;
         const bdefUri = args.bdef_uri; // Optional: full ADT URI
 
-        logger.info(`Getting BDEF source for: ${bdefName}${bdefUri ? ` (uri: ${bdefUri})` : ''}`);
+        logger?.info(`Getting BDEF source for: ${bdefName}${bdefUri ? ` (uri: ${bdefUri})` : ''}`);
 
         // Always use the simple, direct endpoint as in the Python code
         const endpoint = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(bdefName)}/source/main`;
-        logger.info(`Requesting BDEF source from: ${endpoint}`);
+        logger?.info(`Requesting BDEF source from: ${endpoint}`);
         const response = await makeAdtRequestWithTimeout(connection, endpoint, 'GET', 'default', undefined, undefined, {
             'Accept': 'text/plain'
         });

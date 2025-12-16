@@ -77,7 +77,7 @@ export async function handleActivateView(context: HandlerContext, args: Activate
 
     const viewName = view_name.toUpperCase();
 
-    logger.info(`Starting view activation: ${viewName}`);
+    logger?.info(`Starting view activation: ${viewName}`);
 
     try {
       // Activate view
@@ -95,9 +95,9 @@ export async function handleActivateView(context: HandlerContext, args: Activate
       // Get updated session state after activation
 
 
-      logger.info(`✅ ActivateView completed: ${viewName}`);
-      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      logger.info(`   Messages: ${activationResult.messages.length}`);
+      logger?.info(`✅ ActivateView completed: ${viewName}`);
+      logger?.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
+      logger?.info(`   Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -120,7 +120,7 @@ export async function handleActivateView(context: HandlerContext, args: Activate
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating view ${viewName}: ${error?.message || error}`);
+      logger?.error(`Error activating view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate view: ${error.message || String(error)}`;

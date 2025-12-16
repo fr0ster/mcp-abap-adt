@@ -69,7 +69,7 @@ export async function handleUnlockObject(context: HandlerContext, args: UnlockOb
 
     const objectName = object_name.toUpperCase();
 
-    logger.info(`Starting object unlock: ${objectName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(`Starting object unlock: ${objectName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       switch (objectType) {
@@ -117,7 +117,7 @@ export async function handleUnlockObject(context: HandlerContext, args: UnlockOb
 
 
 
-      logger.info(`✅ UnlockObject completed: ${objectName}`);
+      logger?.info(`✅ UnlockObject completed: ${objectName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -131,7 +131,7 @@ export async function handleUnlockObject(context: HandlerContext, args: UnlockOb
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking object ${objectName}:`, error);
+      logger?.error(`Error unlocking object ${objectName}:`, error);
 
       let errorMessage = `Failed to unlock object: ${error.message || String(error)}`;
 

@@ -53,7 +53,7 @@ export async function handleDeleteFunctionGroup(context: HandlerContext, args: D
 
     const client = new CrudClient(connection);
     const functionGroupName = function_group_name.toUpperCase();
-    logger.info(`Starting function group deletion: ${functionGroupName}`);
+    logger?.info(`Starting function group deletion: ${functionGroupName}`);
 
     try {
       // Delete function group
@@ -64,7 +64,7 @@ export async function handleDeleteFunctionGroup(context: HandlerContext, args: D
         throw new Error(`Delete did not return a response for function group ${functionGroupName}`);
       }
 
-      logger.info(`✅ DeleteFunctionGroup completed successfully: ${functionGroupName}`);
+      logger?.info(`✅ DeleteFunctionGroup completed successfully: ${functionGroupName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -76,7 +76,7 @@ export async function handleDeleteFunctionGroup(context: HandlerContext, args: D
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting function group ${functionGroupName}: ${error?.message || error}`);
+      logger?.error(`Error deleting function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete function group: ${error.message || String(error)}`;

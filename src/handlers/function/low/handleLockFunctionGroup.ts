@@ -77,7 +77,7 @@ export async function handleLockFunctionGroup(context: HandlerContext, args: Loc
 
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function group lock: ${functionGroupName}`);
+    logger?.info(`Starting function group lock: ${functionGroupName}`);
 
     try {
       // Lock function group
@@ -91,8 +91,8 @@ export async function handleLockFunctionGroup(context: HandlerContext, args: Loc
       // Get updated session state after lock
 
 
-      logger.info(`✅ LockFunctionGroup completed: ${functionGroupName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger?.info(`✅ LockFunctionGroup completed: ${functionGroupName}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -106,7 +106,7 @@ export async function handleLockFunctionGroup(context: HandlerContext, args: Loc
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking function group ${functionGroupName}: ${error?.message || error}`);
+      logger?.error(`Error locking function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock function group: ${error.message || String(error)}`;

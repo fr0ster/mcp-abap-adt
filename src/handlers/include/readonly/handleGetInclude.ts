@@ -18,13 +18,13 @@ export async function handleGetInclude(context: HandlerContext, args: any) {
       throw new McpError(ErrorCode.InvalidParams, 'Include name is required');
     }
     const url = `/sap/bc/adt/programs/includes/${encodeSapObjectName(args.include_name)}/source/main`;
-    logger.info(`Fetching include: ${args.include_name}`);
+    logger?.info(`Fetching include: ${args.include_name}`);
     const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
     const plainText = response.data;
     if (args.filePath) {
       writeResultToFile(plainText, args.filePath);
     }
-    logger.info(`✅ GetInclude completed: ${args.include_name}`);
+    logger?.info(`✅ GetInclude completed: ${args.include_name}`);
     return {
       isError: false,
       content: [
@@ -35,7 +35,7 @@ export async function handleGetInclude(context: HandlerContext, args: any) {
       ]
     };
   } catch (error) {
-    logger.error(`Error getting include ${args?.include_name ?? ''}: ${error instanceof Error ? error.message : String(error)}`);
+    logger?.error(`Error getting include ${args?.include_name ?? ''}: ${error instanceof Error ? error.message : String(error)}`);
         return {
             isError: true,
             content: [

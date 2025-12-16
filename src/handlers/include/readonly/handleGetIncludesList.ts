@@ -146,7 +146,7 @@ export async function handleGetIncludesList(context: HandlerContext, args: any) 
         let parentTechName = object_name;
         let parentType = object_type;
 
-        logger.info(`Starting includes discovery for ${parentName.toUpperCase()} (${parentType}), detailed=${isDetailed}`);
+        logger?.info(`Starting includes discovery for ${parentName.toUpperCase()} (${parentType}), detailed=${isDetailed}`);
 
         // Step 1: Get root node structure to find includes node (with timeout)
         const rootResponse = await Promise.race([
@@ -168,7 +168,7 @@ export async function handleGetIncludesList(context: HandlerContext, args: any) 
         const includesNode = includesInfo.find(info => info.name === 'PROG/I');
 
         if (!includesNode) {
-            logger.info(`No includes found in ${object_type} '${object_name}'`);
+            logger?.info(`No includes found in ${object_type} '${object_name}'`);
             // Return empty result if no includes node found
             return {
                 isError: false,
@@ -245,7 +245,7 @@ export async function handleGetIncludesList(context: HandlerContext, args: any) 
         }
 
     } catch (error) {
-        logger.error(`Error getting includes list: ${error instanceof Error ? error.message : String(error)}`);
+        logger?.error(`Error getting includes list: ${error instanceof Error ? error.message : String(error)}`);
         return return_error(error instanceof Error ? error : new Error(String(error)));
     }
 }

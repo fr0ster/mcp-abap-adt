@@ -81,7 +81,7 @@ export async function handleLockProgram(context: HandlerContext, args: LockProgr
 
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program lock: ${programName}`);
+    logger?.info(`Starting program lock: ${programName}`);
 
     try {
       // Lock program
@@ -95,8 +95,8 @@ export async function handleLockProgram(context: HandlerContext, args: LockProgr
       // Get updated session state after lock
 
 
-      logger.info(`✅ LockProgram completed: ${programName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger?.info(`✅ LockProgram completed: ${programName}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -110,7 +110,7 @@ export async function handleLockProgram(context: HandlerContext, args: LockProgr
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking program ${programName}: ${error?.message || error}`);
+      logger?.error(`Error locking program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock program: ${error.message || String(error)}`;

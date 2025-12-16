@@ -92,7 +92,7 @@ export async function handleValidateProgram(context: HandlerContext, args: Valid
 
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program validation: ${programName}`);
+    logger?.info(`Starting program validation: ${programName}`);
 
     try {
       // Validate program
@@ -110,7 +110,7 @@ export async function handleValidateProgram(context: HandlerContext, args: Valid
       // Get updated session state after validation
 
 
-      logger.info(`✅ ValidateProgram completed: ${programName} (valid=${result.valid})`);
+      logger?.info(`✅ ValidateProgram completed: ${programName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -126,7 +126,7 @@ export async function handleValidateProgram(context: HandlerContext, args: Valid
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating program ${programName}: ${error?.message || error}`);
+      logger?.error(`Error validating program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate program: ${error.message || String(error)}`;

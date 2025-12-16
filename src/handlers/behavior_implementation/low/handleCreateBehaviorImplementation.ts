@@ -109,7 +109,7 @@ export async function handleCreateBehaviorImplementation(context: HandlerContext
     const className = class_name.toUpperCase();
     const behaviorDefinition = behavior_definition.toUpperCase();
 
-    logger.info(`Starting behavior implementation creation: ${className} for ${behaviorDefinition}`);
+    logger?.info(`Starting behavior implementation creation: ${className} for ${behaviorDefinition}`);
 
     try {
       // Create behavior implementation (full workflow)
@@ -132,7 +132,7 @@ export async function handleCreateBehaviorImplementation(context: HandlerContext
       // Get updated session state after create
 
 
-      logger.info(`✅ CreateBehaviorImplementation completed: ${className}`);
+      logger?.info(`✅ CreateBehaviorImplementation completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -149,7 +149,7 @@ export async function handleCreateBehaviorImplementation(context: HandlerContext
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating behavior implementation ${className}: ${error?.message || error}`);
+      logger?.error(`Error creating behavior implementation ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create behavior implementation: ${error.message || String(error)}`;

@@ -51,7 +51,7 @@ export async function handleUpdateBehaviorDefinition(context: HandlerContext, pa
     const name = args.name.toUpperCase();
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    logger.info(`Starting BDEF update: ${name}`);
+    logger?.info(`Starting BDEF update: ${name}`);
 
     try {
         const client = new CrudClient(connection);
@@ -101,14 +101,14 @@ export async function handleUpdateBehaviorDefinition(context: HandlerContext, pa
         });
 
     } catch (error: any) {
-        logger.error(`Error updating BDEF ${name}: ${error?.message || error}`);
+        logger?.error(`Error updating BDEF ${name}: ${error?.message || error}`);
         return return_error(error);
     } finally {
         try {
             connection.reset();
-            logger.debug('Reset BDEF connection after use');
+            logger?.debug('Reset BDEF connection after use');
         } catch (resetError: any) {
-            logger.error(`Failed to reset BDEF connection: ${resetError?.message || resetError}`);
+            logger?.error(`Failed to reset BDEF connection: ${resetError?.message || resetError}`);
         }
     }
 }

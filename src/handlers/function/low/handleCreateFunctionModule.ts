@@ -101,7 +101,7 @@ export async function handleCreateFunctionModule(context: HandlerContext, args: 
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function module creation: ${functionModuleName} in ${functionGroupName}`);
+    logger?.info(`Starting function module creation: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       // Create function module
@@ -122,7 +122,7 @@ export async function handleCreateFunctionModule(context: HandlerContext, args: 
       // Get updated session state after create
 
 
-      logger.info(`✅ CreateFunctionModule completed: ${functionModuleName}`);
+      logger?.info(`✅ CreateFunctionModule completed: ${functionModuleName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -139,7 +139,7 @@ export async function handleCreateFunctionModule(context: HandlerContext, args: 
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating function module ${functionModuleName}: ${error?.message || error}`);
+      logger?.error(`Error creating function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create function module: ${error.message || String(error)}`;

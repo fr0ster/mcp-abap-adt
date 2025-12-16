@@ -75,7 +75,7 @@ export async function handleLockClass(context: HandlerContext, args: LockClassAr
 
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting class lock: ${className}`);
+    logger?.info(`Starting class lock: ${className}`);
 
     try {
       // Lock class
@@ -89,8 +89,8 @@ export async function handleLockClass(context: HandlerContext, args: LockClassAr
       // Get updated session state after lock
 
 
-      logger.info(`✅ LockClass completed: ${className}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger?.info(`✅ LockClass completed: ${className}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -104,7 +104,7 @@ export async function handleLockClass(context: HandlerContext, args: LockClassAr
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking class ${className}: ${error?.message || error}`);
+      logger?.error(`Error locking class ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock class: ${error.message || String(error)}`;

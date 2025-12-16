@@ -89,7 +89,7 @@ export async function handleUpdateStructure(context: HandlerContext, args: Updat
 
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure update: ${structureName}`);
+    logger?.info(`Starting structure update: ${structureName}`);
 
     try {
       // Update structure with DDL code
@@ -103,7 +103,7 @@ export async function handleUpdateStructure(context: HandlerContext, args: Updat
       // Get updated session state after update
 
 
-      logger.info(`✅ UpdateStructure completed: ${structureName}`);
+      logger?.info(`✅ UpdateStructure completed: ${structureName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -116,7 +116,7 @@ export async function handleUpdateStructure(context: HandlerContext, args: Updat
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating structure ${structureName}:`, error);
+      logger?.error(`Error updating structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to update structure: ${error.message || String(error)}`;

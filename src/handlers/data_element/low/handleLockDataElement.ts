@@ -76,7 +76,7 @@ export async function handleLockDataElement(context: HandlerContext, args: LockD
 
     const dataElementName = data_element_name.toUpperCase();
 
-    logger.info(`Starting data element lock: ${dataElementName}`);
+    logger?.info(`Starting data element lock: ${dataElementName}`);
 
     try {
       // Lock data element
@@ -84,14 +84,14 @@ export async function handleLockDataElement(context: HandlerContext, args: LockD
       const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {
-        logger.error(`Lock did not return a lock handle for data element ${dataElementName}`);
+        logger?.error(`Lock did not return a lock handle for data element ${dataElementName}`);
         throw new Error(`Lock did not return a lock handle for data element ${dataElementName}`);
       }
 
       // Get updated session state after lock
 
 
-      logger.info(`✅ LockDataElement completed: ${dataElementName}`);
+      logger?.info(`✅ LockDataElement completed: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -105,7 +105,7 @@ export async function handleLockDataElement(context: HandlerContext, args: LockD
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking data element ${dataElementName}: ${error?.message || error}`);
+      logger?.error(`Error locking data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock data element: ${error.message || String(error)}`;

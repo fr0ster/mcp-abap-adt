@@ -77,7 +77,7 @@ export async function handleActivateMetadataExtension(context: HandlerContext, a
 
     const metadataExtensionName = name.toUpperCase();
 
-    logger.info(`Starting metadata extension activation: ${metadataExtensionName}`);
+    logger?.info(`Starting metadata extension activation: ${metadataExtensionName}`);
 
     try {
       // Activate metadata extension
@@ -95,8 +95,8 @@ export async function handleActivateMetadataExtension(context: HandlerContext, a
       // Get updated session state after activation
 
 
-      logger.info(`✅ ActivateMetadataExtension completed: ${metadataExtensionName}`);
-      logger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
+      logger?.info(`✅ ActivateMetadataExtension completed: ${metadataExtensionName}`);
+      logger?.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +119,7 @@ export async function handleActivateMetadataExtension(context: HandlerContext, a
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating metadata extension ${metadataExtensionName}: ${error?.message || error}`);
+      logger?.error(`Error activating metadata extension ${metadataExtensionName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate metadata extension: ${error.message || String(error)}`;

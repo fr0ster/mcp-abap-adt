@@ -70,7 +70,7 @@ export async function handleLockDomain(context: HandlerContext, args: LockDomain
 
     const domainName = domain_name.toUpperCase();
 
-    logger.info(`Starting domain lock: ${domainName}`);
+    logger?.info(`Starting domain lock: ${domainName}`);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -91,8 +91,8 @@ export async function handleLockDomain(context: HandlerContext, args: LockDomain
       // Get actual session ID from connection (may be different from input if new session was created)
       const actualSessionId = connection.getSessionId() || session_id || null;
 
-      logger.info(`✅ LockDomain completed: ${domainName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger?.info(`✅ LockDomain completed: ${domainName}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -106,7 +106,7 @@ export async function handleLockDomain(context: HandlerContext, args: LockDomain
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking domain ${domainName}: ${error?.message || error}`);
+      logger?.error(`Error locking domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to lock domain: ${error.message || String(error)}`;

@@ -76,7 +76,7 @@ export async function handleCreateBehaviorDefinition(context: HandlerContext, pa
    const name = args.name.toUpperCase();
    // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-   logger.info(`Starting BDEF creation: ${name}`);
+   logger?.info(`Starting BDEF creation: ${name}`);
 
     try {
         const client = new CrudClient(connection);
@@ -118,7 +118,7 @@ export async function handleCreateBehaviorDefinition(context: HandlerContext, pa
             const unlockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
             await client.unlockBehaviorDefinition(unlockConfig, lockHandle);
           } catch (unlockError) {
-            logger.error(`Failed to unlock behavior definition after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+            logger?.error(`Failed to unlock behavior definition after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
           }
           // Principle 2: first error and exit
           throw error;
@@ -133,7 +133,7 @@ export async function handleCreateBehaviorDefinition(context: HandlerContext, pa
                 ? `Behavior Definition ${name} created and activated successfully`
                 : `Behavior Definition ${name} created successfully`
         };
-        logger.info(`✅ CreateBehaviorDefinition completed successfully: ${name}`);
+        logger?.info(`✅ CreateBehaviorDefinition completed successfully: ${name}`);
 
         return return_response({
             data: JSON.stringify(result, null, 2),
@@ -144,14 +144,14 @@ export async function handleCreateBehaviorDefinition(context: HandlerContext, pa
         });
 
     } catch (error: any) {
-        logger.error(`Error creating BDEF ${name}: ${error?.message || error}`);
+        logger?.error(`Error creating BDEF ${name}: ${error?.message || error}`);
         return return_error(error);
     } finally {
         try {
             connection.reset();
-            logger.debug('Reset BDEF connection after use');
+            logger?.debug('Reset BDEF connection after use');
         } catch (resetError: any) {
-            logger.error(`Failed to reset BDEF connection: ${resetError?.message || resetError}`);
+            logger?.error(`Failed to reset BDEF connection: ${resetError?.message || resetError}`);
         }
     }
 }

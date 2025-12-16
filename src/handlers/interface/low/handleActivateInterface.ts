@@ -75,7 +75,7 @@ export async function handleActivateInterface(context: HandlerContext, args: Act
 
     const interfaceName = interface_name.toUpperCase();
 
-    logger.info(`Starting interface activation: ${interfaceName}`);
+    logger?.info(`Starting interface activation: ${interfaceName}`);
 
     try {
       // Activate interface
@@ -93,8 +93,8 @@ export async function handleActivateInterface(context: HandlerContext, args: Act
       // Get updated session state after activation
 
 
-      logger.info(`✅ ActivateInterface completed: ${interfaceName}`);
-      logger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
+      logger?.info(`✅ ActivateInterface completed: ${interfaceName}`);
+      logger?.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -117,7 +117,7 @@ export async function handleActivateInterface(context: HandlerContext, args: Act
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating interface ${interfaceName}: ${error?.message || error}`);
+      logger?.error(`Error activating interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate interface: ${error.message || String(error)}`;

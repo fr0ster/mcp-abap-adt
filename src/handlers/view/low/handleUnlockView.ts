@@ -83,7 +83,7 @@ export async function handleUnlockView(context: HandlerContext, args: UnlockView
 
     const viewName = view_name.toUpperCase();
 
-    logger.info(`Starting view unlock: ${viewName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(`Starting view unlock: ${viewName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock view
@@ -97,7 +97,7 @@ export async function handleUnlockView(context: HandlerContext, args: UnlockView
       // Get updated session state after unlock
 
 
-      logger.info(`✅ UnlockView completed: ${viewName}`);
+      logger?.info(`✅ UnlockView completed: ${viewName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -110,7 +110,7 @@ export async function handleUnlockView(context: HandlerContext, args: UnlockView
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking view ${viewName}: ${error?.message || error}`);
+      logger?.error(`Error unlocking view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock view: ${error.message || String(error)}`;

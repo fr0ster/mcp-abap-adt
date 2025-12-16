@@ -72,7 +72,7 @@ export async function handleGetClassUnitTestStatus(context: HandlerContext, args
     } else {
     }
 
-    logger.info(`Fetching ABAP Unit status for run ${run_id}`);
+    logger?.info(`Fetching ABAP Unit status for run ${run_id}`);
 
     try {
       await client.getClassUnitTestRunStatus(run_id, with_long_polling);
@@ -84,7 +84,7 @@ export async function handleGetClassUnitTestStatus(context: HandlerContext, args
 
       return return_response(statusResponse);
     } catch (error: any) {
-      logger.error(`Error retrieving ABAP Unit status for run ${run_id}: ${error?.message || error}`);
+      logger?.error(`Error retrieving ABAP Unit status for run ${run_id}: ${error?.message || error}`);
       return return_error(new Error(error?.message || String(error)));
     }
   } catch (error: any) {

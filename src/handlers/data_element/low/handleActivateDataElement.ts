@@ -77,7 +77,7 @@ export async function handleActivateDataElement(context: HandlerContext, args: A
 
     const dataElementName = data_element_name.toUpperCase();
 
-    logger.info(`Starting data element activation: ${dataElementName}`);
+    logger?.info(`Starting data element activation: ${dataElementName}`);
 
     try {
       // Activate data element
@@ -85,7 +85,7 @@ export async function handleActivateDataElement(context: HandlerContext, args: A
       const response = client.getActivateResult();
 
       if (!response) {
-        logger.error(`Activation did not return a response for data element ${dataElementName}`);
+        logger?.error(`Activation did not return a response for data element ${dataElementName}`);
         throw new Error(`Activation did not return a response for data element ${dataElementName}`);
       }
 
@@ -96,7 +96,7 @@ export async function handleActivateDataElement(context: HandlerContext, args: A
       // Get updated session state after activation
 
 
-      logger.info(`✅ ActivateDataElement completed: ${dataElementName}`);
+      logger?.info(`✅ ActivateDataElement completed: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +119,7 @@ export async function handleActivateDataElement(context: HandlerContext, args: A
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating data element ${dataElementName}: ${error?.message || error}`);
+      logger?.error(`Error activating data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate data element: ${error.message || String(error)}`;

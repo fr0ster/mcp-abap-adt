@@ -97,7 +97,7 @@ export async function handleValidateBehaviorImplementation(context: HandlerConte
     const className = class_name.toUpperCase();
     const behaviorDefinition = behavior_definition.toUpperCase();
 
-    logger.info(`Starting behavior implementation validation: ${className} for ${behaviorDefinition}`);
+    logger?.info(`Starting behavior implementation validation: ${className} for ${behaviorDefinition}`);
 
     try {
       // Validate behavior implementation
@@ -117,8 +117,8 @@ export async function handleValidateBehaviorImplementation(context: HandlerConte
       // Get updated session state after validation
 
 
-      logger.info(`✅ ValidateBehaviorImplementation completed: ${className}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      logger?.info(`✅ ValidateBehaviorImplementation completed: ${className}`);
+      logger?.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
         data: JSON.stringify({
@@ -135,7 +135,7 @@ export async function handleValidateBehaviorImplementation(context: HandlerConte
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating behavior implementation ${className}: ${error?.message || error}`);
+      logger?.error(`Error validating behavior implementation ${className}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate behavior implementation: ${error.message || String(error)}`;

@@ -77,7 +77,7 @@ export async function handleUpdateBehaviorImplementation(context: HandlerContext
     const className = class_name.toUpperCase();
     const behaviorDefinition = behavior_definition.toUpperCase();
 
-    logger.info(`Starting behavior implementation source update: ${className} for ${behaviorDefinition}`);
+    logger?.info(`Starting behavior implementation source update: ${className} for ${behaviorDefinition}`);
 
     try {
       // Create client
@@ -110,7 +110,7 @@ export async function handleUpdateBehaviorImplementation(context: HandlerContext
             () => client.checkClass({ className }),
             className,
             {
-              debug: (message: string) => logger.debug(message)
+              debug: (message: string) => logger?.debug(message)
             }
           );
         } catch (checkError: any) {
@@ -133,7 +133,7 @@ export async function handleUpdateBehaviorImplementation(context: HandlerContext
         try {
           await client.unlockClass({ className: className }, lockHandle);
         } catch (unlockError) {
-          logger.error(`Failed to unlock behavior implementation after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+          logger?.error(`Failed to unlock behavior implementation after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
         }
         throw error;
       }
@@ -155,7 +155,7 @@ export async function handleUpdateBehaviorImplementation(context: HandlerContext
         }
       }
 
-      logger.info(`✅ UpdateBehaviorImplementation completed successfully: ${className}`);
+      logger?.info(`✅ UpdateBehaviorImplementation completed successfully: ${className}`);
 
       // Return success result
       const stepsCompleted = ['lock', 'update_main_source', 'update_implementations', 'check', 'unlock'];
@@ -186,7 +186,7 @@ export async function handleUpdateBehaviorImplementation(context: HandlerContext
       });
 
     } catch (error: any) {
-      logger.error(`Error updating behavior implementation source ${className}: ${error?.message || error}`);
+      logger?.error(`Error updating behavior implementation source ${className}: ${error?.message || error}`);
 
       const errorMessage = error.response?.data
         ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
@@ -197,10 +197,10 @@ export async function handleUpdateBehaviorImplementation(context: HandlerContext
       try {
         if (connection) {
           connection.reset();
-          logger.debug('Reset behavior implementation connection after use');
+          logger?.debug('Reset behavior implementation connection after use');
         }
       } catch (resetError: any) {
-        logger.error(`Failed to reset behavior implementation connection: ${resetError?.message || resetError}`);
+        logger?.error(`Failed to reset behavior implementation connection: ${resetError?.message || resetError}`);
       }
     }
 

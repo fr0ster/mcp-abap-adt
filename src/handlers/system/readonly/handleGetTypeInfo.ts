@@ -75,7 +75,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
             throw new McpError(ErrorCode.InvalidParams, 'Type name is required');
         }
     } catch (error) {
-        logger.error('Invalid parameters for GetTypeInfo', error as any);
+        logger?.error('Invalid parameters for GetTypeInfo', error as any);
         // MCP-compliant error response: always return content[] with type "text"
         return {
             isError: true,
@@ -89,7 +89,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
     }
 
     try {
-        logger.info(`Fetching domain info for type ${args.type_name}`);
+        logger?.info(`Fetching domain info for type ${args.type_name}`);
         const url = `/sap/bc/adt/ddic/domains/${encodeSapObjectName(args.type_name)}/source/main`;
         const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
         const result = {
@@ -106,7 +106,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
     } catch (error) {
         // no domain found, try data element
         try {
-            logger.debug(`Domain lookup failed for ${args.type_name}, trying data element`);
+            logger?.debug(`Domain lookup failed for ${args.type_name}, trying data element`);
             const url = `/sap/bc/adt/ddic/dataelements/${encodeSapObjectName(args.type_name)}`;
             const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
             const result = {
@@ -123,7 +123,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
         } catch (error) {
             // no data element found, try table type
             try {
-                logger.debug(`Data element lookup failed for ${args.type_name}, trying table type`);
+                logger?.debug(`Data element lookup failed for ${args.type_name}, trying table type`);
                 const url = `/sap/bc/adt/ddic/tabletypes/${encodeSapObjectName(args.type_name)}`;
                 const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
                 const result = {
@@ -140,7 +140,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
             } catch (error) {
                 // fallback: try repository informationsystem for domain
                 try {
-                    logger.debug(`Table type lookup failed for ${args.type_name}, trying repository information system`);
+                    logger?.debug(`Table type lookup failed for ${args.type_name}, trying repository information system`);
                     const uri = encodeURIComponent(`/sap/bc/adt/ddic/domains/${args.type_name.toLowerCase()}`);
                     const url = `/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${uri}`;
                     const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
@@ -156,7 +156,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
                         objectsListCache.setCache(result);
                         return result;
                 } catch (error) {
-                    logger.error(`Failed to resolve type info for ${args.type_name}`, error as any);
+                    logger?.error(`Failed to resolve type info for ${args.type_name}`, error as any);
                     // MCP-compliant error response: always return content[] with type "text"
                     return {
                         isError: true,

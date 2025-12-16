@@ -96,7 +96,7 @@ export async function handleCheckView(context: HandlerContext, args: CheckViewAr
       ? version.toLowerCase() as 'active' | 'inactive'
       : 'inactive';
 
-    logger.info(`Starting view check: ${viewName} (version: ${checkVersion}) ${ddl_source ? '(with new code)' : '(saved version)'}`);
+    logger?.info(`Starting view check: ${viewName} (version: ${checkVersion}) ${ddl_source ? '(with new code)' : '(saved version)'}`);
 
     try {
       // Check view with optional source code (for validating new/unsaved code)
@@ -114,9 +114,9 @@ export async function handleCheckView(context: HandlerContext, args: CheckViewAr
       // Get updated session state after check
 
 
-      logger.info(`✅ CheckView completed: ${viewName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.info(`✅ CheckView completed: ${viewName}`);
+      logger?.info(`   Status: ${checkResult.status}`);
+      logger?.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -133,7 +133,7 @@ export async function handleCheckView(context: HandlerContext, args: CheckViewAr
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking view ${viewName}: ${error?.message || error}`);
+      logger?.error(`Error checking view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check view: ${error.message || String(error)}`;

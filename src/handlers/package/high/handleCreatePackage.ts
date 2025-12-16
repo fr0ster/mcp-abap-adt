@@ -64,7 +64,7 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
     const packageName = typedArgs.package_name.toUpperCase();
 
-    logger.info(`Starting package creation: ${packageName}`);
+    logger?.info(`Starting package creation: ${packageName}`);
 
     try {
       const client = new CrudClient(connection);
@@ -97,15 +97,15 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
       }
 
       // DEBUG: Log softwareComponent at each step
-      logger.debug(`[CreatePackage] software_component in args: ${typedArgs.software_component || 'undefined'}`);
-      logger.debug(`[CreatePackage] softwareComponent in config: ${createConfig.softwareComponent || 'undefined'}`);
+      logger?.debug(`[CreatePackage] software_component in args: ${typedArgs.software_component || 'undefined'}`);
+      logger?.debug(`[CreatePackage] softwareComponent in config: ${createConfig.softwareComponent || 'undefined'}`);
 
       await client.createPackage(createConfig);
 
       // Check
       await client.checkPackage({ packageName: packageName, superPackage: typedArgs.super_package });
 
-      logger.info(`✅ CreatePackage completed successfully: ${packageName}`);
+      logger?.info(`✅ CreatePackage completed successfully: ${packageName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -123,7 +123,7 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`CreatePackage ${packageName}`, error);
+      logger?.error(`CreatePackage ${packageName}`, error);
 
       // Check for authentication errors (expired tokens)
       if (error.message?.includes('Refresh token has expired') ||
@@ -172,9 +172,9 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
     } finally {
       try {
         connection.reset();
-        logger.debug('Reset package connection after use');
+        logger?.debug('Reset package connection after use');
       } catch (resetError: any) {
-        logger.error(`Failed to reset package connection: ${resetError?.message || resetError}`);
+        logger?.error(`Failed to reset package connection: ${resetError?.message || resetError}`);
       }
     }
 

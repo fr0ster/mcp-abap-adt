@@ -164,7 +164,7 @@ export async function handleCreateStructure(context: HandlerContext, args: Creat
 
     const structureName = createStructureArgs.structure_name.toUpperCase();
 
-    logger.info(`Starting structure creation: ${structureName}`);
+    logger?.info(`Starting structure creation: ${structureName}`);
 
             try {
       // Get configuration from environment variables
@@ -172,7 +172,7 @@ export async function handleCreateStructure(context: HandlerContext, args: Creat
             // Create connection directly for this handler call
       // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-      logger.debug(`[CreateStructure] Created separate connection for handler call: ${structureName}`);
+      logger?.debug(`[CreateStructure] Created separate connection for handler call: ${structureName}`);
     } catch (connectionError: any) {
       const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
       throw new McpError(ErrorCode.InternalError, `Failed to create connection: ${errorMessage}`);
@@ -210,26 +210,26 @@ export async function handleCreateStructure(context: HandlerContext, args: Creat
 
         // Unlock (MANDATORY after lock)
         await client.unlockStructure({ structureName }, lockHandle);
-        logger.info(`[CreateStructure] Structure unlocked: ${structureName}`);
+        logger?.info(`[CreateStructure] Structure unlocked: ${structureName}`);
 
         // Check inactive version (after unlock)
-        logger.info(`[CreateStructure] Checking inactive version: ${structureName}`);
+        logger?.info(`[CreateStructure] Checking inactive version: ${structureName}`);
         try {
           await safeCheckOperation(
             () => client.checkStructure({ structureName }, undefined, 'inactive'),
             structureName,
             {
-              debug: (message: string) => logger.debug(`[CreateStructure] ${message}`)
+              debug: (message: string) => logger?.debug(`[CreateStructure] ${message}`)
             }
           );
-          logger.info(`[CreateStructure] Inactive version check completed: ${structureName}`);
+          logger?.info(`[CreateStructure] Inactive version check completed: ${structureName}`);
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
           if ((checkError as any).isAlreadyChecked) {
-            logger.info(`[CreateStructure] Structure ${structureName} was already checked - this is OK, continuing`);
+            logger?.info(`[CreateStructure] Structure ${structureName} was already checked - this is OK, continuing`);
           } else {
             // Log warning but don't fail - inactive check is informational
-            logger.warn(`[CreateStructure] Inactive version check had issues: ${structureName}`, {
+            logger?.warn(`[CreateStructure] Inactive version check had issues: ${structureName}`, {
               error: checkError instanceof Error ? checkError.message : String(checkError)
             });
           }
@@ -244,13 +244,13 @@ export async function handleCreateStructure(context: HandlerContext, args: Creat
         try {
           await client.unlockStructure({ structureName }, lockHandle);
         } catch (unlockError) {
-          logger.error('Failed to unlock structure after error:', unlockError);
+          logger?.error('Failed to unlock structure after error:', unlockError);
         }
         // Principle 2: first error and exit
         throw error;
       }
 
-      logger.info(`✅ CreateStructure completed successfully: ${structureName}`);
+      logger?.info(`✅ CreateStructure completed successfully: ${structureName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -264,7 +264,7 @@ export async function handleCreateStructure(context: HandlerContext, args: Creat
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating structure ${structureName}:`, error);
+      logger?.error(`Error creating structure ${structureName}:`, error);
 
       // Check if structure already exists
       if (error.message?.includes('already exists') || error.response?.status === 409) {
@@ -287,9 +287,9 @@ export async function handleCreateStructure(context: HandlerContext, args: Creat
       if (connection) {
         try {
           connection.reset();
-          logger.debug(`[CreateStructure] Reset connection`);
+          logger?.debug(`[CreateStructure] Reset connection`);
         } catch (resetError: any) {
-          logger.error(`[CreateStructure] Failed to reset connection: ${resetError.message || resetError}`);
+          logger?.error(`[CreateStructure] Failed to reset connection: ${resetError.message || resetError}`);
         }
       }
     }

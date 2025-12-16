@@ -85,10 +85,10 @@ function parseEnhancementSpotMetadata(xmlData: string): any {
         }
         if (links.length > 0) metadata.links = links;
 
-        logger.info(`Parsed structured metadata for enhancement spot:`, metadata);
+        logger?.info(`Parsed structured metadata for enhancement spot:`, metadata);
         return metadata;
     } catch (parseError) {
-        logger.error('Failed to parse enhancement spot XML metadata:', parseError);
+        logger?.error('Failed to parse enhancement spot XML metadata:', parseError);
         return {};
     }
 }
@@ -110,7 +110,7 @@ function parseEnhancementSpotMetadata(xmlData: string): any {
 export async function handleGetEnhancementSpot(context: HandlerContext, args: any) {
   const { connection, logger } = context;
     try {
-        logger.info('handleGetEnhancementSpot called with args:', args);
+        logger?.info('handleGetEnhancementSpot called with args:', args);
 
         if (!args?.enhancement_spot) {
             throw new McpError(ErrorCode.InvalidParams, 'Enhancement spot is required');
@@ -118,12 +118,12 @@ export async function handleGetEnhancementSpot(context: HandlerContext, args: an
 
         const enhancementSpot = args.enhancement_spot;
 
-        logger.info(`Getting metadata for enhancement spot: ${enhancementSpot}`);
+        logger?.info(`Getting metadata for enhancement spot: ${enhancementSpot}`);
 
         // Build the ADT URL for the specific enhancement spot (Eclipse uses /sap/bc/adt/enhancements/enhsxsb/{spot_name})
         const url = `/sap/bc/adt/enhancements/enhsxsb/${encodeSapObjectName(enhancementSpot)}`;
 
-        logger.info(`Enhancement spot URL: ${url}`);
+        logger?.info(`Enhancement spot URL: ${url}`);
 
         const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default', {
             'Accept': 'application/vnd.sap.adt.enhancements.v1+xml'

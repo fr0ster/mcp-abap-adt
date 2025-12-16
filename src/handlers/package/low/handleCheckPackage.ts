@@ -85,7 +85,7 @@ export async function handleCheckPackage(context: HandlerContext, args: CheckPac
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    logger.info(`Starting package check: ${packageName} in ${superPackage}`);
+    logger?.info(`Starting package check: ${packageName} in ${superPackage}`);
 
     try {
       // Check package
@@ -102,8 +102,8 @@ export async function handleCheckPackage(context: HandlerContext, args: CheckPac
       // Get updated session state after check
 
 
-      logger.info(`✅ CheckPackage completed: ${packageName}`);
-      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.info(`✅ CheckPackage completed: ${packageName}`);
+      logger?.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -120,7 +120,7 @@ export async function handleCheckPackage(context: HandlerContext, args: CheckPac
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking package ${packageName}: ${error?.message || error}`);
+      logger?.error(`Error checking package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check package: ${error.message || String(error)}`;

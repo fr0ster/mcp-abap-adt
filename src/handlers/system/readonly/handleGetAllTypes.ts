@@ -77,7 +77,7 @@ export async function handleGetAdtTypes(context: HandlerContext, args: any) {
   try {
     const url = `/sap/bc/adt/repository/informationsystem/objecttypes?maxItemCount=999&name=*&data=usedByProvider`;
     const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
-    logger.info('Fetched ADT object types list');
+    logger?.info('Fetched ADT object types list');
     const items = extractNamedItems(response.data);
     return {
       isError: false,
@@ -89,7 +89,7 @@ export async function handleGetAdtTypes(context: HandlerContext, args: any) {
       ]
     };
   } catch (error) {
-    logger.error('Failed to fetch ADT object types', error as any);
+    logger?.error('Failed to fetch ADT object types', error as any);
     return {
       isError: true,
       content: [

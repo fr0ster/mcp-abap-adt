@@ -110,7 +110,7 @@ export async function handleCreateBehaviorDefinition(context: HandlerContext, ar
 
     const bdefName = name.toUpperCase();
 
-    logger.info(`Starting behavior definition creation: ${bdefName}`);
+    logger?.info(`Starting behavior definition creation: ${bdefName}`);
 
     try {
       // Create behavior definition - using types from adt-clients
@@ -132,7 +132,7 @@ export async function handleCreateBehaviorDefinition(context: HandlerContext, ar
       // Get updated session state after create
 
 
-      logger.info(`✅ CreateBehaviorDefinition completed: ${bdefName}`);
+      logger?.info(`✅ CreateBehaviorDefinition completed: ${bdefName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -150,7 +150,7 @@ export async function handleCreateBehaviorDefinition(context: HandlerContext, ar
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating behavior definition ${bdefName}: ${error?.message || error}`);
+      logger?.error(`Error creating behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create behavior definition: ${error.message || String(error)}`;

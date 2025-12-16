@@ -121,22 +121,22 @@ export function createTestLogger(category: string): LoggerWithExtras {
     }
   };
 
-  const info = emit(LogLevel.INFO, msg => baseLogger.info(msg));
-  const debug = emit(LogLevel.DEBUG, msg => baseLogger.debug(msg));
-  const warn = emit(LogLevel.WARN, msg => baseLogger.warn(msg));
-  const error = emit(LogLevel.ERROR, msg => baseLogger.error(msg));
+  const info = emit(LogLevel.INFO, msg => baseLogger?.info(msg));
+  const debug = emit(LogLevel.DEBUG, msg => baseLogger?.debug(msg));
+  const warn = emit(LogLevel.WARN, msg => baseLogger?.warn(msg));
+  const error = emit(LogLevel.ERROR, msg => baseLogger?.error(msg));
 
   return {
     info,
     debug,
     warn,
     error,
-    browserAuth: emit(LogLevel.INFO, msg => baseLogger.info(`🌐 ${msg}`)),
-    refresh: emit(LogLevel.INFO, msg => baseLogger.info(`🔄 ${msg}`)),
-    success: emit(LogLevel.INFO, msg => baseLogger.info(`✅ ${msg}`)),
-    browserUrl: emit(LogLevel.INFO, msg => baseLogger.info(`🔗 ${msg}`)),
-    browserOpening: emit(LogLevel.DEBUG, msg => baseLogger.debug(`🌐 ${msg}`)),
-    testSkip: emit(LogLevel.INFO, msg => baseLogger.info(`⏭️  ${msg}`)),
+    browserAuth: emit(LogLevel.INFO, msg => baseLogger?.info(`🌐 ${msg}`)),
+    refresh: emit(LogLevel.INFO, msg => baseLogger?.info(`🔄 ${msg}`)),
+    success: emit(LogLevel.INFO, msg => baseLogger?.info(`✅ ${msg}`)),
+    browserUrl: emit(LogLevel.INFO, msg => baseLogger?.info(`🔗 ${msg}`)),
+    browserOpening: emit(LogLevel.DEBUG, msg => baseLogger?.debug(`🌐 ${msg}`)),
+    testSkip: emit(LogLevel.INFO, msg => baseLogger?.info(`⏭️  ${msg}`)),
   };
 }
 
@@ -145,5 +145,5 @@ export function createTestLogger(category: string): LoggerWithExtras {
  */
 export function logObjectAction(logger: Logger, action: string, objectName: string, extra?: Record<string, any>) {
   const payload = extra ? ` ${JSON.stringify(extra)}` : '';
-  logger.info(`${action} ${objectName}${payload}`);
+  logger?.info(`${action} ${objectName}${payload}`);
 }

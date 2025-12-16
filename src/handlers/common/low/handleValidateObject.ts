@@ -121,7 +121,7 @@ export async function handleValidateObject(context: HandlerContext, args: Valida
 
     const objectName = object_name.toUpperCase();
 
-    logger.info(`Starting object validation: ${objectName} (type: ${object_type})`);
+    logger?.info(`Starting object validation: ${objectName} (type: ${object_type})`);
 
     try {
 
@@ -309,8 +309,8 @@ export async function handleValidateObject(context: HandlerContext, args: Valida
       // Get updated session state after validation
 
 
-      logger.info(`✅ ValidateObject completed: ${objectName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      logger?.info(`✅ ValidateObject completed: ${objectName}`);
+      logger?.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
         data: JSON.stringify({
@@ -327,7 +327,7 @@ export async function handleValidateObject(context: HandlerContext, args: Valida
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`ValidateObject ${objectName}`, error);
+      logger?.error(`ValidateObject ${objectName}`, error);
 
       // Parse error message
       let errorMessage = `Failed to validate object: ${error.message || String(error)}`;

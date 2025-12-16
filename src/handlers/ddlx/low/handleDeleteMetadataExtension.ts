@@ -54,7 +54,7 @@ export async function handleDeleteMetadataExtension(context: HandlerContext, arg
         const client = new CrudClient(connection);
     const ddlxName = name.toUpperCase();
 
-    logger.info(`Starting metadata extension deletion: ${ddlxName}`);
+    logger?.info(`Starting metadata extension deletion: ${ddlxName}`);
 
     try {
       // Delete metadata extension
@@ -65,7 +65,7 @@ export async function handleDeleteMetadataExtension(context: HandlerContext, arg
         throw new Error(`Delete did not return a response for metadata extension ${ddlxName}`);
       }
 
-      logger.info(`✅ DeleteMetadataExtension completed successfully: ${ddlxName}`);
+      logger?.info(`✅ DeleteMetadataExtension completed successfully: ${ddlxName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -77,7 +77,7 @@ export async function handleDeleteMetadataExtension(context: HandlerContext, arg
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting metadata extension ${ddlxName}: ${error?.message || error}`);
+      logger?.error(`Error deleting metadata extension ${ddlxName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete metadata extension: ${error.message || String(error)}`;

@@ -65,7 +65,7 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
     const typedArgs = args as CreateTransportArgs;
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    logger.info(`Starting transport creation: ${typedArgs.description}`);
+    logger?.info(`Starting transport creation: ${typedArgs.description}`);
 
     try {
       // Create client
@@ -80,7 +80,7 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
       // Get create result
       const createResult = client.getCreateResult();
 
-      logger.info(`✅ CreateTransport completed successfully`);
+      logger?.info(`✅ CreateTransport completed successfully`);
 
       // Parse response data if available
       let transportInfo: any = {};
@@ -154,7 +154,7 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
       });
 
     } catch (error: any) {
-      logger.error(`Error creating transport:`, error);
+      logger?.error(`Error creating transport:`, error);
 
       const errorMessage = error.response?.data
         ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
@@ -167,9 +167,9 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
     } finally {
       try {
         connection.reset();
-        logger.debug('Reset transport connection after use');
+        logger?.debug('Reset transport connection after use');
       } catch (resetError: any) {
-        logger.error(`Failed to reset transport connection: ${resetError?.message || resetError}`);
+        logger?.error(`Failed to reset transport connection: ${resetError?.message || resetError}`);
       }
     }
 

@@ -104,7 +104,7 @@ export async function handleCheckTable(context: HandlerContext, args: CheckTable
     const sessionId = session_id || generateSessionId();
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table check: ${tableName} (reporter: ${checkReporter}, version: ${checkVersion}, session: ${sessionId.substring(0, 8)}..., ${ddl_code ? 'with new code' : 'saved version'})`);
+    logger?.info(`Starting table check: ${tableName} (reporter: ${checkReporter}, version: ${checkVersion}, session: ${sessionId.substring(0, 8)}..., ${ddl_code ? 'with new code' : 'saved version'})`);
 
     try {
       const builder = new CrudClient(connection);
@@ -123,9 +123,9 @@ export async function handleCheckTable(context: HandlerContext, args: CheckTable
       // Get updated session state after check
 
 
-      logger.info(`✅ CheckTable completed: ${tableName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.info(`✅ CheckTable completed: ${tableName}`);
+      logger?.info(`   Status: ${checkResult.status}`);
+      logger?.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -143,7 +143,7 @@ export async function handleCheckTable(context: HandlerContext, args: CheckTable
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking table ${tableName}:`, error);
+      logger?.error(`Error checking table ${tableName}:`, error);
 
       let errorMessage = `Failed to check table: ${error.message || String(error)}`;
 

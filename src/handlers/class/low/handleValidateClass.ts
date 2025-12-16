@@ -88,7 +88,7 @@ export async function handleValidateClass(context: HandlerContext, args: Validat
 
     const className = class_name.toUpperCase();
 
-    logger.info(`Starting class validation: ${className}`);
+    logger?.info(`Starting class validation: ${className}`);
 
     try {
       const builder = new CrudClient(connection);
@@ -129,8 +129,8 @@ export async function handleValidateClass(context: HandlerContext, args: Validat
       // Get updated session state after validation
 
 
-      logger.info(`✅ ValidateClass completed: ${className}`);
-      logger.debug(`Result: valid=${result.valid}, message=${result.message || 'N/A'}`);
+      logger?.info(`✅ ValidateClass completed: ${className}`);
+      logger?.debug(`Result: valid=${result.valid}, message=${result.message || 'N/A'}`);
 
       // Always return structured response, even if validation failed
       // This allows tests to check validation_result.valid and skip if needed
@@ -158,9 +158,9 @@ export async function handleValidateClass(context: HandlerContext, args: Validat
 
       if (!isValidationError || debugEnabled) {
         if (isValidationError) {
-          logger.debug(`Validation returned 400 for class ${className} (expected behavior): ${error.message || String(error)}`);
+          logger?.debug(`Validation returned 400 for class ${className} (expected behavior): ${error.message || String(error)}`);
         } else {
-          logger.error(`Error validating class ${className}: ${error.message || String(error)}`);
+          logger?.error(`Error validating class ${className}: ${error.message || String(error)}`);
         }
       }
 

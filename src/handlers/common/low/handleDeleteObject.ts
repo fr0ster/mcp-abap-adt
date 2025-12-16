@@ -41,7 +41,7 @@ export async function handleDeleteObject(context: HandlerContext, args: DeleteOb
     const objectName = object_name.toUpperCase();
     const objectType = object_type.toLowerCase();
 
-    logger.info(`Starting object deletion: ${objectName} (type: ${object_type})`);
+    logger?.info(`Starting object deletion: ${objectName} (type: ${object_type})`);
 
     try {
       let response;
@@ -122,7 +122,7 @@ export async function handleDeleteObject(context: HandlerContext, args: DeleteOb
         throw new Error(`Delete did not return a response for object ${objectName}`);
       }
 
-      logger.info(`✅ DeleteObject completed successfully: ${objectName}`);
+      logger?.info(`✅ DeleteObject completed successfully: ${objectName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -135,7 +135,7 @@ export async function handleDeleteObject(context: HandlerContext, args: DeleteOb
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting object ${objectName}:`, error);
+      logger?.error(`Error deleting object ${objectName}:`, error);
 
       let errorMessage = `Failed to delete object: ${error.message || String(error)}`;
 

@@ -86,7 +86,7 @@ export async function handleValidateFunctionModule(context: HandlerContext, args
     const functionGroupName = function_group_name.toUpperCase();
     const functionModuleName = function_module_name.toUpperCase();
 
-    logger.info(`Starting function module validation: ${functionModuleName} in group ${functionGroupName}`);
+    logger?.info(`Starting function module validation: ${functionModuleName} in group ${functionGroupName}`);
 
     try {
       const client = new CrudClient(connection);
@@ -104,7 +104,7 @@ export async function handleValidateFunctionModule(context: HandlerContext, args
       // Get updated session state after validation
 
 
-      logger.info(`✅ ValidateFunctionModule completed: ${functionModuleName} (valid=${result.valid}, msg=${result.message || 'N/A'})`);
+      logger?.info(`✅ ValidateFunctionModule completed: ${functionModuleName} (valid=${result.valid}, msg=${result.message || 'N/A'})`);
 
       return return_response({
         data: JSON.stringify({
@@ -122,7 +122,7 @@ export async function handleValidateFunctionModule(context: HandlerContext, args
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating function module ${functionModuleName}: ${error?.message || error}`);
+      logger?.error(`Error validating function module ${functionModuleName}: ${error?.message || error}`);
 
       let errorMessage = `Failed to validate function module: ${error.message || String(error)}`;
 

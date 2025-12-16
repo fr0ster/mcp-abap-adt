@@ -54,7 +54,7 @@ export async function handleDeleteView(context: HandlerContext, args: DeleteView
     const client = new CrudClient(connection);
     const viewName = view_name.toUpperCase();
 
-    logger.info(`Starting view deletion: ${viewName}`);
+    logger?.info(`Starting view deletion: ${viewName}`);
 
     try {
       // Delete view
@@ -65,7 +65,7 @@ export async function handleDeleteView(context: HandlerContext, args: DeleteView
         throw new Error(`Delete did not return a response for view ${viewName}`);
       }
 
-      logger.info(`✅ DeleteView completed successfully: ${viewName}`);
+      logger?.info(`✅ DeleteView completed successfully: ${viewName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -77,7 +77,7 @@ export async function handleDeleteView(context: HandlerContext, args: DeleteView
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting view ${viewName}: ${error?.message || error}`);
+      logger?.error(`Error deleting view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete view: ${error.message || String(error)}`;

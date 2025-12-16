@@ -33,7 +33,7 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
         create: async (context: TesterContext) => {
           const { connection, session, logger, objectName, params, packageName, transportRequest } = context;
 
-          logger.info(`   • create: ${objectName}`);
+          logger?.info(`   • create: ${objectName}`);
 
           const sourceCode = params.source_code || '';
           const createArgs = {
@@ -63,7 +63,7 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
           if (createResponse.isError) {
             const errorMsg = extractErrorMessage(createResponse);
             if (errorMsg.includes('already exists') || errorMsg.includes('ExceptionResourceAlreadyExists')) {
-              logger.info(`⏭️  SKIP: Object already exists: ${errorMsg}`);
+              logger?.info(`⏭️  SKIP: Object already exists: ${errorMsg}`);
               throw new Error(`SKIP: ${errorMsg}`);
             }
             throw new Error(`Create failed: ${errorMsg}`);
@@ -74,7 +74,7 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
             throw new Error(`Create failed: ${JSON.stringify(createData)}`);
           }
 
-          logger.success(`✅ create: ${objectName} completed successfully`);
+          logger?.success(`✅ create: ${objectName} completed successfully`);
           updateSessionFromResponse(session, createData);
 
           return createData;
@@ -84,7 +84,7 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
         update: async (context: TesterContext) => {
           const { connection, session, logger, objectName, params } = context;
 
-          logger.info(`   • update: ${objectName}`);
+          logger?.info(`   • update: ${objectName}`);
 
           const updatedSourceCode = params.update_source_code;
           if (!updatedSourceCode) {
@@ -107,7 +107,7 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
             throw new Error(`Update failed: ${JSON.stringify(updateData)}`);
           }
 
-          logger.success(`✅ update: ${objectName} completed successfully`);
+          logger?.success(`✅ update: ${objectName} completed successfully`);
 
           return updateData;
         },
@@ -116,7 +116,7 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
         delete: async (context: TesterContext) => {
           const { connection, logger, objectName, transportRequest } = context;
 
-          logger.info(`   • delete: ${objectName}`);
+          logger?.info(`   • delete: ${objectName}`);
 
           const deleteResponse = await handleDeleteClass({connection, logger}, {
             class_name: objectName || '',
@@ -125,11 +125,11 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
 
           if (deleteResponse.isError) {
             const errorMsg = extractErrorMessage(deleteResponse);
-            logger.warn(`Delete failed (ignored in cleanup): ${errorMsg}`);
+            logger?.warn(`Delete failed (ignored in cleanup): ${errorMsg}`);
             return;
           }
 
-          logger.success(`✅ delete: ${objectName} completed successfully`);
+          logger?.success(`✅ delete: ${objectName} completed successfully`);
         }
       }
     );

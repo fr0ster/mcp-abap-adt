@@ -136,7 +136,7 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
     const typedArgs = args as DomainArgs;
     const domainName = typedArgs.domain_name.toUpperCase();
 
-    logger.info(`Starting domain creation: ${domainName}`);
+    logger?.info(`Starting domain creation: ${domainName}`);
 
     try {
       // Create client
@@ -183,13 +183,13 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
           () => client.checkDomain({ domainName }),
           domainName,
           {
-            debug: (message: string) => logger.debug(message)
+            debug: (message: string) => logger?.debug(message)
           }
         );
       } catch (checkError: any) {
         // If error was marked as "already checked", continue silently
         if ((checkError as any).isAlreadyChecked) {
-          logger.debug(`Domain ${domainName} was already checked - continuing`);
+          logger?.debug(`Domain ${domainName} was already checked - continuing`);
         } else {
           // Real check error - rethrow
           throw checkError;
@@ -203,7 +203,7 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
       if (shouldActivate) {
         await client.activateDomain({ domainName });
       } else {
-        logger.debug(`Skipping activation for: ${domainName}`);
+        logger?.debug(`Skipping activation for: ${domainName}`);
       }
 
       // Get domain details from create result (createDomain already does verification)
@@ -213,7 +213,7 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
         domainDetails = (createResult.data as any).domain_details;
       }
 
-      logger.info(`✅ CreateDomain completed: ${domainName}`);
+      logger?.info(`✅ CreateDomain completed: ${domainName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -228,7 +228,7 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating domain ${domainName}: ${error?.message || error}`);
+      logger?.error(`Error creating domain ${domainName}: ${error?.message || error}`);
 
       // Check if domain already exists
       if (error.message?.includes('already exists') || error.response?.data?.includes('ExceptionResourceAlreadyExists')) {
@@ -261,9 +261,9 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
     } finally {
       try {
         connection.reset();
-        logger.debug('Reset domain connection after use');
+        logger?.debug('Reset domain connection after use');
       } catch (resetError: any) {
-        logger.error(`Failed to reset domain connection: ${resetError?.message || resetError}`);
+        logger?.error(`Failed to reset domain connection: ${resetError?.message || resetError}`);
       }
     }
 

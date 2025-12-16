@@ -89,7 +89,7 @@ export async function handleUpdateMetadataExtension(context: HandlerContext, arg
 
     const metadataExtensionName = name.toUpperCase();
 
-    logger.info(`Starting metadata extension update: ${metadataExtensionName}`);
+    logger?.info(`Starting metadata extension update: ${metadataExtensionName}`);
 
     try {
       // Update metadata extension with source code
@@ -106,7 +106,7 @@ export async function handleUpdateMetadataExtension(context: HandlerContext, arg
       // Get updated session state after update
 
 
-      logger.info(`✅ UpdateMetadataExtension completed: ${metadataExtensionName}`);
+      logger?.info(`✅ UpdateMetadataExtension completed: ${metadataExtensionName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -119,7 +119,7 @@ export async function handleUpdateMetadataExtension(context: HandlerContext, arg
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating metadata extension ${metadataExtensionName}: ${error?.message || error}`);
+      logger?.error(`Error updating metadata extension ${metadataExtensionName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update metadata extension: ${error.message || String(error)}`;

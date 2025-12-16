@@ -76,7 +76,7 @@ export async function handleActivateFunctionGroup(context: HandlerContext, args:
 
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function group activation: ${functionGroupName}`);
+    logger?.info(`Starting function group activation: ${functionGroupName}`);
 
     try {
       // Activate function group
@@ -94,8 +94,8 @@ export async function handleActivateFunctionGroup(context: HandlerContext, args:
       // Get updated session state after activation
 
 
-      logger.info(`✅ ActivateFunctionGroup completed: ${functionGroupName}`);
-      logger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
+      logger?.info(`✅ ActivateFunctionGroup completed: ${functionGroupName}`);
+      logger?.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -118,7 +118,7 @@ export async function handleActivateFunctionGroup(context: HandlerContext, args:
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating function group ${functionGroupName}: ${error?.message || error}`);
+      logger?.error(`Error activating function group ${functionGroupName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate function group: ${error.message || String(error)}`;

@@ -91,7 +91,7 @@ export async function handleCheckFunctionModule(context: HandlerContext, args: C
     const functionGroupName = function_group_name.toUpperCase();
     const functionModuleName = function_module_name.toUpperCase();
 
-    logger.info(`Starting function module check: ${functionModuleName} in group ${functionGroupName} (version: ${checkVersion})`);
+    logger?.info(`Starting function module check: ${functionModuleName} in group ${functionGroupName} (version: ${checkVersion})`);
 
     try {
       const client = new CrudClient(connection);
@@ -107,8 +107,8 @@ export async function handleCheckFunctionModule(context: HandlerContext, args: C
       // Get updated session state after check
 
 
-      logger.info(`✅ CheckFunctionModule completed: ${functionModuleName}`);
-      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.info(`✅ CheckFunctionModule completed: ${functionModuleName}`);
+      logger?.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -126,7 +126,7 @@ export async function handleCheckFunctionModule(context: HandlerContext, args: C
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking function module ${functionModuleName}: ${error?.message || error}`);
+      logger?.error(`Error checking function module ${functionModuleName}: ${error?.message || error}`);
 
       let errorMessage = `Failed to check function module: ${error.message || String(error)}`;
 

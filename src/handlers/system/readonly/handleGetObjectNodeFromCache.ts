@@ -45,7 +45,7 @@ export async function handleGetObjectNodeFromCache(context: HandlerContext, args
         ) || null;
     }
     if (!node) {
-        logger.debug(`Node ${object_type}/${object_name}/${tech_name} not found in cache`);
+        logger?.debug(`Node ${object_type}/${object_name}/${tech_name} not found in cache`);
         return {
             isError: true,
             content: [{ type: 'text', text: 'Node not found in cache' }]
@@ -81,11 +81,11 @@ export async function handleGetObjectNodeFromCache(context: HandlerContext, args
                 objectsListCache.setCache(cache);
             }
         } catch (e) {
-            logger.error('Failed to expand OBJECT_URI from cache', e as any);
+            logger?.error('Failed to expand OBJECT_URI from cache', e as any);
             node.object_uri_response = `ERROR: ${e instanceof Error ? e.message : String(e)}`;
         }
     }
-    logger.info(`Returning cached node for ${object_type}/${object_name}/${tech_name}`);
+    logger?.info(`Returning cached node for ${object_type}/${object_name}/${tech_name}`);
     return {
         content: [{ type: 'json', json: node }]
     };

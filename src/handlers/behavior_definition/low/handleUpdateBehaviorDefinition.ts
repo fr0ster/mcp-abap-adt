@@ -90,7 +90,7 @@ export async function handleUpdateBehaviorDefinition(context: HandlerContext, ar
 
     const behaviorDefinitionName = name.toUpperCase();
 
-    logger.info(`Starting behavior definition update: ${behaviorDefinitionName}`);
+    logger?.info(`Starting behavior definition update: ${behaviorDefinitionName}`);
 
     try {
       // Update behavior definition with source code - using types from adt-clients
@@ -108,7 +108,7 @@ export async function handleUpdateBehaviorDefinition(context: HandlerContext, ar
       // Get updated session state after update
 
 
-      logger.info(`✅ UpdateBehaviorDefinition completed: ${behaviorDefinitionName}`);
+      logger?.info(`✅ UpdateBehaviorDefinition completed: ${behaviorDefinitionName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -121,7 +121,7 @@ export async function handleUpdateBehaviorDefinition(context: HandlerContext, ar
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating behavior definition ${behaviorDefinitionName}: ${error?.message || error}`);
+      logger?.error(`Error updating behavior definition ${behaviorDefinitionName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update behavior definition: ${error.message || String(error)}`;

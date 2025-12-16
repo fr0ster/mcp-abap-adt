@@ -89,7 +89,7 @@ export async function handleValidateStructure(context: HandlerContext, args: Val
 
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure validation: ${structureName}`);
+    logger?.info(`Starting structure validation: ${structureName}`);
 
     try {
       // Validate structure
@@ -107,8 +107,8 @@ export async function handleValidateStructure(context: HandlerContext, args: Val
       // Get updated session state after validation
 
 
-      logger.info(`✅ ValidateStructure completed: ${structureName}`);
-      logger.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      logger?.info(`✅ ValidateStructure completed: ${structureName}`);
+      logger?.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
         data: JSON.stringify({
@@ -124,7 +124,7 @@ export async function handleValidateStructure(context: HandlerContext, args: Val
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating structure ${structureName}:`, error);
+      logger?.error(`Error validating structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to validate structure: ${error.message || String(error)}`;

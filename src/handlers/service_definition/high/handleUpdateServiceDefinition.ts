@@ -71,7 +71,7 @@ export async function handleUpdateServiceDefinition(context: HandlerContext, arg
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
     const serviceDefinitionName = service_definition_name.toUpperCase();
 
-    logger.info(`Starting service definition source update: ${serviceDefinitionName}`);
+    logger?.info(`Starting service definition source update: ${serviceDefinitionName}`);
 
     try {
       // Create client
@@ -98,7 +98,7 @@ export async function handleUpdateServiceDefinition(context: HandlerContext, arg
             () => client.checkServiceDefinition({ serviceDefinitionName }),
             serviceDefinitionName,
             {
-              debug: (message: string) => logger.debug(`[UpdateServiceDefinition] ${message}`)
+              debug: (message: string) => logger?.debug(`[UpdateServiceDefinition] ${message}`)
             }
           );
         } catch (checkError: any) {
@@ -121,7 +121,7 @@ export async function handleUpdateServiceDefinition(context: HandlerContext, arg
         try {
           await client.unlockServiceDefinition({ serviceDefinitionName: serviceDefinitionName }, lockHandle);
         } catch (unlockError) {
-          logger.error('Failed to unlock service definition after error:', unlockError);
+          logger?.error('Failed to unlock service definition after error:', unlockError);
         }
         throw error;
       }
@@ -143,7 +143,7 @@ export async function handleUpdateServiceDefinition(context: HandlerContext, arg
         }
       }
 
-      logger.info(`✅ UpdateServiceDefinition completed successfully: ${serviceDefinitionName}`);
+      logger?.info(`✅ UpdateServiceDefinition completed successfully: ${serviceDefinitionName}`);
 
       // Return success result
       const stepsCompleted = ['lock', 'update', 'check', 'unlock'];
@@ -174,7 +174,7 @@ export async function handleUpdateServiceDefinition(context: HandlerContext, arg
       });
 
     } catch (error: any) {
-      logger.error(`Error updating service definition source ${serviceDefinitionName}:`, error);
+      logger?.error(`Error updating service definition source ${serviceDefinitionName}:`, error);
 
       const errorMessage = error.response?.data
         ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
@@ -185,10 +185,10 @@ export async function handleUpdateServiceDefinition(context: HandlerContext, arg
       try {
         if (connection) {
           connection.reset();
-          logger.debug('Reset service definition connection after use');
+          logger?.debug('Reset service definition connection after use');
         }
       } catch (resetError: any) {
-        logger.error(`Failed to reset service definition connection: ${resetError?.message || resetError}`);
+        logger?.error(`Failed to reset service definition connection: ${resetError?.message || resetError}`);
       }
     }
 

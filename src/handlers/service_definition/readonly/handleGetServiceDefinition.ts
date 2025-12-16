@@ -62,7 +62,7 @@ export async function handleGetServiceDefinition(context: HandlerContext, args: 
       throw new McpError(ErrorCode.InternalError, 'Failed to read service definition');
     }
 
-    logger.info(`Read service definition ${args.service_definition_name.toUpperCase()}`);
+    logger?.info(`Read service definition ${args.service_definition_name.toUpperCase()}`);
 
     // Parse XML responses; otherwise return the payload unchanged
     return return_response({
@@ -73,7 +73,7 @@ export async function handleGetServiceDefinition(context: HandlerContext, args: 
       config: {} as any
     });
   } catch (error) {
-    logger.error(`Error reading service definition ${args?.service_definition_name || ''}: ${error instanceof Error ? error.message : String(error)}`);
+    logger?.error(`Error reading service definition ${args?.service_definition_name || ''}: ${error instanceof Error ? error.message : String(error)}`);
     return return_error(new Error(`Error reading service definition ${args?.service_definition_name || ''}: ${error instanceof Error ? error.message : String(error)}`));
   }
 }

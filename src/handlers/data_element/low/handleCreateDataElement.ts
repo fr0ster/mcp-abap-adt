@@ -124,7 +124,7 @@ export async function handleCreateDataElement(context: HandlerContext, args: Cre
 
     const dataElementName = data_element_name.toUpperCase();
 
-    logger.info(`Starting data element creation: ${dataElementName}`);
+    logger?.info(`Starting data element creation: ${dataElementName}`);
 
     try {
       // Determine typeKind based on type_kind parameter
@@ -163,14 +163,14 @@ export async function handleCreateDataElement(context: HandlerContext, args: Cre
       const createResult = client.getCreateResult();
 
       if (!createResult) {
-        logger.error(`Create did not return a response for data element ${dataElementName}`);
+        logger?.error(`Create did not return a response for data element ${dataElementName}`);
         throw new Error(`Create did not return a response for data element ${dataElementName}`);
       }
 
       // Get updated session state after create
 
 
-      logger.info(`✅ CreateDataElement completed: ${dataElementName}`);
+      logger?.info(`✅ CreateDataElement completed: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -186,7 +186,7 @@ export async function handleCreateDataElement(context: HandlerContext, args: Cre
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating data element ${dataElementName}: ${error?.message || error}`);
+      logger?.error(`Error creating data element ${dataElementName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create data element: ${error.message || String(error)}`;

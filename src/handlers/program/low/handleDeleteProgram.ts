@@ -59,7 +59,7 @@ export async function handleDeleteProgram(context: HandlerContext, args: DeleteP
     const client = new CrudClient(connection);
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program deletion: ${programName}`);
+    logger?.info(`Starting program deletion: ${programName}`);
 
     try {
       // Delete program
@@ -70,7 +70,7 @@ export async function handleDeleteProgram(context: HandlerContext, args: DeleteP
         throw new Error(`Delete did not return a response for program ${programName}`);
       }
 
-      logger.info(`✅ DeleteProgram completed successfully: ${programName}`);
+      logger?.info(`✅ DeleteProgram completed successfully: ${programName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -82,7 +82,7 @@ export async function handleDeleteProgram(context: HandlerContext, args: DeleteP
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting program ${programName}: ${error?.message || error}`);
+      logger?.error(`Error deleting program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete program: ${error.message || String(error)}`;

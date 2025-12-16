@@ -48,7 +48,7 @@ export interface SqlQueryResponse {
  * @param rowNumber - Number of rows requested
  * @returns Parsed SQL query response
  */
-function parseSqlQueryXml(xmlData: string, sqlQuery: string, rowNumber: number, logger: ILogger): SqlQueryResponse {
+function parseSqlQueryXml(xmlData: string, sqlQuery: string, rowNumber: number, logger?: ILogger): SqlQueryResponse {
     try {
         // Extract basic information
         const totalRowsMatch = xmlData.match(/<dataPreview:totalRows>(\d+)<\/dataPreview:totalRows>/);
@@ -128,7 +128,7 @@ function parseSqlQueryXml(xmlData: string, sqlQuery: string, rowNumber: number, 
         };
 
     } catch (parseError) {
-        logger.error('Failed to parse SQL query XML:', parseError as any);
+        logger?.error('Failed to parse SQL query XML:', parseError as any);
 
         // Return basic structure on parse error
         return {
@@ -150,7 +150,7 @@ function parseSqlQueryXml(xmlData: string, sqlQuery: string, rowNumber: number, 
 export async function handleGetSqlQuery(context: HandlerContext, args: any) {
     const { connection, logger } = context;
     try {
-        logger.info('handleGetSqlQuery called');
+        logger?.info('handleGetSqlQuery called');
 
         if (!args?.sql_query) {
             throw new McpError(ErrorCode.InvalidParams, 'SQL query is required');
@@ -159,23 +159,23 @@ export async function handleGetSqlQuery(context: HandlerContext, args: any) {
         const sqlQuery = args.sql_query;
         const rowNumber = args.row_number || 100; // Default to 100 rows if not specified
 
-        logger.info(`Executing SQL query (rows=${rowNumber})`);
+        logger?.info(`Executing SQL query (rows=${rowNumber})`);
 
         // Build URL for freestyle data preview with rowNumber parameter
         const url = `/sap/bc/adt/datapreview/freestyle?rowNumber=${rowNumber}`;
 
-        logger.debug(`Making SQL query request to: ${url}`);
+        logger?.debug(`Making SQL query request to: ${url}`);
 
         // Execute POST request with SQL query in body
         const response = await makeAdtRequestWithTimeout(connection, url, 'POST', 'long', sqlQuery);
 
         if (response.status === 200 && response.data) {
-            logger.info('SQL query request completed successfully');
+            logger?.info('SQL query request completed successfully');
 
             // Parse the XML response
             const parsedData = parseSqlQueryXml(response.data, sqlQuery, rowNumber, logger);
 
-            logger.debug(
+            logger?.debug(
               `Parsed SQL query data: rows=${parsedData.rows.length}/${parsedData.total_rows ?? 0}, columns=${parsedData.columns.length}`
             );
 
@@ -189,7 +189,7 @@ export async function handleGetSqlQuery(context: HandlerContext, args: any) {
                 ]
             };
             if (args.filePath) {
-                logger.debug(`Writing SQL query result to file: ${args.filePath}`);
+                logger?.debug(`Writing SQL query result to file: ${args.filePath}`);
                 writeResultToFile(result, args.filePath);
             }
             return result;
@@ -198,7 +198,7 @@ export async function handleGetSqlQuery(context: HandlerContext, args: any) {
         }
 
     } catch (error) {
-        logger.error('Failed to execute SQL query', error as any);
+        logger?.error('Failed to execute SQL query', error as any);
         // MCP-compliant error response: always return content[] with type "text"
         return {
             isError: true,

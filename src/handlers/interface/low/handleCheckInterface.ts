@@ -77,7 +77,7 @@ export async function handleCheckInterface(context: HandlerContext, args: CheckI
 
     const interfaceName = interface_name.toUpperCase();
 
-    logger.info(`Starting interface check: ${interfaceName}`);
+    logger?.info(`Starting interface check: ${interfaceName}`);
 
     try {
       // Check interface
@@ -94,8 +94,8 @@ export async function handleCheckInterface(context: HandlerContext, args: CheckI
       // Get updated session state after check
 
 
-      logger.info(`✅ CheckInterface completed: ${interfaceName}`);
-      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.info(`✅ CheckInterface completed: ${interfaceName}`);
+      logger?.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -111,7 +111,7 @@ export async function handleCheckInterface(context: HandlerContext, args: CheckI
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking interface ${interfaceName}: ${error?.message || error}`);
+      logger?.error(`Error checking interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check interface: ${error.message || String(error)}`;

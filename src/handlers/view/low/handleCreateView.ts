@@ -104,7 +104,7 @@ export async function handleCreateView(context: HandlerContext, args: CreateView
 
     const viewName = view_name.toUpperCase();
 
-    logger.info(`Starting view creation: ${viewName}`);
+    logger?.info(`Starting view creation: ${viewName}`);
 
     try {
       // Create view
@@ -124,7 +124,7 @@ export async function handleCreateView(context: HandlerContext, args: CreateView
       // Get updated session state after create
 
 
-      logger.info(`✅ CreateView completed: ${viewName}`);
+      logger?.info(`✅ CreateView completed: ${viewName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -140,7 +140,7 @@ export async function handleCreateView(context: HandlerContext, args: CreateView
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating view ${viewName}: ${error?.message || error}`);
+      logger?.error(`Error creating view ${viewName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to create view: ${error.message || String(error)}`;

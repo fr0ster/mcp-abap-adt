@@ -75,7 +75,7 @@ export async function handleActivateDomain(context: HandlerContext, args: Activa
 
     const domainName = domain_name.toUpperCase();
 
-    logger.info(`Starting domain activation: ${domainName}`);
+    logger?.info(`Starting domain activation: ${domainName}`);
 
     try {
       // Activate domain
@@ -93,8 +93,8 @@ export async function handleActivateDomain(context: HandlerContext, args: Activa
       // Get updated session state after activation
 
 
-      logger.info(`✅ ActivateDomain completed: ${domainName}`);
-      logger.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
+      logger?.info(`✅ ActivateDomain completed: ${domainName}`);
+      logger?.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -117,7 +117,7 @@ export async function handleActivateDomain(context: HandlerContext, args: Activa
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating domain ${domainName}: ${error?.message || error}`);
+      logger?.error(`Error activating domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate domain: ${error.message || String(error)}`;

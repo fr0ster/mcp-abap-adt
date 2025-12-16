@@ -41,7 +41,7 @@ describe('Class High-Level Handlers Integration', () => {
             throw new Error('objectName is required for create');
           }
 
-          logger.info(`   • create: ${objectName}`);
+          logger?.info(`   • create: ${objectName}`);
 
           const sourceCode = params.source_code || '';
           const createArgs = {
@@ -55,14 +55,14 @@ describe('Class High-Level Handlers Integration', () => {
           };
 
           // Log create args for debugging (without full source_code)
-          logger.debug(`Create args: ${JSON.stringify({ ...createArgs, source_code: sourceCode ? `${sourceCode.length} chars` : 'empty' }, null, 2)}`);
+          logger?.debug(`Create args: ${JSON.stringify({ ...createArgs, source_code: sourceCode ? `${sourceCode.length} chars` : 'empty' }, null, 2)}`);
 
           let createResponse;
           try {
             createResponse = await handleCreateClass({ connection, logger }, createArgs);
           } catch (error: any) {
             // If handler throws an error directly (not wrapped in response)
-            logger.error(`Handler threw error: ${error.message || String(error)}`);
+            logger?.error(`Handler threw error: ${error.message || String(error)}`);
             if (error.message?.includes('404')) {
               await delay(1000);
               createResponse = await handleCreateClass({ connection, logger }, createArgs);
@@ -75,7 +75,7 @@ describe('Class High-Level Handlers Integration', () => {
             const errorMsg = extractErrorMessage(createResponse);
             // Log full error details for debugging
             const errorDetails = JSON.stringify(createResponse.content, null, 2);
-            logger.debug(`Create error details: ${errorDetails}`);
+            logger?.debug(`Create error details: ${errorDetails}`);
 
             // Try to extract more detailed error message
             let detailedError = errorMsg;
@@ -91,21 +91,21 @@ describe('Class High-Level Handlers Integration', () => {
             if (detailedError.includes('already exists') ||
                 detailedError.includes('ExceptionResourceAlreadyExists') ||
                 detailedError.includes('ResourceAlreadyExists')) {
-              logger.info(`⏭️  SKIP: Object already exists: ${detailedError}`);
+              logger?.info(`⏭️  SKIP: Object already exists: ${detailedError}`);
               throw new Error(`SKIP: ${detailedError}`);
             }
 
             // 400 errors during validation might indicate object already exists or invalid name
             // Try to check if it's a validation error that we should skip
             if (detailedError.includes('400') || detailedError.includes('status code 400')) {
-              logger.warn(`⚠️  Create failed with 400 error (might be validation or already exists): ${detailedError}`);
+              logger?.warn(`⚠️  Create failed with 400 error (might be validation or already exists): ${detailedError}`);
               // For now, treat 400 as a skip condition to avoid test failures
               // In production, you might want to check if object exists first
-              logger.info(`⏭️  SKIP: Validation failed or object might already exist: ${detailedError}`);
+              logger?.info(`⏭️  SKIP: Validation failed or object might already exist: ${detailedError}`);
               throw new Error(`SKIP: ${detailedError}`);
             }
 
-            logger.error(`Create failed with error: ${detailedError}`);
+            logger?.error(`Create failed with error: ${detailedError}`);
             throw new Error(`Create failed: ${detailedError}`);
           }
 
@@ -114,7 +114,7 @@ describe('Class High-Level Handlers Integration', () => {
             throw new Error(`Create failed: ${JSON.stringify(createData)}`);
           }
 
-          logger.success(`✅ create: ${objectName} completed successfully`);
+          logger?.success(`✅ create: ${objectName} completed successfully`);
           updateSessionFromResponse(session, createData);
 
           return createData;
@@ -128,7 +128,7 @@ describe('Class High-Level Handlers Integration', () => {
             throw new Error('objectName is required for update');
           }
 
-          logger.info(`   • update: ${objectName}`);
+          logger?.info(`   • update: ${objectName}`);
 
           // Use update_source_code if provided, otherwise modify original source_code
           let updatedSourceCode = params.update_source_code;
@@ -161,7 +161,7 @@ describe('Class High-Level Handlers Integration', () => {
             throw new Error(`Update failed: ${JSON.stringify(updateData)}`);
           }
 
-          logger.success(`✅ update: ${objectName} completed successfully`);
+          logger?.success(`✅ update: ${objectName} completed successfully`);
 
           return updateData;
         },
@@ -174,7 +174,7 @@ describe('Class High-Level Handlers Integration', () => {
             throw new Error('objectName is required for delete');
           }
 
-          logger.info(`   • delete: ${objectName}`);
+          logger?.info(`   • delete: ${objectName}`);
 
           const deleteResponse = await handleDeleteClass({ connection: connection, logger }, {
             class_name: objectName,
@@ -183,11 +183,11 @@ describe('Class High-Level Handlers Integration', () => {
 
           if (deleteResponse.isError) {
             const errorMsg = extractErrorMessage(deleteResponse);
-            logger.warn(`Delete failed (ignored in cleanup): ${errorMsg}`);
+            logger?.warn(`Delete failed (ignored in cleanup): ${errorMsg}`);
             return;
           }
 
-          logger.success(`✅ delete: ${objectName} completed successfully`);
+          logger?.success(`✅ delete: ${objectName} completed successfully`);
         }
       }
     );

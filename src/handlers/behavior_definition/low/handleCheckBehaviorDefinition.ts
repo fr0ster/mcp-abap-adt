@@ -79,7 +79,7 @@ export async function handleCheckBehaviorDefinition(context: HandlerContext, arg
 
     const bdefName = name.toUpperCase();
 
-    logger.info(`Starting behavior definition check: ${bdefName}`);
+    logger?.info(`Starting behavior definition check: ${bdefName}`);
 
     try {
       // Check behavior definition - using types from adt-clients
@@ -99,9 +99,9 @@ export async function handleCheckBehaviorDefinition(context: HandlerContext, arg
       // Get updated session state after check
 
 
-      logger.info(`✅ CheckBehaviorDefinition completed: ${bdefName}`);
-      logger.info(`   Status: ${checkResult.status}`);
-      logger.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.info(`✅ CheckBehaviorDefinition completed: ${bdefName}`);
+      logger?.info(`   Status: ${checkResult.status}`);
+      logger?.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -117,7 +117,7 @@ export async function handleCheckBehaviorDefinition(context: HandlerContext, arg
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking behavior definition ${bdefName}: ${error?.message || error}`);
+      logger?.error(`Error checking behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check behavior definition: ${error.message || String(error)}`;

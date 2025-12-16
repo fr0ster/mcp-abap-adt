@@ -100,7 +100,7 @@ export async function handleCreateInterface(context: HandlerContext, args: Creat
     const typedArgs = args as CreateInterfaceArgs;
     const interfaceName = typedArgs.interface_name.toUpperCase();
 
-    logger.info(`Starting interface creation: ${interfaceName}`);
+    logger?.info(`Starting interface creation: ${interfaceName}`);
 
             try {
       // Get configuration from environment variables
@@ -108,10 +108,10 @@ export async function handleCreateInterface(context: HandlerContext, args: Creat
             // Create connection directly for this handler call
       // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-      logger.debug(`[CreateInterface] Created separate connection for handler call: ${interfaceName}`);
+      logger?.debug(`[CreateInterface] Created separate connection for handler call: ${interfaceName}`);
     } catch (connectionError: any) {
       const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
-      logger.error(`[CreateInterface] Failed to create connection: ${errorMessage}`);
+      logger?.error(`[CreateInterface] Failed to create connection: ${errorMessage}`);
       return return_error(new Error(`Failed to create connection: ${errorMessage}`));
     }
 
@@ -139,61 +139,61 @@ export async function handleCreateInterface(context: HandlerContext, args: Creat
 
         try {
           // Step 1: Check new code BEFORE update (with sourceCode and version='inactive')
-          logger.info(`[CreateInterface] Checking new code before update: ${interfaceName}`);
+          logger?.info(`[CreateInterface] Checking new code before update: ${interfaceName}`);
           let checkNewCodePassed = false;
           try {
             await safeCheckOperation(
               () => client.checkInterface({ interfaceName }, sourceCode, 'inactive'),
               interfaceName,
               {
-                debug: (message: string) => logger.debug(`[CreateInterface] ${message}`)
+                debug: (message: string) => logger?.debug(`[CreateInterface] ${message}`)
               }
             );
             checkNewCodePassed = true;
-            logger.info(`[CreateInterface] New code check passed: ${interfaceName}`);
+            logger?.info(`[CreateInterface] New code check passed: ${interfaceName}`);
           } catch (checkError: any) {
             // If error was marked as "already checked", continue silently
             if ((checkError as any).isAlreadyChecked) {
-              logger.info(`[CreateInterface] Interface ${interfaceName} was already checked - continuing`);
+              logger?.info(`[CreateInterface] Interface ${interfaceName} was already checked - continuing`);
               checkNewCodePassed = true;
             } else {
               // Real check error - don't update if check failed
-              logger.error(`[CreateInterface] New code check failed: ${interfaceName} | ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+              logger?.error(`[CreateInterface] New code check failed: ${interfaceName} | ${checkError instanceof Error ? checkError.message : String(checkError)}`);
               throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
             }
           }
 
           // Step 2: Update (only if check passed)
           if (checkNewCodePassed) {
-            logger.info(`[CreateInterface] Updating interface source code: ${interfaceName}`);
+            logger?.info(`[CreateInterface] Updating interface source code: ${interfaceName}`);
             await client.updateInterface({ interfaceName, sourceCode }, lockHandle);
-            logger.info(`[CreateInterface] Interface source code updated: ${interfaceName}`);
+            logger?.info(`[CreateInterface] Interface source code updated: ${interfaceName}`);
           } else {
-            logger.info(`[CreateInterface] Skipping update - new code check failed: ${interfaceName}`);
+            logger?.info(`[CreateInterface] Skipping update - new code check failed: ${interfaceName}`);
           }
 
           // Step 3: Unlock (MANDATORY after lock)
           await client.unlockInterface({ interfaceName }, lockHandle);
-          logger.info(`[CreateInterface] Interface unlocked: ${interfaceName}`);
+          logger?.info(`[CreateInterface] Interface unlocked: ${interfaceName}`);
 
           // Step 4: Check inactive version (after unlock)
-          logger.info(`[CreateInterface] Checking inactive version: ${interfaceName}`);
+          logger?.info(`[CreateInterface] Checking inactive version: ${interfaceName}`);
           try {
             await safeCheckOperation(
               () => client.checkInterface({ interfaceName }, undefined, 'inactive'),
               interfaceName,
               {
-                debug: (message: string) => logger.debug(`[CreateInterface] ${message}`)
+                debug: (message: string) => logger?.debug(`[CreateInterface] ${message}`)
               }
             );
-            logger.info(`[CreateInterface] Inactive version check completed: ${interfaceName}`);
+            logger?.info(`[CreateInterface] Inactive version check completed: ${interfaceName}`);
           } catch (checkError: any) {
             // If error was marked as "already checked", continue silently
             if ((checkError as any).isAlreadyChecked) {
-              logger.info(`[CreateInterface] Interface ${interfaceName} was already checked - continuing`);
+              logger?.info(`[CreateInterface] Interface ${interfaceName} was already checked - continuing`);
             } else {
               // Log warning but don't fail - inactive check is informational
-              logger.warn(`[CreateInterface] Inactive version check had issues: ${interfaceName} | ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+              logger?.warn(`[CreateInterface] Inactive version check had issues: ${interfaceName} | ${checkError instanceof Error ? checkError.message : String(checkError)}`);
             }
           }
 
@@ -206,13 +206,13 @@ export async function handleCreateInterface(context: HandlerContext, args: Creat
           try {
             await client.unlockInterface({ interfaceName }, lockHandle);
           } catch (unlockError) {
-            logger.error(`Failed to unlock interface after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+            logger?.error(`Failed to unlock interface after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
           }
           // Principle 2: first error and exit
           throw error;
         }
       } catch (error) {
-        logger.error(`Interface creation chain failed: ${error instanceof Error ? error.message : String(error)}`);
+        logger?.error(`Interface creation chain failed: ${error instanceof Error ? error.message : String(error)}`);
         throw error;
       }
 
@@ -262,21 +262,21 @@ export async function handleCreateInterface(context: HandlerContext, args: Creat
       });
 
     } catch (error: any) {
-      logger.error(`Interface creation failed: ${error instanceof Error ? error.message : String(error)}`);
+      logger?.error(`Interface creation failed: ${error instanceof Error ? error.message : String(error)}`);
       return return_error(error);
     } finally {
       // Cleanup: Reset connection created for this handler call
       if (connection) {
         try {
           connection.reset();
-          logger.debug(`[CreateInterface] Reset connection`);
+          logger?.debug(`[CreateInterface] Reset connection`);
         } catch (resetError: any) {
-          logger.error(`[CreateInterface] Failed to reset connection: ${resetError.message || resetError}`);
+          logger?.error(`[CreateInterface] Failed to reset connection: ${resetError.message || resetError}`);
         }
       }
     }
   } catch (error: any) {
-    logger.error(`CreateInterface handler error: ${error instanceof Error ? error.message : String(error)}`);
+    logger?.error(`CreateInterface handler error: ${error instanceof Error ? error.message : String(error)}`);
     return return_error(error);
   }
 }

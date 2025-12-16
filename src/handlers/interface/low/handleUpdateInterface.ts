@@ -89,7 +89,7 @@ export async function handleUpdateInterface(context: HandlerContext, args: Updat
 
     const interfaceName = interface_name.toUpperCase();
 
-    logger.info(`Starting interface update: ${interfaceName}`);
+    logger?.info(`Starting interface update: ${interfaceName}`);
 
     try {
       // Update interface with source code
@@ -103,7 +103,7 @@ export async function handleUpdateInterface(context: HandlerContext, args: Updat
       // Get updated session state after update
 
 
-      logger.info(`✅ UpdateInterface completed: ${interfaceName}`);
+      logger?.info(`✅ UpdateInterface completed: ${interfaceName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -116,7 +116,7 @@ export async function handleUpdateInterface(context: HandlerContext, args: Updat
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating interface ${interfaceName}: ${error?.message || error}`);
+      logger?.error(`Error updating interface ${interfaceName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to update interface: ${error.message || String(error)}`;

@@ -12,5 +12,5 @@ import type { ILogger, IAbapConnection } from '@mcp-abap-adt/interfaces';
  */
 export interface HandlerContext {
   connection: IAbapConnection;
-  logger: ILogger;
+  logger?: ILogger;
 }

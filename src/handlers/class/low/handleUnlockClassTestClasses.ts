@@ -74,13 +74,13 @@ export async function handleUnlockClassTestClasses(context: HandlerContext, args
           }
 
     const className = class_name.toUpperCase();
-    logger.info(`Starting test classes unlock for: ${className}`);
+    logger?.info(`Starting test classes unlock for: ${className}`);
 
     try {
       await client.unlockTestClasses({ className }, lock_handle);
 
 
-      logger.info(`✅ UnlockClassTestClasses completed: ${className}`);
+      logger?.info(`✅ UnlockClassTestClasses completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -92,7 +92,7 @@ export async function handleUnlockClassTestClasses(context: HandlerContext, args
         }, null, 2)
       } as AxiosResponse);
     } catch (error: any) {
-      logger.error(`Error unlocking test classes for ${className}: ${error?.message || error}`);
+      logger?.error(`Error unlocking test classes for ${className}: ${error?.message || error}`);
       const reason = error?.response?.status === 404
         ? `Class ${className} or the provided lock handle was not found.`
         : error?.message || String(error);

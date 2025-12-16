@@ -86,7 +86,7 @@ export async function handleUnlockProgram(context: HandlerContext, args: UnlockP
 
     const programName = program_name.toUpperCase();
 
-    logger.info(`Starting program unlock: ${programName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(`Starting program unlock: ${programName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock program
@@ -100,7 +100,7 @@ export async function handleUnlockProgram(context: HandlerContext, args: UnlockP
       // Get updated session state after unlock
 
 
-      logger.info(`✅ UnlockProgram completed: ${programName}`);
+      logger?.info(`✅ UnlockProgram completed: ${programName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -113,7 +113,7 @@ export async function handleUnlockProgram(context: HandlerContext, args: UnlockP
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking program ${programName}: ${error?.message || error}`);
+      logger?.error(`Error unlocking program ${programName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock program: ${error.message || String(error)}`;

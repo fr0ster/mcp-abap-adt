@@ -18,18 +18,18 @@ export async function handleGetDataElement(context: HandlerContext, args: any) {
       throw new McpError(ErrorCode.InvalidParams, 'Data element name is required');
     }
 
-    logger.info(`Reading data element ${args.data_element_name}`);
+    logger?.info(`Reading data element ${args.data_element_name}`);
 
     // Create client
     const client = new ReadOnlyClient(connection);
     const result = await client.readDataElement(args.data_element_name);
-    logger.debug(`Successfully read data element ${args.data_element_name}`);
+    logger?.debug(`Successfully read data element ${args.data_element_name}`);
     return {
       isError: false,
       content: [{ type: "json", json: result }],
     };
   } catch (error) {
-    logger.error(`Failed to read data element ${args?.data_element_name || ''}`, error as any);
+    logger?.error(`Failed to read data element ${args?.data_element_name || ''}`, error as any);
     return {
       isError: true,
       content: [

@@ -54,7 +54,7 @@ export async function handleDeleteStructure(context: HandlerContext, args: Delet
     const client = new CrudClient(connection);
     const structureName = structure_name.toUpperCase();
 
-    logger.info(`Starting structure deletion: ${structureName}`);
+    logger?.info(`Starting structure deletion: ${structureName}`);
 
     try {
       // Delete structure
@@ -65,7 +65,7 @@ export async function handleDeleteStructure(context: HandlerContext, args: Delet
         throw new Error(`Delete did not return a response for structure ${structureName}`);
       }
 
-      logger.info(`✅ DeleteStructure completed successfully: ${structureName}`);
+      logger?.info(`✅ DeleteStructure completed successfully: ${structureName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -77,7 +77,7 @@ export async function handleDeleteStructure(context: HandlerContext, args: Delet
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting structure ${structureName}:`, error);
+      logger?.error(`Error deleting structure ${structureName}:`, error);
 
       // Parse error message
       let errorMessage = `Failed to delete structure: ${error.message || String(error)}`;

@@ -60,7 +60,7 @@ export async function handleDeleteFunctionModule(context: HandlerContext, args: 
         const client = new CrudClient(connection);
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
-    logger.info(`Starting function module deletion: ${functionModuleName} in ${functionGroupName}`);
+    logger?.info(`Starting function module deletion: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       // Delete function module
@@ -71,7 +71,7 @@ export async function handleDeleteFunctionModule(context: HandlerContext, args: 
         throw new Error(`Delete did not return a response for function module ${functionModuleName}`);
       }
 
-      logger.info(`✅ DeleteFunctionModule completed successfully: ${functionModuleName}`);
+      logger?.info(`✅ DeleteFunctionModule completed successfully: ${functionModuleName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -84,7 +84,7 @@ export async function handleDeleteFunctionModule(context: HandlerContext, args: 
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting function module ${functionModuleName}: ${error?.message || error}`);
+      logger?.error(`Error deleting function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete function module: ${error.message || String(error)}`;

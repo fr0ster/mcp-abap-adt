@@ -71,7 +71,7 @@ export async function handleLockObject(context: HandlerContext, args: LockObject
     const desiredSessionId = session_id || generateSessionId();
     const objectName = object_name.toUpperCase();
 
-    logger.info(`Starting object lock: ${objectName} (type: ${objectType}, session: ${desiredSessionId.substring(0, 8)}...)`);
+    logger?.info(`Starting object lock: ${objectName} (type: ${objectType}, session: ${desiredSessionId.substring(0, 8)}...)`);
 
     try {
       let lockHandle: string | undefined;
@@ -138,8 +138,8 @@ export async function handleLockObject(context: HandlerContext, args: LockObject
         throw new Error(`Lock did not return a lock handle for object ${objectName}`);
       }
 
-      logger.info(`✅ LockObject completed: ${objectName}`);
-      logger.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
+      logger?.info(`✅ LockObject completed: ${objectName}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify({
@@ -154,7 +154,7 @@ export async function handleLockObject(context: HandlerContext, args: LockObject
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error locking object ${objectName}:`, error);
+      logger?.error(`Error locking object ${objectName}:`, error);
 
       let errorMessage = `Failed to lock object: ${error.message || String(error)}`;
 

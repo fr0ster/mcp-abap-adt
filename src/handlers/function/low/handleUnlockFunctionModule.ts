@@ -89,7 +89,7 @@ export async function handleUnlockFunctionModule(context: HandlerContext, args: 
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger.info(`Starting function module unlock: ${functionModuleName} in ${functionGroupName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(`Starting function module unlock: ${functionModuleName} in ${functionGroupName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock function module
@@ -99,7 +99,7 @@ export async function handleUnlockFunctionModule(context: HandlerContext, args: 
       // Get updated session state after unlock
 
 
-      logger.info(`✅ UnlockFunctionModule completed: ${functionModuleName}`);
+      logger?.info(`✅ UnlockFunctionModule completed: ${functionModuleName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -113,7 +113,7 @@ export async function handleUnlockFunctionModule(context: HandlerContext, args: 
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking function module ${functionModuleName}: ${error?.message || error}`);
+      logger?.error(`Error unlocking function module ${functionModuleName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock function module: ${error.message || String(error)}`;

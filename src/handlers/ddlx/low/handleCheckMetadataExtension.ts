@@ -78,7 +78,7 @@ export async function handleCheckMetadataExtension(context: HandlerContext, args
 
     const ddlxName = name.toUpperCase();
 
-    logger.info(`Starting metadata extension check: ${ddlxName}`);
+    logger?.info(`Starting metadata extension check: ${ddlxName}`);
 
     try {
       // Check metadata extension
@@ -95,8 +95,8 @@ export async function handleCheckMetadataExtension(context: HandlerContext, args
       // Get updated session state after check
 
 
-      logger.info(`✅ CheckMetadataExtension completed: ${ddlxName}`);
-      logger.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.info(`✅ CheckMetadataExtension completed: ${ddlxName}`);
+      logger?.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -112,7 +112,7 @@ export async function handleCheckMetadataExtension(context: HandlerContext, args
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error checking metadata extension ${ddlxName}: ${error?.message || error}`);
+      logger?.error(`Error checking metadata extension ${ddlxName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to check metadata extension: ${error.message || String(error)}`;

@@ -18,18 +18,18 @@ export async function handleGetInterface(context: HandlerContext, args: any) {
       throw new McpError(ErrorCode.InvalidParams, 'Interface name is required');
     }
 
-    logger.info(`Reading interface ${args.interface_name}`);
+    logger?.info(`Reading interface ${args.interface_name}`);
 
     // Create client
     const client = new ReadOnlyClient(connection);
     const result = await client.readInterface(args.interface_name);
-    logger.debug(`Successfully read interface ${args.interface_name}`);
+    logger?.debug(`Successfully read interface ${args.interface_name}`);
     return {
       isError: false,
       content: [{ type: "json", json: result }],
     };
   } catch (error) {
-    logger.error(`Failed to read interface ${args?.interface_name || ''}`, error as any);
+    logger?.error(`Failed to read interface ${args?.interface_name || ''}`, error as any);
     return {
       isError: true,
       content: [

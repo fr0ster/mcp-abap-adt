@@ -140,7 +140,7 @@ export async function handleCreateDataElement(context: HandlerContext, args: Dat
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
         const dataElementName = typedArgs.data_element_name.toUpperCase();
 
-    logger.info(`Starting data element creation: ${dataElementName}`);
+    logger?.info(`Starting data element creation: ${dataElementName}`);
 
     try {
       // Create client
@@ -201,7 +201,7 @@ export async function handleCreateDataElement(context: HandlerContext, args: Dat
           () => client.checkDataElement({ dataElementName }),
           dataElementName,
           {
-            debug: (message: string) => logger.debug(message)
+            debug: (message: string) => logger?.debug(message)
           }
         );
       } catch (checkError: any) {
@@ -251,7 +251,7 @@ export async function handleCreateDataElement(context: HandlerContext, args: Dat
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error creating data element ${dataElementName}: ${error?.message || error}`);
+      logger?.error(`Error creating data element ${dataElementName}: ${error?.message || error}`);
 
       // Check if data element already exists
       if (error.message?.includes('already exists') || error.response?.data?.includes('ExceptionResourceAlreadyExists')) {
@@ -272,9 +272,9 @@ export async function handleCreateDataElement(context: HandlerContext, args: Dat
     } finally {
       try {
         connection.reset();
-        logger.debug('Reset data element connection after use');
+        logger?.debug('Reset data element connection after use');
       } catch (resetError: any) {
-        logger.error(`Failed to reset data element connection: ${resetError?.message || resetError}`);
+        logger?.error(`Failed to reset data element connection: ${resetError?.message || resetError}`);
       }
     }
 

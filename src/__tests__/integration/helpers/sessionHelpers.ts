@@ -73,7 +73,7 @@ async function createConnectionViaBroker(destination?: string, envFilePath?: str
       sessionStore = stores.sessionStore;
       storeType = stores.storeType;
 
-      sessionLogger.debug("Created SessionStore from .env file directory", {
+      sessionLogger?.debug("Created SessionStore from .env file directory", {
         envFilePath,
         envFileDir,
         destination: 'default',
@@ -112,23 +112,23 @@ async function createConnectionViaBroker(destination?: string, envFilePath?: str
           authType: "jwt",
           jwtToken,
         };
-        sessionLogger.info("Using connection from auth broker", {
+        sessionLogger?.info("Using connection from auth broker", {
           destination: brokerDestination,
           url: config.url,
           authType: config.authType,
         });
         const connectionLogger = {
-          debug: sessionLogger.debug,
-          info: sessionLogger.info,
-          warn: sessionLogger.warn,
-          error: sessionLogger.error,
-          csrfToken: sessionLogger.debug,
+          debug: sessionLogger?.debug,
+          info: sessionLogger?.info,
+          warn: sessionLogger?.warn,
+          error: sessionLogger?.error,
+          csrfToken: sessionLogger?.debug,
         };
         return createAbapConnection(config, connectionLogger);
       }
     }
   } catch (error: any) {
-    sessionLogger.warn("Failed to create connection via AuthBroker", {
+    sessionLogger?.warn("Failed to create connection via AuthBroker", {
       error: error instanceof Error ? error.message : String(error),
     });
   }
@@ -148,7 +148,7 @@ export async function createTestConnectionAndSession(): Promise<{
   try {
     await loadTestEnv();
   } catch (error: any) {
-    sessionLogger.warn(`[createTestConnectionAndSession] loadTestEnv failed: ${error?.message || String(error)}`);
+    sessionLogger?.warn(`[createTestConnectionAndSession] loadTestEnv failed: ${error?.message || String(error)}`);
   }
 
   try {
@@ -178,21 +178,21 @@ export async function createTestConnectionAndSession(): Promise<{
     try {
       connection = await createConnectionViaBroker(undefined, envFilePath);
     } catch (brokerError: any) {
-      sessionLogger.debug(`[createTestConnectionAndSession] AuthBroker failed: ${brokerError?.message || String(brokerError)}`);
+      sessionLogger?.debug(`[createTestConnectionAndSession] AuthBroker failed: ${brokerError?.message || String(brokerError)}`);
     }
 
     // Fallback to getSapConfigFromEnv() if AuthBroker failed
     if (!connection) {
-      sessionLogger.debug("[createTestConnectionAndSession] Using fallback: getSapConfigFromEnv()");
+      sessionLogger?.debug("[createTestConnectionAndSession] Using fallback: getSapConfigFromEnv()");
       const config = getSapConfigFromEnv();
 
       // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
       const connectionLogger = {
-        debug: sessionLogger.debug,
-        info: sessionLogger.info,
-        warn: sessionLogger.warn,
-        error: sessionLogger.error,
-        csrfToken: sessionLogger.debug,
+        debug: sessionLogger?.debug,
+        info: sessionLogger?.info,
+        warn: sessionLogger?.warn,
+        error: sessionLogger?.error,
+        csrfToken: sessionLogger?.debug,
       };
 
       // Create connection directly (fallback when AuthBroker is not available)
@@ -205,7 +205,7 @@ export async function createTestConnectionAndSession(): Promise<{
       try {
         connectionConfig = connection.getConfig();
       } catch (error: any) {
-        sessionLogger.warn(`[getTestSession] Failed to get connection config: ${error?.message}`);
+        sessionLogger?.warn(`[getTestSession] Failed to get connection config: ${error?.message}`);
       }
 
       const connectionConfigJwtToken = connectionConfig?.jwtToken;
@@ -218,7 +218,7 @@ export async function createTestConnectionAndSession(): Promise<{
           : connectionConfigRefreshToken.substring(0, 10) + '...' // If too short, show only first 10
         : 'empty';
 
-      sessionLogger.debug(
+      sessionLogger?.debug(
         `[getTestSession] Connection tokens: ${JSON.stringify({
           hasJwtToken: !!connectionConfigJwtToken,
           jwtTokenStart: connectionConfigJwtToken ? `${connectionConfigJwtToken.substring(0, 20)}...` : 'empty',
@@ -282,11 +282,11 @@ export async function createTestConnectionAndSession(): Promise<{
       session
     };
   } catch (error: any) {
-    sessionLogger.error(
+    sessionLogger?.error(
       `[createTestConnectionAndSession] Error caught: ${error?.message || String(error)}`
     );
     if (process.env.DEBUG_TESTS === 'true' && error?.stack) {
-      sessionLogger.debug(`[createTestConnectionAndSession] Stack: ${error.stack}`);
+      sessionLogger?.debug(`[createTestConnectionAndSession] Stack: ${error.stack}`);
     }
     throw error;
   }

@@ -108,9 +108,9 @@ const testLogger = createTestLogger('test');
 export function debugLog(step: string, message: string, data?: any): void {
   if (!DEBUG_TESTS) return;
 
-  testLogger.debug(`${step}: ${message}`);
+  testLogger?.debug(`${step}: ${message}`);
   if (data !== undefined && data !== null) {
-    testLogger.debug(`${step} data: ${JSON.stringify(data, null, 2)}`);
+    testLogger?.debug(`${step} data: ${JSON.stringify(data, null, 2)}`);
   }
 }
 

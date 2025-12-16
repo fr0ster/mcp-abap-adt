@@ -70,7 +70,7 @@ export async function handleUpdateTable(context: HandlerContext, args: UpdateTab
 
     const tableName = table_name.toUpperCase();
 
-    logger.info(`Starting table source update: ${tableName}`);
+    logger?.info(`Starting table source update: ${tableName}`);
 
             try {
       // Get configuration from environment variables
@@ -78,10 +78,10 @@ export async function handleUpdateTable(context: HandlerContext, args: UpdateTab
             // Create connection directly for this handler call
       // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-      logger.debug(`[UpdateTable] Created separate connection for handler call: ${tableName}`);
+      logger?.debug(`[UpdateTable] Created separate connection for handler call: ${tableName}`);
     } catch (connectionError: any) {
       const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
-      logger.error(`[UpdateTable] Failed to create connection: ${errorMessage}`);
+      logger?.error(`[UpdateTable] Failed to create connection: ${errorMessage}`);
       return return_error(new Error(`Failed to create connection: ${errorMessage}`));
     }
 
@@ -99,26 +99,26 @@ export async function handleUpdateTable(context: HandlerContext, args: UpdateTab
 
       try {
         // Step 1: Check new code BEFORE update (with ddlCode and version='inactive')
-        logger.info(`[UpdateTable] Checking new DDL code before update: ${tableName}`);
+        logger?.info(`[UpdateTable] Checking new DDL code before update: ${tableName}`);
         let checkNewCodePassed = false;
         try {
           await safeCheckOperation(
             () => client.checkTable({ tableName }, ddl_code, 'inactive'),
             tableName,
             {
-              debug: (message: string) => logger.debug(`[UpdateTable] ${message}`)
+              debug: (message: string) => logger?.debug(`[UpdateTable] ${message}`)
             }
           );
           checkNewCodePassed = true;
-          logger.info(`[UpdateTable] New code check passed: ${tableName}`);
+          logger?.info(`[UpdateTable] New code check passed: ${tableName}`);
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
           if ((checkError as any).isAlreadyChecked) {
-            logger.info(`[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`);
+            logger?.info(`[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`);
             checkNewCodePassed = true;
           } else {
             // Real check error - don't update if check failed
-            logger.error(`[UpdateTable] New code check failed: ${tableName}`, {
+            logger?.error(`[UpdateTable] New code check failed: ${tableName}`, {
               error: checkError instanceof Error ? checkError.message : String(checkError)
             });
             throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
@@ -127,35 +127,35 @@ export async function handleUpdateTable(context: HandlerContext, args: UpdateTab
 
         // Step 2: Update (only if check passed)
         if (checkNewCodePassed) {
-          logger.info(`[UpdateTable] Updating table with DDL code: ${tableName}`);
+          logger?.info(`[UpdateTable] Updating table with DDL code: ${tableName}`);
           await client.updateTable({ tableName, ddlCode: ddl_code, transportRequest: transport_request }, lockHandle);
-          logger.info(`[UpdateTable] Table source code updated: ${tableName}`);
+          logger?.info(`[UpdateTable] Table source code updated: ${tableName}`);
         } else {
-          logger.info(`[UpdateTable] Skipping update - new code check failed: ${tableName}`);
+          logger?.info(`[UpdateTable] Skipping update - new code check failed: ${tableName}`);
         }
 
         // Step 3: Unlock (MANDATORY after lock)
         await client.unlockTable({ tableName }, lockHandle);
-        logger.info(`[UpdateTable] Table unlocked: ${tableName}`);
+        logger?.info(`[UpdateTable] Table unlocked: ${tableName}`);
 
         // Step 4: Check inactive version (after unlock)
-        logger.info(`[UpdateTable] Checking inactive version: ${tableName}`);
+        logger?.info(`[UpdateTable] Checking inactive version: ${tableName}`);
         try {
           await safeCheckOperation(
             () => client.checkTable({ tableName }, undefined, 'inactive'),
             tableName,
             {
-              debug: (message: string) => logger.debug(`[UpdateTable] ${message}`)
+              debug: (message: string) => logger?.debug(`[UpdateTable] ${message}`)
             }
           );
-          logger.info(`[UpdateTable] Inactive version check completed: ${tableName}`);
+          logger?.info(`[UpdateTable] Inactive version check completed: ${tableName}`);
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
           if ((checkError as any).isAlreadyChecked) {
-            logger.info(`[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`);
+            logger?.info(`[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`);
           } else {
             // Log warning but don't fail - inactive check is informational
-            logger.warn(`[UpdateTable] Inactive version check had issues: ${tableName}`, {
+            logger?.warn(`[UpdateTable] Inactive version check had issues: ${tableName}`, {
               error: checkError instanceof Error ? checkError.message : String(checkError)
             });
           }
@@ -170,7 +170,7 @@ export async function handleUpdateTable(context: HandlerContext, args: UpdateTab
         try {
           await client.unlockTable({ tableName: tableName }, lockHandle);
         } catch (unlockError) {
-          logger.error('Failed to unlock table after error:', unlockError);
+          logger?.error('Failed to unlock table after error:', unlockError);
         }
         throw error;
       }
@@ -192,7 +192,7 @@ export async function handleUpdateTable(context: HandlerContext, args: UpdateTab
         }
       }
 
-      logger.info(`✅ UpdateTable completed successfully: ${tableName}`);
+      logger?.info(`✅ UpdateTable completed successfully: ${tableName}`);
 
       // Return success result
       const stepsCompleted = ['lock', 'check_new_code', 'update', 'unlock', 'check_inactive'];
@@ -223,7 +223,7 @@ export async function handleUpdateTable(context: HandlerContext, args: UpdateTab
       });
 
     } catch (error: any) {
-      logger.error(`Error updating table source ${tableName}:`, error);
+      logger?.error(`Error updating table source ${tableName}:`, error);
 
       const errorMessage = error.response?.data
         ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
@@ -235,9 +235,9 @@ export async function handleUpdateTable(context: HandlerContext, args: UpdateTab
       if (connection) {
         try {
           connection.reset();
-          logger.debug(`[UpdateTable] Reset test connection`);
+          logger?.debug(`[UpdateTable] Reset test connection`);
         } catch (resetError: any) {
-          logger.error(`[UpdateTable] Failed to reset connection: ${resetError.message || resetError}`);
+          logger?.error(`[UpdateTable] Failed to reset connection: ${resetError.message || resetError}`);
         }
       }
     }

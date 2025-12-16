@@ -59,7 +59,7 @@ export class ReadOnlyTester extends BaseTester {
    */
   async run(): Promise<void> {
     if (this.shouldSkipTest()) {
-      this.logger.testSkip(`Skipping test: ${this.getSkipReason()}`);
+      this.logger?.testSkip(`Skipping test: ${this.getSkipReason()}`);
       return;
     }
 
@@ -74,18 +74,18 @@ export class ReadOnlyTester extends BaseTester {
     const params = this.getTestParams();
 
     // Log test start
-    this.logger.info(`🚀 Starting read-only test for ${this.objectName || 'object'}`);
-    this.logger.info(`   Workflow steps: get`);
+    this.logger?.info(`🚀 Starting read-only test for ${this.objectName || 'object'}`);
+    this.logger?.info(`   Workflow steps: get`);
 
     try {
       // Execute read-only get operation
       await this.runGet(params);
 
       // Log test completion
-      this.logger.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-      this.logger.success(`✨ Read-only operation completed successfully for ${this.objectName}`);
+      this.logger?.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      this.logger?.success(`✨ Read-only operation completed successfully for ${this.objectName}`);
     } catch (error: any) {
-      this.logger.error(`❌ Test failed: ${error.message}`);
+      this.logger?.error(`❌ Test failed: ${error.message}`);
       throw error;
     }
   }
@@ -98,7 +98,7 @@ export class ReadOnlyTester extends BaseTester {
       throw new Error('Handler or connection not available');
     }
 
-    this.logger.info(`   • get: ${this.objectName}`);
+    this.logger?.info(`   • get: ${this.objectName}`);
 
     const getArgs = this.buildGetArgs(params);
     const getResponse = await this.handler(this.connection, getArgs);
@@ -106,7 +106,7 @@ export class ReadOnlyTester extends BaseTester {
     // Validate response format
     this.validateResponse(getResponse);
 
-    this.logger.success(`✅ Retrieved ${this.objectName} successfully`);
+    this.logger?.success(`✅ Retrieved ${this.objectName} successfully`);
   }
 
   /**
@@ -143,7 +143,7 @@ export class ReadOnlyTester extends BaseTester {
     }
 
     // Response is valid
-    this.logger.debug('Response format validated successfully');
+    this.logger?.debug('Response format validated successfully');
   }
 
   // Helper methods to build handler arguments (can be overridden in subclasses)

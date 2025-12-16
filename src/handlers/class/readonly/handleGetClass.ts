@@ -18,18 +18,18 @@ export async function handleGetClass(context: HandlerContext, args: any) {
       throw new McpError(ErrorCode.InvalidParams, 'Class name is required');
     }
 
-    logger.info(`Reading class ${args.class_name}`);
+    logger?.info(`Reading class ${args.class_name}`);
 
     // Create client
     const client = new ReadOnlyClient(connection);
     const result = await client.readClass(args.class_name);
-    logger.debug(`Successfully read class ${args.class_name}`);
+    logger?.debug(`Successfully read class ${args.class_name}`);
     return {
       isError: false,
       content: [{ type: "json", json: result }],
     };
   } catch (error) {
-    logger.error(`Failed to read class ${args?.class_name || ''}`, error as any);
+    logger?.error(`Failed to read class ${args?.class_name || ''}`, error as any);
     return {
       isError: true,
       content: [

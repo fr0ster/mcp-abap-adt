@@ -80,7 +80,7 @@ export async function handleActivateBehaviorDefinition(context: HandlerContext, 
 
     const behaviorDefinitionName = name.toUpperCase();
 
-    logger.info(`Starting behavior definition activation: ${behaviorDefinitionName}`);
+    logger?.info(`Starting behavior definition activation: ${behaviorDefinitionName}`);
 
     try {
       // Activate behavior definition - using types from adt-clients
@@ -101,9 +101,9 @@ export async function handleActivateBehaviorDefinition(context: HandlerContext, 
       // Get updated session state after activation
 
 
-      logger.info(`✅ ActivateBehaviorDefinition completed: ${behaviorDefinitionName}`);
-      logger.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
-      logger.info(`   Messages: ${activationResult.messages.length}`);
+      logger?.info(`✅ ActivateBehaviorDefinition completed: ${behaviorDefinitionName}`);
+      logger?.info(`   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`);
+      logger?.info(`   Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify({
@@ -126,7 +126,7 @@ export async function handleActivateBehaviorDefinition(context: HandlerContext, 
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error activating behavior definition ${behaviorDefinitionName}: ${error?.message || error}`);
+      logger?.error(`Error activating behavior definition ${behaviorDefinitionName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to activate behavior definition: ${error.message || String(error)}`;

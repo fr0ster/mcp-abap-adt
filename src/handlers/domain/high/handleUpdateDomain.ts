@@ -140,7 +140,7 @@ export async function handleUpdateDomain(context: HandlerContext, args: DomainAr
     const typedArgs = args as DomainArgs;
     const domainName = typedArgs.domain_name.toUpperCase();
 
-    logger.info(`Starting domain update: ${domainName}`);
+    logger?.info(`Starting domain update: ${domainName}`);
 
     try {
       // Create client
@@ -175,7 +175,7 @@ export async function handleUpdateDomain(context: HandlerContext, args: DomainAr
             () => client.checkDomain({ domainName }),
             domainName,
             {
-              debug: (message: string) => logger.debug(message)
+              debug: (message: string) => logger?.debug(message)
             }
           );
         } catch (checkError: any) {
@@ -198,7 +198,7 @@ export async function handleUpdateDomain(context: HandlerContext, args: DomainAr
         try {
           await client.unlockDomain({ domainName }, lockHandle);
         } catch (unlockError) {
-          logger.error(`Failed to unlock domain after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+          logger?.error(`Failed to unlock domain after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
         }
         throw error;
       }
@@ -223,7 +223,7 @@ export async function handleUpdateDomain(context: HandlerContext, args: DomainAr
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error updating domain ${domainName}: ${error?.message || error}`);
+      logger?.error(`Error updating domain ${domainName}: ${error?.message || error}`);
 
       // Handle specific error cases
       if (error.message?.includes('not found') || error.response?.status === 404) {
@@ -259,10 +259,10 @@ export async function handleUpdateDomain(context: HandlerContext, args: DomainAr
     try {
       if (connection) {
         connection.reset();
-        logger.debug('Reset domain connection after use');
+        logger?.debug('Reset domain connection after use');
       }
     } catch (resetError: any) {
-      logger.error(`Failed to reset domain connection: ${resetError?.message || resetError}`);
+      logger?.error(`Failed to reset domain connection: ${resetError?.message || resetError}`);
       }
   }
 }

@@ -77,7 +77,7 @@ export async function handleCreateClass(context: HandlerContext, params: CreateC
   }
 
   const className = args.class_name.toUpperCase();
-  logger.info(`Starting class creation: ${className} (activate=${args.activate !== false})`);
+  logger?.info(`Starting class creation: ${className} (activate=${args.activate !== false})`);
 
   try {
     const sourceCode = args.source_code || generateClassTemplate(className, args.description || className);
@@ -86,22 +86,22 @@ export async function handleCreateClass(context: HandlerContext, params: CreateC
 
     try {
       // Validate
-      logger.debug(`Validating class: ${className}`);
+      logger?.debug(`Validating class: ${className}`);
       try {
         await client.validateClass({
           className,
           packageName: args.package_name,
           description: args.description || className
         });
-        logger.debug(`Class validation passed: ${className}`);
+        logger?.debug(`Class validation passed: ${className}`);
       } catch (validateError: any) {
         const errorMessage = validateError instanceof Error ? validateError.message : String(validateError);
-        logger.error(`Class validation failed: ${className} - ${errorMessage}`);
+        logger?.error(`Class validation failed: ${className} - ${errorMessage}`);
         throw new Error(`Class validation failed: ${errorMessage}`);
       }
 
       // Create
-      logger.debug(`Creating class: ${className}`);
+      logger?.debug(`Creating class: ${className}`);
       await client.createClass({
         className,
         description: args.description || className,
@@ -120,86 +120,86 @@ export async function handleCreateClass(context: HandlerContext, params: CreateC
           : 'Unknown error';
         throw new Error(`Class creation failed with status ${createResult?.status || 'unknown'}: ${errorData}`);
       }
-      logger.info(`Class created: ${className}`);
+      logger?.info(`Class created: ${className}`);
 
       // Lock
-      logger.debug(`Locking class: ${className}`);
+      logger?.debug(`Locking class: ${className}`);
       await client.lockClass({ className: className });
       const lockHandle = client.getLockHandle();
-      logger.debug(`Class locked: ${className} (handle=${lockHandle ? lockHandle.substring(0, 8) + '...' : 'none'})`);
+      logger?.debug(`Class locked: ${className} (handle=${lockHandle ? lockHandle.substring(0, 8) + '...' : 'none'})`);
 
       try {
         // Check new code before update
-        logger.debug(`Checking new code before update: ${className}`);
+        logger?.debug(`Checking new code before update: ${className}`);
         let checkNewCodePassed = false;
         try {
           await safeCheckOperation(
             () => client.checkClass({ className: className }, 'inactive', sourceCode),
             className,
             {
-              debug: (message: string) => logger.debug(message)
+              debug: (message: string) => logger?.debug(message)
             }
           );
           checkNewCodePassed = true;
-          logger.debug(`New code check passed: ${className}`);
+          logger?.debug(`New code check passed: ${className}`);
         } catch (checkError: any) {
           if ((checkError as any).isAlreadyChecked) {
-            logger.debug(`Class ${className} was already checked - continuing`);
+            logger?.debug(`Class ${className} was already checked - continuing`);
             checkNewCodePassed = true;
           } else {
-            logger.error(`New code check failed: ${className} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+            logger?.error(`New code check failed: ${className} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
             throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
           }
         }
 
         // Update only if check passed
         if (checkNewCodePassed) {
-          logger.debug(`Updating class source code: ${className}`);
+          logger?.debug(`Updating class source code: ${className}`);
           await client.updateClass({ className: className, sourceCode: sourceCode }, lockHandle);
-          logger.info(`Class source code updated: ${className}`);
+          logger?.info(`Class source code updated: ${className}`);
         } else {
-          logger.warn(`Skipping update - new code check failed: ${className}`);
+          logger?.warn(`Skipping update - new code check failed: ${className}`);
         }
 
         // Unlock (mandatory)
-        logger.debug(`Unlocking class: ${className}`);
+        logger?.debug(`Unlocking class: ${className}`);
         await client.unlockClass({ className: className }, lockHandle);
-        logger.info(`Class unlocked: ${className}`);
+        logger?.info(`Class unlocked: ${className}`);
 
         // Check inactive version (after unlock)
-        logger.debug(`Checking inactive version: ${className}`);
+        logger?.debug(`Checking inactive version: ${className}`);
         try {
           await safeCheckOperation(
             () => client.checkClass({ className: className }, 'inactive'),
             className,
             {
-              debug: (message: string) => logger.debug(message)
+              debug: (message: string) => logger?.debug(message)
             }
           );
-          logger.debug(`Inactive version check completed: ${className}`);
+          logger?.debug(`Inactive version check completed: ${className}`);
         } catch (checkError: any) {
           if ((checkError as any).isAlreadyChecked) {
-            logger.debug(`Class ${className} was already checked - continuing`);
+            logger?.debug(`Class ${className} was already checked - continuing`);
           } else {
-            logger.warn(`Inactive version check had issues: ${className} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+            logger?.warn(`Inactive version check had issues: ${className} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
           }
         }
 
         // Activate if requested
         if (shouldActivate) {
-          logger.debug(`Activating class: ${className}`);
+          logger?.debug(`Activating class: ${className}`);
           try {
             await client.activateClass({ className: className });
-            logger.info(`Class activated: ${className}`);
+            logger?.info(`Class activated: ${className}`);
           } catch (activationError: any) {
-            logger.error(`Activation failed: ${className} - ${activationError instanceof Error ? activationError.message : String(activationError)}`);
+            logger?.error(`Activation failed: ${className} - ${activationError instanceof Error ? activationError.message : String(activationError)}`);
             throw new Error(`Activation failed: ${activationError instanceof Error ? activationError.message : String(activationError)}`);
           }
         } else {
-          logger.debug(`Skipping activation for: ${className}`);
+          logger?.debug(`Skipping activation for: ${className}`);
         }
 
-        logger.info(`CreateClass completed successfully: ${className}`);
+        logger?.info(`CreateClass completed successfully: ${className}`);
 
         return return_response({
           data: JSON.stringify({
@@ -217,12 +217,12 @@ export async function handleCreateClass(context: HandlerContext, params: CreateC
         try {
           const lockHandle = client.getLockHandle();
           if (lockHandle) {
-            logger.warn(`Attempting unlock after error for class ${className}`);
+            logger?.warn(`Attempting unlock after error for class ${className}`);
             await client.unlockClass({ className: className }, lockHandle);
-            logger.warn(`Unlocked class after error: ${className}`);
+            logger?.warn(`Unlocked class after error: ${className}`);
           }
         } catch (unlockError: any) {
-          logger.error(`Failed to unlock class after error: ${className} - ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+          logger?.error(`Failed to unlock class after error: ${className} - ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
         }
 
         // Parse error message

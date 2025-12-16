@@ -77,7 +77,7 @@ export async function handleActivateClassTestClasses(context: HandlerContext, ar
     const className = class_name.toUpperCase();
     const testClassName = test_class_name ? test_class_name.toUpperCase() : undefined;
 
-    logger.info(`Starting test classes activation for: ${className}`);
+    logger?.info(`Starting test classes activation for: ${className}`);
 
     try {
       await client.activateTestClasses({
@@ -87,7 +87,7 @@ export async function handleActivateClassTestClasses(context: HandlerContext, ar
       const activationResult = client.getTestClassActivateResult();
 
 
-      logger.info(`✅ ActivateClassTestClasses completed: ${className}`);
+      logger?.info(`✅ ActivateClassTestClasses completed: ${className}`);
 
       return return_response({
         data: JSON.stringify({
@@ -100,7 +100,7 @@ export async function handleActivateClassTestClasses(context: HandlerContext, ar
         }, null, 2)
       } as AxiosResponse);
     } catch (error: any) {
-      logger.error(`Error activating test classes for ${className}: ${error?.message || error}`);
+      logger?.error(`Error activating test classes for ${className}: ${error?.message || error}`);
       const reason = error?.response?.status === 404
         ? `Class ${className} not found or test classes are missing.`
         : error?.message || String(error);

@@ -76,13 +76,13 @@ export async function handleUnlockDomain(context: HandlerContext, args: UnlockDo
 
     const domainName = domain_name.toUpperCase();
 
-    logger.info(
+    logger?.info(
       `Starting unlock for ${domainName}; lock_handle=${lock_handle}; session=${session_id.substring(0, 8)}...; session_state=${session_state ? 'provided' : 'none'}`
     );
 
     // Restore session state if provided
     if (session_state) {
-      logger.info(
+      logger?.info(
         `Restoring session state from lock: cookies=${session_state.cookies?.length || 0}, csrf=${session_state.csrf_token?.length || 0}, store_keys=${session_state.cookie_store ? Object.keys(session_state.cookie_store).length : 0}`
       );
 
@@ -91,19 +91,19 @@ export async function handleUnlockDomain(context: HandlerContext, args: UnlockDo
       await restoreSessionInConnection(connection, session_id, session_state);
 
       // Verify session was restored
-      logger.info(
+      logger?.info(
         `Session state restored (conn session ${connection.getSessionId()})`
       );
     } else {
-      logger.warn('No session state provided (may fail if domain is locked)');
+      logger?.warn('No session state provided (may fail if domain is locked)');
       // Ensure connection is established
     }
 
-    logger.info(`Starting domain unlock: ${domainName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(`Starting domain unlock: ${domainName} (session: ${session_id.substring(0, 8)}...)`);
 
     try {
       // Unlock domain
-      logger.debug(`Calling client.unlockDomain({ domainName: ${domainName} }, ${lock_handle})`);
+      logger?.debug(`Calling client.unlockDomain({ domainName: ${domainName} }, ${lock_handle})`);
       await client.unlockDomain({ domainName }, lock_handle);
       const unlockResult = client.getUnlockResult();
 
@@ -113,7 +113,7 @@ export async function handleUnlockDomain(context: HandlerContext, args: UnlockDo
 
       // Session state management is now handled by auth-broker
 
-      logger.info(`✅ UnlockDomain completed: ${domainName}`);
+      logger?.info(`✅ UnlockDomain completed: ${domainName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -126,7 +126,7 @@ export async function handleUnlockDomain(context: HandlerContext, args: UnlockDo
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error unlocking domain ${domainName}: ${error?.message || error}`);
+      logger?.error(`Error unlocking domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to unlock domain: ${error.message || String(error)}`;

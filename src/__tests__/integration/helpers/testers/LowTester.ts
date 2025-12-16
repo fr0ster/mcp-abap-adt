@@ -91,7 +91,7 @@ export class LowTester extends BaseTester {
    */
   async run(): Promise<void> {
     if (this.shouldSkipTest()) {
-      this.logger.testSkip(`Skipping test: ${this.getSkipReason()}`);
+      this.logger?.testSkip(`Skipping test: ${this.getSkipReason()}`);
       return;
     }
 
@@ -120,8 +120,8 @@ export class LowTester extends BaseTester {
 
     // Log test start
     const totalSteps = this.handlers.validate ? 6 : 5;
-    this.logger.info(`🚀 Starting low-level workflow test for ${this.objectName || 'object'}`);
-    this.logger.info(`   Workflow steps: ${this.handlers.validate ? 'validate → ' : ''}create → lock → update → unlock → activate`);
+    this.logger?.info(`🚀 Starting low-level workflow test for ${this.objectName || 'object'}`);
+    this.logger?.info(`   Workflow steps: ${this.handlers.validate ? 'validate → ' : ''}create → lock → update → unlock → activate`);
 
     try {
       let currentStep = 0;
@@ -151,10 +151,10 @@ export class LowTester extends BaseTester {
       currentStep = this.handlers.validate ? 6 : 5;
       await this.runActivate(currentStep, totalSteps);
 
-      this.logger.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-      this.logger.success(`✨ Full workflow completed successfully for ${this.objectName}`);
+      this.logger?.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      this.logger?.success(`✨ Full workflow completed successfully for ${this.objectName}`);
     } catch (error: any) {
-      this.logger.error(`❌ Test failed: ${error.message}`);
+      this.logger?.error(`❌ Test failed: ${error.message}`);
       throw error;
     } finally {
       // Persist lock info for diagnostics
@@ -176,14 +176,14 @@ export class LowTester extends BaseTester {
       return;
     }
 
-    this.logger.info(`   • validate: ${this.objectName}`);
+    this.logger?.info(`   • validate: ${this.objectName}`);
 
     const validateArgs = this.buildValidateArgs(params, packageName);
     const validateResponse = await this.handlers.validate(this.connection, validateArgs);
 
     if (validateResponse.isError) {
       const errorMsg = extractErrorMessage(validateResponse);
-      this.logger.info(`⏭️  Validation error for ${this.objectName}: ${errorMsg}, skipping test`);
+      this.logger?.info(`⏭️  Validation error for ${this.objectName}: ${errorMsg}, skipping test`);
       throw new Error(`Validation failed: ${errorMsg}`);
     }
 
@@ -191,12 +191,12 @@ export class LowTester extends BaseTester {
 
     if (!validateData.validation_result?.valid) {
       const message = validateData.validation_result?.message || '';
-      this.logger.info(`⏭️  Validation failed for ${this.objectName}: ${message}, skipping test`);
+      this.logger?.info(`⏭️  Validation failed for ${this.objectName}: ${message}, skipping test`);
       throw new Error(`Validation failed: ${message}`);
     }
 
     this.session = updateSessionFromResponse(this.session, validateData);
-    this.logger.success(`✅ Step ${stepNum}/${totalSteps}: Validation successful for ${this.objectName}`);
+    this.logger?.success(`✅ Step ${stepNum}/${totalSteps}: Validation successful for ${this.objectName}`);
   }
 
   /**
@@ -207,7 +207,7 @@ export class LowTester extends BaseTester {
       throw new Error('Create handler or connection/session not available');
     }
 
-    this.logger.info(`   • create: ${this.objectName}`);
+    this.logger?.info(`   • create: ${this.objectName}`);
 
     const createArgs = this.buildCreateArgs(params, packageName, transportRequest);
     const createResponse = await this.handlers.create(this.connection, createArgs);
@@ -215,7 +215,7 @@ export class LowTester extends BaseTester {
     if (createResponse.isError) {
       const errorMsg = extractErrorMessage(createResponse);
       if (errorMsg.includes('already exists') || errorMsg.includes('does already exist')) {
-        this.logger.info(`⏭️  Object ${this.objectName} already exists, skipping test`);
+        this.logger?.info(`⏭️  Object ${this.objectName} already exists, skipping test`);
         throw new Error(`SKIP: Object already exists: ${errorMsg}`);
       }
       throw new Error(`Create failed: ${errorMsg}`);
@@ -227,7 +227,7 @@ export class LowTester extends BaseTester {
     }
 
     this.objectWasCreated = true;
-    this.logger.success(`✅ Step ${stepNum}/${totalSteps}: Created ${this.objectName} successfully`);
+    this.logger?.success(`✅ Step ${stepNum}/${totalSteps}: Created ${this.objectName} successfully`);
 
     this.session = updateSessionFromResponse(this.session, createData);
     await delay(this.getOperationDelay('create'));
@@ -241,7 +241,7 @@ export class LowTester extends BaseTester {
       throw new Error('Lock handler or connection/session not available');
     }
 
-    this.logger.info(`   • lock: ${this.objectName}`);
+    this.logger?.info(`   • lock: ${this.objectName}`);
 
     const lockResponse = await this.handlers.lock(this.connection, {
       ...this.buildLockArgs(),
@@ -262,7 +262,7 @@ export class LowTester extends BaseTester {
       throw new Error('Lock response does not contain valid session information');
     }
 
-    this.logger.success(`✅ Step ${stepNum}/${totalSteps}: Locked ${this.objectName} successfully`);
+    this.logger?.success(`✅ Step ${stepNum}/${totalSteps}: Locked ${this.objectName} successfully`);
     await delay(this.getOperationDelay('lock'));
   }
 
@@ -274,7 +274,7 @@ export class LowTester extends BaseTester {
       throw new Error('Update handler, lock session, or lock handle not available');
     }
 
-    this.logger.info(`   • update: ${this.objectName}`);
+    this.logger?.info(`   • update: ${this.objectName}`);
 
     const sourceCode = this.getSourceCode(params);
     if (!sourceCode) {
@@ -298,7 +298,7 @@ export class LowTester extends BaseTester {
       throw new Error(`Update failed: ${JSON.stringify(updateData)}`);
     }
 
-    this.logger.success(`✅ Step ${stepNum}/${totalSteps}: Updated ${this.objectName} successfully`);
+    this.logger?.success(`✅ Step ${stepNum}/${totalSteps}: Updated ${this.objectName} successfully`);
     await delay(this.getOperationDelay('update'));
   }
 
@@ -310,7 +310,7 @@ export class LowTester extends BaseTester {
       throw new Error('Unlock handler, lock session, or lock handle not available');
     }
 
-    this.logger.info(`   • unlock: ${this.objectName}`);
+    this.logger?.info(`   • unlock: ${this.objectName}`);
 
     const unlockResponse = await this.handlers.unlock(this.connection, {
       ...this.buildUnlockArgs(),
@@ -330,7 +330,7 @@ export class LowTester extends BaseTester {
     }
 
     this.session = updateSessionFromResponse(this.session, unlockData);
-    this.logger.success(`✅ Step ${stepNum}/${totalSteps}: Unlocked ${this.objectName} successfully`);
+    this.logger?.success(`✅ Step ${stepNum}/${totalSteps}: Unlocked ${this.objectName} successfully`);
     await delay(this.getOperationDelay('unlock'));
   }
 
@@ -342,7 +342,7 @@ export class LowTester extends BaseTester {
       throw new Error('Activate handler or connection/session not available');
     }
 
-    this.logger.info(`   • activate: ${this.objectName}`);
+    this.logger?.info(`   • activate: ${this.objectName}`);
 
     const activateResponse = await this.handlers.activate(this.connection, {
       ...this.buildActivateArgs(),
@@ -360,7 +360,7 @@ export class LowTester extends BaseTester {
       throw new Error(`Activate failed: ${JSON.stringify(activateData)}`);
     }
 
-    this.logger.success(`✅ Step ${stepNum}/${totalSteps}: Activated ${this.objectName} successfully`);
+    this.logger?.success(`✅ Step ${stepNum}/${totalSteps}: Activated ${this.objectName} successfully`);
   }
 
   /**
@@ -391,7 +391,7 @@ export class LowTester extends BaseTester {
         });
       } catch (unlockError: any) {
         // Ignore unlock errors during cleanup
-        this.logger.debug(`Cleanup unlock error (ignored): ${unlockError?.message || String(unlockError)}`);
+        this.logger?.debug(`Cleanup unlock error (ignored): ${unlockError?.message || String(unlockError)}`);
       }
     }
 
@@ -404,10 +404,10 @@ export class LowTester extends BaseTester {
           ...this.buildDeleteArgs(),
           transport_request: transportRequest
         });
-        this.logger.debug(`✅ Cleanup: Deleted ${this.objectName}`);
+        this.logger?.debug(`✅ Cleanup: Deleted ${this.objectName}`);
       } catch (deleteError: any) {
         // Log but don't fail test on cleanup errors
-        this.logger.warn(`Cleanup delete error (ignored): ${deleteError?.message || String(deleteError)}`);
+        this.logger?.warn(`Cleanup delete error (ignored): ${deleteError?.message || String(deleteError)}`);
       }
     }
   }

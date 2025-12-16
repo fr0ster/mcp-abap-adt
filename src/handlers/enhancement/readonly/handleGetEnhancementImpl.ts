@@ -53,7 +53,7 @@ function parseEnhancementSourceFromXml(xmlData: string): string {
                 const decodedSource = Buffer.from(base64Match[1], 'base64').toString('utf-8');
                 return decodedSource;
             } catch (decodeError) {
-                logger.warn('Failed to decode base64 source code:', decodeError);
+                logger?.warn('Failed to decode base64 source code:', decodeError);
             }
         }
 
@@ -66,11 +66,11 @@ function parseEnhancementSourceFromXml(xmlData: string): string {
         }
 
         // If no specific source tags found, return the entire XML as fallback
-        logger.warn('Could not find source code in expected format, returning raw XML');
+        logger?.warn('Could not find source code in expected format, returning raw XML');
         return xmlData;
 
     } catch (parseError) {
-        logger.error('Failed to parse enhancement source XML:', parseError);
+        logger?.error('Failed to parse enhancement source XML:', parseError);
         return xmlData; // Return raw XML as fallback
     }
 }
@@ -93,7 +93,7 @@ function parseEnhancementSourceFromXml(xmlData: string): string {
 export async function handleGetEnhancementImpl(context: HandlerContext, args: any) {
   const { connection, logger } = context;
     try {
-        logger.info('handleGetEnhancementByName called with args:', args);
+        logger?.info('handleGetEnhancementByName called with args:', args);
 
         if (!args?.enhancement_spot) {
             throw new McpError(ErrorCode.InvalidParams, 'Enhancement spot is required');
@@ -106,13 +106,13 @@ export async function handleGetEnhancementImpl(context: HandlerContext, args: an
         const enhancementSpot = args.enhancement_spot;
         const enhancementName = args.enhancement_name;
 
-        logger.info(`Getting enhancement: ${enhancementName} from spot: ${enhancementSpot}`);
+        logger?.info(`Getting enhancement: ${enhancementName} from spot: ${enhancementSpot}`);
 
         // Build the ADT URL for the specific enhancement
         // Format: /sap/bc/adt/enhancements/{enhancement_spot}/{enhancement_name}/source/main
         const url = `/sap/bc/adt/enhancements/${encodeSapObjectName(enhancementSpot)}/${encodeSapObjectName(enhancementName)}/source/main`;
 
-        logger.info(`Enhancement URL: ${url}`);
+        logger?.info(`Enhancement URL: ${url}`);
 
         const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
 
@@ -140,10 +140,10 @@ export async function handleGetEnhancementImpl(context: HandlerContext, args: an
             }
             return result;
         } else {
-            logger.warn(`Enhancement ${enhancementName} not found in spot ${enhancementSpot}. Status: ${response.status}. Attempting to retrieve spot metadata as fallback.`);
+            logger?.warn(`Enhancement ${enhancementName} not found in spot ${enhancementSpot}. Status: ${response.status}. Attempting to retrieve spot metadata as fallback.`);
             // Fallback to retrieve metadata about the enhancement spot
             const spotUrl = `/sap/bc/adt/enhancements/${encodeSapObjectName(enhancementSpot)}`;
-            logger.info(`Fallback enhancement spot URL: ${spotUrl}`);
+            logger?.info(`Fallback enhancement spot URL: ${spotUrl}`);
 
             const spotResponse = await makeAdtRequestWithTimeout(connection, spotUrl, 'GET', 'default', {
                 'Accept': 'application/vnd.sap.adt.enhancements.v1+xml'

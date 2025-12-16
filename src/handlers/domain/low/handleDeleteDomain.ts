@@ -54,7 +54,7 @@ export async function handleDeleteDomain(context: HandlerContext, args: DeleteDo
     const client = new CrudClient(connection);
     const domainName = domain_name.toUpperCase();
 
-    logger.info(`Starting domain deletion: ${domainName}`);
+    logger?.info(`Starting domain deletion: ${domainName}`);
 
     try {
       // Delete domain
@@ -65,7 +65,7 @@ export async function handleDeleteDomain(context: HandlerContext, args: DeleteDo
         throw new Error(`Delete did not return a response for domain ${domainName}`);
       }
 
-      logger.info(`✅ DeleteDomain completed successfully: ${domainName}`);
+      logger?.info(`✅ DeleteDomain completed successfully: ${domainName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -77,7 +77,7 @@ export async function handleDeleteDomain(context: HandlerContext, args: DeleteDo
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting domain ${domainName}: ${error?.message || error}`);
+      logger?.error(`Error deleting domain ${domainName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete domain: ${error.message || String(error)}`;

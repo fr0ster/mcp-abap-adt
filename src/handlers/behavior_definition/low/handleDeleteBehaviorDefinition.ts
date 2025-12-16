@@ -55,7 +55,7 @@ export async function handleDeleteBehaviorDefinition(context: HandlerContext, ar
     const client = new CrudClient(connection);
     const bdefName = name.toUpperCase();
 
-    logger.info(`Starting behavior definition deletion: ${bdefName}`);
+    logger?.info(`Starting behavior definition deletion: ${bdefName}`);
 
     try {
       // Delete behavior definition - using types from adt-clients
@@ -70,7 +70,7 @@ export async function handleDeleteBehaviorDefinition(context: HandlerContext, ar
         throw new Error(`Delete did not return a response for behavior definition ${bdefName}`);
       }
 
-      logger.info(`✅ DeleteBehaviorDefinition completed successfully: ${bdefName}`);
+      logger?.info(`✅ DeleteBehaviorDefinition completed successfully: ${bdefName}`);
 
       return return_response({
         data: JSON.stringify({
@@ -82,7 +82,7 @@ export async function handleDeleteBehaviorDefinition(context: HandlerContext, ar
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error deleting behavior definition ${bdefName}: ${error?.message || error}`);
+      logger?.error(`Error deleting behavior definition ${bdefName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to delete behavior definition: ${error.message || String(error)}`;

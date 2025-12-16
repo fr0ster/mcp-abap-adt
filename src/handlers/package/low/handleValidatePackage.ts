@@ -80,7 +80,7 @@ export async function handleValidatePackage(context: HandlerContext, args: Valid
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    logger.info(`Starting package validation: ${packageName} in ${superPackage}`);
+    logger?.info(`Starting package validation: ${packageName} in ${superPackage}`);
 
     try {
       // Validate package
@@ -94,7 +94,7 @@ export async function handleValidatePackage(context: HandlerContext, args: Valid
       // Get updated session state after validation
 
 
-      logger.info(`✅ ValidatePackage completed: ${packageName} (valid=${result.valid})`);
+      logger?.info(`✅ ValidatePackage completed: ${packageName} (valid=${result.valid})`);
 
       return return_response({
         data: JSON.stringify({
@@ -111,7 +111,7 @@ export async function handleValidatePackage(context: HandlerContext, args: Valid
       } as AxiosResponse);
 
     } catch (error: any) {
-      logger.error(`Error validating package ${packageName}: ${error?.message || error}`);
+      logger?.error(`Error validating package ${packageName}: ${error?.message || error}`);
 
       // Parse error message
       let errorMessage = `Failed to validate package: ${error.message || String(error)}`;

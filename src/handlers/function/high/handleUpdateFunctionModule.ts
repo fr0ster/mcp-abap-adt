@@ -76,7 +76,7 @@ export async function handleUpdateFunctionModule(context: HandlerContext, args: 
     const functionGroupName = args.function_group_name.toUpperCase();
     const functionModuleName = args.function_module_name.toUpperCase();
 
-    logger.info(`Starting function module source update: ${functionModuleName} in ${functionGroupName}`);
+    logger?.info(`Starting function module source update: ${functionModuleName} in ${functionGroupName}`);
 
     try {
       const client = new CrudClient(connection);
@@ -93,11 +93,11 @@ export async function handleUpdateFunctionModule(context: HandlerContext, args: 
           await client.activateFunctionModule({ functionModuleName, functionGroupName });
         }
       } catch (error) {
-        logger.error(`Function module update chain failed: ${error instanceof Error ? error.message : String(error)}`);
+        logger?.error(`Function module update chain failed: ${error instanceof Error ? error.message : String(error)}`);
         throw error;
       }
 
-      logger.info(`✅ UpdateFunctionModule completed successfully: ${functionModuleName}`);
+      logger?.info(`✅ UpdateFunctionModule completed successfully: ${functionModuleName}`);
 
       const result = {
         success: true,
@@ -116,7 +116,7 @@ export async function handleUpdateFunctionModule(context: HandlerContext, args: 
       });
 
     } catch (error: any) {
-      logger.error(`Error updating function module source ${functionModuleName}: ${error?.message || error}`);
+      logger?.error(`Error updating function module source ${functionModuleName}: ${error?.message || error}`);
 
       const errorMessage = error.response?.data
         ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
@@ -127,10 +127,10 @@ export async function handleUpdateFunctionModule(context: HandlerContext, args: 
       try {
         if (connection) {
           connection.reset();
-          logger.debug('Reset function module connection after use');
+          logger?.debug('Reset function module connection after use');
         }
       } catch (resetError: any) {
-        logger.error(`Failed to reset function module connection: ${resetError?.message || resetError}`);
+        logger?.error(`Failed to reset function module connection: ${resetError?.message || resetError}`);
       }
     }
 

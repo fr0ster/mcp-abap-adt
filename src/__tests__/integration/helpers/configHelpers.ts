@@ -464,22 +464,34 @@ export function resolveTransportRequest(testCase?: any): string | undefined {
 /**
  * Get cleanup_after setting from configuration
  * Checks test case specific setting first, then falls back to global environment.cleanup_after
- * @param testCase - Optional test case object (may have params.cleanup_after)
+ * Priority:
+ * 1. Global skip_cleanup flag (environment.skip_cleanup)
+ * 2. Test case skip_cleanup flag (testCase.params.skip_cleanup)
+ * 3. Test case cleanup_after flag (testCase.params.cleanup_after)
+ * 4. Global cleanup_after flag (environment.cleanup_after)
+ * 5. Default: true (cleanup enabled by default)
+ * @param testCase - Optional test case object (may have params.cleanup_after or params.skip_cleanup)
  * @returns true if cleanup should be performed, false otherwise
  */
 export function getCleanupAfter(testCase?: any): boolean {
-  // Explicit skip flag has highest priority
+  const config = loadTestConfig();
+
+  // Global skip flag has highest priority
+  if (config.environment?.skip_cleanup === true) {
+    return false;
+  }
+
+  // Test case specific skip flag (overrides global cleanup_after)
   if (testCase?.params?.skip_cleanup === true) {
     return false;
   }
 
-  // Check test case specific setting first (overrides global)
+  // Check test case specific setting (overrides global)
   if (testCase?.params?.cleanup_after !== undefined) {
     return testCase.params.cleanup_after === true;
   }
 
   // Fallback to global environment.cleanup_after
-  const config = loadTestConfig();
   const globalCleanupAfter = config.environment?.cleanup_after;
 
   // Default to true if not specified (backward compatibility)

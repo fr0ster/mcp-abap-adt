@@ -188,7 +188,8 @@ export class LambdaTester {
 
   /**
    * Cleanup after test - checks if cleanup is needed and performs it
-   * Checks YAML parameters first, then calls cleanup lambda from test if provided
+   * Checks YAML parameters first, then calls cleanup lambda from test
+   * This method is designed to be safe to call even if test failed
    */
   protected async cleanupAfter(): Promise<void> {
     if (!this.context || !this.testCase) {
@@ -196,19 +197,27 @@ export class LambdaTester {
       return;
     }
 
-    // Check YAML parameters first
+    // Check YAML parameters first (global skip_cleanup, test case skip_cleanup, cleanup_after flags)
     const shouldCleanup = getCleanupAfter(this.testCase);
     if (!shouldCleanup) {
       this.context.logger?.info?.('ℹ️ Cleanup skipped: disabled in YAML config (skip_cleanup=true or cleanup_after=false)');
       return;
     }
 
-    // Call cleanup lambda from test if provided
-    if (this.cleanupAfterLambda) {
+    // Cleanup lambda must be provided - it's mandatory
+    if (!this.cleanupAfterLambda) {
+      this.context.logger?.error?.('❌ Cleanup lambda not provided! Each test must set cleanup lambda in beforeAll().');
+      throw new Error('Cleanup lambda is mandatory. Provide cleanupAfter lambda in beforeAll() method.');
+    }
+
+    // Execute cleanup lambda (errors are caught and logged, but don't fail the cleanup process)
+    try {
       this.context.logger?.info?.('🧹 Running cleanup...');
       await this.cleanupAfterLambda(this.context);
-    } else {
-      this.context.logger?.warn?.('⚠️ Cleanup skipped: no cleanup lambda provided in beforeAll');
+      this.context.logger?.success?.('✅ Cleanup completed successfully');
+    } catch (error: any) {
+      // Log cleanup errors but don't throw - cleanup should not fail the test suite
+      this.context.logger?.warn?.(`⚠️ Cleanup error (ignored): ${error?.message || String(error)}`);
     }
   }
 
@@ -216,17 +225,23 @@ export class LambdaTester {
    * Lifecycle: beforeAll
    * Initializes tester (loads config, creates connection), then executes lambda
    * @param lambda - Lambda to execute after initialization
-   * @param cleanupAfter - Optional lambda to execute for cleanup (checks YAML params first)
+   * @param cleanupAfter - REQUIRED lambda to execute for cleanup (checks YAML params before executing)
+   *                       Each test must provide cleanup lambda. Test decides whether to run it via YAML config.
    */
-  async beforeAll(lambda: TLambda, cleanupAfter?: TLambda): Promise<void> {
+  async beforeAll(lambda: TLambda, cleanupAfter: TLambda): Promise<void> {
     await this.init();
     if (!this.context) {
       throw new Error('Context not initialized');
     }
-    // Store cleanup lambda if provided
-    if (cleanupAfter) {
-      this.cleanupAfterLambda = cleanupAfter;
+
+    // Cleanup lambda is mandatory - each test must set it up
+    if (!cleanupAfter) {
+      throw new Error('Cleanup lambda is mandatory. Provide cleanupAfter lambda in beforeAll() method. ' +
+        'The test decides whether to run it via YAML config (skip_cleanup or cleanup_after flags).');
     }
+
+    // Store cleanup lambda
+    this.cleanupAfterLambda = cleanupAfter;
     await lambda(this.context);
   }
 
@@ -258,26 +273,43 @@ export class LambdaTester {
    * Lifecycle: afterEach
    * Cleanup after each test
    * Automatically checks YAML parameters and executes cleanup if needed
+   * This method is guaranteed to run by Jest even if test fails
    * @param lambda - Optional lambda to execute before cleanup check
    */
   async afterEach(lambda?: TLambda): Promise<void> {
     if (!this.context) {
-      throw new Error('Context not initialized');
+      // If context is not initialized, we can't do cleanup, but don't throw
+      // This might happen if beforeAll failed
+      return;
     }
 
-    // Execute custom lambda if provided
-    if (lambda) {
-      await lambda(this.context);
+    try {
+      // Execute custom lambda if provided
+      if (lambda) {
+        await lambda(this.context);
+      }
+    } catch (error: any) {
+      // Log custom lambda errors but continue with cleanup
+      this.context.logger?.warn?.(`⚠️ Custom afterEach lambda error (continuing with cleanup): ${error?.message || String(error)}`);
     }
 
     // Always check YAML parameters and execute cleanup if needed
-    // This ensures consistent cleanup behavior across all tests
-    await this.cleanupAfter();
+    // This ensures cleanup runs even if test failed
+    // Jest guarantees afterEach runs regardless of test outcome
+    try {
+      await this.cleanupAfter();
+    } catch (error: any) {
+      // Cleanup errors are already handled in cleanupAfter(), but log here for visibility
+      this.context.logger?.warn?.(`⚠️ Cleanup process error: ${error?.message || String(error)}`);
+    }
   }
 
 
   /**
    * Main run method - executes test function (lambda) with context
+   * Ensures cleanup runs even if test fails (cleanup is called by afterEach, which Jest guarantees to run)
+   * Note: Jest's afterEach hook will run cleanup even if test fails, so we don't need try-finally here.
+   * The cleanup is handled by afterEach() which is called by Jest regardless of test outcome.
    */
   async run(testFunc: TLambda): Promise<void> {
     if (!this.context) {
@@ -293,6 +325,12 @@ export class LambdaTester {
       throw new Error('Connection and session not available');
     }
 
+    // Verify cleanup lambda is set (should be set in beforeAll)
+    if (!this.cleanupAfterLambda) {
+      throw new Error('Cleanup lambda not set! Each test must provide cleanupAfter lambda in beforeAll(). ' +
+        'The test decides whether to run it via YAML config (skip_cleanup or cleanup_after flags).');
+    }
+
     try {
       // Execute test function (lambda) with context
       // Lambda decides what messages to log and whether to pass logger to handlers
@@ -306,6 +344,8 @@ export class LambdaTester {
       }
 
       this.context.logger?.error(`❌ Test failed: ${error.message}`);
+      // Note: Cleanup will still run via afterEach() hook, which Jest guarantees to execute
+      // even when test fails. This ensures cleanup runs regardless of test outcome.
       throw error;
     }
   }

@@ -38,9 +38,11 @@ export class HighTester extends LambdaTester {
   }
 
   /**
-   * Initialize tester and optionally set cleanup lambda
-   * Cleanup lambda should be provided by the test, not automatically created
+   * Initialize tester and set cleanup lambda
+   * Cleanup lambda must be provided by the test, or will be auto-generated from delete function if available
    * @param cleanupAfter - Optional cleanup lambda (checks YAML params before executing)
+   *                       If not provided and delete function exists, cleanup lambda will be auto-generated.
+   *                       Each test must have cleanup lambda set up. Test decides whether to run it via YAML config.
    */
   async beforeAll(cleanupAfter?: TLambda): Promise<void> {
     await this.init();
@@ -48,10 +50,44 @@ export class HighTester extends LambdaTester {
       throw new Error('Context not initialized');
     }
 
-    // Store cleanup lambda if provided by test
+    // If cleanup lambda is provided, use it
     if (cleanupAfter) {
       this.cleanupAfterLambda = cleanupAfter;
+      return;
     }
+
+    // If no cleanup lambda provided, try to auto-generate from delete function
+    if (this.workflowFunctions?.delete) {
+      const deleteFunction = this.workflowFunctions.delete;
+      this.cleanupAfterLambda = async (context: LambdaTesterContext) => {
+        const { connection, objectName, transportRequest, logger } = context;
+        if (!objectName) return;
+
+        logger?.info?.(`   • cleanup: delete ${objectName}`);
+        try {
+          const handlerContext = createHandlerContext({
+            connection,
+            logger: logger || undefined
+          });
+          const deleteArgs = this.buildDeleteArgs(context);
+          const deleteResponse = await deleteFunction(handlerContext, deleteArgs);
+
+          if (deleteResponse?.isError) {
+            const errorMsg = deleteResponse.content?.[0]?.text || 'Unknown error';
+            logger?.warn?.(`Delete failed (ignored in cleanup): ${errorMsg}`);
+          } else {
+            logger?.success?.(`✅ cleanup: deleted ${objectName} successfully`);
+          }
+        } catch (error: any) {
+          logger?.warn?.(`Cleanup delete error (ignored): ${error?.message || String(error)}`);
+        }
+      };
+      return;
+    }
+
+    // Cleanup lambda is mandatory - either provide it or include delete function in workflowFunctions
+    throw new Error('Cleanup lambda is mandatory. Either provide cleanupAfter lambda in beforeAll() method, ' +
+      'or include delete function in workflowFunctions. The test decides whether to run it via YAML config (skip_cleanup or cleanup_after flags).');
   }
 
   async run(): Promise<void> {

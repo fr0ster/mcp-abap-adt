@@ -1121,19 +1121,40 @@ export class mcp_abap_adt_server {
             try {
               const connConfig = await authBroker.getConnectionConfig(this.defaultDestination);
               if (connConfig?.serviceUrl) {
-                const jwtToken = await authBroker.getToken(this.defaultDestination);
-                if (jwtToken) {
-                  // Create headers object with default destination
-                  headers = {
-                    [HEADER_MCP_DESTINATION]: this.defaultDestination,
-                    [HEADER_SAP_URL]: connConfig.serviceUrl,
-                    [HEADER_SAP_JWT_TOKEN]: jwtToken,
-                  };
-                  logger?.info("No headers provided, using default destination", {
-                    type: "NO_HEADERS_DEFAULT_DESTINATION_USED",
-                    destination: this.defaultDestination,
-                    sessionId: sessionId?.substring(0, 8),
-                  });
+                // Check authType from connection config BEFORE calling getToken()
+                const isBasicAuth = connConfig.authType === 'basic' || (connConfig.username && connConfig.password);
+
+                if (isBasicAuth) {
+                  // Basic auth for on-premise
+                  if (connConfig.username && connConfig.password) {
+                    this.processBasicAuthConfigUpdate(
+                      connConfig.serviceUrl,
+                      connConfig.username,
+                      connConfig.password,
+                      sessionId
+                    );
+                    logger?.info("No headers provided, using default destination with basic auth", {
+                      type: "NO_HEADERS_DEFAULT_DESTINATION_BASIC_AUTH",
+                      destination: this.defaultDestination,
+                      sessionId: sessionId?.substring(0, 8),
+                    });
+                  }
+                } else {
+                  // JWT auth for cloud
+                  const jwtToken = await authBroker.getToken(this.defaultDestination);
+                  if (jwtToken) {
+                    // Create headers object with default destination
+                    headers = {
+                      [HEADER_MCP_DESTINATION]: this.defaultDestination,
+                      [HEADER_SAP_URL]: connConfig.serviceUrl,
+                      [HEADER_SAP_JWT_TOKEN]: jwtToken,
+                    };
+                    logger?.info("No headers provided, using default destination", {
+                      type: "NO_HEADERS_DEFAULT_DESTINATION_USED",
+                      destination: this.defaultDestination,
+                      sessionId: sessionId?.substring(0, 8),
+                    });
+                  }
                 }
               }
             } catch (error) {
@@ -1280,21 +1301,49 @@ export class mcp_abap_adt_server {
             sessionId: sessionId?.substring(0, 8),
           });
 
-          // Get token from AuthBroker
-          const jwtToken = await authBroker.getToken(config.destination);
+          // Check authType from connection config BEFORE calling getToken()
+          const isBasicAuth = connConfig.authType === 'basic' || (connConfig.username && connConfig.password);
 
-          // Register AuthBroker in global registry for connection to use during token refresh
-          const { registerAuthBroker } = require('./lib/utils');
-          registerAuthBroker(config.destination, authBroker);
+          if (isBasicAuth) {
+            // Basic auth for on-premise
+            if (connConfig.username && connConfig.password) {
+              this.processBasicAuthConfigUpdate(
+                sapUrl,
+                connConfig.username,
+                connConfig.password,
+                sessionId
+              );
+              logger?.info("Updated SAP configuration using SAP destination with basic auth", {
+                type: "SAP_CONFIG_UPDATED_SAP_DESTINATION_BASIC_AUTH",
+                destination: config.destination,
+                url: sapUrl,
+                sessionId: sessionId?.substring(0, 8),
+              });
+            } else {
+              logger?.error("Basic auth requires username and password", {
+                type: "BASIC_AUTH_MISSING_CREDENTIALS",
+                destination: config.destination,
+                sessionId: sessionId?.substring(0, 8),
+              });
+            }
+          } else {
+            // JWT auth for cloud
+            // Get token from AuthBroker
+            const jwtToken = await authBroker.getToken(config.destination);
 
-          this.processJwtConfigUpdate(sapUrl, jwtToken, undefined, config.destination, sessionId);
+            // Register AuthBroker in global registry for connection to use during token refresh
+            const { registerAuthBroker } = require('./lib/utils');
+            registerAuthBroker(config.destination, authBroker);
 
-          logger?.info("Updated SAP configuration using SAP destination (AuthBroker)", {
-            type: "SAP_CONFIG_UPDATED_SAP_DESTINATION",
-            destination: config.destination,
-            url: sapUrl,
-            sessionId: sessionId?.substring(0, 8),
-          });
+            this.processJwtConfigUpdate(sapUrl, jwtToken, undefined, config.destination, sessionId);
+
+            logger?.info("Updated SAP configuration using SAP destination (AuthBroker)", {
+              type: "SAP_CONFIG_UPDATED_SAP_DESTINATION",
+              destination: config.destination,
+              url: sapUrl,
+              sessionId: sessionId?.substring(0, 8),
+            });
+          }
         } catch (error) {
           logger?.error("Failed to get token from AuthBroker for SAP destination", {
             type: "AUTH_BROKER_ERROR_SAP_DESTINATION",
@@ -1352,21 +1401,49 @@ export class mcp_abap_adt_server {
             sessionId: sessionId?.substring(0, 8),
           });
 
-          // Get token from AuthBroker
-          const jwtToken = await authBroker.getToken(config.destination);
+          // Check authType from connection config BEFORE calling getToken()
+          const isBasicAuth = connConfig.authType === 'basic' || (connConfig.username && connConfig.password);
 
-          // Register AuthBroker in global registry for connection to use during token refresh
-          const { registerAuthBroker } = require('./lib/utils');
-          registerAuthBroker(config.destination, authBroker);
+          if (isBasicAuth) {
+            // Basic auth for on-premise
+            if (connConfig.username && connConfig.password) {
+              this.processBasicAuthConfigUpdate(
+                sapUrl,
+                connConfig.username,
+                connConfig.password,
+                sessionId
+              );
+              logger?.info("Updated SAP configuration using MCP destination with basic auth", {
+                type: "SAP_CONFIG_UPDATED_MCP_DESTINATION_BASIC_AUTH",
+                destination: config.destination,
+                url: sapUrl,
+                sessionId: sessionId?.substring(0, 8),
+              });
+            } else {
+              logger?.error("Basic auth requires username and password", {
+                type: "BASIC_AUTH_MISSING_CREDENTIALS",
+                destination: config.destination,
+                sessionId: sessionId?.substring(0, 8),
+              });
+            }
+          } else {
+            // JWT auth for cloud
+            // Get token from AuthBroker
+            const jwtToken = await authBroker.getToken(config.destination);
 
-          this.processJwtConfigUpdate(sapUrl, jwtToken, undefined, config.destination, sessionId);
+            // Register AuthBroker in global registry for connection to use during token refresh
+            const { registerAuthBroker } = require('./lib/utils');
+            registerAuthBroker(config.destination, authBroker);
 
-          logger?.info("Updated SAP configuration using MCP destination (AuthBroker)", {
-            type: "SAP_CONFIG_UPDATED_MCP_DESTINATION",
-            destination: config.destination,
-            url: sapUrl,
-            sessionId: sessionId?.substring(0, 8),
-          });
+            this.processJwtConfigUpdate(sapUrl, jwtToken, undefined, config.destination, sessionId);
+
+            logger?.info("Updated SAP configuration using MCP destination (AuthBroker)", {
+              type: "SAP_CONFIG_UPDATED_MCP_DESTINATION",
+              destination: config.destination,
+              url: sapUrl,
+              sessionId: sessionId?.substring(0, 8),
+            });
+          }
         } catch (error) {
           logger?.error("Failed to get token from AuthBroker for MCP destination", {
             type: "AUTH_BROKER_ERROR_MCP_DESTINATION",

@@ -8,13 +8,16 @@ import { IHandlersRegistry, IHandlerGroup, ToolDefinition, ToolHandler } from ".
 export class CompositeHandlersRegistry implements IHandlersRegistry {
   private registeredTools: Set<string> = new Set();
   private handlerGroups: IHandlerGroup[];
+  private readonly failOnDuplicate: boolean;
 
   /**
    * Creates a composite registry with the specified handler groups
    * @param handlerGroups - Array of handler groups to register
+   * @param failOnDuplicate - When true, throws on duplicate tool names (useful in dev)
    */
-  constructor(handlerGroups: IHandlerGroup[] = []) {
+  constructor(handlerGroups: IHandlerGroup[] = [], failOnDuplicate: boolean = true) {
     this.handlerGroups = handlerGroups;
+    this.failOnDuplicate = failOnDuplicate;
   }
 
   /**
@@ -47,13 +50,21 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
     this.registeredTools.clear();
 
     for (const group of this.handlerGroups) {
-      group.registerHandlers(server);
-
-      // Track registered tools
       const handlers = group.getHandlers();
       for (const entry of handlers) {
-        this.registeredTools.add(entry.toolDefinition.name);
+        const name = entry.toolDefinition.name;
+        if (this.registeredTools.has(name)) {
+          const msg = `Duplicate tool registration detected: "${name}" in group "${group.getName()}"`;
+          if (this.failOnDuplicate) {
+            throw new Error(msg);
+          }
+          // Skip duplicate if not failing
+          continue;
+        }
+        this.registeredTools.add(name);
       }
+      // Use group's own registration logic (preserves schema conversions)
+      group.registerHandlers(server);
     }
   }
 
@@ -67,11 +78,13 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
     toolDefinition: ToolDefinition,
     handler: ToolHandler
   ): void {
-    // For single tool registration, we need to use the base group's registerToolOnServer
-    // This is a fallback method - prefer using handler groups
-    throw new Error(
-      "Single tool registration not supported. Use handler groups instead. " +
-      "Create a handler group and add it via addHandlerGroup() or constructor."
+    server.registerTool(
+      toolName,
+      {
+        description: toolDefinition.description,
+        inputSchema: toolDefinition.inputSchema,
+      },
+      handler as any
     );
   }
 

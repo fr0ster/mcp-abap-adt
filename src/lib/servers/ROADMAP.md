@@ -4,34 +4,37 @@ Implementation roadmap for the new simplified architecture based on `BaseMcpServ
 
 ## Status
 
-- ⏳ **Not Started**: All phases
+- ✅ **Completed**: Phase 1.2, Phase 1.3, Phase 2.1 (BaseMcpServer implementation)
+- 🔄 **In Progress**: Phase 1.1 (handlers use HandlerContext, but need verification)
+- ⏳ **Not Started**: Phase 1.4, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8
 
 ---
 
 ## Phase 1: Handler Correction & Registry Implementation
 
 ### 1.1 Update Handler Signature
-- [ ] Update all handlers to accept `connection` as first parameter
-- [ ] Handler signature: `(connection: AbapConnection, args: any) => Promise<any>`
-- [ ] Remove `getManagedConnection()` calls from handlers
-- [ ] Update handler function signatures in all handler files
-- [ ] Update handler groups to use new signature
+- [x] Update all handlers to accept `connection` as first parameter (via HandlerContext)
+- [x] Handler signature: `(context: HandlerContext, args: any) => Promise<any>` (HandlerContext contains connection)
+- [x] Remove `getManagedConnection()` calls from handlers (verified: no matches found)
+- [x] Update handler function signatures in all handler files (handlers use HandlerContext)
+- [x] Update handler groups to use new signature
+- [ ] **Verification needed**: Ensure all handlers properly use context.connection
 
 ### 1.2 Handler Registry with Lambda Wrapping
-- [ ] Create `BaseMcpServer` class extending `McpServer` from SDK
-- [ ] Add `connectionContext: ConnectionContext | null` property
-- [ ] Implement `getConnection()` method (creates AbapConnection from context)
-- [ ] Implement `registerHandlers(handlersRegistry)` method:
+- [x] Create `BaseMcpServer` class extending `McpServer` from SDK
+- [x] Add `connectionContext: ConnectionContext | null` property
+- [x] Implement `getConnection()` method (creates AbapConnection from context)
+- [x] Implement `registerHandlers(handlersRegistry)` method:
   - Get handler groups from `CompositeHandlersRegistry`
-  - For each handler, wrap it with lambda: `(args) => handler(getConnection(), args)`
+  - For each handler, wrap it with lambda: `(args) => handler(context, args)` where context contains connection
   - Register wrapped handler via `this.registerTool()` (connection is NOT part of MCP tool signature)
   - This ensures connection is injected but not exposed in MCP protocol
 
 ### 1.3 ConnectionContext Type
-- [ ] Define `ConnectionContext` interface
-- [ ] Include `connectionParams` (sapUrl, auth, client)
-- [ ] Include `sessionId`
-- [ ] Include optional `metadata`
+- [x] Define `ConnectionContext` interface (in `src/lib/servers/ConnectionContext.ts`)
+- [x] Include `connectionParams` (SapConfig type with url, authType, jwtToken, client)
+- [x] Include `sessionId`
+- [x] Include optional `metadata`
 
 ### 1.4 Testing Handler Registration
 - [ ] Verify handlers are wrapped correctly
@@ -43,11 +46,11 @@ Implementation roadmap for the new simplified architecture based on `BaseMcpServ
 ## Phase 2: Base Server Class
 
 ### 2.1 BaseMcpServer Implementation
-- [ ] Complete `BaseMcpServer` class (started in Phase 1.2)
-- [ ] Add `authBroker?: AuthBroker` property
-- [ ] Implement `setConnectionContext(destination, authBroker)` method
-- [ ] Implement `getConnectionContext()` method
-- [ ] Add error handling for missing context
+- [x] Complete `BaseMcpServer` class (started in Phase 1.2)
+- [x] Add `authBroker?: AuthBroker` property
+- [x] Implement `setConnectionContext(destination, authBroker)` method
+- [x] Implement `getConnectionContext()` method
+- [x] Add error handling for missing context (error thrown in `getConnection()`)
 
 ---
 
@@ -125,10 +128,11 @@ Implementation roadmap for the new simplified architecture based on `BaseMcpServ
 - [ ] Parse `--config=path/to/config.yaml`
 
 ### 6.2 YAML Config Loader
-- [ ] Create `YamlConfigLoader` class
-- [ ] Load destinations from YAML
-- [ ] Load service keys paths
-- [ ] Merge CLI args with YAML config (CLI overrides YAML)
+- [x] Create YAML config loader functions (in `src/lib/yamlConfig.ts`)
+- [x] Load destinations from YAML
+- [x] Load service keys paths
+- [x] Merge CLI args with YAML config (CLI overrides YAML)
+- [ ] **Note**: Implemented as functions, not as a class. Consider refactoring to class if needed.
 
 ### 6.3 Server Launcher
 - [ ] Create `ServerLauncher` class
@@ -189,9 +193,11 @@ Implementation roadmap for the new simplified architecture based on `BaseMcpServ
 
 ## Notes
 
-- **Critical**: Handlers accept `connection` as first parameter, but this parameter is NOT part of MCP tool signature
-- Connection is injected via lambda wrapper: `(args) => handler(getConnection(), args)`
+- **Critical**: Handlers accept `HandlerContext` as first parameter (which contains `connection` and `logger`), but this parameter is NOT part of MCP tool signature
+- Connection is injected via lambda wrapper: `(args) => handler({ connection: getConnection(), logger }, args)`
+- Handler signature: `(context: HandlerContext, args: any) => Promise<any>` where `HandlerContext = { connection: AbapConnection, logger?: ILogger }`
 - MCP tool signature only includes the actual tool arguments (from `inputSchema`)
 - Each server instance (per request for SSE/HTTP) has its own `connectionContext`
 - Transports are used directly from SDK, no custom wrapper classes needed
 - Handler registry wraps handlers to inject connection without exposing it in MCP protocol
+- **Implementation Status**: BaseMcpServer, ConnectionContext, and handler registry are implemented. Transport-specific servers (StdioServer, SseServer, StreamableHttpServer) are not yet implemented.

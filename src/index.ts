@@ -478,6 +478,18 @@ const skipEnvAutoload =
   !!defaultMcpDestination ||
   isTestEnv;
 
+// If using auth-broker (--mcp or --auth-broker), clear SAP_* env vars to prevent .env from being used
+// This ensures that even if .env was loaded earlier or vars are set in system, they won't be used
+if (skipEnvAutoload && (useAuthBroker || !!defaultMcpDestination)) {
+  const sapEnvKeys = Object.keys(process.env).filter(key => key.startsWith('SAP_'));
+  for (const key of sapEnvKeys) {
+    delete process.env[key];
+  }
+  if (sapEnvKeys.length > 0 && !isStdio) {
+    process.stderr.write(`[MCP-ENV] Cleared ${sapEnvKeys.length} SAP_* environment variables (using auth-broker)\n`);
+  }
+}
+
 let envFilePath = initialEnvFilePath;
 
 // Debug: Always log on Windows to help diagnose issues
@@ -1040,42 +1052,33 @@ export class mcp_abap_adt_server {
    * Initialize default broker on server startup (for stdio/SSE transports)
    * Creates broker with default destination from --mcp parameter or .env file
    */
+  /**
+   * Initialize default broker using unified AuthBrokerFactory logic
+   * Sets defaultDestination based on what broker was created
+   */
   private async initializeDefaultBroker(): Promise<void> {
-    // Determine default destination
-    if (this.defaultMcpDestination) {
-      // Scenario A: Destination specified at startup (--mcp parameter)
-      this.defaultDestination = this.defaultMcpDestination;
+    // Use unified AuthBrokerFactory logic to initialize default broker
+    await this.authBrokerFactory.initializeDefaultBroker();
 
-      // Create broker with serviceKeyStore + sessionStore
-      const authBroker = await this.getOrCreateAuthBroker(this.defaultMcpDestination, 'global');
-      if (authBroker) {
-        logger?.info("Default broker initialized with destination from --mcp parameter", {
-          type: "DEFAULT_BROKER_INITIALIZED",
-          destination: this.defaultMcpDestination,
-          transport: this.transportConfig.type,
-        });
+    // Get default broker to determine default destination
+    const defaultBroker = this.authBrokerFactory.getDefaultBroker();
+    if (defaultBroker) {
+      // If we have --mcp, use that as default destination
+      if (this.defaultMcpDestination) {
+        this.defaultDestination = this.defaultMcpDestination;
+      } else {
+        // Otherwise use 'default' as destination name
+        this.defaultDestination = 'default';
       }
-    } else if (this.hasEnvFile) {
-      // Scenario B: No destination specified, but .env file exists
-      this.defaultDestination = 'default'; // Use 'default' as destination name for .env case
 
-      // Create broker with only sessionStore (without serviceKeyStore)
-      // Note: getOrCreateAuthBroker will create broker, but we need to ensure it works with .env
-      // For .env case, sessionStore should load from .env file
-      const authBroker = await this.getOrCreateAuthBroker('default', 'global');
-      if (authBroker) {
-        logger?.info("Default broker initialized with .env file", {
-          type: "DEFAULT_BROKER_INITIALIZED_ENV",
-          destination: 'default',
-          transport: this.transportConfig.type,
-        });
-      }
+      logger?.info("Default broker initialized", {
+        type: "DEFAULT_BROKER_INITIALIZED",
+        destination: this.defaultDestination,
+        transport: this.transportConfig.type,
+      });
     } else {
-      // Scenario C: Neither destination nor .env
-      // For stdio: error will be thrown in run() method
-      // For SSE/HTTP: no default broker, wait for headers
-      logger?.debug("No default destination available (no --mcp parameter and no .env file)", {
-        type: "NO_DEFAULT_DESTINATION",
+      logger?.debug("No default broker created (no conditions met)", {
+        type: "NO_DEFAULT_BROKER",
         transport: this.transportConfig.type,
       });
     }
@@ -1083,10 +1086,11 @@ export class mcp_abap_adt_server {
 
   /**
    * Get or create AuthBroker for a specific destination (lazy initialization)
-   * If destination is not specified, uses default destination
+   * If destination is not specified, returns default broker
    */
   private async getOrCreateAuthBroker(destination?: string, clientKey?: string): Promise<AuthBroker | undefined> {
-    return this.authBrokerFactory.getOrCreateAuthBroker(destination, clientKey);
+    // clientKey is ignored in unified logic (one broker per destination)
+    return this.authBrokerFactory.getOrCreateAuthBroker(destination);
   }
 
   private async applyAuthHeaders(headers?: IncomingHttpHeaders, sessionId?: string, clientKey?: string) {
@@ -1553,7 +1557,10 @@ export class mcp_abap_adt_server {
     sapUrl = cleanedUrl;
 
     let baseConfig: SapConfig | undefined = this.sapConfig;
-    if (!baseConfig || baseConfig.url === "http://placeholder") {
+    // Don't load from .env if using auth-broker (--mcp or --auth-broker)
+    // This prevents .env from being used when destination-based auth is specified
+    const isUsingAuthBroker = this.defaultMcpDestination || useAuthBroker;
+    if ((!baseConfig || baseConfig.url === "http://placeholder") && !isUsingAuthBroker) {
       try {
         baseConfig = getConfig();
       } catch (error) {
@@ -1566,6 +1573,12 @@ export class mcp_abap_adt_server {
           authType: "jwt",
         };
       }
+    } else if (!baseConfig || baseConfig.url === "http://placeholder") {
+      // Using auth-broker, don't load from .env
+      baseConfig = {
+        url: sapUrl,
+        authType: "jwt",
+      };
     }
 
     // Check if any configuration changed
@@ -1802,6 +1815,7 @@ export class mcp_abap_adt_server {
     this.envFilePath = envFilePath; // Store .env file path for SessionStore creation
 
     // Initialize AuthBroker factory
+    // Pass useAuthBroker to ensure .env is not used when --auth-broker is specified
     this.authBrokerFactory = new AuthBrokerFactory({
       defaultMcpDestination: this.defaultMcpDestination,
       defaultDestination: this.defaultDestination,
@@ -1809,6 +1823,7 @@ export class mcp_abap_adt_server {
       authBrokerPath,
       unsafe,
       transportType: transportType,
+      useAuthBroker: useAuthBroker, // Important: prevents .env from being used when --auth-broker is specified
       logger,
     });
 
@@ -1834,28 +1849,43 @@ export class mcp_abap_adt_server {
       if (options?.sapConfig) {
         this.sapConfig = options.sapConfig;
       } else if (!options?.connection) {
-        // Try to get config, but don't fail if it's invalid - server should still initialize
-        // Invalid config will be caught when handlers try to use it
-        try {
-          this.sapConfig = getConfig();
-        } catch (configError) {
-          // For stdio mode, we want the server to initialize even with invalid config
-          // The error will be shown when user tries to use a tool
-          // Check stdio mode using environment variable or stdin check (transportConfig not set yet)
-          const isStdioMode = process.env.MCP_TRANSPORT === "stdio" || !process.stdin.isTTY;
-
-          if (isStdioMode) {
-            // In stdio mode, write error to stderr (safe for MCP protocol)
-            process.stderr.write(`[MCP] ⚠ WARNING: Invalid SAP configuration: ${configError instanceof Error ? configError.message : String(configError)}\n`);
-            process.stderr.write(`[MCP]   Server will start, but tools will fail until configuration is fixed.\n`);
-          }
-
-          logger?.warn("SAP config invalid at initialization, will use placeholder", {
-            type: "CONFIG_INVALID",
-            error: configError instanceof Error ? configError.message : String(configError),
+        // Don't load .env config if using auth-broker (--mcp or --auth-broker)
+        // Connection will be created via auth-broker instead
+        if (this.defaultMcpDestination || useAuthBroker) {
+          // Using auth-broker, don't load .env config
+          this.sapConfig = {
+            url: "http://placeholder",
+            authType: "basic",
+          };
+          logger?.debug("Skipping .env config load (using auth-broker)", {
+            type: "SKIP_ENV_CONFIG_FOR_AUTH_BROKER",
+            defaultMcpDestination: this.defaultMcpDestination,
+            useAuthBroker,
           });
-          // Set a placeholder that will be replaced when valid config is provided
-          this.sapConfig = { url: "http://placeholder", authType: "jwt", jwtToken: "placeholder" };
+        } else {
+          // Try to get config from .env, but don't fail if it's invalid - server should still initialize
+          // Invalid config will be caught when handlers try to use it
+          try {
+            this.sapConfig = getConfig();
+          } catch (configError) {
+            // For stdio mode, we want the server to initialize even with invalid config
+            // The error will be shown when user tries to use a tool
+            // Check stdio mode using environment variable or stdin check (transportConfig not set yet)
+            const isStdioMode = process.env.MCP_TRANSPORT === "stdio" || !process.stdin.isTTY;
+
+            if (isStdioMode) {
+              // In stdio mode, write error to stderr (safe for MCP protocol)
+              process.stderr.write(`[MCP] ⚠ WARNING: Invalid SAP configuration: ${configError instanceof Error ? configError.message : String(configError)}\n`);
+              process.stderr.write(`[MCP]   Server will start, but tools will fail until configuration is fixed.\n`);
+            }
+
+            logger?.warn("SAP config invalid at initialization, will use placeholder", {
+              type: "CONFIG_INVALID",
+              error: configError instanceof Error ? configError.message : String(configError),
+            });
+            // Set a placeholder that will be replaced when valid config is provided
+            this.sapConfig = { url: "http://placeholder", authType: "jwt", jwtToken: "placeholder" };
+          }
         }
       } else {
         this.sapConfig = { url: "http://injected-connection", authType: "jwt", jwtToken: "injected" };
@@ -2012,11 +2042,28 @@ export class mcp_abap_adt_server {
     sessionId?: string,
     destination?: string
   ): Promise<AbapConnection> {
+    // Extract destination from headers if not provided
+    let actualDestination = destination;
+    if (!actualDestination && headers) {
+      actualDestination = headers[HEADER_MCP_DESTINATION] as string ||
+                         headers['X-MCP-Destination'] as string ||
+                         headers['x-mcp-destination'] as string;
+    }
+
+    // Use default destination if still not set
+    if (!actualDestination && this.defaultDestination) {
+      actualDestination = this.defaultDestination;
+      logger?.debug('Using default destination for connection', {
+        destination: actualDestination,
+        type: 'DEFAULT_DESTINATION_USED',
+      });
+    }
+
     logger?.info("Creating connection for server", {
       type: "CONNECTION_CREATION_START",
       hasHeaders: !!headers,
       sessionId: sessionId || 'not-provided',
-      destination: destination || 'not-provided',
+      destination: actualDestination || 'not-provided',
     });
 
     // Try to get connection from session context first
@@ -2041,65 +2088,109 @@ export class mcp_abap_adt_server {
       // Get config from headers (already processed by applyAuthHeaders)
       const config = this.sapConfig;
       if (config && config.url !== "http://placeholder" && config.url !== "http://injected-connection") {
+        // If destination is known, try to refresh token via auth broker before creating connection
+        if (actualDestination) {
+          try {
+            const brokerForHeaders = await this.getOrCreateAuthBroker(actualDestination, sessionId || 'global');
+            if (brokerForHeaders) {
+              const freshToken = await brokerForHeaders.getToken(actualDestination);
+              if (freshToken && (config as any)) {
+                (config as any).authorizationToken = freshToken;
+              }
+              const { registerAuthBroker } = require('./lib/utils');
+              registerAuthBroker(actualDestination, brokerForHeaders);
+            }
+          } catch (e) {
+            logger?.warn?.("Auth broker refresh failed for header connection", {
+              type: "CONNECTION_FROM_HEADERS_BROKER_WARN",
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
+
         logger?.info("Using connection from headers", {
           type: "CONNECTION_FROM_HEADERS",
           sessionId: sessionId || 'not-provided',
           url: config.url,
           authType: config.authType,
         });
-        return createAbapConnection(
+        let connection = createAbapConnection(
           config,
           loggerAdapter,
           sessionId || `mcp-server-${randomUUID()}`
         );
+        if (actualDestination) {
+          const { createDestinationAwareConnection } = require('./lib/utils');
+          connection = createDestinationAwareConnection(connection, actualDestination);
+        }
+        return connection;
       }
     }
 
     // If destination provided, create connection via broker
-    if (destination) {
+    if (actualDestination) {
       try {
         logger?.info("Attempting to create connection via auth broker", {
           type: "CONNECTION_VIA_BROKER_ATTEMPT",
-          destination,
+          destination: actualDestination,
           sessionId: sessionId || 'not-provided',
         });
-        const authBroker = await this.getOrCreateAuthBroker(destination, sessionId || 'global');
+        const authBroker = await this.getOrCreateAuthBroker(actualDestination, sessionId || 'global');
         if (authBroker) {
-          const connConfig = await authBroker.getConnectionConfig(destination);
+          const connConfig = await authBroker.getConnectionConfig(actualDestination);
           if (connConfig?.serviceUrl) {
-            const jwtToken = await authBroker.getToken(destination);
+            // Get fresh token now to ensure connection can be created
+            const jwtToken = await authBroker.getToken(actualDestination);
             if (jwtToken) {
+              // Register AuthBroker in global registry for connection to use during token refresh
+              const { registerAuthBroker } = require('./lib/utils');
+              registerAuthBroker(actualDestination, authBroker);
+
               const config: SapConfig = {
                 url: connConfig.serviceUrl,
                 authType: "jwt",
                 jwtToken,
+                client: connConfig.sapClient,
               };
               logger?.info("Using connection from auth broker", {
                 type: "CONNECTION_FROM_BROKER",
-                destination,
+                destination: actualDestination,
                 sessionId: sessionId || 'not-provided',
                 url: config.url,
                 authType: config.authType,
               });
-              return createAbapConnection(
+
+              // Create connection and wrap it to intercept refreshToken()/makeAdtRequest for destination-based authentication
+              let connection = createAbapConnection(
                 config,
                 loggerAdapter,
                 sessionId || `mcp-server-${randomUUID()}`
               );
+
+              // Wrap connection to intercept refreshToken()/makeAdtRequest
+              const { createDestinationAwareConnection } = require('./lib/utils');
+              connection = createDestinationAwareConnection(connection, actualDestination);
+
+              return connection;
             }
           }
         }
       } catch (error) {
         logger?.warn("Failed to create connection from destination", {
           type: "CONNECTION_FROM_DESTINATION_FAILED",
-          destination,
+          destination: actualDestination,
           error: error instanceof Error ? error.message : String(error),
         });
       }
     }
 
     // Fallback to default config (from .env or constructor)
-    if (this.sapConfig && this.sapConfig.url !== "http://placeholder" && this.sapConfig.url !== "http://injected-connection") {
+    // BUT: Don't use .env fallback if we have defaultDestination (means we're using auth-broker)
+    // This prevents .env from being used when --mcp is specified
+    if (this.sapConfig &&
+        this.sapConfig.url !== "http://placeholder" &&
+        this.sapConfig.url !== "http://injected-connection" &&
+        !this.defaultDestination) { // Don't fallback to .env if using auth-broker
       logger?.info("Using connection from default config (.env or constructor)", {
         type: "CONNECTION_FROM_DEFAULT_CONFIG",
         sessionId: sessionId || 'not-provided',
@@ -2117,7 +2208,8 @@ export class mcp_abap_adt_server {
       type: "CONNECTION_CREATION_FAILED",
       hasHeaders: !!headers,
       sessionId: sessionId || 'not-provided',
-      destination: destination || 'not-provided',
+      destination: actualDestination || 'not-provided',
+      defaultDestination: this.defaultDestination || 'not-set',
       hasSapConfig: !!this.sapConfig,
       sapConfigUrl: this.sapConfig?.url || 'not-set',
     });
@@ -2145,12 +2237,203 @@ export class mcp_abap_adt_server {
 
   /**
    * Sets up handlers for new McpServer using registerTool (recommended API)
-   * @param connection - AbapConnection instance to use for handlers
+   * @param context - HandlerContext with connection and logger
    * @private
    */
   private setupMcpServerHandlers(context: HandlerContext) {
-    // Register all tools using McpHandlers
+    // Connection is already wrapped with token refresh in run() method
+    // Just register handlers with the provided context
     this.mcpHandlers.RegisterAllToolsOnServer(this.mcpServer, context);
+  }
+
+  /**
+   * Creates a wrapper connection that refreshes token before each request
+   * @private
+   */
+  private createConnectionWithTokenRefresh(connection: AbapConnection, destination: string): AbapConnection {
+    const connectionWithRefresh = connection as any;
+
+    // Wrap makeAdtRequest to refresh token before each request
+    if (connectionWithRefresh.makeAdtRequest) {
+      const originalMakeAdtRequest = connectionWithRefresh.makeAdtRequest.bind(connection);
+      connectionWithRefresh.makeAdtRequest = async function (options: any) {
+        // Always refresh token via AuthBroker before request (AuthBroker will refresh if needed)
+        const { getAuthBroker } = require('./lib/utils');
+        const authBroker = getAuthBroker(destination);
+
+        logger?.debug('makeAdtRequest called, checking AuthBroker', {
+          destination,
+          hasAuthBroker: !!authBroker,
+          method: options?.method,
+          url: options?.url,
+        });
+
+        if (!authBroker) {
+          logger?.warn('AuthBroker not found for destination, cannot refresh token', {
+            destination,
+            type: 'AUTH_BROKER_NOT_FOUND',
+          });
+          // Continue without refresh - will use existing token
+          return await originalMakeAdtRequest(options);
+        }
+
+        try {
+          // Get fresh token from AuthBroker (will refresh automatically if expired)
+          logger?.debug('Requesting fresh token from AuthBroker', {
+            destination,
+            type: 'TOKEN_REFRESH_REQUEST',
+          });
+          const freshToken = await authBroker.getToken(destination);
+          const config = connectionWithRefresh.getConfig();
+          if (config) {
+            // Always update token (AuthBroker.getToken() returns fresh token)
+            const tokenChanged = config.jwtToken !== freshToken;
+            const oldToken = config.jwtToken;
+
+            logger?.debug('Updating connection config with fresh token', {
+              destination,
+              tokenChanged,
+              oldTokenPreview: oldToken ? oldToken.substring(0, 20) + '...' : 'none',
+              newTokenPreview: freshToken.substring(0, 20) + '...',
+              type: 'TOKEN_UPDATE',
+            });
+
+            config.jwtToken = freshToken;
+
+            // Verify token was updated
+            const verifyConfig = connectionWithRefresh.getConfig();
+            if (verifyConfig.jwtToken !== freshToken) {
+              logger?.error('Token update failed - config.jwtToken does not match fresh token', {
+                destination,
+                expectedPreview: freshToken.substring(0, 20) + '...',
+                actualPreview: verifyConfig.jwtToken ? verifyConfig.jwtToken.substring(0, 20) + '...' : 'none',
+                type: 'TOKEN_UPDATE_FAILED',
+              });
+            }
+
+            // Get refresh token from session store if available
+            try {
+              const { authorizationConfig } = await authBroker.getConnectionConfig(destination);
+              if (authorizationConfig?.refreshToken) {
+                config.refreshToken = authorizationConfig.refreshToken;
+              }
+            } catch (configError) {
+              // Ignore errors getting refresh token (not critical)
+              logger?.debug('Could not get refresh token from AuthBroker', {
+                destination,
+                error: configError instanceof Error ? configError.message : String(configError),
+              });
+            }
+
+            // Reset connection only if token changed to ensure fresh token is used
+            // This ensures that buildAuthorizationHeader() will use the new token
+            // Don't reset if token didn't change to preserve CSRF token and cookies
+            if (tokenChanged) {
+              connectionWithRefresh.reset();
+              logger?.info('Token refreshed via AuthBroker before request', {
+                destination,
+                tokenPreview: freshToken.substring(0, 20) + '...',
+                oldTokenPreview: oldToken ? oldToken.substring(0, 20) + '...' : 'none',
+                type: 'TOKEN_REFRESHED_BEFORE_REQUEST',
+              });
+            } else {
+              // Token didn't change - no need to reset, connection can reuse CSRF token and cookies
+              logger?.debug('Token verified via AuthBroker before request (no change, keeping session)', {
+                destination,
+                tokenPreview: freshToken.substring(0, 20) + '...',
+                type: 'TOKEN_VERIFIED_BEFORE_REQUEST',
+              });
+            }
+          } else {
+            logger?.warn('Connection config not available, cannot update token', {
+              destination,
+              type: 'CONNECTION_CONFIG_NOT_AVAILABLE',
+            });
+          }
+        } catch (error) {
+          logger?.error('Failed to refresh token before request', {
+            error: error instanceof Error ? error.message : String(error),
+            destination,
+            errorStack: error instanceof Error ? error.stack : undefined,
+            type: 'TOKEN_REFRESH_FAILED',
+          });
+          // Continue with existing token - will try to use it, but may fail if expired
+        }
+
+        // Call original makeAdtRequest (with potentially refreshed token)
+        try {
+          return await originalMakeAdtRequest(options);
+        } catch (error: any) {
+          // If we still get 401/403 or "JWT token has expired" error, try to refresh token again
+          const isAuthError = error?.response?.status === 401 || error?.response?.status === 403;
+          const isExpiredTokenError = error?.message?.includes('JWT token has expired') ||
+                                      error?.message?.includes('Please re-authenticate');
+
+          if ((isAuthError || isExpiredTokenError) && authBroker) {
+            // Check if this is a permissions error, not an auth error
+            const responseData = error?.response?.data;
+            const responseText = typeof responseData === "string" ? responseData : JSON.stringify(responseData || "");
+
+            if (responseText.includes("ExceptionResourceNoAccess") ||
+                responseText.includes("No authorization") ||
+                responseText.includes("Missing authorization")) {
+              // Not an auth token issue, re-throw
+              throw error;
+            }
+
+            // Try to refresh token again and retry
+            try {
+              logger?.info('Got 401/403 after token refresh, attempting to refresh token again', {
+                destination,
+                error: error?.message,
+                type: 'TOKEN_REFRESH_RETRY',
+              });
+
+              const freshToken = await authBroker.getToken(destination);
+              const config = connectionWithRefresh.getConfig();
+              if (config) {
+                config.jwtToken = freshToken;
+
+                // Get refresh token from session store if available
+                try {
+                  const { authorizationConfig } = await authBroker.getConnectionConfig(destination);
+                  if (authorizationConfig?.refreshToken) {
+                    config.refreshToken = authorizationConfig.refreshToken;
+                  }
+                } catch (configError) {
+                  // Ignore errors getting refresh token
+                }
+
+                // Reset connection to use new token
+                connectionWithRefresh.reset();
+
+                logger?.info('Token refreshed again, retrying request', {
+                  destination,
+                  tokenPreview: freshToken.substring(0, 20) + '...',
+                  type: 'TOKEN_REFRESHED_RETRY',
+                });
+
+                // Retry the request with new token
+                return await originalMakeAdtRequest(options);
+              }
+            } catch (refreshError) {
+              logger?.error('Failed to refresh token on retry', {
+                destination,
+                error: refreshError instanceof Error ? refreshError.message : String(refreshError),
+                type: 'TOKEN_REFRESH_RETRY_FAILED',
+              });
+              // Re-throw original error if refresh fails
+              throw error;
+            }
+          }
+
+          // Re-throw error if not handled
+          throw error;
+        }
+      };
+    }
+
+    return connectionWithRefresh;
   }
 
   private setupSignalHandlers() {
@@ -2242,45 +2525,28 @@ export class mcp_abap_adt_server {
       // Initialize default broker (creates broker with default destination from --mcp or .env)
       await this.initializeDefaultBroker();
 
-      // If default destination exists, connect to ABAP automatically
-      if (this.defaultDestination) {
-        try {
-          const authBroker = await this.getOrCreateAuthBroker(this.defaultDestination, 'global');
-          if (authBroker) {
-            const connConfig = await authBroker.getConnectionConfig(this.defaultDestination);
-            if (connConfig?.serviceUrl) {
-              const jwtToken = await authBroker.getToken(this.defaultDestination);
-              if (jwtToken) {
-                // Register AuthBroker in global registry for connection to use during token refresh
-                const { registerAuthBroker } = require('./lib/utils');
-                registerAuthBroker(this.defaultDestination, authBroker);
-                this.processJwtConfigUpdate(connConfig.serviceUrl, jwtToken, undefined, this.defaultDestination);
-                logger?.info("SAP configuration initialized for stdio transport", {
-                  type: "STDIO_DESTINATION_INIT",
-                  destination: this.defaultDestination,
-                  url: connConfig.serviceUrl,
-                });
-              }
-            }
-          }
-        } catch (error) {
-          logger?.warn("Failed to initialize connection with default destination for stdio transport", {
-            type: "STDIO_DESTINATION_INIT_FAILED",
-            destination: this.defaultDestination,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
-
       // Create connection for stdio mode
+      // Note: getOrCreateConnectionForServer already wraps connection via createDestinationAwareConnection
+      // which handles token refresh on 401/403 errors. We also wrap it to refresh token before each request.
       const connection = await this.getOrCreateConnectionForServer(
         undefined, // no headers in stdio
         'stdio-session',
         this.defaultDestination
       );
 
+      // Additional wrapper to refresh token BEFORE each request (not just on error)
+      // This ensures token is always fresh, preventing 401/403 errors
+      const wrappedConnection = this.defaultDestination
+        ? this.createConnectionWithTokenRefresh(connection, this.defaultDestination)
+        : connection;
+
+      logger?.debug('Connection created for stdio', {
+        destination: this.defaultDestination || 'none',
+        hasTokenRefresh: !!this.defaultDestination,
+      });
+
       // Setup handlers with connection
-      this.setupMcpServerHandlers({ connection, logger: loggerAdapter });
+      this.setupMcpServerHandlers({ connection: wrappedConnection, logger: loggerAdapter });
 
       // Simple stdio setup like reference implementation
       const transport = new StdioServerTransport();
@@ -2291,6 +2557,9 @@ export class mcp_abap_adt_server {
 
     if (this.transportConfig.type === "streamable-http") {
       const httpConfig = this.transportConfig;
+
+      // Initialize default broker for HTTP transport (creates broker with default destination from --mcp)
+      await this.initializeDefaultBroker();
 
       // HTTP Server wrapper for StreamableHTTP transport (like the SDK example)
       const httpServer = createServer(async (req, res) => {

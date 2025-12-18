@@ -346,16 +346,18 @@ function cleanupConnectionCache() {
 }
 
 /**
- * Create a wrapper connection that intercepts refreshToken() for destination-based authentication
- * If destination is provided, uses AuthBroker for token refresh instead of direct refresh
+ * Create a wrapper connection that intercepts refreshToken() and makeAdtRequest() for destination-based authentication.
+ * If destination is provided, uses AuthBroker for token refresh instead of direct refresh.
+ * Automatically refreshes token on 401/403 errors and ensures token is fetched from broker before each request.
  */
-function createDestinationAwareConnection(connection: AbapConnection, destination?: string): AbapConnection {
+export function createDestinationAwareConnection(connection: AbapConnection, destination?: string): AbapConnection {
   if (!destination) {
     return connection;
   }
 
-  // Create a proxy that intercepts refreshToken() method
   const connectionWithRefresh = connection as any;
+
+  // Intercept refreshToken() method
   if (connectionWithRefresh.refreshToken) {
     const originalRefreshToken = connectionWithRefresh.refreshToken.bind(connection);
     connectionWithRefresh.refreshToken = async function () {
@@ -387,6 +389,83 @@ function createDestinationAwareConnection(connection: AbapConnection, destinatio
       } else {
         // No AuthBroker available, use original refreshToken()
         return originalRefreshToken();
+      }
+    };
+  }
+
+  // Intercept makeAdtRequest() to automatically refresh token on 401/403 errors
+  if (connectionWithRefresh.makeAdtRequest) {
+    const originalMakeAdtRequest = connectionWithRefresh.makeAdtRequest.bind(connection);
+    connectionWithRefresh.makeAdtRequest = async function (options: any) {
+      // Pre-flight: ensure token fetched from AuthBroker before request
+      const authBroker = getAuthBroker(destination);
+      if (authBroker) {
+        try {
+          const freshToken = await authBroker.getToken(destination);
+          const config = connectionWithRefresh.getConfig?.();
+          if (config && freshToken) {
+            const tokenChanged = config.jwtToken !== freshToken;
+            config.jwtToken = freshToken;
+            try {
+              const { authorizationConfig } = await authBroker.getConnectionConfig(destination);
+              if (authorizationConfig?.refreshToken) {
+                config.refreshToken = authorizationConfig.refreshToken;
+              }
+            } catch {
+              // ignore
+            }
+            if (tokenChanged) {
+              connectionWithRefresh.reset?.();
+              connectionManagerLogger?.debug(`[DEBUG] Pre-flight token refresh via AuthBroker (destination: ${destination})`);
+            }
+          }
+        } catch (preFlightError) {
+          connectionManagerLogger?.debug(`[DEBUG] Pre-flight token refresh failed, proceeding with existing token: ${preFlightError instanceof Error ? preFlightError.message : String(preFlightError)}`);
+        }
+      }
+
+      try {
+        return await originalMakeAdtRequest(options);
+      } catch (error: any) {
+        // Check if this is a 401/403 authentication error
+        const isAuthError = error?.response?.status === 401 || error?.response?.status === 403;
+        const isExpiredTokenError = error?.message?.includes('JWT token has expired') ||
+                                    error?.message?.includes('Please re-authenticate');
+
+        if ((isAuthError || isExpiredTokenError) && !error?.response?.data?.includes?.('ExceptionResourceNoAccess')) {
+          // Try to refresh token via AuthBroker
+          const authBroker = getAuthBroker(destination);
+          if (authBroker) {
+            try {
+              connectionManagerLogger?.debug(`[DEBUG] Auto-refreshing token on ${error?.response?.status || 'error'} (destination: ${destination})`);
+              // Get fresh token from AuthBroker (will refresh if needed)
+              const jwtToken = await authBroker.getToken(destination);
+              const config = connectionWithRefresh.getConfig();
+              if (config) {
+                // Update config with new token
+                config.jwtToken = jwtToken;
+                // Get refresh token from session store if available
+                const { authorizationConfig } = await authBroker.getConnectionConfig(destination);
+                if (authorizationConfig?.refreshToken) {
+                  config.refreshToken = authorizationConfig.refreshToken;
+                }
+                // Clear CSRF token and cookies to force new session with new token
+                connectionWithRefresh.reset();
+                connectionManagerLogger?.debug(`[DEBUG] Token auto-refreshed via AuthBroker, retrying request (destination: ${destination})`);
+
+                // Retry the request with new token
+                return await originalMakeAdtRequest(options);
+              }
+            } catch (refreshError) {
+              connectionManagerLogger?.debug(`[DEBUG] Auto-refresh failed: ${refreshError instanceof Error ? refreshError.message : String(refreshError)}`);
+              // Re-throw original error if refresh fails
+              throw error;
+            }
+          }
+        }
+
+        // Re-throw error if not handled
+        throw error;
       }
     };
   }

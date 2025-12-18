@@ -16,6 +16,9 @@
     "dev": "npx @modelcontextprotocol/inspector node ./dist/index.js --transport=stdio",
     "dev:http": "node ./tools/dev-http.js",
     "dev:sse": "node ./tools/dev-sse.js",
+    "dev:v2": "npm run build && npx @modelcontextprotocol/inspector node ./dist/lib/servers/launcher.js --transport=stdio",
+    "dev:v2:http": "npm run build && node ./tools/dev-http-v2.js",
+    "dev:v2:sse": "npm run build && node ./tools/dev-sse-v2.js",
     "auth": "npx sap-abap-auth auth",
     "clean": "make clean",
     "docs:tools": "node ./tools/generate-tools-docs.js",
@@ -57,7 +60,7 @@
   },
   "dependencies": {
     "@mcp-abap-adt/adt-clients": "^0.2.3",
-    "@mcp-abap-adt/auth-broker": "^0.2.2",
+    "@mcp-abap-adt/auth-broker": "^0.2.3",
     "@mcp-abap-adt/auth-providers": "^0.1.5",
     "@mcp-abap-adt/auth-stores": "^0.2.3",
     "@mcp-abap-adt/connection": "^0.2.2",
@@ -90,7 +93,8 @@
     "adt-unlock-object": "./bin/unlock-object.js",
     "adt-manage-locks": "./bin/manage-locks.js",
     "adt-manage-sessions": "./bin/manage-sessions.js",
-    "adt-unlock-objects": "./bin/unlock-test-objects.js"
+    "adt-unlock-objects": "./bin/unlock-test-objects.js",
+    "mcp-abap-adt-v2": "./bin/mcp-abap-adt-v2.js"
   },
   "jest": {
     "preset": "ts-jest",

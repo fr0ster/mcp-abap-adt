@@ -1170,11 +1170,14 @@ The navigation below mirrors the document structure for easier discovery.
 ### GetTable {#gettable-readonly}
 **Description:** [read-only] Retrieve ABAP table structure.
 
-**Parameters:** None
+**Parameters:**
+- `table_name` (string, optional) — Name of the ABAP table (snake_case)
+- `tableName` (string, optional) — Name of the ABAP table (camelCase)
+> At least one of `table_name` or `tableName` is required.
 
 **Example:**
 ```json
-{}
+{ "table_name": "SFLIGHT" }
 ```
 
 ---
@@ -1184,7 +1187,9 @@ The navigation below mirrors the document structure for easier discovery.
 
 > **⚠️ ABAP Cloud Limitation:** Direct access to table data through ADT Data Preview is blocked by SAP BTP backend policies. When authenticating via JWT/XSUAA, the server will return a descriptive error. This function works only for on-premise systems.
 
-**Parameters:** None
+**Parameters:**
+- `table_name` (string, required) — Name of the ABAP table
+- `max_rows` (number, optional) — Maximum number of rows to retrieve
 
 **Example:**
 ```json

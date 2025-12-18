@@ -138,36 +138,55 @@ export abstract class BaseMcpServer extends McpServer {
 
             // If handler expects context+args (preferred), pass both.
             // Otherwise, update group context and call with args only for backward compatibility.
-            const result =
-              (entry.handler as any).length >= 2
-                ? await (entry.handler as any)(context, args)
-                : (() => {
-                    try {
-                      if (typeof (group as any).setContext === 'function') {
-                        (group as any).setContext(context);
-                      } else {
-                        (group as any).context = context;
-                      }
-                    } catch {
-                      // ignore if group doesn't expose context setter
-                    }
-                    return (entry.handler as any)(args);
-                  })();
-
-            // Normalize content: SDK expects text/image/audio/resource, convert custom json to text
-            if (result && Array.isArray((result as any).content)) {
-              (result as any).content = (result as any).content.map((item: any) => {
-                if (item?.type === 'json') {
-                  return {
-                    type: 'text',
-                    text: JSON.stringify(item.json ?? item, null, 2),
-                  };
+            // NOTE: Always await the handler result to ensure we get the resolved value for normalization
+            let handlerPromise: Promise<any>;
+            if ((entry.handler as any).length >= 2) {
+              handlerPromise = (entry.handler as any)(context, args);
+            } else {
+              try {
+                if (typeof (group as any).setContext === 'function') {
+                  (group as any).setContext(context);
+                } else {
+                  (group as any).context = context;
                 }
-                return item;
-              });
+              } catch {
+                // ignore if group doesn't expose context setter
+              }
+              handlerPromise = (entry.handler as any)(args);
             }
 
-            return await result;
+            const result = await handlerPromise;
+
+            // Handle errors: if handler returns isError, throw McpError
+            if (result?.isError) {
+              const { ErrorCode, McpError } = await import('@modelcontextprotocol/sdk/types.js');
+              const errorText = (result.content || [])
+                .map((item: any) => {
+                  if (item?.type === 'json' && item.json !== undefined) {
+                    return JSON.stringify(item.json);
+                  }
+                  return item?.text || String(item);
+                })
+                .join('\n') || 'Unknown error';
+              throw new McpError(ErrorCode.InternalError, errorText);
+            }
+
+            // Normalize content: SDK expects text/image/audio/resource, convert custom json to text
+            const content = (result?.content || []).map((item: any) => {
+              if (item?.type === 'json' && item.json !== undefined) {
+                return {
+                  type: 'text' as const,
+                  text: JSON.stringify(item.json),
+                };
+              }
+              // Ensure all items have proper text type structure
+              return {
+                type: 'text' as const,
+                text: item?.text || String(item || ''),
+              };
+            });
+
+            return { content };
           };
 
           // Register wrapped handler via SDK registerTool

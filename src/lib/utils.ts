@@ -427,6 +427,23 @@ export function createDestinationAwareConnection(connection: AbapConnection, des
       try {
         return await originalMakeAdtRequest(options);
       } catch (error: any) {
+        // Check if this is a network error (connection refused, timeout, DNS, etc.)
+        const isNetworkError = error?.code === 'ECONNREFUSED' ||
+                               error?.code === 'ETIMEDOUT' ||
+                               error?.code === 'ENOTFOUND' ||
+                               error?.code === 'ECONNRESET' ||
+                               error?.code === 'ENETUNREACH' ||
+                               error?.code === 'EHOSTUNREACH' ||
+                               error?.message?.includes('ECONNREFUSED') ||
+                               error?.message?.includes('ETIMEDOUT') ||
+                               error?.message?.includes('ENOTFOUND');
+
+        // Don't try to refresh token for network errors - throw immediately with clear message
+        if (isNetworkError) {
+          connectionManagerLogger?.debug(`[DEBUG] Network error detected, skipping token refresh: ${error?.code || error?.message}`);
+          throw error;
+        }
+
         // Check if this is a 401/403 authentication error
         const isAuthError = error?.response?.status === 401 || error?.response?.status === 403;
         const isExpiredTokenError = error?.message?.includes('JWT token has expired') ||

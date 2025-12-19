@@ -1,10 +1,10 @@
 import express from "express";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import type { Logger } from "@mcp-abap-adt/logger";
-import { noopLogger } from "../handlerLogger.js";
+import { noopLogger } from "../../lib/handlerLogger.js";
 import { BaseMcpServer } from "./BaseMcpServer.js";
-import { IHandlersRegistry } from "./handlers/interfaces.js";
-import { AuthBrokerFactory } from "../authBrokerFactory.js";
+import { IHandlersRegistry } from "../../lib/handlers/interfaces.js";
+import { AuthBrokerFactory } from "../../lib/auth/index.js";
 const DEFAULT_VERSION = process.env.npm_package_version ?? "1.0.0";
 
 export interface SseServerOptions {

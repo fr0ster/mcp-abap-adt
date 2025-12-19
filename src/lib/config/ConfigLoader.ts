@@ -9,8 +9,8 @@ import * as path from "path";
 import { parse as parseYaml } from "yaml";
 import { ArgumentsParser, ParsedArguments } from "./ArgumentsParser.js";
 import { ServerConfig } from "./ServerConfig.js";
-import { TransportConfig } from "../servers/utils.js";
-import { YamlConfig, loadYamlConfig, generateConfigTemplateIfNeeded } from "../yamlConfig.js";
+import { TransportConfig } from "../utils.js";
+import { YamlConfig, loadYamlConfig, generateConfigTemplateIfNeeded } from "./yamlConfig.js";
 
 export class ConfigLoader {
   /**

@@ -1,16 +1,16 @@
-import { CompositeHandlersRegistry } from "./handlers/registry/CompositeHandlersRegistry.js";
+import { CompositeHandlersRegistry } from "../../lib/handlers/registry/CompositeHandlersRegistry.js";
 import {
   HighLevelHandlersGroup,
   LowLevelHandlersGroup,
   ReadOnlyHandlersGroup,
   SearchHandlersGroup,
-} from "./handlers/groups/index.js";
+} from "../../lib/handlers/groups/index.js";
 import { StdioServer } from "./StdioServer.js";
 import { StreamableHttpServer } from "./StreamableHttpServer.js";
 import { SseServer } from "./SseServer.js";
-import { AuthBrokerFactory } from "../authBrokerFactory.js";
-import type { HandlerContext } from "../handlers/interfaces.js";
-import { ServerConfigManager } from "../ServerConfigManager.js";
+import { AuthBrokerFactory } from "../../lib/auth/index.js";
+import type { HandlerContext } from "../../lib/handlers/interfaces.js";
+import { ServerConfigManager } from "../../lib/config/index.js";
 
 const stderrLogger = {
   info: (...args: any[]) => console.error(...args),

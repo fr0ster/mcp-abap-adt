@@ -22,10 +22,10 @@ import type { ISessionStore, IServiceKeyStore } from "@mcp-abap-adt/interfaces";
 import { defaultLogger } from "@mcp-abap-adt/logger";
 import * as path from "path";
 import * as fs from "fs";
-import { detectStoreType } from "./stores";
-import { getPlatformPaths } from "./stores/platformPaths";
+import { detectStoreType } from "../stores";
+import { getPlatformPaths } from "../stores/platformPaths";
 import type { ILogger } from "@mcp-abap-adt/interfaces";
-import type { ServerConfig } from "./config/ServerConfig.js";
+import type { ServerConfig } from "../config/ServerConfig.js";
 
 /**
  * @deprecated Use ServerConfig instead

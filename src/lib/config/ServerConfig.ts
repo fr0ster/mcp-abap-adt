@@ -3,7 +3,7 @@
  * Used by both old server (mcp_abap_adt_server) and new servers (StdioServer, SseServer, StreamableHttpServer)
  */
 
-import { TransportConfig } from "../servers/utils.js";
+import { TransportConfig } from "../utils.js";
 
 export interface ServerConfig {
   /** Default MCP destination from --mcp parameter */

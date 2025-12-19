@@ -2,37 +2,37 @@ import { BaseHandlerGroup } from "../base/BaseHandlerGroup.js";
 import { HandlerEntry } from "../interfaces.js";
 
 // Import system handlers
-import { handleGetTypeInfo } from "../../../../handlers/system/readonly/handleGetTypeInfo";
-import { handleGetTransaction } from "../../../../handlers/system/readonly/handleGetTransaction";
-import { handleGetSqlQuery } from "../../../../handlers/system/readonly/handleGetSqlQuery";
-import { handleGetWhereUsed } from "../../../../handlers/system/readonly/handleGetWhereUsed";
-import { handleGetObjectInfo } from "../../../../handlers/system/readonly/handleGetObjectInfo";
-import { handleGetAbapAST } from "../../../../handlers/system/readonly/handleGetAbapAST";
-import { handleGetAbapSemanticAnalysis } from "../../../../handlers/system/readonly/handleGetAbapSemanticAnalysis";
-import { handleGetAbapSystemSymbols } from "../../../../handlers/system/readonly/handleGetAbapSystemSymbols";
-import { handleGetSession } from "../../../../handlers/system/readonly/handleGetSession";
-import { handleGetInactiveObjects } from "../../../../handlers/system/readonly/handleGetInactiveObjects";
-import { handleGetAdtTypes } from "../../../../handlers/system/readonly/handleGetAllTypes";
-import { handleGetObjectStructure } from "../../../../handlers/system/readonly/handleGetObjectStructure.js";
-import { handleGetObjectNodeFromCache } from "../../../../handlers/system/readonly/handleGetObjectNodeFromCache.js";
-import { handleDescribeByList } from "../../../../handlers/system/readonly/handleDescribeByList.js";
+import { handleGetTypeInfo } from "../../../handlers/system/readonly/handleGetTypeInfo";
+import { handleGetTransaction } from "../../../handlers/system/readonly/handleGetTransaction";
+import { handleGetSqlQuery } from "../../../handlers/system/readonly/handleGetSqlQuery";
+import { handleGetWhereUsed } from "../../../handlers/system/readonly/handleGetWhereUsed";
+import { handleGetObjectInfo } from "../../../handlers/system/readonly/handleGetObjectInfo";
+import { handleGetAbapAST } from "../../../handlers/system/readonly/handleGetAbapAST";
+import { handleGetAbapSemanticAnalysis } from "../../../handlers/system/readonly/handleGetAbapSemanticAnalysis";
+import { handleGetAbapSystemSymbols } from "../../../handlers/system/readonly/handleGetAbapSystemSymbols";
+import { handleGetSession } from "../../../handlers/system/readonly/handleGetSession";
+import { handleGetInactiveObjects } from "../../../handlers/system/readonly/handleGetInactiveObjects";
+import { handleGetAdtTypes } from "../../../handlers/system/readonly/handleGetAllTypes";
+import { handleGetObjectStructure } from "../../../handlers/system/readonly/handleGetObjectStructure.js";
+import { handleGetObjectNodeFromCache } from "../../../handlers/system/readonly/handleGetObjectNodeFromCache.js";
+import { handleDescribeByList } from "../../../handlers/system/readonly/handleDescribeByList.js";
 
 
 // Import TOOL_DEFINITION from handlers
-import { TOOL_DEFINITION as GetTypeInfo_Tool } from "../../../../handlers/system/readonly/handleGetTypeInfo";
-import { TOOL_DEFINITION as GetTransaction_Tool } from "../../../../handlers/system/readonly/handleGetTransaction";
-import { TOOL_DEFINITION as GetSqlQuery_Tool } from "../../../../handlers/system/readonly/handleGetSqlQuery";
-import { TOOL_DEFINITION as GetWhereUsed_Tool } from "../../../../handlers/system/readonly/handleGetWhereUsed";
-import { TOOL_DEFINITION as GetObjectInfo_Tool } from "../../../../handlers/system/readonly/handleGetObjectInfo";
-import { TOOL_DEFINITION as GetAbapAST_Tool } from "../../../../handlers/system/readonly/handleGetAbapAST";
-import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from "../../../../handlers/system/readonly/handleGetAbapSemanticAnalysis";
-import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from "../../../../handlers/system/readonly/handleGetAbapSystemSymbols";
-import { TOOL_DEFINITION as GetSession_Tool } from "../../../../handlers/system/readonly/handleGetSession";
-import { TOOL_DEFINITION as GetInactiveObjects_Tool } from "../../../../handlers/system/readonly/handleGetInactiveObjects";
-import { TOOL_DEFINITION as GetAdtTypes_Tool } from "../../../../handlers/system/readonly/handleGetAllTypes";
-import { TOOL_DEFINITION as GetObjectStructure_Tool } from "../../../../handlers/system/readonly/handleGetObjectStructure";
-import { TOOL_DEFINITION as GetObjectNodeFromCache_Tool } from "../../../../handlers/system/readonly/handleGetObjectNodeFromCache";
-import { TOOL_DEFINITION as DescribeByList_Tool } from "../../../../handlers/system/readonly/handleDescribeByList";
+import { TOOL_DEFINITION as GetTypeInfo_Tool } from "../../../handlers/system/readonly/handleGetTypeInfo";
+import { TOOL_DEFINITION as GetTransaction_Tool } from "../../../handlers/system/readonly/handleGetTransaction";
+import { TOOL_DEFINITION as GetSqlQuery_Tool } from "../../../handlers/system/readonly/handleGetSqlQuery";
+import { TOOL_DEFINITION as GetWhereUsed_Tool } from "../../../handlers/system/readonly/handleGetWhereUsed";
+import { TOOL_DEFINITION as GetObjectInfo_Tool } from "../../../handlers/system/readonly/handleGetObjectInfo";
+import { TOOL_DEFINITION as GetAbapAST_Tool } from "../../../handlers/system/readonly/handleGetAbapAST";
+import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from "../../../handlers/system/readonly/handleGetAbapSemanticAnalysis";
+import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from "../../../handlers/system/readonly/handleGetAbapSystemSymbols";
+import { TOOL_DEFINITION as GetSession_Tool } from "../../../handlers/system/readonly/handleGetSession";
+import { TOOL_DEFINITION as GetInactiveObjects_Tool } from "../../../handlers/system/readonly/handleGetInactiveObjects";
+import { TOOL_DEFINITION as GetAdtTypes_Tool } from "../../../handlers/system/readonly/handleGetAllTypes";
+import { TOOL_DEFINITION as GetObjectStructure_Tool } from "../../../handlers/system/readonly/handleGetObjectStructure";
+import { TOOL_DEFINITION as GetObjectNodeFromCache_Tool } from "../../../handlers/system/readonly/handleGetObjectNodeFromCache";
+import { TOOL_DEFINITION as DescribeByList_Tool } from "../../../handlers/system/readonly/handleDescribeByList";
 
 /**
  * Handler group for all system-related handlers

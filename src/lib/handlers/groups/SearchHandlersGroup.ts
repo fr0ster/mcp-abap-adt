@@ -2,14 +2,14 @@ import { BaseHandlerGroup } from "../base/BaseHandlerGroup.js";
 import { HandlerEntry } from "../interfaces.js";
 
 // Import search handlers
-import { handleSearchObject } from "../../../../handlers/search/readonly/handleSearchObject";
-import { handleGetObjectsList } from "../../../../handlers/search/readonly/handleGetObjectsList";
-import { handleGetObjectsByType } from "../../../../handlers/search/readonly/handleGetObjectsByType";
+import { handleSearchObject } from "../../../handlers/search/readonly/handleSearchObject";
+import { handleGetObjectsList } from "../../../handlers/search/readonly/handleGetObjectsList";
+import { handleGetObjectsByType } from "../../../handlers/search/readonly/handleGetObjectsByType";
 
 // Import TOOL_DEFINITION from handlers
-import { TOOL_DEFINITION as SearchObject_Tool } from "../../../../handlers/search/readonly/handleSearchObject";
-import { TOOL_DEFINITION as GetObjectsList_Tool } from "../../../../handlers/search/readonly/handleGetObjectsList";
-import { TOOL_DEFINITION as GetObjectsByType_Tool } from "../../../../handlers/search/readonly/handleGetObjectsByType";
+import { TOOL_DEFINITION as SearchObject_Tool } from "../../../handlers/search/readonly/handleSearchObject";
+import { TOOL_DEFINITION as GetObjectsList_Tool } from "../../../handlers/search/readonly/handleGetObjectsList";
+import { TOOL_DEFINITION as GetObjectsByType_Tool } from "../../../handlers/search/readonly/handleGetObjectsByType";
 
 /**
  * Handler group for all search-related handlers

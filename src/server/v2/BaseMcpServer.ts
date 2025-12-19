@@ -2,11 +2,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AbapConnection, createAbapConnection } from "@mcp-abap-adt/connection";
 import { AuthBroker } from "@mcp-abap-adt/auth-broker";
 import { ConnectionContext } from "./ConnectionContext.js";
-import { IHandlersRegistry } from "./handlers/interfaces.js";
-import { CompositeHandlersRegistry } from "./handlers/registry/CompositeHandlersRegistry.js";
-import { HandlerContext } from "../handlers/interfaces.js";
+import { IHandlersRegistry } from "../../lib/handlers/interfaces.js";
+import { CompositeHandlersRegistry } from "../../lib/handlers/registry/CompositeHandlersRegistry.js";
+import { HandlerContext } from "../../handlers/interfaces.js";
 import { defaultLogger, type Logger } from "@mcp-abap-adt/logger";
-import { registerAuthBroker } from "../utils.js";
+import { registerAuthBroker } from "../../lib/utils.js";
 
 /**
  * Base MCP Server class that extends SDK McpServer
@@ -113,7 +113,7 @@ export abstract class BaseMcpServer extends McpServer {
     const connection = createAbapConnection(this.connectionContext.connectionParams);
     const destination = this.connectionContext.metadata?.destination as string | undefined;
     if (destination) {
-      const { createDestinationAwareConnection } = await import('../utils.js');
+      const { createDestinationAwareConnection } = await import('../../lib/utils.js');
       return createDestinationAwareConnection(connection, destination);
     }
     return connection;

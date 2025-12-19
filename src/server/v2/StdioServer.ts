@@ -1,9 +1,9 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { AuthBroker } from "@mcp-abap-adt/auth-broker";
 import type { Logger } from "@mcp-abap-adt/logger";
-import { noopLogger } from "../handlerLogger.js";
+import { noopLogger } from "../../lib/handlerLogger.js";
 import { BaseMcpServer } from "./BaseMcpServer.js";
-import { IHandlersRegistry } from "./handlers/interfaces.js";
+import { IHandlersRegistry } from "../../lib/handlers/interfaces.js";
 const DEFAULT_VERSION = process.env.npm_package_version ?? "1.0.0";
 
 export interface StdioServerOptions {

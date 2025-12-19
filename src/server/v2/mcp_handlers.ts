@@ -5,7 +5,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import * as z from "zod";
-import type { HandlerContext } from "../handlers/interfaces.js";
+import type { HandlerContext } from "../../handlers/interfaces.js";
 // dotenv removed - using manual .env parsing for all modes to avoid stdout pollution
 
 // Import handler functions

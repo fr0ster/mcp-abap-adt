@@ -6,7 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import { McpHandlers } from "./lib/servers/mcp_handlers";
+import { McpHandlers } from "../v2/mcp_handlers";
 import path from "path";
 import * as os from "os";
 // dotenv removed - using manual .env parsing for all modes to avoid stdout pollution
@@ -26,18 +26,18 @@ import {
   HEADER_SAP_UAA_CLIENT_SECRET,
   HEADER_AUTHORIZATION,
 } from "@mcp-abap-adt/interfaces";
-import { AuthBrokerFactory } from "./lib/authBrokerFactory";
-import { getPlatformPaths } from "./lib/stores/platformPaths";
+import { AuthBrokerFactory } from "../../lib/auth/index";
+import { getPlatformPaths } from "../../lib/stores/platformPaths";
 import { defaultLogger } from "@mcp-abap-adt/logger";
 import {
   buildRuntimeConfig,
-} from "./lib/runtimeConfig";
+} from "../../lib/config/runtimeConfig";
 import {
   parseConfigArg,
   loadYamlConfig,
   generateConfigTemplateIfNeeded,
   applyYamlConfigToArgs,
-} from "./lib/yamlConfig";
+} from "../../lib/config/yamlConfig";
 import { ILogger } from "@mcp-abap-adt/interfaces";
 
 // Import handler functions
@@ -49,13 +49,13 @@ import {
   sessionContext,
   removeConnectionForSession,
   setConnectionOverride,
-} from "./lib/utils";
-import { getConfig, setSapConfigOverride } from "./lib/config.js";
+} from "../../lib/utils";
+import { getConfig, setSapConfigOverride } from "../../lib/config.js";
 import { SapConfig, AbapConnection, createAbapConnection } from "@mcp-abap-adt/connection";
-import { loggerAdapter } from "./lib/loggerAdapter";
+import { loggerAdapter } from "../../lib/loggerAdapter";
 
 // Import logger
-import { logger } from "./lib/logger";
+import { logger } from "../../lib/logger";
 // import { defaultLogger as logger } from "@mcp-abap-adt/logger";
 
 // Import tool registry
@@ -65,7 +65,7 @@ import { logger } from "./lib/logger";
 
 // --- ENV FILE LOADING LOGIC ---
 import fs from "fs";
-import { HandlerContext } from "./lib/handlers/interfaces";
+import { HandlerContext } from "../../lib/handlers/interfaces";
 
 /**
  * Display help message

@@ -13,7 +13,7 @@ These handlers currently use `makeAdtRequest`/`makeAdtRequestWithTimeout` direct
   - Endpoint: `/sap/bc/adt/repository/informationsystem/usageReferences`
   - Method: POST with XML body
   - Purpose: Get where-used references for ABAP objects
-  - Status: ✅ Fully implemented with direct endpoint
+  - Status: ⚠️ TODO: Needs infrastructure module
 
 - **`GetObjectStructure`** (`system/readonly/handleGetObjectStructure.ts`)
   - Endpoint: `/sap/bc/adt/repository/objectstructure`
@@ -72,13 +72,13 @@ These handlers currently use `makeAdtRequest`/`makeAdtRequestWithTimeout` direct
   - Endpoint: `/sap/bc/adt/enhancements/{spot}/{name}/source/main`
   - Method: GET
   - Purpose: Retrieve source code of specific enhancement implementation
-  - Status: ✅ Fully implemented with direct endpoint
+  - Status: ⚠️ TODO: Needs infrastructure module
 
 - **`GetEnhancementSpot`** (`enhancement/readonly/handleGetEnhancementSpot.ts`)
   - Endpoint: `/sap/bc/adt/enhancements/enhsxsb/{spot_name}`
   - Method: GET
   - Purpose: Retrieve metadata and list of implementations for enhancement spot
-  - Status: ✅ Fully implemented with direct endpoint
+  - Status: ⚠️ TODO: Needs infrastructure module
 
 - **`GetEnhancements`** (`enhancement/readonly/handleGetEnhancements.ts`)
   - Endpoints: 
@@ -87,14 +87,14 @@ These handlers currently use `makeAdtRequest`/`makeAdtRequestWithTimeout` direct
     - `/sap/bc/adt/programs/includes/{name}/source/main/enhancements/elements`
   - Method: GET (with context parameter for includes)
   - Purpose: Retrieve enhancement implementations for ABAP programs/includes/classes
-  - Status: ✅ Fully implemented with direct endpoints
+  - Status: ⚠️ TODO: Needs infrastructure module
 
 #### Include Operations
 - **`GetInclude`** (`include/readonly/handleGetInclude.ts`)
   - Endpoint: `/sap/bc/adt/programs/includes/{name}/source/main`
   - Method: GET
   - Purpose: Retrieve source code of specific ABAP include file
-  - Status: ✅ Fully implemented with direct endpoint
+  - Status: ⚠️ TODO: Marked with TODO comment - needs infrastructure module
 
 - **`GetIncludesList`** (`include/readonly/handleGetIncludesList.ts`)
   - Endpoint: `/sap/bc/adt/repository/nodestructure` (via `fetchNodeStructure`)
@@ -107,14 +107,14 @@ These handlers currently use `makeAdtRequest`/`makeAdtRequestWithTimeout` direct
   - Endpoint: `/sap/bc/adt/bo/behaviordefinitions/{name}/source/main`
   - Method: GET
   - Purpose: Retrieve source code of BDEF (Behavior Definition) for CDS entity
-  - Status: ✅ Fully implemented with direct endpoint
+  - Status: ⚠️ TODO: Needs migration to infrastructure module (marked with TODO comment)
 
 #### Package Operations
 - **`GetPackage`** (`package/readonly/handleGetPackage.ts`)
   - Endpoint: `/sap/bc/adt/repository/nodestructure`
   - Method: POST with parameters
   - Purpose: Retrieve ABAP package details and contents
-  - Status: ✅ Fully implemented with direct endpoint
+  - Status: ⚠️ TODO: Needs infrastructure module (getPackageContents exists in core/package/read.ts but not exposed in ReadOnlyClient)
 
 #### Transport Operations
 - **`GetTransport`** (`transport/readonly/handleGetTransport.ts`)

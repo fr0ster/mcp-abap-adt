@@ -5,6 +5,12 @@ import { writeResultToFile } from '../../../lib/writeResultToFile';
 import * as z from 'zod';
 
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+
+// TODO: Migrate to infrastructure module
+// This handler uses getPackageContents() from @mcp-abap-adt/adt-clients/src/core/package/read.ts
+// ReadOnlyClient.readPackage() doesn't return package contents
+// Need infrastructure module with method that returns parsed package contents
+
 export const TOOL_DEFINITION = {
   name: "GetPackage",
   description: "[read-only] Retrieve ABAP package details.",

@@ -2,6 +2,11 @@ import { McpError, ErrorCode } from '../../../lib/utils';
 import { makeAdtRequestWithTimeout, return_error, logger, encodeSapObjectName  } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
+// TODO: Migrate to infrastructure module
+// This handler uses direct ADT endpoint: /sap/bc/adt/bo/behaviordefinitions/{name}/source/main
+// ReadOnlyClient doesn't have readBehaviorDefinition() method yet
+// Need infrastructure.readBehaviorDefinition() that returns source code
+
 export const TOOL_DEFINITION = {
   "name": "GetBdef",
   "description": "[read-only] Retrieve the source code of a BDEF (Behavior Definition) for a CDS entity.",

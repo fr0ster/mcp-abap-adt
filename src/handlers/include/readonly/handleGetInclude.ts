@@ -3,6 +3,12 @@ import { makeAdtRequestWithTimeout, return_error, return_response, encodeSapObje
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import * as z from 'zod';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+
+// TODO: Migrate to infrastructure module
+// This handler uses direct ADT endpoint: /sap/bc/adt/programs/includes/{name}/source/main
+// ReadOnlyClient doesn't have readInclude() method
+// Need infrastructure.readInclude() that returns source code
+
 export const TOOL_DEFINITION = {
   name: "GetInclude",
   description: "[read-only] Retrieve source code of a specific ABAP include file.",

@@ -83,7 +83,7 @@ export async function handleUpdateFunctionModule(context: HandlerContext, args: 
       const shouldActivate = args.activate === true;
 
       // Execute operation chain: lock -> update -> check -> unlock -> (activate)
-      let lockHandle: string | null = null;
+      let lockHandle: string | undefined = undefined;
       try {
         await client.lockFunctionModule({ functionModuleName, functionGroupName });
         lockHandle = client.getLockHandle();

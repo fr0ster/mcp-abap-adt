@@ -108,7 +108,7 @@ export async function handleCreateFunctionModule(context: HandlerContext, args: 
         transportRequest: typedArgs.transport_request
       });
 
-      let lockHandle: string | null = null;
+      let lockHandle: string | undefined = undefined;
       try {
         // Lock
         await client.lockFunctionModule({ functionModuleName, functionGroupName });

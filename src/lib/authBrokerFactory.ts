@@ -242,12 +242,30 @@ export class AuthBrokerFactory {
           unsafe
         );
 
+        // Load .env file into session store for Variant 2 and 3
+        if (!defaultBrokerConfig.hasServiceKeyStore && envFilePath) {
+          const broker = this.authBrokers.get('default');
+          if (broker) {
+            try {
+              await this.loadEnvFileIntoSessionStore(envFilePath, 'default', broker, logger);
+            } catch (error) {
+              logger.error("Failed to load .env file into session store", {
+                type: "ENV_LOAD_FAILED",
+                envFilePath,
+                error: error instanceof Error ? error.message : String(error),
+              });
+              throw error;
+            }
+          }
+        }
+
         this.defaultBrokerInitialized = true;
 
         logger.info("Default broker initialized", {
           type: "DEFAULT_BROKER_INIT_SUCCESS",
           hasServiceKeyStore: defaultBrokerConfig.hasServiceKeyStore,
           serviceKeyDestination: defaultBrokerConfig.serviceKeyDestination,
+          hasEnvFile: !defaultBrokerConfig.hasServiceKeyStore && !!envFilePath,
         });
       } catch (error) {
         logger.error("Failed to initialize default broker", {
@@ -428,8 +446,9 @@ export class AuthBrokerFactory {
 
     const { serviceKeyStore, sessionStore } = stores;
 
-    // Create token provider
-    const tokenProvider = new BtpTokenProvider();
+    // Create token provider only when service key store is available
+    // For .env-only setup (no service key), no token provider needed - user manages tokens
+    const tokenProvider = hasServiceKeyStore ? new BtpTokenProvider() : undefined;
 
     // Pre-seed session store with data from service key (without tokens) to avoid stale/absent configs
     if (hasServiceKeyStore && serviceKeyDestination) {
@@ -462,8 +481,9 @@ export class AuthBrokerFactory {
         serviceKeyStore: hasServiceKeyStore ? serviceKeyStore : undefined,
         sessionStore,
         tokenProvider,
-        // disable client_credentials for ABAP to force provider/interactive
-        allowClientCredentials: storeType !== 'abap',
+        // Allow client_credentials flow for all store types (including ABAP)
+        // This prevents browser auth conflicts when UAA credentials are available
+        allowClientCredentials: true,
       } as any,
       'system',
       logger
@@ -478,6 +498,102 @@ export class AuthBrokerFactory {
       serviceKeyDestination,
       storeType,
     });
+  }
+
+  /**
+   * Load .env file and populate session store with connection config
+   * @param envFilePath Path to .env file
+   * @param destination Destination name (usually 'default')
+   * @param broker AuthBroker instance
+   * @param logger Logger instance
+   */
+  private async loadEnvFileIntoSessionStore(
+    envFilePath: string,
+    destination: string,
+    broker: AuthBroker,
+    logger: ILogger
+  ): Promise<void> {
+    if (!fs.existsSync(envFilePath)) {
+      throw new Error(`.env file not found: ${envFilePath}`);
+    }
+
+    logger.debug("Loading .env file into session store", {
+      type: "ENV_LOAD_START",
+      envFilePath,
+      destination,
+    });
+
+    // Parse .env file
+    const envContent = fs.readFileSync(envFilePath, "utf8");
+    const envVars: Record<string, string> = {};
+
+    for (const line of envContent.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+
+      const eqIndex = trimmed.indexOf("=");
+      if (eqIndex === -1) continue;
+
+      const key = trimmed.substring(0, eqIndex).trim();
+      let value = trimmed.substring(eqIndex + 1);
+
+      // Remove inline comments
+      const commentIndex = value.indexOf('#');
+      if (commentIndex !== -1) {
+        value = value.substring(0, commentIndex).trim();
+      } else {
+        value = value.trim();
+      }
+
+      // Remove quotes
+      value = value.replace(/^["']+|["']+$/g, '').trim();
+
+      if (key) {
+        envVars[key] = value;
+      }
+    }
+
+    // Validate required fields
+    if (!envVars.SAP_URL) {
+      throw new Error(".env file missing SAP_URL");
+    }
+
+    // Build connection config from .env
+    const connectionConfig: any = {
+      serviceUrl: envVars.SAP_URL,
+      sapClient: envVars.SAP_CLIENT,
+    };
+
+    // Check auth type
+    const authType = envVars.SAP_AUTH_TYPE || 'basic';
+    connectionConfig.authType = authType;
+
+    if (authType === 'basic') {
+      if (!envVars.SAP_USERNAME || !envVars.SAP_PASSWORD) {
+        throw new Error(".env file missing SAP_USERNAME or SAP_PASSWORD for basic auth");
+      }
+      connectionConfig.username = envVars.SAP_USERNAME;
+      connectionConfig.password = envVars.SAP_PASSWORD;
+    } else if (authType === 'jwt') {
+      if (!envVars.SAP_JWT_TOKEN) {
+        throw new Error(".env file missing SAP_JWT_TOKEN for JWT auth");
+      }
+      connectionConfig.authorizationToken = envVars.SAP_JWT_TOKEN;
+    }
+
+    // Store in session store via broker's session store
+    const sessionStore = (broker as any).sessionStore as ISessionStore;
+    if (sessionStore?.setConnectionConfig) {
+      await sessionStore.setConnectionConfig(destination, connectionConfig);
+      logger.info(".env file loaded into session store", {
+        type: "ENV_LOAD_SUCCESS",
+        destination,
+        serviceUrl: connectionConfig.serviceUrl,
+        authType: connectionConfig.authType,
+      });
+    } else {
+      throw new Error("Session store does not support setConnectionConfig");
+    }
   }
 
   /**

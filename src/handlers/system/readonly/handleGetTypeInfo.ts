@@ -1,3 +1,12 @@
+/**
+ * @TODO Migrate to infrastructure module
+ * Endpoints: Multiple fallback chain:
+ * - /sap/bc/adt/ddic/domains/{name}/source/main
+ * - /sap/bc/adt/ddic/dataelements/{name}
+ * - /sap/bc/adt/ddic/tabletypes/{name}
+ * - /sap/bc/adt/repository/informationsystem/objectproperties/values
+ * This handler uses makeAdtRequestWithTimeout directly and should be moved to adt-clients infrastructure module
+ */
 import { McpError, ErrorCode } from '../../../lib/utils';
 import { makeAdtRequestWithTimeout, encodeSapObjectName } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';

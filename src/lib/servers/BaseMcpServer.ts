@@ -47,36 +47,46 @@ export abstract class BaseMcpServer extends McpServer {
     registerAuthBroker(destination, authBroker);
 
     // Get connection parameters from broker
+    // AuthBroker.getConnectionConfig() automatically checks session store first, then service key store
     const connectionConfig = await authBroker.getConnectionConfig(destination);
+
     if (!connectionConfig) {
-      throw new Error('Connection config not found');
+      throw new Error(`Connection config not found for destination: ${destination}`);
     }
 
-    // Ensure session store has base config and no stale token (important for safe/in-memory stores)
+    // Try to get fresh token from broker
+    // If broker can't refresh (no UAA credentials), use existing token from connectionConfig
+    let freshToken: string | undefined;
     try {
-      const sessionStore = (authBroker as any).sessionStore;
-      if (sessionStore?.setConnectionConfig) {
-        await sessionStore.setConnectionConfig(destination, {
-          ...connectionConfig,
-          authorizationToken: undefined,
-        });
-      }
-    } catch {
-      // ignore, continue with best-effort
+      freshToken = await authBroker.getToken(destination);
+    } catch (error) {
+      // Broker can't provide/refresh token (e.g., no UAA credentials for .env-only setup)
+      // Use existing token from connectionConfig - user is responsible for token management
+      this.logger.debug(`Broker can't refresh token, using existing token from session: ${error instanceof Error ? error.message : String(error)}`);
+      freshToken = connectionConfig.authorizationToken;
     }
-
-    // Always request token from broker to ensure freshness
-    const freshToken = await authBroker.getToken(destination);
     const tokenToUse = freshToken || connectionConfig.authorizationToken || '';
+
+    // Determine auth type from connection config
+    const authType = connectionConfig.authType ||
+                     (connectionConfig.username && connectionConfig.password ? 'basic' : 'jwt');
 
     this.connectionContext = {
       sessionId: destination,
-      connectionParams: {
-        url: connectionConfig.serviceUrl || '',
-        authType: 'jwt',
-        jwtToken: tokenToUse, // broker keeps it fresh
-        client: connectionConfig.sapClient || '',
-      },
+      connectionParams: authType === 'basic'
+        ? {
+            url: connectionConfig.serviceUrl || '',
+            authType: 'basic',
+            username: connectionConfig.username || '',
+            password: connectionConfig.password || '',
+            client: connectionConfig.sapClient || '',
+          }
+        : {
+            url: connectionConfig.serviceUrl || '',
+            authType: 'jwt',
+            jwtToken: tokenToUse, // broker keeps it fresh
+            client: connectionConfig.sapClient || '',
+          },
       metadata: {
         destination,
       },

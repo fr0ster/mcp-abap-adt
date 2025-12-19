@@ -1,3 +1,8 @@
+/**
+ * @TODO Migrate to infrastructure module
+ * Endpoint: /sap/bc/adt/datapreview/freestyle
+ * This handler uses makeAdtRequestWithTimeout directly and should be moved to adt-clients infrastructure module
+ */
 import { McpError, ErrorCode, makeAdtRequestWithTimeout, return_error, return_response } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';

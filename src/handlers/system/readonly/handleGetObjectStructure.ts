@@ -1,4 +1,10 @@
-// Handler for retrieving ADT object structure and returning compact JSON tree
+/**
+ * Handler for retrieving ADT object structure and returning compact JSON tree
+ *
+ * @TODO Migrate to infrastructure module
+ * Endpoint: /sap/bc/adt/repository/objectstructure
+ * This handler uses makeAdtRequestWithTimeout directly and should be moved to adt-clients infrastructure module
+ */
 
 import { makeAdtRequestWithTimeout } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';

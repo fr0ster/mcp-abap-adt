@@ -1,3 +1,8 @@
+/**
+ * @TODO Migrate to infrastructure module
+ * Endpoint: Dynamic (from OBJECT_URI)
+ * This handler uses makeAdtRequest directly and should be moved to adt-clients infrastructure module
+ */
 import { AbapConnection } from '@mcp-abap-adt/connection';
 
 export const TOOL_DEFINITION = {

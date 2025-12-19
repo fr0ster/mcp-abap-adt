@@ -6,6 +6,12 @@
  * - Owner and target system information
  * - Included objects and tasks
  * - Change history
+ *
+ * @TODO Migrate to infrastructure module or enhance ReadOnlyClient.readTransport()
+ * Current ReadOnlyClient.readTransport() doesn't support:
+ * - includeObjects and includeTasks query parameters
+ * - XML parsing (returns raw AxiosResponse)
+ * This handler provides richer functionality that should be added to adt-clients
  */
 
 import { McpError, ErrorCode, makeAdtRequestWithTimeout, return_error, return_response, AxiosResponse } from '../../../lib/utils';

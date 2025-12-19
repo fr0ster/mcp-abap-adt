@@ -48,7 +48,10 @@ export function getPlatformPaths(customPath?: string | string[], subfolder?: 'se
   if (envPath) {
     // Support both colon (Unix) and semicolon (Windows) separators
     const envPaths = envPath.split(/[:;]/).map(p => p.trim()).filter(p => p.length > 0);
-    paths.push(...envPaths.map(p => path.resolve(p)));
+    paths.push(...envPaths.map(p => {
+      const resolved = path.resolve(p);
+      return subfolder ? path.join(resolved, subfolder) : resolved;
+    }));
   }
 
   // Priority 3: Platform-specific standard paths

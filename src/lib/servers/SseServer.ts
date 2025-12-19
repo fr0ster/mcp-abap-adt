@@ -76,12 +76,16 @@ export class SseServer {
     const destination = destinationHeader || this.defaultDestination;
 
     if (!destination) {
+      this.logger.error("SSE GET: Destination not provided");
       res.writeHead(400).end("Destination not provided");
       return;
     }
 
+    this.logger.debug(`SSE GET: destination=${destination}`);
+
     const broker = await this.authBrokerFactory.getOrCreateAuthBroker(destination);
     if (!broker) {
+      this.logger.error(`SSE GET: Auth broker not available for ${destination}`);
       res.writeHead(400).end("Auth broker not available");
       return;
     }
@@ -100,42 +104,60 @@ export class SseServer {
     await server.init(destination, broker);
 
     const transport = new SSEServerTransport(this.postPath, res);
-    this.sessions.set(transport.sessionId, { server, transport });
+    const sessionId = transport.sessionId;
 
+    console.error(`[SSE GET] Created session ${sessionId} for destination ${destination}`);
+    this.sessions.set(sessionId, { server, transport });
+    console.error(`[SSE GET] Session stored, total sessions: ${this.sessions.size}`);
+
+    // Connect transport to server BEFORE registering close handler
+    // This ensures connection is established before any cleanup can happen
+    try {
+      await server.connect(transport);
+      this.logger.debug(`SSE GET: server connected for session ${sessionId}`);
+    } catch (error) {
+      this.logger.error(`SSE GET: failed to connect for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`);
+      this.sessions.delete(sessionId);
+      if (!res.headersSent) {
+        res.writeHead(500).end("Internal Server Error");
+      }
+      return;
+    }
+
+    // Register cleanup handler AFTER successful connection
     res.on("close", () => {
-      this.sessions.delete(transport.sessionId);
+      console.error(`[SSE CLOSE] Connection closed for session ${sessionId}`);
+      this.sessions.delete(sessionId);
       void transport.close();
       void server.close();
     });
-
-    await server.connect(transport);
   }
 
   private async handlePost(req: any, res: any, url?: URL): Promise<void> {
     const sessionId = (url?.searchParams.get("sessionId") || req.headers["x-session-id"] || "") as string;
+
+    console.error(`[SSE POST] sessionId=${sessionId}, activeSessions=${this.sessions.size}, keys=[${Array.from(this.sessions.keys()).join(', ')}]`);
+
     const entry = this.sessions.get(sessionId);
     if (!entry) {
+      console.error(`[SSE POST] Invalid session ${sessionId} - session not found!`);
       res.writeHead(400).end("Invalid session");
       return;
     }
 
-    const body = await this.readBody(req);
-    await entry.transport.handlePostMessage(req, res, body);
-  }
+    // Pass pre-parsed body from express.json() middleware (like reference implementation)
+    // express.json() already read and parsed the body into req.body
+    console.error(`[SSE POST] Calling handlePostMessage with req.body for session ${sessionId}`);
 
-  private async readBody(req: any): Promise<unknown> {
-    const chunks: Uint8Array[] = [];
-    for await (const chunk of req) {
-      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-    }
-    if (chunks.length === 0) {
-      return undefined;
-    }
-    const raw = Buffer.concat(chunks).toString("utf8");
     try {
-      return JSON.parse(raw);
-    } catch {
-      return raw;
+      await entry.transport.handlePostMessage(req, res, req.body);
+      console.error(`[SSE POST] Successfully processed for session ${sessionId}`);
+    } catch (error) {
+      console.error(`[SSE POST] FAILED for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(`[SSE POST] Error stack:`, error);
+      if (!res.headersSent) {
+        res.writeHead(500).end("Internal Server Error");
+      }
     }
   }
 }

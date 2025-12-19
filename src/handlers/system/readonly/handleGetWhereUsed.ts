@@ -1,3 +1,8 @@
+/**
+ * @TODO Migrate to infrastructure module
+ * Endpoint: /sap/bc/adt/repository/informationsystem/usageReferences
+ * This handler uses makeAdtRequestWithTimeout directly and should be moved to adt-clients infrastructure module
+ */
 import { McpError, ErrorCode, makeAdtRequestWithTimeout, encodeSapObjectName } from '../../../lib/utils';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';

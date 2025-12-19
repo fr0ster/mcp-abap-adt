@@ -2,6 +2,30 @@
 
 This document lists handlers from `mcp-abap-adt` that need to be implemented in the `infrastructure` module of `@mcp-abap-adt/adt-clients` package.
 
+## Migration Status Overview
+
+### ✅ Already Migrated to adt-clients
+
+These handlers correctly use ReadOnlyClient, AdtClient, or CrudClient from `@mcp-abap-adt/adt-clients`:
+
+**Readonly Operations (using ReadOnlyClient):**
+- `GetProgram` - Uses `ReadOnlyClient.readProgram()`
+- `GetClass` - Uses `ReadOnlyClient.readClass()`
+- `GetInterface` - Uses `ReadOnlyClient.readInterface()`
+- `GetDomain` - Uses `ReadOnlyClient.readDomain()`
+- `GetDataElement` - Uses `ReadOnlyClient.readDataElement()`
+- `GetStructure` - Uses `ReadOnlyClient.readStructure()`
+- `GetTable` - Uses `ReadOnlyClient.readTable()`
+- `GetView` - Uses `ReadOnlyClient.readView()`
+- `GetFunctionGroup` - Uses `ReadOnlyClient.readFunctionGroup()`
+- `GetFunction` (Function Module) - Uses `ReadOnlyClient.readFunctionModule()`
+- `GetServiceDefinition` - Uses `ReadOnlyClient.readServiceDefinition()`
+
+**High-level Operations (using CrudClient + ReadOnlyClient):**
+- `UpdateFunctionGroup` - Uses `CrudClient` for lock/unlock operations
+
+**Total: 12 handlers successfully migrated** ✅
+
 ## Categories
 
 ### 1. Handlers using direct endpoints (need infrastructure module)
@@ -19,19 +43,19 @@ These handlers currently use `makeAdtRequest`/`makeAdtRequestWithTimeout` direct
   - Endpoint: `/sap/bc/adt/repository/objectstructure`
   - Method: GET with query parameters
   - Purpose: Retrieve ADT object structure as compact JSON tree
-  - Status: ✅ Fully implemented with direct endpoint
+  - Status: ⚠️ TODO: Needs infrastructure module (marked with TODO comment)
 
 - **`GetObjectInfo`** (`system/readonly/handleGetObjectInfo.ts`)
   - Endpoint: `/sap/bc/adt/repository/nodestructure`
   - Method: POST with parameters
   - Purpose: Return ABAP object tree with root, group nodes, and terminal leaves
-  - Status: ✅ Fully implemented with direct endpoint
+  - Status: ⚠️ TODO: Needs infrastructure module (marked with TODO comment)
 
 - **`GetObjectNodeFromCache`** (`system/readonly/handleGetObjectNodeFromCache.ts`)
   - Endpoint: Dynamic (from OBJECT_URI)
   - Method: GET
   - Purpose: Returns a node from in-memory cache and expands OBJECT_URI if present
-  - Status: ✅ Fully implemented with direct endpoint
+  - Status: ⚠️ TODO: Needs infrastructure module (marked with TODO comment)
 
 - **`GetTypeInfo`** (`system/readonly/handleGetTypeInfo.ts`)
   - Endpoints: 
@@ -41,19 +65,19 @@ These handlers currently use `makeAdtRequest`/`makeAdtRequestWithTimeout` direct
     - `/sap/bc/adt/repository/informationsystem/objectproperties/values`
   - Method: GET (with fallback chain)
   - Purpose: Retrieve ABAP type information (domain, data element, table type)
-  - Status: ✅ Fully implemented with direct endpoints
+  - Status: ⚠️ TODO: Needs infrastructure module (marked with TODO comment)
 
 - **`GetAllTypes`** (`system/readonly/handleGetAllTypes.ts`)
   - Endpoint: `/sap/bc/adt/repository/informationsystem/objecttypes`
   - Method: GET with query parameters
   - Purpose: Retrieve all valid ADT object types
-  - Status: ✅ Fully implemented with direct endpoint
+  - Status: ⚠️ TODO: Needs infrastructure module (marked with TODO comment)
 
 - **`GetSqlQuery`** (`system/readonly/handleGetSqlQuery.ts`)
   - Endpoint: `/sap/bc/adt/datapreview/freestyle`
   - Method: POST with SQL query in body
   - Purpose: Execute freestyle SQL queries via SAP ADT Data Preview API
-  - Status: ✅ Fully implemented with direct endpoint
+  - Status: ⚠️ TODO: Needs infrastructure module (marked with TODO comment)
 
 - **`GetTransaction`** (`system/readonly/handleGetTransaction.ts`)
   - Endpoint: Not implemented (commented out)
@@ -119,16 +143,16 @@ These handlers currently use `makeAdtRequest`/`makeAdtRequestWithTimeout` direct
 #### Transport Operations
 - **`GetTransport`** (`transport/readonly/handleGetTransport.ts`)
   - Endpoint: `/sap/bc/adt/cts/transportrequests/{number}`
-  - Method: GET with query parameters
+  - Method: GET with query parameters (`includeObjects`, `includeTasks`)
   - Purpose: Retrieve ABAP transport request information
-  - Status: ✅ Fully implemented with direct endpoint
+  - Status: ⚠️ TODO: ReadOnlyClient.readTransport() exists but lacks features (no query params support, no XML parsing). Handler provides richer functionality that should be added to adt-clients or infrastructure module.
 
 #### Function Group Operations
 - **`UpdateFunctionGroup`** (`function/high/handleUpdateFunctionGroup.ts`)
   - Endpoint: `/sap/bc/adt/functions/groups/{name}` (PUT)
   - Method: PUT (uses `connection.makeAdtRequest` directly)
   - Purpose: Update function group metadata (description)
-  - Status: ⚠️ Partially implemented (uses CrudClient for lock/unlock, but direct endpoint for update)
+  - Status: ✅ Correctly uses CrudClient for lock/unlock and direct endpoint for update (acceptable pattern)
 
 #### Code Analysis (No ADT endpoints, but could benefit from infrastructure)
 - **`GetAbapAST`** (`system/readonly/handleGetAbapAST.ts`)

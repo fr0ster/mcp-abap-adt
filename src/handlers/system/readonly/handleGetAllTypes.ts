@@ -1,4 +1,10 @@
-// Handler for retrieving all valid ADT object types and validating a type
+/**
+ * Handler for retrieving all valid ADT object types and validating a type
+ *
+ * @TODO Migrate to infrastructure module
+ * Endpoint: /sap/bc/adt/repository/informationsystem/objecttypes
+ * This handler uses makeAdtRequestWithTimeout directly and should be moved to adt-clients infrastructure module
+ */
 
 import { makeAdtRequestWithTimeout } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';

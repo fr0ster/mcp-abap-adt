@@ -1,3 +1,8 @@
+/**
+ * @TODO Migrate to infrastructure module
+ * Endpoint: /sap/bc/adt/repository/nodestructure
+ * This handler uses makeAdtRequestWithTimeout directly and should be moved to adt-clients infrastructure module
+ */
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { McpError, ErrorCode, return_error, return_response, makeAdtRequestWithTimeout, logger as baseLogger, AxiosResponse } from '../../../lib/utils';
 import convert from 'xml-js';

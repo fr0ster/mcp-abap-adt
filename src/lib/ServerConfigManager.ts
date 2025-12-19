@@ -19,6 +19,10 @@ import {
   type YamlConfig,
 } from './yamlConfig.js';
 
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
 /**
  * Handler exposition sets
  */
@@ -51,11 +55,19 @@ export interface ServerConfig {
   configFile?: string;
 }
 
+// ============================================================================
+// SERVER CONFIGURATION MANAGER CLASS
+// ============================================================================
+
 /**
  * Server Configuration Manager
  */
 export class ServerConfigManager {
   private config: ServerConfig | null = null;
+
+  // --------------------------------------------------------------------------
+  // PUBLIC API - Configuration Access
+  // --------------------------------------------------------------------------
 
   /**
    * Get current configuration with async YAML support
@@ -66,21 +78,8 @@ export class ServerConfigManager {
       return { ...this.config };
     }
 
-    // Check for --conf/--config parameter using existing function
-    const configPath = parseConfigArg();
-
-    if (configPath) {
-      // Generate template if needed (from yamlConfig)
-      const templateGenerated = generateConfigTemplateIfNeeded(configPath);
-
-      if (!templateGenerated) {
-        // Load YAML config and apply to process.argv
-        const yamlConfig = loadYamlConfig(configPath);
-        if (yamlConfig) {
-          applyYamlConfigToArgs(yamlConfig);
-        }
-      }
-    }
+    // Load and apply YAML config if specified
+    this.loadYamlConfigIfNeeded();
 
     // Parse final config from process.argv (after YAML applied)
     this.config = this.parseCommandLine();
@@ -98,49 +97,52 @@ export class ServerConfigManager {
     return { ...this.config };
   }
 
+  // --------------------------------------------------------------------------
+  // PRIVATE - YAML Configuration Loading
+  // --------------------------------------------------------------------------
+
+  /**
+   * Load YAML configuration if --conf parameter is present
+   * Delegates to yamlConfig module via DI
+   */
+  private loadYamlConfigIfNeeded(): void {
+    const configPath = parseConfigArg();
+    if (!configPath) return;
+
+    // Generate template if needed (from yamlConfig)
+    const templateGenerated = generateConfigTemplateIfNeeded(configPath);
+    if (templateGenerated) return;
+
+    // Load YAML config and apply to process.argv
+    const yamlConfig = loadYamlConfig(configPath);
+    if (yamlConfig) {
+      applyYamlConfigToArgs(yamlConfig);
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // PRIVATE - Command Line Parsing
+  // --------------------------------------------------------------------------
+
   /**
    * Parse command line arguments
    * Note: Should be called after applyYamlConfigToArgs for proper YAML support
    */
   private parseCommandLine(): ServerConfig {
-    const args = process.argv;
-
-    // Get config file path
-    const configFile = parseConfigArg();
-
-    // Parse all parameters from command line (after YAML applied via applyYamlConfigToArgs)
     const transport = this.parseTransport();
     const exposition = this.parseExposition();
 
-    const result: ServerConfig = {
+    return {
       transport: transport || 'stdio',
       exposition: exposition.length > 0 ? exposition : ['readonly', 'high'],
-      configFile,
+      configFile: parseConfigArg(),
+      host: this.getArgValue('--host'),
+      port: this.parsePort(),
+      httpJsonResponse: this.hasArg('--http-json-response'),
+      envFile: this.getArgValue('--env'),
+      authBrokerPath: this.getArgValue('--auth-broker-path'),
+      mcpDestination: this.getArgValue('--mcp'),
     };
-
-    // Host and port
-    const host = this.getArgValue('--host');
-    if (host) result.host = host;
-
-    const port = this.getArgValue('--port');
-    if (port) result.port = parseInt(port, 10);
-
-    // HTTP JSON response
-    if (this.hasArg('--http-json-response')) {
-      result.httpJsonResponse = true;
-    }
-
-    // Environment settings
-    const envFile = this.getArgValue('--env');
-    if (envFile) result.envFile = envFile;
-
-    const authBrokerPath = this.getArgValue('--auth-broker-path');
-    if (authBrokerPath) result.authBrokerPath = authBrokerPath;
-
-    const mcpDestination = this.getArgValue('--mcp');
-    if (mcpDestination) result.mcpDestination = mcpDestination;
-
-    return result;
   }
 
   /**
@@ -155,6 +157,14 @@ export class ServerConfigManager {
   }
 
   /**
+   * Parse port from command line
+   */
+  private parsePort(): number | undefined {
+    const port = this.getArgValue('--port');
+    return port ? parseInt(port, 10) : undefined;
+  }
+
+  /**
    * Parse handler exposition from command line
    * Format: --exposition=readonly,high,low
    */
@@ -162,17 +172,17 @@ export class ServerConfigManager {
     const value = this.getArgValue('--exposition');
     if (!value) return [];
 
-    const sets = value.split(',').map(s => s.trim()).filter(Boolean);
-    const validSets: HandlerSet[] = [];
-
-    for (const set of sets) {
-      if (set === 'readonly' || set === 'high' || set === 'low') {
-        validSets.push(set);
-      }
-    }
-
-    return validSets;
+    return value
+      .split(',')
+      .map(s => s.trim())
+      .filter((s): s is HandlerSet =>
+        s === 'readonly' || s === 'high' || s === 'low'
+      );
   }
+
+  // --------------------------------------------------------------------------
+  // PRIVATE - Command Line Utilities
+  // --------------------------------------------------------------------------
 
   /**
    * Get argument value from command line
@@ -197,6 +207,10 @@ export class ServerConfigManager {
   private hasArg(name: string): boolean {
     return process.argv.includes(name);
   }
+
+  // --------------------------------------------------------------------------
+  // STATIC - Help Text Generation
+  // --------------------------------------------------------------------------
 
   /**
    * Get handler sets description for help text

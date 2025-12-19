@@ -14,6 +14,7 @@ export interface YamlConfig {
   unsafe?: boolean;
   "auth-broker"?: boolean;
   "auth-broker-path"?: string;
+  exposition?: string | string[]; // Handler sets: readonly, high, low
   http?: {
     port?: number;
     host?: string;
@@ -190,6 +191,16 @@ auth-broker: false
 # If not specified, uses platform-specific default paths
 auth-broker-path:
 
+# Handler sets to expose: readonly, high, low
+# Default: readonly,high
+# Use comma-separated list or YAML array
+exposition: readonly,high
+# Alternative YAML array format:
+# exposition:
+#   - readonly
+#   - high
+#   - low
+
 # HTTP/StreamableHTTP transport options
 http:
   # Server port
@@ -322,6 +333,14 @@ export function applyYamlConfigToArgs(config: YamlConfig): void {
   // Apply auth-broker-path
   if (config["auth-broker-path"] && !hasArg("--auth-broker-path")) {
     addArg("--auth-broker-path", config["auth-broker-path"]);
+  }
+
+  // Apply exposition
+  if (config.exposition && !hasArg("--exposition")) {
+    const exposition = Array.isArray(config.exposition)
+      ? config.exposition.join(",")
+      : config.exposition;
+    addArg("--exposition", exposition);
   }
 
   // Apply HTTP options

@@ -73,17 +73,18 @@ export async function handleUpdateFunctionGroup(context: HandlerContext, args: U
       // Use CrudClient for lock/unlock
       const crudClient = new CrudClient(connection);
 
-      // Lock function group
-      await crudClient.lockFunctionGroup({ functionGroupName });
-      const lockHandle = crudClient.getLockHandle();
-      if (!lockHandle) {
-        throw new Error('Failed to acquire lock handle');
-      }
-
-      // Small delay to ensure lock is fully established
-      await new Promise(resolve => setTimeout(resolve, 200));
-
+      let lockHandle: string | undefined = undefined;
       try {
+        // Lock function group
+        await crudClient.lockFunctionGroup({ functionGroupName });
+        lockHandle = crudClient.getLockHandle();
+        if (!lockHandle) {
+          throw new Error('Failed to acquire lock handle');
+        }
+
+        // Small delay to ensure lock is fully established
+        await new Promise(resolve => setTimeout(resolve, 200));
+
         // Get current XML using CrudClient (same connection, same session as lock)
         // This ensures we use the same session that was used for locking
         await crudClient.readFunctionGroup(functionGroupName);
@@ -116,41 +117,37 @@ export async function handleUpdateFunctionGroup(context: HandlerContext, args: U
             'Accept': 'application/vnd.sap.adt.functions.groups.v3+xml'
           }
         });
-
-        // Unlock
-        await crudClient.unlockFunctionGroup({ functionGroupName }, lockHandle);
-
-        logger?.info(`✅ UpdateFunctionGroup completed successfully: ${functionGroupName}`);
-
-        // Return success result
-        const result = {
-          success: true,
-          function_group_name: functionGroupName,
-          description: description,
-          transport_request: transport_request || 'local',
-          message: `Function group ${functionGroupName} metadata updated successfully`,
-          uri: `/sap/bc/adt/functions/groups/${encodeSapObjectName(functionGroupName)}`,
-          steps_completed: ['lock', 'get_current', 'update_metadata', 'unlock']
-        };
-
-        return return_response({
-          data: JSON.stringify(result, null, 2),
-          status: 200,
-          statusText: 'OK',
-          headers: {},
-          config: {} as any
-        });
-      } catch (error) {
-        // Try to unlock on error (only if lock was successful)
+      } finally {
+        // Always unlock if we got a lock handle
         if (lockHandle) {
           try {
             await crudClient.unlockFunctionGroup({ functionGroupName }, lockHandle);
-          } catch (unlockError) {
-            logger?.error(`Failed to unlock function group after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+          } catch (unlockError: any) {
+            logger?.warn(`Failed to unlock function group ${functionGroupName}: ${unlockError?.message || unlockError}`);
           }
         }
-        throw error;
       }
+
+      logger?.info(`✅ UpdateFunctionGroup completed successfully: ${functionGroupName}`);
+
+      // Return success result
+      const result = {
+        success: true,
+        function_group_name: functionGroupName,
+        description: description,
+        transport_request: transport_request || 'local',
+        message: `Function group ${functionGroupName} metadata updated successfully`,
+        uri: `/sap/bc/adt/functions/groups/${encodeSapObjectName(functionGroupName)}`,
+        steps_completed: ['lock', 'get_current', 'update_metadata', 'unlock']
+      };
+
+      return return_response({
+        data: JSON.stringify(result, null, 2),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {} as any
+      });
 
     } catch (error: any) {
       logger?.error(`Error updating function group metadata ${functionGroupName}: ${error?.message || error}`);

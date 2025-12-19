@@ -184,6 +184,81 @@ create_behavior_definition_low:
 # METADATA EXTENSION - Low-Level Handler
 # ============================================================================
 
+# ============================================================================
+# BEHAVIOR IMPLEMENTATION - High-Level Handler
+# ============================================================================
+
+# Behavior Implementation (Behavior Implementation - High-Level)
+create_behavior_implementation:
+  test_cases:
+    - name: "builder_behavior_implementation"
+      enabled: false
+      description: "Behavior Implementation used by BehaviorImplementationBuilder workflow tests"
+      params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
+        class_name: "<YOUR_BEHAVIOR_IMPLEMENTATION_CLASS_NAME>"
+        description: "Behavior Implementation for <YOUR_BEHAVIOR_DEFINITION_NAME>"
+        # package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        # ⚠️ IMPORTANT: behavior_definition MUST be an existing Behavior Definition name
+        behavior_definition: "<YOUR_EXISTING_BEHAVIOR_DEFINITION_NAME>"  # ⚠️ UPDATE: Replace with existing Behavior Definition name
+        # ⚠️ implementation_code is implementations include (local handler class), NOT main class
+        # Main class is created automatically with "FOR BEHAVIOR OF" clause
+        implementation_code: |
+          CLASS lhc_<your_behavior_definition_lowercase> DEFINITION INHERITING FROM cl_abap_behavior_handler.
+            PRIVATE SECTION.
+
+              METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
+                IMPORTING keys REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+
+              METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
+                IMPORTING REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+
+          ENDCLASS.
+
+          CLASS lhc_<your_behavior_definition_lowercase> IMPLEMENTATION.
+
+            METHOD get_instance_authorizations.
+            ENDMETHOD.
+
+            METHOD get_global_authorizations.
+            ENDMETHOD.
+
+          ENDCLASS.
+        # ⚠️ update_implementation_code is for updating the implementations include
+        update_implementation_code: |
+          CLASS lhc_<your_behavior_definition_lowercase> DEFINITION INHERITING FROM cl_abap_behavior_handler.
+            PRIVATE SECTION.
+
+              METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
+                IMPORTING keys REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+
+              METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
+                IMPORTING REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+
+              METHODS create FOR MODIFY
+                IMPORTING entities FOR CREATE <your_behavior_definition_lowercase>.
+
+          ENDCLASS.
+
+          CLASS lhc_<your_behavior_definition_lowercase> IMPLEMENTATION.
+
+            METHOD get_instance_authorizations.
+            ENDMETHOD.
+
+            METHOD get_global_authorizations.
+            ENDMETHOD.
+
+            METHOD create.
+              " Implementation for create operation
+            ENDMETHOD.
+
+          ENDCLASS.
+
+# ============================================================================
+# BEHAVIOR IMPLEMENTATION - Low-Level Handler
+# ============================================================================
+
 # Behavior Implementation (Behavior Implementation - Low-Level)
 
 # Behavior Implementation (Behavior Implementation - Low-Level)
@@ -616,6 +691,44 @@ create_domain_low:
 
 # Step 3: Read-only test (separate read-only handler)
 
+# Function Group & Function Module (High & Low Level Tests)
+create_function:
+  test_cases:
+    - name: "full_workflow"
+      enabled: true
+      description: "Complete function group and function module workflow for high and low level tests"
+      params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
+        # Function Group parameters
+        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
+        function_group_description: "Function group for workflow tests"
+        # ⚠️ DISABLED: update_description causes lock conflict after create
+        # update_function_group_description: "Function group for workflow tests (updated)"
+
+        # Function Module parameters
+        function_module_name: "<YOUR_FUNCTION_MODULE_NAME>"
+        function_module_description: "Function module for workflow tests"
+        source_code: |
+          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>.
+              IMPORTING
+                 VALUE(IV_PARAM) TYPE  STRING
+              EXPORTING
+                 VALUE(EV_RESULT) TYPE  STRING.
+            ev_result = |Result: { iv_param }|.
+          ENDFUNCTION.
+        update_source_code: |
+          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>.
+              IMPORTING
+                 VALUE(IV_PARAM) TYPE  STRING
+              EXPORTING
+                 VALUE(EV_RESULT) TYPE  STRING.
+            ev_result = |Updated Result: { iv_param }|.
+          ENDFUNCTION.
+
+        # Common parameters
+        # package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"
+
 # Function Group (Function Group)
 
 # Function Group (Function Group)
@@ -711,53 +824,6 @@ create_function_module:
         delete_object_type: "FUGR/FF"
 
 # Step 2: Low-level flow test (create → update → delete through low-level handlers)
-
-# Function Module (Function Module - Low-Level)
-
-# Function Module (Function Module - Low-Level)
-create_function_module_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        function_module_name: "<YOUR_FUNCTION_MODULE_NAME>_LOW"
-        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
-        description: "Test function module created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        source_code: |
-          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>_LOW
-            IMPORTING VALUE(IV_PARAM) TYPE STRING
-            EXPORTING VALUE(EV_RESULT) TYPE STRING.
-            ev_result = |Result: { iv_param }|.
-          ENDFUNCTION.
-        # Update through low-level
-        update_source_code: |
-          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>_LOW
-            IMPORTING VALUE(IV_PARAM) TYPE STRING
-            EXPORTING VALUE(EV_RESULT) TYPE STRING.
-            ev_result = |Updated via low-level: { iv_param }|.
-          ENDFUNCTION.
-    - name: "test_function_module_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        function_module_name: "<YOUR_FUNCTION_MODULE_NAME>_LOW"
-        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
-        description: "Test function module created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # Update through low-level
-        update_source_code: |
-          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>_LOW
-            IMPORTING VALUE(IV_PARAM) TYPE STRING
-            EXPORTING VALUE(EV_RESULT) TYPE STRING.
-            ev_result = |Updated via low-level: { iv_param }|.
-          ENDFUNCTION.
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "FUGR/FF"
 
 # Step 3: Read-only test (separate read-only handler)
 

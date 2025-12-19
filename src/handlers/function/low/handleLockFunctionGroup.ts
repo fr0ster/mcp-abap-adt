@@ -89,7 +89,9 @@ export async function handleLockFunctionGroup(context: HandlerContext, args: Loc
       }
 
       // Get updated session state after lock
-
+      const actualSessionId = connection.getSessionId() || session_id || null;
+      // Session state is passed through from input - auth-broker manages it
+      const actualSessionState = session_state || null;
 
       logger?.info(`✅ LockFunctionGroup completed: ${functionGroupName}`);
       logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
@@ -98,9 +100,9 @@ export async function handleLockFunctionGroup(context: HandlerContext, args: Loc
         data: JSON.stringify({
           success: true,
           function_group_name: functionGroupName,
-          session_id: session_id || null,
+          session_id: actualSessionId,
           lock_handle: lockHandle,
-          session_state: null, // Session state management is now handled by auth-broker,
+          session_state: actualSessionState,
           message: `FunctionGroup ${functionGroupName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`
         }, null, 2)
       } as AxiosResponse);

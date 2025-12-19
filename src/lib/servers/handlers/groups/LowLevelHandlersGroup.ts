@@ -1,13 +1,13 @@
 import { BaseHandlerGroup } from "../base/BaseHandlerGroup.js";
 import { HandlerEntry } from "../interfaces.js";
 
-// Import common low-level handlers
-import { handleActivateObject } from "../../../../handlers/common/low/handleActivateObject";
-import { handleDeleteObject } from "../../../../handlers/common/low/handleDeleteObject";
-import { handleCheckObject } from "../../../../handlers/common/low/handleCheckObject";
-import { handleValidateObject } from "../../../../handlers/common/low/handleValidateObject";
-import { handleLockObject } from "../../../../handlers/common/low/handleLockObject";
-import { handleUnlockObject } from "../../../../handlers/common/low/handleUnlockObject";
+// // Import common low-level handlers
+// import { handleActivateObject } from "../../../../handlers/common/low/handleActivateObject";
+// import { handleDeleteObject } from "../../../../handlers/common/low/handleDeleteObject";
+// import { handleCheckObject } from "../../../../handlers/common/low/handleCheckObject";
+// import { handleValidateObject } from "../../../../handlers/common/low/handleValidateObject";
+// import { handleLockObject } from "../../../../handlers/common/low/handleLockObject";
+// import { handleUnlockObject } from "../../../../handlers/common/low/handleUnlockObject";
 
 // Import low-level handlers - Package
 import { handleUpdatePackage } from "../../../../handlers/package/low/handleUpdatePackage";
@@ -145,13 +145,13 @@ import { handleCreateMetadataExtension as handleCreateMetadataExtensionLow } fro
 import { handleUpdateMetadataExtension as handleUpdateMetadataExtensionLow } from "../../../../handlers/ddlx/low/handleUpdateMetadataExtension";
 import { handleActivateMetadataExtension } from "../../../../handlers/ddlx/low/handleActivateMetadataExtension";
 
-// Import TOOL_DEFINITION from common low handlers
-import { TOOL_DEFINITION as ActivateObject_Tool } from "../../../../handlers/common/low/handleActivateObject";
-import { TOOL_DEFINITION as DeleteObject_Tool } from "../../../../handlers/common/low/handleDeleteObject";
-import { TOOL_DEFINITION as CheckObject_Tool } from "../../../../handlers/common/low/handleCheckObject";
-import { TOOL_DEFINITION as ValidateObject_Tool } from "../../../../handlers/common/low/handleValidateObject";
-import { TOOL_DEFINITION as LockObject_Tool } from "../../../../handlers/common/low/handleLockObject";
-import { TOOL_DEFINITION as UnlockObject_Tool } from "../../../../handlers/common/low/handleUnlockObject";
+// // Import TOOL_DEFINITION from common low handlers
+// import { TOOL_DEFINITION as ActivateObject_Tool } from "../../../../handlers/common/low/handleActivateObject";
+// import { TOOL_DEFINITION as DeleteObject_Tool } from "../../../../handlers/common/low/handleDeleteObject";
+// import { TOOL_DEFINITION as CheckObject_Tool } from "../../../../handlers/common/low/handleCheckObject";
+// import { TOOL_DEFINITION as ValidateObject_Tool } from "../../../../handlers/common/low/handleValidateObject";
+// import { TOOL_DEFINITION as LockObject_Tool } from "../../../../handlers/common/low/handleLockObject";
+// import { TOOL_DEFINITION as UnlockObject_Tool } from "../../../../handlers/common/low/handleUnlockObject";
 
 // Import TOOL_DEFINITION from package low handlers
 import { TOOL_DEFINITION as UpdatePackage_Tool } from "../../../../handlers/package/low/handleUpdatePackage";
@@ -301,47 +301,47 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
    */
   getHandlers(): HandlerEntry[] {
     return [
-      // Common low-level handlers
-      {
-        toolDefinition: {
-          name: ActivateObject_Tool.name,
-          description: ActivateObject_Tool.description,
-          inputSchema: ActivateObject_Tool.inputSchema,
-        },
-        handler: (args: any) => { return handleActivateObject(this.context, args) },
-      },
-      {
-        toolDefinition: {
-          name: CheckObject_Tool.name,
-          description: CheckObject_Tool.description,
-          inputSchema: CheckObject_Tool.inputSchema,
-        },
-        handler: (args: any) => { return handleCheckObject(this.context, args) },
-      },
-      {
-        toolDefinition: {
-          name: ValidateObject_Tool.name,
-          description: ValidateObject_Tool.description,
-          inputSchema: ValidateObject_Tool.inputSchema,
-        },
-        handler: (args: any) => { return handleValidateObject(this.context, args) },
-      },
-      {
-        toolDefinition: {
-          name: LockObject_Tool.name,
-          description: LockObject_Tool.description,
-          inputSchema: LockObject_Tool.inputSchema,
-        },
-        handler: (args: any) => { return handleLockObject(this.context, args) },
-      },
-      {
-        toolDefinition: {
-          name: UnlockObject_Tool.name,
-          description: UnlockObject_Tool.description,
-          inputSchema: UnlockObject_Tool.inputSchema,
-        },
-        handler: (args: any) => { return handleUnlockObject(this.context, args) },
-      },
+      // // Common low-level handlers
+      // {
+      //   toolDefinition: {
+      //     name: ActivateObject_Tool.name,
+      //     description: ActivateObject_Tool.description,
+      //     inputSchema: ActivateObject_Tool.inputSchema,
+      //   },
+      //   handler: (args: any) => { return handleActivateObject(this.context, args) },
+      // },
+      // {
+      //   toolDefinition: {
+      //     name: CheckObject_Tool.name,
+      //     description: CheckObject_Tool.description,
+      //     inputSchema: CheckObject_Tool.inputSchema,
+      //   },
+      //   handler: (args: any) => { return handleCheckObject(this.context, args) },
+      // },
+      // {
+      //   toolDefinition: {
+      //     name: ValidateObject_Tool.name,
+      //     description: ValidateObject_Tool.description,
+      //     inputSchema: ValidateObject_Tool.inputSchema,
+      //   },
+      //   handler: (args: any) => { return handleValidateObject(this.context, args) },
+      // },
+      // {
+      //   toolDefinition: {
+      //     name: LockObject_Tool.name,
+      //     description: LockObject_Tool.description,
+      //     inputSchema: LockObject_Tool.inputSchema,
+      //   },
+      //   handler: (args: any) => { return handleLockObject(this.context, args) },
+      // },
+      // {
+      //   toolDefinition: {
+      //     name: UnlockObject_Tool.name,
+      //     description: UnlockObject_Tool.description,
+      //     inputSchema: UnlockObject_Tool.inputSchema,
+      //   },
+      //   handler: (args: any) => { return handleUnlockObject(this.context, args) },
+      // },
       // Package low-level handlers
       {
         toolDefinition: {

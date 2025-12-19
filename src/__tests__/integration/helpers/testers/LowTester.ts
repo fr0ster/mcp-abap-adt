@@ -10,7 +10,7 @@
 import { LambdaTester, type TLambda } from './LambdaTester';
 import type { LambdaTesterContext } from './types';
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
-import { createHandlerContext, parseHandlerResponse, extractLockHandle } from '../testHelpers';
+import { createHandlerContext, parseHandlerResponse, extractLockHandle, delay } from '../testHelpers';
 
 // Handler function type: (context: HandlerContext, args: any) => Promise<any>
 type HandlerFunction = (context: HandlerContext, args: any) => Promise<any>;
@@ -69,6 +69,7 @@ export class LowTester extends LambdaTester {
 
         logger?.info?.(`   • cleanup: delete ${objectName}`);
         try {
+          await delay(2000); // Ensure object is ready for deletion
           const handlerContext = createHandlerContext({
             connection,
             logger: logger || undefined
@@ -262,10 +263,10 @@ export class LowTester extends LambdaTester {
     if (handlerName.includes('data_element')) return 'data_element_name';
     if (handlerName.includes('structure')) return 'structure_name';
     if (handlerName.includes('function')) return 'function_name';
-    if (handlerName.includes('behavior_definition')) return 'bdef_name';
-    if (handlerName.includes('behavior_implementation')) return 'bimp_name';
-    if (handlerName.includes('metadata_extension')) return 'ddlx_name';
-    if (handlerName.includes('service_definition')) return 'service_definition_name';
+    if (handlerName.includes('behavior_definition')) return 'name'; // behavior definition uses 'name' field
+    if (handlerName.includes('behavior_implementation')) return 'name'; // behavior implementation also uses 'name'
+    if (handlerName.includes('metadata_extension')) return 'name'; // metadata extension also uses 'name'
+    if (handlerName.includes('service_definition')) return 'name'; // service definition also uses 'name'
     return 'name'; // fallback
   }
 

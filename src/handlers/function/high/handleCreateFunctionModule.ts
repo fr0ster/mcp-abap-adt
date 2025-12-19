@@ -108,18 +108,27 @@ export async function handleCreateFunctionModule(context: HandlerContext, args: 
         transportRequest: typedArgs.transport_request
       });
 
-      // Lock
-      await client.lockFunctionModule({ functionModuleName, functionGroupName });
-      const lockHandle = client.getLockHandle();
+      let lockHandle: string | null = null;
+      try {
+        // Lock
+        await client.lockFunctionModule({ functionModuleName, functionGroupName });
+        lockHandle = client.getLockHandle();
 
-      // Update with source code
-      await client.updateFunctionModule({ functionModuleName, functionGroupName, sourceCode: typedArgs.source_code }, lockHandle);
+        // Update with source code
+        await client.updateFunctionModule({ functionModuleName, functionGroupName, sourceCode: typedArgs.source_code }, lockHandle);
 
-      // Check
-      await client.checkFunctionModule({ functionModuleName, functionGroupName });
-
-      // Unlock
-      await client.unlockFunctionModule({ functionModuleName, functionGroupName }, lockHandle);
+        // Check
+        await client.checkFunctionModule({ functionModuleName, functionGroupName });
+      } finally {
+        // Always unlock if we got a lock handle
+        if (lockHandle) {
+          try {
+            await client.unlockFunctionModule({ functionModuleName, functionGroupName }, lockHandle);
+          } catch (unlockError: any) {
+            logger?.warn(`Failed to unlock function module ${functionModuleName}: ${unlockError?.message || unlockError}`);
+          }
+        }
+      }
 
       // Activate if requested
       if (shouldActivate) {

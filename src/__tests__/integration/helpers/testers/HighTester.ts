@@ -144,6 +144,21 @@ export class HighTester extends LambdaTester {
       ...(params.ddl_code && { ddl_code: params.ddl_code }),
       ...(params.source_code && { source_code: params.source_code }),
       ...(params.superclass && { superclass: params.superclass }),
+      // Data element specific fields
+      ...(params.type_kind && { type_kind: params.type_kind }),
+      ...(params.data_type && { data_type: params.data_type }),
+      ...(params.length !== undefined && { length: params.length }),
+      ...(params.decimals !== undefined && { decimals: params.decimals }),
+      ...(params.short_label && { short_label: params.short_label }),
+      ...(params.medium_label && { medium_label: params.medium_label }),
+      ...(params.long_label && { long_label: params.long_label }),
+      ...(params.heading_label && { heading_label: params.heading_label }),
+      // Structure specific fields
+      ...(params.fields && { fields: params.fields }),
+      // Domain specific fields
+      ...(params.datatype && { datatype: params.datatype }),
+      ...(params.lowercase !== undefined && { lowercase: params.lowercase }),
+      ...(params.sign_exists !== undefined && { sign_exists: params.sign_exists }),
       ...(transportRequest && { transport_request: transportRequest }),
       ...(session?.session_id && { session_id: session.session_id }),
       ...(session?.session_state && { session_state: session.session_state })
@@ -151,13 +166,28 @@ export class HighTester extends LambdaTester {
   }
 
   private buildUpdateArgs(context: LambdaTesterContext): any {
-    const { objectName, params, session } = context;
+    const { objectName, params, packageName, transportRequest, session } = context;
     const nameField = this.getNameField();
     return {
       [nameField]: objectName,
-      ...(params.ddl_code && { ddl_code: params.ddl_code }),
+      ...(packageName && { package_name: packageName }),
+      ...(transportRequest && { transport_request: transportRequest }),
+      ...(params.update_ddl_code && { ddl_code: params.update_ddl_code }),
+      ...(params.ddl_code && !params.update_ddl_code && { ddl_code: params.ddl_code }),
       ...(params.source_code && { source_code: params.source_code }),
       ...(params.update_source_code && { source_code: params.update_source_code }),
+      ...(params.update_description && { description: params.update_description }),
+      // Data element specific fields for update
+      ...(params.type_kind && { type_kind: params.type_kind }),
+      ...(params.data_type && { data_type: params.data_type }),
+      ...(params.length !== undefined && { length: params.length }),
+      ...(params.decimals !== undefined && { decimals: params.decimals }),
+      // Structure specific fields for update
+      ...(params.fields && { fields: params.fields }),
+      // Domain specific fields for update
+      ...(params.datatype && { datatype: params.datatype }),
+      ...(params.lowercase !== undefined && { lowercase: params.lowercase }),
+      ...(params.sign_exists !== undefined && { sign_exists: params.sign_exists }),
       ...(session?.session_id && { session_id: session.session_id }),
       ...(session?.session_state && { session_state: session.session_state })
     };

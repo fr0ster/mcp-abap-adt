@@ -83,18 +83,26 @@ export async function handleUpdateFunctionModule(context: HandlerContext, args: 
       const shouldActivate = args.activate === true;
 
       // Execute operation chain: lock -> update -> check -> unlock -> (activate)
+      let lockHandle: string | null = null;
       try {
         await client.lockFunctionModule({ functionModuleName, functionGroupName });
-        const lockHandle = client.getLockHandle();
+        lockHandle = client.getLockHandle();
         await client.updateFunctionModule({ functionModuleName, functionGroupName, sourceCode: args.source_code }, lockHandle);
         await client.checkFunctionModule({ functionModuleName, functionGroupName });
-        await client.unlockFunctionModule({ functionModuleName, functionGroupName }, lockHandle);
-        if (shouldActivate) {
-          await client.activateFunctionModule({ functionModuleName, functionGroupName });
+      } finally {
+        // Always unlock if we got a lock handle
+        if (lockHandle) {
+          try {
+            await client.unlockFunctionModule({ functionModuleName, functionGroupName }, lockHandle);
+          } catch (unlockError: any) {
+            logger?.warn(`Failed to unlock function module ${functionModuleName}: ${unlockError?.message || unlockError}`);
+          }
         }
-      } catch (error) {
-        logger?.error(`Function module update chain failed: ${error instanceof Error ? error.message : String(error)}`);
-        throw error;
+      }
+
+      // Activate if requested (after unlock)
+      if (shouldActivate) {
+        await client.activateFunctionModule({ functionModuleName, functionGroupName });
       }
 
       logger?.info(`✅ UpdateFunctionModule completed successfully: ${functionModuleName}`);

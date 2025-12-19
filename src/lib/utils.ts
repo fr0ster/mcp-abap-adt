@@ -985,11 +985,29 @@ export function parseValidationResponse(response: AxiosResponse): {
     if (response.status === 200) {
       return { valid: true };
     }
-    // If parsing fails and status is not 200, assume validation failed
+    // If parsing fails and status is not 200, try to extract error message from response.data
+    let errorMessage = `Validation failed with status ${response.status}`;
+
+    // Try to extract error details from response data (plain text or XML)
+    if (response.data) {
+      const dataStr = typeof response.data === 'string' ? response.data : String(response.data);
+      // Try to extract meaningful error from plain text or unparsed XML
+      if (dataStr.length > 0 && dataStr.length < 1000) {
+        // If it's short text, use it directly (might be plain error message)
+        errorMessage = dataStr.trim();
+      } else if (dataStr.includes('<message>')) {
+        // Try simple regex extraction for <message> tag
+        const match = dataStr.match(/<message[^>]*>([^<]+)<\/message>/i);
+        if (match && match[1]) {
+          errorMessage = match[1].trim();
+        }
+      }
+    }
+
     return {
       valid: false,
       severity: 'ERROR',
-      message: `Validation failed with status ${response.status}`
+      message: errorMessage
     };
   }
 }

@@ -57,9 +57,9 @@ import { handleCreateInterface } from "../../handlers/interface/high/handleCreat
 import { handleCreateFunctionGroup } from "../../handlers/function/high/handleCreateFunctionGroup";
 import { handleUpdateFunctionGroup } from "../../handlers/function/high/handleUpdateFunctionGroup";
 import { handleCreateFunctionModule } from "../../handlers/function/high/handleCreateFunctionModule";
-import { handleActivateObject } from "../../handlers/common/low/handleActivateObject";
-import { handleDeleteObject } from "../../handlers/common/low/handleDeleteObject";
-import { handleCheckObject } from "../../handlers/common/low/handleCheckObject";
+// import { handleActivateObject } from "../../handlers/common/low/handleActivateObject";
+// import { handleDeleteObject } from "../../handlers/common/low/handleDeleteObject";
+// import { handleCheckObject } from "../../handlers/common/low/handleCheckObject";
 import { handleUpdateClass as handleUpdateClassHigh } from "../../handlers/class/high/handleUpdateClass";
 import { handleUpdateProgram as handleUpdateProgramHigh } from "../../handlers/program/high/handleUpdateProgram";
 import { handleUpdateView as handleUpdateViewHigh } from "../../handlers/view/high/handleUpdateView";
@@ -246,9 +246,9 @@ import { TOOL_DEFINITION as CreateInterface_Tool } from "../../handlers/interfac
 import { TOOL_DEFINITION as CreateFunctionGroup_Tool } from "../../handlers/function/high/handleCreateFunctionGroup";
 import { TOOL_DEFINITION as UpdateFunctionGroup_Tool } from "../../handlers/function/high/handleUpdateFunctionGroup";
 import { TOOL_DEFINITION as CreateFunctionModule_Tool } from "../../handlers/function/high/handleCreateFunctionModule";
-import { TOOL_DEFINITION as ActivateObject_Tool } from "../../handlers/common/low/handleActivateObject";
-import { TOOL_DEFINITION as DeleteObject_Tool } from "../../handlers/common/low/handleDeleteObject";
-import { TOOL_DEFINITION as CheckObject_Tool } from "../../handlers/common/low/handleCheckObject";
+// import { TOOL_DEFINITION as ActivateObject_Tool } from "../../handlers/common/low/handleActivateObject";
+// import { TOOL_DEFINITION as DeleteObject_Tool } from "../../handlers/common/low/handleDeleteObject";
+// import { TOOL_DEFINITION as CheckObject_Tool } from "../../handlers/common/low/handleCheckObject";
 import { TOOL_DEFINITION as UpdateClassHigh_Tool } from "../../handlers/class/high/handleUpdateClass";
 import { TOOL_DEFINITION as UpdateProgramHigh_Tool } from "../../handlers/program/high/handleUpdateProgram";
 import { TOOL_DEFINITION as UpdateViewHigh_Tool } from "../../handlers/view/high/handleUpdateView";
@@ -673,9 +673,9 @@ export class McpHandlers {
     this.registerToolOnServer(server, UpdateViewHigh_Tool.name, UpdateViewHigh_Tool.description, UpdateViewHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateViewHigh(context, args) });
     this.registerToolOnServer(server, UpdateInterfaceHigh_Tool.name, UpdateInterfaceHigh_Tool.description, UpdateInterfaceHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateInterfaceHigh(context, args) });
     this.registerToolOnServer(server, UpdateFunctionModuleHigh_Tool.name, UpdateFunctionModuleHigh_Tool.description, UpdateFunctionModuleHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateFunctionModuleHigh(context, args) });
-    this.registerToolOnServer(server, ActivateObject_Tool.name, ActivateObject_Tool.description, ActivateObject_Tool.inputSchema as any, (args: any) => { return handleActivateObject(context, args) });
-    this.registerToolOnServer(server, DeleteObject_Tool.name, DeleteObject_Tool.description, DeleteObject_Tool.inputSchema as any, (args: any) => { return handleDeleteObject(context, args) });
-    this.registerToolOnServer(server, CheckObject_Tool.name, CheckObject_Tool.description, CheckObject_Tool.inputSchema as any, (args: any) => { return handleCheckObject(context, args) });
+    // this.registerToolOnServer(server, ActivateObject_Tool.name, ActivateObject_Tool.description, ActivateObject_Tool.inputSchema as any, (args: any) => { return handleActivateObject(context, args) });
+    // this.registerToolOnServer(server, DeleteObject_Tool.name, DeleteObject_Tool.description, DeleteObject_Tool.inputSchema as any, (args: any) => { return handleDeleteObject(context, args) });
+    // this.registerToolOnServer(server, CheckObject_Tool.name, CheckObject_Tool.description, CheckObject_Tool.inputSchema as any, (args: any) => { return handleCheckObject(context, args) });
     this.registerToolOnServer(server, GetSession_Tool.name, GetSession_Tool.description, GetSession_Tool.inputSchema as any, (args: any) => { return handleGetSession(context, args) });
     this.registerToolOnServer(server, ValidateObject_Tool.name, ValidateObject_Tool.description, ValidateObject_Tool.inputSchema as any, (args: any) => { return handleValidateObject(context, args) });
     this.registerToolOnServer(server, LockObject_Tool.name, LockObject_Tool.description, LockObject_Tool.inputSchema as any, (args: any) => { return handleLockObject(context, args) });

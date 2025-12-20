@@ -87,3 +87,4 @@ docker/nginx.conf
 
 *.d.ts
 *.d.ts.map
+mdd.json

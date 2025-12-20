@@ -60,7 +60,7 @@ function spawnInspector(port) {
     '--transport',
     'http',
     '--server-url',
-    `http://localhost:${port}`,
+    `http://localhost:${port}/mcp/stream/http`,
   ];
   const opts = {
     stdio: 'inherit',

@@ -2872,7 +2872,9 @@ export class mcp_abap_adt_server {
           }
 
           // Validate that we have a real config (not placeholder) only for requests that need it
-          if (requiresSapConfig && (!sessionSapConfig || sessionSapConfig.url === "http://placeholder" || sessionSapConfig.url === "http://injected-connection")) {
+          // BUT: Allow proceeding if defaultDestination is set (auth-broker will create connection)
+          const hasDefaultDestination = !!this.defaultDestination;
+          if (requiresSapConfig && !hasDefaultDestination && (!sessionSapConfig || sessionSapConfig.url === "http://placeholder" || sessionSapConfig.url === "http://injected-connection")) {
             // Check what headers were provided
             const providedHeaders: Record<string, string> = {};
             if (req.headers[HEADER_SAP_DESTINATION_SERVICE]) providedHeaders[HEADER_SAP_DESTINATION_SERVICE] = String(req.headers[HEADER_SAP_DESTINATION_SERVICE]);
@@ -2890,6 +2892,7 @@ export class mcp_abap_adt_server {
               baseConfigUrl: this.sapConfig?.url,
               providedHeaders: Object.keys(providedHeaders).length > 0 ? providedHeaders : 'none',
               hasAuthBroker: this.transportConfig.type === "streamable-http",
+              hasDefaultDestination,
               hint: "For destination-based auth, ensure service key file exists and destination name matches exactly (case-sensitive). For direct auth, provide x-sap-url and x-sap-auth-type headers.",
             });
 

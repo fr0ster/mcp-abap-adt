@@ -28,6 +28,11 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected authBroker?: AuthBroker;
 
+  /**
+   * Cached connection for stdio mode (created once, reused for all requests)
+   */
+  private cachedConnection: AbapConnection | null = null;
+
   constructor(options: { name: string; version?: string; logger?: Logger }) {
     super({ name: options.name, version: options.version ?? "1.0.0" });
     this.logger = options.logger ?? defaultLogger;
@@ -157,19 +162,40 @@ export abstract class BaseMcpServer extends McpServer {
    * Gets ABAP connection from connection context
    * Creates connection using connectionParams from context
    * Automatically refreshes token via AuthBroker if available (inside makeAdtRequest)
+   * For stdio mode: caches connection and reuses it for all requests (like v1)
+   * For SSE/HTTP: creates new connection per request
    */
   protected async getConnection(): Promise<AbapConnection> {
     if (!this.connectionContext?.connectionParams) {
       throw new Error('Connection context not set. Call setConnectionContext() first.');
     }
 
-    const connection = createAbapConnection(this.connectionContext.connectionParams);
     const destination = this.connectionContext.metadata?.destination as string | undefined;
+    const sessionId = this.connectionContext.sessionId;
+
+    // For stdio mode: cache connection and reuse it (like v1)
+    // This prevents creating new connection on each request, which would trigger browser auth
+    // Check if we have cached connection with same sessionId (stdio uses destination as sessionId)
+    if (destination && this.cachedConnection && sessionId === destination) {
+      // Reuse cached connection for stdio mode
+      return this.cachedConnection;
+    }
+
+    const connection = createAbapConnection(this.connectionContext.connectionParams);
+    let finalConnection = connection;
+
     if (destination) {
       const { createDestinationAwareConnection } = await import('../../lib/utils.js');
-      return createDestinationAwareConnection(connection, destination);
+      finalConnection = createDestinationAwareConnection(connection, destination);
+
+      // Cache connection for stdio mode (when sessionId === destination, it's stdio)
+      // SSE/HTTP modes use different sessionId per request, so caching won't interfere
+      if (sessionId === destination) {
+        this.cachedConnection = finalConnection;
+      }
     }
-    return connection;
+
+    return finalConnection;
   }
 
   /**

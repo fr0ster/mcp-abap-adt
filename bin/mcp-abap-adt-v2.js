@@ -5,29 +5,12 @@
  *
  * Runs the new server stack (stdio | sse | http) based on --transport flag.
  * Defaults to stdio.
+ *
+ * NOTE: Using direct require() instead of spawn() to ensure proper stdio handling.
+ * spawn() with stdio: 'inherit' can cause issues with MCP protocol
+ * because the parent process becomes an unnecessary intermediate layer.
  */
 
-const { spawn } = require('child_process');
-const path = require('path');
-
-// Path to compiled launcher (v2)
-const launcherPath = path.resolve(__dirname, '../dist/server/v2/launcher.js');
-
-// Passthrough args
-const args = process.argv.slice(2);
-
-const child = spawn(process.execPath, [launcherPath, ...args], {
-  stdio: 'inherit',
-  env: process.env,
-  cwd: process.cwd(),
-  shell: false,
-});
-
-child.on('error', (error) => {
-  console.error(`[mcp-abap-adt-v2] Failed to start: ${error.message}`);
-  process.exit(1);
-});
-
-child.on('exit', (code, signal) => {
-  process.exit(code ?? 0);
-});
+// Just require the launcher entry point directly - this runs the server in the same process
+// with proper stdin/stdout handling for MCP protocol
+require('../dist/server/v2/launcher.js');

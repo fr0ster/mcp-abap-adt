@@ -8,7 +8,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { parse as parseYaml } from "yaml";
 import { ArgumentsParser, ParsedArguments } from "./ArgumentsParser.js";
-import { ServerConfig } from "./ServerConfig.js";
+import type { IServerConfig } from "../../server/v1/IServerConfig.js";
 import { TransportConfig } from "../utils.js";
 import { YamlConfig, loadYamlConfig, generateConfigTemplateIfNeeded } from "./yamlConfig.js";
 
@@ -17,7 +17,7 @@ export class ConfigLoader {
    * Load and merge configuration from CLI arguments and YAML file
    * CLI arguments override YAML values
    */
-  static load(): ServerConfig {
+  static load(): IServerConfig {
     // Parse CLI arguments first
     const cliArgs = ArgumentsParser.parse();
 
@@ -51,7 +51,7 @@ export class ConfigLoader {
     const transport = this.buildTransportConfig(mergedArgs);
 
     // Build server config
-    const config: ServerConfig = {
+    const config: IServerConfig = {
       defaultMcpDestination: mergedArgs.mcp,
       defaultDestination: mergedArgs.mcp || (mergedArgs.env ? undefined : undefined), // Will be resolved later
       envFilePath: mergedArgs.env,

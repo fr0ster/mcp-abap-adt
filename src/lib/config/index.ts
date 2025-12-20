@@ -5,7 +5,7 @@
 
 export { ArgumentsParser, type ParsedArguments } from "./ArgumentsParser.js";
 export { ConfigLoader } from "./ConfigLoader.js";
-export { type ServerConfig } from "./ServerConfig.js";
+export { type IServerConfig } from "./IServerConfig.js";
 
 // Server configuration manager
 export { ServerConfigManager } from './ServerConfigManager.js';

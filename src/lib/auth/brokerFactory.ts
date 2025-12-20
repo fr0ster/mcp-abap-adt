@@ -1,5 +1,5 @@
 /**
- * Unified AuthBrokerFactory for both old and new servers
+ * Default implementation of AuthBrokerFactory
  * Implements unified broker creation logic according to UNIFIED_BROKER_LOGIC.md
  *
  * Key principles:
@@ -25,31 +25,13 @@ import * as fs from "fs";
 import { detectStoreType } from "../stores";
 import { getPlatformPaths } from "../stores/platformPaths";
 import type { ILogger } from "@mcp-abap-adt/interfaces";
-import type { ServerConfig } from "../config/ServerConfig.js";
+import type { IAuthBrokerFactory } from "./IAuthBrokerFactory.js";
+import type { IAuthBrokerFactoryConfig } from "./IAuthBrokerFactoryConfig.js";
 
 /**
- * @deprecated Use ServerConfig instead
+ * Default implementation of IAuthBrokerFactory
  */
-export interface AuthBrokerFactoryConfig {
-  /** Default MCP destination from --mcp parameter */
-  defaultMcpDestination?: string;
-  /** Default destination (from --mcp or .env) */
-  defaultDestination?: string;
-  /** Path to .env file */
-  envFilePath?: string;
-  /** Custom path for auth broker storage */
-  authBrokerPath?: string;
-  /** Use unsafe mode (file-based session store) */
-  unsafe: boolean;
-  /** Transport type */
-  transportType: string;
-  /** Use auth-broker instead of .env file */
-  useAuthBroker?: boolean;
-  /** Logger instance */
-  logger?: ILogger;
-}
-
-export class AuthBrokerFactory {
+export class AuthBrokerFactory implements IAuthBrokerFactory {
   // Map of brokers: key = destination name (or 'default' for default broker)
   private authBrokers = new Map<string, AuthBroker>();
 
@@ -57,74 +39,31 @@ export class AuthBrokerFactory {
   // Key: `${storeType}::${serviceKeysDir}::${sessionsDir}::${unsafe}`
   private sharedStores = new Map<string, { serviceKeyStore?: IServiceKeyStore; sessionStore: ISessionStore }>();
 
-  private config: ServerConfig | AuthBrokerFactoryConfig;
+  private config: IAuthBrokerFactoryConfig;
   private defaultBrokerInitialized = false;
 
-  constructor(config: ServerConfig | AuthBrokerFactoryConfig) {
+  constructor(config: IAuthBrokerFactoryConfig) {
     this.config = config;
   }
 
   /**
-   * Create AuthBrokerFactory from ServerConfig (recommended)
+   * Get transport type from config
    */
-  static fromServerConfig(config: ServerConfig): AuthBrokerFactory {
-    return new AuthBrokerFactory(config);
-  }
-
-  /**
-   * Get config values (handles both ServerConfig and legacy AuthBrokerFactoryConfig)
-   */
-  private getConfigValue<K extends keyof ServerConfig>(
-    key: K
-  ): ServerConfig[K] | undefined {
-    if (this.isServerConfig(this.config)) {
-      return this.config[key];
-    }
-    // Legacy config mapping
-    const legacyConfig = this.config as AuthBrokerFactoryConfig;
-    switch (key) {
-      case "defaultMcpDestination":
-        return legacyConfig.defaultMcpDestination as any;
-      case "defaultDestination":
-        return legacyConfig.defaultDestination as any;
-      case "envFilePath":
-        return legacyConfig.envFilePath as any;
-      case "authBrokerPath":
-        return legacyConfig.authBrokerPath as any;
-      case "unsafe":
-        return legacyConfig.unsafe as any;
-      case "useAuthBroker":
-        // If explicitly set, use it; otherwise if --mcp is set, use auth-broker (--mcp implies auth-broker)
-        return legacyConfig.useAuthBroker !== undefined
-          ? legacyConfig.useAuthBroker as any
-          : !!legacyConfig.defaultMcpDestination as any;
-      case "transport":
-        return {
-          type: legacyConfig.transportType === "sse" ? "sse" :
-                legacyConfig.transportType === "streamable-http" || legacyConfig.transportType === "http" ? "streamable-http" :
-                "stdio",
-        } as any;
-      case "logger":
-        return legacyConfig.logger as any;
-      default:
-        return undefined;
-    }
-  }
-
-  private isServerConfig(config: any): config is ServerConfig {
-    return config && typeof config === "object" && "transport" in config;
+  private getTransportType(): string {
+    return this.config.transportType;
   }
 
   /**
    * Check if transport type supports AuthBroker
    */
   private isTransportSupported(): boolean {
-    const transport = this.getConfigValue("transport");
-    if (!transport) return false;
+    const transportType = this.getTransportType();
+    if (!transportType) return false;
     return (
-      transport.type === "streamable-http" ||
-      transport.type === "stdio" ||
-      transport.type === "sse"
+      transportType === "streamable-http" ||
+      transportType === "http" ||
+      transportType === "stdio" ||
+      transportType === "sse"
     );
   }
 
@@ -147,16 +86,30 @@ export class AuthBrokerFactory {
       return;
     }
 
-    const logger = this.getConfigValue("logger") || defaultLogger;
-    const defaultMcpDestination = this.getConfigValue("defaultMcpDestination");
-    const envFilePath = this.getConfigValue("envFilePath");
-    const useAuthBroker = this.getConfigValue("useAuthBroker");
-    const unsafe = this.getConfigValue("unsafe") || false;
-    const transport = this.getConfigValue("transport");
-    const isStdio = transport?.type === "stdio";
-    const isSse = transport?.type === "sse";
-    const customPath = this.getConfigValue("authBrokerPath")
-      ? path.resolve(this.getConfigValue("authBrokerPath")!)
+    const logger = this.config.logger || defaultLogger;
+    const defaultMcpDestination = this.config.defaultMcpDestination;
+    const envFilePath = this.config.envFilePath;
+    const useAuthBroker = this.config.useAuthBroker !== undefined
+      ? this.config.useAuthBroker
+      : !!this.config.defaultMcpDestination; // If --mcp is set, use auth-broker
+    const unsafe = this.config.unsafe || false;
+    const transportType = this.getTransportType();
+    const isStdio = transportType === "stdio";
+    const isSse = transportType === "sse";
+    const isHttp = transportType === "http";
+
+    logger.debug("[BrokerFactory] initializeDefaultBroker called", {
+      type: "BROKER_INIT_START",
+      defaultMcpDestination,
+      envFilePath,
+      useAuthBroker,
+      transportType,
+      isStdio,
+      isSse,
+      isHttp,
+    });
+    const customPath = this.config.authBrokerPath
+      ? path.resolve(this.config.authBrokerPath)
       : undefined;
 
     // Check if .env exists in current directory
@@ -170,6 +123,7 @@ export class AuthBrokerFactory {
       serviceKeyDestination?: string;
       sessionStorePath: string;
       storeType: 'abap' | 'btp';
+      envFileToLoad?: string; // Track which .env file to load
     } | null = null;
 
     // Variant 1: --mcp=destination specified
@@ -189,9 +143,10 @@ export class AuthBrokerFactory {
         storeType: detected.storeType,
       };
     }
-    // Variant 2: --env=path specified
-    else if (envFilePath) {
+    // Variant 2: --env=path specified (stdio/sse/http)
+    else if (envFilePath && (isStdio || isSse || isHttp)) {
       shouldCreateDefault = true;
+      console.error("[DEBUG] Variant 2: --env specified", { envFilePath, isStdio, isSse, isHttp });
       const envFileDir = path.dirname(envFilePath);
       const serviceKeysPaths = getPlatformPaths(envFileDir, 'service-keys');
       const sessionsPaths = getPlatformPaths(envFileDir, 'sessions');
@@ -204,10 +159,12 @@ export class AuthBrokerFactory {
         hasServiceKeyStore: false,
         sessionStorePath: sessionsDir,
         storeType: detected.storeType,
+        envFileToLoad: envFilePath, // Store which .env file to load
       };
+      console.error("[DEBUG] Variant 2 config created", defaultBrokerConfig);
     }
-    // Variant 3: stdio/sse + .env in current folder + NOT --auth-broker
-    else if ((isStdio || isSse) && hasCwdEnv && !useAuthBroker) {
+    // Variant 3: stdio/sse/http + .env in current folder + NOT --auth-broker
+    else if ((isStdio || isSse || isHttp) && hasCwdEnv && !useAuthBroker) {
       shouldCreateDefault = true;
       const serviceKeysPaths = getPlatformPaths(process.cwd(), 'service-keys');
       const sessionsPaths = getPlatformPaths(process.cwd(), 'sessions');
@@ -220,10 +177,12 @@ export class AuthBrokerFactory {
         hasServiceKeyStore: false,
         sessionStorePath: sessionsDir,
         storeType: detected.storeType,
+        envFileToLoad: cwdEnvPath, // Use .env from current directory
       };
     }
 
     if (shouldCreateDefault && defaultBrokerConfig) {
+      console.error("[DEBUG] Creating default broker", { shouldCreateDefault, hasConfig: !!defaultBrokerConfig });
       try {
         logger.debug("Initializing default broker", {
           type: "DEFAULT_BROKER_INIT_START",
@@ -243,15 +202,15 @@ export class AuthBrokerFactory {
         );
 
         // Load .env file into session store for Variant 2 and 3
-        if (!defaultBrokerConfig.hasServiceKeyStore && envFilePath) {
+        if (!defaultBrokerConfig.hasServiceKeyStore && defaultBrokerConfig.envFileToLoad) {
           const broker = this.authBrokers.get('default');
           if (broker) {
             try {
-              await this.loadEnvFileIntoSessionStore(envFilePath, 'default', broker, logger);
+              await this.loadEnvFileIntoSessionStore(defaultBrokerConfig.envFileToLoad, 'default', broker, logger);
             } catch (error) {
               logger.error("Failed to load .env file into session store", {
                 type: "ENV_LOAD_FAILED",
-                envFilePath,
+                envFilePath: defaultBrokerConfig.envFileToLoad,
                 error: error instanceof Error ? error.message : String(error),
               });
               throw error;
@@ -265,9 +224,11 @@ export class AuthBrokerFactory {
           type: "DEFAULT_BROKER_INIT_SUCCESS",
           hasServiceKeyStore: defaultBrokerConfig.hasServiceKeyStore,
           serviceKeyDestination: defaultBrokerConfig.serviceKeyDestination,
-          hasEnvFile: !defaultBrokerConfig.hasServiceKeyStore && !!envFilePath,
+          hasEnvFile: !defaultBrokerConfig.hasServiceKeyStore && !!defaultBrokerConfig.envFileToLoad,
+          envFilePath: defaultBrokerConfig.envFileToLoad,
         });
       } catch (error) {
+        console.error("[DEBUG] Failed to initialize default broker", error);
         logger.error("Failed to initialize default broker", {
           type: "DEFAULT_BROKER_INIT_FAILED",
           error: error instanceof Error ? error.message : String(error),
@@ -293,7 +254,7 @@ export class AuthBrokerFactory {
    * Get default broker (if initialized)
    */
   getDefaultBroker(): AuthBroker | undefined {
-    return this.authBrokers.get('default');
+    return this.authBrokers.get('default') || undefined;
   }
 
   /**
@@ -318,12 +279,21 @@ export class AuthBrokerFactory {
       return this.getDefaultBroker();
     }
 
+    // Special case: if destination is 'default', return default broker (don't create new one)
+    if (destination === 'default') {
+      // Ensure default broker is initialized
+      if (!this.defaultBrokerInitialized) {
+        await this.initializeDefaultBroker();
+      }
+      return this.getDefaultBroker();
+    }
+
     // Get or create broker for specific destination
     if (!this.authBrokers.has(destination)) {
-      const logger = this.getConfigValue("logger") || defaultLogger;
-      const unsafe = this.getConfigValue("unsafe") || false;
-      const customPath = this.getConfigValue("authBrokerPath")
-        ? path.resolve(this.getConfigValue("authBrokerPath")!)
+      const logger = this.config.logger || defaultLogger;
+      const unsafe = this.config.unsafe || false;
+      const customPath = this.config.authBrokerPath
+        ? path.resolve(this.config.authBrokerPath)
         : undefined;
 
       const serviceKeysPaths = getPlatformPaths(customPath, 'service-keys');
@@ -352,7 +322,7 @@ export class AuthBrokerFactory {
       }
     }
 
-    return this.authBrokers.get(destination);
+    return this.authBrokers.get(destination) || undefined;
   }
 
   /**
@@ -367,9 +337,9 @@ export class AuthBrokerFactory {
     storeType: 'abap' | 'btp',
     unsafe: boolean
   ): Promise<void> {
-    const logger = this.getConfigValue("logger") || defaultLogger;
-    const customPath = this.getConfigValue("authBrokerPath")
-      ? path.resolve(this.getConfigValue("authBrokerPath")!)
+    const logger = this.config.logger || defaultLogger;
+    const customPath = this.config.authBrokerPath
+      ? path.resolve(this.config.authBrokerPath)
       : undefined;
 
     const serviceKeysPaths = getPlatformPaths(customPath, 'service-keys');
@@ -446,9 +416,8 @@ export class AuthBrokerFactory {
 
     const { serviceKeyStore, sessionStore } = stores;
 
-    // Create token provider only when service key store is available
-    // For .env-only setup (no service key), no token provider needed - user manages tokens
-    const tokenProvider = hasServiceKeyStore ? new BtpTokenProvider() : undefined;
+    // Create token provider with browser auth port from config (to avoid port conflicts)
+    const tokenProvider = new BtpTokenProvider(this.config.browserAuthPort);
 
     // Pre-seed session store with data from service key (without tokens) to avoid stale/absent configs
     if (hasServiceKeyStore && serviceKeyDestination) {

@@ -11,49 +11,10 @@
  * Uses dependency injection pattern to reuse existing yamlConfig infrastructure
  */
 
-import {
-  parseConfigArg,
-  loadYamlConfig,
-  generateConfigTemplateIfNeeded,
-  applyYamlConfigToArgs,
-  type YamlConfig,
-} from './yamlConfig.js';
+import { parseConfigArg, applyYamlConfigToArgs, loadYamlConfig, generateConfigTemplateIfNeeded } from "./yamlConfig.js";
+import type { IServerConfig, Transport, HandlerSet } from "../../server/v2/IServerConfig.js";
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
-
-/**
- * Handler exposition sets
- */
-export type HandlerSet = 'readonly' | 'high' | 'low';
-
-/**
- * Transport type
- */
-export type Transport = 'stdio' | 'sse' | 'http';
-
-/**
- * Server configuration interface
- */
-export interface ServerConfig {
-  // Transport settings
-  transport: Transport;
-  host?: string;
-  port?: number;
-  httpJsonResponse?: boolean;
-
-  // Environment settings
-  envFile?: string;
-  authBrokerPath?: string;
-  mcpDestination?: string;
-
-  // Handler exposition
-  exposition: HandlerSet[];
-
-  // Config file
-  configFile?: string;
-}
+export type { Transport, HandlerSet } from "../../server/v2/IServerConfig.js";
 
 // ============================================================================
 // SERVER CONFIGURATION MANAGER CLASS
@@ -63,7 +24,7 @@ export interface ServerConfig {
  * Server Configuration Manager
  */
 export class ServerConfigManager {
-  private config: ServerConfig | null = null;
+  private config: IServerConfig | null = null;
 
   // --------------------------------------------------------------------------
   // PUBLIC API - Configuration Access
@@ -73,7 +34,7 @@ export class ServerConfigManager {
    * Get current configuration with async YAML support
    * Uses existing yamlConfig infrastructure via DI
    */
-  async getConfig(): Promise<ServerConfig> {
+  async getConfig(): Promise<IServerConfig> {
     if (this.config) {
       return { ...this.config };
     }
@@ -90,7 +51,7 @@ export class ServerConfigManager {
    * Get current configuration synchronously (for backward compatibility)
    * Note: If used before getConfig(), will not include YAML config values
    */
-  getConfigSync(): ServerConfig {
+  getConfigSync(): IServerConfig {
     if (!this.config) {
       this.config = this.parseCommandLine();
     }
@@ -128,7 +89,7 @@ export class ServerConfigManager {
    * Parse command line arguments
    * Note: Should be called after applyYamlConfigToArgs for proper YAML support
    */
-  private parseCommandLine(): ServerConfig {
+  private parseCommandLine(): IServerConfig {
     const transport = this.parseTransport();
     const exposition = this.parseExposition();
 
@@ -140,8 +101,11 @@ export class ServerConfigManager {
       port: this.parsePort(),
       httpJsonResponse: this.hasArg('--http-json-response'),
       envFile: this.getArgValue('--env'),
+      envFilePath: this.getArgValue('--env'),
       authBrokerPath: this.getArgValue('--auth-broker-path'),
       mcpDestination: this.getArgValue('--mcp'),
+      unsafe: this.hasArg('--unsafe') || process.env.MCP_UNSAFE === 'true',
+      useAuthBroker: this.hasArg('--auth-broker') || process.env.MCP_USE_AUTH_BROKER === 'true',
     };
   }
 
@@ -221,6 +185,7 @@ HANDLER EXPOSITION:
   --exposition=<sets>              Comma-separated handler sets to expose
                                    Options: readonly, high, low
                                    Default: readonly,high
+                                   Note: search and system handlers are ALWAYS included
                                    Examples:
                                    --exposition=readonly       (only read-only operations)
                                    --exposition=readonly,high  (read-only + high-level writes)

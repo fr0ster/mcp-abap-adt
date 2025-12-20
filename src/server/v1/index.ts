@@ -6,7 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import { McpHandlers } from "../v2/mcp_handlers";
+import { McpHandlers } from "./mcp_handlers";
 import path from "path";
 import * as os from "os";
 // dotenv removed - using manual .env parsing for all modes to avoid stdout pollution
@@ -27,6 +27,7 @@ import {
   HEADER_AUTHORIZATION,
 } from "@mcp-abap-adt/interfaces";
 import { AuthBrokerFactory } from "../../lib/auth/index";
+import { AuthBrokerConfig } from "./AuthBrokerConfig.js";
 import { getPlatformPaths } from "../../lib/stores/platformPaths";
 import { defaultLogger } from "@mcp-abap-adt/logger";
 import {
@@ -361,19 +362,74 @@ SERVICE KEYS (Destination-Based Authentication):
 
     The destination name must exactly match the service key filename (without .json extension, case-sensitive).
 
-    Example Cline configuration (~/.cline/mcp.json):
+    Example Cline configurations (~/.cline/mcp.json):
+
+    1. Stdio with .env file:
       {
         "mcpServers": {
-          "mcp-abap-adt": {
-            "command": "npx",
-            "args": ["-y", "@mcp-abap-adt/server", "--transport=http", "--http-port=3000"],
-            "env": {}
+          "mcp-abap-adt-stdio": {
+            "type": "stdio",
+            "command": "mcp-abap-adt",
+            "args": ["--env=/path/to/.env"],
+            "timeout": 60
           }
         }
       }
 
-      Then in Cline, use destination in requests:
-        Headers: x-sap-destination: TRIAL
+    2. Stdio with MCP destination (requires service key):
+      {
+        "mcpServers": {
+          "mcp-abap-adt-mcp": {
+            "type": "stdio",
+            "command": "mcp-abap-adt",
+            "args": ["--unsafe", "--mcp=trial"],
+            "timeout": 60,
+            "autoApprove": []
+          }
+        }
+      }
+
+    3. SSE with .env (requires server running):
+      {
+        "mcpServers": {
+          "mcp-abap-adt-sse": {
+            "type": "sse",
+            "url": "http://localhost:3001/sse",
+            "timeout": 60
+          }
+        }
+      }
+
+    4. HTTP with destination (requires proxy server running):
+      {
+        "mcpServers": {
+          "mcp-abap-adt-http": {
+            "type": "streamableHttp",
+            "url": "http://localhost:3001/mcp/stream/http",
+            "headers": {
+              "x-mcp-destination": "trial"
+            },
+            "timeout": 60
+          }
+        }
+      }
+
+    5. HTTP with direct auth (manual token refresh needed):
+      {
+        "mcpServers": {
+          "mcp-abap-adt-direct": {
+            "type": "streamableHttp",
+            "url": "http://localhost:3000/mcp/stream/http",
+            "headers": {
+              "x-sap-url": "https://your-system.com",
+              "x-sap-auth-type": "jwt",
+              "x-sap-jwt-token": "your-token",
+              "x-sap-refresh-token": "your-refresh-token"
+            },
+            "timeout": 60
+          }
+        }
+      }
 
   First-Time Authentication:
     - Server reads service key from {destination}.json
@@ -1436,7 +1492,7 @@ export class mcp_abap_adt_server {
             const jwtToken = await authBroker.getToken(config.destination);
 
             // Register AuthBroker in global registry for connection to use during token refresh
-            const { registerAuthBroker } = require('./lib/utils');
+            const { registerAuthBroker } = require('../../lib/utils.js');
             registerAuthBroker(config.destination, authBroker);
 
             this.processJwtConfigUpdate(sapUrl, jwtToken, undefined, config.destination, sessionId);
@@ -1619,7 +1675,7 @@ export class mcp_abap_adt_server {
     }
 
     // Force connection cache invalidation (for backward compatibility)
-    const { invalidateConnectionCache } = require('./lib/utils');
+    const { invalidateConnectionCache } = require('../../lib/utils.js');
     try {
       invalidateConnectionCache();
     } catch (error) {
@@ -1732,7 +1788,7 @@ export class mcp_abap_adt_server {
     }
 
     // Force connection cache invalidation (for backward compatibility)
-    const { invalidateConnectionCache } = require('./lib/utils');
+    const { invalidateConnectionCache } = require('../../lib/utils.js');
     try {
       invalidateConnectionCache();
     } catch (error) {
@@ -1815,17 +1871,17 @@ export class mcp_abap_adt_server {
     this.envFilePath = envFilePath; // Store .env file path for SessionStore creation
 
     // Initialize AuthBroker factory
-    // Pass useAuthBroker to ensure .env is not used when --auth-broker is specified
-    this.authBrokerFactory = new AuthBrokerFactory({
-      defaultMcpDestination: this.defaultMcpDestination,
-      defaultDestination: this.defaultDestination,
-      envFilePath: this.envFilePath,
+    const brokerConfig = new AuthBrokerConfig(
+      this.defaultMcpDestination,
+      this.defaultDestination,
+      this.envFilePath,
       authBrokerPath,
       unsafe,
-      transportType: transportType,
-      useAuthBroker: useAuthBroker, // Important: prevents .env from being used when --auth-broker is specified
-      logger,
-    });
+      transportType,
+      useAuthBroker,
+      logger
+    );
+    this.authBrokerFactory = new AuthBrokerFactory(brokerConfig);
 
     this.mcpHandlers = new McpHandlers();
 
@@ -2097,7 +2153,7 @@ export class mcp_abap_adt_server {
               if (freshToken && (config as any)) {
                 (config as any).authorizationToken = freshToken;
               }
-              const { registerAuthBroker } = require('./lib/utils');
+              const { registerAuthBroker } = require('../../lib/utils.js');
               registerAuthBroker(actualDestination, brokerForHeaders);
             }
           } catch (e) {
@@ -2120,7 +2176,7 @@ export class mcp_abap_adt_server {
           sessionId || `mcp-server-${randomUUID()}`
         );
         if (actualDestination) {
-          const { createDestinationAwareConnection } = require('./lib/utils');
+          const { createDestinationAwareConnection } = require('../../lib/utils.js');
           connection = createDestinationAwareConnection(connection, actualDestination);
         }
         return connection;
@@ -2143,7 +2199,7 @@ export class mcp_abap_adt_server {
             const jwtToken = await authBroker.getToken(actualDestination);
             if (jwtToken) {
               // Register AuthBroker in global registry for connection to use during token refresh
-              const { registerAuthBroker } = require('./lib/utils');
+              const { registerAuthBroker } = require('../../lib/utils.js');
               registerAuthBroker(actualDestination, authBroker);
 
               const config: SapConfig = {
@@ -2168,7 +2224,7 @@ export class mcp_abap_adt_server {
               );
 
               // Wrap connection to intercept refreshToken()/makeAdtRequest
-              const { createDestinationAwareConnection } = require('./lib/utils');
+              const { createDestinationAwareConnection } = require('../../lib/utils.js');
               connection = createDestinationAwareConnection(connection, actualDestination);
 
               return connection;
@@ -2258,7 +2314,7 @@ export class mcp_abap_adt_server {
       const originalMakeAdtRequest = connectionWithRefresh.makeAdtRequest.bind(connection);
       connectionWithRefresh.makeAdtRequest = async function (options: any) {
         // Always refresh token via AuthBroker before request (AuthBroker will refresh if needed)
-        const { getAuthBroker } = require('./lib/utils');
+        const { getAuthBroker } = require('../../lib/utils.js');
         const authBroker = getAuthBroker(destination);
 
         logger?.debug('makeAdtRequest called, checking AuthBroker', {
@@ -2975,7 +3031,7 @@ export class mcp_abap_adt_server {
               const jwtToken = await authBroker.getToken(this.defaultDestination);
               if (jwtToken) {
                 // Register AuthBroker in global registry for connection to use during token refresh
-                const { registerAuthBroker } = require('./lib/utils');
+                const { registerAuthBroker } = require('../../lib/utils.js');
                 registerAuthBroker(this.defaultDestination, authBroker);
                 this.processJwtConfigUpdate(connConfig.serviceUrl, jwtToken, undefined, this.defaultDestination);
                 logger?.info("SAP configuration initialized for SSE transport", {

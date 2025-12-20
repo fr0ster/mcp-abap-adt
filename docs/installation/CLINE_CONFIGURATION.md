@@ -114,16 +114,47 @@ If you cloned the repository and are developing locally, use the full path confi
 
 If you installed globally (`npm install -g @fr0ster/mcp-abap-adt`):
 
+**With .env file:**
 ```json
 {
   "mcpServers": {
-    "mcp-abap-adt": {
+    "mcp-abap-adt-stdio": {
+      "type": "stdio",
       "command": "mcp-abap-adt",
-      "args": [
-        "--transport=stdio",
-        "--env=/absolute/path/to/.env"
-      ],
-      "env": {},
+      "args": ["--env=/absolute/path/to/.env"],
+      "timeout": 60,
+      "disabled": false
+    }
+  }
+}
+```
+
+**With MCP destination (requires service key):**
+```json
+{
+  "mcpServers": {
+    "mcp-abap-adt-mcp": {
+      "type": "stdio",
+      "command": "mcp-abap-adt",
+      "args": ["--unsafe", "--mcp=trial"],
+      "timeout": 60,
+      "autoApprove": [],
+      "disabled": false
+    }
+  }
+}
+```
+
+**With SAP destination (requires service key):**
+```json
+{
+  "mcpServers": {
+    "mcp-abap-adt-sap": {
+      "type": "stdio",
+      "command": "mcp-abap-adt",
+      "args": ["--unsafe", "--sap=PROD"],
+      "timeout": 60,
+      "autoApprove": [],
       "disabled": false
     }
   }
@@ -176,27 +207,39 @@ npm run start:http
 
 #### Step 2: Configure Cline
 
-Same config for all installation methods:
+#### Cline Configuration Options
 
+**Option A: With Destination (Recommended)** - requires proxy server running:
 ```json
 {
   "mcpServers": {
     "mcp-abap-adt-http": {
-      "url": "http://localhost:3000",
-      "transport": "http",
+      "type": "streamableHttp",
+      "url": "http://localhost:3001/mcp/stream/http",
+      "headers": {
+        "x-mcp-destination": "trial"
+      },
+      "timeout": 60,
       "disabled": false
     }
   }
 }
 ```
 
-**With Custom Port**:
+**Option B: Direct Auth** - requires manual token refresh:
 ```json
 {
   "mcpServers": {
-    "mcp-abap-adt-http": {
-      "url": "http://localhost:8080",
-      "transport": "http",
+    "mcp-abap-adt-direct": {
+      "type": "streamableHttp",
+      "url": "http://localhost:3000/mcp/stream/http",
+      "headers": {
+        "x-sap-url": "https://your-system.com",
+        "x-sap-auth-type": "jwt",
+        "x-sap-jwt-token": "your-jwt-token",
+        "x-sap-refresh-token": "your-refresh-token"
+      },
+      "timeout": 60,
       "disabled": false
     }
   }
@@ -228,16 +271,15 @@ mcp-abap-adt --transport=sse --sse-port=3001 --env=/path/to/.env
 npm run start:sse
 ```
 
-#### Step 2: Configure Cline
-
-Same config for all installation methods:
+#### Cline Configuration
 
 ```json
 {
   "mcpServers": {
     "mcp-abap-adt-sse": {
-      "url": "http://localhost:3001",
-      "transport": "sse",
+      "type": "sse",
+      "url": "http://localhost:3001/sse",
+      "timeout": 60,
       "disabled": false
     }
   }
@@ -248,9 +290,10 @@ Same config for all installation methods:
 ```json
 {
   "mcpServers": {
-    "mcp-abap-adt-sse": {
-      "url": "http://localhost:8081",
-      "transport": "sse",
+    "mcp-abap-adt-sse-custom": {
+      "type": "sse",
+      "url": "http://localhost:8081/sse",
+      "timeout": 60,
       "disabled": false
     }
   }

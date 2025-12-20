@@ -10,8 +10,8 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
-// Path to compiled launcher
-const launcherPath = path.resolve(__dirname, '../dist/lib/servers/launcher.js');
+// Path to compiled launcher (v2)
+const launcherPath = path.resolve(__dirname, '../dist/server/v2/launcher.js');
 
 // Passthrough args
 const args = process.argv.slice(2);

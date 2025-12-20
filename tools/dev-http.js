@@ -21,7 +21,7 @@ const normalizedArgs = [];
 let i = 0;
 while (i < args.length) {
   const arg = args[i];
-  
+
   // If we see --env, keep it and the next argument
   if (arg === '--env' || arg.startsWith('--env=')) {
     if (arg.startsWith('--env=')) {
@@ -77,7 +77,7 @@ function parseHttpPort(cliArgs) {
 
 function ensureDistExists(entryPath) {
   if (!fs.existsSync(entryPath)) {
-    process.stderr.write('[dev-http] dist/index.js not found. Please run "npm run build" first.\n');
+    process.stderr.write('[dev-http] dist/server/v1/index.js not found. Please run "npm run build" first.\n');
     process.exit(1);
   }
 }
@@ -106,7 +106,7 @@ function spawnServer(entryPath, cliArgs) {
     process.stderr.write(`[dev-http] Working directory: ${process.cwd()}\n`);
     process.stderr.write(`[dev-http] CLI args received: ${JSON.stringify(cliArgs)}\n`);
     process.stderr.write(`[dev-http] Server args to spawn: ${JSON.stringify(serverArgs)}\n`);
-    
+
     // Find --env argument
     let envFile = null;
     const envArgIndex = cliArgs.findIndex(arg => arg === '--env' || arg.startsWith('--env='));
@@ -118,10 +118,10 @@ function spawnServer(entryPath, cliArgs) {
         envFile = cliArgs[envArgIndex + 1];
       }
     }
-    
+
     if (envFile) {
-      const resolvedEnvFile = require('path').isAbsolute(envFile) 
-        ? envFile 
+      const resolvedEnvFile = require('path').isAbsolute(envFile)
+        ? envFile
         : require('path').resolve(process.cwd(), envFile);
       process.stderr.write(`[dev-http] Detected .env file from --env arg: ${resolvedEnvFile}\n`);
     } else {
@@ -137,7 +137,7 @@ function spawnServer(entryPath, cliArgs) {
     process.stderr.write(`[dev-http] With args: ${JSON.stringify(serverArgs)}\n`);
     process.stderr.write(`[dev-http] Args count: ${serverArgs.length}\n`);
   }
-  
+
   const child = spawn(process.execPath, serverArgs, {
     stdio: 'inherit',
     env: serverEnv,
@@ -209,7 +209,7 @@ function spawnInspector(port) {
 }
 
 (function main() {
-  const entryPath = path.resolve(__dirname, '../dist/index.js');
+  const entryPath = path.resolve(__dirname, '../dist/server/v1/index.js');
   ensureDistExists(entryPath);
 
   const port = parseHttpPort(normalizedArgs);

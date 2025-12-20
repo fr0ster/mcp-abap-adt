@@ -46,9 +46,17 @@ export abstract class BaseMcpServer extends McpServer {
     // Register broker so destination-aware connections can refresh tokens
     registerAuthBroker(destination, authBroker);
 
+    this.logger.debug(`[BaseMcpServer] Getting connection config for destination: ${destination}`);
+
     // Get connection parameters from broker
     // AuthBroker.getConnectionConfig() automatically checks session store first, then service key store
     const connectionConfig = await authBroker.getConnectionConfig(destination);
+
+    this.logger.debug(`[BaseMcpServer] Connection config result:`, {
+      found: !!connectionConfig,
+      destination,
+      hasServiceUrl: !!connectionConfig?.serviceUrl
+    });
 
     if (!connectionConfig) {
       throw new Error(`Connection config not found for destination: ${destination}`);

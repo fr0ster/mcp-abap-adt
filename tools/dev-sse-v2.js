@@ -24,7 +24,7 @@ function parsePort(cliArgs) {
 
 function ensureDistExists(entryPath) {
   if (!fs.existsSync(entryPath)) {
-    process.stderr.write('[dev-sse-v2] dist/lib/servers/launcher.js not found. Run "npm run build" first.\n');
+    process.stderr.write('[dev-sse-v2] dist/server/v2/launcher.js not found. Run "npm run build" first.\n');
     process.exit(1);
   }
 }
@@ -73,7 +73,7 @@ function spawnInspector(port) {
 }
 
 (function main() {
-  const entryPath = path.resolve(__dirname, '../dist/lib/servers/launcher.js');
+  const entryPath = path.resolve(__dirname, '../dist/server/v2/launcher.js');
   ensureDistExists(entryPath);
 
   const port = parsePort(args);

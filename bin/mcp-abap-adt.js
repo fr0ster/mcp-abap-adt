@@ -10,8 +10,8 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
-// Path to compiled server
-const serverPath = path.resolve(__dirname, '../dist/index.js');
+// Path to compiled server (v1)
+const serverPath = path.resolve(__dirname, '../dist/server/v1/index.js');
 
 // Get all command line arguments (skip node and script name)
 const args = process.argv.slice(2);

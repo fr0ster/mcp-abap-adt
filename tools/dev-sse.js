@@ -28,7 +28,7 @@ function parseSsePort(cliArgs) {
 
 function ensureDistExists(entryPath) {
   if (!fs.existsSync(entryPath)) {
-    process.stderr.write('[dev-sse] dist/index.js not found. Please run "npm run build" first.\n');
+    process.stderr.write('[dev-sse] dist/server/v1/index.js not found. Please run "npm run build" first.\n');
     process.exit(1);
   }
 }
@@ -121,7 +121,7 @@ function spawnInspector(port) {
 }
 
 (function main() {
-  const entryPath = path.resolve(__dirname, '../dist/index.js');
+  const entryPath = path.resolve(__dirname, '../dist/server/v1/index.js');
   ensureDistExists(entryPath);
 
   const port = parseSsePort(args);

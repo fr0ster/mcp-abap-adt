@@ -4,11 +4,13 @@ import {
   LowLevelHandlersGroup,
   ReadOnlyHandlersGroup,
   SearchHandlersGroup,
+  SystemHandlersGroup,
 } from "../../lib/handlers/groups/index.js";
 import { StdioServer } from "./StdioServer.js";
 import { StreamableHttpServer } from "./StreamableHttpServer.js";
 import { SseServer } from "./SseServer.js";
 import { AuthBrokerFactory } from "../../lib/auth/index.js";
+import { AuthBrokerConfig } from "./AuthBrokerConfig.js";
 import type { HandlerContext } from "../../lib/handlers/interfaces.js";
 import { ServerConfigManager } from "../../lib/config/index.js";
 
@@ -74,6 +76,7 @@ async function main() {
   const handlerGroups: any[] = [];
   if (config.exposition.includes('readonly')) {
     handlerGroups.push(new ReadOnlyHandlersGroup(baseContext));
+    handlerGroups.push(new SystemHandlersGroup(baseContext));
   }
   if (config.exposition.includes('high')) {
     handlerGroups.push(new HighLevelHandlersGroup(baseContext));
@@ -86,16 +89,9 @@ async function main() {
 
   const handlersRegistry = new CompositeHandlersRegistry(handlerGroups);
 
-  const authBrokerFactory = new AuthBrokerFactory({
-    defaultMcpDestination: config.mcpDestination,
-    defaultDestination: config.mcpDestination,
-    envFilePath: config.envFile,
-    authBrokerPath: config.authBrokerPath,
-    unsafe: false,
-    transportType: config.transport,
-    useAuthBroker: !config.envFile, // Use auth-broker only if no .env file specified
-    logger: loggerForTransport,
-  });
+  // Create auth broker config using adapter
+  const brokerConfig = AuthBrokerConfig.fromServerConfig(config, loggerForTransport);
+  const authBrokerFactory = new AuthBrokerFactory(brokerConfig);
 
   // Initialize default broker (important for .env file support)
   await authBrokerFactory.initializeDefaultBroker();

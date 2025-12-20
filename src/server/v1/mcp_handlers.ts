@@ -603,7 +603,13 @@ export class McpHandlers {
    * Registers all tools on a McpServer instance
    * Used for both main server and per-session servers
    */
-  public RegisterAllToolsOnServer(server: McpServer, context: HandlerContext) {
+  public RegisterAllToolsOnServer(server: McpServer, context: HandlerContext, exposition: string[] = ['readonly', 'high']) {
+    const includeReadOnly = exposition.includes('readonly');
+    const includeHigh = exposition.includes('high');
+    const includeLow = exposition.includes('low');
+
+    // === READONLY HANDLERS ===
+    if (includeReadOnly) {
     this.registerToolOnServer(server, GetProgram_Tool.name, GetProgram_Tool.description, GetProgram_Tool.inputSchema as any, (args: any) => { return handleGetProgram(context, args) });
     this.registerToolOnServer(server, GetClass_Tool.name, GetClass_Tool.description, GetClass_Tool.inputSchema as any, (args: any) => { return handleGetClass(context, args) });
     this.registerToolOnServer(server, GetFunction_Tool.name, GetFunction_Tool.description, GetFunction_Tool.inputSchema as any, (args: any) => { return handleGetFunction(context, args) });
@@ -795,5 +801,6 @@ export class McpHandlers {
     this.registerToolOnServer(server, GetProgFullCode_Tool.name, GetProgFullCode_Tool.description, GetProgFullCode_Tool.inputSchema as any, (args: any) => { return handleGetProgFullCode(context, args as { name: string; type: string }); });
     this.registerToolOnServer(server, GetObjectNodeFromCache_Tool.name, GetObjectNodeFromCache_Tool.description, GetObjectNodeFromCache_Tool.inputSchema as any, (args: any) => { return handleGetObjectNodeFromCache(context, args as { object_name: string; object_type: string }); });
     this.registerToolOnServer(server, DescribeByList_Tool.name, DescribeByList_Tool.description, DescribeByList_Tool.inputSchema as any, (args: any) => { return handleDescribeByList(context, args as { objects: string[] }); });
+    } // end if includeReadOnly
   }
 }

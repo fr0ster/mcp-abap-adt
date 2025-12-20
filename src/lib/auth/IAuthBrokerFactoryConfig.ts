@@ -1,11 +1,11 @@
 /**
- * Unified server configuration interface
- * Used by both old server (mcp_abap_adt_server) and new servers (StdioServer, SseServer, StreamableHttpServer)
+ * Configuration interface for AuthBrokerFactory
+ * Different server versions can implement their own config that conforms to this
  */
 
-import { TransportConfig } from "../utils.js";
+import type { ILogger } from "@mcp-abap-adt/interfaces";
 
-export interface ServerConfig {
+export interface IAuthBrokerFactoryConfig {
   /** Default MCP destination from --mcp parameter */
   defaultMcpDestination?: string;
   /** Default destination (from --mcp or .env) */
@@ -16,11 +16,12 @@ export interface ServerConfig {
   authBrokerPath?: string;
   /** Use unsafe mode (file-based session store) */
   unsafe: boolean;
+  /** Transport type */
+  transportType: string;
   /** Use auth-broker instead of .env file */
-  useAuthBroker: boolean;
-  /** Transport configuration */
-  transport: TransportConfig;
+  useAuthBroker?: boolean;
+  /** Port for browser auth callback server (to avoid conflicts with SSE/HTTP servers) */
+  browserAuthPort?: number;
   /** Logger instance */
-  logger?: any;
+  logger?: ILogger;
 }
-

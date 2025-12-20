@@ -1383,19 +1383,74 @@ SERVICE KEYS (Destination-Based Authentication):
 
     The destination name must exactly match the service key filename (without .json extension, case-sensitive).
 
-    Example Cline configuration (~/.cline/mcp.json):
+    Example Cline configurations (~/.cline/mcp.json):
+
+    1. Stdio with .env file:
       {
         "mcpServers": {
-          "mcp-abap-adt": {
-            "command": "npx",
-            "args": ["-y", "@mcp-abap-adt/server", "--transport=http", "--http-port=3000"],
-            "env": {}
+          "mcp-abap-adt-stdio": {
+            "type": "stdio",
+            "command": "mcp-abap-adt",
+            "args": ["--env=/path/to/.env"],
+            "timeout": 60
           }
         }
       }
 
-      Then in Cline, use destination in requests:
-        Headers: x-sap-destination: TRIAL
+    2. Stdio with MCP destination (requires service key):
+      {
+        "mcpServers": {
+          "mcp-abap-adt-mcp": {
+            "type": "stdio",
+            "command": "mcp-abap-adt",
+            "args": ["--unsafe", "--mcp=trial"],
+            "timeout": 60,
+            "autoApprove": []
+          }
+        }
+      }
+
+    3. SSE with .env (requires server running):
+      {
+        "mcpServers": {
+          "mcp-abap-adt-sse": {
+            "type": "sse",
+            "url": "http://localhost:3001/sse",
+            "timeout": 60
+          }
+        }
+      }
+
+    4. HTTP with destination (requires proxy server running):
+      {
+        "mcpServers": {
+          "mcp-abap-adt-http": {
+            "type": "streamableHttp",
+            "url": "http://localhost:3001/mcp/stream/http",
+            "headers": {
+              "x-mcp-destination": "trial"
+            },
+            "timeout": 60
+          }
+        }
+      }
+
+    5. HTTP with direct auth (manual token refresh needed):
+      {
+        "mcpServers": {
+          "mcp-abap-adt-direct": {
+            "type": "streamableHttp",
+            "url": "http://localhost:3000/mcp/stream/http",
+            "headers": {
+              "x-sap-url": "https://your-system.com",
+              "x-sap-auth-type": "jwt",
+              "x-sap-jwt-token": "your-token",
+              "x-sap-refresh-token": "your-refresh-token"
+            },
+            "timeout": 60
+          }
+        }
+      }
 
   First-Time Authentication:
     - Server reads service key from {destination}.json

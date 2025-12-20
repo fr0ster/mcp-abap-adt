@@ -608,8 +608,12 @@ export class McpHandlers {
     const includeHigh = exposition.includes('high');
     const includeLow = exposition.includes('low');
 
-    // === READONLY HANDLERS ===
+    // === READONLY & SYSTEM HANDLERS (included when readonly is enabled) ===
     if (includeReadOnly) {
+    // Search handler
+    this.registerToolOnServer(server, SearchObject_Tool.name, SearchObject_Tool.description, SearchObject_Tool.inputSchema as any, (args: any) => { return handleSearchObject(context, args) });
+
+    // Readonly handlers
     this.registerToolOnServer(server, GetProgram_Tool.name, GetProgram_Tool.description, GetProgram_Tool.inputSchema as any, (args: any) => { return handleGetProgram(context, args) });
     this.registerToolOnServer(server, GetClass_Tool.name, GetClass_Tool.description, GetClass_Tool.inputSchema as any, (args: any) => { return handleGetClass(context, args) });
     this.registerToolOnServer(server, GetFunction_Tool.name, GetFunction_Tool.description, GetFunction_Tool.inputSchema as any, (args: any) => { return handleGetFunction(context, args) });
@@ -618,15 +622,12 @@ export class McpHandlers {
     this.registerToolOnServer(server, GetStructure_Tool.name, GetStructure_Tool.description, GetStructure_Tool.inputSchema as any, (args: any) => { return handleGetStructure(context, args) });
     this.registerToolOnServer(server, GetTableContents_Tool.name, GetTableContents_Tool.description, GetTableContents_Tool.inputSchema as any, (args: any) => { return handleGetTableContents(context, args) });
     this.registerToolOnServer(server, GetPackage_Tool.name, GetPackage_Tool.description, GetPackage_Tool.inputSchema as any, (args: any) => { return handleGetPackage(context, args) });
-    this.registerToolOnServer(server, CreatePackage_Tool.name, CreatePackage_Tool.description, CreatePackage_Tool.inputSchema as any, (args: any) => { return handleCreatePackage(context, args) });
-    this.registerToolOnServer(server, UpdatePackage_Tool.name, UpdatePackage_Tool.description, UpdatePackage_Tool.inputSchema as any, (args: any) => { return handleUpdatePackage(context, args) });
     this.registerToolOnServer(server, UnlockPackage_Tool.name, UnlockPackage_Tool.description, UnlockPackage_Tool.inputSchema as any, (args: any) => { return handleUnlockPackage(context, args) });
     this.registerToolOnServer(server, GetInclude_Tool.name, GetInclude_Tool.description, GetInclude_Tool.inputSchema as any, (args: any) => { return handleGetInclude(context, args) });
     this.registerToolOnServer(server, GetIncludesList_Tool.name, GetIncludesList_Tool.description, GetIncludesList_Tool.inputSchema as any, (args: any) => { return handleGetIncludesList(context, args) });
     this.registerToolOnServer(server, GetTypeInfo_Tool.name, GetTypeInfo_Tool.description, GetTypeInfo_Tool.inputSchema as any, (args: any) => { return handleGetTypeInfo(context, args) });
     this.registerToolOnServer(server, GetInterface_Tool.name, GetInterface_Tool.description, GetInterface_Tool.inputSchema as any, (args: any) => { return handleGetInterface(context, args) });
     this.registerToolOnServer(server, GetTransaction_Tool.name, GetTransaction_Tool.description, GetTransaction_Tool.inputSchema as any, (args: any) => { return handleGetTransaction(context, args) });
-    this.registerToolOnServer(server, SearchObject_Tool.name, SearchObject_Tool.description, SearchObject_Tool.inputSchema as any, (args: any) => { return handleSearchObject(context, args) });
     this.registerToolOnServer(server, GetEnhancements_Tool.name, GetEnhancements_Tool.description, GetEnhancements_Tool.inputSchema as any, (args: any) => { return handleGetEnhancements(context, args) });
     this.registerToolOnServer(server, GetEnhancementSpot_Tool.name, GetEnhancementSpot_Tool.description, GetEnhancementSpot_Tool.inputSchema as any, (args: any) => { return handleGetEnhancementSpot(context, args) });
     this.registerToolOnServer(server, GetEnhancementImpl_Tool.name, GetEnhancementImpl_Tool.description, GetEnhancementImpl_Tool.inputSchema as any, (args: any) => { return handleGetEnhancementImpl(context, args) });
@@ -643,42 +644,10 @@ export class McpHandlers {
     this.registerToolOnServer(server, GetAbapSemanticAnalysis_Tool.name, GetAbapSemanticAnalysis_Tool.description, GetAbapSemanticAnalysis_Tool.inputSchema as any, (args: any) => { return handleGetAbapSemanticAnalysis(context, args) });
     this.registerToolOnServer(server, GetAbapSystemSymbols_Tool.name, GetAbapSystemSymbols_Tool.description, GetAbapSystemSymbols_Tool.inputSchema as any, (args: any) => { return handleGetAbapSystemSymbols(context, args) });
     this.registerToolOnServer(server, GetDomain_Tool.name, GetDomain_Tool.description, GetDomain_Tool.inputSchema as any, (args: any) => { return handleGetDomain(context, args) });
-    this.registerToolOnServer(server, CreateDomain_Tool.name, CreateDomain_Tool.description, CreateDomain_Tool.inputSchema as any, (args: any) => { return handleCreateDomain(context, args) });
-    this.registerToolOnServer(server, UpdateDomainLow_Tool.name, UpdateDomainLow_Tool.description, UpdateDomainLow_Tool.inputSchema as any, (args: any) => { return handleUpdateDomain(context, args) });
-    this.registerToolOnServer(server, UpdateDomainHigh_Tool.name, UpdateDomainHigh_Tool.description, UpdateDomainHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateDomainHigh(context, args) });
-    this.registerToolOnServer(server, CreateDataElement_Tool.name, CreateDataElement_Tool.description, CreateDataElement_Tool.inputSchema as any, (args: any) => { return handleCreateDataElement(context, args) });
-    this.registerToolOnServer(server, UpdateDataElementLow_Tool.name, UpdateDataElementLow_Tool.description, UpdateDataElementLow_Tool.inputSchema as any, (args: any) => { return handleUpdateDataElement(context, args) });
-    this.registerToolOnServer(server, UpdateDataElementHigh_Tool.name, UpdateDataElementHigh_Tool.description, UpdateDataElementHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateDataElementHigh(context, args) });
     this.registerToolOnServer(server, GetDataElement_Tool.name, GetDataElement_Tool.description, GetDataElement_Tool.inputSchema as any, (args: any) => { return handleGetDataElement(context, args) });
-    this.registerToolOnServer(server, CreateTransport_Tool.name, CreateTransport_Tool.description, CreateTransport_Tool.inputSchema as any, (args: any) => { return handleCreateTransport(context, args) });
     this.registerToolOnServer(server, GetTransport_Tool.name, GetTransport_Tool.description, GetTransport_Tool.inputSchema as any, (args: any) => { return handleGetTransport(context, args) });
-    this.registerToolOnServer(server, CreateTable_Tool.name, CreateTable_Tool.description, CreateTable_Tool.inputSchema as any, (args: any) => { return handleCreateTable(context, args) });
-    this.registerToolOnServer(server, UpdateTableLow_Tool.name, UpdateTableLow_Tool.description, UpdateTableLow_Tool.inputSchema as any, (args: any) => { return handleUpdateTableLow(context, args) });
-    this.registerToolOnServer(server, UpdateTableHigh_Tool.name, UpdateTableHigh_Tool.description, UpdateTableHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateTableHigh(context, args) });
-    this.registerToolOnServer(server, CreateStructure_Tool.name, CreateStructure_Tool.description, CreateStructure_Tool.inputSchema as any, (args: any) => { return handleCreateStructure(context, args) });
-    this.registerToolOnServer(server, UpdateStructureLow_Tool.name, UpdateStructureLow_Tool.description, UpdateStructureLow_Tool.inputSchema as any, (args: any) => { return handleUpdateStructureLow(context, args) });
-    this.registerToolOnServer(server, UpdateStructureHigh_Tool.name, UpdateStructureHigh_Tool.description, UpdateStructureHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateStructureHigh(context, args) });
-    this.registerToolOnServer(server, CreateView_Tool.name, CreateView_Tool.description, CreateView_Tool.inputSchema as any, (args: any) => { return handleCreateView(context, args) });
     this.registerToolOnServer(server, GetView_Tool.name, GetView_Tool.description, GetView_Tool.inputSchema as any, (args: any) => { return handleGetView(context, args) });
     this.registerToolOnServer(server, GetServiceDefinition_Tool.name, GetServiceDefinition_Tool.description, GetServiceDefinition_Tool.inputSchema as any, (args: any) => { return handleGetServiceDefinition(context, args) });
-    this.registerToolOnServer(server, CreateServiceDefinition_Tool.name, CreateServiceDefinition_Tool.description, CreateServiceDefinition_Tool.inputSchema as any, (args: any) => { return handleCreateServiceDefinition(context, args) });
-    this.registerToolOnServer(server, UpdateServiceDefinition_Tool.name, UpdateServiceDefinition_Tool.description, UpdateServiceDefinition_Tool.inputSchema as any, (args: any) => { return handleUpdateServiceDefinition(context, args) });
-    this.registerToolOnServer(server, UpdateView_Tool.name, UpdateView_Tool.description, UpdateView_Tool.inputSchema as any, (args: any) => { return handleUpdateViewLow(context, args) });
-    this.registerToolOnServer(server, CreateClass_Tool.name, CreateClass_Tool.description, CreateClass_Tool.inputSchema as any, (args: any) => { return handleCreateClass(context, args) });
-    this.registerToolOnServer(server, UpdateClass_Tool.name, UpdateClass_Tool.description, UpdateClass_Tool.inputSchema as any, (args: any) => { return handleUpdateClassLow(context, args) });
-    this.registerToolOnServer(server, UpdateClassHigh_Tool.name, UpdateClassHigh_Tool.description, UpdateClassHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateClassHigh(context, args) });
-    this.registerToolOnServer(server, CreateProgram_Tool.name, CreateProgram_Tool.description, CreateProgram_Tool.inputSchema as any, (args: any) => { return handleCreateProgram(context, args) });
-    this.registerToolOnServer(server, UpdateProgram_Tool.name, UpdateProgram_Tool.description, UpdateProgram_Tool.inputSchema as any, (args: any) => { return handleUpdateProgramLow(context, args) });
-    this.registerToolOnServer(server, UpdateProgramHigh_Tool.name, UpdateProgramHigh_Tool.description, UpdateProgramHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateProgramHigh(context, args) });
-    this.registerToolOnServer(server, CreateInterface_Tool.name, CreateInterface_Tool.description, CreateInterface_Tool.inputSchema as any, (args: any) => { return handleCreateInterface(context, args) });
-    this.registerToolOnServer(server, UpdateInterface_Tool.name, UpdateInterface_Tool.description, UpdateInterface_Tool.inputSchema as any, (args: any) => { return handleUpdateInterfaceLow(context, args) });
-    this.registerToolOnServer(server, CreateFunctionGroup_Tool.name, CreateFunctionGroup_Tool.description, CreateFunctionGroup_Tool.inputSchema as any, (args: any) => { return handleCreateFunctionGroup(context, args) });
-    this.registerToolOnServer(server, UpdateFunctionGroup_Tool.name, UpdateFunctionGroup_Tool.description, UpdateFunctionGroup_Tool.inputSchema as any, (args: any) => { return handleUpdateFunctionGroup(context, args) });
-    this.registerToolOnServer(server, CreateFunctionModule_Tool.name, CreateFunctionModule_Tool.description, CreateFunctionModule_Tool.inputSchema as any, (args: any) => { return handleCreateFunctionModule(context, args) });
-    this.registerToolOnServer(server, UpdateFunctionModule_Tool.name, UpdateFunctionModule_Tool.description, UpdateFunctionModule_Tool.inputSchema as any, (args: any) => { return handleUpdateFunctionModuleLow(context, args) });
-    this.registerToolOnServer(server, UpdateViewHigh_Tool.name, UpdateViewHigh_Tool.description, UpdateViewHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateViewHigh(context, args) });
-    this.registerToolOnServer(server, UpdateInterfaceHigh_Tool.name, UpdateInterfaceHigh_Tool.description, UpdateInterfaceHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateInterfaceHigh(context, args) });
-    this.registerToolOnServer(server, UpdateFunctionModuleHigh_Tool.name, UpdateFunctionModuleHigh_Tool.description, UpdateFunctionModuleHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateFunctionModuleHigh(context, args) });
     // this.registerToolOnServer(server, ActivateObject_Tool.name, ActivateObject_Tool.description, ActivateObject_Tool.inputSchema as any, (args: any) => { return handleActivateObject(context, args) });
     // this.registerToolOnServer(server, DeleteObject_Tool.name, DeleteObject_Tool.description, DeleteObject_Tool.inputSchema as any, (args: any) => { return handleDeleteObject(context, args) });
     // this.registerToolOnServer(server, CheckObject_Tool.name, CheckObject_Tool.description, CheckObject_Tool.inputSchema as any, (args: any) => { return handleCheckObject(context, args) });
@@ -692,95 +661,144 @@ export class McpHandlers {
     this.registerToolOnServer(server, CheckTable_Tool.name, CheckTable_Tool.description, CheckTable_Tool.inputSchema as any, (args: any) => { return handleCheckTable(context, args) });
     this.registerToolOnServer(server, ValidateFunctionModule_Tool.name, ValidateFunctionModule_Tool.description, ValidateFunctionModule_Tool.inputSchema as any, (args: any) => { return handleValidateFunctionModule(context, args) });
     this.registerToolOnServer(server, CheckFunctionModule_Tool.name, CheckFunctionModule_Tool.description, CheckFunctionModule_Tool.inputSchema as any, (args: any) => { return handleCheckFunctionModule(context, args) });
-    this.registerToolOnServer(server, CreateBdef_Tool.name, CreateBdef_Tool.description, CreateBdef_Tool.inputSchema as any, (args: any) => { return handleCreateBehaviorDefinition(context, args) });
-    this.registerToolOnServer(server, UpdateBdef_Tool.name, UpdateBdef_Tool.description, UpdateBdef_Tool.inputSchema as any, (args: any) => { return handleUpdateBehaviorDefinitionHigh(context, args) });
-    this.registerToolOnServer(server, CreateBehaviorImplementation_Tool.name, CreateBehaviorImplementation_Tool.description, CreateBehaviorImplementation_Tool.inputSchema as any, (args: any) => { return handleCreateBehaviorImplementation(context, args) });
-    this.registerToolOnServer(server, UpdateBehaviorImplementation_Tool.name, UpdateBehaviorImplementation_Tool.description, UpdateBehaviorImplementation_Tool.inputSchema as any, (args: any) => { return handleUpdateBehaviorImplementation(context, args) });
-    this.registerToolOnServer(server, UpdateBehaviorDefinitionLow_Tool.name, UpdateBehaviorDefinitionLow_Tool.description, UpdateBehaviorDefinitionLow_Tool.inputSchema as any, (args: any) => { return handleUpdateBehaviorDefinitionLow(context, args) });
-    this.registerToolOnServer(server, CreateDdlx_Tool.name, CreateDdlx_Tool.description, CreateDdlx_Tool.inputSchema as any, (args: any) => { return handleCreateMetadataExtension(context, args) });
-    this.registerToolOnServer(server, UpdateDdlx_Tool.name, UpdateDdlx_Tool.description, UpdateDdlx_Tool.inputSchema as any, (args: any) => { return handleUpdateMetadataExtensionHigh(context, args) });
-    this.registerToolOnServer(server, UpdateMetadataExtensionLow_Tool.name, UpdateMetadataExtensionLow_Tool.description, UpdateMetadataExtensionLow_Tool.inputSchema as any, (args: any) => { return handleUpdateMetadataExtensionLow(context, args) });
     this.registerToolOnServer(server, GetInactiveObjects_Tool.name, GetInactiveObjects_Tool.description, GetInactiveObjects_Tool.inputSchema as any, (args: any) => { return handleGetInactiveObjects(context, args) });
 
-    // New low-level handlers registration
-    this.registerToolOnServer(server, DeleteClass_Tool.name, DeleteClass_Tool.description, DeleteClass_Tool.inputSchema as any, (args: any) => { return handleDeleteClass(context, args) });
+    // READONLY continues with Check/Validate/Lock/Unlock handlers below...
     this.registerToolOnServer(server, LockClass_Tool.name, LockClass_Tool.description, LockClass_Tool.inputSchema as any, (args: any) => { return handleLockClass(context, args) });
     this.registerToolOnServer(server, UnlockClass_Tool.name, UnlockClass_Tool.description, UnlockClass_Tool.inputSchema as any, (args: any) => { return handleUnlockClass(context, args) });
-    this.registerToolOnServer(server, CreateClassLow_Tool.name, CreateClassLow_Tool.description, CreateClassLow_Tool.inputSchema as any, (args: any) => { return handleCreateClassLow(context, args) });
     this.registerToolOnServer(server, LockClassTestClasses_Tool.name, LockClassTestClasses_Tool.description, LockClassTestClasses_Tool.inputSchema as any, (args: any) => { return handleLockClassTestClasses(context, args) });
     this.registerToolOnServer(server, UnlockClassTestClasses_Tool.name, UnlockClassTestClasses_Tool.description, UnlockClassTestClasses_Tool.inputSchema as any, (args: any) => { return handleUnlockClassTestClasses(context, args) });
-    this.registerToolOnServer(server, UpdateClassTestClasses_Tool.name, UpdateClassTestClasses_Tool.description, UpdateClassTestClasses_Tool.inputSchema as any, (args: any) => { return handleUpdateClassTestClasses(context, args) });
-    this.registerToolOnServer(server, ActivateClassTestClasses_Tool.name, ActivateClassTestClasses_Tool.description, ActivateClassTestClasses_Tool.inputSchema as any, (args: any) => { return handleActivateClassTestClasses(context, args) });
     this.registerToolOnServer(server, RunClassUnitTests_Tool.name, RunClassUnitTests_Tool.description, RunClassUnitTests_Tool.inputSchema as any, (args: any) => { return handleRunClassUnitTests(context, args) });
     this.registerToolOnServer(server, GetClassUnitTestStatus_Tool.name, GetClassUnitTestStatus_Tool.description, GetClassUnitTestStatus_Tool.inputSchema as any, (args: any) => { return handleGetClassUnitTestStatus(context, args) });
     this.registerToolOnServer(server, GetClassUnitTestResult_Tool.name, GetClassUnitTestResult_Tool.description, GetClassUnitTestResult_Tool.inputSchema as any, (args: any) => { return handleGetClassUnitTestResult(context, args) });
     this.registerToolOnServer(server, CheckProgram_Tool.name, CheckProgram_Tool.description, CheckProgram_Tool.inputSchema as any, (args: any) => { return handleCheckProgram(context, args) });
-    this.registerToolOnServer(server, DeleteProgram_Tool.name, DeleteProgram_Tool.description, DeleteProgram_Tool.inputSchema as any, (args: any) => { return handleDeleteProgram(context, args) });
     this.registerToolOnServer(server, LockProgram_Tool.name, LockProgram_Tool.description, LockProgram_Tool.inputSchema as any, (args: any) => { return handleLockProgram(context, args) });
     this.registerToolOnServer(server, UnlockProgram_Tool.name, UnlockProgram_Tool.description, UnlockProgram_Tool.inputSchema as any, (args: any) => { return handleUnlockProgram(context, args) });
     this.registerToolOnServer(server, ValidateProgram_Tool.name, ValidateProgram_Tool.description, ValidateProgram_Tool.inputSchema as any, (args: any) => { return handleValidateProgram(context, args) });
-    this.registerToolOnServer(server, CreateProgramLow_Tool.name, CreateProgramLow_Tool.description, CreateProgramLow_Tool.inputSchema as any, (args: any) => { return handleCreateProgramLow(context, args) });
     this.registerToolOnServer(server, CheckInterface_Tool.name, CheckInterface_Tool.description, CheckInterface_Tool.inputSchema as any, (args: any) => { return handleCheckInterface(context, args) });
-    this.registerToolOnServer(server, DeleteInterface_Tool.name, DeleteInterface_Tool.description, DeleteInterface_Tool.inputSchema as any, (args: any) => { return handleDeleteInterface(context, args) });
     this.registerToolOnServer(server, LockInterface_Tool.name, LockInterface_Tool.description, LockInterface_Tool.inputSchema as any, (args: any) => { return handleLockInterface(context, args) });
     this.registerToolOnServer(server, UnlockInterface_Tool.name, UnlockInterface_Tool.description, UnlockInterface_Tool.inputSchema as any, (args: any) => { return handleUnlockInterface(context, args) });
     this.registerToolOnServer(server, ValidateInterface_Tool.name, ValidateInterface_Tool.description, ValidateInterface_Tool.inputSchema as any, (args: any) => { return handleValidateInterface(context, args) });
-    this.registerToolOnServer(server, CreateInterfaceLow_Tool.name, CreateInterfaceLow_Tool.description, CreateInterfaceLow_Tool.inputSchema as any, (args: any) => { return handleCreateInterfaceLow(context, args) });
     this.registerToolOnServer(server, CheckFunctionGroup_Tool.name, CheckFunctionGroup_Tool.description, CheckFunctionGroup_Tool.inputSchema as any, (args: any) => { return handleCheckFunctionGroup(context, args) });
-    this.registerToolOnServer(server, DeleteFunctionGroup_Tool.name, DeleteFunctionGroup_Tool.description, DeleteFunctionGroup_Tool.inputSchema as any, (args: any) => { return handleDeleteFunctionGroup(context, args) });
-    this.registerToolOnServer(server, DeleteFunctionModule_Tool.name, DeleteFunctionModule_Tool.description, DeleteFunctionModule_Tool.inputSchema as any, (args: any) => { return handleDeleteFunctionModule(context, args) });
     this.registerToolOnServer(server, LockFunctionGroup_Tool.name, LockFunctionGroup_Tool.description, LockFunctionGroup_Tool.inputSchema as any, (args: any) => { return handleLockFunctionGroup(context, args) });
     this.registerToolOnServer(server, LockFunctionModule_Tool.name, LockFunctionModule_Tool.description, LockFunctionModule_Tool.inputSchema as any, (args: any) => { return handleLockFunctionModule(context, args) });
     this.registerToolOnServer(server, UnlockFunctionGroup_Tool.name, UnlockFunctionGroup_Tool.description, UnlockFunctionGroup_Tool.inputSchema as any, (args: any) => { return handleUnlockFunctionGroup(context, args) });
     this.registerToolOnServer(server, UnlockFunctionModule_Tool.name, UnlockFunctionModule_Tool.description, UnlockFunctionModule_Tool.inputSchema as any, (args: any) => { return handleUnlockFunctionModule(context, args) });
     this.registerToolOnServer(server, ValidateFunctionGroup_Tool.name, ValidateFunctionGroup_Tool.description, ValidateFunctionGroup_Tool.inputSchema as any, (args: any) => { return handleValidateFunctionGroup(context, args) });
-    this.registerToolOnServer(server, CreateFunctionGroupLow_Tool.name, CreateFunctionGroupLow_Tool.description, CreateFunctionGroupLow_Tool.inputSchema as any, (args: any) => { return handleCreateFunctionGroupLow(context, args) });
-    this.registerToolOnServer(server, CreateFunctionModuleLow_Tool.name, CreateFunctionModuleLow_Tool.description, CreateFunctionModuleLow_Tool.inputSchema as any, (args: any) => { return handleCreateFunctionModuleLow(context, args) });
     this.registerToolOnServer(server, CheckDataElement_Tool.name, CheckDataElement_Tool.description, CheckDataElement_Tool.inputSchema as any, (args: any) => { return handleCheckDataElement(context, args) });
-    this.registerToolOnServer(server, DeleteDataElement_Tool.name, DeleteDataElement_Tool.description, DeleteDataElement_Tool.inputSchema as any, (args: any) => { return handleDeleteDataElement(context, args) });
     this.registerToolOnServer(server, LockDataElement_Tool.name, LockDataElement_Tool.description, LockDataElement_Tool.inputSchema as any, (args: any) => { return handleLockDataElement(context, args) });
     this.registerToolOnServer(server, UnlockDataElement_Tool.name, UnlockDataElement_Tool.description, UnlockDataElement_Tool.inputSchema as any, (args: any) => { return handleUnlockDataElement(context, args) });
     this.registerToolOnServer(server, ValidateDataElement_Tool.name, ValidateDataElement_Tool.description, ValidateDataElement_Tool.inputSchema as any, (args: any) => { return handleValidateDataElement(context, args) });
-    this.registerToolOnServer(server, CreateDataElementLow_Tool.name, CreateDataElementLow_Tool.description, CreateDataElementLow_Tool.inputSchema as any, (args: any) => { return handleCreateDataElementLow(context, args) });
     this.registerToolOnServer(server, CheckDomain_Tool.name, CheckDomain_Tool.description, CheckDomain_Tool.inputSchema as any, (args: any) => { return handleCheckDomain(context, args) });
-    this.registerToolOnServer(server, DeleteDomain_Tool.name, DeleteDomain_Tool.description, DeleteDomain_Tool.inputSchema as any, (args: any) => { return handleDeleteDomain(context, args) });
     this.registerToolOnServer(server, LockDomain_Tool.name, LockDomain_Tool.description, LockDomain_Tool.inputSchema as any, (args: any) => { return handleLockDomain(context, args) });
     this.registerToolOnServer(server, UnlockDomain_Tool.name, UnlockDomain_Tool.description, UnlockDomain_Tool.inputSchema as any, (args: any) => { return handleUnlockDomain(context, args) });
     this.registerToolOnServer(server, ValidateDomain_Tool.name, ValidateDomain_Tool.description, ValidateDomain_Tool.inputSchema as any, (args: any) => { return handleValidateDomain(context, args) });
-    this.registerToolOnServer(server, CreateDomainLow_Tool.name, CreateDomainLow_Tool.description, CreateDomainLow_Tool.inputSchema as any, (args: any) => { return handleCreateDomainLow(context, args) });
     this.registerToolOnServer(server, CheckStructure_Tool.name, CheckStructure_Tool.description, CheckStructure_Tool.inputSchema as any, (args: any) => { return handleCheckStructure(context, args) });
-    this.registerToolOnServer(server, DeleteStructure_Tool.name, DeleteStructure_Tool.description, DeleteStructure_Tool.inputSchema as any, (args: any) => { return handleDeleteStructure(context, args) });
     this.registerToolOnServer(server, LockStructure_Tool.name, LockStructure_Tool.description, LockStructure_Tool.inputSchema as any, (args: any) => { return handleLockStructure(context, args) });
     this.registerToolOnServer(server, UnlockStructure_Tool.name, UnlockStructure_Tool.description, UnlockStructure_Tool.inputSchema as any, (args: any) => { return handleUnlockStructure(context, args) });
     this.registerToolOnServer(server, ValidateStructure_Tool.name, ValidateStructure_Tool.description, ValidateStructure_Tool.inputSchema as any, (args: any) => { return handleValidateStructure(context, args) });
-    this.registerToolOnServer(server, CreateStructureLow_Tool.name, CreateStructureLow_Tool.description, CreateStructureLow_Tool.inputSchema as any, (args: any) => { return handleCreateStructureLow(context, args) });
-    this.registerToolOnServer(server, DeleteTable_Tool.name, DeleteTable_Tool.description, DeleteTable_Tool.inputSchema as any, (args: any) => { return handleDeleteTable(context, args) });
     this.registerToolOnServer(server, LockTable_Tool.name, LockTable_Tool.description, LockTable_Tool.inputSchema as any, (args: any) => { return handleLockTable(context, args) });
     this.registerToolOnServer(server, UnlockTable_Tool.name, UnlockTable_Tool.description, UnlockTable_Tool.inputSchema as any, (args: any) => { return handleUnlockTable(context, args) });
-    this.registerToolOnServer(server, CreateTableLow_Tool.name, CreateTableLow_Tool.description, CreateTableLow_Tool.inputSchema as any, (args: any) => { return handleCreateTableLow(context, args) });
     this.registerToolOnServer(server, CheckView_Tool.name, CheckView_Tool.description, CheckView_Tool.inputSchema as any, (args: any) => { return handleCheckView(context, args) });
-    this.registerToolOnServer(server, DeleteView_Tool.name, DeleteView_Tool.description, DeleteView_Tool.inputSchema as any, (args: any) => { return handleDeleteView(context, args) });
     this.registerToolOnServer(server, LockView_Tool.name, LockView_Tool.description, LockView_Tool.inputSchema as any, (args: any) => { return handleLockView(context, args) });
     this.registerToolOnServer(server, UnlockView_Tool.name, UnlockView_Tool.description, UnlockView_Tool.inputSchema as any, (args: any) => { return handleUnlockView(context, args) });
     this.registerToolOnServer(server, ValidateView_Tool.name, ValidateView_Tool.description, ValidateView_Tool.inputSchema as any, (args: any) => { return handleValidateView(context, args) });
-    this.registerToolOnServer(server, CreateViewLow_Tool.name, CreateViewLow_Tool.description, CreateViewLow_Tool.inputSchema as any, (args: any) => { return handleCreateViewLow(context, args) });
     this.registerToolOnServer(server, CheckPackage_Tool.name, CheckPackage_Tool.description, CheckPackage_Tool.inputSchema as any, (args: any) => { return handleCheckPackage(context, args) });
-    this.registerToolOnServer(server, DeletePackage_Tool.name, DeletePackage_Tool.description, DeletePackage_Tool.inputSchema as any, (args: any) => { return handleDeletePackage(context, args) });
     this.registerToolOnServer(server, LockPackage_Tool.name, LockPackage_Tool.description, LockPackage_Tool.inputSchema as any, (args: any) => { return handleLockPackage(context, args) });
     this.registerToolOnServer(server, ValidatePackage_Tool.name, ValidatePackage_Tool.description, ValidatePackage_Tool.inputSchema as any, (args: any) => { return handleValidatePackage(context, args) });
-    this.registerToolOnServer(server, CreatePackageLow_Tool.name, CreatePackageLow_Tool.description, CreatePackageLow_Tool.inputSchema as any, (args: any) => { return handleCreatePackageLow(context, args) });
-    this.registerToolOnServer(server, CreateTransportLow_Tool.name, CreateTransportLow_Tool.description, CreateTransportLow_Tool.inputSchema as any, (args: any) => { return handleCreateTransportLow(context, args) });
     this.registerToolOnServer(server, CheckBehaviorDefinition_Tool.name, CheckBehaviorDefinition_Tool.description, CheckBehaviorDefinition_Tool.inputSchema as any, (args: any) => { return handleCheckBehaviorDefinition(context, args) });
-    this.registerToolOnServer(server, DeleteBehaviorDefinition_Tool.name, DeleteBehaviorDefinition_Tool.description, DeleteBehaviorDefinition_Tool.inputSchema as any, (args: any) => { return handleDeleteBehaviorDefinition(context, args) });
     this.registerToolOnServer(server, LockBehaviorDefinition_Tool.name, LockBehaviorDefinition_Tool.description, LockBehaviorDefinition_Tool.inputSchema as any, (args: any) => { return handleLockBehaviorDefinition(context, args) });
     this.registerToolOnServer(server, UnlockBehaviorDefinition_Tool.name, UnlockBehaviorDefinition_Tool.description, UnlockBehaviorDefinition_Tool.inputSchema as any, (args: any) => { return handleUnlockBehaviorDefinition(context, args) });
     this.registerToolOnServer(server, ValidateBehaviorDefinition_Tool.name, ValidateBehaviorDefinition_Tool.description, ValidateBehaviorDefinition_Tool.inputSchema as any, (args: any) => { return handleValidateBehaviorDefinition(context, args) });
-    this.registerToolOnServer(server, CreateBehaviorDefinitionLow_Tool.name, CreateBehaviorDefinitionLow_Tool.description, CreateBehaviorDefinitionLow_Tool.inputSchema as any, (args: any) => { return handleCreateBehaviorDefinitionLow(context, args) });
     this.registerToolOnServer(server, CheckMetadataExtension_Tool.name, CheckMetadataExtension_Tool.description, CheckMetadataExtension_Tool.inputSchema as any, (args: any) => { return handleCheckMetadataExtension(context, args) });
-    this.registerToolOnServer(server, DeleteMetadataExtension_Tool.name, DeleteMetadataExtension_Tool.description, DeleteMetadataExtension_Tool.inputSchema as any, (args: any) => { return handleDeleteMetadataExtension(context, args) });
     this.registerToolOnServer(server, LockMetadataExtension_Tool.name, LockMetadataExtension_Tool.description, LockMetadataExtension_Tool.inputSchema as any, (args: any) => { return handleLockMetadataExtension(context, args) });
     this.registerToolOnServer(server, UnlockMetadataExtension_Tool.name, UnlockMetadataExtension_Tool.description, UnlockMetadataExtension_Tool.inputSchema as any, (args: any) => { return handleUnlockMetadataExtension(context, args) });
     this.registerToolOnServer(server, ValidateMetadataExtension_Tool.name, ValidateMetadataExtension_Tool.description, ValidateMetadataExtension_Tool.inputSchema as any, (args: any) => { return handleValidateMetadataExtension(context, args) });
+    // this.registerToolOnServer(server, GetAbapAST_Tool.name, GetAbapAST_Tool.description, GetAbapAST_Tool.inputSchema as any, (args: any) => { return handleGetAbapAST(context, args); });
+    this.registerToolOnServer(server, GetObjectStructure_Tool.name, GetObjectStructure_Tool.description, GetObjectStructure_Tool.inputSchema as any, (args: any) => { return handleGetObjectStructure(context, args as { object_name: string; object_type: string }); });
+    this.registerToolOnServer(server, GetObjectsList_Tool.name, GetObjectsList_Tool.description, GetObjectsList_Tool.inputSchema as any, (args: any) => { return handleGetObjectsList(context, args as { package_name: string }); });
+    this.registerToolOnServer(server, GetObjectsByType_Tool.name, GetObjectsByType_Tool.description, GetObjectsByType_Tool.inputSchema as any, (args: any) => { return handleGetObjectsByType(context, args as { object_type: string; package_name: string }); });
+    this.registerToolOnServer(server, GetProgFullCode_Tool.name, GetProgFullCode_Tool.description, GetProgFullCode_Tool.inputSchema as any, (args: any) => { return handleGetProgFullCode(context, args as { name: string; type: string }); });
+    this.registerToolOnServer(server, GetObjectNodeFromCache_Tool.name, GetObjectNodeFromCache_Tool.description, GetObjectNodeFromCache_Tool.inputSchema as any, (args: any) => { return handleGetObjectNodeFromCache(context, args as { object_name: string; object_type: string }); });
+    this.registerToolOnServer(server, DescribeByList_Tool.name, DescribeByList_Tool.description, DescribeByList_Tool.inputSchema as any, (args: any) => { return handleDescribeByList(context, args as { objects: string[] }); });
+    } // end if includeReadOnly
+
+    // === HIGH LEVEL HANDLERS ===
+    if (includeHigh) {
+    this.registerToolOnServer(server, CreatePackage_Tool.name, CreatePackage_Tool.description, CreatePackage_Tool.inputSchema as any, (args: any) => { return handleCreatePackage(context, args) });
+    this.registerToolOnServer(server, CreateDomain_Tool.name, CreateDomain_Tool.description, CreateDomain_Tool.inputSchema as any, (args: any) => { return handleCreateDomain(context, args) });
+    this.registerToolOnServer(server, UpdateDomainHigh_Tool.name, UpdateDomainHigh_Tool.description, UpdateDomainHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateDomainHigh(context, args) });
+    this.registerToolOnServer(server, CreateDataElement_Tool.name, CreateDataElement_Tool.description, CreateDataElement_Tool.inputSchema as any, (args: any) => { return handleCreateDataElement(context, args) });
+    this.registerToolOnServer(server, UpdateDataElementHigh_Tool.name, UpdateDataElementHigh_Tool.description, UpdateDataElementHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateDataElementHigh(context, args) });
+    this.registerToolOnServer(server, CreateTransport_Tool.name, CreateTransport_Tool.description, CreateTransport_Tool.inputSchema as any, (args: any) => { return handleCreateTransport(context, args) });
+    this.registerToolOnServer(server, CreateTable_Tool.name, CreateTable_Tool.description, CreateTable_Tool.inputSchema as any, (args: any) => { return handleCreateTable(context, args) });
+    this.registerToolOnServer(server, UpdateTableHigh_Tool.name, UpdateTableHigh_Tool.description, UpdateTableHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateTableHigh(context, args) });
+    this.registerToolOnServer(server, CreateStructure_Tool.name, CreateStructure_Tool.description, CreateStructure_Tool.inputSchema as any, (args: any) => { return handleCreateStructure(context, args) });
+    this.registerToolOnServer(server, UpdateStructureHigh_Tool.name, UpdateStructureHigh_Tool.description, UpdateStructureHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateStructureHigh(context, args) });
+    this.registerToolOnServer(server, CreateView_Tool.name, CreateView_Tool.description, CreateView_Tool.inputSchema as any, (args: any) => { return handleCreateView(context, args) });
+    this.registerToolOnServer(server, UpdateViewHigh_Tool.name, UpdateViewHigh_Tool.description, UpdateViewHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateViewHigh(context, args) });
+    this.registerToolOnServer(server, CreateServiceDefinition_Tool.name, CreateServiceDefinition_Tool.description, CreateServiceDefinition_Tool.inputSchema as any, (args: any) => { return handleCreateServiceDefinition(context, args) });
+    this.registerToolOnServer(server, UpdateServiceDefinition_Tool.name, UpdateServiceDefinition_Tool.description, UpdateServiceDefinition_Tool.inputSchema as any, (args: any) => { return handleUpdateServiceDefinition(context, args) });
+    this.registerToolOnServer(server, CreateClass_Tool.name, CreateClass_Tool.description, CreateClass_Tool.inputSchema as any, (args: any) => { return handleCreateClass(context, args) });
+    this.registerToolOnServer(server, UpdateClassHigh_Tool.name, UpdateClassHigh_Tool.description, UpdateClassHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateClassHigh(context, args) });
+    this.registerToolOnServer(server, CreateProgram_Tool.name, CreateProgram_Tool.description, CreateProgram_Tool.inputSchema as any, (args: any) => { return handleCreateProgram(context, args) });
+    this.registerToolOnServer(server, UpdateProgramHigh_Tool.name, UpdateProgramHigh_Tool.description, UpdateProgramHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateProgramHigh(context, args) });
+    this.registerToolOnServer(server, CreateInterface_Tool.name, CreateInterface_Tool.description, CreateInterface_Tool.inputSchema as any, (args: any) => { return handleCreateInterface(context, args) });
+    this.registerToolOnServer(server, UpdateInterfaceHigh_Tool.name, UpdateInterfaceHigh_Tool.description, UpdateInterfaceHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateInterfaceHigh(context, args) });
+    this.registerToolOnServer(server, CreateFunctionGroup_Tool.name, CreateFunctionGroup_Tool.description, CreateFunctionGroup_Tool.inputSchema as any, (args: any) => { return handleCreateFunctionGroup(context, args) });
+    this.registerToolOnServer(server, UpdateFunctionGroup_Tool.name, UpdateFunctionGroup_Tool.description, UpdateFunctionGroup_Tool.inputSchema as any, (args: any) => { return handleUpdateFunctionGroup(context, args) });
+    this.registerToolOnServer(server, CreateFunctionModule_Tool.name, CreateFunctionModule_Tool.description, CreateFunctionModule_Tool.inputSchema as any, (args: any) => { return handleCreateFunctionModule(context, args) });
+    this.registerToolOnServer(server, UpdateFunctionModuleHigh_Tool.name, UpdateFunctionModuleHigh_Tool.description, UpdateFunctionModuleHigh_Tool.inputSchema as any, (args: any) => { return handleUpdateFunctionModuleHigh(context, args) });
+    this.registerToolOnServer(server, CreateBdef_Tool.name, CreateBdef_Tool.description, CreateBdef_Tool.inputSchema as any, (args: any) => { return handleCreateBehaviorDefinition(context, args) });
+    this.registerToolOnServer(server, UpdateBdef_Tool.name, UpdateBdef_Tool.description, UpdateBdef_Tool.inputSchema as any, (args: any) => { return handleUpdateBehaviorDefinitionHigh(context, args) });
+    this.registerToolOnServer(server, CreateBehaviorImplementation_Tool.name, CreateBehaviorImplementation_Tool.description, CreateBehaviorImplementation_Tool.inputSchema as any, (args: any) => { return handleCreateBehaviorImplementation(context, args) });
+    this.registerToolOnServer(server, UpdateBehaviorImplementation_Tool.name, UpdateBehaviorImplementation_Tool.description, UpdateBehaviorImplementation_Tool.inputSchema as any, (args: any) => { return handleUpdateBehaviorImplementation(context, args) });
+    this.registerToolOnServer(server, CreateDdlx_Tool.name, CreateDdlx_Tool.description, CreateDdlx_Tool.inputSchema as any, (args: any) => { return handleCreateMetadataExtension(context, args) });
+    this.registerToolOnServer(server, UpdateDdlx_Tool.name, UpdateDdlx_Tool.description, UpdateDdlx_Tool.inputSchema as any, (args: any) => { return handleUpdateMetadataExtensionHigh(context, args) });
+    } // end if includeHigh
+
+    // === LOW LEVEL HANDLERS ===
+    if (includeLow) {
+    this.registerToolOnServer(server, UpdatePackage_Tool.name, UpdatePackage_Tool.description, UpdatePackage_Tool.inputSchema as any, (args: any) => { return handleUpdatePackage(context, args) });
+    this.registerToolOnServer(server, UpdateDomainLow_Tool.name, UpdateDomainLow_Tool.description, UpdateDomainLow_Tool.inputSchema as any, (args: any) => { return handleUpdateDomain(context, args) });
+    this.registerToolOnServer(server, UpdateDataElementLow_Tool.name, UpdateDataElementLow_Tool.description, UpdateDataElementLow_Tool.inputSchema as any, (args: any) => { return handleUpdateDataElement(context, args) });
+    this.registerToolOnServer(server, UpdateTableLow_Tool.name, UpdateTableLow_Tool.description, UpdateTableLow_Tool.inputSchema as any, (args: any) => { return handleUpdateTableLow(context, args) });
+    this.registerToolOnServer(server, UpdateStructureLow_Tool.name, UpdateStructureLow_Tool.description, UpdateStructureLow_Tool.inputSchema as any, (args: any) => { return handleUpdateStructureLow(context, args) });
+    this.registerToolOnServer(server, UpdateView_Tool.name, UpdateView_Tool.description, UpdateView_Tool.inputSchema as any, (args: any) => { return handleUpdateViewLow(context, args) });
+    this.registerToolOnServer(server, UpdateClass_Tool.name, UpdateClass_Tool.description, UpdateClass_Tool.inputSchema as any, (args: any) => { return handleUpdateClassLow(context, args) });
+    this.registerToolOnServer(server, UpdateProgram_Tool.name, UpdateProgram_Tool.description, UpdateProgram_Tool.inputSchema as any, (args: any) => { return handleUpdateProgramLow(context, args) });
+    this.registerToolOnServer(server, UpdateInterface_Tool.name, UpdateInterface_Tool.description, UpdateInterface_Tool.inputSchema as any, (args: any) => { return handleUpdateInterfaceLow(context, args) });
+    this.registerToolOnServer(server, UpdateFunctionModule_Tool.name, UpdateFunctionModule_Tool.description, UpdateFunctionModule_Tool.inputSchema as any, (args: any) => { return handleUpdateFunctionModuleLow(context, args) });
+    this.registerToolOnServer(server, UpdateBehaviorDefinitionLow_Tool.name, UpdateBehaviorDefinitionLow_Tool.description, UpdateBehaviorDefinitionLow_Tool.inputSchema as any, (args: any) => { return handleUpdateBehaviorDefinitionLow(context, args) });
+    this.registerToolOnServer(server, UpdateMetadataExtensionLow_Tool.name, UpdateMetadataExtensionLow_Tool.description, UpdateMetadataExtensionLow_Tool.inputSchema as any, (args: any) => { return handleUpdateMetadataExtensionLow(context, args) });
+    this.registerToolOnServer(server, DeleteClass_Tool.name, DeleteClass_Tool.description, DeleteClass_Tool.inputSchema as any, (args: any) => { return handleDeleteClass(context, args) });
+    this.registerToolOnServer(server, CreateClassLow_Tool.name, CreateClassLow_Tool.description, CreateClassLow_Tool.inputSchema as any, (args: any) => { return handleCreateClassLow(context, args) });
+    this.registerToolOnServer(server, UpdateClassTestClasses_Tool.name, UpdateClassTestClasses_Tool.description, UpdateClassTestClasses_Tool.inputSchema as any, (args: any) => { return handleUpdateClassTestClasses(context, args) });
+    this.registerToolOnServer(server, ActivateClassTestClasses_Tool.name, ActivateClassTestClasses_Tool.description, ActivateClassTestClasses_Tool.inputSchema as any, (args: any) => { return handleActivateClassTestClasses(context, args) });
+    this.registerToolOnServer(server, DeleteProgram_Tool.name, DeleteProgram_Tool.description, DeleteProgram_Tool.inputSchema as any, (args: any) => { return handleDeleteProgram(context, args) });
+    this.registerToolOnServer(server, CreateProgramLow_Tool.name, CreateProgramLow_Tool.description, CreateProgramLow_Tool.inputSchema as any, (args: any) => { return handleCreateProgramLow(context, args) });
+    this.registerToolOnServer(server, DeleteInterface_Tool.name, DeleteInterface_Tool.description, DeleteInterface_Tool.inputSchema as any, (args: any) => { return handleDeleteInterface(context, args) });
+    this.registerToolOnServer(server, CreateInterfaceLow_Tool.name, CreateInterfaceLow_Tool.description, CreateInterfaceLow_Tool.inputSchema as any, (args: any) => { return handleCreateInterfaceLow(context, args) });
+    this.registerToolOnServer(server, DeleteFunctionGroup_Tool.name, DeleteFunctionGroup_Tool.description, DeleteFunctionGroup_Tool.inputSchema as any, (args: any) => { return handleDeleteFunctionGroup(context, args) });
+    this.registerToolOnServer(server, DeleteFunctionModule_Tool.name, DeleteFunctionModule_Tool.description, DeleteFunctionModule_Tool.inputSchema as any, (args: any) => { return handleDeleteFunctionModule(context, args) });
+    this.registerToolOnServer(server, CreateFunctionGroupLow_Tool.name, CreateFunctionGroupLow_Tool.description, CreateFunctionGroupLow_Tool.inputSchema as any, (args: any) => { return handleCreateFunctionGroupLow(context, args) });
+    this.registerToolOnServer(server, CreateFunctionModuleLow_Tool.name, CreateFunctionModuleLow_Tool.description, CreateFunctionModuleLow_Tool.inputSchema as any, (args: any) => { return handleCreateFunctionModuleLow(context, args) });
+    this.registerToolOnServer(server, DeleteDataElement_Tool.name, DeleteDataElement_Tool.description, DeleteDataElement_Tool.inputSchema as any, (args: any) => { return handleDeleteDataElement(context, args) });
+    this.registerToolOnServer(server, CreateDataElementLow_Tool.name, CreateDataElementLow_Tool.description, CreateDataElementLow_Tool.inputSchema as any, (args: any) => { return handleCreateDataElementLow(context, args) });
+    this.registerToolOnServer(server, DeleteDomain_Tool.name, DeleteDomain_Tool.description, DeleteDomain_Tool.inputSchema as any, (args: any) => { return handleDeleteDomain(context, args) });
+    this.registerToolOnServer(server, CreateDomainLow_Tool.name, CreateDomainLow_Tool.description, CreateDomainLow_Tool.inputSchema as any, (args: any) => { return handleCreateDomainLow(context, args) });
+    this.registerToolOnServer(server, DeleteStructure_Tool.name, DeleteStructure_Tool.description, DeleteStructure_Tool.inputSchema as any, (args: any) => { return handleDeleteStructure(context, args) });
+    this.registerToolOnServer(server, CreateStructureLow_Tool.name, CreateStructureLow_Tool.description, CreateStructureLow_Tool.inputSchema as any, (args: any) => { return handleCreateStructureLow(context, args) });
+    this.registerToolOnServer(server, DeleteTable_Tool.name, DeleteTable_Tool.description, DeleteTable_Tool.inputSchema as any, (args: any) => { return handleDeleteTable(context, args) });
+    this.registerToolOnServer(server, CreateTableLow_Tool.name, CreateTableLow_Tool.description, CreateTableLow_Tool.inputSchema as any, (args: any) => { return handleCreateTableLow(context, args) });
+    this.registerToolOnServer(server, DeleteView_Tool.name, DeleteView_Tool.description, DeleteView_Tool.inputSchema as any, (args: any) => { return handleDeleteView(context, args) });
+    this.registerToolOnServer(server, CreateViewLow_Tool.name, CreateViewLow_Tool.description, CreateViewLow_Tool.inputSchema as any, (args: any) => { return handleCreateViewLow(context, args) });
+    this.registerToolOnServer(server, DeletePackage_Tool.name, DeletePackage_Tool.description, DeletePackage_Tool.inputSchema as any, (args: any) => { return handleDeletePackage(context, args) });
+    this.registerToolOnServer(server, CreatePackageLow_Tool.name, CreatePackageLow_Tool.description, CreatePackageLow_Tool.inputSchema as any, (args: any) => { return handleCreatePackageLow(context, args) });
+    this.registerToolOnServer(server, CreateTransportLow_Tool.name, CreateTransportLow_Tool.description, CreateTransportLow_Tool.inputSchema as any, (args: any) => { return handleCreateTransportLow(context, args) });
+    this.registerToolOnServer(server, DeleteBehaviorDefinition_Tool.name, DeleteBehaviorDefinition_Tool.description, DeleteBehaviorDefinition_Tool.inputSchema as any, (args: any) => { return handleDeleteBehaviorDefinition(context, args) });
+    this.registerToolOnServer(server, CreateBehaviorDefinitionLow_Tool.name, CreateBehaviorDefinitionLow_Tool.description, CreateBehaviorDefinitionLow_Tool.inputSchema as any, (args: any) => { return handleCreateBehaviorDefinitionLow(context, args) });
+    this.registerToolOnServer(server, DeleteMetadataExtension_Tool.name, DeleteMetadataExtension_Tool.description, DeleteMetadataExtension_Tool.inputSchema as any, (args: any) => { return handleDeleteMetadataExtension(context, args) });
     this.registerToolOnServer(server, CreateMetadataExtensionLow_Tool.name, CreateMetadataExtensionLow_Tool.description, CreateMetadataExtensionLow_Tool.inputSchema as any, (args: any) => { return handleCreateMetadataExtensionLow(context, args) });
     this.registerToolOnServer(server, ActivateProgram_Tool.name, ActivateProgram_Tool.description, ActivateProgram_Tool.inputSchema as any, (args: any) => { return handleActivateProgram(context, args) });
     this.registerToolOnServer(server, ActivateClass_Tool.name, ActivateClass_Tool.description, ActivateClass_Tool.inputSchema as any, (args: any) => { return handleActivateClass(context, args) });
@@ -794,13 +812,6 @@ export class McpHandlers {
     this.registerToolOnServer(server, ActivateView_Tool.name, ActivateView_Tool.description, ActivateView_Tool.inputSchema as any, (args: any) => { return handleActivateView(context, args) });
     this.registerToolOnServer(server, ActivateBehaviorDefinition_Tool.name, ActivateBehaviorDefinition_Tool.description, ActivateBehaviorDefinition_Tool.inputSchema as any, (args: any) => { return handleActivateBehaviorDefinition(context, args) });
     this.registerToolOnServer(server, ActivateMetadataExtension_Tool.name, ActivateMetadataExtension_Tool.description, ActivateMetadataExtension_Tool.inputSchema as any, (args: any) => { return handleActivateMetadataExtension(context, args) });
-    // this.registerToolOnServer(server, GetAbapAST_Tool.name, GetAbapAST_Tool.description, GetAbapAST_Tool.inputSchema as any, (args: any) => { return handleGetAbapAST(context, args); });
-    this.registerToolOnServer(server, GetObjectStructure_Tool.name, GetObjectStructure_Tool.description, GetObjectStructure_Tool.inputSchema as any, (args: any) => { return handleGetObjectStructure(context, args as { object_name: string; object_type: string }); });
-    this.registerToolOnServer(server, GetObjectsList_Tool.name, GetObjectsList_Tool.description, GetObjectsList_Tool.inputSchema as any, (args: any) => { return handleGetObjectsList(context, args as { package_name: string }); });
-    this.registerToolOnServer(server, GetObjectsByType_Tool.name, GetObjectsByType_Tool.description, GetObjectsByType_Tool.inputSchema as any, (args: any) => { return handleGetObjectsByType(context, args as { object_type: string; package_name: string }); });
-    this.registerToolOnServer(server, GetProgFullCode_Tool.name, GetProgFullCode_Tool.description, GetProgFullCode_Tool.inputSchema as any, (args: any) => { return handleGetProgFullCode(context, args as { name: string; type: string }); });
-    this.registerToolOnServer(server, GetObjectNodeFromCache_Tool.name, GetObjectNodeFromCache_Tool.description, GetObjectNodeFromCache_Tool.inputSchema as any, (args: any) => { return handleGetObjectNodeFromCache(context, args as { object_name: string; object_type: string }); });
-    this.registerToolOnServer(server, DescribeByList_Tool.name, DescribeByList_Tool.description, DescribeByList_Tool.inputSchema as any, (args: any) => { return handleDescribeByList(context, args as { objects: string[] }); });
-    } // end if includeReadOnly
+    } // end if includeLow
   }
 }

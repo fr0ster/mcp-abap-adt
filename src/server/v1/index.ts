@@ -1011,6 +1011,7 @@ export interface ServerOptions {
   transportConfig?: TransportConfig;
   allowProcessExit?: boolean;
   registerSignalHandlers?: boolean;
+  exposition?: string[];
 }
 
 // Re-export setSapConfigOverride from config module
@@ -1079,6 +1080,7 @@ export class mcp_abap_adt_server {
   private readonly defaultMcpDestination?: string; // Default MCP destination from --mcp parameter
   private defaultDestination?: string; // Default destination (from --mcp or .env, used when client doesn't specify)
   private mcpHandlers: McpHandlers;
+  private exposition: string[] = ['readonly', 'high']; // Default exposition
 
   // Client session tracking for StreamableHTTP (like the example)
   private streamableHttpSessions = new Map<string, {
@@ -1870,6 +1872,18 @@ export class mcp_abap_adt_server {
     this.defaultMcpDestination = defaultMcpDestination;
     this.envFilePath = envFilePath; // Store .env file path for SessionStore creation
 
+    // Parse exposition from CLI args or use default
+    if (options?.exposition) {
+      this.exposition = options.exposition;
+    } else {
+      // Parse --exposition from CLI
+      const expositionArg = process.argv.find(arg => arg.startsWith('--exposition='));
+      if (expositionArg) {
+        const sets = expositionArg.split('=')[1]?.split(',').map(s => s.trim()).filter(Boolean) || [];
+        this.exposition = sets.length > 0 ? sets : ['readonly', 'high'];
+      }
+    }
+
     // Initialize AuthBroker factory
     const brokerConfig = new AuthBrokerConfig(
       this.defaultMcpDestination,
@@ -2286,7 +2300,7 @@ export class mcp_abap_adt_server {
 
     // Register all tools using McpHandlers
     const handlers = new McpHandlers();
-    handlers.RegisterAllToolsOnServer(server, context);
+    handlers.RegisterAllToolsOnServer(server, context, this.exposition);
 
     return server;
   }
@@ -2299,7 +2313,7 @@ export class mcp_abap_adt_server {
   private setupMcpServerHandlers(context: HandlerContext) {
     // Connection is already wrapped with token refresh in run() method
     // Just register handlers with the provided context
-    this.mcpHandlers.RegisterAllToolsOnServer(this.mcpServer, context);
+    this.mcpHandlers.RegisterAllToolsOnServer(this.mcpServer, context, this.exposition);
   }
 
   /**
@@ -2915,7 +2929,7 @@ export class mcp_abap_adt_server {
 
           // Register all tools using McpHandlers
           const handlers = new McpHandlers();
-          handlers.RegisterAllToolsOnServer(requestServer, { connection, logger: loggerAdapter });
+          handlers.RegisterAllToolsOnServer(requestServer, { connection, logger: loggerAdapter }, this.exposition);
 
           // KEY MOMENT: Create new StreamableHTTP transport for each request (like the SDK example)
           // SDK automatically handles:

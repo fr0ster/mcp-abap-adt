@@ -185,11 +185,27 @@ HANDLER EXPOSITION:
   --exposition=<sets>              Comma-separated handler sets to expose
                                    Options: readonly, high, low
                                    Default: readonly,high
-                                   Note: search and system handlers are ALWAYS included
+
+                                   Handler Sets:
+                                   - readonly: Get*, Check*, Validate*, Lock*, Unlock*
+                                               (read operations, validation, locking)
+                                               Also includes: search, system
+                                   - high:     Create*, Update*High
+                                               (safe create/update via ADT)
+                                   - low:      Update*Low, Delete*, Activate*
+                                               (direct/dangerous operations)
+                                   - search:   SearchObject (included with readonly)
+                                   - system:   GetWhereUsed, GetTypeInfo, GetObjectInfo,
+                                               GetAbapAST, GetSession, etc.
+                                               (included with readonly)
+
                                    Examples:
-                                   --exposition=readonly       (only read-only operations)
-                                   --exposition=readonly,high  (read-only + high-level writes)
-                                   --exposition=readonly,high,low (all operations)
+                                   --exposition=readonly       (readonly + search + system)
+                                   --exposition=readonly,high  (readonly + high + search + system)
+                                   --exposition=high           (high only, NO search/system)
+                                   --exposition=readonly,high,low (all handlers)
+
+                                   For details: docs/user-guide/HANDLERS_MANAGEMENT.md
 `;
   }
 

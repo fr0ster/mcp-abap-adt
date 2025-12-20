@@ -1444,4 +1444,19 @@ create_view_low:
         delete_after_test: true
         delete_object_type: "DDLS/DF"
 
+# ============================================================================
+# READ-ONLY HANDLER TESTS (for mcp-abap-adt integration tests)
+# ============================================================================
+
+# WhereUsed Read-Only Handler
+whereused_readonly:
+  test_cases:
+    - name: "test_whereused"
+      enabled: true
+      description: "WhereUsed handler read-only tests"
+      params:
+        # Test objects for where-used analysis
+        test_class: "CL_ABAP_CHAR_UTILITIES"  # Standard SAP class for testing
+        test_table: "SCARR"                    # Standard SAP table (Flight: Airlines)
+
 # Step 3: Read-only test (separate read-only handler)

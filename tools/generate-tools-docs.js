@@ -272,42 +272,50 @@ function getCategoryFromFolder(folder) {
 }
 
 /**
- * Load all tools from toolsRegistry
+ * Load all tools from handler groups (used by v2 server)
  */
 function loadAllTools() {
-  const registryPath = path.join(__dirname, '../src/lib/toolsRegistry.ts');
-  const content = fs.readFileSync(registryPath, 'utf8');
-
+  const groupsDir = path.join(__dirname, '../src/lib/handlers/groups');
   const tools = [];
   const processedHandlers = new Set();
 
-  // Extract all handler imports - now supports subdirectories
-  // Pattern: import { TOOL_DEFINITION as XXX_Tool } from '../handlers/subdir/handlerFile';
-  const importMatches = content.matchAll(/import \{ TOOL_DEFINITION as (\w+)_Tool \} from '\.\.\/handlers\/(.+)';/g);
-  for (const match of importMatches) {
-    const handlerRelativePath = match[2]; // e.g., "bdef/low/handleGetBdef" or "program/high/handleCreateProgram"
-    const handlerPath = path.join(__dirname, `../src/handlers/${handlerRelativePath}.ts`);
+  // Read all handler group files
+  const groupFiles = fs.readdirSync(groupsDir)
+    .filter(f => f.endsWith('.ts') && f !== 'index.ts');
 
-    if (processedHandlers.has(handlerPath)) {
-      continue;
-    }
+  for (const groupFile of groupFiles) {
+    const groupPath = path.join(groupsDir, groupFile);
+    const content = fs.readFileSync(groupPath, 'utf8');
 
-    if (fs.existsSync(handlerPath)) {
-      const toolDef = extractToolDefinition(handlerPath);
-      if (toolDef) {
-        processedHandlers.add(handlerPath);
-        // Determine if it's low, high, or read-only level based on path
-        const isReadOnly = handlerRelativePath.includes('/readonly/');
-        const isLow = handlerRelativePath.includes('/low/');
-        const isHigh = handlerRelativePath.includes('/high/');
-        toolDef.level = isReadOnly ? 'readonly' : (isLow ? 'low' : (isHigh ? 'high' : 'unknown'));
-        // Extract category folder from path (e.g., "bdef/low/handleGetBdef" -> "bdef")
-        const categoryMatch = handlerRelativePath.match(/^([^\/]+)/);
-        const categoryFolder = categoryMatch ? categoryMatch[1] : 'other';
-        // Map to display category
-        toolDef.category = getCategoryFromFolder(categoryFolder);
-        toolDef.categoryFolder = categoryFolder;
-        tools.push(toolDef);
+    // Extract all TOOL_DEFINITION imports from handler groups
+    // Pattern: import { TOOL_DEFINITION as XXX_Tool } from '../../../handlers/category/level/handlerFile';
+    const importMatches = content.matchAll(/import \{ TOOL_DEFINITION as (\w+)_Tool \} from ['"]\.\.\/\.\.\/\.\.\/handlers\/(.+?)['"];/g);
+
+    for (const match of importMatches) {
+      const handlerRelativePath = match[2]; // e.g., "program/readonly/handleGetProgram"
+      const handlerPath = path.join(__dirname, `../src/handlers/${handlerRelativePath}.ts`);
+
+      if (processedHandlers.has(handlerPath)) {
+        continue;
+      }
+
+      if (fs.existsSync(handlerPath)) {
+        const toolDef = extractToolDefinition(handlerPath);
+        if (toolDef) {
+          processedHandlers.add(handlerPath);
+          // Determine level based on path
+          const isReadOnly = handlerRelativePath.includes('/readonly/');
+          const isLow = handlerRelativePath.includes('/low/');
+          const isHigh = handlerRelativePath.includes('/high/');
+          toolDef.level = isReadOnly ? 'readonly' : (isLow ? 'low' : (isHigh ? 'high' : 'unknown'));
+          // Extract category folder from path (e.g., "program/readonly/handleGetProgram" -> "program")
+          const categoryMatch = handlerRelativePath.match(/^([^\/]+)/);
+          const categoryFolder = categoryMatch ? categoryMatch[1] : 'other';
+          // Map to display category
+          toolDef.category = getCategoryFromFolder(categoryFolder);
+          toolDef.categoryFolder = categoryFolder;
+          tools.push(toolDef);
+        }
       }
     }
   }
@@ -736,7 +744,7 @@ function main() {
 
   const markdown = generateMarkdown(tools, levelTotals);
 
-  const outputPath = path.join(__dirname, '../doc/user-guide/AVAILABLE_TOOLS.md');
+  const outputPath = path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS.md');
   fs.writeFileSync(outputPath, markdown, 'utf8');
 
   console.log(`✅ Documentation generated: ${outputPath}`);

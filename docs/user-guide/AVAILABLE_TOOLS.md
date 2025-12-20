@@ -9,8 +9,8 @@ This document contains a complete list of all tools (functions) provided by the 
 
 ## 📊 Tool Summary
 
-- Total tools: 177
-- High-level tools: 23
+- Total tools: 184
+- High-level tools: 30
 - Low-level tools: 116
 - Read-only tools: 38
 - Other tools: 0
@@ -19,7 +19,7 @@ This document contains a complete list of all tools (functions) provided by the 
 
 The navigation below mirrors the document structure for easier discovery.
 
-- [Programs, Classes, Functions](#programs,-classes,-functions) (50 tools – 7 high-level, 38 low-level, 5 read-only)
+- [Programs, Classes, Functions](#programs,-classes,-functions) (51 tools – 8 high-level, 38 low-level, 5 read-only)
   - [Read-Only Tools](#programs,-classes,-functions-read-only)
     - [GetClass](#getclass-readonly)
     - [GetFunction](#getfunction-readonly)
@@ -32,6 +32,7 @@ The navigation below mirrors the document structure for easier discovery.
     - [CreateFunctionModule](#createfunctionmodule-high)
     - [CreateProgram](#createprogram-high)
     - [UpdateClass](#updateclass-high)
+    - [UpdateFunctionGroup](#updatefunctiongroup-high)
     - [UpdateFunctionModule](#updatefunctionmodule-high)
     - [UpdateProgram](#updateprogram-high)
   - [Low-Level Tools](#programs,-classes,-functions-low-level)
@@ -73,7 +74,7 @@ The navigation below mirrors the document structure for easier discovery.
     - [ValidateFunctionGroupLow](#validatefunctiongrouplow-low)
     - [ValidateFunctionModuleLow](#validatefunctionmodulelow-low)
     - [ValidateProgramLow](#validateprogramlow-low)
-- [Tables and Structures](#tables-and-structures) (55 tools – 8 high-level, 40 low-level, 7 read-only)
+- [Tables and Structures](#tables-and-structures) (59 tools – 12 high-level, 40 low-level, 7 read-only)
   - [Read-Only Tools](#tables-and-structures-read-only)
     - [GetDataElement](#getdataelement-readonly)
     - [GetDomain](#getdomain-readonly)
@@ -85,11 +86,15 @@ The navigation below mirrors the document structure for easier discovery.
   - [High-Level Tools](#tables-and-structures-high-level)
     - [CreateDataElement](#createdataelement-high)
     - [CreateDomain](#createdomain-high)
+    - [CreateServiceDefinition](#createservicedefinition-high)
     - [CreateStructure](#createstructure-high)
     - [CreateTable](#createtable-high)
     - [CreateView](#createview-high)
     - [UpdateDataElement](#updatedataelement-high)
     - [UpdateDomain](#updatedomain-high)
+    - [UpdateServiceDefinition](#updateservicedefinition-high)
+    - [UpdateStructure](#updatestructure-high)
+    - [UpdateTable](#updatetable-high)
     - [UpdateView](#updateview-high)
   - [Low-Level Tools](#tables-and-structures-low-level)
     - [ActivateDataElementLow](#activatedataelementlow-low)
@@ -282,19 +287,19 @@ The navigation below mirrors the document structure for easier discovery.
 *High-level tools perform a chain of operations (e.g., validate → lock → update → check → unlock → activate).*
 
 ### CreateClass {#createclass-high}
-**Description:** Create a new ABAP class in SAP system with source code. Supports public/protected/private sections, interfaces, and inheritance. Uses stateful session for proper lock management.
+**Description:** Create a new ABAP class with optional activation. Manages validation, lock, check, update, unlock, and optional activation.
 
 **Parameters:**
-- `inputSchema` (string, optional) - Class name (e.g., ZCL_TEST_CLASS_001). Must follow SAP naming conventions (start with Z or Y).
-- `description` (string, optional) - Class description. If not provided, class_name will be used.
-- `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `superclass` (string, optional) - Optional superclass name for inheritance (e.g., CL_OBJECT)
-- `final` (boolean, optional) - Mark class as final (cannot be inherited). Default: false
-- `abstract` (boolean, optional) - Mark class as abstract (cannot be instantiated). Default: false
-- `create_protected` (boolean, optional) - Constructor visibility is protected. Default: false (public)
-- `source_code` (string, optional) - Complete ABAP class source code including CLASS DEFINITION and IMPLEMENTATION sections. If not provided, generates minimal template.
-- `activate` (boolean, optional) - Activate class after creation. Default: true. Set to false for batch operations (activate multiple objects later).
+- `inputSchema` (string, optional) - Class name (e.g., ZCL_TEST_CLASS_001).
+- `description` (string, optional) - Class description (defaults to class_name).
+- `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP).
+- `transport_request` (string, optional) - Transport request number (required for transportable packages).
+- `superclass` (string, optional) - Optional superclass name.
+- `final` (boolean, optional) - Mark class as final. Default: false
+- `abstract` (boolean, optional) - Mark class as abstract. Default: false
+- `create_protected` (boolean, optional) - Protected constructor. Default: false
+- `source_code` (string, optional) - Full ABAP class source code. If omitted, a minimal template is generated.
+- `activate` (boolean, optional) - Activate after creation. Default: true.
 
 **Example:**
 ```json
@@ -369,17 +374,34 @@ The navigation below mirrors the document structure for easier discovery.
 ---
 
 ### UpdateClass {#updateclass-high}
-**Description:** Update source code of an existing ABAP class. Locks the class, uploads new source code, and unlocks. Optionally activates after update. Use this to modify existing classes without re-creating metadata.
+**Description:** Update source code of an existing ABAP class. Locks, checks, updates, unlocks, and optionally activates.
 
 **Parameters:**
-- `inputSchema` (string, optional) - Class name (e.g., ZCL_TEST_CLASS_001). Class must already exist.
-- `source_code` (string, required) - Complete ABAP class source code including CLASS DEFINITION and IMPLEMENTATION sections.
-- `activate` (boolean, optional) - Activate class after source update. Default: false. Set to true to activate immediately, or use ActivateObject for batch activation.
+- `inputSchema` (string, optional) - Class name (e.g., ZCL_TEST_CLASS_001).
+- `source_code` (string, required) - Complete ABAP class source code.
+- `activate` (boolean, optional) - Activate after update. Default: false.
 
 **Example:**
 ```json
 {
   "source_code": "\"example_value\""
+}
+```
+
+---
+
+### UpdateFunctionGroup {#updatefunctiongroup-high}
+**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don
+
+**Parameters:**
+- `inputSchema` (string, optional) - Function group name (e.g., ZTEST_FG_001). Must exist in the system.
+- `description` (string, required) - New description for the function group.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport.
+
+**Example:**
+```json
+{
+  "description": "\"example_value\""
 }
 ```
 
@@ -406,7 +428,7 @@ The navigation below mirrors the document structure for easier discovery.
 ---
 
 ### UpdateProgram {#updateprogram-high}
-**Description:** Update source code of an existing ABAP program. Locks the program, uploads new source code, and unlocks. Optionally activates after update. Use this to modify existing programs without re-creating metadata.
+**Description:** Update source code of an existing ABAP program. Locks the program, checks new code, uploads new source code, and unlocks. Optionally activates after update. Use this to modify existing programs without re-creating metadata.
 
 **Parameters:**
 - `inputSchema` (string, optional) - Program name (e.g., Z_TEST_PROGRAM_001). Program must already exist.
@@ -512,7 +534,7 @@ The navigation below mirrors the document structure for easier discovery.
 **Parameters:**
 - `inputSchema` (string, optional) - Class name (e.g., ZCL_MY_CLASS)
 - `version` (string, optional) - Version to check: 
-- `source_code` (string, optional) - Optional: source code to validate. If provided, validates hypothetical code without creating object.
+- `source_code` (string, optional) - Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1170,14 +1192,11 @@ The navigation below mirrors the document structure for easier discovery.
 ### GetTable {#gettable-readonly}
 **Description:** [read-only] Retrieve ABAP table structure.
 
-**Parameters:**
-- `table_name` (string, optional) — Name of the ABAP table (snake_case)
-- `tableName` (string, optional) — Name of the ABAP table (camelCase)
-> At least one of `table_name` or `tableName` is required.
+**Parameters:** None
 
 **Example:**
 ```json
-{ "table_name": "SFLIGHT" }
+{}
 ```
 
 ---
@@ -1187,9 +1206,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 > **⚠️ ABAP Cloud Limitation:** Direct access to table data through ADT Data Preview is blocked by SAP BTP backend policies. When authenticating via JWT/XSUAA, the server will return a descriptive error. This function works only for on-premise systems.
 
-**Parameters:**
-- `table_name` (string, required) — Name of the ABAP table
-- `max_rows` (number, optional) — Maximum number of rows to retrieve
+**Parameters:** None
 
 **Example:**
 ```json
@@ -1283,6 +1300,26 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
+### CreateServiceDefinition {#createservicedefinition-high}
+**Description:** Create a new ABAP service definition for OData services. Service definitions define the structure and behavior of OData services. Uses stateful session for proper lock management.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Service definition name (e.g., ZSD_MY_SERVICE). Must follow SAP naming conventions (start with Z or Y).
+- `description` (string, optional) - Service definition description. If not provided, service_definition_name will be used.
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `source_code` (string, optional) - Service definition source code (optional). If not provided, a minimal template will be created.
+- `activate` (boolean, optional) - Activate service definition after creation. Default: true.
+
+**Example:**
+```json
+{
+  "package_name": "\"ZMY_PACKAGE_NAME\""
+}
+```
+
+---
+
 ### CreateStructure {#createstructure-high}
 **Description:** Create a new ABAP structure in SAP system with fields and type references. Includes create, activate, and verify steps.
 
@@ -1333,15 +1370,15 @@ The navigation below mirrors the document structure for easier discovery.
 ---
 
 ### CreateView {#createview-high}
-**Description:** Create CDS View or Classic View in SAP using DDL syntax. Both types use the same API workflow, differing only in DDL content (CDS has @AbapCatalog annotations).
+**Description:** Create CDS View or Classic View in SAP using DDL syntax. Both types use the same API workflow, differing only in DDL content (CDS has @AbapCatalog.sqlViewName and other annotations).
 
 **Parameters:**
-- `inputSchema` (string, optional) - View name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW). Must follow SAP naming conventions.
-- `ddl_source` (string, required) - Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 
+- `inputSchema` (string, optional) - View name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).
+- `ddl_source` (string, required) - Complete DDL source code.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `description` (string, optional) - Optional description. If not provided, view_name will be used.
-- `activate` (boolean, optional) - Activate view after creation. Default: true. Set to false for batch operations (activate multiple objects later).
+- `transport_request` (string, optional) - Transport request number (required for transportable packages).
+- `description` (string, optional) - Optional description (defaults to view_name).
+- `activate` (boolean, optional) - Activate after creation. Default: true.
 
 **Example:**
 ```json
@@ -1415,13 +1452,67 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
-### UpdateView {#updateview-high}
-**Description:** Update DDL source code of an existing CDS View or Classic View. Locks the view, uploads new DDL source, and unlocks. Optionally activates after update. Use this to modify existing views without re-creating metadata.
+### UpdateServiceDefinition {#updateservicedefinition-high}
+**Description:** Update source code of an existing ABAP service definition. Uses stateful session with proper lock/unlock mechanism.
 
 **Parameters:**
-- `inputSchema` (string, optional) - View name (e.g., ZOK_R_TEST_0002). View must already exist.
-- `ddl_source` (string, required) - Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 
-- `activate` (boolean, optional) - Activate view after source update. Default: false. Set to true to activate immediately, or use ActivateObject for batch activation.
+- `inputSchema` (string, optional) - Service definition name (e.g., ZSD_MY_SERVICE). Must exist in the system.
+- `source_code` (string, required) - Complete service definition source code.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport.
+- `activate` (boolean, optional) - Activate service definition after update. Default: true.
+
+**Example:**
+```json
+{
+  "source_code": "\"example_value\""
+}
+```
+
+---
+
+### UpdateStructure {#updatestructure-high}
+**Description:** Update DDL source code of an existing ABAP structure. Locks the structure, uploads new DDL source, and unlocks. Optionally activates after update. Use this to modify existing structures without re-creating metadata.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Structure name (e.g., ZZ_S_TEST_001). Structure must already exist.
+- `ddl_code` (string, required) - Complete DDL source code for structure. Example: 
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport.
+- `activate` (boolean, optional) - Activate structure after source update. Default: true.
+
+**Example:**
+```json
+{
+  "ddl_code": "\"example_value\""
+}
+```
+
+---
+
+### UpdateTable {#updatetable-high}
+**Description:** Update DDL source code of an existing ABAP table. Locks the table, uploads new DDL source, and unlocks. Optionally activates after update. Use this to modify existing tables without re-creating metadata.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Table name (e.g., ZZ_TEST_TABLE_001). Table must already exist.
+- `ddl_code` (string, required) - Complete DDL source code for table. Example: 
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport.
+- `activate` (boolean, optional) - Activate table after source update. Default: true.
+
+**Example:**
+```json
+{
+  "ddl_code": "\"example_value\""
+}
+```
+
+---
+
+### UpdateView {#updateview-high}
+**Description:** Update DDL source code of an existing CDS View or Classic View. Locks the view, checks new code, uploads new DDL source, unlocks, and optionally activates.
+
+**Parameters:**
+- `inputSchema` (string, optional) - View name (e.g., ZOK_R_TEST_0002).
+- `ddl_source` (string, required) - Complete DDL source code.
+- `activate` (boolean, optional) - Activate after update. Default: false.
 
 **Example:**
 ```json
@@ -3136,12 +3227,12 @@ All functions return MCP-compliant responses in the following format:
 
 ## Additional Information
 
-- [Tools Architecture](../architecture/TOOLS_ARCHITECTURE.md) - Technical documentation about the tools architecture
-- [Installation Guide](../installation/INSTALLATION.md) - Setup and configuration instructions
+- [Tools Architecture](../TOOLS_ARCHITECTURE.md) - Technical documentation about the tools architecture
+- [Installation Guide](INSTALLATION_GUIDE_UA.md) - Setup and configuration instructions
 - [README](../README.md) - Main project documentation
 
 ---
 
-*Last updated: 2025-12-05*
+*Last updated: 2025-12-20*
 *Document version: 1.0*
 *Generated automatically from TOOL_DEFINITION exports*

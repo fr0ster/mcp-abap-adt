@@ -1,0 +1,31 @@
+# Dockerfile using npm package tarball from volume
+# Run 'npm pack' before building to create the tarball
+# Optimized for smaller image size
+
+FROM node:22-bookworm-slim
+
+WORKDIR /app
+
+# Runtime environment
+ENV NODE_ENV=production \
+    MCP_HTTP_PORT=3000 \
+    MCP_HTTP_HOST=0.0.0.0
+
+# Extract and install package with production dependencies only
+RUN --mount=type=bind,source=docker/packages,target=/packages \
+    tar -xzf /packages/*.tgz --strip-components=1 && \
+    npm install --omit=dev --production && \
+    npm cache clean --force
+
+# Create directories for service keys and sessions
+RUN mkdir -p /app/service-keys /app/sessions
+
+# Expose HTTP port
+EXPOSE 3000
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
+
+# Start server with streamable-http transport
+CMD ["node", "./bin/mcp-abap-adt.js", "--transport", "streamable-http"]

@@ -26,7 +26,18 @@
     "docs:tools": "node ./tools/generate-tools-docs.js",
     "prepublishOnly": "npm run build",
     "package": "npm pack",
-    "package:build": "npm run build && npm pack"
+    "package:build": "npm run build && npm pack",
+    "docker:pack": "npm pack && mkdir -p docker/packages && mv *.tgz docker/packages/",
+    "docker:build": "cd docker && docker-compose build",
+    "docker:build:package": "npm run docker:pack && cd docker && docker-compose -f docker-compose.package.yml build",
+    "docker:up": "cd docker && docker-compose up -d",
+    "docker:up:package": "npm run docker:pack && cd docker && docker-compose -f docker-compose.package.yml up -d",
+    "docker:down": "cd docker && docker-compose down",
+    "docker:down:package": "cd docker && docker-compose -f docker-compose.package.yml down",
+    "docker:logs": "cd docker && docker-compose logs -f",
+    "docker:logs:package": "cd docker && docker-compose -f docker-compose.package.yml logs -f",
+    "docker:rebuild": "npm run docker:down && npm run docker:build && npm run docker:up",
+    "docker:rebuild:package": "npm run docker:down:package && npm run docker:build:package && npm run docker:up:package"
   },
   "keywords": [
     "abap",

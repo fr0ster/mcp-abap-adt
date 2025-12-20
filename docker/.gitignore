@@ -1,0 +1,23 @@
+# Service keys contain sensitive OAuth2 credentials - NEVER commit
+service-keys/
+*.json
+
+# Sessions contain JWT tokens and refresh tokens - NEVER commit
+sessions/
+*.env
+
+# Package tarballs for Docker deployment
+packages/
+
+# Locks directory
+locks/
+
+# Cache directory
+cache/
+
+# Docker override files (may contain sensitive data)
+docker-compose.override.yml
+
+# Backup files
+*.tar.gz
+*.zip

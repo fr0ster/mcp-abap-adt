@@ -1,188 +1,327 @@
-# Docker Configuration
+# Docker Deployment
 
-This directory contains all Docker-related configuration files for the MCP ABAP ADT server.
+Docker configuration for MCP ABAP ADT Server with AuthBroker and destination-based authentication.
 
-## Files
+## Two Deployment Options
 
-- `Dockerfile` - Docker image build configuration
-- `docker-compose.yml` - Basic configuration (minimal, no logging, no persistence)
-- `docker-compose.logging.yml` - Configuration with logging enabled
-- `docker-compose.full.yml` - Full configuration with logging and persistence (sessions, locks, cache)
+### Option 1: Using Published npm Package (Recommended)
 
-## Configuration Variants
+Simplest approach - uses pre-built package from npm:
+- Smaller image size
+- Faster build time
+- Always uses latest published version
 
-### 1. Basic (`docker-compose.yml`)
+```bash
+docker-compose -f docker-compose.package.yml up -d
+```
 
-**Use for:** Simple testing, quick start, minimal resource usage
+### Option 2: Building from Source
 
-**Features:**
-- ✅ HTTP server on port 3000
-- ✅ Health checks
-- ✅ Resource limits
-- ⚙️ Logging: Optional (uncomment in file)
-- ⚙️ Persistence: Optional (uncomment in file)
+For development or custom modifications:
+- Build from local source code
+- Larger image size
+- Requires build step
 
-**Usage:**
 ```bash
 docker-compose up -d
 ```
-
-**To enable logging:** Uncomment the `logging:` section in `docker-compose.yml`
-
-**To enable session persistence:** 
-1. Uncomment `MCP_ENABLE_SESSION_STORAGE=true` in `environment:` section
-2. Uncomment the `volumes:` section
-
-### 2. With Logging (`docker-compose.logging.yml`)
-
-**Use for:** Debugging, monitoring server activity
-
-**Features:**
-- ✅ HTTP server on port 3000
-- ✅ Health checks
-- ✅ Resource limits
-- ✅ Logging (json-file driver, 10MB max, 3 files)
-- ❌ No persistence (sessions, locks)
-
-**Usage:**
-```bash
-docker-compose -f docker-compose.logging.yml up -d
-docker-compose -f docker-compose.logging.yml logs -f
-```
-
-### 3. Full (`docker-compose.full.yml`)
-
-**Use for:** Production, long-running operations, when you need session/lock persistence
-
-**Features:**
-- ✅ HTTP server on port 3000
-- ✅ Health checks
-- ✅ Resource limits
-- ✅ Logging (json-file driver, 10MB max, 3 files)
-- ✅ Session persistence (enabled via `MCP_ENABLE_SESSION_STORAGE=true`)
-- ✅ Lock persistence (active-locks.json)
-- ✅ Cache directory (reserved for future use)
-
-**Usage:**
-```bash
-docker-compose -f docker-compose.full.yml up -d
-docker-compose -f docker-compose.full.yml logs -f
-```
-
-**Note:** Session persistence requires `MCP_ENABLE_SESSION_STORAGE=true` (already set in this config). This allows cookies and CSRF tokens to persist across requests.
 
 ## Quick Start
 
-### Prerequisites
+### 1. Prepare Service Key
 
-1. Create `.env` file in the project root with SAP connection details:
-   ```env
-   SAP_URL=https://your-sap-system.com
-   SAP_CLIENT=100
-   SAP_AUTH_TYPE=jwt
-   SAP_JWT_TOKEN=your-token
-   ```
+Create `service-keys` directory and add your SAP service key:
 
-2. Ensure Docker and Docker Compose are installed
-
-### Running with Docker Compose
-
-**Basic (minimal):**
 ```bash
-cd docker
+mkdir -p service-keys
+# Copy your service key file
+cp /path/to/your-service-key.json service-keys/trial.json
+```
+
+Service key format (ABAP environment):
+```json
+{
+  "uaa": {
+    "url": "https://your-uaa-url.com",
+    "clientid": "your-client-id",
+    "clientsecret": "your-client-secret"
+  },
+  "url": "https://your-sap-url.com",
+  "abap": {
+    "url": "https://your-sap-url.com"
+  }
+}
+```
+
+### 2. Configure Environment
+
+```bash
+cp .env.example .env
+# Edit .env and set MCP_DESTINATION to match your service key filename (without .json)
+```
+
+### 3. Start Server
+
+**Using npm package (recommended)**:
+```bash
+docker-compose -f docker-compose.package.yml up -d
+```
+
+**Or building from source**:
+```bash
 docker-compose up -d
 ```
 
-**With logging:**
+### 4. Check Status
+
 ```bash
-cd docker
-docker-compose -f docker-compose.logging.yml up -d
-docker-compose -f docker-compose.logging.yml logs -f
+# View logs
+docker-compose logs -f
+
+# Check health
+curl http://localhost:3000/health
+
+# Check container status
+docker-compose ps
 ```
 
-**Full (with persistence):**
-```bash
-cd docker
-docker-compose -f docker-compose.full.yml up -d
-docker-compose -f docker-compose.full.yml logs -f
+## Architecture
+
+### Dockerfile Options
+
+**Dockerfile.package** (recommended):
+- Uses `npm install -g @fr0ster/mcp-abap-adt`
+- Single-stage build
+- ~200MB image size
+- Fast build (~1 minute)
+
+**Dockerfile** (from source):
+- Multi-stage build with TypeScript compilation
+- Builds from local source code
+- ~300MB image size
+- Slower build (~3-5 minutes)
+
+### Authentication Flow
+
+1. **Service Keys**: Stored in `./service-keys/{destination}.json`
+   - Read-only volume mount
+   - Contains OAuth2 credentials for SAP system
+
+2. **Sessions**: Stored in `./sessions/{destination}.env`
+   - Read-write volume mount
+   - AuthBroker saves JWT tokens and refresh tokens here
+   - Automatically refreshed when expired
+
+3. **Destination**: Specified via `MCP_DESTINATION` environment variable
+   - Determines which service key to use
+   - Session file matches the destination name
+
+### Directory Structure
+
+```
+docker/
+├── Dockerfile              # Multi-stage build
+├── docker-compose.yml      # Service configuration
+├── .env.example            # Environment template
+├── README.md              # This file
+├── service-keys/          # Service keys (not in git)
+│   ├── trial.json
+│   ├── dev.json
+│   └── prod.json
+└── sessions/              # Session data (not in git)
+    ├── trial.env
+    ├── dev.env
+    └── prod.env
 ```
 
-**Stop services:**
+## Usage Examples
+
+### Single Destination
+
 ```bash
+# Use default destination from .env
+docker-compose up -d
+
+# Or specify destination
+MCP_DESTINATION=trial docker-compose up -d
+```
+
+### Multiple Destinations
+
+Create multiple service key files and switch between them:
+
+```bash
+# Use trial
+MCP_DESTINATION=trial docker-compose up -d
+
+# Stop and switch to dev
 docker-compose down
-# or
-docker-compose -f docker-compose.logging.yml down
-# or
-docker-compose -f docker-compose.full.yml down
+MCP_DESTINATION=dev docker-compose up -d
 ```
 
-The server will be available at `http://localhost:3000/mcp/stream/http`
+### Development with Volume Mounts
 
-### Building Docker Image
+```yaml
+# docker-compose.override.yml
+services:
+  mcp-abap-adt:
+    volumes:
+      - ../dist:/app/dist  # Hot reload
+```
+
+**From source**:
+```bash
+docker-compose up -d
+```
+
+**From npm package**:
+```bash
+# No need for volume mounts - package is already built
+docker-compose -f docker-compose.package.yml up -d
+```
+
+## Configuration Options
+
+### Environment Variables
+
+- `MCP_DESTINATION`: Destination name (default: "default")
+- `MCP_HTTP_PORT`: Server port (default: 3000)
+- `MCP_HTTP_HOST`: Server host (default: 0.0.0.0)
+- `MCP_ENABLE_SESSION_STORAGE`: Enable persistent sessions (default: false)
+- `AUTH_BROKER_PATH`: Custom path for service keys (default: /app/service-keys)
+
+### Volumes
+
+- `./service-keys:/app/service-keys:ro` - Service keys (read-only)
+- `./sessions:/app/sessions` - Session storage (read-write)
+- `./locks:/app/.locks` - Lock files (optional)
+- `./cache:/app/cache` - Cache directory (optional)
+
+## Troubleshooting
+
+### Container exits immediately
 
 ```bash
-# From this directory (docker/)
-docker build -f Dockerfile -t mcp-abap-adt ..
+# Check logs
+docker-compose logs
+
+# Common causes:
+# - Missing service key file
+# - Invalid service key format
+# - Port 3000 already in use
 ```
 
-### Running Docker Image Directly
-
-You can also run the image directly without docker-compose:
+### Authentication fails
 
 ```bash
-# Build image
-docker build -f docker/Dockerfile -t mcp-abap-adt .
+# Check service key exists
+ls -la service-keys/
 
-# Run container (basic)
-docker run -d \
-  --name mcp-abap-adt-server \
-  -p 3000:3000 \
-  --env-file .env \
-  mcp-abap-adt
+# Check destination matches filename
+echo $MCP_DESTINATION  # Should match {destination}.json
 
-# Run container (with persistence)
-docker run -d \
-  --name mcp-abap-adt-server \
-  -p 3000:3000 \
-  --env-file .env \
-  -e MCP_ENABLE_SESSION_STORAGE=true \
-  -v $(pwd)/data/sessions:/app/.sessions \
-  -v $(pwd)/data/locks:/app/.locks \
-  -v $(pwd)/data/cache:/app/cache \
-  mcp-abap-adt
+# Check session was created
+ls -la sessions/
+
+# View session contents (after first successful auth)
+cat sessions/${MCP_DESTINATION}.env
 ```
 
-## Documentation
+### Token expired
 
-For detailed deployment instructions, see:
-- [Docker Deployment Guide](../docs/deployment/DOCKER.md)
-- [Cline Setup Guide](../docs/deployment/CLINE_SETUP.md)
+AuthBroker automatically refreshes tokens. If manual refresh needed:
 
-## Directory Structure
+```bash
+# Remove session file to force re-authentication
+rm sessions/${MCP_DESTINATION}.env
 
-```
-mcp-abap-adt/
-├── docker/              # Docker configuration files (this directory)
-│   ├── Dockerfile
-│   ├── docker-compose.yml          # Basic (minimal)
-│   ├── docker-compose.logging.yml  # With logging
-│   ├── docker-compose.full.yml     # Full (logging + persistence)
-│   └── README.md
-├── .env                 # Environment variables (create in project root)
-└── data/                # Persistent data (created by Docker containers, only with full config)
-    ├── sessions/        # Session files (only if MCP_ENABLE_SESSION_STORAGE=true)
-    ├── locks/           # Lock registry (active-locks.json)
-    └── cache/           # Cache directory (reserved for future use)
+# Restart container
+docker-compose restart
 ```
 
-## Notes
+## Security
 
-- All Docker commands should be run from the `docker/` directory (for docker-compose)
-- The build context is set to the project root (`..`) to access source files
-- Environment variables are loaded from `.env` file in the project root
-- Persistent data directories are created in the project root (only when volumes are enabled)
-- The server listens on port 3000 and is exposed directly (no nginx proxy needed for local development)
-- **Logging:** Disabled by default. Uncomment the `logging:` section in `docker-compose.yml` to enable
-- **Session storage:** Disabled by default (stateless mode). To enable:
-  1. Uncomment `MCP_ENABLE_SESSION_STORAGE=true` in `environment:` section
-  2. Uncomment the `volumes:` section
+### Best Practices
+
+1. **Never commit service keys or sessions to git**
+   - `.gitignore` already excludes these directories
+   - Use secrets management in production
+
+2. **Use read-only mount for service keys**
+   - Already configured in docker-compose.yml
+
+3. **Restrict container resources**
+   - Memory and CPU limits configured
+
+4. **Use specific user**
+   ```dockerfile
+   USER node  # Add to Dockerfile if needed
+   ```
+
+5. **Scan for vulnerabilities**
+   ```bash
+   docker scan mcp-abap-adt
+   ```
+
+## Production Deployment
+
+### With HTTPS Proxy (nginx)
+
+```yaml
+# docker-compose.prod.yml
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - mcp-abap-adt
+```
+
+### With Secrets Management
+
+```bash
+# Using Docker secrets
+echo '{"uaa": {...}}' | docker secret create sap_service_key -
+
+# Reference in compose
+secrets:
+  - sap_service_key
+```
+
+## Maintenance
+
+### Update Server
+
+```bash
+# Rebuild image
+docker-compose build
+
+# Restart with new image
+docker-compose up -d
+```
+
+### Backup
+
+```bash
+# Backup sessions (tokens)
+tar -czf sessions-backup.tar.gz sessions/
+
+# Service keys should be backed up separately (security)
+```
+
+### Clean Up
+
+```bash
+# Stop and remove containers
+docker-compose down
+
+# Remove volumes
+docker-compose down -v
+
+# Remove images
+docker rmi mcp-abap-adt
+```

@@ -1,18 +1,19 @@
 version: '3.8'
 
-# MCP ABAP ADT Server with AuthBroker and destination-based authentication
+# MCP ABAP ADT Server using npm package tarball
 #
-# Architecture:
-# - Uses AuthBroker for authentication management
-# - Service keys stored in volume (./service-keys)
-# - Sessions stored in local temporary directory (./sessions)
-# - HTTP transport on port 3000
+# Before building:
+# 1. Run 'npm pack' in project root
+# 2. Move .tgz to docker/packages/
+#
+# Usage: docker-compose -f docker-compose.package.yml up -d
 
 services:
   mcp-abap-adt:
     build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: docker/Dockerfile.package
+    image: mcp-abap-adt:package
     container_name: mcp-abap-adt-server
     restart: unless-stopped
 
@@ -27,30 +28,15 @@ services:
       - MCP_HTTP_HOST=0.0.0.0
 
       # Destination name (service key filename without .json)
-      # Override with: docker-compose run -e MCP_DESTINATION=your-dest mcp-abap-adt
       - MCP_DESTINATION=${MCP_DESTINATION:-default}
-
-      # Optional: Enable session storage for persistent sessions
-      # - MCP_ENABLE_SESSION_STORAGE=true
-
-      # Optional: Custom paths for AuthBroker
-      # - AUTH_BROKER_PATH=/app/service-keys
 
     # Volumes for AuthBroker data
     volumes:
       # Service keys directory - put your {destination}.json files here
-      # Example: ./service-keys/trial.json, ./service-keys/dev.json
       - ./service-keys:/app/service-keys:ro
 
       # Sessions directory - AuthBroker stores session data here
-      # Contains .env files with tokens: {destination}.env
       - ./sessions:/app/sessions
-
-      # Optional: Locks directory for object locking
-      # - ./locks:/app/.locks
-
-      # Optional: Cache directory
-      # - ./cache:/app/cache
 
     # Resource limits
     deploy:

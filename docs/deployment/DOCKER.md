@@ -1,271 +1,356 @@
 # Docker Deployment Guide
 
-This guide explains how to deploy MCP ABAP ADT Server using Docker.
+This guide explains how to deploy MCP ABAP ADT Server using Docker with the current AuthBroker + destination-based architecture.
 
 ## Quick Start
 
-### 1. Using Docker Run
+### Prerequisites
 
-```bash
-# Build image
-docker build -t mcp-abap-adt .
+- Docker and Docker Compose installed
+- SAP BTP ABAP Environment service key
 
-# Run container
-docker run -d \
-  --name mcp-abap-adt \
-  -p 3000:3000 \
-  -e SAP_URL=https://your-sap-system.com \
-  -e SAP_CLIENT=100 \
-  -e SAP_AUTH_TYPE=jwt \
-  -e SAP_JWT_TOKEN=your-token \
-  mcp-abap-adt
+### Two Deployment Options
+
+**Option 1: Using Published Package (Recommended)**
+- Simpler and faster
+- Uses pre-built npm package
+- Best for production use
+
+**Option 2: Building from Source**
+- For development
+- Custom modifications
+- Latest unreleased code
+
+### Setup
+
+1. **Navigate to docker directory**:
+   ```bash
+   cd docker
+   ```
+
+2. **Create service keys directory and add your service key**:
+   ```bash
+   mkdir -p service-keys
+   # Add your service key file (get from SAP BTP)
+   cp /path/to/your-key.json service-keys/trial.json
+   ```
+
+3. **Configure environment**:
+   ```bash
+   cp .env.example .env
+   # Edit .env and set MCP_DESTINATION=trial
+   ```
+
+4. **Start the server**:
+   
+   **Using npm package (recommended)**:
+   ```bash
+   docker-compose -f docker-compose.package.yml up -d
+   ```
+   
+   **Or from source**:
+   ```bash
+   docker-compose up -d
+   ```
+
+5. **Verify it's running**:
+   ```bash
+   docker-compose logs -f
+   curl http://localhost:3000/health
+   ```
+
+## Architecture
+
+### How It Works
+
+The Docker deployment uses:
+
+1. **Service Keys** (`./service-keys/{destination}.json`):
+   - Mounted as read-only volume
+   - Contains OAuth2 credentials for SAP system
+   - Never committed to git (.gitignore)
+
+2. **Sessions** (`./sessions/{destination}.env`):
+   - Mounted as read-write volume
+   - AuthBroker stores JWT tokens and refresh tokens here
+   - Automatically refreshed when expired
+   - Never committed to git (.gitignore)
+
+3. **Destination**:
+   - Specified via `MCP_DESTINATION` environment variable
+   - Determines which service key to use
+   - Example: `MCP_DESTINATION=trial` uses `service-keys/trial.json`
+
+### Container Configuration
+
+```
+Container: mcp-abap-adt-server
+├── Port: 3000 (HTTP)
+├── Transport: streamable-http
+├── Volumes:
+│   ├── ./service-keys:/app/service-keys (ro)  # Service keys
+│   ├── ./sessions:/app/sessions (rw)          # Session tokens
+│   └── ./locks:/app/.locks (optional)         # Object locks
+└── Environment:
+    ├── MCP_DESTINATION (default: default)
+    ├── MCP_HTTP_PORT (default: 3000)
+    └── AUTH_BROKER_PATH (default: /app/service-keys)
 ```
 
-### 2. Using Docker Compose (Recommended)
+## Service Key Format
 
+Your service key should be in ABAP environment format:
+
+```json
+{
+  "uaa": {
+    "url": "https://your-account.authentication.region.hana.ondemand.com",
+    "clientid": "your-client-id",
+    "clientsecret": "your-client-secret"
+  },
+  "url": "https://your-abap-system.abap.region.hana.ondemand.com",
+  "abap": {
+    "url": "https://your-abap-system.abap.region.hana.ondemand.com"
+  }
+}
+```
+
+Save this as `service-keys/{destination}.json` (e.g., `service-keys/trial.json`)
+
+## Common Operations
+
+### Start Server
 ```bash
-# Create .env file with SAP credentials (in project root)
-cat > .env << EOF
-SAP_URL=https://your-sap-system.com
-SAP_CLIENT=100
-SAP_AUTH_TYPE=jwt
-SAP_JWT_TOKEN=your-token
-EOF
-
-# Start service (from docker/ directory)
-cd docker
 docker-compose up -d
+```
 
-# View logs
+### View Logs
+```bash
 docker-compose logs -f
+```
 
-# Stop service
+### Stop Server
+```bash
 docker-compose down
-cd ..
 ```
 
-## Configuration
-
-### Environment Variables
-
-Required:
-- `SAP_URL` - SAP system URL
-- `SAP_CLIENT` - SAP client number
-- `SAP_AUTH_TYPE` - Authentication type (jwt, basic)
-
-For JWT auth:
-- `SAP_JWT_TOKEN` - JWT token
-
-For Basic auth:
-- `SAP_USERNAME` - SAP username
-- `SAP_PASSWORD` - SAP password
-
-Optional:
-- `MCP_HTTP_PORT` - Server port (default: 3000)
-- `MCP_HTTP_HOST` - Server host (default: 0.0.0.0)
-- `NODE_ENV` - Environment (default: production)
-
-### Volumes
-
-Persist data by mounting volumes:
-
-```yaml
-volumes:
-  - ./data/sessions:/app/.sessions    # Session storage
-  - ./data/locks:/app/.locks          # Lock files
-  - ./data/cache:/app/cache           # Cache files
+### Restart Server
+```bash
+docker-compose restart
 ```
 
-## Using with nginx Reverse Proxy
+### Check Status
+```bash
+docker-compose ps
+curl http://localhost:3000/health
+```
 
-Enable nginx proxy:
+### Use Different Destination
+```bash
+# Stop current
+docker-compose down
+
+# Start with different destination
+MCP_DESTINATION=dev docker-compose up -d
+```
+
+## Troubleshooting
+
+### Container exits immediately
 
 ```bash
-# Start with nginx profile
-cd docker
-docker-compose --profile with-nginx up -d
-cd ..
+# Check logs
+docker-compose logs
+
+# Verify service key exists
+ls -la service-keys/
+
+# Check destination name matches filename
+cat .env | grep MCP_DESTINATION
+ls service-keys/${MCP_DESTINATION}.json
 ```
+
+### Authentication errors
+
+```bash
+# Check service key format
+cat service-keys/${MCP_DESTINATION}.json | jq .
+
+# Check if session was created
+ls -la sessions/
+
+# Force re-authentication (remove session)
+rm sessions/${MCP_DESTINATION}.env
+docker-compose restart
+```
+
+### Port already in use
+
+```bash
+# Check what's using port 3000
+lsof -i :3000
+
+# Use different port
+echo "MCP_HTTP_PORT=3001" >> .env
+# Update ports in docker-compose.yml: "3001:3001"
+docker-compose up -d
+```
+
+## Multiple Environments
+
+### Setup
+
+```bash
+# Create service keys for each environment
+service-keys/
+├── trial.json    # Trial environment
+├── dev.json      # Development
+└── prod.json     # Production
+```
+
+### Switch Between Environments
+
+```bash
+# Use trial
+MCP_DESTINATION=trial docker-compose up -d
+
+# Switch to dev
+docker-compose down
+MCP_DESTINATION=dev docker-compose up -d
+```
+
+## Advanced Configuration
+
+### Enable Session Persistence
+
+By default, sessions are stateless. Enable persistent sessions:
+
+```bash
+# In .env or docker-compose.yml
+MCP_ENABLE_SESSION_STORAGE=true
+```
+
+### Custom Port
+
+```bash
+# In .env
+MCP_HTTP_PORT=8080
+
+# Update docker-compose.yml ports:
+ports:
+  - "8080:8080"
+```
+
+### Add nginx Reverse Proxy
 
 Create `nginx.conf`:
-
 ```nginx
-events {
-    worker_connections 1024;
-}
-
-http {
-    upstream mcp-abap-adt {
-        server mcp-abap-adt:3000;
-    }
-
-    server {
-        listen 80;
-        server_name your-domain.com;
-
-        location / {
-            proxy_pass http://mcp-abap-adt;
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection 'upgrade';
-            proxy_set_header Host $host;
-            proxy_cache_bypass $http_upgrade;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
+server {
+    listen 80;
+    location / {
+        proxy_pass http://mcp-abap-adt:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
     }
 }
 ```
 
-## Health Checks
-
-Built-in health check endpoint:
-
-```bash
-# Check health
-curl http://localhost:3000/health
-
-# Docker healthcheck
-docker inspect --format='{{.State.Health.Status}}' mcp-abap-adt
-```
-
-## Multi-stage Builds (Optimized)
-
-For smaller image size, use multi-stage build:
-
-```dockerfile
-# Build stage
-FROM node:18-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-# Production stage
-FROM node:18-alpine
-WORKDIR /app
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./
-EXPOSE 3000
-CMD ["node", "./dist/index.js", "--transport", "streamable-http"]
-```
-
-## Examples
-
-### Example 1: Development with hot reload
-
-```bash
-docker run -it --rm \
-  -v $(pwd):/app \
-  -v /app/node_modules \
-  -p 3000:3000 \
-  --env-file .env \
-  node:18-alpine \
-  sh -c "cd /app && npm install && npm run dev:http"
-```
-
-### Example 2: Production with custom port
-
-```bash
-docker run -d \
-  --name mcp-abap-adt \
-  -p 8080:3000 \
-  -e MCP_HTTP_PORT=3000 \
-  --env-file .env \
-  mcp-abap-adt
-```
-
-### Example 3: Multiple instances (load balancing)
-
+Add to `docker-compose.yml`:
 ```yaml
-version: '3.8'
 services:
-  mcp-abap-adt-1:
-    image: mcp-abap-adt
-    env_file: .env
-
-  mcp-abap-adt-2:
-    image: mcp-abap-adt
-    env_file: .env
-
   nginx:
     image: nginx:alpine
     ports:
       - "80:80"
     volumes:
-      - ./nginx-lb.conf:/etc/nginx/nginx.conf
-```
-
-## Troubleshooting
-
-**Container exits immediately:**
-```bash
-# Check logs
-docker logs mcp-abap-adt
-
-# Common issues:
-# - Missing .env file
-# - Invalid SAP credentials
-# - Port already in use
-```
-
-**Connection refused:**
-```bash
-# Ensure container is running
-docker ps
-
-# Check port mapping
-docker port mcp-abap-adt
-
-# Test from container
-docker exec mcp-abap-adt wget -O- http://localhost:3000/health
-```
-
-**High memory usage:**
-```bash
-# Set memory limit
-docker run --memory=1g --memory-swap=1g ...
-
-# Or in docker-compose.yml
-deploy:
-  resources:
-    limits:
-      memory: 1G
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - mcp-abap-adt
 ```
 
 ## Security
 
-**Best practices:**
+### Best Practices
 
-1. Use secrets for credentials:
+1. **Never commit credentials**:
+   - `.gitignore` excludes `service-keys/` and `sessions/`
+   - Use secrets management in production
+
+2. **Use read-only mounts for service keys**:
+   - Already configured in docker-compose.yml
+
+3. **Restrict network access**:
+   - Bind to localhost only: `MCP_HTTP_HOST=127.0.0.1`
+   - Use firewall rules
+
+4. **Regular updates**:
+   ```bash
+   docker-compose pull
+   docker-compose up -d
+   ```
+
+5. **Monitor logs**:
+   ```bash
+   docker-compose logs -f | grep -i error
+   ```
+
+## Production Deployment
+
+### Resource Limits
+
+Already configured in docker-compose.yml:
+- CPU: 1.0 core (limit), 0.5 core (reservation)
+- Memory: 1GB (limit), 512MB (reservation)
+
+### Monitoring
+
 ```bash
-echo "your-token" | docker secret create sap_jwt_token -
+# Container stats
+docker stats mcp-abap-adt-server
+
+# Health check status
+docker inspect mcp-abap-adt-server | jq '.[0].State.Health'
 ```
 
-2. Run as non-root user:
-```dockerfile
-USER node
-```
-
-3. Use read-only filesystem:
-```bash
-docker run --read-only --tmpfs /tmp ...
-```
-
-4. Scan for vulnerabilities:
-```bash
-docker scan mcp-abap-adt
-```
-
-## Building for Multiple Platforms
+### Backup
 
 ```bash
-# Build for ARM and x86
-docker buildx build \
-  --platform linux/amd64,linux/arm64 \
-  -t mcp-abap-adt:latest \
-  --push .
+# Backup sessions (tokens)
+tar -czf backup-$(date +%Y%m%d).tar.gz sessions/
+
+# Service keys should be backed up separately with encryption
 ```
+
+## Maintenance
+
+### Update Server
+
+```bash
+# Pull latest code
+cd /path/to/mcp-abap-adt
+git pull
+
+# Rebuild and restart
+cd docker
+docker-compose build
+docker-compose up -d
+```
+
+### Clean Up
+
+```bash
+# Remove containers
+docker-compose down
+
+# Remove containers and volumes
+docker-compose down -v
+
+# Remove images
+docker rmi $(docker images -q mcp-abap-adt)
+```
+
+## See Also
+
+- [Docker README](../docker/README.md) - Detailed Docker documentation
+- [Installation Guide](../installation/INSTALLATION.md) - General installation
+- [CLI Options](../user-guide/CLI_OPTIONS.md) - Command-line options

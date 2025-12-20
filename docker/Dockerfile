@@ -1,25 +1,27 @@
+# Multi-stage build for mcp-abap-adt server
+# Optimized for production deployment with AuthBroker + destination-based auth
+
 # =========================
-# Stage 1: Build + prune dev dependencies
+# Stage 1: Build
 # =========================
 FROM node:22-bookworm-slim AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy only package manifests first (better cache re-use)
+# Copy package files
 COPY package.json package-lock.json ./
 
-# Install all dependencies (including dev) for TypeScript build
+# Install all dependencies (including devDependencies for build)
 ENV NODE_ENV=development
 RUN npm ci
 
-# Copy application source
+# Copy source code
 COPY . .
 
-# Build TypeScript → JavaScript
+# Build TypeScript to JavaScript
 RUN npm run build
 
-# Remove dev dependencies and keep only production ones
+# Remove dev dependencies
 RUN npm prune --omit=dev
 
 
@@ -28,25 +30,28 @@ RUN npm prune --omit=dev
 # =========================
 FROM node:22-bookworm-slim
 
-# Set working directory
 WORKDIR /app
 
-# Runtime environment variables
-ENV MCP_HTTP_PORT=3000 \
-    MCP_HTTP_HOST=0.0.0.0 \
-    NODE_ENV=production
+# Runtime environment
+ENV NODE_ENV=production \
+    MCP_HTTP_PORT=3000 \
+    MCP_HTTP_HOST=0.0.0.0
 
-# Copy only what is required at runtime
+# Copy built application
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
-COPY package.json package-lock.json ./
+COPY --from=builder /app/package.json ./
+
+# Create directories for service keys and sessions
+RUN mkdir -p /app/service-keys /app/sessions
 
 # Expose HTTP port
 EXPOSE 3000
 
-# Healthcheck for container orchestration
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:${MCP_HTTP_PORT}/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
 
-# Default command with StreamableHTTP transport
-CMD ["node", "./dist/index.js", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "3000"]
+# Start server with streamable-http transport and destination
+# Destination should be passed via --mcp parameter or configured via YAML
+CMD ["node", "./dist/index.js", "--transport", "streamable-http"]

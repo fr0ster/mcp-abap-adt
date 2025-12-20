@@ -99,7 +99,10 @@ export class ServerConfigManager {
       configFile: parseConfigArg(),
       host: this.getArgValue('--host'),
       port: this.parsePort(),
-      httpJsonResponse: this.hasArg('--http-json-response'),
+      httpJsonResponse: this.hasArg('--http-json-response') || undefined,
+      httpPath: this.getArgValue('--path') || this.getArgValue('--http-path'),
+      ssePath: this.getArgValue('--sse-path'),
+      postPath: this.getArgValue('--post-path'),
       envFile: this.getArgValue('--env'),
       envFilePath: this.getArgValue('--env'),
       authBrokerPath: this.getArgValue('--auth-broker-path'),
@@ -235,6 +238,10 @@ TRANSPORT SELECTION:
   --host=<host>                    Server host (default: 127.0.0.1)
                                    Use 0.0.0.0 for all interfaces
   --port=<port>                    Server port (default: 3000 for http, 3001 for sse)
+  --path=<path>                    HTTP endpoint path (default: /mcp/stream/http)
+  --http-path=<path>               Alias for --path
+  --sse-path=<path>                SSE connection path (default: /sse)
+  --post-path=<path>               SSE message post path (default: /messages)
 
 AUTHENTICATION:
   --env=<path>                     Path to .env file (uses .env instead of auth-broker)
@@ -261,11 +268,17 @@ EXAMPLES:
   # Limit to readonly operations only
   mcp-abap-adt --mcp=TRIAL --exposition=readonly
 
-  # HTTP server
+  # HTTP server (default path /mcp/stream/http)
   mcp-abap-adt --transport=http --port=8080
+
+  # HTTP server with custom path
+  mcp-abap-adt --transport=http --path=/api/mcp
 
   # SSE transport
   mcp-abap-adt --transport=sse --mcp=TRIAL
+
+  # SSE transport with custom paths
+  mcp-abap-adt --transport=sse --sse-path=/events --post-path=/msgs
 
   # Use YAML config file
   mcp-abap-adt --conf=my-config.yaml

@@ -102,6 +102,51 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
+   * Sets connection context from HTTP headers (direct SAP connection, no broker)
+   * Used when x-sap-url + auth headers are provided
+   */
+  protected setConnectionContextFromHeaders(headers: any): void {
+    const url = headers["x-sap-url"] || headers["X-SAP-URL"];
+    const jwtToken = headers["x-sap-jwt-token"] || headers["X-SAP-JWT-Token"];
+    const username = headers["x-sap-login"] || headers["X-SAP-Login"];
+    const password = headers["x-sap-password"] || headers["X-SAP-Password"];
+    const client = headers["x-sap-client"] || headers["X-SAP-Client"] || "";
+
+    if (!url) {
+      throw new Error("x-sap-url header is required for direct SAP connection");
+    }
+
+    if (jwtToken) {
+      // JWT auth
+      this.connectionContext = {
+        sessionId: "direct-jwt",
+        connectionParams: {
+          url,
+          authType: 'jwt',
+          jwtToken,
+          client,
+        },
+        metadata: {},
+      };
+    } else if (username && password) {
+      // Basic auth
+      this.connectionContext = {
+        sessionId: "direct-basic",
+        connectionParams: {
+          url,
+          authType: 'basic',
+          username,
+          password,
+          client,
+        },
+        metadata: {},
+      };
+    } else {
+      throw new Error("Either x-sap-jwt-token or x-sap-login+x-sap-password headers are required");
+    }
+  }
+
+  /**
    * Gets current connection context
    */
   protected getConnectionContext(): ConnectionContext | null {

@@ -115,6 +115,8 @@ async function main() {
     const server = new SseServer(handlersRegistry, authBrokerFactory, {
       host: config.host,
       port: config.port,
+      ssePath: config.ssePath,
+      postPath: config.postPath,
       defaultDestination: config.envFile ? 'default' : config.mcpDestination,
       logger: loggerForTransport,
     });
@@ -127,6 +129,7 @@ async function main() {
     host: config.host,
     port: config.port,
     enableJsonResponse: config.httpJsonResponse,
+    path: config.httpPath,
     defaultDestination: config.envFile ? 'default' : config.mcpDestination,
     logger: loggerForTransport,
   });

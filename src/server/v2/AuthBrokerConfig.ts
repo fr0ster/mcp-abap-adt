@@ -28,13 +28,13 @@ export class AuthBrokerConfig implements IAuthBrokerFactoryConfig {
     this.useAuthBroker = serverConfig.useAuthBroker;
 
     // Set browser auth port to avoid conflicts with server ports
-    // stdio: default (3000), sse: 4000, http: 5000
+    // stdio: 4001 (no server port), sse: 4000 (SSE server uses 3001), http: 5000 (HTTP server uses 3000)
     if (serverConfig.transport === 'sse') {
       this.browserAuthPort = 4000;
     } else if (serverConfig.transport === 'http') {
       this.browserAuthPort = 5000;
     } else {
-      this.browserAuthPort = 3000; // stdio default
+      this.browserAuthPort = 4001; // stdio: use 4001 to avoid conflict with HTTP (3000) and SSE (3001)
     }
 
     this.logger = logger;

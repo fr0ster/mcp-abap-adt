@@ -95,7 +95,9 @@ export function buildRuntimeConfig() {
   // If transport was auto-detected (not explicitly set), consider it as explicit for stdio mode
   // This allows stdio mode to work when run by inspector without --transport=stdio argument
   const isAutoDetectedStdio = explicitTransportType === "stdio" && !hasExplicitTransportArg && !process.env.MCP_TRANSPORT;
-  // Default transport is stdio (changed from streamable-http per user request)
+  // Default transport is stdio (for MCP clients like Cline, Cursor, Claude Desktop)
+  // Auto-detects stdio when stdin is not TTY (e.g., piped or run by MCP client)
+  // For HTTP/SSE, explicitly use --transport=http or --transport=sse
   const transportType = explicitTransportType || "stdio";
   const isHttp = transportType === "http" || transportType === "streamable-http" || transportType === "server";
   const isSse = transportType === "sse";

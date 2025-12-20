@@ -13,6 +13,9 @@ export interface IServerConfig extends IBaseServerConfig {
   host?: string;
   port?: number;
   httpJsonResponse?: boolean;
+  httpPath?: string;
+  ssePath?: string;
+  postPath?: string;
 
   // Environment settings (v2 alias)
   envFile?: string; // Alias for envFilePath

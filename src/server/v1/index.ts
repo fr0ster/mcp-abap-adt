@@ -80,7 +80,7 @@ USAGE:
 
 DESCRIPTION:
   MCP server for interacting with SAP ABAP systems via ADT (ABAP Development Tools).
-  Supports multiple transport modes: HTTP (default), stdio, and SSE.
+  Supports multiple transport modes: stdio (default), HTTP, and SSE.
 
 TRANSPORT MODES:
   Default: stdio (for MCP clients like Cline, Cursor, Claude Desktop)
@@ -275,17 +275,17 @@ EXAMPLES:
 
 QUICK REFERENCE:
   Transport types:
-    http            - HTTP StreamableHTTP transport (default)
+    stdio           - Standard input/output (default, for MCP clients, requires .env file or --mcp parameter)
+    http            - HTTP StreamableHTTP transport
     streamable-http - Same as http
-    stdio           - Standard input/output (for MCP clients, requires .env file or --mcp parameter)
     sse             - Server-Sent Events transport
 
   Common use cases:
-    Web interfaces (HTTP):        mcp-abap-adt (default, no .env needed)
-    MCP clients (Cline, Cursor):  mcp-abap-adt --transport=stdio
-    MCP clients with auth-broker: mcp-abap-adt --transport=stdio --mcp=TRIAL (skips .env)
-    Web interfaces (SSE):         mcp-abap-adt --transport=sse --sse-port=3001
-    SSE with auth-broker:         mcp-abap-adt --transport=sse --mcp=TRIAL (skips .env)
+    MCP clients (Cline, Cursor):  mcp-abap-adt (default, stdio mode)
+    MCP clients with auth-broker: mcp-abap-adt --mcp=TRIAL (stdio mode, skips .env)
+    Web interfaces (HTTP):        mcp-abap-adt --transport=http
+    Web interfaces (SSE):          mcp-abap-adt --transport=sse --sse-port=3001
+    SSE with auth-broker:          mcp-abap-adt --transport=sse --mcp=TRIAL (skips .env)
 
 DOCUMENTATION:
   https://github.com/fr0ster/mcp-abap-adt
@@ -2821,11 +2821,9 @@ export class mcp_abap_adt_server {
           const requiresSapConfig = methodName === 'tools/call';
 
           // Apply auth headers before processing and store config in session
-          // Apply headers if:
-          // 1. This request requires SAP config (tools/call)
-          // 2. AND (auth headers are present OR defaultMcpDestination is set)
-          // If no headers are present and no defaultMcpDestination, fall back to .env file or base config
-          if (requiresSapConfig && (this.hasSapHeaders(req.headers) || this.defaultMcpDestination)) {
+          // Always apply headers to ensure sapConfig is set for any request with headers
+          // This fixes initialization issues when client sends SAP headers with first request
+          if (this.hasSapHeaders(req.headers)) {
             await this.applyAuthHeaders(req.headers, session.sessionId, clientID);
           }
 

@@ -70,38 +70,53 @@ export class SseServer {
   }
 
   private async handleGet(req: any, res: any): Promise<void> {
+    let destination: string | undefined;
+    let broker: any = undefined;
+
+    // Priority 1: Check x-mcp-destination header
     const destinationHeader =
       (req.headers["x-mcp-destination"] as string | undefined) ??
       (req.headers["X-MCP-Destination"] as string | undefined);
-    const destination = destinationHeader || this.defaultDestination;
 
-    if (!destination) {
-      this.logger.error("SSE GET: Destination not provided");
-      res.writeHead(400).end("Destination not provided");
-      return;
+    if (destinationHeader) {
+      destination = destinationHeader;
+      broker = await this.authBrokerFactory.getOrCreateAuthBroker(destination);
     }
-
-    this.logger.debug(`SSE GET: destination=${destination}`);
-
-    const broker = await this.authBrokerFactory.getOrCreateAuthBroker(destination);
-    if (!broker) {
-      this.logger.error(`SSE GET: Auth broker not available for ${destination}`);
-      res.writeHead(400).end("Auth broker not available");
-      return;
+    // Priority 2: Check SAP connection headers (x-sap-url + auth params)
+    // Headers will be passed directly to handlers, no broker needed
+    else if (this.hasSapConnectionHeaders(req.headers)) {
+      // No destination, no broker - handlers will use headers directly
+      destination = undefined;
+      broker = undefined;
     }
+    // Priority 3: Use default destination
+    else if (this.defaultDestination) {
+      destination = this.defaultDestination;
+      broker = await this.authBrokerFactory.getOrCreateAuthBroker(destination);
+    }
+    // Priority 4: No auth params at all
+    // Allow request to proceed - metadata methods (tools/list, etc.) will work
+    // tools/call will fail with appropriate error in handler
+
+    this.logger.debug(`SSE GET: destination=${destination ?? 'none'}`);
+
 
     class SessionServer extends BaseMcpServer {
       constructor(private readonly registry: IHandlersRegistry, private readonly loggerImpl: Logger, private readonly ver: string) {
         super({ name: "mcp-abap-adt-sse", version: ver, logger: loggerImpl });
       }
-      async init(dest: string, b: any) {
-        await this.setConnectionContext(dest, b);
+      async init(dest: string | undefined, b: any, hdrs?: any) {
+        if (dest && b) {
+          await this.setConnectionContext(dest, b);
+        } else if (hdrs) {
+          this.setConnectionContextFromHeaders(hdrs);
+        }
         this.registerHandlers(this.registry);
       }
     }
 
     const server = new SessionServer(this.handlersRegistry, this.logger, this.version);
-    await server.init(destination, broker);
+    await server.init(destination, broker, this.hasSapConnectionHeaders(req.headers) ? req.headers : undefined);
 
     const transport = new SSEServerTransport(this.postPath, res);
     const sessionId = transport.sessionId;
@@ -159,5 +174,18 @@ export class SseServer {
         res.writeHead(500).end("Internal Server Error");
       }
     }
+  }
+
+  /**
+   * Check if request has SAP connection headers
+   */
+  private hasSapConnectionHeaders(headers: any): boolean {
+    const hasUrl = headers["x-sap-url"] || headers["X-SAP-URL"];
+    const hasJwtAuth = headers["x-sap-jwt-token"] || headers["X-SAP-JWT-Token"];
+    const hasBasicAuth =
+      (headers["x-sap-login"] || headers["X-SAP-Login"]) &&
+      (headers["x-sap-password"] || headers["X-SAP-Password"]);
+
+    return !!(hasUrl && (hasJwtAuth || hasBasicAuth));
   }
 }

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.2.1] - 2025-12-22
+### Added
+- **Subpath export `./utils`** for internal utilities access
+  - `@fr0ster/mcp-abap-adt/utils` - exports `sessionContext`, `getManagedConnection`, and other utilities
+  - Required for cloud-llm-hub integration to access session context
+
 ## [1.2.0] - 2025-12-21
 ### Changed
 - **BREAKING: v2 is now the default server**

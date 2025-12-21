@@ -18,6 +18,11 @@
       "types": "./dist/server/v1/index.d.ts",
       "import": "./dist/server/v1/index.js",
       "require": "./dist/server/v1/index.js"
+    },
+    "./utils": {
+      "types": "./dist/lib/utils.d.ts",
+      "import": "./dist/lib/utils.js",
+      "require": "./dist/lib/utils.js"
     }
   },
   "typesVersions": {
@@ -27,6 +32,9 @@
       ],
       "server/v1": [
         "dist/server/v1/index.d.ts"
+      ],
+      "utils": [
+        "dist/lib/utils.d.ts"
       ]
     }
   },

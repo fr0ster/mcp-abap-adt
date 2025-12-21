@@ -193,15 +193,6 @@ export async function handleUpdateBehaviorImplementation(context: HandlerContext
         : error.message || String(error);
 
       return return_error(new Error(`Failed to update behavior implementation: ${errorMessage}`));
-    } finally {
-      try {
-        if (connection) {
-          connection.reset();
-          logger?.debug('Reset behavior implementation connection after use');
-        }
-      } catch (resetError: any) {
-        logger?.error(`Failed to reset behavior implementation connection: ${resetError?.message || resetError}`);
-      }
     }
 
   } catch (error: any) {

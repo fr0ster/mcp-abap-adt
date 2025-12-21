@@ -103,12 +103,5 @@ export async function handleUpdateBehaviorDefinition(context: HandlerContext, pa
     } catch (error: any) {
         logger?.error(`Error updating BDEF ${name}: ${error?.message || error}`);
         return return_error(error);
-    } finally {
-        try {
-            connection.reset();
-            logger?.debug('Reset BDEF connection after use');
-        } catch (resetError: any) {
-            logger?.error(`Failed to reset BDEF connection: ${resetError?.message || resetError}`);
-        }
     }
 }

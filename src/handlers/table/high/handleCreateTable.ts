@@ -217,15 +217,6 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
         ErrorCode.InternalError,
         `Failed to create table ${tableName}: ${errorMessage}`
       );
-    } finally {
-      // Cleanup: Reset connection created for this handler call
-      if (connection) {
-        try {
-          connection.reset();
-        } catch (resetError: any) {
-          logger?.error(`Failed to reset connection: ${resetError.message || resetError}`);
-        }
-      }
     }
 
   } catch (error: any) {

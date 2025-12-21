@@ -48,7 +48,7 @@ export class ConfigLoader {
     const mergedArgs = this.mergeConfig(cliArgs, yamlConfig);
 
     // Build transport config
-    const transport = this.buildTransportConfig(mergedArgs);
+    const transportConfig = this.buildTransportConfig(mergedArgs);
 
     // Build server config
     const config: IServerConfig = {
@@ -58,7 +58,8 @@ export class ConfigLoader {
       authBrokerPath: mergedArgs.authBrokerPath,
       unsafe: mergedArgs.unsafe,
       useAuthBroker: mergedArgs.useAuthBroker,
-      transport,
+      transportConfig,
+      transport: transportConfig.type === 'streamable-http' ? 'http' : transportConfig.type as 'stdio' | 'sse',
     };
 
     return config;

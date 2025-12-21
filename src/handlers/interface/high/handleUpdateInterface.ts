@@ -216,16 +216,6 @@ export async function handleUpdateInterface(context: HandlerContext, args: Updat
         : error.message || String(error);
 
       return return_error(new Error(`Failed to update interface: ${errorMessage}`));
-    } finally {
-      // Cleanup: Reset connection created for this handler call
-      if (connection) {
-        try {
-          connection.reset();
-          logger?.debug(`[UpdateInterface] Reset connection`);
-        } catch (resetError: any) {
-          logger?.error(`[UpdateInterface] Failed to reset connection: ${resetError.message || resetError}`);
-        }
-      }
     }
 
   } catch (error: any) {

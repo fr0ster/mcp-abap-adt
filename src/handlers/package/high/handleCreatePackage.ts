@@ -169,13 +169,6 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
         ErrorCode.InternalError,
         `Failed to create package ${packageName}: ${errorMessage}`
       );
-    } finally {
-      try {
-        connection.reset();
-        logger?.debug('Reset package connection after use');
-      } catch (resetError: any) {
-        logger?.error(`Failed to reset package connection: ${resetError?.message || resetError}`);
-      }
     }
 
   } catch (error: any) {

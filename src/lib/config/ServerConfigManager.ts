@@ -12,9 +12,10 @@
  */
 
 import { parseConfigArg, applyYamlConfigToArgs, loadYamlConfig, generateConfigTemplateIfNeeded } from "./yamlConfig.js";
-import type { IServerConfig, Transport, HandlerSet } from "../../server/v2/IServerConfig.js";
+import type { IServerConfig, Transport, HandlerSet } from "./IServerConfig.js";
+import { ArgumentsParser } from "./ArgumentsParser.js";
 
-export type { Transport, HandlerSet } from "../../server/v2/IServerConfig.js";
+export type { Transport, HandlerSet } from "./IServerConfig.js";
 
 // ============================================================================
 // SERVER CONFIGURATION MANAGER CLASS
@@ -88,8 +89,12 @@ export class ServerConfigManager {
   /**
    * Parse command line arguments
    * Note: Should be called after applyYamlConfigToArgs for proper YAML support
+   * Uses ArgumentsParser for unified CLI parsing
    */
   private parseCommandLine(): IServerConfig {
+    // Use unified ArgumentsParser for CLI args
+    const parsed = ArgumentsParser.parse();
+
     const transport = this.parseTransport();
     const exposition = this.parseExposition();
 
@@ -97,18 +102,18 @@ export class ServerConfigManager {
       transport: transport || 'stdio',
       exposition: exposition.length > 0 ? exposition : ['readonly', 'high'],
       configFile: parseConfigArg(),
-      host: this.getArgValue('--host'),
-      port: this.parsePort(),
-      httpJsonResponse: this.hasArg('--http-json-response') || undefined,
-      httpPath: this.getArgValue('--path') || this.getArgValue('--http-path'),
-      ssePath: this.getArgValue('--sse-path'),
-      postPath: this.getArgValue('--post-path'),
-      envFile: this.getArgValue('--env'),
-      envFilePath: this.getArgValue('--env'),
-      authBrokerPath: this.getArgValue('--auth-broker-path'),
-      mcpDestination: this.getArgValue('--mcp'),
-      unsafe: this.hasArg('--unsafe') || process.env.MCP_UNSAFE === 'true',
-      useAuthBroker: this.hasArg('--auth-broker') || process.env.MCP_USE_AUTH_BROKER === 'true',
+      host: ArgumentsParser.getArgument('--host') || parsed.httpHost,
+      port: this.parsePort() || parsed.httpPort,
+      httpJsonResponse: parsed.httpJsonResponse || undefined,
+      httpPath: ArgumentsParser.getArgument('--path') || ArgumentsParser.getArgument('--http-path'),
+      ssePath: ArgumentsParser.getArgument('--sse-path'),
+      postPath: ArgumentsParser.getArgument('--post-path'),
+      envFile: parsed.env,
+      envFilePath: parsed.env,
+      authBrokerPath: parsed.authBrokerPath,
+      mcpDestination: parsed.mcp,
+      unsafe: parsed.unsafe,
+      useAuthBroker: parsed.useAuthBroker,
     };
   }
 
@@ -116,7 +121,7 @@ export class ServerConfigManager {
    * Parse transport from command line
    */
   private parseTransport(): Transport | undefined {
-    const value = this.getArgValue('--transport');
+    const value = ArgumentsParser.getArgument('--transport');
     if (value === 'sse') return 'sse';
     if (value === 'http' || value === 'streamable-http') return 'http';
     if (value === 'stdio') return 'stdio';
@@ -127,7 +132,7 @@ export class ServerConfigManager {
    * Parse port from command line
    */
   private parsePort(): number | undefined {
-    const port = this.getArgValue('--port');
+    const port = ArgumentsParser.getArgument('--port');
     return port ? parseInt(port, 10) : undefined;
   }
 
@@ -136,7 +141,7 @@ export class ServerConfigManager {
    * Format: --exposition=readonly,high,low
    */
   private parseExposition(): HandlerSet[] {
-    const value = this.getArgValue('--exposition');
+    const value = ArgumentsParser.getArgument('--exposition');
     if (!value) return [];
 
     return value
@@ -145,34 +150,6 @@ export class ServerConfigManager {
       .filter((s): s is HandlerSet =>
         s === 'readonly' || s === 'high' || s === 'low'
       );
-  }
-
-  // --------------------------------------------------------------------------
-  // PRIVATE - Command Line Utilities
-  // --------------------------------------------------------------------------
-
-  /**
-   * Get argument value from command line
-   */
-  private getArgValue(name: string): string | undefined {
-    const args = process.argv;
-    for (let i = 0; i < args.length; i++) {
-      const arg = args[i];
-      if (arg.startsWith(`${name}=`)) {
-        return arg.slice(name.length + 1);
-      }
-      if (arg === name && i + 1 < args.length) {
-        return args[i + 1];
-      }
-    }
-    return undefined;
-  }
-
-  /**
-   * Check if argument is present
-   */
-  private hasArg(name: string): boolean {
-    return process.argv.includes(name);
   }
 
   // --------------------------------------------------------------------------

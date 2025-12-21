@@ -204,14 +204,5 @@ export async function handleCreateBehaviorImplementation(context: HandlerContext
   } catch (error: any) {
     logger?.error(`CreateBehaviorImplementation handler error: ${error?.message || error}`);
     return return_error(error);
-  } finally {
-    try {
-      if (connection) {
-        connection.reset();
-        logger?.debug('Reset behavior implementation connection after use');
-      }
-    } catch (resetError: any) {
-      logger?.error(`Failed to reset behavior implementation connection: ${resetError?.message || resetError}`);
-    }
   }
 }

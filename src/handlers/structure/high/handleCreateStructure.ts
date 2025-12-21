@@ -282,16 +282,6 @@ export async function handleCreateStructure(context: HandlerContext, args: Creat
         ErrorCode.InternalError,
         `Failed to create structure ${structureName}: ${errorMessage}`
       );
-    } finally {
-      // Cleanup: Reset connection created for this handler call
-      if (connection) {
-        try {
-          connection.reset();
-          logger?.debug(`[CreateStructure] Reset connection`);
-        } catch (resetError: any) {
-          logger?.error(`[CreateStructure] Failed to reset connection: ${resetError.message || resetError}`);
-        }
-      }
     }
 
   } catch (error: any) {

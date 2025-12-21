@@ -210,11 +210,5 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger?.error(`Error updating view ${viewName}: ${errorMessage}`);
     return return_error(new Error(errorMessage));
-  } finally {
-    try {
-      connection?.reset?.();
-    } catch {
-      // ignore
-    }
   }
 }

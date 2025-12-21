@@ -230,16 +230,6 @@ export async function handleUpdateTable(context: HandlerContext, args: UpdateTab
         : error.message || String(error);
 
       return return_error(new Error(`Failed to update table: ${errorMessage}`));
-    } finally {
-      // Cleanup: Reset connection created for this handler call
-      if (connection) {
-        try {
-          connection.reset();
-          logger?.debug(`[UpdateTable] Reset test connection`);
-        } catch (resetError: any) {
-          logger?.error(`[UpdateTable] Failed to reset connection: ${resetError.message || resetError}`);
-        }
-      }
     }
 
   } catch (error: any) {

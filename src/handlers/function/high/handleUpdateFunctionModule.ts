@@ -131,15 +131,6 @@ export async function handleUpdateFunctionModule(context: HandlerContext, args: 
         : error.message || String(error);
 
       return return_error(new Error(`Failed to update function module source: ${errorMessage}`));
-    } finally {
-      try {
-        if (connection) {
-          connection.reset();
-          logger?.debug('Reset function module connection after use');
-        }
-      } catch (resetError: any) {
-        logger?.error(`Failed to reset function module connection: ${resetError?.message || resetError}`);
-      }
     }
 
   } catch (error: any) {

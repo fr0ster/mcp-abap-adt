@@ -1,13 +1,13 @@
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { AxiosError, AxiosResponse } from "axios";
 import {
-  AbapConnection,
   createAbapConnection,
   SapConfig,
   sapConfigSignature,
   getTimeout,
   getTimeoutConfig,
 } from "@mcp-abap-adt/connection";
+import type { IAbapConnection } from "@mcp-abap-adt/interfaces";
 import { loggerAdapter } from "./loggerAdapter";
 import { logger, connectionManagerLogger } from "./logger";
 import { notifyConnectionResetListeners, registerConnectionResetHook } from "./connectionEvents";
@@ -18,13 +18,13 @@ import { randomUUID } from "crypto";
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
 let overrideConfig: SapConfig | undefined;
-let overrideConnection: AbapConnection | undefined;
-let cachedConnection: AbapConnection | undefined;
+let overrideConnection: IAbapConnection | undefined;
+let cachedConnection: IAbapConnection | undefined;
 let cachedConfigSignature: string | undefined;
 
 // Connection cache per session + config hash
 interface ConnectionCacheEntry {
-  connection: AbapConnection;
+  connection: IAbapConnection;
   configSignature: string;
   sessionId: string;
   lastUsed: Date;
@@ -304,12 +304,6 @@ export function return_error(error: any) {
   };
 }
 
-function disposeConnection(connection?: AbapConnection) {
-  if (connection) {
-    connection.reset();
-  }
-}
-
 /**
  * Generate cache key for connection based on sessionId, config signature, and destination
  * This ensures each client session with different SAP config or destination gets its own connection
@@ -339,161 +333,15 @@ function cleanupConnectionCache() {
     const age = now.getTime() - entry.lastUsed.getTime();
     if (age > maxAge) {
       connectionManagerLogger?.debug(`[DEBUG] Cleaning up old connection cache entry: ${key.substring(0, 16)}...`);
-      disposeConnection(entry.connection);
       connectionCache.delete(key);
     }
   }
 }
 
 /**
- * Create a wrapper connection that intercepts refreshToken() and makeAdtRequest() for destination-based authentication.
- * If destination is provided, uses AuthBroker for token refresh instead of direct refresh.
- * Automatically refreshes token on 401/403 errors and ensures token is fetched from broker before each request.
- */
-export function createDestinationAwareConnection(connection: AbapConnection, destination?: string): AbapConnection {
-  if (!destination) {
-    return connection;
-  }
-
-  const connectionWithRefresh = connection as any;
-
-  // Intercept refreshToken() method
-  if (connectionWithRefresh.refreshToken) {
-    const originalRefreshToken = connectionWithRefresh.refreshToken.bind(connection);
-    connectionWithRefresh.refreshToken = async function () {
-      // Check if AuthBroker is available for this destination
-      const authBroker = getAuthBroker(destination);
-      if (authBroker) {
-        try {
-          connectionManagerLogger?.debug(`[DEBUG] Using AuthBroker for token refresh (destination: ${destination})`);
-          // Get fresh token from AuthBroker (will refresh if needed)
-          const jwtToken = await authBroker.getToken(destination);
-          const config = connectionWithRefresh.getConfig();
-          if (config) {
-            // Update config with new token
-            config.jwtToken = jwtToken;
-            // Get refresh token from session store if available
-            const { authorizationConfig } = await authBroker.getConnectionConfig(destination);
-            if (authorizationConfig?.refreshToken) {
-              config.refreshToken = authorizationConfig.refreshToken;
-            }
-            // Clear CSRF token and cookies to force new session with new token
-            connectionWithRefresh.reset();
-            connectionManagerLogger?.debug(`[DEBUG] Token refreshed via AuthBroker (destination: ${destination})`);
-          }
-        } catch (error) {
-          connectionManagerLogger?.debug(`[DEBUG] AuthBroker token refresh failed, falling back to direct refresh: ${error instanceof Error ? error.message : String(error)}`);
-          // Fall back to original refreshToken() if AuthBroker fails
-          return originalRefreshToken();
-        }
-      } else {
-        // No AuthBroker available, use original refreshToken()
-        return originalRefreshToken();
-      }
-    };
-  }
-
-  // Intercept makeAdtRequest() to automatically refresh token on 401/403 errors
-  if (connectionWithRefresh.makeAdtRequest) {
-    const originalMakeAdtRequest = connectionWithRefresh.makeAdtRequest.bind(connection);
-    connectionWithRefresh.makeAdtRequest = async function (options: any) {
-      // Pre-flight: ensure token fetched from AuthBroker before request
-      const authBroker = getAuthBroker(destination);
-      if (authBroker) {
-        try {
-          const freshToken = await authBroker.getToken(destination);
-          const config = connectionWithRefresh.getConfig?.();
-          if (config && freshToken) {
-            const tokenChanged = config.jwtToken !== freshToken;
-            config.jwtToken = freshToken;
-            try {
-              const { authorizationConfig } = await authBroker.getConnectionConfig(destination);
-              if (authorizationConfig?.refreshToken) {
-                config.refreshToken = authorizationConfig.refreshToken;
-              }
-            } catch {
-              // ignore
-            }
-            if (tokenChanged) {
-              connectionWithRefresh.reset?.();
-              connectionManagerLogger?.debug(`[DEBUG] Pre-flight token refresh via AuthBroker (destination: ${destination})`);
-            }
-          }
-        } catch (preFlightError) {
-          connectionManagerLogger?.debug(`[DEBUG] Pre-flight token refresh failed, proceeding with existing token: ${preFlightError instanceof Error ? preFlightError.message : String(preFlightError)}`);
-        }
-      }
-
-      try {
-        return await originalMakeAdtRequest(options);
-      } catch (error: any) {
-        // Check if this is a network error (connection refused, timeout, DNS, etc.)
-        const isNetworkError = error?.code === 'ECONNREFUSED' ||
-                               error?.code === 'ETIMEDOUT' ||
-                               error?.code === 'ENOTFOUND' ||
-                               error?.code === 'ECONNRESET' ||
-                               error?.code === 'ENETUNREACH' ||
-                               error?.code === 'EHOSTUNREACH' ||
-                               error?.message?.includes('ECONNREFUSED') ||
-                               error?.message?.includes('ETIMEDOUT') ||
-                               error?.message?.includes('ENOTFOUND');
-
-        // Don't try to refresh token for network errors - throw immediately with clear message
-        if (isNetworkError) {
-          connectionManagerLogger?.debug(`[DEBUG] Network error detected, skipping token refresh: ${error?.code || error?.message}`);
-          throw error;
-        }
-
-        // Check if this is a 401/403 authentication error
-        const isAuthError = error?.response?.status === 401 || error?.response?.status === 403;
-        const isExpiredTokenError = error?.message?.includes('JWT token has expired') ||
-                                    error?.message?.includes('Please re-authenticate');
-
-        if ((isAuthError || isExpiredTokenError) && !error?.response?.data?.includes?.('ExceptionResourceNoAccess')) {
-          // Try to refresh token via AuthBroker
-          const authBroker = getAuthBroker(destination);
-          if (authBroker) {
-            try {
-              connectionManagerLogger?.debug(`[DEBUG] Auto-refreshing token on ${error?.response?.status || 'error'} (destination: ${destination})`);
-              // Get fresh token from AuthBroker (will refresh if needed)
-              const jwtToken = await authBroker.getToken(destination);
-              const config = connectionWithRefresh.getConfig();
-              if (config) {
-                // Update config with new token
-                config.jwtToken = jwtToken;
-                // Get refresh token from session store if available
-                const { authorizationConfig } = await authBroker.getConnectionConfig(destination);
-                if (authorizationConfig?.refreshToken) {
-                  config.refreshToken = authorizationConfig.refreshToken;
-                }
-                // Clear CSRF token and cookies to force new session with new token
-                connectionWithRefresh.reset();
-                connectionManagerLogger?.debug(`[DEBUG] Token auto-refreshed via AuthBroker, retrying request (destination: ${destination})`);
-
-                // Retry the request with new token
-                return await originalMakeAdtRequest(options);
-              }
-            } catch (refreshError) {
-              connectionManagerLogger?.debug(`[DEBUG] Auto-refresh failed: ${refreshError instanceof Error ? refreshError.message : String(refreshError)}`);
-              // Re-throw original error if refresh fails
-              throw error;
-            }
-          }
-        }
-
-        // Re-throw error if not handled
-        throw error;
-      }
-    };
-  }
-
-  return connection;
-}
-
-/**
  * Get or create connection for a specific session and config
  */
-function getConnectionForSession(sessionId: string, config: SapConfig, destination?: string): AbapConnection {
+function getConnectionForSession(sessionId: string, config: SapConfig, destination?: string): IAbapConnection {
   const configSignature = sapConfigSignature(config);
   const cacheKey = generateConnectionCacheKey(sessionId, configSignature, destination);
 
@@ -509,15 +357,24 @@ function getConnectionForSession(sessionId: string, config: SapConfig, destinati
 
     // Dispose old connection if exists
     if (entry) {
-      disposeConnection(entry.connection);
+      /* cleanup */
     }
 
     // Create new connection with unique session ID per client session
     const connectionSessionId = `mcp-abap-adt-session-${sessionId}`;
-    let connection = createAbapConnection(config, loggerAdapter, connectionSessionId);
 
-    // Wrap connection to intercept refreshToken() for destination-based authentication
-    connection = createDestinationAwareConnection(connection, destination);
+    // Get tokenRefresher from AuthBroker if destination is provided (for JWT connections)
+    let tokenRefresher: any = undefined;
+    if (destination && config.authType === 'jwt') {
+      const authBroker = getAuthBroker(destination);
+      if (authBroker?.createTokenRefresher) {
+        tokenRefresher = authBroker.createTokenRefresher(destination);
+        connectionManagerLogger?.debug(`[DEBUG] Created tokenRefresher for destination "${destination}"`);
+      }
+    }
+
+    // Create connection with optional tokenRefresher for automatic token refresh
+    const connection = createAbapConnection(config, loggerAdapter, connectionSessionId, tokenRefresher);
 
     // Don't call enableStatefulSession during module import - it may trigger connection attempts
     // Session ID is already set via createAbapConnection() constructor
@@ -543,7 +400,7 @@ function getConnectionForSession(sessionId: string, config: SapConfig, destinati
   return entry.connection;
 }
 
-export function getManagedConnection(): AbapConnection {
+export function getManagedConnection(): IAbapConnection {
   // If override connection is set, use it (for backward compatibility)
   if (overrideConnection) {
     return overrideConnection;
@@ -628,7 +485,7 @@ export function getManagedConnection(): AbapConnection {
       configObjectId: (config as any).__debugId || 'no-id'
     });
 
-    disposeConnection(cachedConnection);
+    /* cleanup */
 
     // Generate unique session ID for fallback connections to prevent session sharing
     // When sessionContext is not available, each connection should have its own isolated session
@@ -680,7 +537,7 @@ export function removeConnectionForSession(sessionId: string, config?: SapConfig
     const entry = connectionCache.get(cacheKey);
     if (entry) {
       connectionManagerLogger?.debug(`[DEBUG] Removing connection cache entry for session ${sessionId.substring(0, 8)}... (destination: ${destination || 'none'})`);
-      disposeConnection(entry.connection);
+      /* cleanup */
       connectionCache.delete(cacheKey);
     }
   } else {
@@ -688,7 +545,7 @@ export function removeConnectionForSession(sessionId: string, config?: SapConfig
     for (const [key, entry] of connectionCache.entries()) {
       if (entry.sessionId === sessionId) {
         connectionManagerLogger?.debug(`[DEBUG] Removing connection cache entry for session ${sessionId.substring(0, 8)}...`);
-        disposeConnection(entry.connection);
+        /* cleanup */
         connectionCache.delete(key);
       }
     }
@@ -702,7 +559,7 @@ export function removeConnectionForSession(sessionId: string, config?: SapConfig
  * This function now only sets session type to stateful and session ID
  */
 export async function restoreSessionInConnection(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   sessionId: string,
   sessionState: { cookies?: string | null; csrf_token?: string | null; cookie_store?: Record<string, string> }
 ): Promise<void> {
@@ -730,17 +587,17 @@ export function setConfigOverride(override?: SapConfig) {
     overrideHasUrl: !!override?.url
   });
   overrideConfig = override;
-  disposeConnection(overrideConnection);
+  /* cleanup */
   overrideConnection = override ? createAbapConnection(override, loggerAdapter, undefined) : undefined;
 
   // Reset shared connection so that it will be re-created lazily with fresh config
-  disposeConnection(cachedConnection);
+  /* cleanup */
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
   notifyConnectionResetListeners();
 }
 
-export function setConnectionOverride(connection?: AbapConnection) {
+export function setConnectionOverride(connection?: IAbapConnection) {
   connectionManagerLogger?.debug(`[DEBUG] setConnectionOverride - Setting connection override`, {
     hasOverride: !!connection,
     hadPreviousOverride: !!overrideConnection
@@ -748,14 +605,14 @@ export function setConnectionOverride(connection?: AbapConnection) {
   // Use a local variable to avoid TDZ issues
   const currentOverride = overrideConnection;
   if (currentOverride) {
-    disposeConnection(currentOverride);
+    /* cleanup */
   }
   // Assign after reading to avoid TDZ
   overrideConnection = connection;
   overrideConfig = undefined;
 
   const currentCached = cachedConnection;
-  disposeConnection(currentCached);
+  /* cleanup */
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
   notifyConnectionResetListeners();
@@ -766,8 +623,8 @@ export function cleanup() {
     hadOverrideConnection: !!overrideConnection,
     hadCachedConnection: !!cachedConnection
   });
-  disposeConnection(overrideConnection);
-  disposeConnection(cachedConnection);
+  /* cleanup */
+  /* cleanup */
   overrideConnection = undefined;
   overrideConfig = undefined;
   cachedConnection = undefined;
@@ -785,12 +642,12 @@ export function invalidateConnectionCache() {
     hadCachedConnection: !!cachedConnection,
     hadOverrideConnection: !!overrideConnection
   });
-  disposeConnection(cachedConnection);
+  /* cleanup */
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
   // Also invalidate override connection if it exists
   if (overrideConnection) {
-    disposeConnection(overrideConnection);
+    /* cleanup */
     overrideConnection = undefined;
   }
   notifyConnectionResetListeners();
@@ -810,10 +667,6 @@ export async function getBaseUrl() {
   return getManagedConnection().getBaseUrl();
 }
 
-export async function getAuthHeaders() {
-  return getManagedConnection().getAuthHeaders();
-}
-
 /**
  * Makes an ADT request with specified timeout
  * @param url Request URL
@@ -825,7 +678,7 @@ export async function getAuthHeaders() {
  * @returns Promise with the response
  */
 export async function makeAdtRequestWithTimeout(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   url: string,
   method: string,
   timeoutType: 'default' | 'csrf' | 'long' | number = 'default',
@@ -842,7 +695,7 @@ export async function makeAdtRequestWithTimeout(
  * @deprecated Use getReadOnlyClient().fetchNodeStructure() instead
  */
 export async function fetchNodeStructure(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   parentName: string,
   parentTechName: string,
   parentType: string,
@@ -856,7 +709,7 @@ export async function fetchNodeStructure(
 }
 
 export async function makeAdtRequest(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   url: string,
   method: string,
   timeout: number,
@@ -1653,7 +1506,7 @@ let sapConfigOverride: SapConfig | undefined;
 
 export interface ServerOptions {
   sapConfig?: SapConfig;
-  connection?: AbapConnection;
+  connection?: IAbapConnection;
   transportConfig?: TransportConfig;
   allowProcessExit?: boolean;
   registerSignalHandlers?: boolean;
@@ -1664,7 +1517,7 @@ export function setSapConfigOverride(config?: SapConfig) {
   setConfigOverride(config);
 }
 
-export function setAbapConnectionOverride(connection?: AbapConnection) {
+export function setAbapConnectionOverride(connection?: IAbapConnection) {
   setConnectionOverride(connection);
 }
 

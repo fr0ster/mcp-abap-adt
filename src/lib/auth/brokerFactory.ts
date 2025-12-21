@@ -16,7 +16,8 @@ import {
   AbapSessionStore,
   BtpSessionStore,
   AbapServiceKeyStore,
-  BtpServiceKeyStore
+  BtpServiceKeyStore,
+  EnvFileSessionStore
 } from "@mcp-abap-adt/auth-stores";
 import type { ISessionStore, IServiceKeyStore } from "@mcp-abap-adt/interfaces";
 import { defaultLogger } from "@mcp-abap-adt/logger";
@@ -124,6 +125,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       sessionStorePath: string;
       storeType: 'abap' | 'btp';
       envFileToLoad?: string; // Track which .env file to load
+      useEnvFileStore?: boolean; // Use EnvFileSessionStore directly
     } | null = null;
 
     // Variant 1: --mcp=destination specified
@@ -144,24 +146,18 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       };
     }
     // Variant 2: --env=path specified (stdio/sse/http)
+    // Use EnvFileSessionStore directly - no need for separate session store
     else if (envFilePath && (isStdio || isSse || isHttp)) {
       shouldCreateDefault = true;
-      console.error("[DEBUG] Variant 2: --env specified", { envFilePath, isStdio, isSse, isHttp });
-      const envFileDir = path.dirname(envFilePath);
-      const serviceKeysPaths = getPlatformPaths(envFileDir, 'service-keys');
-      const sessionsPaths = getPlatformPaths(envFileDir, 'sessions');
-      const serviceKeysDir = serviceKeysPaths[0];
-      const sessionsDir = sessionsPaths[0];
-
-      const detected = await detectStoreType(serviceKeysDir);
+      logger.debug("Variant 2: --env specified, using EnvFileSessionStore", { envFilePath, isStdio, isSse, isHttp });
 
       defaultBrokerConfig = {
         hasServiceKeyStore: false,
-        sessionStorePath: sessionsDir,
-        storeType: detected.storeType,
-        envFileToLoad: envFilePath, // Store which .env file to load
+        sessionStorePath: '', // Not used with EnvFileSessionStore
+        storeType: 'abap', // Default, not used with EnvFileSessionStore
+        envFileToLoad: envFilePath,
+        useEnvFileStore: true, // Flag to use EnvFileSessionStore
       };
-      console.error("[DEBUG] Variant 2 config created", defaultBrokerConfig);
     }
     // Variant 3: stdio/sse/http + .env in current folder + NOT --auth-broker
     else if ((isStdio || isSse || isHttp) && hasCwdEnv && !useAuthBroker) {
@@ -182,7 +178,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     }
 
     if (shouldCreateDefault && defaultBrokerConfig) {
-      console.error("[DEBUG] Creating default broker", { shouldCreateDefault, hasConfig: !!defaultBrokerConfig });
+      logger.debug("Creating default broker", { shouldCreateDefault, hasConfig: !!defaultBrokerConfig });
       try {
         logger.debug("Initializing default broker", {
           type: "DEFAULT_BROKER_INIT_START",
@@ -190,30 +186,41 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
           serviceKeyDestination: defaultBrokerConfig.serviceKeyDestination,
           sessionStorePath: defaultBrokerConfig.sessionStorePath,
           storeType: defaultBrokerConfig.storeType,
+          useEnvFileStore: defaultBrokerConfig.useEnvFileStore,
         });
 
-        await this.createBrokerForDestination(
-          'default',
-          defaultBrokerConfig.hasServiceKeyStore,
-          defaultBrokerConfig.serviceKeyDestination,
-          defaultBrokerConfig.sessionStorePath,
-          defaultBrokerConfig.storeType,
-          unsafe
-        );
+        // Variant 2: Use EnvFileSessionStore directly
+        if (defaultBrokerConfig.useEnvFileStore && defaultBrokerConfig.envFileToLoad) {
+          await this.createBrokerWithEnvFileStore(
+            'default',
+            defaultBrokerConfig.envFileToLoad,
+            logger
+          );
+        } else {
+          // Variant 1 and 3: Use standard stores
+          await this.createBrokerForDestination(
+            'default',
+            defaultBrokerConfig.hasServiceKeyStore,
+            defaultBrokerConfig.serviceKeyDestination,
+            defaultBrokerConfig.sessionStorePath,
+            defaultBrokerConfig.storeType,
+            unsafe
+          );
 
-        // Load .env file into session store for Variant 2 and 3
-        if (!defaultBrokerConfig.hasServiceKeyStore && defaultBrokerConfig.envFileToLoad) {
-          const broker = this.authBrokers.get('default');
-          if (broker) {
-            try {
-              await this.loadEnvFileIntoSessionStore(defaultBrokerConfig.envFileToLoad, 'default', broker, logger);
-            } catch (error) {
-              logger.error("Failed to load .env file into session store", {
-                type: "ENV_LOAD_FAILED",
-                envFilePath: defaultBrokerConfig.envFileToLoad,
-                error: error instanceof Error ? error.message : String(error),
-              });
-              throw error;
+          // Load .env file into session store for Variant 3 (cwd .env)
+          if (!defaultBrokerConfig.hasServiceKeyStore && defaultBrokerConfig.envFileToLoad) {
+            const broker = this.authBrokers.get('default');
+            if (broker) {
+              try {
+                await this.loadEnvFileIntoSessionStore(defaultBrokerConfig.envFileToLoad, 'default', broker, logger);
+              } catch (error) {
+                logger.error("Failed to load .env file into session store", {
+                  type: "ENV_LOAD_FAILED",
+                  envFilePath: defaultBrokerConfig.envFileToLoad,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+                throw error;
+              }
             }
           }
         }
@@ -226,9 +233,9 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
           serviceKeyDestination: defaultBrokerConfig.serviceKeyDestination,
           hasEnvFile: !defaultBrokerConfig.hasServiceKeyStore && !!defaultBrokerConfig.envFileToLoad,
           envFilePath: defaultBrokerConfig.envFileToLoad,
+          useEnvFileStore: defaultBrokerConfig.useEnvFileStore,
         });
       } catch (error) {
-        console.error("[DEBUG] Failed to initialize default broker", error);
         logger.error("Failed to initialize default broker", {
           type: "DEFAULT_BROKER_INIT_FAILED",
           error: error instanceof Error ? error.message : String(error),
@@ -470,18 +477,74 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   }
 
   /**
+   * Create broker using EnvFileSessionStore directly
+   * Used for --env=path option (Variant 2)
+   *
+   * EnvFileSessionStore reads connection config directly from .env file
+   * and stores token updates in memory (doesn't modify original file)
+   */
+  private async createBrokerWithEnvFileStore(
+    brokerKey: string,
+    envFilePath: string,
+    logger: ILogger
+  ): Promise<void> {
+    // Create EnvFileSessionStore that reads from specified .env file
+    const sessionStore = new EnvFileSessionStore(envFilePath, logger);
+
+    // Get auth type from .env file to determine if we need token provider
+    const authType = sessionStore.getAuthType();
+
+    if (!authType) {
+      throw new Error(`Unable to determine auth type from .env file: ${envFilePath}`);
+    }
+
+    logger.debug("Creating broker with EnvFileSessionStore", {
+      type: "ENV_FILE_STORE_CREATE",
+      brokerKey,
+      envFilePath,
+      authType,
+    });
+
+    // Create token provider for JWT auth (needed for token refresh)
+    // For basic auth, tokenProvider is not used but AuthBroker still expects it
+    const tokenProvider = new BtpTokenProvider(this.config.browserAuthPort);
+
+    // Create AuthBroker with EnvFileSessionStore
+    const authBroker = new AuthBroker(
+      {
+        serviceKeyStore: undefined, // No service key store for --env mode
+        sessionStore,
+        tokenProvider,
+        allowClientCredentials: authType === 'jwt', // Only for JWT
+      } as any,
+      this.config.browser || 'system',
+      logger
+    );
+
+    this.authBrokers.set(brokerKey, authBroker);
+
+    logger.info("AuthBroker created with EnvFileSessionStore", {
+      type: "AUTH_BROKER_CREATED_ENV_FILE",
+      brokerKey,
+      envFilePath,
+      authType,
+    });
+  }
+
+  /**
    * Load .env file and populate session store with connection config
    * @param envFilePath Path to .env file
    * @param destination Destination name (usually 'default')
    * @param broker AuthBroker instance
    * @param logger Logger instance
+   * @returns Auth type from .env file ('basic' or 'jwt')
    */
   private async loadEnvFileIntoSessionStore(
     envFilePath: string,
     destination: string,
     broker: AuthBroker,
     logger: ILogger
-  ): Promise<void> {
+  ): Promise<'basic' | 'jwt'> {
     if (!fs.existsSync(envFilePath)) {
       throw new Error(`.env file not found: ${envFilePath}`);
     }
@@ -534,7 +597,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     };
 
     // Check auth type
-    const authType = envVars.SAP_AUTH_TYPE || 'basic';
+    const authType = (envVars.SAP_AUTH_TYPE || 'basic') as 'basic' | 'jwt';
     connectionConfig.authType = authType;
 
     if (authType === 'basic') {
@@ -548,6 +611,10 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
         throw new Error(".env file missing SAP_JWT_TOKEN for JWT auth");
       }
       connectionConfig.authorizationToken = envVars.SAP_JWT_TOKEN;
+      // Also store refresh token if available
+      if (envVars.SAP_REFRESH_TOKEN) {
+        connectionConfig.refreshToken = envVars.SAP_REFRESH_TOKEN;
+      }
     }
 
     // Store in session store via broker's session store
@@ -563,6 +630,8 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     } else {
       throw new Error("Session store does not support setConnectionConfig");
     }
+
+    return authType;
   }
 
   /**

@@ -347,11 +347,5 @@ export async function handleCreateProgram(context: HandlerContext, params: any) 
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger?.error(`Error creating program ${programName}: ${errorMessage}`);
     return return_error(new Error(`Failed to create program ${programName}: ${errorMessage}`));
-  } finally {
-    try {
-      connection?.reset?.();
-    } catch {
-      // ignore
-    }
   }
 }

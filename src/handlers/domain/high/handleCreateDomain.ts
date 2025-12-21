@@ -258,13 +258,6 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
         ErrorCode.InternalError,
         `Failed to create domain ${domainName}: ${errorMessage}`
       );
-    } finally {
-      try {
-        connection.reset();
-        logger?.debug('Reset domain connection after use');
-      } catch (resetError: any) {
-        logger?.error(`Failed to reset domain connection: ${resetError?.message || resetError}`);
-      }
     }
 
   } catch (error) {

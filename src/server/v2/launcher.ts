@@ -72,16 +72,17 @@ async function main() {
 
   const baseContext = { connection: undefined as any, logger: undefined } satisfies HandlerContext;
 
-  // Build handlers based on exposition config
+  // Build handlers based on exposition config (default to readonly,high)
+  const exposition = config.exposition || ['readonly', 'high'];
   const handlerGroups: any[] = [];
-  if (config.exposition.includes('readonly')) {
+  if (exposition.includes('readonly')) {
     handlerGroups.push(new ReadOnlyHandlersGroup(baseContext));
     handlerGroups.push(new SystemHandlersGroup(baseContext));
   }
-  if (config.exposition.includes('high')) {
+  if (exposition.includes('high')) {
     handlerGroups.push(new HighLevelHandlersGroup(baseContext));
   }
-  if (config.exposition.includes('low')) {
+  if (exposition.includes('low')) {
     handlerGroups.push(new LowLevelHandlersGroup(baseContext));
   }
   // SearchHandlersGroup is always included

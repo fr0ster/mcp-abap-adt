@@ -173,14 +173,5 @@ export async function handleCreateFunctionModule(context: HandlerContext, args: 
 
   } catch (error: any) {
     return return_error(error);
-  } finally {
-    try {
-      if (connection) {
-        connection.reset();
-        logger?.debug('Reset function module connection after use');
-      }
-    } catch (resetError: any) {
-      logger?.error(`Failed to reset function module connection: ${resetError?.message || resetError}`);
-    }
   }
 }

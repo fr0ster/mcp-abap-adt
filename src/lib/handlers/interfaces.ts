@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { AbapConnection } from "@mcp-abap-adt/connection";
+import type { IAbapConnectionExtended } from "@mcp-abap-adt/interfaces";
 import type { HandlerContext } from "../../handlers/interfaces.js";
 
 // Re-export HandlerContext for consumers

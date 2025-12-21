@@ -271,12 +271,5 @@ export async function handleCreateFunctionGroup(context: HandlerContext, args: C
 
   } catch (error: any) {
     return return_error(error);
-  } finally {
-    try {
-      connection.reset();
-      logger?.debug('Reset function group connection after use');
-    } catch (resetError: any) {
-      logger?.error(`Failed to reset function group connection: ${resetError?.message || resetError}`);
-    }
   }
 }

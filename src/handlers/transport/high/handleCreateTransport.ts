@@ -164,13 +164,6 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
         ErrorCode.InternalError,
         `Failed to create transport: ${errorMessage}`
       );
-    } finally {
-      try {
-        connection.reset();
-        logger?.debug('Reset transport connection after use');
-      } catch (resetError: any) {
-        logger?.error(`Failed to reset transport connection: ${resetError?.message || resetError}`);
-      }
     }
 
   } catch (error: any) {

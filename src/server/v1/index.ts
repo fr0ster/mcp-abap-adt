@@ -39,6 +39,7 @@ import {
   generateConfigTemplateIfNeeded,
   applyYamlConfigToArgs,
 } from "../../lib/config/yamlConfig";
+import { ServerConfigManager } from "../../lib/config/index";
 import { ILogger } from "@mcp-abap-adt/interfaces";
 
 // Import handler functions
@@ -69,399 +70,87 @@ import fs from "fs";
 import { HandlerContext } from "../../lib/handlers/interfaces";
 
 /**
- * Display help message
+ * Additional help sections specific to v1 server
  */
-function showHelp(): void {
-  const help = `
-MCP ABAP ADT Server - SAP ABAP Development Tools MCP Integration
-
-USAGE:
-  mcp-abap-adt [options]
-
-DESCRIPTION:
-  MCP server for interacting with SAP ABAP systems via ADT (ABAP Development Tools).
-  Supports multiple transport modes: stdio (default), HTTP, and SSE.
-
-TRANSPORT MODES:
-  Default: stdio (for MCP clients like Cline, Cursor, Claude Desktop)
-  HTTP:    --transport=http (for web interfaces, receives config via HTTP headers)
-  SSE:     --transport=sse
-
-OPTIONS:
-  --help                           Show this help message
-  --config=<path>                  Path to YAML configuration file
-                                   If file doesn't exist, generates a template and exits
-                                   Command-line arguments override YAML values
-                                   Example: --config=config.yaml
-
-YAML CONFIGURATION:
-  Instead of passing many command-line arguments, you can use a YAML config file:
-
-    mcp-abap-adt --config=config.yaml
-
-  If the file doesn't exist, a template will be generated automatically and the command will exit.
-  Edit the template to configure your server settings, then run the command again.
-
-  The YAML file is validated on load - invalid configurations will cause the command to exit with an error.
-
-  Command-line arguments always override YAML values for flexibility.
-
-  See docs/configuration/YAML_CONFIG.md for detailed documentation.
-
-ENVIRONMENT FILE:
-  --env=<path>                     Path to .env file (uses .env instead of auth-broker)
-  --env <path>                     Alternative syntax for --env
-  --auth-broker                    Force use of auth-broker (service keys) instead of .env file
-                                   Ignores .env file even if present in current directory
-                                   By default, .env in current directory is used automatically (if exists)
-  --auth-broker-path=<path>        Custom path for auth-broker service keys and sessions
-                                   Creates service-keys and sessions subdirectories in this path
-                                   Example: --auth-broker-path=~/prj/tmp/
-                                   This will use ~/prj/tmp/service-keys and ~/prj/tmp/sessions
-  --mcp=<destination>              Default MCP destination name (overrides x-mcp-destination header)
-                                   If specified, this destination will be used when x-mcp-destination
-                                   header is not provided in the request
-                                   Example: --mcp=TRIAL
-                                   This allows using auth-broker with stdio and SSE transports
-                                   When --mcp is specified, .env file is not loaded automatically
-                                   (even if it exists in current directory)
-  --browser=<type>                 Browser type for OAuth authentication
-                                   Options: system (default), headless, none, chrome, edge, firefox
-                                   Use 'headless' for SSH/remote - logs URL and waits for callback
-                                   Use 'none' for tests - logs URL and rejects immediately
-                                   Example: --browser=headless
-                                   Environment variable: MCP_BROWSER
-
-TRANSPORT SELECTION:
-  --transport=<type>               Transport type: stdio|http|streamable-http|sse
-                                   Default: stdio (for MCP clients)
-                                   Shortcuts: --http (same as --transport=http)
-                                             --sse (same as --transport=sse)
-                                             --stdio (same as --transport=stdio)
-
-HTTP/STREAMABLE-HTTP OPTIONS:
-  --http-port=<port>               HTTP server port (default: 3000)
-  --http-host=<host>               HTTP server host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
-                                   Security: When listening on 0.0.0.0, client must provide all connection headers
-                                   Server will not use default destination for non-local connections
-  --http-json-response             Enable JSON response format
-  --http-allowed-origins=<list>    Comma-separated allowed origins for CORS
-                                   Example: --http-allowed-origins=http://localhost:3000,https://example.com
-  --http-allowed-hosts=<list>      Comma-separated allowed hosts
-  --http-enable-dns-protection     Enable DNS rebinding protection
-
-SSE (SERVER-SENT EVENTS) OPTIONS:
-  --sse-port=<port>                SSE server port (default: 3001)
-  --sse-host=<host>                SSE server host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
-                                   Security: When listening on 0.0.0.0, client must provide all connection headers
-                                   Server will not use default destination for non-local connections
-  --sse-allowed-origins=<list>     Comma-separated allowed origins for CORS
-                                   Example: --sse-allowed-origins=http://localhost:3000
-  --sse-allowed-hosts=<list>       Comma-separated allowed hosts
-  --sse-enable-dns-protection     Enable DNS rebinding protection
-
+const V1_HELP_SECTIONS = `
 ENVIRONMENT VARIABLES:
-  MCP_ENV_PATH                     Path to .env file
-  MCP_SKIP_ENV_LOAD                Skip automatic .env loading (true|false)
-  MCP_SKIP_AUTO_START              Skip automatic server start (true|false)
-  MCP_TRANSPORT                    Transport type (stdio|http|sse)
-                                   Default: stdio if not specified
-  MCP_HTTP_PORT                    Default HTTP port (default: 3000)
-  MCP_HTTP_HOST                    Default HTTP host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
-  MCP_HTTP_ENABLE_JSON_RESPONSE   Enable JSON responses (true|false)
-  MCP_HTTP_ALLOWED_ORIGINS         Allowed CORS origins (comma-separated)
-  MCP_HTTP_ALLOWED_HOSTS           Allowed hosts (comma-separated)
-  MCP_HTTP_ENABLE_DNS_PROTECTION   Enable DNS protection (true|false)
-  MCP_SSE_PORT                     Default SSE port (default: 3001)
-  MCP_SSE_HOST                     Default SSE host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
-  MCP_SSE_ALLOWED_ORIGINS          Allowed CORS origins for SSE (comma-separated)
-  MCP_SSE_ALLOWED_HOSTS            Allowed hosts for SSE (comma-separated)
-  MCP_SSE_ENABLE_DNS_PROTECTION    Enable DNS protection for SSE (true|false)
-  AUTH_BROKER_PATH                 Custom paths for service keys and sessions
-                                   Unix: colon-separated (e.g., /path1:/path2)
-                                   Windows: semicolon-separated (e.g., C:\\path1;C:\\path2)
-                                   If not set, uses platform defaults:
-                                   Unix: ~/.config/mcp-abap-adt/service-keys
-                                   Windows: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys
   DEBUG_AUTH_LOG                   Enable debug logging for auth-broker (true|false)
                                    Default: false (only info messages shown)
-                                   When true: shows detailed debug messages
-  DEBUG_AUTH_BROKER                Alias for DEBUG_AUTH_LOG (true|false)
-                                   Same as DEBUG_AUTH_LOG - enables debug logging for auth-broker
-                                   When true: automatically sets DEBUG_AUTH_LOG=true
-  DEBUG_HTTP_REQUESTS              Enable logging of HTTP requests and MCP calls (true|false)
-                                   Default: false
-                                   When true: logs all incoming HTTP requests, methods, URLs,
-                                   headers (sensitive data redacted), and MCP JSON-RPC calls
-                                   Also enabled by DEBUG_CONNECTORS=true
-  DEBUG_CONNECTORS                  Enable debug logging for connection layer (true|false)
-                                   Default: false
-                                   When true: shows HTTP requests, CSRF tokens, cookies,
-                                   session management, and connection details
-                                   Also enables DEBUG_HTTP_REQUESTS automatically
-  DEBUG_HANDLERS                    Enable debug logging for MCP handlers (true|false)
-                                   Default: false
-                                   When true: shows handler entry/exit, session state,
-                                   lock handles, property validation
-  DEBUG_CONNECTION_MANAGER          Enable debug logging for connection manager (true|false)
-                                   Default: false
-                                   When true: shows connection cache operations
+  DEBUG_AUTH_BROKER                Alias for DEBUG_AUTH_LOG
+  DEBUG_HTTP_REQUESTS              Enable logging of HTTP requests (true|false)
+  DEBUG_CONNECTORS                 Enable debug logging for connection layer (true|false)
+  DEBUG_HANDLERS                   Enable debug logging for MCP handlers (true|false)
+  AUTH_BROKER_PATH                 Custom paths for service keys and sessions
+                                   Unix: colon-separated (e.g., /path1:/path2)
+                                   Windows: semicolon-separated (e.g., C:\\\\path1;C:\\\\path2)
 
 SAP CONNECTION (.env file):
   SAP_URL                          SAP system URL (required)
-                                   Example: https://your-system.sap.com
   SAP_CLIENT                       SAP client number (required)
-                                   Example: 100
   SAP_AUTH_TYPE                    Authentication type: basic|jwt (default: basic)
   SAP_USERNAME                     SAP username (required for basic auth)
   SAP_PASSWORD                     SAP password (required for basic auth)
   SAP_JWT_TOKEN                    JWT token (required for jwt auth)
 
-GENERATING .ENV FROM SERVICE KEY (JWT Authentication):
-  To generate .env file from SAP BTP service key JSON file, install the
-  connection package globally:
+GENERATING .ENV FROM SERVICE KEY:
+  Install connection package: npm install -g @mcp-abap-adt/connection
+  Generate .env: sap-abap-auth auth -k path/to/service-key.json
 
-    npm install -g @mcp-abap-adt/connection
+SERVICE KEYS (Destination-Based Authentication):
+  Store service keys in platform-specific locations:
+    Linux/macOS: ~/.config/mcp-abap-adt/service-keys/{destination}.json
+    Windows:     %USERPROFILE%\\\\Documents\\\\mcp-abap-adt\\\\service-keys\\\\{destination}.json
 
-  Then use the sap-abap-auth command:
+  Using Destinations:
+    In HTTP headers: x-mcp-destination: TRIAL
+    Or via CLI:      mcp-abap-adt --mcp=TRIAL
 
-    sap-abap-auth auth -k path/to/service-key.json
+CLINE CONFIGURATION EXAMPLES (~/.cline/mcp.json):
 
-  This will create/update .env file with JWT tokens and connection details.
+  1. Stdio with .env file:
+    {
+      "mcpServers": {
+        "mcp-abap-adt": {
+          "type": "stdio",
+          "command": "mcp-abap-adt",
+          "args": ["--env=/path/to/.env"]
+        }
+      }
+    }
 
-EXAMPLES:
-  # Default stdio mode (for MCP clients, requires .env file or --mcp parameter)
-  mcp-abap-adt
+  2. Stdio with MCP destination (service key):
+    {
+      "mcpServers": {
+        "mcp-abap-adt": {
+          "type": "stdio",
+          "command": "mcp-abap-adt",
+          "args": ["--mcp=TRIAL"]
+        }
+      }
+    }
 
-  # HTTP mode (for web interfaces)
-  mcp-abap-adt --transport=http
-
-  # HTTP server on custom port, localhost only (default)
-  mcp-abap-adt --transport=http --http-port=8080
-
-  # HTTP server accepting connections from all interfaces (less secure)
-  mcp-abap-adt --transport=http --http-host=0.0.0.0 --http-port=8080
-
-  # Use YAML configuration file
-  mcp-abap-adt --config=config.yaml
-
-  # Use stdio mode with --mcp parameter (uses auth-broker, skips .env file)
-  mcp-abap-adt --mcp=TRIAL
-
-  # Default: uses .env from current directory if exists, otherwise auth-broker
-  mcp-abap-adt
-
-  # Force use of auth-broker (service keys), ignore .env file even if exists
-  mcp-abap-adt --auth-broker
-
-  # Use custom path for auth-broker (creates service-keys and sessions subdirectories)
-  mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
-
-  # Use SSE transport with --mcp parameter (allows auth-broker with SSE transport)
-  mcp-abap-adt --transport=sse --mcp=TRIAL
-
-  # Use .env file from custom path
-  mcp-abap-adt --env=/path/to/my.env
-
-  # Start HTTP server with CORS enabled
-  mcp-abap-adt --transport=http --http-port=3000 \\
-                --http-allowed-origins=http://localhost:3000,https://example.com
-
-  # Start SSE server on custom port
-  mcp-abap-adt --transport=sse --sse-port=3001
-
-  # Start SSE server with CORS and DNS protection
-  mcp-abap-adt --transport=sse --sse-port=3001 \\
-                --sse-allowed-origins=http://localhost:3000 \\
-                --sse-enable-dns-protection
-
-  # Using shortcuts
-  mcp-abap-adt --http --http-port=8080
-  mcp-abap-adt --sse --sse-port=3001
-
-QUICK REFERENCE:
-  Transport types:
-    stdio           - Standard input/output (default, for MCP clients, requires .env file or --mcp parameter)
-    http            - HTTP StreamableHTTP transport
-    streamable-http - Same as http
-    sse             - Server-Sent Events transport
-
-  Common use cases:
-    MCP clients (Cline, Cursor):  mcp-abap-adt (default, stdio mode)
-    MCP clients with auth-broker: mcp-abap-adt --mcp=TRIAL (stdio mode, skips .env)
-    Web interfaces (HTTP):        mcp-abap-adt --transport=http
-    Web interfaces (SSE):          mcp-abap-adt --transport=sse --sse-port=3001
-    SSE with auth-broker:          mcp-abap-adt --transport=sse --mcp=TRIAL (skips .env)
+  3. SSE transport:
+    {
+      "mcpServers": {
+        "mcp-abap-adt": {
+          "type": "sse",
+          "url": "http://localhost:3001/sse"
+        }
+      }
+    }
 
 DOCUMENTATION:
   https://github.com/fr0ster/mcp-abap-adt
   Installation:    docs/installation/INSTALLATION.md
   Configuration:   docs/user-guide/CLIENT_CONFIGURATION.md
   Available Tools: docs/user-guide/AVAILABLE_TOOLS.md
-
-AUTHENTICATION:
-  For JWT authentication with SAP BTP service keys:
-  1. Install: npm install -g @mcp-abap-adt/connection
-  2. Run:     sap-abap-auth auth -k path/to/service-key.json
-  3. This generates .env file with JWT tokens automatically
-
-SERVICE KEYS (Destination-Based Authentication):
-  The server supports destination-based authentication using service keys stored locally.
-  This allows you to configure authentication once per destination and reuse it.
-
-  IMPORTANT: Auth-broker (service keys) is only available for HTTP/streamable-http transport.
-  For stdio and SSE transports, use .env file instead.
-
-  How to Save Service Keys:
-
-  Linux:
-    1. Create service keys directory:
-       mkdir -p ~/.config/mcp-abap-adt/service-keys
-
-    2. Download service key from SAP BTP (from the corresponding service instance)
-       and copy it to: ~/.config/mcp-abap-adt/service-keys/{destination}.json
-       (e.g., TRIAL.json - the filename without .json extension becomes the destination name)
-
-    Storage locations:
-      Service keys: ~/.config/mcp-abap-adt/service-keys/{destination}.json
-      Sessions:     ~/.config/mcp-abap-adt/sessions/{destination}.env
-
-  macOS:
-    1. Create service keys directory:
-       mkdir -p ~/.config/mcp-abap-adt/service-keys
-
-    2. Download service key from SAP BTP (from the corresponding service instance)
-       and copy it to: ~/.config/mcp-abap-adt/service-keys/{destination}.json
-       (e.g., TRIAL.json - the filename without .json extension becomes the destination name)
-
-    Storage locations:
-      Service keys: ~/.config/mcp-abap-adt/service-keys/{destination}.json
-      Sessions:     ~/.config/mcp-abap-adt/sessions/{destination}.env
-
-  Windows:
-    1. Create service keys directory (PowerShell):
-       New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\\Documents\\mcp-abap-adt\\service-keys"
-
-    2. Download service key from SAP BTP (from the corresponding service instance)
-       and copy it to: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\{destination}.json
-       (e.g., TRIAL.json - the filename without .json extension becomes the destination name)
-
-    Or using Command Prompt (cmd):
-       mkdir "%USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys"
-       (Then copy the downloaded service key file to this directory)
-
-    Storage locations:
-      Service keys: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\{destination}.json
-      Sessions:     %USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\{destination}.env
-
-  Fallback: Server also searches in current working directory (where server is launched)
-
-  Service Key:
-    Download the service key JSON file from SAP BTP (from the corresponding service instance)
-    and save it as {destination}.json (e.g., TRIAL.json).
-    The filename without .json extension becomes the destination name (case-sensitive).
-
-  Using Destinations:
-    In HTTP headers, use:
-      x-sap-destination: TRIAL    (for SAP Cloud, URL derived from service key)
-      x-mcp-destination: TRIAL    (for MCP destinations, URL derived from service key)
-
-    The destination name must exactly match the service key filename (without .json extension, case-sensitive).
-
-    Example Cline configurations (~/.cline/mcp.json):
-
-    1. Stdio with .env file:
-      {
-        "mcpServers": {
-          "mcp-abap-adt-stdio": {
-            "type": "stdio",
-            "command": "mcp-abap-adt",
-            "args": ["--env=/path/to/.env"],
-            "timeout": 60
-          }
-        }
-      }
-
-    2. Stdio with MCP destination (requires service key):
-      {
-        "mcpServers": {
-          "mcp-abap-adt-mcp": {
-            "type": "stdio",
-            "command": "mcp-abap-adt",
-            "args": ["--unsafe", "--mcp=trial"],
-            "timeout": 60,
-            "autoApprove": []
-          }
-        }
-      }
-
-    3. SSE with .env (requires server running):
-      {
-        "mcpServers": {
-          "mcp-abap-adt-sse": {
-            "type": "sse",
-            "url": "http://localhost:3001/sse",
-            "timeout": 60
-          }
-        }
-      }
-
-    4. HTTP with destination (requires proxy server running):
-      {
-        "mcpServers": {
-          "mcp-abap-adt-http": {
-            "type": "streamableHttp",
-            "url": "http://localhost:3001/mcp/stream/http",
-            "headers": {
-              "x-mcp-destination": "trial"
-            },
-            "timeout": 60
-          }
-        }
-      }
-
-    5. HTTP with direct auth (manual token refresh needed):
-      {
-        "mcpServers": {
-          "mcp-abap-adt-direct": {
-            "type": "streamableHttp",
-            "url": "http://localhost:3000/mcp/stream/http",
-            "headers": {
-              "x-sap-url": "https://your-system.com",
-              "x-sap-auth-type": "jwt",
-              "x-sap-jwt-token": "your-token",
-              "x-sap-refresh-token": "your-refresh-token"
-            },
-            "timeout": 60
-          }
-        }
-      }
-
-  First-Time Authentication:
-    - Server reads service key from {destination}.json
-    - Opens browser for OAuth2 authentication (if no valid session exists)
-    - Saves tokens to {destination}.env for future use
-    - Subsequent requests use cached tokens automatically
-
-  Automatic Token Management:
-    - Validates tokens before use
-    - Refreshes expired tokens using refresh tokens
-    - Caches valid tokens for performance
-    - Falls back to browser authentication if refresh fails
-
-  Custom Paths:
-    Set AUTH_BROKER_PATH environment variable to override default paths:
-      Linux/macOS: export AUTH_BROKER_PATH="/custom/path:/another/path"
-      Windows:     set AUTH_BROKER_PATH=C:\\custom\\path;C:\\another\\path
-
-    Or use --auth-broker-path command-line option:
-      mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
-      This creates service-keys and sessions subdirectories in the specified path.
-
-  For more details, see: docs/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication
-
 `;
-  console.log(help);
+
+/**
+ * Display help message using unified ServerConfigManager
+ */
+function showHelp(): void {
+  console.log(ServerConfigManager.generateHelp(V1_HELP_SECTIONS));
   process.exit(0);
 }
 
@@ -1127,6 +816,11 @@ export class mcp_abap_adt_server {
 
     // Get default broker to determine default destination
     const defaultBroker = this.authBrokerFactory.getDefaultBroker();
+    console.error("[DEBUG v1] initializeDefaultBroker result:", {
+      hasBroker: !!defaultBroker,
+      defaultMcpDestination: this.defaultMcpDestination,
+      envFilePath: this.envFilePath,
+    });
     if (defaultBroker) {
       // If we have --mcp, use that as default destination
       if (this.defaultMcpDestination) {
@@ -2197,10 +1891,6 @@ export class mcp_abap_adt_server {
           loggerAdapter,
           sessionId || `mcp-server-${randomUUID()}`
         );
-        if (actualDestination) {
-          const { createDestinationAwareConnection } = require('../../lib/utils.js');
-          connection = createDestinationAwareConnection(connection, actualDestination);
-        }
         return connection;
       }
     }
@@ -2214,43 +1904,91 @@ export class mcp_abap_adt_server {
           sessionId: sessionId || 'not-provided',
         });
         const authBroker = await this.getOrCreateAuthBroker(actualDestination, sessionId || 'global');
+        console.error("[DEBUG v1] authBroker result:", { hasBroker: !!authBroker, destination: actualDestination });
         if (authBroker) {
           const connConfig = await authBroker.getConnectionConfig(actualDestination);
+          console.error("[DEBUG v1] connConfig result:", {
+            hasConfig: !!connConfig,
+            serviceUrl: connConfig?.serviceUrl?.substring(0, 50),
+            authType: (connConfig as any)?.authType,
+            hasToken: !!connConfig?.authorizationToken,
+            hasUsername: !!(connConfig as any)?.username,
+          });
           if (connConfig?.serviceUrl) {
-            // Get fresh token now to ensure connection can be created
-            const jwtToken = await authBroker.getToken(actualDestination);
-            if (jwtToken) {
-              // Register AuthBroker in global registry for connection to use during token refresh
-              const { registerAuthBroker } = require('../../lib/utils.js');
-              registerAuthBroker(actualDestination, authBroker);
+            // Register AuthBroker in global registry for connection to use during token refresh
+            const { registerAuthBroker } = require('../../lib/utils.js');
+            registerAuthBroker(actualDestination, authBroker);
 
-              const config: SapConfig = {
+            // Determine auth type from connection config (like v2)
+            const authType = (connConfig as any).authType ||
+                             ((connConfig as any).username && (connConfig as any).password ? 'basic' : 'jwt');
+
+            let config: SapConfig;
+
+            if (authType === 'basic') {
+              // Basic auth - use username/password from connection config
+              config = {
                 url: connConfig.serviceUrl,
-                authType: "jwt",
-                jwtToken,
+                authType: "basic",
+                username: (connConfig as any).username,
+                password: (connConfig as any).password,
                 client: connConfig.sapClient,
               };
-              logger?.info("Using connection from auth broker", {
-                type: "CONNECTION_FROM_BROKER",
+              logger?.info("Using basic auth connection from auth broker", {
+                type: "CONNECTION_FROM_BROKER_BASIC",
                 destination: actualDestination,
                 sessionId: sessionId || 'not-provided',
                 url: config.url,
                 authType: config.authType,
               });
+            } else {
+              // JWT auth - try to get fresh token from broker
+              let jwtToken: string | undefined;
+              try {
+                jwtToken = await authBroker.getToken(actualDestination);
+              } catch (error) {
+                // Broker can't provide/refresh token (e.g., no UAA credentials for .env-only setup)
+                // Use existing token from connectionConfig
+                logger?.debug?.("Broker can't refresh token, using existing token from session", {
+                  type: "TOKEN_REFRESH_FALLBACK",
+                  destination: actualDestination,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+                jwtToken = connConfig.authorizationToken;
+              }
+              const tokenToUse = jwtToken || connConfig.authorizationToken;
 
-              // Create connection and wrap it to intercept refreshToken()/makeAdtRequest for destination-based authentication
-              let connection = createAbapConnection(
-                config,
-                loggerAdapter,
-                sessionId || `mcp-server-${randomUUID()}`
-              );
+              if (!tokenToUse) {
+                logger?.warn("No JWT token available for connection", {
+                  type: "NO_JWT_TOKEN",
+                  destination: actualDestination,
+                });
+                throw new Error(`No JWT token available for destination: ${actualDestination}`);
+              }
 
-              // Wrap connection to intercept refreshToken()/makeAdtRequest
-              const { createDestinationAwareConnection } = require('../../lib/utils.js');
-              connection = createDestinationAwareConnection(connection, actualDestination);
-
-              return connection;
+              config = {
+                url: connConfig.serviceUrl,
+                authType: "jwt",
+                jwtToken: tokenToUse,
+                client: connConfig.sapClient,
+              };
+              logger?.info("Using JWT auth connection from auth broker", {
+                type: "CONNECTION_FROM_BROKER_JWT",
+                destination: actualDestination,
+                sessionId: sessionId || 'not-provided',
+                url: config.url,
+                authType: config.authType,
+              });
             }
+
+            // Create connection
+            let connection = createAbapConnection(
+              config,
+              loggerAdapter,
+              sessionId || `mcp-server-${randomUUID()}`
+            );
+
+            return connection;
           }
         }
       } catch (error) {
@@ -2604,8 +2342,6 @@ export class mcp_abap_adt_server {
       await this.initializeDefaultBroker();
 
       // Create connection for stdio mode
-      // Note: getOrCreateConnectionForServer already wraps connection via createDestinationAwareConnection
-      // which handles token refresh on 401/403 errors. We also wrap it to refresh token before each request.
       const connection = await this.getOrCreateConnectionForServer(
         undefined, // no headers in stdio
         'stdio-session',

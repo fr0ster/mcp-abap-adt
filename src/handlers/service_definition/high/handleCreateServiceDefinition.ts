@@ -180,15 +180,6 @@ export async function handleCreateServiceDefinition(context: HandlerContext, arg
         : error.message || String(error);
 
       return return_error(new Error(`Failed to create service definition: ${errorMessage}`));
-    } finally {
-      try {
-        if (connection) {
-          connection.reset();
-          logger?.debug('Reset service definition connection after use');
-        }
-      } catch (resetError: any) {
-        logger?.error(`Failed to reset service definition connection: ${resetError?.message || resetError}`);
-      }
     }
   } catch (error: any) {
     logger?.error('CreateServiceDefinition handler error:', error);

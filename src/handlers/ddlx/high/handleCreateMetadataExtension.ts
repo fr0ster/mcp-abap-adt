@@ -121,14 +121,5 @@ export async function handleCreateMetadataExtension(context: HandlerContext, par
     } catch (error: any) {
         logger?.error(`Error creating DDLX ${name}: ${error?.message || error}`);
         return return_error(error);
-    } finally {
-        try {
-            if (connection) {
-                connection.reset();
-                logger?.debug('Reset metadata extension connection after use');
-            }
-        } catch (resetError: any) {
-            logger?.error(`Failed to reset metadata extension connection: ${resetError?.message || resetError}`);
-        }
     }
 }

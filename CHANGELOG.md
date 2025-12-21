@@ -14,10 +14,15 @@
   - Ideal for SSH sessions, Docker containers, and CI/CD environments
 
 ### Changed
+- **EnvFileSessionStore for `--env` parameter**: Introduced `EnvFileSessionStore` for `--env` handling
+  - When `--env=/path/to/.env` is specified, uses `EnvFileSessionStore` directly
+  - Supports both basic auth (SAP_USERNAME/SAP_PASSWORD) and JWT auth (SAP_JWT_TOKEN)
+  - JWT token refresh now writes back to .env file for subsequent sessions
 - **Dependencies Update**:
   - `@mcp-abap-adt/interfaces`: `^0.2.3` → `^0.2.4` (headless browser mode support)
   - `@mcp-abap-adt/auth-providers`: `^0.2.1` → `^0.2.3` (headless mode implementation, cross-platform fixes)
-  - `@mcp-abap-adt/auth-broker`: `^0.2.4` → `^0.2.7` (headless mode passthrough)
+  - `@mcp-abap-adt/auth-broker`: `^0.2.4` → `^0.2.8` (headless mode passthrough, updated auth-stores)
+  - `@mcp-abap-adt/auth-stores`: `^0.2.5` → `^0.2.8` (EnvFileSessionStore with JWT persistence)
 
 ## [1.1.29] - 2025-12-08
 

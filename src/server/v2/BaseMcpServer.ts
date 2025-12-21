@@ -182,20 +182,14 @@ export abstract class BaseMcpServer extends McpServer {
     }
 
     const connection = createAbapConnection(this.connectionContext.connectionParams);
-    let finalConnection = connection;
 
-    if (destination) {
-      const { createDestinationAwareConnection } = await import('../../lib/utils.js');
-      finalConnection = createDestinationAwareConnection(connection, destination);
-
-      // Cache connection for stdio mode (when sessionId === destination, it's stdio)
-      // SSE/HTTP modes use different sessionId per request, so caching won't interfere
-      if (sessionId === destination) {
-        this.cachedConnection = finalConnection;
-      }
+    // Cache connection for stdio mode (when sessionId === destination, it's stdio)
+    // SSE/HTTP modes use different sessionId per request, so caching won't interfere
+    if (destination && sessionId === destination) {
+      this.cachedConnection = connection;
     }
 
-    return finalConnection;
+    return connection;
   }
 
   /**

@@ -166,14 +166,5 @@ export async function handleUpdateFunctionGroup(context: HandlerContext, args: U
 
   } catch (error: any) {
     return return_error(error);
-  } finally {
-    try {
-      if (connection) {
-        connection.reset();
-        logger?.debug('Reset function group connection after use');
-      }
-    } catch (resetError: any) {
-      logger?.error(`Failed to reset function group connection: ${resetError?.message || resetError}`);
-    }
   }
 }

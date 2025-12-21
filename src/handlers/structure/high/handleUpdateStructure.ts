@@ -230,16 +230,6 @@ export async function handleUpdateStructure(context: HandlerContext, args: Updat
         : error.message || String(error);
 
       return return_error(new Error(`Failed to update structure: ${errorMessage}`));
-    } finally {
-      // Cleanup: Reset connection created for this handler call
-      if (connection) {
-        try {
-          connection.reset();
-          logger?.debug(`[UpdateStructure] Reset connection`);
-        } catch (resetError: any) {
-          logger?.error(`[UpdateStructure] Failed to reset connection: ${resetError.message || resetError}`);
-        }
-      }
     }
 
   } catch (error: any) {

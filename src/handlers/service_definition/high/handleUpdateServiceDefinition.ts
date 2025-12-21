@@ -181,15 +181,6 @@ export async function handleUpdateServiceDefinition(context: HandlerContext, arg
         : error.message || String(error);
 
       return return_error(new Error(`Failed to update service definition: ${errorMessage}`));
-    } finally {
-      try {
-        if (connection) {
-          connection.reset();
-          logger?.debug('Reset service definition connection after use');
-        }
-      } catch (resetError: any) {
-        logger?.error(`Failed to reset service definition connection: ${resetError?.message || resetError}`);
-      }
     }
 
   } catch (error: any) {

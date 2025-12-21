@@ -5,11 +5,10 @@
 
 export { ArgumentsParser, type ParsedArguments } from "./ArgumentsParser.js";
 export { ConfigLoader } from "./ConfigLoader.js";
-export { type IServerConfig } from "./IServerConfig.js";
+export { type IServerConfig, type Transport, type HandlerSet } from "./IServerConfig.js";
 
 // Server configuration manager
 export { ServerConfigManager } from './ServerConfigManager.js';
-export type { HandlerSet, Transport } from './ServerConfigManager.js';
 
 // YAML configuration
 export {

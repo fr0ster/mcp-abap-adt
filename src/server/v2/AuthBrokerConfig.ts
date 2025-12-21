@@ -25,7 +25,7 @@ export class AuthBrokerConfig implements IAuthBrokerFactoryConfig {
     this.envFilePath = serverConfig.envFile || serverConfig.envFilePath;
     this.authBrokerPath = serverConfig.authBrokerPath;
     this.unsafe = false; // V2 always uses safe stores
-    this.transportType = serverConfig.transport;
+    this.transportType = serverConfig.transport || 'stdio';
     this.useAuthBroker = serverConfig.useAuthBroker;
     this.browser = serverConfig.browser;
 

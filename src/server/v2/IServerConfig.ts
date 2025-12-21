@@ -1,28 +1,21 @@
 /**
  * V2 Server configuration
+ * Re-exports unified IServerConfig from lib/config
  */
 
-import { IServerConfig as IBaseServerConfig } from "../../lib/config/IServerConfig.js";
+// Re-export types from unified config
+export type { Transport, HandlerSet, IServerConfig } from "../../lib/config/IServerConfig.js";
 
-export type Transport = 'stdio' | 'sse' | 'http';
-export type HandlerSet = 'readonly' | 'high' | 'low';
+// For backward compatibility, also export the interface with required fields
+import type { IServerConfig as IBaseServerConfig, Transport, HandlerSet } from "../../lib/config/IServerConfig.js";
 
-export interface IServerConfig extends IBaseServerConfig {
-  // Transport settings (v2 specific)
+/**
+ * V2 Server configuration with required fields
+ * @deprecated Use IServerConfig from lib/config/IServerConfig.js
+ */
+export interface IV2ServerConfig extends IBaseServerConfig {
+  // Transport is required for v2
   transport: Transport;
-  host?: string;
-  port?: number;
-  httpJsonResponse?: boolean;
-  httpPath?: string;
-  ssePath?: string;
-  postPath?: string;
-
-  // Environment settings (v2 alias)
-  envFile?: string; // Alias for envFilePath
-
-  // Handler exposition (v2 specific)
+  // Exposition is required for v2
   exposition: HandlerSet[];
-
-  // Config file (v2 specific)
-  configFile?: string;
 }

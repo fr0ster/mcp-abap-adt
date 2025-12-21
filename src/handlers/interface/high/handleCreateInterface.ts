@@ -264,16 +264,6 @@ export async function handleCreateInterface(context: HandlerContext, args: Creat
     } catch (error: any) {
       logger?.error(`Interface creation failed: ${error instanceof Error ? error.message : String(error)}`);
       return return_error(error);
-    } finally {
-      // Cleanup: Reset connection created for this handler call
-      if (connection) {
-        try {
-          connection.reset();
-          logger?.debug(`[CreateInterface] Reset connection`);
-        } catch (resetError: any) {
-          logger?.error(`[CreateInterface] Failed to reset connection: ${resetError.message || resetError}`);
-        }
-      }
     }
   } catch (error: any) {
     logger?.error(`CreateInterface handler error: ${error instanceof Error ? error.message : String(error)}`);

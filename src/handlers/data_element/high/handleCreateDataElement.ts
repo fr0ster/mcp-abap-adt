@@ -269,13 +269,6 @@ export async function handleCreateDataElement(context: HandlerContext, args: Dat
         ErrorCode.InternalError,
         `Failed to create data element ${dataElementName}: ${errorMessage}`
       );
-    } finally {
-      try {
-        connection.reset();
-        logger?.debug('Reset data element connection after use');
-      } catch (resetError: any) {
-        logger?.error(`Failed to reset data element connection: ${resetError?.message || resetError}`);
-      }
     }
 
   } catch (error: any) {

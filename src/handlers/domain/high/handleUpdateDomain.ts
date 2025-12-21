@@ -255,14 +255,5 @@ export async function handleUpdateDomain(context: HandlerContext, args: DomainAr
       throw error;
     }
     return return_error(error);
-  } finally {
-    try {
-      if (connection) {
-        connection.reset();
-        logger?.debug('Reset domain connection after use');
-      }
-    } catch (resetError: any) {
-      logger?.error(`Failed to reset domain connection: ${resetError?.message || resetError}`);
-      }
   }
 }

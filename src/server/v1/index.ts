@@ -156,7 +156,7 @@ function showHelp(): void {
 
 // Check for version/help flags
 if (process.argv.includes("--version") || process.argv.includes("-v")) {
-  const packageJsonPath = path.join(__dirname, "..", "package.json");
+  const packageJsonPath = path.join(__dirname, "..", "..", "..", "package.json");
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
   console.log(packageJson.version);
   process.exit(0);

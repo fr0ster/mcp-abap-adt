@@ -13,6 +13,8 @@ import { AuthBrokerFactory } from "../../lib/auth/index.js";
 import { AuthBrokerConfig } from "./AuthBrokerConfig.js";
 import type { HandlerContext } from "../../lib/handlers/interfaces.js";
 import { ServerConfigManager } from "../../lib/config/index.js";
+import * as fs from "fs";
+import * as path from "path";
 
 const stderrLogger = {
   info: (...args: any[]) => console.error(...args),
@@ -28,6 +30,13 @@ type Transport = "stdio" | "sse" | "http";
 
 function hasArg(name: string): boolean {
   return process.argv.includes(name);
+}
+
+function showVersion(): void {
+  const packageJsonPath = path.join(__dirname, "..", "..", "..", "package.json");
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+  console.log(packageJson.version);
+  process.exit(0);
 }
 
 /**
@@ -60,7 +69,12 @@ function showHelp(): void {
 }
 
 async function main() {
-  // Check for --help first
+  // Check for --version first
+  if (hasArg("--version") || hasArg("-v")) {
+    showVersion();
+  }
+
+  // Check for --help
   if (hasArg("--help") || hasArg("-h")) {
     showHelp();
     process.exit(0);

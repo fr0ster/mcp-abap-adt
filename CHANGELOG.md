@@ -2,8 +2,12 @@
 
 ## [Unreleased]
 
-## [1.1.30] - 2025-12-21
+## [1.1.31] - 2025-12-21
+### Fixed
+- **CLI `--version` flag**: Fixed package.json path resolution for both v1 and v2 servers
+  - Path now correctly resolves from `dist/server/v1/` and `dist/server/v2/` to root `package.json`
 
+## [1.1.30] - 2025-12-21
 ### Added
 - **MCP Server v2 Architecture**:
   - New modular server architecture with `BaseMcpServer`, `StdioServer`, `StreamableHttpServer`
@@ -68,7 +72,6 @@
 - Network error handling in `createDestinationAwareConnection`
 - Handler results properly awaited and errors handled in `BaseMcpServer`
 - Basic auth support in MCP destination handling
-
 ### Removed
 - Legacy test files and deprecated test scripts (85 files)
 - Obsolete v2 components from earlier iterations

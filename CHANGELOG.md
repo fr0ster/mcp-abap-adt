@@ -5,6 +5,15 @@
 ## [1.1.30] - 2025-12-21
 
 ### Added
+- **MCP Server v2 Architecture**:
+  - New modular server architecture with `BaseMcpServer`, `StdioServer`, `StreamableHttpServer`
+  - Handler registration system with Dependency Injection pattern
+  - `HandlerContext` for unified connection and logging access in handlers
+  - `ServerConfigManager` for centralized configuration management
+  - `AuthBrokerConfig` for V2 server configuration
+  - `StdioLogger` for minimal logging in stdio transport
+  - Transport-specific server implementations (stdio, SSE, HTTP)
+
 - **Headless Browser Mode**: Added `--browser` CLI parameter for SSH and remote sessions
   - `--browser=headless`: Logs authentication URL and waits for manual callback
   - `--browser=none`: Logs URL and rejects immediately (for automated tests)
@@ -13,16 +22,79 @@
   - Environment variable: `MCP_BROWSER`
   - Ideal for SSH sessions, Docker containers, and CI/CD environments
 
+- **YAML Configuration Support**:
+  - Load server configuration from YAML files
+  - Enhanced command-line transport handling
+  - Improved configuration validation
+
+- **Structured Logging**:
+  - Handler logging with configurable options and integration
+  - Structured logging for handler functions
+  - Logger cleanup and enhanced handler implementations
+
+- **Testing Improvements**:
+  - Jest configuration and enhanced testing framework
+  - Unified test refactoring roadmap with base tester classes
+  - Integration tests for low-level view handlers
+  - Read-only handler tests for WhereUsed analysis
+  - `AuthBrokerFactory` for test configuration
+
+- **Infrastructure & Handlers**:
+  - Added `tabletypes` to integrated terminal profiles
+  - Handler migration to infrastructure module
+  - Basic auth support in MCP destination handling
+
 ### Changed
-- **EnvFileSessionStore for `--env` parameter**: Introduced `EnvFileSessionStore` for `--env` handling
-  - When `--env=/path/to/.env` is specified, uses `EnvFileSessionStore` directly
-  - Supports both basic auth (SAP_USERNAME/SAP_PASSWORD) and JWT auth (SAP_JWT_TOKEN)
-  - JWT token refresh now writes back to .env file for subsequent sessions
-- **Dependencies Update**:
-  - `@mcp-abap-adt/interfaces`: `^0.2.3` → `^0.2.4` (headless browser mode support)
-  - `@mcp-abap-adt/auth-providers`: `^0.2.1` → `^0.2.3` (headless mode implementation, cross-platform fixes)
-  - `@mcp-abap-adt/auth-broker`: `^0.2.4` → `^0.2.8` (headless mode passthrough, updated auth-stores)
-  - `@mcp-abap-adt/auth-stores`: `^0.2.5` → `^0.2.8` (EnvFileSessionStore with JWT persistence)
+- **Token Refresh Architecture (Breaking)**:
+  - Removed legacy `createDestinationAwareConnection()` wrapper (~150 lines)
+  - Token refresh now handled internally by `JwtAbapConnection` via DI `ITokenRefresher`
+  - `getConnectionForSession()` creates `tokenRefresher` from `AuthBroker` and passes to `createAbapConnection()`
+  - Removed all `reset()` calls from 23+ handler files (no longer needed)
+  - Removed unused `disposeConnection()` and `getAuthHeaders()` functions
+  - Simplified `HandlerContext` to use `IAbapConnection` instead of deprecated `IAbapConnectionExtended`
+
+- **Handler Refactoring**:
+  - All handlers updated to utilize `HandlerContext` for connection and logging
+  - Standardized import statements across handlers
+  - Enhanced error handling and logging across all handlers
+  - Replaced direct connection creation with managed connection
+
+- **Configuration Module**:
+  - Extracted configuration logic into dedicated module
+  - Improved YAML configuration loading and command line parsing
+  - Enhanced connection handling and configuration validation
+
+### Fixed
+- Network error handling in `createDestinationAwareConnection`
+- Handler results properly awaited and errors handled in `BaseMcpServer`
+- Basic auth support in MCP destination handling
+
+### Removed
+- Legacy test files and deprecated test scripts (85 files)
+- Obsolete v2 components from earlier iterations
+- Deprecated tools: `update-crudclient-api.js`, `update-handlers-with-tool-definitions.js`, etc.
+
+### Documentation
+- Comprehensive documentation for various components and usage scenarios
+- MCP Server architecture and implementation roadmap
+- Handler refactoring roadmap
+- YAML configuration support documentation
+- Issue roadmap system for structured issue tracking
+- Updated development guidelines
+
+### Dependencies
+- `@mcp-abap-adt/interfaces`: `^0.2.3` → `^0.2.6`
+  - Removed deprecated `IAbapConnectionExtended` interface
+  - Added `ITokenRefresher` interface for DI
+- `@mcp-abap-adt/connection`: `^0.2.3` → `^0.2.5`
+  - `createAbapConnection()` now accepts 4th parameter `tokenRefresher`
+  - `JwtAbapConnection` handles token refresh internally
+- `@mcp-abap-adt/auth-providers`: `^0.2.1` → `^0.2.3` (headless mode, cross-platform fixes)
+- `@mcp-abap-adt/auth-broker`: `^0.2.4` → `^0.2.9`
+  - Added `createTokenRefresher()` factory method
+  - Headless mode passthrough
+- `@mcp-abap-adt/auth-stores`: `^0.2.5` → `^0.2.8` (EnvFileSessionStore with JWT persistence)
+- `@mcp-abap-adt/clients`: `^0.2.4` → `^0.2.5`
 
 ## [1.1.29] - 2025-12-08
 

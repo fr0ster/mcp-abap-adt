@@ -2,6 +2,46 @@
 
 ## [Unreleased]
 
+## [1.2.2] - 2025-12-22
+### Changed
+- **BREAKING: Removed legacy-server.ts**
+  - Full removal of 3000+ line legacy server with CLI, AuthBroker, .env parsing, etc.
+  - v1 module now exports only lightweight `EmbeddableMcpServer` class
+
+### Added
+- **EmbeddableMcpServer** - lightweight MCP server for embedding
+  - Minimal class (~100 lines) for external HTTP server integration
+  - Constructor takes `context: HandlerContext` with connection and logger
+  - Handlers registered immediately in constructor - no `run()` method needed
+  - Access underlying `McpServer` via `.mcpServer` getter
+  - Configurable `exposition` levels: `readonly`, `high`, `low`, `system`
+  
+### Removed
+- `mcp_abap_adt_server` class (was 3000+ lines with CLI, transports, AuthBroker)
+- `setAbapConnectionOverride()` function
+- `ServerOptions` interface
+- All CLI argument parsing
+- All transport management (stdio, SSE, streamable-http)
+- AuthBroker integration
+- .env file loading logic
+
+### Migration Guide
+**For embedding in external servers (cloud-llm-hub, etc.):**
+```typescript
+// Before (1.2.x)
+import { mcp_abap_adt_server } from '@fr0ster/mcp-abap-adt/server/v1';
+const server = new mcp_abap_adt_server({ connection, allowProcessExit: false });
+server.registerHandlers({ connection, logger });
+
+// After (1.2.2)
+import { EmbeddableMcpServer } from '@fr0ster/mcp-abap-adt/server/v1';
+const server = new EmbeddableMcpServer({
+  context: { connection, logger },
+  exposition: ['readonly', 'high']
+});
+const mcpServer = server.mcpServer; // Use with transport
+```
+
 ## [1.2.1] - 2025-12-22
 ### Added
 - **Subpath export `./utils`** for internal utilities access

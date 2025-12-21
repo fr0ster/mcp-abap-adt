@@ -50,7 +50,6 @@ export * from "@mcp-abap-adt/interfaces";
 // Re-export config utilities
 export { getConfig, setSapConfigOverride } from "../../lib/config.js";
 
-// Re-export legacy server for backward compatibility
-// Users should migrate to v2 or use HandlerExporter
-export { mcp_abap_adt_server, setAbapConnectionOverride } from "./legacy-server.js";
-export type { ServerOptions } from "./legacy-server.js";
+// Re-export embeddable server for external HTTP server integration
+export { EmbeddableMcpServer } from "./embeddable-server.js";
+export type { EmbeddableServerOptions } from "./embeddable-server.js";

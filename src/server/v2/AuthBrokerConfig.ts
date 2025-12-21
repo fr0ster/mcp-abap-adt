@@ -16,6 +16,7 @@ export class AuthBrokerConfig implements IAuthBrokerFactoryConfig {
   transportType: string;
   useAuthBroker?: boolean;
   browserAuthPort?: number;
+  browser?: string;
   logger?: ILogger;
 
   constructor(serverConfig: IServerConfig, logger?: ILogger) {
@@ -26,6 +27,7 @@ export class AuthBrokerConfig implements IAuthBrokerFactoryConfig {
     this.unsafe = false; // V2 always uses safe stores
     this.transportType = serverConfig.transport;
     this.useAuthBroker = serverConfig.useAuthBroker;
+    this.browser = serverConfig.browser;
 
     // Set browser auth port to avoid conflicts with server ports
     // stdio: 4001 (no server port), sse: 4000 (SSE server uses 3001), http: 5000 (HTTP server uses 3000)

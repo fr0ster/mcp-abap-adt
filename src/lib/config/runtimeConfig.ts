@@ -50,6 +50,20 @@ export function parseMcpDestinationArg(): string | undefined {
   return undefined;
 }
 
+export function parseBrowserArg(): string | undefined {
+  const args = process.argv;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith("--browser=")) {
+      return arg.slice("--browser=".length);
+    } else if (arg === "--browser" && i + 1 < args.length) {
+      return args[i + 1];
+    }
+  }
+  // Also check environment variable
+  return process.env.MCP_BROWSER;
+}
+
 export function getTransportType(): string | null {
   // First check command line arguments
   const args = process.argv;
@@ -86,6 +100,7 @@ export function buildRuntimeConfig() {
   const isTestEnv = process.env.JEST_WORKER_ID !== undefined || process.env.NODE_ENV === "test";
   const authBrokerPath = parseAuthBrokerPathArg();
   const defaultMcpDestination = parseMcpDestinationArg();
+  const browser = parseBrowserArg();
   const unsafe = process.argv.includes("--unsafe") || process.env.MCP_UNSAFE === "true";
   const explicitTransportType = getTransportType();
   // Check if transport was explicitly set (not auto-detected)
@@ -112,6 +127,7 @@ export function buildRuntimeConfig() {
     isTestEnv,
     authBrokerPath,
     defaultMcpDestination,
+    browser,
     unsafe,
     explicitTransportType: effectiveExplicitTransportType,
     transportType,

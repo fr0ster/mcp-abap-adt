@@ -125,6 +125,12 @@ ENVIRONMENT FILE:
                                    This allows using auth-broker with stdio and SSE transports
                                    When --mcp is specified, .env file is not loaded automatically
                                    (even if it exists in current directory)
+  --browser=<type>                 Browser type for OAuth authentication
+                                   Options: system (default), headless, none, chrome, edge, firefox
+                                   Use 'headless' for SSH/remote - logs URL and waits for callback
+                                   Use 'none' for tests - logs URL and rejects immediately
+                                   Example: --browser=headless
+                                   Environment variable: MCP_BROWSER
 
 TRANSPORT SELECTION:
   --transport=<type>               Transport type: stdio|http|streamable-http|sse
@@ -516,6 +522,7 @@ const {
   isTestEnv,
   authBrokerPath,
   defaultMcpDestination,
+  browser,
   unsafe,
   explicitTransportType,
   transportType,
@@ -1893,6 +1900,7 @@ export class mcp_abap_adt_server {
       unsafe,
       transportType,
       useAuthBroker,
+      browser,
       logger
     );
     this.authBrokerFactory = new AuthBrokerFactory(brokerConfig);

@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [1.1.30] - 2025-12-21
+
+### Added
+- **Headless Browser Mode**: Added `--browser` CLI parameter for SSH and remote sessions
+  - `--browser=headless`: Logs authentication URL and waits for manual callback
+  - `--browser=none`: Logs URL and rejects immediately (for automated tests)
+  - `--browser=system`: Opens system default browser (default)
+  - `--browser=chrome|edge|firefox`: Opens specific browser
+  - Environment variable: `MCP_BROWSER`
+  - Ideal for SSH sessions, Docker containers, and CI/CD environments
+
+### Changed
+- **Dependencies Update**:
+  - `@mcp-abap-adt/interfaces`: `^0.2.3` → `^0.2.4` (headless browser mode support)
+  - `@mcp-abap-adt/auth-providers`: `^0.2.1` → `^0.2.3` (headless mode implementation, cross-platform fixes)
+  - `@mcp-abap-adt/auth-broker`: `^0.2.4` → `^0.2.7` (headless mode passthrough)
+
 ## [1.1.29] - 2025-12-08
 
 ### Added

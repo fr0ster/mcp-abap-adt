@@ -14,5 +14,12 @@ export interface IServerConfig {
   unsafe?: boolean;
   /** Use auth-broker instead of .env file */
   useAuthBroker?: boolean;
+  /**
+   * Browser type for authentication (chrome, edge, firefox, system, headless, none)
+   * - 'system' (default): Opens system default browser
+   * - 'headless': Logs URL and waits for manual callback (SSH/remote sessions)
+   * - 'none': Logs URL and rejects immediately (automated tests)
+   */
+  browser?: string;
 }
 

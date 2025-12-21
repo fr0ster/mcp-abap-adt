@@ -14,6 +14,7 @@ export class AuthBrokerConfig implements IAuthBrokerFactoryConfig {
   transportType: string;
   useAuthBroker?: boolean;
   browserAuthPort?: number;
+  browser?: string;
   logger?: any;
 
   constructor(
@@ -24,6 +25,7 @@ export class AuthBrokerConfig implements IAuthBrokerFactoryConfig {
     unsafe: boolean,
     transportType: string,
     useAuthBroker: boolean | undefined,
+    browser: string | undefined,
     logger: any
   ) {
     this.defaultMcpDestination = defaultMcpDestination;
@@ -33,6 +35,7 @@ export class AuthBrokerConfig implements IAuthBrokerFactoryConfig {
     this.unsafe = unsafe;
     this.transportType = transportType;
     this.useAuthBroker = useAuthBroker;
+    this.browser = browser;
     // Set browser auth port to avoid conflicts with server ports
     // stdio: 4001 (no server port), sse: 4000 (SSE server uses 3001), http: 5000 (HTTP server uses 3000)
     if (transportType === 'sse') {

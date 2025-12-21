@@ -22,6 +22,13 @@ export interface IAuthBrokerFactoryConfig {
   useAuthBroker?: boolean;
   /** Port for browser auth callback server (to avoid conflicts with SSE/HTTP servers) */
   browserAuthPort?: number;
+  /**
+   * Browser type for authentication (chrome, edge, firefox, system, headless, none)
+   * - 'system' (default): Opens system default browser
+   * - 'headless': Logs URL and waits for manual callback (SSH/remote sessions)
+   * - 'none': Logs URL and rejects immediately (automated tests)
+   */
+  browser?: string;
   /** Logger instance */
   logger?: ILogger;
 }

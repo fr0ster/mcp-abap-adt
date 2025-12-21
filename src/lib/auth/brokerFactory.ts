@@ -454,7 +454,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
         // This prevents browser auth conflicts when UAA credentials are available
         allowClientCredentials: true,
       } as any,
-      'system',
+      this.config.browser || 'system',
       logger
     );
 

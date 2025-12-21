@@ -5,16 +5,48 @@ import { noopLogger } from "../../lib/handlerLogger.js";
 import { BaseMcpServer } from "./BaseMcpServer.js";
 import { IHandlersRegistry } from "../../lib/handlers/interfaces.js";
 import { AuthBrokerFactory } from "../../lib/auth/index.js";
+import type { IHttpApplication, RouteRegistrationOptions } from "./IHttpApplication.js";
 const DEFAULT_VERSION = process.env.npm_package_version ?? "1.0.0";
 
 export interface SseServerOptions {
+  /**
+   * Host to bind to (only used when no external app is provided)
+   * @default "127.0.0.1"
+   */
   host?: string;
+  /**
+   * Port to listen on (only used when no external app is provided)
+   * @default 3001
+   */
   port?: number;
+  /**
+   * Path for SSE GET endpoint
+   * @default "/sse"
+   */
   ssePath?: string;
+  /**
+   * Path for POST messages endpoint
+   * @default "/messages"
+   */
   postPath?: string;
+  /**
+   * Default SAP destination to use if not specified in headers
+   */
   defaultDestination?: string;
+  /**
+   * Logger instance
+   */
   logger?: Logger;
+  /**
+   * Server version
+   */
   version?: string;
+  /**
+   * External HTTP application to register routes on
+   * When provided, start() will only register routes without creating a server
+   * This enables integration with existing Express/CDS/CAP servers
+   */
+  app?: IHttpApplication;
 }
 
 type SessionEntry = {
@@ -24,6 +56,10 @@ type SessionEntry = {
 
 /**
  * Minimal SSE server: creates a new BaseMcpServer per GET connection, routes POST by sessionId.
+ *
+ * Supports two modes:
+ * 1. Standalone mode: Creates its own Express server (when no app option provided)
+ * 2. Embedded mode: Registers routes on external app (when app option provided)
  */
 export class SseServer {
   private readonly host: string;
@@ -34,6 +70,7 @@ export class SseServer {
   private readonly sessions = new Map<string, SessionEntry>();
   private readonly logger: Logger;
   private readonly version: string;
+  private readonly externalApp?: IHttpApplication;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -47,24 +84,75 @@ export class SseServer {
     this.defaultDestination = opts?.defaultDestination;
     this.logger = opts?.logger ?? noopLogger;
     this.version = opts?.version ?? DEFAULT_VERSION;
+    this.externalApp = opts?.app;
   }
 
+  /**
+   * Register routes on an external HTTP application
+   * Use this when integrating with existing Express/CDS/CAP server
+   *
+   * @param app - External HTTP application (Express, CDS, etc.)
+   * @param options - Route registration options
+   */
+  registerRoutes(app: IHttpApplication, options?: RouteRegistrationOptions): void {
+    app.get(this.ssePath, (async (req: any, res: any) => {
+      await this.handleGet(req, res);
+    }) as any);
+
+    app.post(this.postPath, (async (req: any, res: any) => {
+      const url = new URL(req.originalUrl, `http://${req.headers.host}`);
+      await this.handlePost(req, res, url);
+    }) as any);
+
+    console.error(`[SseServer] Routes registered on external app`);
+    console.error(`[SseServer] SSE endpoint: ${this.ssePath}`);
+    console.error(`[SseServer] POST endpoint: ${this.postPath}`);
+    if (this.defaultDestination) {
+      console.error(`[SseServer] Default destination: ${this.defaultDestination}`);
+    }
+  }
+
+  /**
+   * Get the configured SSE endpoint path
+   */
+  getSsePath(): string {
+    return this.ssePath;
+  }
+
+  /**
+   * Get the configured POST endpoint path
+   */
+  getPostPath(): string {
+    return this.postPath;
+  }
+
+  /**
+   * Start the server
+   *
+   * In standalone mode (no external app): Creates Express server and starts listening
+   * In embedded mode (external app provided): Only registers routes on external app
+   */
   async start(): Promise<void> {
+    // If external app was provided in constructor, register routes on it
+    if (this.externalApp) {
+      this.registerRoutes(this.externalApp);
+      return;
+    }
+
+    // Standalone mode: create own Express server
     const app = express();
     app.use(express.json());
 
-    app.get(this.ssePath, async (req, res) => {
-      await this.handleGet(req, res);
-    });
-
-    app.post(this.postPath, async (req, res) => {
-      const url = new URL(req.originalUrl, `http://${req.headers.host}`);
-      await this.handlePost(req, res, url);
-    });
+    this.registerRoutes(app as unknown as IHttpApplication);
 
     await new Promise<void>((resolve, reject) => {
       const srv = app
-        .listen(this.port, this.host, () => resolve())
+        .listen(this.port, this.host, () => {
+          console.error(`[SseServer] Server started on ${this.host}:${this.port}`);
+          console.error(`[SseServer] SSE endpoint: http://${this.host}:${this.port}${this.ssePath}`);
+          console.error(`[SseServer] POST endpoint: http://${this.host}:${this.port}${this.postPath}`);
+          resolve();
+        })
         .on("error", reject);
     });
   }

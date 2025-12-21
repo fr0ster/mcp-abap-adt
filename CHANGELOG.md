@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [1.1.32] - 2025-12-21
+### Added
+- **v2 HTTP Server Injection**: Added support for external HTTP application injection in v2 servers
+  - New `IHttpApplication` interface for Express-like HTTP applications
+  - `StreamableHttpServer` and `SseServer` now support `app` option in constructor
+  - New `registerRoutes(app, options?)` method for embedding into existing Express/CDS/CAP servers
+  - Enables integration with cloud-llm-hub and other CAP-based applications
+  - Helper methods: `getPath()`, `getSsePath()`, `getPostPath()`
+
 ## [1.1.31] - 2025-12-21
 ### Fixed
 - **CLI `--version` flag**: Fixed package.json path resolution for both v1 and v2 servers

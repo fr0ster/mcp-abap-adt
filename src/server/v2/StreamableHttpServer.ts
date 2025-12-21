@@ -5,22 +5,58 @@ import { noopLogger } from "../../lib/handlerLogger.js";
 import { BaseMcpServer } from "./BaseMcpServer.js";
 import { IHandlersRegistry } from "../../lib/handlers/interfaces.js";
 import { AuthBrokerFactory } from "../../lib/auth/index.js";
+import type { IHttpApplication, RouteRegistrationOptions } from "./IHttpApplication.js";
 const DEFAULT_VERSION = process.env.npm_package_version ?? "1.0.0";
 
 export interface StreamableHttpServerOptions {
+  /**
+   * Host to bind to (only used when no external app is provided)
+   * @default "127.0.0.1"
+   */
   host?: string;
+  /**
+   * Port to listen on (only used when no external app is provided)
+   * @default 3000
+   */
   port?: number;
+  /**
+   * Whether to return JSON responses (vs SSE streams)
+   * @default true
+   */
   enableJsonResponse?: boolean;
+  /**
+   * Default SAP destination to use if not specified in headers
+   */
   defaultDestination?: string;
+  /**
+   * Path for the MCP endpoint
+   * @default "/mcp/stream/http"
+   */
   path?: string;
+  /**
+   * Logger instance
+   */
   logger?: Logger;
+  /**
+   * Server version
+   */
   version?: string;
+  /**
+   * External HTTP application to register routes on
+   * When provided, start() will only register routes without creating a server
+   * This enables integration with existing Express/CDS/CAP servers
+   */
+  app?: IHttpApplication;
 }
 
 /**
  * Minimal Streamable HTTP server implementation.
  * Creates new transport for each HTTP POST and forwards request to the MCP server.
  * Destination is taken from x-mcp-destination header or defaultDestination.
+ *
+ * Supports two modes:
+ * 1. Standalone mode: Creates its own Express server (when no app option provided)
+ * 2. Embedded mode: Registers routes on external app (when app option provided)
  */
 export class StreamableHttpServer extends BaseMcpServer {
   private readonly host: string;
@@ -28,6 +64,7 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly enableJsonResponse: boolean;
   private readonly defaultDestination?: string;
   private readonly path: string;
+  private readonly externalApp?: IHttpApplication;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -44,15 +81,17 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.enableJsonResponse = opts?.enableJsonResponse ?? true;
     this.defaultDestination = opts?.defaultDestination;
     this.path = opts?.path ?? "/mcp/stream/http";
+    this.externalApp = opts?.app;
     // Register handlers once for shared MCP server
     this.registerHandlers(this.handlersRegistry);
   }
 
-  async start(): Promise<void> {
-    const app = express();
-    app.use(express.json());
-
-    const handle = async (req: Request, res: Response) => {
+  /**
+   * Creates the request handler function
+   * Can be used to register on external app or internal Express
+   */
+  private createRequestHandler(): (req: Request, res: Response) => Promise<void> {
+    return async (req: Request, res: Response) => {
       const clientId = `${req.socket.remoteAddress}:${req.socket.remotePort}`;
       console.error(`[StreamableHttpServer] ${req.method} ${req.path} from ${clientId}`);
 
@@ -109,24 +148,64 @@ export class StreamableHttpServer extends BaseMcpServer {
         }
       }
     };
+  }
+
+  /**
+   * Register routes on an external HTTP application
+   * Use this when integrating with existing Express/CDS/CAP server
+   *
+   * @param app - External HTTP application (Express, CDS, etc.)
+   * @param options - Route registration options
+   */
+  registerRoutes(app: IHttpApplication, options?: RouteRegistrationOptions): void {
+    const handler = this.createRequestHandler();
 
     // Only handle POST requests - GET SSE streams cause abort errors on disconnect
-    app.post(this.path, handle);
+    app.post(this.path, handler as any);
 
     // Return 405 for other methods to avoid SSE stream issues
-    app.all(this.path, (req, res) => {
+    app.all(this.path, ((req: Request, res: Response) => {
       res.status(405).send("Method Not Allowed");
-    });
+    }) as any);
+
+    console.error(`[StreamableHttpServer] Routes registered on external app at ${this.path}`);
+    console.error(`[StreamableHttpServer] JSON response mode: ${this.enableJsonResponse}`);
+    if (this.defaultDestination) {
+      console.error(`[StreamableHttpServer] Default destination: ${this.defaultDestination}`);
+    }
+  }
+
+  /**
+   * Get the configured endpoint path
+   */
+  getPath(): string {
+    return this.path;
+  }
+
+  /**
+   * Start the server
+   *
+   * In standalone mode (no external app): Creates Express server and starts listening
+   * In embedded mode (external app provided): Only registers routes on external app
+   */
+  async start(): Promise<void> {
+    // If external app was provided in constructor, register routes on it
+    if (this.externalApp) {
+      this.registerRoutes(this.externalApp);
+      return;
+    }
+
+    // Standalone mode: create own Express server
+    const app = express();
+    app.use(express.json());
+
+    this.registerRoutes(app as unknown as IHttpApplication);
 
     await new Promise<void>((resolve, reject) => {
       const srv = app
         .listen(this.port, this.host, () => {
           console.error(`[StreamableHttpServer] Server started on ${this.host}:${this.port}`);
           console.error(`[StreamableHttpServer] Endpoint: http://${this.host}:${this.port}${this.path}`);
-          console.error(`[StreamableHttpServer] JSON response mode: ${this.enableJsonResponse}`);
-          if (this.defaultDestination) {
-            console.error(`[StreamableHttpServer] Default destination: ${this.defaultDestination}`);
-          }
           resolve();
         })
         .on("error", reject);

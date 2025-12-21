@@ -26,6 +26,7 @@
     "kill-ports": "lsof -ti:3000,3001,4000,4001,5000,6274,6277 | xargs -r kill -9 2>/dev/null || true",
     "auth": "npx sap-abap-auth auth",
     "clean": "make clean",
+    "chrono": "./tools/version-stats.sh",
     "docs:tools": "node ./tools/generate-tools-docs.js",
     "prepublishOnly": "npm run build",
     "package": "npm pack",

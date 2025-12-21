@@ -10,8 +10,13 @@ echo ""
 echo "Generated: $(date '+%Y-%m-%d %H:%M')"
 echo ""
 
-# Get all version tags
-TAGS=$(git tag -l 'v1.1.*' --sort=-version:refname | head -$COUNT)
+# Get all version tags (supports v*.*.* pattern)
+TAGS=$(git tag -l 'v*' --sort=-version:refname | head -$COUNT)
+
+if [ -z "$TAGS" ]; then
+    echo "No version tags found."
+    exit 0
+fi
 
 echo "| Version | Date | Commits | Files | Insertions | Deletions |"
 echo "|---------|------|---------|-------|------------|-----------|"

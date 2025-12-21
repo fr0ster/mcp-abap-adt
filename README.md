@@ -4,6 +4,27 @@
 
 This project provides a server that allows you to interact with SAP ABAP systems using the Model Context Protocol (MCP). Think of it as a bridge that lets tools like [Cline](https://marketplace.visualstudio.com/items?itemName=saoudrizwan.claude-dev) (a VS Code extension) talk to your ABAP system and retrieve information like source code, table structures, and more.
 
+## Architecture
+
+The project provides two main usage patterns:
+
+### 1. Standalone MCP Server (Default)
+Run as a standalone MCP server with stdio, HTTP, or SSE transport:
+```bash
+mcp-abap-adt                           # stdio (default)
+mcp-abap-adt --transport=http          # HTTP mode
+mcp-abap-adt --transport=sse           # SSE mode
+```
+
+### 2. Handler Exporter (For Embedding)
+Export handlers for integration into existing servers (e.g., SAP CAP/CDS applications):
+```typescript
+import { HandlerExporter } from '@fr0ster/mcp-abap-adt/handlers';
+
+const exporter = new HandlerExporter();
+exporter.registerOnServer(mcpServer, () => getConnection());
+```
+
 ## Quick Start
 
 1. **Install**: See [Installation Guide](docs/installation/INSTALLATION.md)
@@ -98,6 +119,9 @@ npm run start:http
 
 # SSE mode
 npm run start:sse
+
+# Legacy v1 server (for backward compatibility)
+npm run start:legacy
 ```
 
 ### Environment Configuration

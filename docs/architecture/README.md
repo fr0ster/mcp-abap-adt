@@ -2,6 +2,40 @@
 
 This directory contains technical documentation about the system architecture, design decisions, and internal structure.
 
+## Server Architecture (v1.2.0+)
+
+The project has a modular architecture with two main usage patterns:
+
+### Standalone Server (v2)
+The default `mcp-abap-adt` command runs the v2 server with full transport support:
+- **StdioServer** - Standard input/output for MCP clients
+- **StreamableHttpServer** - HTTP transport with JSON responses
+- **SseServer** - Server-Sent Events transport
+
+### Handler Exporter (v1)
+For embedding into existing servers (e.g., CAP/CDS applications):
+```typescript
+import { HandlerExporter } from '@fr0ster/mcp-abap-adt/handlers';
+
+const exporter = new HandlerExporter({
+  includeReadOnly: true,
+  includeHighLevel: true,
+  includeLowLevel: true,
+  includeSystem: true,
+  includeSearch: true,
+});
+
+exporter.registerOnServer(mcpServer, () => connection);
+```
+
+### Handler Groups
+Handlers are organized into logical groups for flexible composition:
+- **ReadOnlyHandlersGroup** - Read-only operations (getProgram, getClass, getTable, etc.)
+- **HighLevelHandlersGroup** - High-level operations (create, update)
+- **LowLevelHandlersGroup** - Low-level ADT operations
+- **SystemHandlersGroup** - System operations (getInactiveObjects, etc.)
+- **SearchHandlersGroup** - Search operations (whereUsed, quickFix)
+
 ## Files
 
 - **[STATEFUL_SESSION_GUIDE.md](STATEFUL_SESSION_GUIDE.md)** - Comprehensive guide on stateful session management in SAP ADT API, covering server/handler workflow for lock/update/unlock operations

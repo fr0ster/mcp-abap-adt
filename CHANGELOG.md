@@ -2,6 +2,66 @@
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-12-21
+### Changed
+- **BREAKING: v2 is now the default server**
+  - `mcp-abap-adt` command now runs v2 server (was v1)
+  - v1 server moved to `legacy-server.ts`, accessible via `npm run start:legacy`
+  - Removed separate `mcp-abap-adt-v2` binary
+
+- **v1 becomes Handler Exporter**
+  - v1/index.ts now exports `HandlerExporter` class for external server integration
+  - Allows registering ABAP ADT handlers on any McpServer instance
+  - Designed for embedding into existing Express/CDS/CAP servers (e.g., cloud-llm-hub)
+
+### Added
+- **Subpath exports** for modular imports
+  - `@fr0ster/mcp-abap-adt` - main package (unchanged)
+  - `@fr0ster/mcp-abap-adt/handlers` - HandlerExporter and handler groups
+  - `@fr0ster/mcp-abap-adt/server/v1` - v1 module (exporter + legacy server)
+  - v2 server is internal, not exported as subpath
+
+- **HandlerExporter class** for programmatic handler registration
+  - `new HandlerExporter(options?)` - create exporter with configurable handler groups
+  - `registerOnServer(mcpServer, connectionProvider)` - register handlers with connection injection
+  - `getHandlerEntries()` - get raw handler entries for custom registration
+  - `getToolNames()` - list all available tool names
+  - `createRegistry()` - create IHandlersRegistry for v2 servers
+
+- **Handler Groups** - modular handler organization
+  - `ReadOnlyHandlersGroup` - read-only handlers (getProgram, getClass, etc.)
+  - `HighLevelHandlersGroup` - high-level operations
+  - `LowLevelHandlersGroup` - low-level operations
+  - `SystemHandlersGroup` - system handlers
+  - `SearchHandlersGroup` - search handlers
+
+### Migration Guide
+**For CLI users:**
+- No changes needed - `mcp-abap-adt` command works the same
+- To use legacy v1 server: `npm run start:legacy`
+
+**For library users (cloud-llm-hub, etc.):**
+```typescript
+// Old way (v1 server class) - still works via legacy import
+import { mcp_abap_adt_server } from '@fr0ster/mcp-abap-adt';
+
+// New way (handler exporter) - recommended
+import { HandlerExporter } from '@fr0ster/mcp-abap-adt/handlers';
+
+const exporter = new HandlerExporter();
+exporter.registerOnServer(mcpServer, () => getConnection());
+```
+
+**For CAP/CDS projects with file: dependency:**
+Add path mapping to tsconfig.json:
+```json
+{
+  "paths": {
+    "@fr0ster/mcp-abap-adt/handlers": ["./submodules/mcp-abap-adt/dist/lib/handlers/index"]
+  }
+}
+```
+
 ## [1.1.32] - 2025-12-21
 ### Added
 - **v2 HTTP Server Injection**: Added support for external HTTP application injection in v2 servers

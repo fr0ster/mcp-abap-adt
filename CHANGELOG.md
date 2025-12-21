@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [1.2.3] - 2025-12-22
+### Fixed
+- Removed unused import of `IAbapConnectionExtended` from `@mcp-abap-adt/interfaces`
+  - Interface was removed in interfaces package v1.1.0
+
 ## [1.2.2] - 2025-12-22
 ### Changed
 - **BREAKING: Removed legacy-server.ts**

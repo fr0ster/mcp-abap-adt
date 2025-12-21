@@ -1,6 +1,6 @@
 {
   "name": "@fr0ster/mcp-abap-adt",
-  "version": "1.1.32",
+  "version": "1.2.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -22,8 +22,12 @@
   },
   "typesVersions": {
     "*": {
-      "handlers": ["dist/lib/handlers/index.d.ts"],
-      "server/v1": ["dist/server/v1/index.d.ts"]
+      "handlers": [
+        "dist/lib/handlers/index.d.ts"
+      ],
+      "server/v1": [
+        "dist/server/v1/index.d.ts"
+      ]
     }
   },
   "scripts": {

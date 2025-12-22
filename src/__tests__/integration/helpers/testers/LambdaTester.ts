@@ -9,22 +9,22 @@
  * - Lifecycle hooks (beforeAll, afterAll, beforeEach, afterEach)
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import type { AbapConnection } from '@mcp-abap-adt/connection';
 import {
-  createTestConnectionAndSession,
-  SessionInfo
-} from '../sessionHelpers';
-import {
-  loadTestEnv,
+  getCleanupAfter,
   getEnabledTestCase,
-  getTimeout,
   getOperationDelay,
+  getTimeout,
+  loadTestConfig,
+  loadTestEnv,
   resolvePackageName,
   resolveTransportRequest,
-  getCleanupAfter,
-  loadTestConfig
 } from '../configHelpers';
 import { createTestLogger, type LoggerWithExtras } from '../loggerHelpers';
+import {
+  createTestConnectionAndSession,
+  type SessionInfo,
+} from '../sessionHelpers';
 import type { LambdaTesterContext } from './types';
 
 export type TLambda = (context: LambdaTesterContext) => Promise<void>;
@@ -52,7 +52,7 @@ export class LambdaTester {
     handlerName: string,
     testCaseName: string,
     logPrefix: string,
-    paramsGroupName?: string
+    paramsGroupName?: string,
   ) {
     this.handlerName = handlerName;
     this.testCaseName = testCaseName;
@@ -76,7 +76,7 @@ export class LambdaTester {
     let testParams: any = null;
     let objectName: string | null = null;
     let packageName = '';
-    let transportRequest: string | undefined = undefined;
+    let transportRequest: string | undefined;
 
     try {
       // Load environment variables
@@ -88,17 +88,19 @@ export class LambdaTester {
       testCase = getEnabledTestCase(this.handlerName, this.testCaseName);
 
       if (!testCase) {
-        throw new Error(`Test case "${this.testCaseName}" not found or disabled for handler "${this.handlerName}"`);
+        throw new Error(
+          `Test case "${this.testCaseName}" not found or disabled for handler "${this.handlerName}"`,
+        );
       }
 
       // Resolve parameters from group if paramsGroupName is provided
       if (this.paramsGroupName) {
         // Try structure 1: params_groups.groupName in test case
-        if (testCase.params_groups && testCase.params_groups[this.paramsGroupName]) {
+        if (testCase.params_groups?.[this.paramsGroupName]) {
           testParams = testCase.params_groups[this.paramsGroupName];
         } else {
           // Try structure 2: Global params_groups.groupName in config root
-          if (config.params_groups && config.params_groups[this.paramsGroupName]) {
+          if (config.params_groups?.[this.paramsGroupName]) {
             testParams = config.params_groups[this.paramsGroupName];
           } else {
             // Fallback to direct params
@@ -119,12 +121,23 @@ export class LambdaTester {
       session = connectionResult.session;
 
       // Resolve object name from params
-      objectName = testParams.name || testParams.class_name || testParams.interface_name ||
-        testParams.function_name || testParams.program_name || testParams.table_name ||
-        testParams.view_name || testParams.domain_name || testParams.data_element_name ||
-        testParams.structure_name || testParams.bdef_name || testParams.ddlx_name ||
-        testParams.bimp_name || testParams.metadata_extension_name ||
-        testParams.service_definition_name || null;
+      objectName =
+        testParams.name ||
+        testParams.class_name ||
+        testParams.interface_name ||
+        testParams.function_name ||
+        testParams.program_name ||
+        testParams.table_name ||
+        testParams.view_name ||
+        testParams.domain_name ||
+        testParams.data_element_name ||
+        testParams.structure_name ||
+        testParams.bdef_name ||
+        testParams.ddlx_name ||
+        testParams.bimp_name ||
+        testParams.metadata_extension_name ||
+        testParams.service_definition_name ||
+        null;
 
       // Resolve package name and transport request
       // Create testCase object with resolved params for resolve functions
@@ -153,16 +166,17 @@ export class LambdaTester {
         cleanupAfter: this.cleanupAfter.bind(this),
         getOperationDelay: getOperationDelayForContext,
         defaultPackage,
-        testCase
+        testCase,
       };
 
       this.testCase = testCase;
       this.testParams = testParams;
-
     } catch (error: any) {
       // If initialization failed, create minimal context
       const errorLogger = createTestLogger(this.logPrefix);
-      errorLogger?.warn(`⚠️ Failed to initialize tester: ${error?.message || String(error)}`);
+      errorLogger?.warn(
+        `⚠️ Failed to initialize tester: ${error?.message || String(error)}`,
+      );
 
       // Create minimal getOperationDelay function for error case (returns default)
       const getOperationDelayForContext = (operation: string): number => {
@@ -181,7 +195,7 @@ export class LambdaTester {
         cleanupAfter: async () => {},
         getOperationDelay: getOperationDelayForContext,
         defaultPackage: undefined,
-        testCase: null
+        testCase: null,
       };
     }
   }
@@ -193,21 +207,29 @@ export class LambdaTester {
    */
   protected async cleanupAfter(): Promise<void> {
     if (!this.context || !this.testCase) {
-      this.context?.logger?.warn?.('⚠️ Cleanup skipped: context or testCase not available');
+      this.context?.logger?.warn?.(
+        '⚠️ Cleanup skipped: context or testCase not available',
+      );
       return;
     }
 
     // Check YAML parameters first (global skip_cleanup, test case skip_cleanup, cleanup_after flags)
     const shouldCleanup = getCleanupAfter(this.testCase);
     if (!shouldCleanup) {
-      this.context.logger?.info?.('ℹ️ Cleanup skipped: disabled in YAML config (skip_cleanup=true or cleanup_after=false)');
+      this.context.logger?.info?.(
+        'ℹ️ Cleanup skipped: disabled in YAML config (skip_cleanup=true or cleanup_after=false)',
+      );
       return;
     }
 
     // Cleanup lambda must be provided - it's mandatory
     if (!this.cleanupAfterLambda) {
-      this.context.logger?.error?.('❌ Cleanup lambda not provided! Each test must set cleanup lambda in beforeAll().');
-      throw new Error('Cleanup lambda is mandatory. Provide cleanupAfter lambda in beforeAll() method.');
+      this.context.logger?.error?.(
+        '❌ Cleanup lambda not provided! Each test must set cleanup lambda in beforeAll().',
+      );
+      throw new Error(
+        'Cleanup lambda is mandatory. Provide cleanupAfter lambda in beforeAll() method.',
+      );
     }
 
     // Execute cleanup lambda (errors are caught and logged, but don't fail the cleanup process)
@@ -217,7 +239,9 @@ export class LambdaTester {
       this.context.logger?.success?.('✅ Cleanup completed successfully');
     } catch (error: any) {
       // Log cleanup errors but don't throw - cleanup should not fail the test suite
-      this.context.logger?.warn?.(`⚠️ Cleanup error (ignored): ${error?.message || String(error)}`);
+      this.context.logger?.warn?.(
+        `⚠️ Cleanup error (ignored): ${error?.message || String(error)}`,
+      );
     }
   }
 
@@ -236,8 +260,10 @@ export class LambdaTester {
 
     // Cleanup lambda is mandatory - each test must set it up
     if (!cleanupAfter) {
-      throw new Error('Cleanup lambda is mandatory. Provide cleanupAfter lambda in beforeAll() method. ' +
-        'The test decides whether to run it via YAML config (skip_cleanup or cleanup_after flags).');
+      throw new Error(
+        'Cleanup lambda is mandatory. Provide cleanupAfter lambda in beforeAll() method. ' +
+          'The test decides whether to run it via YAML config (skip_cleanup or cleanup_after flags).',
+      );
     }
 
     // Store cleanup lambda
@@ -290,7 +316,9 @@ export class LambdaTester {
       }
     } catch (error: any) {
       // Log custom lambda errors but continue with cleanup
-      this.context.logger?.warn?.(`⚠️ Custom afterEach lambda error (continuing with cleanup): ${error?.message || String(error)}`);
+      this.context.logger?.warn?.(
+        `⚠️ Custom afterEach lambda error (continuing with cleanup): ${error?.message || String(error)}`,
+      );
     }
 
     // Always check YAML parameters and execute cleanup if needed
@@ -300,10 +328,11 @@ export class LambdaTester {
       await this.cleanupAfter();
     } catch (error: any) {
       // Cleanup errors are already handled in cleanupAfter(), but log here for visibility
-      this.context.logger?.warn?.(`⚠️ Cleanup process error: ${error?.message || String(error)}`);
+      this.context.logger?.warn?.(
+        `⚠️ Cleanup process error: ${error?.message || String(error)}`,
+      );
     }
   }
-
 
   /**
    * Main run method - executes test function (lambda) with context
@@ -327,8 +356,10 @@ export class LambdaTester {
 
     // Verify cleanup lambda is set (should be set in beforeAll)
     if (!this.cleanupAfterLambda) {
-      throw new Error('Cleanup lambda not set! Each test must provide cleanupAfter lambda in beforeAll(). ' +
-        'The test decides whether to run it via YAML config (skip_cleanup or cleanup_after flags).');
+      throw new Error(
+        'Cleanup lambda not set! Each test must provide cleanupAfter lambda in beforeAll(). ' +
+          'The test decides whether to run it via YAML config (skip_cleanup or cleanup_after flags).',
+      );
     }
 
     try {
@@ -337,7 +368,7 @@ export class LambdaTester {
       await testFunc(this.context);
     } catch (error: any) {
       // Check if error is a skip condition
-      if (error.message && error.message.startsWith('SKIP:')) {
+      if (error.message?.startsWith('SKIP:')) {
         const skipReason = error.message.replace(/^SKIP:\s*/, '');
         this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
         return; // Don't throw, just skip the test
@@ -349,5 +380,4 @@ export class LambdaTester {
       throw error;
     }
   }
-
 }

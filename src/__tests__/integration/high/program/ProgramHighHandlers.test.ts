@@ -17,11 +17,9 @@
 import { handleCreateProgram } from '../../../../handlers/program/high/handleCreateProgram';
 import { handleUpdateProgram } from '../../../../handlers/program/high/handleUpdateProgram';
 import { handleDeleteProgram } from '../../../../handlers/program/low/handleDeleteProgram';
-
-import { HighTester } from '../../helpers/testers/HighTester';
 import { getTimeout, isCloudConnection } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
-
+import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Program High-Level Handlers Integration', () => {
   let tester: HighTester;
@@ -34,8 +32,8 @@ describe('Program High-Level Handlers Integration', () => {
       {
         create: handleCreateProgram,
         update: handleUpdateProgram,
-        delete: handleDeleteProgram
-      }
+        delete: handleDeleteProgram,
+      },
     );
     await tester.beforeAll();
   });
@@ -52,13 +50,19 @@ describe('Program High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it('should test all Program high-level handlers', async () => {
-    // Skip test on cloud - programs are not available on cloud systems
-    if (isCloudConnection()) {
-      const logger = createTestLogger('program-high');
-      logger?.info('⏭️  Skipping test: Programs are not available on cloud systems');
-      return;
-    }
-    await tester.run();
-  }, getTimeout('long'));
+  it(
+    'should test all Program high-level handlers',
+    async () => {
+      // Skip test on cloud - programs are not available on cloud systems
+      if (isCloudConnection()) {
+        const logger = createTestLogger('program-high');
+        logger?.info(
+          '⏭️  Skipping test: Programs are not available on cloud systems',
+        );
+        return;
+      }
+      await tester.run();
+    },
+    getTimeout('long'),
+  );
 });

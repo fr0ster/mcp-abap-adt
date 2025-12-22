@@ -14,30 +14,34 @@
  * Run: npm test -- --testPathPattern=integration/serviceDefinition
  */
 
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { handleCreateServiceDefinition } from '../../../../handlers/service_definition/high/handleCreateServiceDefinition';
 import { handleUpdateServiceDefinition } from '../../../../handlers/service_definition/high/handleUpdateServiceDefinition';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
-
-import { HighTester } from '../../helpers/testers/HighTester';
 import { getTimeout } from '../../helpers/configHelpers';
+import { HighTester } from '../../helpers/testers/HighTester';
 
 // Wrapper for delete since there's no handler for deleteServiceDefinition
-async function deleteServiceDefinitionWrapper(context: HandlerContext, args: any): Promise<any> {
+async function deleteServiceDefinitionWrapper(
+  context: HandlerContext,
+  args: any,
+): Promise<any> {
   try {
     const client = new CrudClient(context.connection);
     await client.deleteServiceDefinition(
       { serviceDefinitionName: args.service_definition_name },
-      args.transport_request
+      args.transport_request,
     );
     return {
       isError: false,
-      content: [{ type: 'text', text: 'Service definition deleted successfully' }]
+      content: [
+        { type: 'text', text: 'Service definition deleted successfully' },
+      ],
     };
   } catch (error: any) {
     return {
       isError: true,
-      content: [{ type: 'text', text: error?.message || String(error) }]
+      content: [{ type: 'text', text: error?.message || String(error) }],
     };
   }
 }
@@ -53,8 +57,8 @@ describe('ServiceDefinition High-Level Handlers Integration', () => {
       {
         create: handleCreateServiceDefinition,
         update: handleUpdateServiceDefinition,
-        delete: deleteServiceDefinitionWrapper
-      }
+        delete: deleteServiceDefinitionWrapper,
+      },
     );
     await tester.beforeAll();
   });
@@ -71,7 +75,11 @@ describe('ServiceDefinition High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it('should test all ServiceDefinition high-level handlers', async () => {
-    await tester.run();
-  }, getTimeout('long'));
+  it(
+    'should test all ServiceDefinition high-level handlers',
+    async () => {
+      await tester.run();
+    },
+    getTimeout('long'),
+  );
 });

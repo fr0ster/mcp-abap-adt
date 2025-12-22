@@ -3,19 +3,27 @@
  * Provides utilities for parsing responses, managing sessions, etc.
  */
 
-import { AxiosError } from 'axios';
-import { isAlreadyCheckedError, isAlreadyExistsError } from '../../../lib/utils';
-import { createTestLogger } from './loggerHelpers';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import { AxiosError } from 'axios';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  isAlreadyCheckedError,
+  isAlreadyExistsError,
+} from '../../../lib/utils';
 import type { LoggerWithExtras } from './loggerHelpers';
+import { createTestLogger } from './loggerHelpers';
 
 /**
  * Parse handler response content
  */
-export function parseHandlerResponse(response: { isError: boolean; content: Array<{ type: string; text: string }> }): any {
+export function parseHandlerResponse(response: {
+  isError: boolean;
+  content: Array<{ type: string; text: string }>;
+}): any {
   if (response.isError) {
-    throw new Error(`Handler returned error: ${response.content[0]?.text || 'Unknown error'}`);
+    throw new Error(
+      `Handler returned error: ${response.content[0]?.text || 'Unknown error'}`,
+    );
   }
 
   const text = response.content[0]?.text;
@@ -33,10 +41,13 @@ export function parseHandlerResponse(response: { isError: boolean; content: Arra
 /**
  * Extract session state from handler response
  */
-export function extractSessionState(response: any): { session_id: string | null; session_state: any } {
+export function extractSessionState(response: any): {
+  session_id: string | null;
+  session_state: any;
+} {
   return {
     session_id: response.session_id || null,
-    session_state: response.session_state || null
+    session_state: response.session_state || null,
   };
 }
 
@@ -53,7 +64,10 @@ export function extractLockHandle(response: any): string {
 /**
  * Safely extract error message from handler error response
  */
-export function extractErrorMessage(response: { isError: boolean; content: Array<{ type: string; text: string }> }): string {
+export function extractErrorMessage(response: {
+  isError: boolean;
+  content: Array<{ type: string; text: string }>;
+}): string {
   if (!response.isError) {
     return '';
   }
@@ -74,7 +88,7 @@ export function isSuccessResponse(response: any): boolean {
  * Wait for a specified delay (for SAP operation processing)
  */
 export function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -90,7 +104,12 @@ export function safeStringify(obj: any): string {
       seen.add(value);
     }
     // Remove problematic HTTP objects
-    if (key === 'socket' || key === '_httpMessage' || key === 'res' || key === 'req') {
+    if (
+      key === 'socket' ||
+      key === '_httpMessage' ||
+      key === 'res' ||
+      key === 'req'
+    ) {
       return '[HTTP Object]';
     }
     return value;
@@ -105,7 +124,8 @@ export function safeStringify(obj: any): string {
  *   import { debugLog } from '../helpers/testHelpers';
  *   debugLog('STEP', 'Message', { data: 'value' });
  */
-export const DEBUG_TESTS = process.env.DEBUG_TESTS === 'true' || process.env.DEBUG_ADT_TESTS === 'true';
+export const DEBUG_TESTS =
+  process.env.DEBUG_TESTS === 'true' || process.env.DEBUG_ADT_TESTS === 'true';
 const testLogger = createTestLogger('test');
 
 export function debugLog(step: string, message: string, data?: any): void {
@@ -128,7 +148,7 @@ export function debugLog(step: string, message: string, data?: any): void {
  *   logTestStep('check(active)');
  */
 function logImmediate(message: string): void {
-  process.stdout.write(message + '\n');
+  process.stdout.write(`${message}\n`);
 }
 
 export function logTestStep(step: string): void {
@@ -156,8 +176,11 @@ export { isAlreadyExistsError };
  * @throws Error if check failed with a real error (not "already checked")
  */
 export function handleCheckResponse(
-  checkResponse: { isError: boolean; content: Array<{ type: string; text: string }> },
-  objectName: string
+  checkResponse: {
+    isError: boolean;
+    content: Array<{ type: string; text: string }>;
+  },
+  objectName: string,
 ): void {
   if (!checkResponse.isError) {
     return; // Success
@@ -182,9 +205,12 @@ export function handleCheckResponse(
  * @returns true if object exists (should skip test), false if should continue
  */
 export function shouldSkipDueToExistingObject(
-  validateResponse: { isError: boolean; content: Array<{ type: string; text: string }> },
+  validateResponse: {
+    isError: boolean;
+    content: Array<{ type: string; text: string }>;
+  },
   validateData: any | null,
-  objectName: string
+  _objectName: string,
 ): boolean {
   // Check error message first
   if (validateResponse.isError) {
@@ -197,8 +223,8 @@ export function shouldSkipDueToExistingObject(
   // Check validation result if data is available
   if (validateData && !validateData.validation_result?.valid) {
     const message = validateData.validation_result?.message || '';
-    const indicatesExists = validateData.validation_result?.exists ||
-                           isAlreadyExistsError(message);
+    const indicatesExists =
+      validateData.validation_result?.exists || isAlreadyExistsError(message);
     return indicatesExists;
   }
 
@@ -208,7 +234,7 @@ export function shouldSkipDueToExistingObject(
 /**
  * Create HandlerContext from TesterContext
  * Logger is included only if DEBUG_HANDLERS=true
- * 
+ *
  * @param context - TesterContext from workflow function
  * @returns HandlerContext with connection and optional logger
  */

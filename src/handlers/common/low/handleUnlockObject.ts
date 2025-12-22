@@ -5,32 +5,68 @@
  * Must reuse session_id and lock_handle from LockObject.
  */
 
-import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "UnlockObjectLow",
-  description: "[low-level] Unlock an ABAP object after modification. Must use the same session_id and lock_handle from the LockObject operation.",
+  name: 'UnlockObjectLow',
+  description:
+    '[low-level] Unlock an ABAP object after modification. Must use the same session_id and lock_handle from the LockObject operation.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
-      object_name: { type: "string", description: "Object name (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE). For function modules, use format GROUP|FM_NAME" },
-      object_type: { type: "string", description: "Object type", enum: ["class", "program", "interface", "function_group", "function_module", "table", "structure", "view", "domain", "data_element", "package", "behavior_definition", "metadata_extension"] },
-      lock_handle: { type: "string", description: "Lock handle from LockObject operation" },
-      session_id: { type: "string", description: "Session ID from LockObject operation. Must be the same session." },
+      object_name: {
+        type: 'string',
+        description:
+          'Object name (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE). For function modules, use format GROUP|FM_NAME',
+      },
+      object_type: {
+        type: 'string',
+        description: 'Object type',
+        enum: [
+          'class',
+          'program',
+          'interface',
+          'function_group',
+          'function_module',
+          'table',
+          'structure',
+          'view',
+          'domain',
+          'data_element',
+          'package',
+          'behavior_definition',
+          'metadata_extension',
+        ],
+      },
+      lock_handle: {
+        type: 'string',
+        description: 'Lock handle from LockObject operation',
+      },
+      session_id: {
+        type: 'string',
+        description:
+          'Session ID from LockObject operation. Must be the same session.',
+      },
       session_state: {
-        type: "object",
-        description: "Session state from LockObject (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from LockObject (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["object_name", "object_type", "lock_handle", "session_id"]
-  }
+    required: ['object_name', 'object_type', 'lock_handle', 'session_id'],
+  },
 } as const;
 
 interface UnlockObjectArgs {
@@ -45,31 +81,59 @@ interface UnlockObjectArgs {
   };
 }
 
-export async function handleUnlockObject(context: HandlerContext, args: UnlockObjectArgs) {
+export async function handleUnlockObject(
+  context: HandlerContext,
+  args: UnlockObjectArgs,
+) {
   const { connection, logger } = context;
   try {
-    const { object_name, object_type, lock_handle, session_id, session_state } = args as UnlockObjectArgs;
+    const { object_name, object_type, lock_handle, session_id, session_state } =
+      args as UnlockObjectArgs;
 
     if (!object_name || !object_type || !lock_handle || !session_id) {
-      return return_error(new Error('object_name, object_type, lock_handle, and session_id are required'));
+      return return_error(
+        new Error(
+          'object_name, object_type, lock_handle, and session_id are required',
+        ),
+      );
     }
 
-    const validTypes = ['class', 'program', 'interface', 'function_group', 'function_module', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'metadata_extension'];
+    const validTypes = [
+      'class',
+      'program',
+      'interface',
+      'function_group',
+      'function_module',
+      'table',
+      'structure',
+      'view',
+      'domain',
+      'data_element',
+      'package',
+      'behavior_definition',
+      'metadata_extension',
+    ];
     const objectType = object_type.toLowerCase();
     if (!validTypes.includes(objectType)) {
-      return return_error(new Error(`Invalid object_type. Must be one of: ${validTypes.join(', ')}`));
+      return return_error(
+        new Error(
+          `Invalid object_type. Must be one of: ${validTypes.join(', ')}`,
+        ),
+      );
     }
 
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     if (session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
-          }
+    }
 
     const objectName = object_name.toUpperCase();
 
-    logger?.info(`Starting object unlock: ${objectName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(
+      `Starting object unlock: ${objectName} (session: ${session_id.substring(0, 8)}...)`,
+    );
 
     try {
       switch (objectType) {
@@ -80,18 +144,31 @@ export async function handleUnlockObject(context: HandlerContext, args: UnlockOb
           await client.unlockProgram({ programName: objectName }, lock_handle);
           break;
         case 'interface':
-          await client.unlockInterface({ interfaceName: objectName }, lock_handle);
+          await client.unlockInterface(
+            { interfaceName: objectName },
+            lock_handle,
+          );
           break;
         case 'function_group':
-          await client.unlockFunctionGroup({ functionGroupName: objectName }, lock_handle);
+          await client.unlockFunctionGroup(
+            { functionGroupName: objectName },
+            lock_handle,
+          );
           break;
         case 'function_module':
-          return return_error(new Error('Function module unlocking via UnlockObject is not supported. Use function-module-specific handler.'));
+          return return_error(
+            new Error(
+              'Function module unlocking via UnlockObject is not supported. Use function-module-specific handler.',
+            ),
+          );
         case 'table':
           await client.unlockTable({ tableName: objectName }, lock_handle);
           break;
         case 'structure':
-          await client.unlockStructure({ structureName: objectName }, lock_handle);
+          await client.unlockStructure(
+            { structureName: objectName },
+            lock_handle,
+          );
           break;
         case 'view':
           await client.unlockView({ viewName: objectName }, lock_handle);
@@ -100,36 +177,48 @@ export async function handleUnlockObject(context: HandlerContext, args: UnlockOb
           await client.unlockDomain({ domainName: objectName }, lock_handle);
           break;
         case 'data_element':
-          await client.unlockDataElement({ dataElementName: objectName }, lock_handle);
+          await client.unlockDataElement(
+            { dataElementName: objectName },
+            lock_handle,
+          );
           break;
         case 'package':
           await client.unlockPackage({ packageName: objectName }, lock_handle);
           break;
         case 'behavior_definition':
-          await client.unlockBehaviorDefinition({ name: objectName }, lock_handle);
+          await client.unlockBehaviorDefinition(
+            { name: objectName },
+            lock_handle,
+          );
           break;
         case 'metadata_extension':
-          await client.unlockMetadataExtension({ name: objectName }, lock_handle);
+          await client.unlockMetadataExtension(
+            { name: objectName },
+            lock_handle,
+          );
           break;
         default:
-          return return_error(new Error(`Unsupported object_type: ${object_type}`));
+          return return_error(
+            new Error(`Unsupported object_type: ${object_type}`),
+          );
       }
-
-
 
       logger?.info(`✅ UnlockObject completed: ${objectName}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          object_name: objectName,
-          object_type: objectType,
-          session_id,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: `Object ${objectName} unlocked successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            object_name: objectName,
+            object_type: objectType,
+            session_id,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: `Object ${objectName} unlocked successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
       logger?.error(`Error unlocking object ${objectName}:`, error);
 
@@ -139,12 +228,20 @@ export async function handleUnlockObject(context: HandlerContext, args: UnlockOb
         errorMessage = `Object ${objectName} not found.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Invalid lock handle or session. Use the same session_id and lock_handle from LockObject.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+          const parser = new XMLParser({
+            ignoreAttributes: false,
+            attributeNamePrefix: '@_',
+          });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
@@ -155,7 +252,6 @@ export async function handleUnlockObject(context: HandlerContext, args: UnlockOb
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

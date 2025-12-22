@@ -1,31 +1,37 @@
-import { AbapConnection } from '@mcp-abap-adt/connection';
-
 export const TOOL_DEFINITION = {
-  name: "DescribeByList",
-  description: "[read-only] Batch description for a list of ABAP objects. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE, STRUCTURE, etc.",
+  name: 'DescribeByList',
+  description:
+    '[read-only] Batch description for a list of ABAP objects. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE, STRUCTURE, etc.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       objects: {
-        type: "array",
+        type: 'array',
         items: {
-          type: "object",
+          type: 'object',
           properties: {
-            name: { type: "string", description: "[read-only] Object name (required, must be valid ABAP object name or mask)" },
-            type: { type: "string", description: "[read-only] Optional type (e.g. PROG/P, CLAS/OC, etc.)" }
-          }
-        }
-      }
+            name: {
+              type: 'string',
+              description:
+                '[read-only] Object name (required, must be valid ABAP object name or mask)',
+            },
+            type: {
+              type: 'string',
+              description:
+                '[read-only] Optional type (e.g. PROG/P, CLAS/OC, etc.)',
+            },
+          },
+        },
+      },
     },
-    required: ["objects"]
-  }
+    required: ['objects'],
+  },
 } as const;
 
 // DescribeByList: Batch description for a list of ABAP objects
 
-import { handleSearchObject } from "../../search/readonly/handleSearchObject";
-import { logger as baseLogger } from "../../../lib/utils";
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 
 /**
  * DescribeByListArray handler.
@@ -36,15 +42,18 @@ export async function handleDescribeByList(context: HandlerContext, args: any) {
   const { connection, logger } = context;
   const objects = args?.objects;
   if (!args || !Array.isArray(objects) || objects.length === 0) {
-    const err = new Error("Missing or invalid parameters: objects (array) is required and must not be empty.");
-    // @ts-ignore
+    const err = new Error(
+      'Missing or invalid parameters: objects (array) is required and must not be empty.',
+    );
+    // @ts-expect-error
     err.status = 400;
-    // @ts-ignore
+    // @ts-expect-error
     err.body = {
       error: {
-        message: "Missing or invalid parameters: objects (array) is required and must not be empty.",
-        code: "INVALID_PARAMS"
-      }
+        message:
+          'Missing or invalid parameters: objects (array) is required and must not be empty.',
+        code: 'INVALID_PARAMS',
+      },
     };
     throw err;
   }
@@ -52,30 +61,37 @@ export async function handleDescribeByList(context: HandlerContext, args: any) {
   const results: any[] = [];
   try {
     for (const obj of objects) {
-      let type = obj.type;
-      let res = await handleSearchObject(context, { object_name: obj.name, object_type: type });
-      let parsed;
+      const type = obj.type;
+      let res = await handleSearchObject(context, {
+        object_name: obj.name,
+        object_type: type,
+      });
+      let parsed: any;
       try {
-        parsed = typeof res === "string" ? JSON.parse(res) : res;
+        parsed = typeof res === 'string' ? JSON.parse(res) : res;
 
         // If the response is empty or flagged as an error, retry without explicit type
         let tryWithoutType = false;
         if (
-          (parsed == null) ||
-          (parsed.isError === true) ||
-          (parsed.content && Array.isArray(parsed.content) && parsed.content.length === 0)
+          parsed == null ||
+          parsed.isError === true ||
+          (parsed.content &&
+            Array.isArray(parsed.content) &&
+            parsed.content.length === 0)
         ) {
           tryWithoutType = true;
         }
 
         if (tryWithoutType) {
           res = await handleSearchObject(context, { object_name: obj.name });
-          parsed = typeof res === "string" ? JSON.parse(res) : res;
+          parsed = typeof res === 'string' ? JSON.parse(res) : res;
           // If it still fails or comes back empty, skip this object
           if (
-            (parsed == null) ||
-            (parsed.isError === true) ||
-            (parsed.content && Array.isArray(parsed.content) && parsed.content.length === 0)
+            parsed == null ||
+            parsed.isError === true ||
+            (parsed.content &&
+              Array.isArray(parsed.content) &&
+              parsed.content.length === 0)
           ) {
             continue;
           }
@@ -91,8 +107,11 @@ export async function handleDescribeByList(context: HandlerContext, args: any) {
           let allResults: any[] = [];
           for (const item of contentArr) {
             try {
-              let parsedItem = typeof item.text === "string" ? JSON.parse(item.text) : item.text;
-              if (parsedItem && parsedItem.results && Array.isArray(parsedItem.results)) {
+              const parsedItem =
+                typeof item.text === 'string'
+                  ? JSON.parse(item.text)
+                  : item.text;
+              if (parsedItem?.results && Array.isArray(parsedItem.results)) {
                 allResults = allResults.concat(parsedItem.results);
               } else {
                 allResults.push(parsedItem);
@@ -102,27 +121,25 @@ export async function handleDescribeByList(context: HandlerContext, args: any) {
             }
           }
           results.push({
-            type: "text",
+            type: 'text',
             text: JSON.stringify({
               name: obj.name,
-              results: allResults
-            })
+              results: allResults,
+            }),
           });
           continue;
         }
 
         // Otherwise handle direct object payloads (e.g., DTEL)
-        if (typeof parsed === "object" && parsed !== null) {
-          results.push({ type: "text", text: JSON.stringify(parsed) });
+        if (typeof parsed === 'object' && parsed !== null) {
+          results.push({ type: 'text', text: JSON.stringify(parsed) });
         }
-      } catch {
-        continue;
-      }
+      } catch {}
     }
     // Return isError: false even when nothing matched
     return {
       isError: false,
-      content: results
+      content: results,
     };
   } catch (e) {
     logger?.error('Failed to describe objects list', e as any);

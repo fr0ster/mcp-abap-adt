@@ -6,8 +6,8 @@
  * to use different sets of handlers.
  */
 
-export { ReadOnlyHandlersGroup } from "./ReadOnlyHandlersGroup.js";
-export { HighLevelHandlersGroup } from "./HighLevelHandlersGroup.js";
-export { LowLevelHandlersGroup } from "./LowLevelHandlersGroup.js";
-export { SystemHandlersGroup } from "./SystemHandlersGroup.js";
-export { SearchHandlersGroup } from "./SearchHandlersGroup.js";
+export { HighLevelHandlersGroup } from './HighLevelHandlersGroup.js';
+export { LowLevelHandlersGroup } from './LowLevelHandlersGroup.js';
+export { ReadOnlyHandlersGroup } from './ReadOnlyHandlersGroup.js';
+export { SearchHandlersGroup } from './SearchHandlersGroup.js';
+export { SystemHandlersGroup } from './SystemHandlersGroup.js';

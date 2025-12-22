@@ -6,43 +6,53 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, restoreSessionInConnection, parseValidationResponse, AxiosResponse } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  parseValidationResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "ValidateInterfaceLow",
-  description: "[low-level] Validate an ABAP interface name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.",
+  name: 'ValidateInterfaceLow',
+  description:
+    '[low-level] Validate an ABAP interface name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       interface_name: {
-        type: "string",
-        description: "Interface name to validate (e.g., Z_MY_PROGRAM)."
+        type: 'string',
+        description: 'Interface name to validate (e.g., Z_MY_PROGRAM).',
       },
       package_name: {
-        type: "string",
-        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation."
+        type: 'string',
+        description:
+          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.',
       },
       description: {
-        type: "string",
-        description: "Interface description. Required for validation."
+        type: 'string',
+        description: 'Interface description. Required for validation.',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from GetSession. If not provided, a new session will be created."
+        type: 'string',
+        description:
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["interface_name", "package_name", "description"]
-  }
+    required: ['interface_name', 'package_name', 'description'],
+  },
 } as const;
 
 interface ValidateInterfaceArgs {
@@ -62,7 +72,10 @@ interface ValidateInterfaceArgs {
  *
  * Uses CrudClient.validateInterface - low-level single method call
  */
-export async function handleValidateInterface(context: HandlerContext, args: ValidateInterfaceArgs) {
+export async function handleValidateInterface(
+  context: HandlerContext,
+  args: ValidateInterfaceArgs,
+) {
   const { connection, logger } = context;
   try {
     const {
@@ -70,12 +83,14 @@ export async function handleValidateInterface(context: HandlerContext, args: Val
       package_name,
       description,
       session_id,
-      session_state
+      session_state,
     } = args as ValidateInterfaceArgs;
 
     // Validation
     if (!interface_name || !package_name || !description) {
-      return return_error(new Error('interface_name, package_name, and description are required'));
+      return return_error(
+        new Error('interface_name, package_name, and description are required'),
+      );
     }
 
     const client = new CrudClient(connection);
@@ -94,7 +109,7 @@ export async function handleValidateInterface(context: HandlerContext, args: Val
       await client.validateInterface({
         interfaceName: interfaceName,
         packageName: package_name.toUpperCase(),
-        description: description
+        description: description,
       });
       const validationResponse = client.getValidationResponse();
       if (!validationResponse) {
@@ -104,50 +119,60 @@ export async function handleValidateInterface(context: HandlerContext, args: Val
 
       // Get updated session state after validation
 
-
-      logger?.info(`✅ ValidateInterface completed: ${interfaceName} (valid=${result.valid})`);
+      logger?.info(
+        `✅ ValidateInterface completed: ${interfaceName} (valid=${result.valid})`,
+      );
 
       return return_response({
-        data: JSON.stringify({
-          success: result.valid,
-          interface_name: interfaceName,
-          validation_result: result,
-          session_id: session_id || null,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: result.valid
-            ? `Interface name ${interfaceName} is valid and available`
-            : `Interface name ${interfaceName} validation failed: ${result.message}`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: result.valid,
+            interface_name: interfaceName,
+            validation_result: result,
+            session_id: session_id || null,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: result.valid
+              ? `Interface name ${interfaceName} is valid and available`
+              : `Interface name ${interfaceName} validation failed: ${result.message}`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error validating interface ${interfaceName}: ${error?.message || error}`);
+      logger?.error(
+        `Error validating interface ${interfaceName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to validate interface: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
         errorMessage = `Interface ${interfaceName} not found.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

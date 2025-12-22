@@ -8,38 +8,44 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "UpdateFunctionModule",
-  description: "Update source code of an existing ABAP function module. Locks the function module, uploads new source code, and unlocks. Optionally activates after update. Use this to modify existing function modules without re-creating metadata.",
+  name: 'UpdateFunctionModule',
+  description:
+    'Update source code of an existing ABAP function module. Locks the function module, uploads new source code, and unlocks. Optionally activates after update. Use this to modify existing function modules without re-creating metadata.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       function_group_name: {
-        type: "string",
-        description: "Function group name containing the function module (e.g., ZOK_FG_MCP01)."
+        type: 'string',
+        description:
+          'Function group name containing the function module (e.g., ZOK_FG_MCP01).',
       },
       function_module_name: {
-        type: "string",
-        description: "Function module name (e.g., Z_TEST_FM_MCP01). Function module must already exist."
+        type: 'string',
+        description:
+          'Function module name (e.g., Z_TEST_FM_MCP01). Function module must already exist.',
       },
       source_code: {
-        type: "string",
-        description: "Complete ABAP function module source code. Must include FUNCTION statement with parameters and ENDFUNCTION. Example:\n\nFUNCTION Z_TEST_FM\n  IMPORTING\n    VALUE(iv_input) TYPE string\n  EXPORTING\n    VALUE(ev_output) TYPE string.\n  \n  ev_output = iv_input.\nENDFUNCTION."
+        type: 'string',
+        description:
+          'Complete ABAP function module source code. Must include FUNCTION statement with parameters and ENDFUNCTION. Example:\n\nFUNCTION Z_TEST_FM\n  IMPORTING\n    VALUE(iv_input) TYPE string\n  EXPORTING\n    VALUE(ev_output) TYPE string.\n  \n  ev_output = iv_input.\nENDFUNCTION.',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable function modules."
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable function modules.',
       },
       activate: {
-        type: "boolean",
-        description: "Activate function module after source update. Default: false. Set to true to activate immediately."
-      }
+        type: 'boolean',
+        description:
+          'Activate function module after source update. Default: false. Set to true to activate immediately.',
+      },
     },
-    required: ["function_group_name", "function_module_name", "source_code"]
-  }
+    required: ['function_group_name', 'function_module_name', 'source_code'],
+  },
 } as const;
 
 interface UpdateFunctionModuleArgs {
@@ -50,25 +56,35 @@ interface UpdateFunctionModuleArgs {
   activate?: boolean;
 }
 
-
 /**
  * Main handler for UpdateFunctionModule MCP tool
  *
  * Uses FunctionModuleBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleUpdateFunctionModule(context: HandlerContext, args: UpdateFunctionModuleArgs): Promise<any> {
+export async function handleUpdateFunctionModule(
+  context: HandlerContext,
+  args: UpdateFunctionModuleArgs,
+): Promise<any> {
   const { connection, logger } = context;
   try {
     // Validate inputs
     if (!args.function_module_name || args.function_module_name.length > 30) {
-      return return_error(new Error("Function module name is required and must not exceed 30 characters"));
+      return return_error(
+        new Error(
+          'Function module name is required and must not exceed 30 characters',
+        ),
+      );
     }
     if (!args.function_group_name || args.function_group_name.length > 30) {
-      return return_error(new Error("Function group name is required and must not exceed 30 characters"));
+      return return_error(
+        new Error(
+          'Function group name is required and must not exceed 30 characters',
+        ),
+      );
     }
     if (!args.source_code) {
-      return return_error(new Error("Source code is required"));
+      return return_error(new Error('Source code is required'));
     }
 
     // Get connection from session context (set by ProtocolHandler)
@@ -76,43 +92,68 @@ export async function handleUpdateFunctionModule(context: HandlerContext, args: 
     const functionGroupName = args.function_group_name.toUpperCase();
     const functionModuleName = args.function_module_name.toUpperCase();
 
-    logger?.info(`Starting function module source update: ${functionModuleName} in ${functionGroupName}`);
+    logger?.info(
+      `Starting function module source update: ${functionModuleName} in ${functionGroupName}`,
+    );
 
     try {
       const client = new CrudClient(connection);
       const shouldActivate = args.activate === true;
 
       // Execute operation chain: lock -> update -> check -> unlock -> (activate)
-      let lockHandle: string | undefined = undefined;
+      let lockHandle: string | undefined;
       try {
-        await client.lockFunctionModule({ functionModuleName, functionGroupName });
+        await client.lockFunctionModule({
+          functionModuleName,
+          functionGroupName,
+        });
         lockHandle = client.getLockHandle();
-        await client.updateFunctionModule({ functionModuleName, functionGroupName, sourceCode: args.source_code }, lockHandle);
-        await client.checkFunctionModule({ functionModuleName, functionGroupName });
+        await client.updateFunctionModule(
+          {
+            functionModuleName,
+            functionGroupName,
+            sourceCode: args.source_code,
+          },
+          lockHandle,
+        );
+        await client.checkFunctionModule({
+          functionModuleName,
+          functionGroupName,
+        });
       } finally {
         // Always unlock if we got a lock handle
         if (lockHandle) {
           try {
-            await client.unlockFunctionModule({ functionModuleName, functionGroupName }, lockHandle);
+            await client.unlockFunctionModule(
+              { functionModuleName, functionGroupName },
+              lockHandle,
+            );
           } catch (unlockError: any) {
-            logger?.warn(`Failed to unlock function module ${functionModuleName}: ${unlockError?.message || unlockError}`);
+            logger?.warn(
+              `Failed to unlock function module ${functionModuleName}: ${unlockError?.message || unlockError}`,
+            );
           }
         }
       }
 
       // Activate if requested (after unlock)
       if (shouldActivate) {
-        await client.activateFunctionModule({ functionModuleName, functionGroupName });
+        await client.activateFunctionModule({
+          functionModuleName,
+          functionGroupName,
+        });
       }
 
-      logger?.info(`✅ UpdateFunctionModule completed successfully: ${functionModuleName}`);
+      logger?.info(
+        `✅ UpdateFunctionModule completed successfully: ${functionModuleName}`,
+      );
 
       const result = {
         success: true,
         function_module_name: functionModuleName,
         function_group_name: functionGroupName,
         activated: shouldActivate,
-        message: `Function module ${functionModuleName} source code updated successfully${shouldActivate ? ' and activated' : ''}`
+        message: `Function module ${functionModuleName} source code updated successfully${shouldActivate ? ' and activated' : ''}`,
       };
 
       return return_response({
@@ -120,19 +161,23 @@ export async function handleUpdateFunctionModule(context: HandlerContext, args: 
         status: 200,
         statusText: 'OK',
         headers: {},
-        config: {} as any
+        config: {} as any,
       });
-
     } catch (error: any) {
-      logger?.error(`Error updating function module source ${functionModuleName}: ${error?.message || error}`);
+      logger?.error(
+        `Error updating function module source ${functionModuleName}: ${error?.message || error}`,
+      );
 
       const errorMessage = error.response?.data
-        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+        ? typeof error.response.data === 'string'
+          ? error.response.data
+          : JSON.stringify(error.response.data)
         : error.message || String(error);
 
-      return return_error(new Error(`Failed to update function module source: ${errorMessage}`));
+      return return_error(
+        new Error(`Failed to update function module source: ${errorMessage}`),
+      );
     }
-
   } catch (error: any) {
     return return_error(error);
   }

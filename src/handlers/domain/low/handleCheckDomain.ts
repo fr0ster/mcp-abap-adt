@@ -6,36 +6,44 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "CheckDomainLow",
-  description: "[low-level] Perform syntax check on an ABAP domain. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.",
+  name: 'CheckDomainLow',
+  description:
+    '[low-level] Perform syntax check on an ABAP domain. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       domain_name: {
-        type: "string",
-        description: "Domain name (e.g., Z_MY_PROGRAM)."
+        type: 'string',
+        description: 'Domain name (e.g., Z_MY_PROGRAM).',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from GetSession. If not provided, a new session will be created."
+        type: 'string',
+        description:
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["domain_name"]
-  }
+    required: ['domain_name'],
+  },
 } as const;
 
 interface CheckDomainArgs {
@@ -53,14 +61,13 @@ interface CheckDomainArgs {
  *
  * Uses CrudClient.checkDomain - low-level single method call
  */
-export async function handleCheckDomain(context: HandlerContext, args: CheckDomainArgs) {
+export async function handleCheckDomain(
+  context: HandlerContext,
+  args: CheckDomainArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      domain_name,
-      session_id,
-      session_state
-    } = args as CheckDomainArgs;
+    const { domain_name, session_id, session_state } = args as CheckDomainArgs;
 
     // Validation
     if (!domain_name) {
@@ -84,7 +91,9 @@ export async function handleCheckDomain(context: HandlerContext, args: CheckDoma
       const response = client.getCheckResult();
 
       if (!response) {
-        throw new Error(`Check did not return a response for domain ${domainName}`);
+        throw new Error(
+          `Check did not return a response for domain ${domainName}`,
+        );
       }
 
       // Parse check results
@@ -92,51 +101,61 @@ export async function handleCheckDomain(context: HandlerContext, args: CheckDoma
 
       // Get updated session state after check
 
-
       logger?.info(`✅ CheckDomain completed: ${domainName}`);
-      logger?.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.debug(
+        `Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,
+      );
 
       return return_response({
-        data: JSON.stringify({
-          success: checkResult.success,
-          domain_name: domainName,
-          check_result: checkResult,
-          session_id: session_id || null,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: checkResult.success
-            ? `Domain ${domainName} has no syntax errors`
-            : `Domain ${domainName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: checkResult.success,
+            domain_name: domainName,
+            check_result: checkResult,
+            session_id: session_id || null,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: checkResult.success
+              ? `Domain ${domainName} has no syntax errors`
+              : `Domain ${domainName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error checking domain ${domainName}: ${error?.message || error}`);
+      logger?.error(
+        `Error checking domain ${domainName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to check domain: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
         errorMessage = `Domain ${domainName} not found.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

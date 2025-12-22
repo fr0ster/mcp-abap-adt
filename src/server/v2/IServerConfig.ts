@@ -4,10 +4,18 @@
  */
 
 // Re-export types from unified config
-export type { Transport, HandlerSet, IServerConfig } from "../../lib/config/IServerConfig.js";
+export type {
+  HandlerSet,
+  IServerConfig,
+  Transport,
+} from '../../lib/config/IServerConfig.js';
 
 // For backward compatibility, also export the interface with required fields
-import type { IServerConfig as IBaseServerConfig, Transport, HandlerSet } from "../../lib/config/IServerConfig.js";
+import type {
+  HandlerSet,
+  IServerConfig as IBaseServerConfig,
+  Transport,
+} from '../../lib/config/IServerConfig.js';
 
 /**
  * V2 Server configuration with required fields

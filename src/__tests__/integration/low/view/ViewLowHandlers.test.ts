@@ -12,35 +12,29 @@
  * Run: npm test -- --testPathPattern=integration/view
  */
 
-import { handleValidateView } from '../../../../handlers/view/low/handleValidateView';
-import { handleCreateView } from '../../../../handlers/view/low/handleCreateView';
-import { handleLockView } from '../../../../handlers/view/low/handleLockView';
-import { handleUpdateView } from '../../../../handlers/view/low/handleUpdateView';
-import { handleUnlockView } from '../../../../handlers/view/low/handleUnlockView';
 import { handleActivateView } from '../../../../handlers/view/low/handleActivateView';
+import { handleCreateView } from '../../../../handlers/view/low/handleCreateView';
 import { handleDeleteView } from '../../../../handlers/view/low/handleDeleteView';
-
-import { LowTester } from '../../helpers/testers/LowTester';
+import { handleLockView } from '../../../../handlers/view/low/handleLockView';
+import { handleUnlockView } from '../../../../handlers/view/low/handleUnlockView';
+import { handleUpdateView } from '../../../../handlers/view/low/handleUpdateView';
+import { handleValidateView } from '../../../../handlers/view/low/handleValidateView';
 import { getTimeout } from '../../helpers/configHelpers';
+import { LowTester } from '../../helpers/testers/LowTester';
 
 describe('View Low-Level Handlers Integration', () => {
   let tester: LowTester;
 
   beforeAll(async () => {
-    tester = new LowTester(
-      'create_view_low',
-      'full_workflow',
-      'view-low',
-      {
-        validate: handleValidateView,
-        create: handleCreateView,
-        lock: handleLockView,
-        update: handleUpdateView,
-        unlock: handleUnlockView,
-        activate: handleActivateView,
-        delete: handleDeleteView
-      }
-    );
+    tester = new LowTester('create_view_low', 'full_workflow', 'view-low', {
+      validate: handleValidateView,
+      create: handleCreateView,
+      lock: handleLockView,
+      update: handleUpdateView,
+      unlock: handleUnlockView,
+      activate: handleActivateView,
+      delete: handleDeleteView,
+    });
     await tester.beforeAll();
   });
 
@@ -56,7 +50,11 @@ describe('View Low-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it('should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate', async () => {
-    await tester.run();
-  }, getTimeout('long'));
+  it(
+    'should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate',
+    async () => {
+      await tester.run();
+    },
+    getTimeout('long'),
+  );
 });

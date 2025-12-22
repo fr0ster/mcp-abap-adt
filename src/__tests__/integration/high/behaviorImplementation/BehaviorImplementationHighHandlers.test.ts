@@ -18,9 +18,8 @@
 import { handleCreateBehaviorImplementation } from '../../../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleUpdateBehaviorImplementation } from '../../../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
 import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
-
-import { HighTester } from '../../helpers/testers/HighTester';
 import { getTimeout } from '../../helpers/configHelpers';
+import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('BehaviorImplementation High-Level Handlers Integration', () => {
   let tester: HighTester;
@@ -33,8 +32,8 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
       {
         create: handleCreateBehaviorImplementation,
         update: handleUpdateBehaviorImplementation,
-        delete: handleDeleteClass
-      }
+        delete: handleDeleteClass,
+      },
     );
     await tester.beforeAll();
   });
@@ -51,7 +50,11 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it('should test all BehaviorImplementation high-level handlers', async () => {
-    await tester.run();
-  }, getTimeout('long'));
+  it(
+    'should test all BehaviorImplementation high-level handlers',
+    async () => {
+      await tester.run();
+    },
+    getTimeout('long'),
+  );
 });

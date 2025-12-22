@@ -5,26 +5,32 @@
  * Low-level handler: single method call.
  */
 
-import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 export const TOOL_DEFINITION = {
-  name: "DeleteClassLow",
-  description: "[low-level] Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for $TMP objects.",
+  name: 'DeleteClassLow',
+  description:
+    '[low-level] Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       class_name: {
-        type: "string",
-        description: "Class name (e.g., ZCL_MY_CLASS)."
+        type: 'string',
+        description: 'Class name (e.g., ZCL_MY_CLASS).',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP)."
-      }
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
+      },
     },
-    required: ["class_name"]
-  }
+    required: ['class_name'],
+  },
 } as const;
 
 interface DeleteClassArgs {
@@ -37,13 +43,13 @@ interface DeleteClassArgs {
  *
  * Uses CrudClient.deleteClass - low-level single method call
  */
-export async function handleDeleteClass(context: HandlerContext, args: DeleteClassArgs) {
+export async function handleDeleteClass(
+  context: HandlerContext,
+  args: DeleteClassArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      class_name,
-      transport_request
-    } = args as DeleteClassArgs;
+    const { class_name, transport_request } = args as DeleteClassArgs;
 
     // Validation
     if (!class_name) {
@@ -59,27 +65,34 @@ export async function handleDeleteClass(context: HandlerContext, args: DeleteCla
       // Delete class
       await client.deleteClass({
         className,
-        transportRequest: transport_request
+        transportRequest: transport_request,
       });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {
-        throw new Error(`Delete did not return a response for class ${className}`);
+        throw new Error(
+          `Delete did not return a response for class ${className}`,
+        );
       }
 
       logger?.info(`✅ DeleteClass completed successfully: ${className}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          class_name: className,
-          transport_request: transport_request || null,
-          message: `Class ${className} deleted successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            class_name: className,
+            transport_request: transport_request || null,
+            message: `Class ${className} deleted successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error deleting class ${className}: ${error?.message || error}`);
+      logger?.error(
+        `Error deleting class ${className}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to delete class: ${error.message || String(error)}`;
@@ -90,26 +103,30 @@ export async function handleDeleteClass(context: HandlerContext, args: DeleteCla
         errorMessage = `Class ${className} is locked by another user. Cannot delete.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

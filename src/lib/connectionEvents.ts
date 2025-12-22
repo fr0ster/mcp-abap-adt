@@ -17,5 +17,3 @@ export function notifyConnectionResetListeners() {
 export function clearConnectionResetHooks() {
   connectionResetHooks.clear();
 }
-
-

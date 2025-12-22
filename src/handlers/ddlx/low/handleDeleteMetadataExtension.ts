@@ -5,27 +5,33 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "DeleteMetadataExtensionLow",
-  description: "[low-level] Delete an ABAP metadata extension from the SAP system via ADT deletion API. Transport request optional for $TMP objects.",
+  name: 'DeleteMetadataExtensionLow',
+  description:
+    '[low-level] Delete an ABAP metadata extension from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       name: {
-        type: "string",
-        description: "MetadataExtension name (e.g., ZI_MY_DDLX)."
+        type: 'string',
+        description: 'MetadataExtension name (e.g., ZI_MY_DDLX).',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP)."
-      }
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
+      },
     },
-    required: ["name"]
-  }
+    required: ['name'],
+  },
 } as const;
 
 interface DeleteMetadataExtensionArgs {
@@ -38,46 +44,58 @@ interface DeleteMetadataExtensionArgs {
  *
  * Uses CrudClient.deleteMetadataExtension - low-level single method call
  */
-export async function handleDeleteMetadataExtension(context: HandlerContext, args: DeleteMetadataExtensionArgs) {
+export async function handleDeleteMetadataExtension(
+  context: HandlerContext,
+  args: DeleteMetadataExtensionArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      name,
-      transport_request
-    } = args as DeleteMetadataExtensionArgs;
+    const { name, transport_request } = args as DeleteMetadataExtensionArgs;
 
     // Validation
     if (!name) {
       return return_error(new Error('name is required'));
     }
 
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
     const ddlxName = name.toUpperCase();
 
     logger?.info(`Starting metadata extension deletion: ${ddlxName}`);
 
     try {
       // Delete metadata extension
-      await client.deleteMetadataExtension({ name: ddlxName, transportRequest: transport_request });
+      await client.deleteMetadataExtension({
+        name: ddlxName,
+        transportRequest: transport_request,
+      });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {
-        throw new Error(`Delete did not return a response for metadata extension ${ddlxName}`);
+        throw new Error(
+          `Delete did not return a response for metadata extension ${ddlxName}`,
+        );
       }
 
-      logger?.info(`✅ DeleteMetadataExtension completed successfully: ${ddlxName}`);
+      logger?.info(
+        `✅ DeleteMetadataExtension completed successfully: ${ddlxName}`,
+      );
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          ddlxName: ddlxName,
-          transport_request: transport_request || null,
-          message: `MetadataExtension ${ddlxName} deleted successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            ddlxName: ddlxName,
+            transport_request: transport_request || null,
+            message: `MetadataExtension ${ddlxName} deleted successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error deleting metadata extension ${ddlxName}: ${error?.message || error}`);
+      logger?.error(
+        `Error deleting metadata extension ${ddlxName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to delete metadata extension: ${error.message || String(error)}`;
@@ -88,26 +106,30 @@ export async function handleDeleteMetadataExtension(context: HandlerContext, arg
         errorMessage = `MetadataExtension ${ddlxName} is locked by another user. Cannot delete.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

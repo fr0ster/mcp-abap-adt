@@ -6,30 +6,36 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "DeleteFunctionModuleLow",
-  description: "[low-level] Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for $TMP objects.",
+  name: 'DeleteFunctionModuleLow',
+  description:
+    '[low-level] Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       function_module_name: {
-        type: "string",
-        description: "Function module name (e.g., Z_MY_FUNCTION)."
+        type: 'string',
+        description: 'Function module name (e.g., Z_MY_FUNCTION).',
       },
       function_group_name: {
-        type: "string",
-        description: "Function group name (e.g., ZFG_MY_GROUP)."
+        type: 'string',
+        description: 'Function group name (e.g., ZFG_MY_GROUP).',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP)."
-      }
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
+      },
     },
-    required: ["function_module_name", "function_group_name"]
-  }
+    required: ['function_module_name', 'function_group_name'],
+  },
 } as const;
 
 interface DeleteFunctionModuleArgs {
@@ -43,48 +49,65 @@ interface DeleteFunctionModuleArgs {
  *
  * Uses CrudClient.deleteFunctionModule - low-level single method call
  */
-export async function handleDeleteFunctionModule(context: HandlerContext, args: DeleteFunctionModuleArgs) {
+export async function handleDeleteFunctionModule(
+  context: HandlerContext,
+  args: DeleteFunctionModuleArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      function_module_name,
-      function_group_name,
-      transport_request
-    } = args as DeleteFunctionModuleArgs;
+    const { function_module_name, function_group_name, transport_request } =
+      args as DeleteFunctionModuleArgs;
 
     // Validation
     if (!function_module_name || !function_group_name) {
-      return return_error(new Error('function_module_name and function_group_name are required'));
+      return return_error(
+        new Error('function_module_name and function_group_name are required'),
+      );
     }
 
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
-    logger?.info(`Starting function module deletion: ${functionModuleName} in ${functionGroupName}`);
+    logger?.info(
+      `Starting function module deletion: ${functionModuleName} in ${functionGroupName}`,
+    );
 
     try {
       // Delete function module
-      await client.deleteFunctionModule({ functionModuleName: functionModuleName, functionGroupName: functionGroupName, transportRequest: transport_request });
+      await client.deleteFunctionModule({
+        functionModuleName: functionModuleName,
+        functionGroupName: functionGroupName,
+        transportRequest: transport_request,
+      });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {
-        throw new Error(`Delete did not return a response for function module ${functionModuleName}`);
+        throw new Error(
+          `Delete did not return a response for function module ${functionModuleName}`,
+        );
       }
 
-      logger?.info(`✅ DeleteFunctionModule completed successfully: ${functionModuleName}`);
+      logger?.info(
+        `✅ DeleteFunctionModule completed successfully: ${functionModuleName}`,
+      );
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          function_module_name: functionModuleName,
-          function_group_name: functionGroupName,
-          transport_request: transport_request || null,
-          message: `Function module ${functionModuleName} deleted successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            function_module_name: functionModuleName,
+            function_group_name: functionGroupName,
+            transport_request: transport_request || null,
+            message: `Function module ${functionModuleName} deleted successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error deleting function module ${functionModuleName}: ${error?.message || error}`);
+      logger?.error(
+        `Error deleting function module ${functionModuleName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to delete function module: ${error.message || String(error)}`;
@@ -95,26 +118,30 @@ export async function handleDeleteFunctionModule(context: HandlerContext, args: 
         errorMessage = `Function module ${functionModuleName} is locked by another user. Cannot delete.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

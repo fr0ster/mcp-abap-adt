@@ -2,8 +2,8 @@
  * Logger adapter that wraps the server logger to implement ILogger interface
  * from @mcp-abap-adt/interfaces package
  */
-import type { ILogger } from "@mcp-abap-adt/interfaces";
-import { logger } from "./logger";
+import type { ILogger } from '@mcp-abap-adt/interfaces';
+import { logger } from './logger';
 
 /**
  * Adapter that implements ILogger interface using the server's logger
@@ -26,4 +26,3 @@ export const loggerAdapter: ILogger = {
     logger?.debug(message, meta);
   },
 };
-

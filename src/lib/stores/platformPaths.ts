@@ -6,8 +6,8 @@
  * - Windows: %USERPROFILE%\Documents\mcp-abap-adt\service-keys, %USERPROFILE%\Documents\mcp-abap-adt\sessions
  */
 
-import * as path from 'path';
-import * as os from 'os';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 /**
  * Get platform-specific default paths for service keys and sessions
@@ -24,7 +24,10 @@ import * as os from 'os';
  * @param subfolder Subfolder name ('service-keys' or 'sessions')
  * @returns Array of resolved absolute paths
  */
-export function getPlatformPaths(customPath?: string | string[], subfolder?: 'service-keys' | 'sessions'): string[] {
+export function getPlatformPaths(
+  customPath?: string | string[],
+  subfolder?: 'service-keys' | 'sessions',
+): string[] {
   const paths: string[] = [];
   const isWindows = process.platform === 'win32';
 
@@ -32,10 +35,12 @@ export function getPlatformPaths(customPath?: string | string[], subfolder?: 'se
   if (customPath) {
     if (Array.isArray(customPath)) {
       // For arrays, add subfolder to each path if subfolder is specified
-      paths.push(...customPath.map(p => {
-        const resolved = path.resolve(p);
-        return subfolder ? path.join(resolved, subfolder) : resolved;
-      }));
+      paths.push(
+        ...customPath.map((p) => {
+          const resolved = path.resolve(p);
+          return subfolder ? path.join(resolved, subfolder) : resolved;
+        }),
+      );
     } else {
       // For single path, add subfolder if specified
       const resolved = path.resolve(customPath);
@@ -47,11 +52,16 @@ export function getPlatformPaths(customPath?: string | string[], subfolder?: 'se
   const envPath = process.env.AUTH_BROKER_PATH;
   if (envPath) {
     // Support both colon (Unix) and semicolon (Windows) separators
-    const envPaths = envPath.split(/[:;]/).map(p => p.trim()).filter(p => p.length > 0);
-    paths.push(...envPaths.map(p => {
-      const resolved = path.resolve(p);
-      return subfolder ? path.join(resolved, subfolder) : resolved;
-    }));
+    const envPaths = envPath
+      .split(/[:;]/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+    paths.push(
+      ...envPaths.map((p) => {
+        const resolved = path.resolve(p);
+        return subfolder ? path.join(resolved, subfolder) : resolved;
+      }),
+    );
   }
 
   // Priority 3: Platform-specific standard paths
@@ -94,4 +104,3 @@ export function getPlatformPaths(customPath?: string | string[], subfolder?: 'se
 
   return uniquePaths;
 }
-

@@ -1,12 +1,16 @@
-import express from "express";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import type { Logger } from "@mcp-abap-adt/logger";
-import { noopLogger } from "../../lib/handlerLogger.js";
-import { BaseMcpServer } from "./BaseMcpServer.js";
-import { IHandlersRegistry } from "../../lib/handlers/interfaces.js";
-import { AuthBrokerFactory } from "../../lib/auth/index.js";
-import type { IHttpApplication, RouteRegistrationOptions } from "./IHttpApplication.js";
-const DEFAULT_VERSION = process.env.npm_package_version ?? "1.0.0";
+import type { Logger } from '@mcp-abap-adt/logger';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import express from 'express';
+import type { AuthBrokerFactory } from '../../lib/auth/index.js';
+import { noopLogger } from '../../lib/handlerLogger.js';
+import type { IHandlersRegistry } from '../../lib/handlers/interfaces.js';
+import { BaseMcpServer } from './BaseMcpServer.js';
+import type {
+  IHttpApplication,
+  RouteRegistrationOptions,
+} from './IHttpApplication.js';
+
+const DEFAULT_VERSION = process.env.npm_package_version ?? '1.0.0';
 
 export interface SseServerOptions {
   /**
@@ -75,12 +79,12 @@ export class SseServer {
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
     private readonly authBrokerFactory: AuthBrokerFactory,
-    opts?: SseServerOptions
+    opts?: SseServerOptions,
   ) {
-    this.host = opts?.host ?? "127.0.0.1";
+    this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3001;
-    this.ssePath = opts?.ssePath ?? "/sse";
-    this.postPath = opts?.postPath ?? "/messages";
+    this.ssePath = opts?.ssePath ?? '/sse';
+    this.postPath = opts?.postPath ?? '/messages';
     this.defaultDestination = opts?.defaultDestination;
     this.logger = opts?.logger ?? noopLogger;
     this.version = opts?.version ?? DEFAULT_VERSION;
@@ -94,7 +98,10 @@ export class SseServer {
    * @param app - External HTTP application (Express, CDS, etc.)
    * @param options - Route registration options
    */
-  registerRoutes(app: IHttpApplication, options?: RouteRegistrationOptions): void {
+  registerRoutes(
+    app: IHttpApplication,
+    _options?: RouteRegistrationOptions,
+  ): void {
     app.get(this.ssePath, (async (req: any, res: any) => {
       await this.handleGet(req, res);
     }) as any);
@@ -108,7 +115,9 @@ export class SseServer {
     console.error(`[SseServer] SSE endpoint: ${this.ssePath}`);
     console.error(`[SseServer] POST endpoint: ${this.postPath}`);
     if (this.defaultDestination) {
-      console.error(`[SseServer] Default destination: ${this.defaultDestination}`);
+      console.error(
+        `[SseServer] Default destination: ${this.defaultDestination}`,
+      );
     }
   }
 
@@ -146,25 +155,31 @@ export class SseServer {
     this.registerRoutes(app as unknown as IHttpApplication);
 
     await new Promise<void>((resolve, reject) => {
-      const srv = app
+      const _srv = app
         .listen(this.port, this.host, () => {
-          console.error(`[SseServer] Server started on ${this.host}:${this.port}`);
-          console.error(`[SseServer] SSE endpoint: http://${this.host}:${this.port}${this.ssePath}`);
-          console.error(`[SseServer] POST endpoint: http://${this.host}:${this.port}${this.postPath}`);
+          console.error(
+            `[SseServer] Server started on ${this.host}:${this.port}`,
+          );
+          console.error(
+            `[SseServer] SSE endpoint: http://${this.host}:${this.port}${this.ssePath}`,
+          );
+          console.error(
+            `[SseServer] POST endpoint: http://${this.host}:${this.port}${this.postPath}`,
+          );
           resolve();
         })
-        .on("error", reject);
+        .on('error', reject);
     });
   }
 
   private async handleGet(req: any, res: any): Promise<void> {
     let destination: string | undefined;
-    let broker: any = undefined;
+    let broker: any;
 
     // Priority 1: Check x-mcp-destination header
     const destinationHeader =
-      (req.headers["x-mcp-destination"] as string | undefined) ??
-      (req.headers["X-MCP-Destination"] as string | undefined);
+      (req.headers['x-mcp-destination'] as string | undefined) ??
+      (req.headers['X-MCP-Destination'] as string | undefined);
 
     if (destinationHeader) {
       destination = destinationHeader;
@@ -188,10 +203,13 @@ export class SseServer {
 
     this.logger.debug(`SSE GET: destination=${destination ?? 'none'}`);
 
-
     class SessionServer extends BaseMcpServer {
-      constructor(private readonly registry: IHandlersRegistry, private readonly loggerImpl: Logger, private readonly ver: string) {
-        super({ name: "mcp-abap-adt-sse", version: ver, logger: loggerImpl });
+      constructor(
+        private readonly registry: IHandlersRegistry,
+        readonly loggerImpl: Logger,
+        readonly ver: string,
+      ) {
+        super({ name: 'mcp-abap-adt-sse', version: ver, logger: loggerImpl });
       }
       async init(dest: string | undefined, b: any, hdrs?: any) {
         if (dest && b) {
@@ -203,15 +221,27 @@ export class SseServer {
       }
     }
 
-    const server = new SessionServer(this.handlersRegistry, this.logger, this.version);
-    await server.init(destination, broker, this.hasSapConnectionHeaders(req.headers) ? req.headers : undefined);
+    const server = new SessionServer(
+      this.handlersRegistry,
+      this.logger,
+      this.version,
+    );
+    await server.init(
+      destination,
+      broker,
+      this.hasSapConnectionHeaders(req.headers) ? req.headers : undefined,
+    );
 
     const transport = new SSEServerTransport(this.postPath, res);
     const sessionId = transport.sessionId;
 
-    console.error(`[SSE GET] Created session ${sessionId} for destination ${destination}`);
+    console.error(
+      `[SSE GET] Created session ${sessionId} for destination ${destination}`,
+    );
     this.sessions.set(sessionId, { server, transport });
-    console.error(`[SSE GET] Session stored, total sessions: ${this.sessions.size}`);
+    console.error(
+      `[SSE GET] Session stored, total sessions: ${this.sessions.size}`,
+    );
 
     // Connect transport to server BEFORE registering close handler
     // This ensures connection is established before any cleanup can happen
@@ -219,16 +249,18 @@ export class SseServer {
       await server.connect(transport);
       this.logger.debug(`SSE GET: server connected for session ${sessionId}`);
     } catch (error) {
-      this.logger.error(`SSE GET: failed to connect for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(
+        `SSE GET: failed to connect for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       this.sessions.delete(sessionId);
       if (!res.headersSent) {
-        res.writeHead(500).end("Internal Server Error");
+        res.writeHead(500).end('Internal Server Error');
       }
       return;
     }
 
     // Register cleanup handler AFTER successful connection
-    res.on("close", () => {
+    res.on('close', () => {
       console.error(`[SSE CLOSE] Connection closed for session ${sessionId}`);
       this.sessions.delete(sessionId);
       void transport.close();
@@ -237,29 +269,41 @@ export class SseServer {
   }
 
   private async handlePost(req: any, res: any, url?: URL): Promise<void> {
-    const sessionId = (url?.searchParams.get("sessionId") || req.headers["x-session-id"] || "") as string;
+    const sessionId = (url?.searchParams.get('sessionId') ||
+      req.headers['x-session-id'] ||
+      '') as string;
 
-    console.error(`[SSE POST] sessionId=${sessionId}, activeSessions=${this.sessions.size}, keys=[${Array.from(this.sessions.keys()).join(', ')}]`);
+    console.error(
+      `[SSE POST] sessionId=${sessionId}, activeSessions=${this.sessions.size}, keys=[${Array.from(this.sessions.keys()).join(', ')}]`,
+    );
 
     const entry = this.sessions.get(sessionId);
     if (!entry) {
-      console.error(`[SSE POST] Invalid session ${sessionId} - session not found!`);
-      res.writeHead(400).end("Invalid session");
+      console.error(
+        `[SSE POST] Invalid session ${sessionId} - session not found!`,
+      );
+      res.writeHead(400).end('Invalid session');
       return;
     }
 
     // Pass pre-parsed body from express.json() middleware (like reference implementation)
     // express.json() already read and parsed the body into req.body
-    console.error(`[SSE POST] Calling handlePostMessage with req.body for session ${sessionId}`);
+    console.error(
+      `[SSE POST] Calling handlePostMessage with req.body for session ${sessionId}`,
+    );
 
     try {
       await entry.transport.handlePostMessage(req, res, req.body);
-      console.error(`[SSE POST] Successfully processed for session ${sessionId}`);
+      console.error(
+        `[SSE POST] Successfully processed for session ${sessionId}`,
+      );
     } catch (error) {
-      console.error(`[SSE POST] FAILED for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `[SSE POST] FAILED for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       console.error(`[SSE POST] Error stack:`, error);
       if (!res.headersSent) {
-        res.writeHead(500).end("Internal Server Error");
+        res.writeHead(500).end('Internal Server Error');
       }
     }
   }
@@ -268,11 +312,11 @@ export class SseServer {
    * Check if request has SAP connection headers
    */
   private hasSapConnectionHeaders(headers: any): boolean {
-    const hasUrl = headers["x-sap-url"] || headers["X-SAP-URL"];
-    const hasJwtAuth = headers["x-sap-jwt-token"] || headers["X-SAP-JWT-Token"];
+    const hasUrl = headers['x-sap-url'] || headers['X-SAP-URL'];
+    const hasJwtAuth = headers['x-sap-jwt-token'] || headers['X-SAP-JWT-Token'];
     const hasBasicAuth =
-      (headers["x-sap-login"] || headers["X-SAP-Login"]) &&
-      (headers["x-sap-password"] || headers["X-SAP-Password"]);
+      (headers['x-sap-login'] || headers['X-SAP-Login']) &&
+      (headers['x-sap-password'] || headers['X-SAP-Password']);
 
     return !!(hasUrl && (hasJwtAuth || hasBasicAuth));
   }

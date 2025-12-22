@@ -7,40 +7,51 @@
  * Workflow: lock -> update main source -> update implementations -> check -> unlock -> (activate)
  */
 
-import { return_error, return_response, encodeSapObjectName, safeCheckOperation } from '../../../lib/utils';
-import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  encodeSapObjectName,
+  return_error,
+  return_response,
+  safeCheckOperation,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "UpdateBehaviorImplementation",
-  description: "Update source code of an existing ABAP behavior implementation class. Updates both main source (with FOR BEHAVIOR OF clause) and implementations include. Uses stateful session with proper lock/unlock mechanism.",
+  name: 'UpdateBehaviorImplementation',
+  description:
+    'Update source code of an existing ABAP behavior implementation class. Updates both main source (with FOR BEHAVIOR OF clause) and implementations include. Uses stateful session with proper lock/unlock mechanism.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       class_name: {
-        type: "string",
-        description: "Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must exist in the system."
+        type: 'string',
+        description:
+          'Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must exist in the system.',
       },
       behavior_definition: {
-        type: "string",
-        description: "Behavior Definition name (e.g., ZI_MY_ENTITY). Must match the behavior definition used when creating the class."
+        type: 'string',
+        description:
+          'Behavior Definition name (e.g., ZI_MY_ENTITY). Must match the behavior definition used when creating the class.',
       },
       implementation_code: {
-        type: "string",
-        description: "Implementation code for the implementations include. Contains the actual behavior implementation methods."
+        type: 'string',
+        description:
+          'Implementation code for the implementations include. Contains the actual behavior implementation methods.',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Optional if object is local or already in transport."
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Optional if object is local or already in transport.',
       },
       activate: {
-        type: "boolean",
-        description: "Activate behavior implementation after update. Default: true."
-      }
+        type: 'boolean',
+        description:
+          'Activate behavior implementation after update. Default: true.',
+      },
     },
-    required: ["class_name", "behavior_definition", "implementation_code"]
-  }
+    required: ['class_name', 'behavior_definition', 'implementation_code'],
+  },
 } as const;
 
 interface UpdateBehaviorImplementationArgs {
@@ -57,7 +68,10 @@ interface UpdateBehaviorImplementationArgs {
  * Uses CrudClient for all operations
  * Session and lock management handled internally by client
  */
-export async function handleUpdateBehaviorImplementation(context: HandlerContext, args: UpdateBehaviorImplementationArgs) {
+export async function handleUpdateBehaviorImplementation(
+  context: HandlerContext,
+  args: UpdateBehaviorImplementationArgs,
+) {
   const { connection, logger } = context;
   try {
     const {
@@ -65,19 +79,25 @@ export async function handleUpdateBehaviorImplementation(context: HandlerContext
       behavior_definition,
       implementation_code,
       transport_request,
-      activate = true
+      activate = true,
     } = args as UpdateBehaviorImplementationArgs;
-        // Validation
+    // Validation
     if (!class_name || !behavior_definition || !implementation_code) {
-      return return_error(new Error('class_name, behavior_definition, and implementation_code are required'));
+      return return_error(
+        new Error(
+          'class_name, behavior_definition, and implementation_code are required',
+        ),
+      );
     }
 
-            // Get connection from session context (set by ProtocolHandler)
+    // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
     const className = class_name.toUpperCase();
     const behaviorDefinition = behavior_definition.toUpperCase();
 
-    logger?.info(`Starting behavior implementation source update: ${className} for ${behaviorDefinition}`);
+    logger?.info(
+      `Starting behavior implementation source update: ${className} for ${behaviorDefinition}`,
+    );
 
     try {
       // Create client
@@ -95,13 +115,17 @@ export async function handleUpdateBehaviorImplementation(context: HandlerContext
         // Update main source with "FOR BEHAVIOR OF" clause
         await client.updateBehaviorImplementationMainSource(
           { className, behaviorDefinition },
-          lockHandle
+          lockHandle,
         );
 
         // Update implementations include
         await client.updateBehaviorImplementation(
-          { className, behaviorDefinition, implementationCode: implementation_code },
-          lockHandle
+          {
+            className,
+            behaviorDefinition,
+            implementationCode: implementation_code,
+          },
+          lockHandle,
         );
 
         // Check
@@ -110,8 +134,8 @@ export async function handleUpdateBehaviorImplementation(context: HandlerContext
             () => client.checkClass({ className }),
             className,
             {
-              debug: (message: string) => logger?.debug(message)
-            }
+              debug: (message: string) => logger?.debug(message),
+            },
           );
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
@@ -133,7 +157,9 @@ export async function handleUpdateBehaviorImplementation(context: HandlerContext
         try {
           await client.unlockClass({ className: className }, lockHandle);
         } catch (unlockError) {
-          logger?.error(`Failed to unlock behavior implementation after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+          logger?.error(
+            `Failed to unlock behavior implementation after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
+          );
         }
         throw error;
       }
@@ -142,23 +168,38 @@ export async function handleUpdateBehaviorImplementation(context: HandlerContext
       let activationWarnings: string[] = [];
       if (shouldActivate && client.getActivateResult()) {
         const activateResponse = client.getActivateResult()!;
-        if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
-          const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+        if (
+          typeof activateResponse.data === 'string' &&
+          activateResponse.data.includes('<chkl:messages')
+        ) {
+          const parser = new XMLParser({
+            ignoreAttributes: false,
+            attributeNamePrefix: '@_',
+          });
           const result = parser.parse(activateResponse.data);
-          const messages = result?.['chkl:messages']?.['msg'];
+          const messages = result?.['chkl:messages']?.msg;
           if (messages) {
             const msgArray = Array.isArray(messages) ? messages : [messages];
-            activationWarnings = msgArray.map((msg: any) =>
-              `${msg['@_type']}: ${msg['shortText']?.['txt'] || 'Unknown'}`
+            activationWarnings = msgArray.map(
+              (msg: any) =>
+                `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
             );
           }
         }
       }
 
-      logger?.info(`✅ UpdateBehaviorImplementation completed successfully: ${className}`);
+      logger?.info(
+        `✅ UpdateBehaviorImplementation completed successfully: ${className}`,
+      );
 
       // Return success result
-      const stepsCompleted = ['lock', 'update_main_source', 'update_implementations', 'check', 'unlock'];
+      const stepsCompleted = [
+        'lock',
+        'update_main_source',
+        'update_implementations',
+        'check',
+        'unlock',
+      ];
       if (shouldActivate) {
         stepsCompleted.push('activate');
       }
@@ -174,7 +215,8 @@ export async function handleUpdateBehaviorImplementation(context: HandlerContext
           : `Behavior Implementation ${className} updated successfully (not activated)`,
         uri: `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}`,
         steps_completed: stepsCompleted,
-        activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined
+        activation_warnings:
+          activationWarnings.length > 0 ? activationWarnings : undefined,
       };
 
       return return_response({
@@ -182,19 +224,23 @@ export async function handleUpdateBehaviorImplementation(context: HandlerContext
         status: 200,
         statusText: 'OK',
         headers: {},
-        config: {} as any
+        config: {} as any,
       });
-
     } catch (error: any) {
-      logger?.error(`Error updating behavior implementation source ${className}: ${error?.message || error}`);
+      logger?.error(
+        `Error updating behavior implementation source ${className}: ${error?.message || error}`,
+      );
 
       const errorMessage = error.response?.data
-        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+        ? typeof error.response.data === 'string'
+          ? error.response.data
+          : JSON.stringify(error.response.data)
         : error.message || String(error);
 
-      return return_error(new Error(`Failed to update behavior implementation: ${errorMessage}`));
+      return return_error(
+        new Error(`Failed to update behavior implementation: ${errorMessage}`),
+      );
     }
-
   } catch (error: any) {
     return return_error(error);
   }

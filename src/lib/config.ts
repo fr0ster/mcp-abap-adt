@@ -5,7 +5,8 @@
  * when v2 server imports handlers that use lib/utils
  */
 
-import { SapConfig } from "@mcp-abap-adt/connection";
+import type { SapConfig } from '@mcp-abap-adt/connection';
+
 // Don't import setConfigOverride from utils.ts to avoid circular dependency
 // setConfigOverride will be called lazily if needed
 
@@ -13,9 +14,10 @@ let sapConfigOverride: SapConfig | undefined;
 
 function debugLog(message: string): void {
   // Only log if DEBUG_CONNECTORS is enabled
-  const debugEnabled = process.env.DEBUG_CONNECTORS === "true" ||
-                       process.env.DEBUG_TESTS === "true" ||
-                       process.env.DEBUG_ADT_TESTS === "true";
+  const debugEnabled =
+    process.env.DEBUG_CONNECTORS === 'true' ||
+    process.env.DEBUG_TESTS === 'true' ||
+    process.env.DEBUG_ADT_TESTS === 'true';
   if (debugEnabled) {
     process.stderr.write(message);
   }
@@ -34,7 +36,9 @@ export function getConfig(): SapConfig {
   let url = process.env.SAP_URL;
   let client = process.env.SAP_CLIENT;
 
-  debugLog(`[MCP-CONFIG] Raw process.env.SAP_URL: "${url}" (type: ${typeof url}, length: ${url?.length || 0})\n`);
+  debugLog(
+    `[MCP-CONFIG] Raw process.env.SAP_URL: "${url}" (type: ${typeof url}, length: ${url?.length || 0})\n`,
+  );
 
   // URLs from .env files are expected to be clean - just trim
   if (url) {
@@ -42,7 +46,11 @@ export function getConfig(): SapConfig {
   } else {
     // Log if URL is missing
     debugLog(`[MCP-CONFIG] ✗ SAP_URL is missing from process.env\n`);
-    debugLog(`[MCP-CONFIG] Available env vars: ${Object.keys(process.env).filter(k => k.startsWith('SAP_')).join(', ')}\n`);
+    debugLog(
+      `[MCP-CONFIG] Available env vars: ${Object.keys(process.env)
+        .filter((k) => k.startsWith('SAP_'))
+        .join(', ')}\n`,
+    );
   }
 
   if (client) {
@@ -50,23 +58,28 @@ export function getConfig(): SapConfig {
   }
 
   // Auto-detect auth type: if JWT token is present, use JWT; otherwise check SAP_AUTH_TYPE or default to basic
-  let authType: SapConfig["authType"] = 'basic';
+  let authType: SapConfig['authType'] = 'basic';
   if (process.env.SAP_JWT_TOKEN) {
     authType = 'jwt';
   } else if (process.env.SAP_AUTH_TYPE) {
     const rawAuthType = process.env.SAP_AUTH_TYPE.trim();
-    authType = rawAuthType === 'xsuaa' ? 'jwt' : (rawAuthType as SapConfig["authType"]);
+    authType =
+      rawAuthType === 'xsuaa' ? 'jwt' : (rawAuthType as SapConfig['authType']);
   }
 
   if (!url) {
-    throw new Error(`Missing SAP_URL in environment variables. Please check your .env file.`);
+    throw new Error(
+      `Missing SAP_URL in environment variables. Please check your .env file.`,
+    );
   }
 
   // Final validation - URL should be clean now
   if (!/^https?:\/\//.test(url)) {
     // Log URL in hex for debugging
     const urlHex = Buffer.from(url, 'utf8').toString('hex');
-    throw new Error(`Invalid SAP_URL format: "${url}" (hex: ${urlHex.substring(0, 100)}...). Expected format: https://your-system.sap.com`);
+    throw new Error(
+      `Invalid SAP_URL format: "${url}" (hex: ${urlHex.substring(0, 100)}...). Expected format: https://your-system.sap.com`,
+    );
   }
 
   // Additional validation: try to create URL object to catch any remaining issues
@@ -76,7 +89,9 @@ export function getConfig(): SapConfig {
     url = testUrl.href.replace(/\/$/, ''); // Remove trailing slash if present
   } catch (urlError) {
     const urlHex = Buffer.from(url, 'utf8').toString('hex');
-    throw new Error(`Invalid SAP_URL: "${url}" (hex: ${urlHex.substring(0, 100)}...). Error: ${urlError instanceof Error ? urlError.message : urlError}`);
+    throw new Error(
+      `Invalid SAP_URL: "${url}" (hex: ${urlHex.substring(0, 100)}...). Error: ${urlError instanceof Error ? urlError.message : urlError}`,
+    );
   }
 
   // Log URL for debugging
@@ -103,8 +118,10 @@ export function getConfig(): SapConfig {
       config.refreshToken = refreshToken.trim();
     }
     const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
-    const uaaClientId = process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
-    const uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
+    const uaaClientId =
+      process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
+    const uaaClientSecret =
+      process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
     if (uaaUrl) config.uaaUrl = uaaUrl.trim();
     if (uaaClientId) config.uaaClientId = uaaClientId.trim();
     if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret.trim();
@@ -112,7 +129,9 @@ export function getConfig(): SapConfig {
     const username = process.env.SAP_USERNAME;
     const password = process.env.SAP_PASSWORD;
     if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
+      throw new Error(
+        'Missing SAP_USERNAME or SAP_PASSWORD for basic authentication',
+      );
     }
     config.username = username.trim();
     config.password = password.trim();

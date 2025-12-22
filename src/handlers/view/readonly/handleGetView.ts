@@ -8,18 +8,22 @@
  * - Support for both normal views and maintenance views
  */
 
-import { McpError, ErrorCode } from '../../../lib/utils';
 import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ErrorCode, McpError } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "GetView",
-  description: "[read-only] Retrieve ABAP database view definition including tables, fields, joins, and selection conditions.",
+  name: 'GetView',
+  description:
+    '[read-only] Retrieve ABAP database view definition including tables, fields, joins, and selection conditions.',
   inputSchema: {
-    view_name: z.string().describe("Name of the ABAP database view"),
-    filePath: z.string().optional().describe("Optional file path to write the result to")
-  }
+    view_name: z.string().describe('Name of the ABAP database view'),
+    filePath: z
+      .string()
+      .optional()
+      .describe('Optional file path to write the result to'),
+  },
 } as const;
 
 export async function handleGetView(context: HandlerContext, args: any) {
@@ -37,7 +41,7 @@ export async function handleGetView(context: HandlerContext, args: any) {
     logger?.debug(`Successfully read view ${args.view_name}`);
     return {
       isError: false,
-      content: [{ type: "json", json: result }],
+      content: [{ type: 'json', json: result }],
     };
   } catch (error) {
     logger?.error(`Failed to read view ${args?.view_name || ''}`, error as any);
@@ -46,9 +50,9 @@ export async function handleGetView(context: HandlerContext, args: any) {
       content: [
         {
           type: 'text',
-          text: error instanceof Error ? error.message : String(error)
-        }
-      ]
+          text: error instanceof Error ? error.message : String(error),
+        },
+      ],
     };
   }
 }

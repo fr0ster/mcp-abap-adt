@@ -1,4 +1,4 @@
-import { getBaseUrl, getAuthHeaders } from '../lib/utils';
+import { getAuthHeaders, getBaseUrl } from '../lib/utils';
 
 describe('Utility Functions', () => {
   describe('URL and Header Helpers', () => {
@@ -27,7 +27,7 @@ describe('Utility Functions', () => {
       const tools = ['get_program', 'get_class', 'search_object'];
       expect(tools).toHaveLength(3);
       expect(tools).toContain('get_program');
-      expect(tools.filter(t => t.startsWith('get_'))).toHaveLength(2);
+      expect(tools.filter((t) => t.startsWith('get_'))).toHaveLength(2);
     });
 
     it('should handle string trimming', () => {
@@ -41,10 +41,9 @@ describe('Utility Functions', () => {
       const validTypes = ['PROG/P', 'CLAS/OC', 'FUGR/F', 'TABL/DT'];
       const pattern = /^[A-Z]{4}\/[A-Z]+$/;
 
-      validTypes.forEach(type => {
+      validTypes.forEach((type) => {
         expect(pattern.test(type)).toBe(true);
       });
     });
   });
 });
-

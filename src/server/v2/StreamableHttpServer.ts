@@ -1,12 +1,16 @@
-import express, { Request, Response } from "express";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import type { Logger } from "@mcp-abap-adt/logger";
-import { noopLogger } from "../../lib/handlerLogger.js";
-import { BaseMcpServer } from "./BaseMcpServer.js";
-import { IHandlersRegistry } from "../../lib/handlers/interfaces.js";
-import { AuthBrokerFactory } from "../../lib/auth/index.js";
-import type { IHttpApplication, RouteRegistrationOptions } from "./IHttpApplication.js";
-const DEFAULT_VERSION = process.env.npm_package_version ?? "1.0.0";
+import type { Logger } from '@mcp-abap-adt/logger';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import express, { type Request, type Response } from 'express';
+import type { AuthBrokerFactory } from '../../lib/auth/index.js';
+import { noopLogger } from '../../lib/handlerLogger.js';
+import type { IHandlersRegistry } from '../../lib/handlers/interfaces.js';
+import { BaseMcpServer } from './BaseMcpServer.js';
+import type {
+  IHttpApplication,
+  RouteRegistrationOptions,
+} from './IHttpApplication.js';
+
+const DEFAULT_VERSION = process.env.npm_package_version ?? '1.0.0';
 
 export interface StreamableHttpServerOptions {
   /**
@@ -69,18 +73,18 @@ export class StreamableHttpServer extends BaseMcpServer {
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
     private readonly authBrokerFactory: AuthBrokerFactory,
-    opts?: StreamableHttpServerOptions
+    opts?: StreamableHttpServerOptions,
   ) {
     super({
-      name: "mcp-abap-adt",
+      name: 'mcp-abap-adt',
       version: opts?.version ?? DEFAULT_VERSION,
       logger: opts?.logger ?? noopLogger,
     });
-    this.host = opts?.host ?? "127.0.0.1";
+    this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3000;
     this.enableJsonResponse = opts?.enableJsonResponse ?? true;
     this.defaultDestination = opts?.defaultDestination;
-    this.path = opts?.path ?? "/mcp/stream/http";
+    this.path = opts?.path ?? '/mcp/stream/http';
     this.externalApp = opts?.app;
     // Register handlers once for shared MCP server
     this.registerHandlers(this.handlersRegistry);
@@ -90,23 +94,29 @@ export class StreamableHttpServer extends BaseMcpServer {
    * Creates the request handler function
    * Can be used to register on external app or internal Express
    */
-  private createRequestHandler(): (req: Request, res: Response) => Promise<void> {
+  private createRequestHandler(): (
+    req: Request,
+    res: Response,
+  ) => Promise<void> {
     return async (req: Request, res: Response) => {
       const clientId = `${req.socket.remoteAddress}:${req.socket.remotePort}`;
-      console.error(`[StreamableHttpServer] ${req.method} ${req.path} from ${clientId}`);
+      console.error(
+        `[StreamableHttpServer] ${req.method} ${req.path} from ${clientId}`,
+      );
 
       try {
         let destination: string | undefined;
-        let broker: any = undefined;
+        let broker: any;
 
         // Priority 1: Check x-mcp-destination header
         const destinationHeader =
-          (req.headers["x-mcp-destination"] as string | undefined) ??
-          (req.headers["X-MCP-Destination"] as string | undefined);
+          (req.headers['x-mcp-destination'] as string | undefined) ??
+          (req.headers['X-MCP-Destination'] as string | undefined);
 
         if (destinationHeader) {
           destination = destinationHeader;
-          broker = await this.authBrokerFactory.getOrCreateAuthBroker(destination);
+          broker =
+            await this.authBrokerFactory.getOrCreateAuthBroker(destination);
         }
         // Priority 2: Check SAP connection headers (x-sap-url + auth params)
         // Headers will be passed directly to handlers, no broker needed
@@ -119,7 +129,8 @@ export class StreamableHttpServer extends BaseMcpServer {
         // Priority 3: Use default destination
         else if (this.defaultDestination) {
           destination = this.defaultDestination;
-          broker = await this.authBrokerFactory.getOrCreateAuthBroker(destination);
+          broker =
+            await this.authBrokerFactory.getOrCreateAuthBroker(destination);
         }
         // Priority 4: No auth params at all
         // Allow request to proceed - metadata methods (tools/list, etc.) will work
@@ -135,16 +146,16 @@ export class StreamableHttpServer extends BaseMcpServer {
           enableJsonResponse: this.enableJsonResponse,
         });
 
-        res.on("close", () => {
+        res.on('close', () => {
           void transport.close();
         });
 
         await this.connect(transport);
         await transport.handleRequest(req, res, req.body);
       } catch (err) {
-        console.error("[StreamableHttpServer] Error handling request:", err);
+        console.error('[StreamableHttpServer] Error handling request:', err);
         if (!res.headersSent) {
-          res.status(500).send("Internal Server Error");
+          res.status(500).send('Internal Server Error');
         }
       }
     };
@@ -157,21 +168,30 @@ export class StreamableHttpServer extends BaseMcpServer {
    * @param app - External HTTP application (Express, CDS, etc.)
    * @param options - Route registration options
    */
-  registerRoutes(app: IHttpApplication, options?: RouteRegistrationOptions): void {
+  registerRoutes(
+    app: IHttpApplication,
+    _options?: RouteRegistrationOptions,
+  ): void {
     const handler = this.createRequestHandler();
 
     // Only handle POST requests - GET SSE streams cause abort errors on disconnect
     app.post(this.path, handler as any);
 
     // Return 405 for other methods to avoid SSE stream issues
-    app.all(this.path, ((req: Request, res: Response) => {
-      res.status(405).send("Method Not Allowed");
+    app.all(this.path, ((_req: Request, res: Response) => {
+      res.status(405).send('Method Not Allowed');
     }) as any);
 
-    console.error(`[StreamableHttpServer] Routes registered on external app at ${this.path}`);
-    console.error(`[StreamableHttpServer] JSON response mode: ${this.enableJsonResponse}`);
+    console.error(
+      `[StreamableHttpServer] Routes registered on external app at ${this.path}`,
+    );
+    console.error(
+      `[StreamableHttpServer] JSON response mode: ${this.enableJsonResponse}`,
+    );
     if (this.defaultDestination) {
-      console.error(`[StreamableHttpServer] Default destination: ${this.defaultDestination}`);
+      console.error(
+        `[StreamableHttpServer] Default destination: ${this.defaultDestination}`,
+      );
     }
   }
 
@@ -202,13 +222,17 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.registerRoutes(app as unknown as IHttpApplication);
 
     await new Promise<void>((resolve, reject) => {
-      const srv = app
+      const _srv = app
         .listen(this.port, this.host, () => {
-          console.error(`[StreamableHttpServer] Server started on ${this.host}:${this.port}`);
-          console.error(`[StreamableHttpServer] Endpoint: http://${this.host}:${this.port}${this.path}`);
+          console.error(
+            `[StreamableHttpServer] Server started on ${this.host}:${this.port}`,
+          );
+          console.error(
+            `[StreamableHttpServer] Endpoint: http://${this.host}:${this.port}${this.path}`,
+          );
           resolve();
         })
-        .on("error", reject);
+        .on('error', reject);
     });
   }
 
@@ -216,13 +240,12 @@ export class StreamableHttpServer extends BaseMcpServer {
    * Check if request has SAP connection headers
    */
   private hasSapConnectionHeaders(headers: any): boolean {
-    const hasUrl = headers["x-sap-url"] || headers["X-SAP-URL"];
-    const hasJwtAuth = headers["x-sap-jwt-token"] || headers["X-SAP-JWT-Token"];
+    const hasUrl = headers['x-sap-url'] || headers['X-SAP-URL'];
+    const hasJwtAuth = headers['x-sap-jwt-token'] || headers['X-SAP-JWT-Token'];
     const hasBasicAuth =
-      (headers["x-sap-login"] || headers["X-SAP-Login"]) &&
-      (headers["x-sap-password"] || headers["X-SAP-Password"]);
+      (headers['x-sap-login'] || headers['X-SAP-Login']) &&
+      (headers['x-sap-password'] || headers['X-SAP-Password']);
 
     return !!(hasUrl && (hasJwtAuth || hasBasicAuth));
   }
-
 }

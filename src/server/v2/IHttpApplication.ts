@@ -1,9 +1,13 @@
-import type { Request, Response, NextFunction } from "express";
+import type { NextFunction, Request, Response } from 'express';
 
 /**
  * Handler function type for HTTP routes
  */
-export type RouteHandler = (req: Request, res: Response, next?: NextFunction) => void | Promise<void>;
+export type RouteHandler = (
+  req: Request,
+  res: Response,
+  next?: NextFunction,
+) => void | Promise<void>;
 
 /**
  * Interface for Express-like HTTP application

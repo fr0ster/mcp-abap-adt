@@ -1,5 +1,5 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { HandlerContext } from "../../handlers/interfaces.js";
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { HandlerContext } from '../../handlers/interfaces.js';
 
 // Re-export HandlerContext for consumers
 export type { HandlerContext };
@@ -73,7 +73,7 @@ export interface IHandlersRegistry {
     server: McpServer,
     toolName: string,
     toolDefinition: ToolDefinition,
-    handler: ToolHandler
+    handler: ToolHandler,
   ): void;
 
   /**

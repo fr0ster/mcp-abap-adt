@@ -1,7 +1,7 @@
 import { CrudClient, ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
-import { getManagedConnection } from './utils';
 import { registerConnectionResetHook } from './connectionEvents';
+import { getManagedConnection } from './utils';
 
 let readOnlyClient: ReadOnlyClient | undefined;
 let readOnlyClientConnection: AbapConnection | undefined;
@@ -39,5 +39,3 @@ export function resetClientCache() {
 }
 
 registerConnectionResetHook(resetClientCache);
-
-

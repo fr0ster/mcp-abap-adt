@@ -17,24 +17,18 @@
 import { handleCreateTable } from '../../../../handlers/table/high/handleCreateTable';
 import { handleUpdateTable } from '../../../../handlers/table/high/handleUpdateTable';
 import { handleDeleteTable } from '../../../../handlers/table/low/handleDeleteTable';
-
-import { HighTester } from '../../helpers/testers/HighTester';
 import { getTimeout } from '../../helpers/configHelpers';
+import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Table High-Level Handlers Integration', () => {
   let tester: HighTester;
 
   beforeAll(async () => {
-    tester = new HighTester(
-      'create_table',
-      'builder_table',
-      'table-high',
-      {
-        create: handleCreateTable,
-        update: handleUpdateTable,
-        delete: handleDeleteTable
-      }
-    );
+    tester = new HighTester('create_table', 'builder_table', 'table-high', {
+      create: handleCreateTable,
+      update: handleUpdateTable,
+      delete: handleDeleteTable,
+    });
     await tester.beforeAll();
   });
 
@@ -50,7 +44,11 @@ describe('Table High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it('should test all Table high-level handlers', async () => {
-    await tester.run();
-  }, getTimeout('long'));
+  it(
+    'should test all Table high-level handlers',
+    async () => {
+      await tester.run();
+    },
+    getTimeout('long'),
+  );
 });

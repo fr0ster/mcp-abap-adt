@@ -5,44 +5,57 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "UnlockFunctionModuleLow",
-  description: "[low-level] Unlock an ABAP function module after modification. Must use the same session_id and lock_handle from LockFunctionModule operation.",
+  name: 'UnlockFunctionModuleLow',
+  description:
+    '[low-level] Unlock an ABAP function module after modification. Must use the same session_id and lock_handle from LockFunctionModule operation.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       function_module_name: {
-        type: "string",
-        description: "Function module name (e.g., Z_MY_FUNCTION)."
+        type: 'string',
+        description: 'Function module name (e.g., Z_MY_FUNCTION).',
       },
       function_group_name: {
-        type: "string",
-        description: "Function group name (e.g., ZFG_MY_GROUP)."
+        type: 'string',
+        description: 'Function group name (e.g., ZFG_MY_GROUP).',
       },
       lock_handle: {
-        type: "string",
-        description: "Lock handle from LockFunctionModule operation."
+        type: 'string',
+        description: 'Lock handle from LockFunctionModule operation.',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from LockFunctionModule operation. Must be the same as used in LockFunctionModule."
+        type: 'string',
+        description:
+          'Session ID from LockFunctionModule operation. Must be the same as used in LockFunctionModule.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from LockFunctionModule (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from LockFunctionModule (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["function_module_name", "function_group_name", "lock_handle", "session_id"]
-  }
+    required: [
+      'function_module_name',
+      'function_group_name',
+      'lock_handle',
+      'session_id',
+    ],
+  },
 } as const;
 
 interface UnlockFunctionModuleArgs {
@@ -62,7 +75,10 @@ interface UnlockFunctionModuleArgs {
  *
  * Uses CrudClient.unlockFunctionModule - low-level single method call
  */
-export async function handleUnlockFunctionModule(context: HandlerContext, args: UnlockFunctionModuleArgs) {
+export async function handleUnlockFunctionModule(
+  context: HandlerContext,
+  args: UnlockFunctionModuleArgs,
+) {
   const { connection, logger } = context;
   try {
     const {
@@ -70,12 +86,21 @@ export async function handleUnlockFunctionModule(context: HandlerContext, args: 
       function_group_name,
       lock_handle,
       session_id,
-      session_state
+      session_state,
     } = args as UnlockFunctionModuleArgs;
 
     // Validation
-    if (!function_module_name || !function_group_name || !lock_handle || !session_id) {
-      return return_error(new Error('function_module_name, function_group_name, lock_handle, and session_id are required'));
+    if (
+      !function_module_name ||
+      !function_group_name ||
+      !lock_handle ||
+      !session_id
+    ) {
+      return return_error(
+        new Error(
+          'function_module_name, function_group_name, lock_handle, and session_id are required',
+        ),
+      );
     }
 
     const client = new CrudClient(connection);
@@ -89,31 +114,43 @@ export async function handleUnlockFunctionModule(context: HandlerContext, args: 
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger?.info(`Starting function module unlock: ${functionModuleName} in ${functionGroupName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(
+      `Starting function module unlock: ${functionModuleName} in ${functionGroupName} (session: ${session_id.substring(0, 8)}...)`,
+    );
 
     try {
       // Unlock function module
       // Note: unlock() doesn't throw if successful, so if we reach here, unlock succeeded
-      await client.unlockFunctionModule({ functionModuleName: functionModuleName, functionGroupName: functionGroupName }, lock_handle);
+      await client.unlockFunctionModule(
+        {
+          functionModuleName: functionModuleName,
+          functionGroupName: functionGroupName,
+        },
+        lock_handle,
+      );
 
       // Get updated session state after unlock
-
 
       logger?.info(`✅ UnlockFunctionModule completed: ${functionModuleName}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          function_module_name: functionModuleName,
-          function_group_name: functionGroupName,
-          session_id: session_id,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: `Function module ${functionModuleName} unlocked successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            function_module_name: functionModuleName,
+            function_group_name: functionGroupName,
+            session_id: session_id,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: `Function module ${functionModuleName} unlocked successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error unlocking function module ${functionModuleName}: ${error?.message || error}`);
+      logger?.error(
+        `Error unlocking function module ${functionModuleName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to unlock function module: ${error.message || String(error)}`;
@@ -122,26 +159,30 @@ export async function handleUnlockFunctionModule(context: HandlerContext, args: 
         errorMessage = `Function module ${functionModuleName} not found.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockFunctionModule.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

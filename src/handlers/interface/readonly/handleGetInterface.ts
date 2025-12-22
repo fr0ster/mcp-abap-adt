@@ -1,14 +1,14 @@
-import { McpError, ErrorCode } from '../../../lib/utils';
-import * as z from 'zod';
 import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ErrorCode, McpError } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "GetInterface",
-  description: "[read-only] Retrieve ABAP interface source code.",
+  name: 'GetInterface',
+  description: '[read-only] Retrieve ABAP interface source code.',
   inputSchema: {
-    interface_name: z.string().describe("Name of the ABAP interface")
-  }
+    interface_name: z.string().describe('Name of the ABAP interface'),
+  },
 } as const;
 
 export async function handleGetInterface(context: HandlerContext, args: any) {
@@ -26,18 +26,21 @@ export async function handleGetInterface(context: HandlerContext, args: any) {
     logger?.debug(`Successfully read interface ${args.interface_name}`);
     return {
       isError: false,
-      content: [{ type: "json", json: result }],
+      content: [{ type: 'json', json: result }],
     };
   } catch (error) {
-    logger?.error(`Failed to read interface ${args?.interface_name || ''}`, error as any);
+    logger?.error(
+      `Failed to read interface ${args?.interface_name || ''}`,
+      error as any,
+    );
     return {
       isError: true,
       content: [
         {
           type: 'text',
-          text: error instanceof Error ? error.message : String(error)
-        }
-      ]
+          text: error instanceof Error ? error.message : String(error),
+        },
+      ],
     };
   }
 }

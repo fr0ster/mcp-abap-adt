@@ -5,16 +5,15 @@
  * server configurations with different sets of handlers.
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { CompositeHandlersRegistry } from "../registry/CompositeHandlersRegistry.js";
-import { IHandlerGroup } from "../interfaces.js";
-import { ReadOnlyHandlersGroup } from "../groups/ReadOnlyHandlersGroup.js";
-import { HighLevelHandlersGroup } from "../groups/HighLevelHandlersGroup.js";
-import { LowLevelHandlersGroup } from "../groups/LowLevelHandlersGroup.js";
-import { SystemHandlersGroup } from "../groups/SystemHandlersGroup.js";
-import { SearchHandlersGroup } from "../groups/SearchHandlersGroup.js";
-import { AbapConnection } from "@mcp-abap-adt/connection";
-import { HandlerContext } from "../../../handlers/interfaces.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { HandlerContext } from '../../../handlers/interfaces.js';
+import { HighLevelHandlersGroup } from '../groups/HighLevelHandlersGroup.js';
+import { LowLevelHandlersGroup } from '../groups/LowLevelHandlersGroup.js';
+import { ReadOnlyHandlersGroup } from '../groups/ReadOnlyHandlersGroup.js';
+import { SearchHandlersGroup } from '../groups/SearchHandlersGroup.js';
+import { SystemHandlersGroup } from '../groups/SystemHandlersGroup.js';
+import type { IHandlerGroup } from '../interfaces.js';
+import { CompositeHandlersRegistry } from '../registry/CompositeHandlersRegistry.js';
 
 /**
  * Example 1: Read-only server (e.g., for public API)
@@ -23,8 +22,8 @@ import { HandlerContext } from "../../../handlers/interfaces.js";
 export function createReadOnlyServer(context: HandlerContext): McpServer {
   const { connection, logger } = context;
   const mcpServer = new McpServer({
-    name: "mcp-abap-adt-readonly",
-    version: "1.0.0",
+    name: 'mcp-abap-adt-readonly',
+    version: '1.0.0',
   });
 
   const handlersRegistry = new CompositeHandlersRegistry([
@@ -44,8 +43,8 @@ export function createReadOnlyServer(context: HandlerContext): McpServer {
  */
 export function createFullServer(context: HandlerContext): McpServer {
   const mcpServer = new McpServer({
-    name: "mcp-abap-adt-full",
-    version: "1.0.0",
+    name: 'mcp-abap-adt-full',
+    version: '1.0.0',
   });
 
   const handlersRegistry = new CompositeHandlersRegistry([
@@ -68,8 +67,8 @@ export function createFullServer(context: HandlerContext): McpServer {
 export function createDynamicServer(context: HandlerContext): McpServer {
   const { connection, logger } = context;
   const mcpServer = new McpServer({
-    name: "mcp-abap-adt-dynamic",
-    version: "1.0.0",
+    name: 'mcp-abap-adt-dynamic',
+    version: '1.0.0',
   });
 
   const handlersRegistry = new CompositeHandlersRegistry();
@@ -84,8 +83,8 @@ export function createDynamicServer(context: HandlerContext): McpServer {
   handlersRegistry.registerAllTools(mcpServer);
 
   // Get information about registered groups
-  console.log("Handler groups:", handlersRegistry.getHandlerGroupNames());
-  console.log("Registered tools:", handlersRegistry.getRegisteredTools());
+  console.log('Handler groups:', handlersRegistry.getHandlerGroupNames());
+  console.log('Registered tools:', handlersRegistry.getRegisteredTools());
 
   // Remove a group if needed
   // handlersRegistry.removeHandlerGroup("HighLevelHandlers");
@@ -100,10 +99,13 @@ export function createDynamicServer(context: HandlerContext): McpServer {
  * Example 4: Custom server configuration
  * Create a server with only specific handler groups
  */
-export function createCustomServer(includeReadOnly: boolean = true, context: HandlerContext): McpServer {
+export function createCustomServer(
+  includeReadOnly: boolean = true,
+  context: HandlerContext,
+): McpServer {
   const mcpServer = new McpServer({
-    name: "mcp-abap-adt-custom",
-    version: "1.0.0",
+    name: 'mcp-abap-adt-custom',
+    version: '1.0.0',
   });
 
   const handlerGroups: IHandlerGroup[] = [];

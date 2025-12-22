@@ -17,9 +17,8 @@
 import { handleCreateStructure } from '../../../../handlers/structure/high/handleCreateStructure';
 import { handleUpdateStructure } from '../../../../handlers/structure/high/handleUpdateStructure';
 import { handleDeleteStructure } from '../../../../handlers/structure/low/handleDeleteStructure';
-
-import { HighTester } from '../../helpers/testers/HighTester';
 import { getTimeout } from '../../helpers/configHelpers';
+import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Structure High-Level Handlers Integration', () => {
   let tester: HighTester;
@@ -32,8 +31,8 @@ describe('Structure High-Level Handlers Integration', () => {
       {
         create: handleCreateStructure,
         update: handleUpdateStructure,
-        delete: handleDeleteStructure
-      }
+        delete: handleDeleteStructure,
+      },
     );
     await tester.beforeAll();
   });
@@ -50,7 +49,11 @@ describe('Structure High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it('should test all Structure high-level handlers', async () => {
-    await tester.run();
-  }, getTimeout('long'));
+  it(
+    'should test all Structure high-level handlers',
+    async () => {
+      await tester.run();
+    },
+    getTimeout('long'),
+  );
 });

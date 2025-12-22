@@ -5,9 +5,15 @@ describe('MCP ABAP ADT Server', () => {
 
   describe('Module Imports', () => {
     it('should require handler modules without errors', () => {
-      expect(() => require('../handlers/program/readonly/handleGetProgram')).not.toThrow();
-      expect(() => require('../handlers/class/readonly/handleGetClass')).not.toThrow();
-      expect(() => require('../handlers/function/readonly/handleGetFunction')).not.toThrow();
+      expect(() =>
+        require('../handlers/program/readonly/handleGetProgram'),
+      ).not.toThrow();
+      expect(() =>
+        require('../handlers/class/readonly/handleGetClass'),
+      ).not.toThrow();
+      expect(() =>
+        require('../handlers/function/readonly/handleGetFunction'),
+      ).not.toThrow();
     });
 
     it('should require utility modules without errors', () => {
@@ -19,7 +25,7 @@ describe('MCP ABAP ADT Server', () => {
   describe('Configuration', () => {
     it('should have valid Node.js version', () => {
       const nodeVersion = process.version;
-      const majorVersion = parseInt(nodeVersion.split('.')[0].slice(1));
+      const majorVersion = parseInt(nodeVersion.split('.')[0].slice(1), 10);
       expect(majorVersion).toBeGreaterThanOrEqual(18);
     });
   });

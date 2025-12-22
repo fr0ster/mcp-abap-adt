@@ -4,55 +4,76 @@
  * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, encodeSapObjectName, parseValidationResponse, safeCheckOperation, isCloudConnection } from '../../../lib/utils';
-import { validateTransportRequest } from '../../../utils/transportValidation.js';
-import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  encodeSapObjectName,
+  isCloudConnection,
+  parseValidationResponse,
+  return_error,
+  return_response,
+  safeCheckOperation,
+} from '../../../lib/utils';
+import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
-  name: "CreateProgram",
-  description: "Create a new ABAP program (report) in SAP system with source code. Supports executable programs, includes, module pools. Uses stateful session for proper lock management.",
+  name: 'CreateProgram',
+  description:
+    'Create a new ABAP program (report) in SAP system with source code. Supports executable programs, includes, module pools. Uses stateful session for proper lock management.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       program_name: {
-        type: "string",
-        description: "Program name (e.g., Z_TEST_PROGRAM_001). Must follow SAP naming conventions (start with Z or Y)."
+        type: 'string',
+        description:
+          'Program name (e.g., Z_TEST_PROGRAM_001). Must follow SAP naming conventions (start with Z or Y).',
       },
       description: {
-        type: "string",
-        description: "Program description. If not provided, program_name will be used."
+        type: 'string',
+        description:
+          'Program description. If not provided, program_name will be used.',
       },
       package_name: {
-        type: "string",
-        description: "Package name (e.g., ZOK_LAB, $TMP for local objects)"
+        type: 'string',
+        description: 'Package name (e.g., ZOK_LAB, $TMP for local objects)',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable packages."
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
       program_type: {
-        type: "string",
-        description: "Program type: 'executable' (Report), 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'",
-        enum: ["executable", "include", "module_pool", "function_group", "class_pool", "interface_pool"]
+        type: 'string',
+        description:
+          "Program type: 'executable' (Report), 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'",
+        enum: [
+          'executable',
+          'include',
+          'module_pool',
+          'function_group',
+          'class_pool',
+          'interface_pool',
+        ],
       },
       application: {
-        type: "string",
-        description: "Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'"
+        type: 'string',
+        description:
+          "Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'",
       },
       source_code: {
-        type: "string",
-        description: "Complete ABAP program source code. If not provided, generates minimal template based on program_type."
+        type: 'string',
+        description:
+          'Complete ABAP program source code. If not provided, generates minimal template based on program_type.',
       },
       activate: {
-        type: "boolean",
-        description: "Activate program after creation. Default: true. Set to false for batch operations (activate multiple objects later)."
-      }
+        type: 'boolean',
+        description:
+          'Activate program after creation. Default: true. Set to false for batch operations (activate multiple objects later).',
+      },
     },
-    required: ["program_name", "package_name"]
-  }
+    required: ['program_name', 'package_name'],
+  },
 } as const;
 
 interface CreateProgramArgs {
@@ -71,12 +92,12 @@ interface CreateProgramArgs {
  */
 function convertProgramType(programType?: string): string {
   const typeMap: Record<string, string> = {
-    'executable': '1',
-    'include': 'I',
-    'module_pool': 'M',
-    'function_group': 'F',
-    'class_pool': 'K',
-    'interface_pool': 'J'
+    executable: '1',
+    include: 'I',
+    module_pool: 'M',
+    function_group: 'F',
+    class_pool: 'K',
+    interface_pool: 'J',
   };
 
   return typeMap[programType || 'executable'] || '1';
@@ -85,7 +106,11 @@ function convertProgramType(programType?: string): string {
 /**
  * Generate minimal program source code if not provided
  */
-function generateProgramTemplate(programName: string, programType: string, description: string): string {
+function generateProgramTemplate(
+  programName: string,
+  programType: string,
+  description: string,
+): string {
   const upperName = programName.toUpperCase();
 
   switch (programType) {
@@ -106,8 +131,6 @@ function generateProgramTemplate(programName: string, programType: string, descr
 
 PROGRAM ${upperName}.
 `;
-
-    case '1': // Executable (Report)
     default:
       return `*&---------------------------------------------------------------------*
 *& Report ${upperName}
@@ -121,18 +144,27 @@ START-OF-SELECTION.
   }
 }
 
-export async function handleCreateProgram(context: HandlerContext, params: any) {
+export async function handleCreateProgram(
+  context: HandlerContext,
+  params: any,
+) {
   const { connection, logger } = context;
   const args: CreateProgramArgs = params;
 
   // Validate required parameters
   if (!args.program_name || !args.package_name) {
-    return return_error(new Error("Missing required parameters: program_name and package_name"));
+    return return_error(
+      new Error('Missing required parameters: program_name and package_name'),
+    );
   }
 
   // Check if cloud - programs are not available on cloud systems
   if (isCloudConnection()) {
-    return return_error(new Error('Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.'));
+    return return_error(
+      new Error(
+        'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
+      ),
+    );
   }
 
   // Validate transport_request: required for non-$TMP packages
@@ -143,23 +175,38 @@ export async function handleCreateProgram(context: HandlerContext, params: any) 
   }
 
   const programName = args.program_name.toUpperCase();
-  logger?.info(`Starting program creation: ${programName} (activate=${args.activate !== false})`);
+  logger?.info(
+    `Starting program creation: ${programName} (activate=${args.activate !== false})`,
+  );
 
   // Connection setup
-    try {
-            // Get connection from session context (set by ProtocolHandler)
+  try {
+    // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    logger?.debug(`Created separate connection for handler call: ${programName}`);
+    logger?.debug(
+      `Created separate connection for handler call: ${programName}`,
+    );
   } catch (connectionError: any) {
-    const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
+    const errorMessage =
+      connectionError instanceof Error
+        ? connectionError.message
+        : String(connectionError);
     logger?.error(`Failed to create connection: ${errorMessage}`);
-    return return_error(new Error(`Failed to create connection: ${errorMessage}`));
+    return return_error(
+      new Error(`Failed to create connection: ${errorMessage}`),
+    );
   }
 
   try {
     // Generate source code if not provided
     const programType = convertProgramType(args.program_type);
-    const sourceCode = args.source_code || generateProgramTemplate(programName, programType, args.description || programName);
+    const sourceCode =
+      args.source_code ||
+      generateProgramTemplate(
+        programName,
+        programType,
+        args.description || programName,
+      );
 
     // Create client
     const client = new CrudClient(connection);
@@ -170,7 +217,7 @@ export async function handleCreateProgram(context: HandlerContext, params: any) 
     await client.validateProgram({
       programName,
       description: args.description || programName,
-      packageName: args.package_name
+      packageName: args.package_name,
     });
     const validationResponse = client.getValidationResponse();
     if (!validationResponse) {
@@ -178,7 +225,9 @@ export async function handleCreateProgram(context: HandlerContext, params: any) 
     }
     const validationResult = parseValidationResponse(validationResponse);
     if (!validationResult || validationResult.valid === false) {
-      throw new Error(`Program name validation failed: ${validationResult?.message || 'Invalid program name'}`);
+      throw new Error(
+        `Program name validation failed: ${validationResult?.message || 'Invalid program name'}`,
+      );
     }
     logger?.debug(`Program validation passed: ${programName}`);
 
@@ -190,7 +239,7 @@ export async function handleCreateProgram(context: HandlerContext, params: any) 
       packageName: args.package_name,
       transportRequest: args.transport_request,
       programType: args.program_type,
-      application: args.application
+      application: args.application,
     });
     logger?.info(`Program created: ${programName}`);
 
@@ -198,7 +247,9 @@ export async function handleCreateProgram(context: HandlerContext, params: any) 
     logger?.debug(`Locking program: ${programName}`);
     await client.lockProgram({ programName });
     const lockHandle = client.getLockHandle();
-    logger?.debug(`Program locked: ${programName} (handle=${lockHandle ? lockHandle.substring(0, 8) + '...' : 'none'})`);
+    logger?.debug(
+      `Program locked: ${programName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
+    );
 
     try {
       // Check new code BEFORE update
@@ -209,18 +260,24 @@ export async function handleCreateProgram(context: HandlerContext, params: any) 
           () => client.checkProgram({ programName }, 'inactive', sourceCode),
           programName,
           {
-            debug: (message: string) => logger?.debug(message)
-          }
+            debug: (message: string) => logger?.debug(message),
+          },
         );
         checkNewCodePassed = true;
         logger?.debug(`New code check passed: ${programName}`);
       } catch (checkError: any) {
         if ((checkError as any).isAlreadyChecked) {
-          logger?.debug(`Program ${programName} was already checked - continuing`);
+          logger?.debug(
+            `Program ${programName} was already checked - continuing`,
+          );
           checkNewCodePassed = true;
         } else {
-          logger?.error(`New code check failed: ${programName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
-          throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+          logger?.error(
+            `New code check failed: ${programName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+          );
+          throw new Error(
+            `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+          );
         }
       }
 
@@ -245,15 +302,19 @@ export async function handleCreateProgram(context: HandlerContext, params: any) 
           () => client.checkProgram({ programName }, 'inactive'),
           programName,
           {
-            debug: (message: string) => logger?.debug(message)
-          }
+            debug: (message: string) => logger?.debug(message),
+          },
         );
         logger?.debug(`Inactive version check completed: ${programName}`);
       } catch (checkError: any) {
         if ((checkError as any).isAlreadyChecked) {
-          logger?.debug(`Program ${programName} was already checked - continuing`);
+          logger?.debug(
+            `Program ${programName} was already checked - continuing`,
+          );
         } else {
-          logger?.warn(`Inactive version check had issues: ${programName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+          logger?.warn(
+            `Inactive version check had issues: ${programName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+          );
         }
       }
 
@@ -264,8 +325,12 @@ export async function handleCreateProgram(context: HandlerContext, params: any) 
           await client.activateProgram({ programName });
           logger?.info(`Program activated: ${programName}`);
         } catch (activationError: any) {
-          logger?.error(`Activation failed: ${programName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`);
-          throw new Error(`Activation failed: ${activationError instanceof Error ? activationError.message : String(activationError)}`);
+          logger?.error(
+            `Activation failed: ${programName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`,
+          );
+          throw new Error(
+            `Activation failed: ${activationError instanceof Error ? activationError.message : String(activationError)}`,
+          );
         }
       } else {
         logger?.debug(`Skipping activation for: ${programName}`);
@@ -275,14 +340,21 @@ export async function handleCreateProgram(context: HandlerContext, params: any) 
       let activationWarnings: string[] = [];
       if (shouldActivate && client.getActivateResult()) {
         const activateResponse = client.getActivateResult()!;
-        if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
-          const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+        if (
+          typeof activateResponse.data === 'string' &&
+          activateResponse.data.includes('<chkl:messages')
+        ) {
+          const parser = new XMLParser({
+            ignoreAttributes: false,
+            attributeNamePrefix: '@_',
+          });
           const result = parser.parse(activateResponse.data);
-          const messages = result?.['chkl:messages']?.['msg'];
+          const messages = result?.['chkl:messages']?.msg;
           if (messages) {
             const msgArray = Array.isArray(messages) ? messages : [messages];
-            activationWarnings = msgArray.map((msg: any) =>
-              `${msg['@_type']}: ${msg['shortText']?.['txt'] || 'Unknown'}`
+            activationWarnings = msgArray.map(
+              (msg: any) =>
+                `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
             );
           }
         }
@@ -301,8 +373,18 @@ export async function handleCreateProgram(context: HandlerContext, params: any) 
           ? `Program ${programName} created and activated successfully`
           : `Program ${programName} created successfully (not activated)`,
         uri: `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`,
-        steps_completed: ['validate', 'create', 'lock', 'check_new_code', 'update', 'unlock', 'check_inactive', ...(shouldActivate ? ['activate'] : [])],
-        activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined
+        steps_completed: [
+          'validate',
+          'create',
+          'lock',
+          'check_new_code',
+          'update',
+          'unlock',
+          'check_inactive',
+          ...(shouldActivate ? ['activate'] : []),
+        ],
+        activation_warnings:
+          activationWarnings.length > 0 ? activationWarnings : undefined,
       };
 
       return return_response({
@@ -310,30 +392,43 @@ export async function handleCreateProgram(context: HandlerContext, params: any) 
         status: 200,
         statusText: 'OK',
         headers: {},
-        config: {} as any
+        config: {} as any,
       });
-
     } catch (workflowError: any) {
       // On error, ensure we attempt unlock
       try {
         const lockHandle = client.getLockHandle();
         if (lockHandle) {
-          logger?.warn(`Attempting unlock after error for program ${programName}`);
+          logger?.warn(
+            `Attempting unlock after error for program ${programName}`,
+          );
           await client.unlockProgram({ programName }, lockHandle);
           logger?.warn(`Unlocked program after error: ${programName}`);
         }
       } catch (unlockError: any) {
-        logger?.error(`Failed to unlock program after error: ${programName} - ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+        logger?.error(
+          `Failed to unlock program after error: ${programName} - ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
+        );
       }
 
       // Parse error message
-      let errorMessage = workflowError instanceof Error ? workflowError.message : String(workflowError);
+      let errorMessage =
+        workflowError instanceof Error
+          ? workflowError.message
+          : String(workflowError);
 
       // Attempt to parse ADT XML error
       try {
-        const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
-        const errorData = workflowError?.response?.data ? parser.parse(workflowError.response.data) : null;
-        const errorMsg = errorData?.['exc:exception']?.message?.['#text'] || errorData?.['exc:exception']?.message;
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@_',
+        });
+        const errorData = workflowError?.response?.data
+          ? parser.parse(workflowError.response.data)
+          : null;
+        const errorMsg =
+          errorData?.['exc:exception']?.message?.['#text'] ||
+          errorData?.['exc:exception']?.message;
         if (errorMsg) {
           errorMessage = `SAP Error: ${errorMsg}`;
         }
@@ -346,6 +441,8 @@ export async function handleCreateProgram(context: HandlerContext, params: any) 
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger?.error(`Error creating program ${programName}: ${errorMessage}`);
-    return return_error(new Error(`Failed to create program ${programName}: ${errorMessage}`));
+    return return_error(
+      new Error(`Failed to create program ${programName}: ${errorMessage}`),
+    );
   }
 }

@@ -12,16 +12,15 @@
  * Run: npm test -- --testPathPattern=integration/structure
  */
 
-import { handleValidateStructure } from '../../../../handlers/structure/low/handleValidateStructure';
-import { handleCreateStructure } from '../../../../handlers/structure/low/handleCreateStructure';
-import { handleLockStructure } from '../../../../handlers/structure/low/handleLockStructure';
-import { handleUpdateStructure } from '../../../../handlers/structure/low/handleUpdateStructure';
-import { handleUnlockStructure } from '../../../../handlers/structure/low/handleUnlockStructure';
 import { handleActivateStructure } from '../../../../handlers/structure/low/handleActivateStructure';
+import { handleCreateStructure } from '../../../../handlers/structure/low/handleCreateStructure';
 import { handleDeleteStructure } from '../../../../handlers/structure/low/handleDeleteStructure';
-
-import { LowTester } from '../../helpers/testers/LowTester';
+import { handleLockStructure } from '../../../../handlers/structure/low/handleLockStructure';
+import { handleUnlockStructure } from '../../../../handlers/structure/low/handleUnlockStructure';
+import { handleUpdateStructure } from '../../../../handlers/structure/low/handleUpdateStructure';
+import { handleValidateStructure } from '../../../../handlers/structure/low/handleValidateStructure';
 import { getTimeout } from '../../helpers/configHelpers';
+import { LowTester } from '../../helpers/testers/LowTester';
 
 describe('Structure Low-Level Handlers Integration', () => {
   let tester: LowTester;
@@ -38,8 +37,8 @@ describe('Structure Low-Level Handlers Integration', () => {
         update: handleUpdateStructure,
         unlock: handleUnlockStructure,
         activate: handleActivateStructure,
-        delete: handleDeleteStructure
-      }
+        delete: handleDeleteStructure,
+      },
     );
     await tester.beforeAll();
   });
@@ -56,7 +55,11 @@ describe('Structure Low-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it('should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate', async () => {
-    await tester.run();
-  }, getTimeout('long'));
+  it(
+    'should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate',
+    async () => {
+      await tester.run();
+    },
+    getTimeout('long'),
+  );
 });

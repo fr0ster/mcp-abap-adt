@@ -33,51 +33,73 @@
  */
 
 export const TOOL_DEFINITION = {
-  name: "GetProgFullCode",
-  description: "[read-only] Returns the full code for a program or function group, including all includes, in tree traversal order.",
+  name: 'GetProgFullCode',
+  description:
+    '[read-only] Returns the full code for a program or function group, including all includes, in tree traversal order.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
-      name: { type: "string", description: "[read-only] Technical name of the program or function group (e.g., '/CBY/MM_INVENTORY')" },
-      type: { type: "string", enum: ["PROG/P", "FUGR"], description: "[read-only] 'PROG/P' for program or 'FUGR' for function group" }
+      name: {
+        type: 'string',
+        description:
+          "[read-only] Technical name of the program or function group (e.g., '/CBY/MM_INVENTORY')",
+      },
+      type: {
+        type: 'string',
+        enum: ['PROG/P', 'FUGR'],
+        description:
+          "[read-only] 'PROG/P' for program or 'FUGR' for function group",
+      },
     },
-    required: ["name", "type"]
-  }
+    required: ['name', 'type'],
+  },
 } as const;
 
 import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
-import { handleGetInclude } from '../../include/readonly/handleGetInclude';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { handleGetInclude } from '../../include/readonly/handleGetInclude';
 
 /**
  * handleGetProgFullCode: returns full code for program (report) or function group with all includes.
  * @param args { name: string, type: "PROG/P" | "FUGR" }
  */
-export async function handleGetProgFullCode(context: HandlerContext, args: { name: string; type: string }) {
+export async function handleGetProgFullCode(
+  context: HandlerContext,
+  args: { name: string; type: string },
+) {
   const { connection } = context;
   const { name, type } = args;
   const typeUpper = type.toUpperCase();
 
   // Helper to recursively collect includes for a program/include
-  async function collectIncludes(objectName: string, collected: Set<string> = new Set()): Promise<string[]> {
+  async function collectIncludes(
+    objectName: string,
+    collected: Set<string> = new Set(),
+  ): Promise<string[]> {
     if (collected.has(objectName)) return [];
     collected.add(objectName);
 
     // Try to get include source
-    const includeResult = await handleGetInclude(context, { include_name: objectName });
+    const includeResult = await handleGetInclude(context, {
+      include_name: objectName,
+    });
     let code: string | null = null;
-    if (Array.isArray(includeResult?.content) && includeResult.content.length > 0) {
+    if (
+      Array.isArray(includeResult?.content) &&
+      includeResult.content.length > 0
+    ) {
       const c = includeResult.content[0];
       if (c.type === 'text' && 'data' in c) code = c.data as string;
     }
 
     // Find nested includes in code (ABAP: INCLUDE <name>. or 'INCLUDE <name> .')
-    const includeRegex = /^\s*INCLUDE\s+([A-Z0-9_\/]+)\s*\.\s*$/gim;
+    const includeRegex = /^\s*INCLUDE\s+([A-Z0-9_/]+)\s*\.\s*$/gim;
     const nested: string[] = [];
     if (typeof code === 'string') {
-      let match;
-      while ((match = includeRegex.exec(code)) !== null) {
+      let match: RegExpExecArray | null = includeRegex.exec(code);
+      while (match !== null) {
         nested.push(match[1]);
+        match = includeRegex.exec(code);
       }
     }
 
@@ -120,9 +142,9 @@ export async function handleGetProgFullCode(context: HandlerContext, args: { nam
           content: [
             {
               type: 'text',
-              text: `No program code found for ${name}. Result: ${progResult ? 'exists but no sourceCode' : 'undefined'}`
-            }
-          ]
+              text: `No program code found for ${name}. Result: ${progResult ? 'exists but no sourceCode' : 'undefined'}`,
+            },
+          ],
         };
       }
       codeObjects.push({
@@ -132,23 +154,25 @@ export async function handleGetProgFullCode(context: HandlerContext, args: { nam
       });
 
       // Find all includes in program code
-      const includeRegex = /^\s*INCLUDE\s+([A-Z0-9_\/]+)\s*\.\s*$/gim;
-      const includeListRegex = /^\s*INCLUDE:\s*([A-Z0-9_\/,\s]+)\./gim;
+      const includeRegex = /^\s*INCLUDE\s+([A-Z0-9_/]+)\s*\.\s*$/gim;
+      const includeListRegex = /^\s*INCLUDE:\s*([A-Z0-9_/,\s]+)\./gim;
       const includes: string[] = [];
       if (typeof progCode === 'string') {
-        let match;
+        let match: RegExpExecArray | null = includeRegex.exec(progCode);
         // Match single INCLUDE <name>.
-        while ((match = includeRegex.exec(progCode)) !== null) {
+        while (match !== null) {
           includes.push(match[1]);
+          match = includeRegex.exec(progCode);
         }
         // Match INCLUDE: <name1>, <name2>, ...
-        let listMatch;
-        while ((listMatch = includeListRegex.exec(progCode)) !== null) {
+        let listMatch: RegExpExecArray | null = includeListRegex.exec(progCode);
+        while (listMatch !== null) {
           const list = listMatch[1]
             .split(',')
-            .map(s => s.trim())
+            .map((s) => s.trim())
             .filter(Boolean);
           includes.push(...list);
+          listMatch = includeListRegex.exec(progCode);
         }
       }
 
@@ -157,11 +181,21 @@ export async function handleGetProgFullCode(context: HandlerContext, args: { nam
       for (const inc of includes) {
         const all = await collectIncludes(inc, collected);
         for (const incName of all) {
-          if (!codeObjects.some(obj => obj.OBJECT_TYPE === 'PROG/I' && obj.OBJECT_NAME === incName)) {
+          if (
+            !codeObjects.some(
+              (obj) =>
+                obj.OBJECT_TYPE === 'PROG/I' && obj.OBJECT_NAME === incName,
+            )
+          ) {
             // Get code for each include
-            const incResult = await handleGetInclude(context, { include_name: incName });
+            const incResult = await handleGetInclude(context, {
+              include_name: incName,
+            });
             let incCode: string | null = null;
-            if (Array.isArray(incResult?.content) && incResult.content.length > 0) {
+            if (
+              Array.isArray(incResult?.content) &&
+              incResult.content.length > 0
+            ) {
               const c = incResult.content[0];
               if (c.type === 'text' && 'text' in c) incCode = c.text as string;
             }
@@ -195,9 +229,9 @@ export async function handleGetProgFullCode(context: HandlerContext, args: { nam
           content: [
             {
               type: 'text',
-              text: `No function group code found for ${name}. Result: ${rawResult ? 'exists but no data' : 'undefined'}`
-            }
-          ]
+              text: `No function group code found for ${name}. Result: ${rawResult ? 'exists but no data' : 'undefined'}`,
+            },
+          ],
         };
       }
       codeObjects.push({
@@ -207,12 +241,13 @@ export async function handleGetProgFullCode(context: HandlerContext, args: { nam
       });
 
       // Find all includes in function group code
-      const includeRegex = /^\s*INCLUDE\s+([A-Z0-9_\/]+)\s*\.\s*$/gim;
+      const includeRegex = /^\s*INCLUDE\s+([A-Z0-9_/]+)\s*\.\s*$/gim;
       const includes: string[] = [];
       if (typeof fgCode === 'string') {
-        let match;
-        while ((match = includeRegex.exec(fgCode)) !== null) {
+        let match: RegExpExecArray | null = includeRegex.exec(fgCode);
+        while (match !== null) {
           includes.push(match[1]);
+          match = includeRegex.exec(fgCode);
         }
       }
 
@@ -221,11 +256,21 @@ export async function handleGetProgFullCode(context: HandlerContext, args: { nam
       for (const inc of includes) {
         const all = await collectIncludes(inc, collected);
         for (const incName of all) {
-          if (!codeObjects.some(obj => obj.OBJECT_TYPE === 'PROG/I' && obj.OBJECT_NAME === incName)) {
+          if (
+            !codeObjects.some(
+              (obj) =>
+                obj.OBJECT_TYPE === 'PROG/I' && obj.OBJECT_NAME === incName,
+            )
+          ) {
             // Get code for each include
-            const incResult = await handleGetInclude(context, { include_name: incName });
+            const incResult = await handleGetInclude(context, {
+              include_name: incName,
+            });
             let incCode: string | null = null;
-            if (Array.isArray(incResult?.content) && incResult.content.length > 0) {
+            if (
+              Array.isArray(incResult?.content) &&
+              incResult.content.length > 0
+            ) {
               const c = incResult.content[0];
               if (c.type === 'text' && 'data' in c) incCode = c.data as string;
             }
@@ -243,16 +288,19 @@ export async function handleGetProgFullCode(context: HandlerContext, args: { nam
         content: [
           {
             type: 'text',
-            text: 'Unsupported type'
-          }
-        ]
+            text: 'Unsupported type',
+          },
+        ],
       };
     }
 
     // Normalize spaces in code fields: replace 2+ spaces with 1
-    codeObjects = codeObjects.map(obj => ({
+    codeObjects = codeObjects.map((obj) => ({
       ...obj,
-      code: typeof obj.code === 'string' ? obj.code.replace(/ {2,}/g, ' ') : obj.code,
+      code:
+        typeof obj.code === 'string'
+          ? obj.code.replace(/ {2,}/g, ' ')
+          : obj.code,
     }));
 
     const fullResult = {
@@ -267,9 +315,9 @@ export async function handleGetProgFullCode(context: HandlerContext, args: { nam
       content: [
         {
           type: 'text',
-          text: JSON.stringify(fullResult, null, 2)
-        }
-      ]
+          text: JSON.stringify(fullResult, null, 2),
+        },
+      ],
     };
   } catch (e) {
     return {
@@ -277,9 +325,9 @@ export async function handleGetProgFullCode(context: HandlerContext, args: { nam
       content: [
         {
           type: 'text',
-          text: e instanceof Error ? e.message : String(e)
-        }
-      ]
+          text: e instanceof Error ? e.message : String(e),
+        },
+      ],
     };
   }
 }

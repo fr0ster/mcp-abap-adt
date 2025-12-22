@@ -9,18 +9,17 @@
  * - HandlerExporter for easy integration with external servers
  */
 
-// Interfaces
-export * from "./interfaces.js";
-
 // Base classes
-export { BaseHandlerGroup } from "./base/BaseHandlerGroup.js";
-
-// Registry implementations
-export { CompositeHandlersRegistry } from "./registry/CompositeHandlersRegistry.js";
-
+export { BaseHandlerGroup } from './base/BaseHandlerGroup.js';
 // Handler groups
-export * from "./groups/index.js";
-
+export * from './groups/index.js';
+export type { HandlerExporterOptions } from './HandlerExporter.js';
 // Handler exporter for external server integration
-export { HandlerExporter, createDefaultHandlerExporter } from "./HandlerExporter.js";
-export type { HandlerExporterOptions } from "./HandlerExporter.js";
+export {
+  createDefaultHandlerExporter,
+  HandlerExporter,
+} from './HandlerExporter.js';
+// Interfaces
+export * from './interfaces.js';
+// Registry implementations
+export { CompositeHandlersRegistry } from './registry/CompositeHandlersRegistry.js';

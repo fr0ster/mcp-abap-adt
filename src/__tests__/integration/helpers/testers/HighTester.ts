@@ -7,10 +7,10 @@
  * @deprecated Use LambdaTester instead
  */
 
-import { LambdaTester, type TLambda } from './LambdaTester';
-import type { LambdaTesterContext } from './types';
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import { createHandlerContext } from '../testHelpers';
+import { LambdaTester, type TLambda } from './LambdaTester';
+import type { LambdaTesterContext } from './types';
 
 // Handler function type: (context: HandlerContext, args: any) => Promise<any>
 type HandlerFunction = (context: HandlerContext, args: any) => Promise<any>;
@@ -31,7 +31,7 @@ export class HighTester extends LambdaTester {
     handlerName: string,
     testCaseName: string,
     logPrefix: string,
-    workflowFunctions: HighWorkflowFunctions
+    workflowFunctions: HighWorkflowFunctions,
   ) {
     super(handlerName, testCaseName, logPrefix);
     this.workflowFunctions = workflowFunctions;
@@ -67,27 +67,35 @@ export class HighTester extends LambdaTester {
         try {
           const handlerContext = createHandlerContext({
             connection,
-            logger: logger || undefined
+            logger: logger || undefined,
           });
           const deleteArgs = this.buildDeleteArgs(context);
-          const deleteResponse = await deleteFunction(handlerContext, deleteArgs);
+          const deleteResponse = await deleteFunction(
+            handlerContext,
+            deleteArgs,
+          );
 
           if (deleteResponse?.isError) {
-            const errorMsg = deleteResponse.content?.[0]?.text || 'Unknown error';
+            const errorMsg =
+              deleteResponse.content?.[0]?.text || 'Unknown error';
             logger?.warn?.(`Delete failed (ignored in cleanup): ${errorMsg}`);
           } else {
             logger?.success?.(`✅ cleanup: deleted ${objectName} successfully`);
           }
         } catch (error: any) {
-          logger?.warn?.(`Cleanup delete error (ignored): ${error?.message || String(error)}`);
+          logger?.warn?.(
+            `Cleanup delete error (ignored): ${error?.message || String(error)}`,
+          );
         }
       };
       return;
     }
 
     // Cleanup lambda is mandatory - either provide it or include delete function in workflowFunctions
-    throw new Error('Cleanup lambda is mandatory. Either provide cleanupAfter lambda in beforeAll() method, ' +
-      'or include delete function in workflowFunctions. The test decides whether to run it via YAML config (skip_cleanup or cleanup_after flags).');
+    throw new Error(
+      'Cleanup lambda is mandatory. Either provide cleanupAfter lambda in beforeAll() method, ' +
+        'or include delete function in workflowFunctions. The test decides whether to run it via YAML config (skip_cleanup or cleanup_after flags).',
+    );
   }
 
   async run(): Promise<void> {
@@ -106,7 +114,7 @@ export class HighTester extends LambdaTester {
 
     const handlerContext = createHandlerContext({
       connection: this.context.connection,
-      logger: this.context.logger
+      logger: this.context.logger,
     });
 
     try {
@@ -123,7 +131,7 @@ export class HighTester extends LambdaTester {
       }
     } catch (error: any) {
       // Check if error is a skip condition
-      if (error.message && error.message.startsWith('SKIP:')) {
+      if (error.message?.startsWith('SKIP:')) {
         const skipReason = error.message.replace(/^SKIP:\s*/, '');
         this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
         return;
@@ -135,7 +143,8 @@ export class HighTester extends LambdaTester {
   }
 
   private buildCreateArgs(context: LambdaTesterContext): any {
-    const { objectName, params, packageName, transportRequest, session } = context;
+    const { objectName, params, packageName, transportRequest, session } =
+      context;
     const nameField = this.getNameField();
     return {
       [nameField]: objectName,
@@ -158,25 +167,33 @@ export class HighTester extends LambdaTester {
       // Domain specific fields
       ...(params.datatype && { datatype: params.datatype }),
       ...(params.lowercase !== undefined && { lowercase: params.lowercase }),
-      ...(params.sign_exists !== undefined && { sign_exists: params.sign_exists }),
+      ...(params.sign_exists !== undefined && {
+        sign_exists: params.sign_exists,
+      }),
       ...(transportRequest && { transport_request: transportRequest }),
       ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state })
+      ...(session?.session_state && { session_state: session.session_state }),
     };
   }
 
   private buildUpdateArgs(context: LambdaTesterContext): any {
-    const { objectName, params, packageName, transportRequest, session } = context;
+    const { objectName, params, packageName, transportRequest, session } =
+      context;
     const nameField = this.getNameField();
     return {
       [nameField]: objectName,
       ...(packageName && { package_name: packageName }),
       ...(transportRequest && { transport_request: transportRequest }),
       ...(params.update_ddl_code && { ddl_code: params.update_ddl_code }),
-      ...(params.ddl_code && !params.update_ddl_code && { ddl_code: params.ddl_code }),
+      ...(params.ddl_code &&
+        !params.update_ddl_code && { ddl_code: params.ddl_code }),
       ...(params.source_code && { source_code: params.source_code }),
-      ...(params.update_source_code && { source_code: params.update_source_code }),
-      ...(params.update_description && { description: params.update_description }),
+      ...(params.update_source_code && {
+        source_code: params.update_source_code,
+      }),
+      ...(params.update_description && {
+        description: params.update_description,
+      }),
       // Data element specific fields for update
       ...(params.type_kind && { type_kind: params.type_kind }),
       ...(params.data_type && { data_type: params.data_type }),
@@ -187,9 +204,11 @@ export class HighTester extends LambdaTester {
       // Domain specific fields for update
       ...(params.datatype && { datatype: params.datatype }),
       ...(params.lowercase !== undefined && { lowercase: params.lowercase }),
-      ...(params.sign_exists !== undefined && { sign_exists: params.sign_exists }),
+      ...(params.sign_exists !== undefined && {
+        sign_exists: params.sign_exists,
+      }),
       ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state })
+      ...(session?.session_state && { session_state: session.session_state }),
     };
   }
 
@@ -200,7 +219,7 @@ export class HighTester extends LambdaTester {
       [nameField]: objectName,
       ...(transportRequest && { transport_request: transportRequest }),
       ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state })
+      ...(session?.session_state && { session_state: session.session_state }),
     };
   }
 
@@ -219,7 +238,8 @@ export class HighTester extends LambdaTester {
     if (handlerName.includes('behavior_definition')) return 'bdef_name';
     if (handlerName.includes('behavior_implementation')) return 'bimp_name';
     if (handlerName.includes('metadata_extension')) return 'ddlx_name';
-    if (handlerName.includes('service_definition')) return 'service_definition_name';
+    if (handlerName.includes('service_definition'))
+      return 'service_definition_name';
     return 'name'; // fallback
   }
 

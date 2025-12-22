@@ -6,39 +6,47 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "UnlockDataElementLow",
-  description: "[low-level] Unlock an ABAP data element after modification. Must use the same session_id and lock_handle from LockDataElement operation.",
+  name: 'UnlockDataElementLow',
+  description:
+    '[low-level] Unlock an ABAP data element after modification. Must use the same session_id and lock_handle from LockDataElement operation.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       data_element_name: {
-        type: "string",
-        description: "DataElement name (e.g., Z_MY_PROGRAM)."
+        type: 'string',
+        description: 'DataElement name (e.g., Z_MY_PROGRAM).',
       },
       lock_handle: {
-        type: "string",
-        description: "Lock handle from LockDataElement operation."
+        type: 'string',
+        description: 'Lock handle from LockDataElement operation.',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from LockDataElement operation. Must be the same as used in LockDataElement."
+        type: 'string',
+        description:
+          'Session ID from LockDataElement operation. Must be the same as used in LockDataElement.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from LockDataElement (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from LockDataElement (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["data_element_name", "lock_handle", "session_id"]
-  }
+    required: ['data_element_name', 'lock_handle', 'session_id'],
+  },
 } as const;
 
 interface UnlockDataElementArgs {
@@ -57,19 +65,22 @@ interface UnlockDataElementArgs {
  *
  * Uses CrudClient.unlockDataElement - low-level single method call
  */
-export async function handleUnlockDataElement(context: HandlerContext, args: UnlockDataElementArgs) {
+export async function handleUnlockDataElement(
+  context: HandlerContext,
+  args: UnlockDataElementArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      data_element_name,
-      lock_handle,
-      session_id,
-      session_state
-    } = args as UnlockDataElementArgs;
+    const { data_element_name, lock_handle, session_id, session_state } =
+      args as UnlockDataElementArgs;
 
     // Validation
     if (!data_element_name || !lock_handle || !session_id) {
-      return return_error(new Error('data_element_name, lock_handle, and session_id are required'));
+      return return_error(
+        new Error(
+          'data_element_name, lock_handle, and session_id are required',
+        ),
+      );
     }
 
     const client = new CrudClient(connection);
@@ -86,31 +97,42 @@ export async function handleUnlockDataElement(context: HandlerContext, args: Unl
 
     try {
       // Unlock data element
-      await client.unlockDataElement({ dataElementName: dataElementName }, lock_handle);
+      await client.unlockDataElement(
+        { dataElementName: dataElementName },
+        lock_handle,
+      );
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {
-        logger?.error(`Unlock did not return a response for data element ${dataElementName}`);
-        throw new Error(`Unlock did not return a response for data element ${dataElementName}`);
+        logger?.error(
+          `Unlock did not return a response for data element ${dataElementName}`,
+        );
+        throw new Error(
+          `Unlock did not return a response for data element ${dataElementName}`,
+        );
       }
 
       // Get updated session state after unlock
 
-
       logger?.info(`✅ UnlockDataElement completed: ${dataElementName}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          data_element_name: dataElementName,
-          session_id: session_id,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: `DataElement ${dataElementName} unlocked successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            data_element_name: dataElementName,
+            session_id: session_id,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: `DataElement ${dataElementName} unlocked successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error unlocking data element ${dataElementName}: ${error?.message || error}`);
+      logger?.error(
+        `Error unlocking data element ${dataElementName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to unlock data element: ${error.message || String(error)}`;
@@ -119,26 +141,30 @@ export async function handleUnlockDataElement(context: HandlerContext, args: Unl
         errorMessage = `DataElement ${dataElementName} not found.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockDataElement.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

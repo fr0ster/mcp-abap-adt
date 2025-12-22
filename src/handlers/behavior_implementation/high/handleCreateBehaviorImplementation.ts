@@ -7,50 +7,61 @@
  * Workflow: create -> lock -> update main source -> update implementations -> unlock -> activate
  */
 
-import { return_error, return_response, encodeSapObjectName } from '../../../lib/utils';
-import { validateTransportRequest  } from '../../../utils/transportValidation.js';
-import { XMLParser } from 'fast-xml-parser';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  encodeSapObjectName,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
+import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
-  name: "CreateBehaviorImplementation",
-  description: "Create a new ABAP behavior implementation class for a behavior definition. Behavior implementations contain the business logic for RAP entities. Uses stateful session for proper lock management.",
+  name: 'CreateBehaviorImplementation',
+  description:
+    'Create a new ABAP behavior implementation class for a behavior definition. Behavior implementations contain the business logic for RAP entities. Uses stateful session for proper lock management.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       class_name: {
-        type: "string",
-        description: "Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must follow SAP naming conventions (typically starts with ZBP_ for behavior implementations)."
+        type: 'string',
+        description:
+          'Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must follow SAP naming conventions (typically starts with ZBP_ for behavior implementations).',
       },
       behavior_definition: {
-        type: "string",
-        description: "Behavior Definition name (e.g., ZI_MY_ENTITY). The behavior definition must exist."
+        type: 'string',
+        description:
+          'Behavior Definition name (e.g., ZI_MY_ENTITY). The behavior definition must exist.',
       },
       description: {
-        type: "string",
-        description: "Class description. If not provided, class_name will be used."
+        type: 'string',
+        description:
+          'Class description. If not provided, class_name will be used.',
       },
       package_name: {
-        type: "string",
-        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects)"
+        type: 'string',
+        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects)',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable packages."
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
       implementation_code: {
-        type: "string",
-        description: "Implementation code for the implementations include (optional). Contains the actual behavior implementation methods."
+        type: 'string',
+        description:
+          'Implementation code for the implementations include (optional). Contains the actual behavior implementation methods.',
       },
       activate: {
-        type: "boolean",
-        description: "Activate behavior implementation after creation. Default: true."
-      }
+        type: 'boolean',
+        description:
+          'Activate behavior implementation after creation. Default: true.',
+      },
     },
-    required: ["class_name", "behavior_definition", "package_name"]
-  }
+    required: ['class_name', 'behavior_definition', 'package_name'],
+  },
 } as const;
 
 interface CreateBehaviorImplementationArgs {
@@ -68,7 +79,10 @@ interface CreateBehaviorImplementationArgs {
  *
  * Uses CrudClient.createBehaviorImplementation - full workflow
  */
-export async function handleCreateBehaviorImplementation(context: HandlerContext, args: CreateBehaviorImplementationArgs) {
+export async function handleCreateBehaviorImplementation(
+  context: HandlerContext,
+  args: CreateBehaviorImplementationArgs,
+) {
   const { connection, logger } = context;
   try {
     // Validate required parameters
@@ -90,12 +104,14 @@ export async function handleCreateBehaviorImplementation(context: HandlerContext
     }
 
     const typedArgs = args as CreateBehaviorImplementationArgs;
-            // Get connection from session context (set by ProtocolHandler)
+    // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
     const className = typedArgs.class_name.toUpperCase();
     const behaviorDefinition = typedArgs.behavior_definition.toUpperCase();
 
-    logger?.info(`Starting behavior implementation creation: ${className} for ${behaviorDefinition}`);
+    logger?.info(
+      `Starting behavior implementation creation: ${className} for ${behaviorDefinition}`,
+    );
 
     try {
       // Create client
@@ -103,40 +119,57 @@ export async function handleCreateBehaviorImplementation(context: HandlerContext
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Create behavior implementation (full workflow)
-      const createConfig: Partial<BehaviorImplementationBuilderConfig> & Pick<BehaviorImplementationBuilderConfig, 'className' | 'packageName' | 'behaviorDefinition'> = {
+      const createConfig: Partial<BehaviorImplementationBuilderConfig> &
+        Pick<
+          BehaviorImplementationBuilderConfig,
+          'className' | 'packageName' | 'behaviorDefinition'
+        > = {
         className: className,
         behaviorDefinition: behaviorDefinition,
         description: typedArgs.description || className,
         packageName: typedArgs.package_name.toUpperCase(),
         transportRequest: typedArgs.transport_request,
-        ...(typedArgs.implementation_code && { sourceCode: typedArgs.implementation_code })
+        ...(typedArgs.implementation_code && {
+          sourceCode: typedArgs.implementation_code,
+        }),
       };
 
       await client.createBehaviorImplementation(createConfig);
       const createResult = client.getCreateResult();
 
       if (!createResult) {
-        throw new Error(`Create did not return a response for behavior implementation ${className}`);
+        throw new Error(
+          `Create did not return a response for behavior implementation ${className}`,
+        );
       }
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];
       if (shouldActivate && client.getActivateResult()) {
         const activateResponse = client.getActivateResult()!;
-        if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
-          const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+        if (
+          typeof activateResponse.data === 'string' &&
+          activateResponse.data.includes('<chkl:messages')
+        ) {
+          const parser = new XMLParser({
+            ignoreAttributes: false,
+            attributeNamePrefix: '@_',
+          });
           const result = parser.parse(activateResponse.data);
-          const messages = result?.['chkl:messages']?.['msg'];
+          const messages = result?.['chkl:messages']?.msg;
           if (messages) {
             const msgArray = Array.isArray(messages) ? messages : [messages];
-            activationWarnings = msgArray.map((msg: any) =>
-              `${msg['@_type']}: ${msg['shortText']?.['txt'] || 'Unknown'}`
+            activationWarnings = msgArray.map(
+              (msg: any) =>
+                `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
             );
           }
         }
       }
 
-      logger?.info(`✅ CreateBehaviorImplementation completed successfully: ${className}`);
+      logger?.info(
+        `✅ CreateBehaviorImplementation completed successfully: ${className}`,
+      );
 
       // Return success result
       const stepsCompleted = ['create', 'lock', 'update_main_source'];
@@ -160,7 +193,8 @@ export async function handleCreateBehaviorImplementation(context: HandlerContext
           : `Behavior Implementation ${className} created successfully (not activated)`,
         uri: `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}`,
         steps_completed: stepsCompleted,
-        activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined
+        activation_warnings:
+          activationWarnings.length > 0 ? activationWarnings : undefined,
       };
 
       return return_response({
@@ -168,15 +202,23 @@ export async function handleCreateBehaviorImplementation(context: HandlerContext
         status: 200,
         statusText: 'OK',
         headers: {},
-        config: {} as any
+        config: {} as any,
       });
-
     } catch (error: any) {
-      logger?.error(`Error creating behavior implementation ${className}: ${error?.message || error}`);
+      logger?.error(
+        `Error creating behavior implementation ${className}: ${error?.message || error}`,
+      );
 
       // Check if behavior implementation already exists
-      if (error.message?.includes('already exists') || error.response?.status === 409) {
-        return return_error(new Error(`Behavior Implementation ${className} already exists. Please delete it first or use a different name.`));
+      if (
+        error.message?.includes('already exists') ||
+        error.response?.status === 409
+      ) {
+        return return_error(
+          new Error(
+            `Behavior Implementation ${className} already exists. Please delete it first or use a different name.`,
+          ),
+        );
       }
 
       // Parse error message
@@ -187,14 +229,16 @@ export async function handleCreateBehaviorImplementation(context: HandlerContext
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
@@ -202,7 +246,9 @@ export async function handleCreateBehaviorImplementation(context: HandlerContext
       return return_error(new Error(errorMessage));
     }
   } catch (error: any) {
-    logger?.error(`CreateBehaviorImplementation handler error: ${error?.message || error}`);
+    logger?.error(
+      `CreateBehaviorImplementation handler error: ${error?.message || error}`,
+    );
     return return_error(error);
   }
 }

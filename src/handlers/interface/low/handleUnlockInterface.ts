@@ -6,39 +6,47 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "UnlockInterfaceLow",
-  description: "[low-level] Unlock an ABAP interface after modification. Must use the same session_id and lock_handle from LockInterface operation.",
+  name: 'UnlockInterfaceLow',
+  description:
+    '[low-level] Unlock an ABAP interface after modification. Must use the same session_id and lock_handle from LockInterface operation.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       interface_name: {
-        type: "string",
-        description: "Interface name (e.g., Z_MY_PROGRAM)."
+        type: 'string',
+        description: 'Interface name (e.g., Z_MY_PROGRAM).',
       },
       lock_handle: {
-        type: "string",
-        description: "Lock handle from LockInterface operation."
+        type: 'string',
+        description: 'Lock handle from LockInterface operation.',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from LockInterface operation. Must be the same as used in LockInterface."
+        type: 'string',
+        description:
+          'Session ID from LockInterface operation. Must be the same as used in LockInterface.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from LockInterface (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from LockInterface (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["interface_name", "lock_handle", "session_id"]
-  }
+    required: ['interface_name', 'lock_handle', 'session_id'],
+  },
 } as const;
 
 interface UnlockInterfaceArgs {
@@ -57,19 +65,20 @@ interface UnlockInterfaceArgs {
  *
  * Uses CrudClient.unlockInterface - low-level single method call
  */
-export async function handleUnlockInterface(context: HandlerContext, args: UnlockInterfaceArgs) {
+export async function handleUnlockInterface(
+  context: HandlerContext,
+  args: UnlockInterfaceArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      interface_name,
-      lock_handle,
-      session_id,
-      session_state
-    } = args as UnlockInterfaceArgs;
+    const { interface_name, lock_handle, session_id, session_state } =
+      args as UnlockInterfaceArgs;
 
     // Validation
     if (!interface_name || !lock_handle || !session_id) {
-      return return_error(new Error('interface_name, lock_handle, and session_id are required'));
+      return return_error(
+        new Error('interface_name, lock_handle, and session_id are required'),
+      );
     }
 
     const client = new CrudClient(connection);
@@ -81,34 +90,45 @@ export async function handleUnlockInterface(context: HandlerContext, args: Unloc
 
     const interfaceName = interface_name.toUpperCase();
 
-    logger?.info(`Starting interface unlock: ${interfaceName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(
+      `Starting interface unlock: ${interfaceName} (session: ${session_id.substring(0, 8)}...)`,
+    );
 
     try {
       // Unlock interface
-      await client.unlockInterface({ interfaceName: interfaceName }, lock_handle);
+      await client.unlockInterface(
+        { interfaceName: interfaceName },
+        lock_handle,
+      );
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {
-        throw new Error(`Unlock did not return a response for interface ${interfaceName}`);
+        throw new Error(
+          `Unlock did not return a response for interface ${interfaceName}`,
+        );
       }
 
       // Get updated session state after unlock
 
-
       logger?.info(`✅ UnlockInterface completed: ${interfaceName}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          interface_name: interfaceName,
-          session_id: session_id,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: `Interface ${interfaceName} unlocked successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            interface_name: interfaceName,
+            session_id: session_id,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: `Interface ${interfaceName} unlocked successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error unlocking interface ${interfaceName}: ${error?.message || error}`);
+      logger?.error(
+        `Error unlocking interface ${interfaceName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to unlock interface: ${error.message || String(error)}`;
@@ -117,26 +137,30 @@ export async function handleUnlockInterface(context: HandlerContext, args: Unloc
         errorMessage = `Interface ${interfaceName} not found.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockInterface.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

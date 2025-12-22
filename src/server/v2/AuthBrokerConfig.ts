@@ -3,9 +3,9 @@
  * Maps v2 ServerConfig to IAuthBrokerFactoryConfig
  */
 
-import type { IAuthBrokerFactoryConfig } from "../../lib/auth/IAuthBrokerFactoryConfig.js";
-import type { IServerConfig } from "./IServerConfig.js";
-import type { ILogger } from "@mcp-abap-adt/interfaces";
+import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAuthBrokerFactoryConfig } from '../../lib/auth/IAuthBrokerFactoryConfig.js';
+import type { IServerConfig } from './IServerConfig.js';
 
 export class AuthBrokerConfig implements IAuthBrokerFactoryConfig {
   defaultMcpDestination?: string;
@@ -42,7 +42,10 @@ export class AuthBrokerConfig implements IAuthBrokerFactoryConfig {
     this.logger = logger;
   }
 
-  static fromServerConfig(config: IServerConfig, logger?: ILogger): AuthBrokerConfig {
+  static fromServerConfig(
+    config: IServerConfig,
+    logger?: ILogger,
+  ): AuthBrokerConfig {
     return new AuthBrokerConfig(config, logger);
   }
 }

@@ -4,13 +4,14 @@
  * Used by both old server (mcp_abap_adt_server) and new servers
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import { parse as parseYaml } from "yaml";
-import { ArgumentsParser, ParsedArguments } from "./ArgumentsParser.js";
-import type { IServerConfig } from "../../server/v1/IServerConfig.js";
-import { TransportConfig } from "../utils.js";
-import { YamlConfig, loadYamlConfig, generateConfigTemplateIfNeeded } from "./yamlConfig.js";
+import type { IServerConfig } from '../../server/v1/IServerConfig.js';
+import type { TransportConfig } from '../utils.js';
+import { ArgumentsParser, type ParsedArguments } from './ArgumentsParser.js';
+import {
+  generateConfigTemplateIfNeeded,
+  loadYamlConfig,
+  type YamlConfig,
+} from './yamlConfig.js';
 
 export class ConfigLoader {
   /**
@@ -26,40 +27,51 @@ export class ConfigLoader {
     if (cliArgs.config) {
       try {
         // Generate template if file doesn't exist
-        const templateGenerated = generateConfigTemplateIfNeeded(cliArgs.config);
+        const templateGenerated = generateConfigTemplateIfNeeded(
+          cliArgs.config,
+        );
         if (templateGenerated) {
           // Template was generated, exit (handled by caller)
-          throw new Error("Config template generated");
+          throw new Error('Config template generated');
         }
 
         // Load YAML config
         yamlConfig = loadYamlConfig(cliArgs.config);
       } catch (error) {
         // If template was generated, re-throw to let caller handle
-        if (error instanceof Error && error.message === "Config template generated") {
+        if (
+          error instanceof Error &&
+          error.message === 'Config template generated'
+        ) {
           throw error;
         }
         // Otherwise, log warning and continue without YAML
-        console.error(`[MCP-CONFIG] Failed to load YAML config: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(
+          `[MCP-CONFIG] Failed to load YAML config: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 
     // Merge YAML into CLI args (CLI has priority)
-    const mergedArgs = this.mergeConfig(cliArgs, yamlConfig);
+    const mergedArgs = ConfigLoader.mergeConfig(cliArgs, yamlConfig);
 
     // Build transport config
-    const transportConfig = this.buildTransportConfig(mergedArgs);
+    const transportConfig = ConfigLoader.buildTransportConfig(mergedArgs);
 
     // Build server config
     const config: IServerConfig = {
       defaultMcpDestination: mergedArgs.mcp,
-      defaultDestination: mergedArgs.mcp || (mergedArgs.env ? undefined : undefined), // Will be resolved later
+      defaultDestination:
+        mergedArgs.mcp || (mergedArgs.env ? undefined : undefined), // Will be resolved later
       envFilePath: mergedArgs.env,
       authBrokerPath: mergedArgs.authBrokerPath,
       unsafe: mergedArgs.unsafe,
       useAuthBroker: mergedArgs.useAuthBroker,
       transportConfig,
-      transport: transportConfig.type === 'streamable-http' ? 'http' : transportConfig.type as 'stdio' | 'sse',
+      transport:
+        transportConfig.type === 'streamable-http'
+          ? 'http'
+          : (transportConfig.type as 'stdio' | 'sse'),
     };
 
     return config;
@@ -68,7 +80,10 @@ export class ConfigLoader {
   /**
    * Merge YAML config into CLI arguments (CLI overrides YAML)
    */
-  private static mergeConfig(cliArgs: ParsedArguments, yamlConfig: YamlConfig | null): ParsedArguments {
+  private static mergeConfig(
+    cliArgs: ParsedArguments,
+    yamlConfig: YamlConfig | null,
+  ): ParsedArguments {
     if (!yamlConfig) {
       return cliArgs;
     }
@@ -96,13 +111,13 @@ export class ConfigLoader {
     }
 
     // Merge auth-broker flag (CLI overrides YAML)
-    if (!merged.useAuthBroker && yamlConfig["auth-broker"]) {
-      merged.useAuthBroker = yamlConfig["auth-broker"];
+    if (!merged.useAuthBroker && yamlConfig['auth-broker']) {
+      merged.useAuthBroker = yamlConfig['auth-broker'];
     }
 
     // Merge auth-broker-path (CLI overrides YAML)
-    if (!merged.authBrokerPath && yamlConfig["auth-broker-path"]) {
-      merged.authBrokerPath = yamlConfig["auth-broker-path"];
+    if (!merged.authBrokerPath && yamlConfig['auth-broker-path']) {
+      merged.authBrokerPath = yamlConfig['auth-broker-path'];
     }
 
     // Merge HTTP options (CLI overrides YAML)
@@ -113,17 +128,21 @@ export class ConfigLoader {
       if (!merged.httpHost && yamlConfig.http.host) {
         merged.httpHost = yamlConfig.http.host;
       }
-      if (!merged.httpJsonResponse && yamlConfig.http["json-response"]) {
-        merged.httpJsonResponse = yamlConfig.http["json-response"];
+      if (!merged.httpJsonResponse && yamlConfig.http['json-response']) {
+        merged.httpJsonResponse = yamlConfig.http['json-response'];
       }
-      if (!merged.httpAllowedOrigins && yamlConfig.http["allowed-origins"]) {
-        merged.httpAllowedOrigins = yamlConfig.http["allowed-origins"];
+      if (!merged.httpAllowedOrigins && yamlConfig.http['allowed-origins']) {
+        merged.httpAllowedOrigins = yamlConfig.http['allowed-origins'];
       }
-      if (!merged.httpAllowedHosts && yamlConfig.http["allowed-hosts"]) {
-        merged.httpAllowedHosts = yamlConfig.http["allowed-hosts"];
+      if (!merged.httpAllowedHosts && yamlConfig.http['allowed-hosts']) {
+        merged.httpAllowedHosts = yamlConfig.http['allowed-hosts'];
       }
-      if (!merged.httpEnableDnsProtection && yamlConfig.http["enable-dns-protection"]) {
-        merged.httpEnableDnsProtection = yamlConfig.http["enable-dns-protection"];
+      if (
+        !merged.httpEnableDnsProtection &&
+        yamlConfig.http['enable-dns-protection']
+      ) {
+        merged.httpEnableDnsProtection =
+          yamlConfig.http['enable-dns-protection'];
       }
     }
 
@@ -135,14 +154,17 @@ export class ConfigLoader {
       if (!merged.sseHost && yamlConfig.sse.host) {
         merged.sseHost = yamlConfig.sse.host;
       }
-      if (!merged.sseAllowedOrigins && yamlConfig.sse["allowed-origins"]) {
-        merged.sseAllowedOrigins = yamlConfig.sse["allowed-origins"];
+      if (!merged.sseAllowedOrigins && yamlConfig.sse['allowed-origins']) {
+        merged.sseAllowedOrigins = yamlConfig.sse['allowed-origins'];
       }
-      if (!merged.sseAllowedHosts && yamlConfig.sse["allowed-hosts"]) {
-        merged.sseAllowedHosts = yamlConfig.sse["allowed-hosts"];
+      if (!merged.sseAllowedHosts && yamlConfig.sse['allowed-hosts']) {
+        merged.sseAllowedHosts = yamlConfig.sse['allowed-hosts'];
       }
-      if (!merged.sseEnableDnsProtection && yamlConfig.sse["enable-dns-protection"]) {
-        merged.sseEnableDnsProtection = yamlConfig.sse["enable-dns-protection"];
+      if (
+        !merged.sseEnableDnsProtection &&
+        yamlConfig.sse['enable-dns-protection']
+      ) {
+        merged.sseEnableDnsProtection = yamlConfig.sse['enable-dns-protection'];
       }
     }
 
@@ -153,28 +175,28 @@ export class ConfigLoader {
    * Build transport configuration from parsed arguments
    */
   private static buildTransportConfig(args: ParsedArguments): TransportConfig {
-    const transportType = args.transport || "stdio";
+    const transportType = args.transport || 'stdio';
 
     // Normalize transport type
     let normalized = transportType;
-    if (normalized === "http" || normalized === "server") {
-      normalized = "streamable-http";
+    if (normalized === 'http' || normalized === 'server') {
+      normalized = 'streamable-http';
     }
 
     // Validate transport type
     if (
-      normalized !== "stdio" &&
-      normalized !== "streamable-http" &&
-      normalized !== "sse"
+      normalized !== 'stdio' &&
+      normalized !== 'streamable-http' &&
+      normalized !== 'sse'
     ) {
       throw new Error(`Unsupported transport: ${normalized}`);
     }
 
     // Build transport config based on type
-    if (normalized === "sse") {
+    if (normalized === 'sse') {
       return {
-        type: "sse",
-        host: args.sseHost || "127.0.0.1",
+        type: 'sse',
+        host: args.sseHost || '127.0.0.1',
         port: args.ssePort || 3001,
         allowedOrigins: args.sseAllowedOrigins,
         allowedHosts: args.sseAllowedHosts,
@@ -182,10 +204,10 @@ export class ConfigLoader {
       };
     }
 
-    if (normalized === "streamable-http") {
+    if (normalized === 'streamable-http') {
       return {
-        type: "streamable-http",
-        host: args.httpHost || "127.0.0.1",
+        type: 'streamable-http',
+        host: args.httpHost || '127.0.0.1',
         port: args.httpPort || 3000,
         enableJsonResponse: args.httpJsonResponse || false,
         allowedOrigins: args.httpAllowedOrigins,
@@ -196,8 +218,7 @@ export class ConfigLoader {
 
     // stdio transport (default)
     return {
-      type: "stdio",
+      type: 'stdio',
     };
   }
 }
-

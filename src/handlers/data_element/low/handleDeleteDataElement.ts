@@ -6,26 +6,32 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "DeleteDataElementLow",
-  description: "[low-level] Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for $TMP objects.",
+  name: 'DeleteDataElementLow',
+  description:
+    '[low-level] Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       data_element_name: {
-        type: "string",
-        description: "DataElement name (e.g., Z_MY_PROGRAM)."
+        type: 'string',
+        description: 'DataElement name (e.g., Z_MY_PROGRAM).',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP)."
-      }
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
+      },
     },
-    required: ["data_element_name"]
-  }
+    required: ['data_element_name'],
+  },
 } as const;
 
 interface DeleteDataElementArgs {
@@ -38,13 +44,14 @@ interface DeleteDataElementArgs {
  *
  * Uses CrudClient.deleteDataElement - low-level single method call
  */
-export async function handleDeleteDataElement(context: HandlerContext, args: DeleteDataElementArgs) {
+export async function handleDeleteDataElement(
+  context: HandlerContext,
+  args: DeleteDataElementArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      data_element_name,
-      transport_request
-    } = args as DeleteDataElementArgs;
+    const { data_element_name, transport_request } =
+      args as DeleteDataElementArgs;
 
     // Validation
     if (!data_element_name) {
@@ -58,26 +65,38 @@ export async function handleDeleteDataElement(context: HandlerContext, args: Del
 
     try {
       // Delete data element
-      await client.deleteDataElement({ dataElementName: dataElementName, transportRequest: transport_request });
+      await client.deleteDataElement({
+        dataElementName: dataElementName,
+        transportRequest: transport_request,
+      });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {
-        throw new Error(`Delete did not return a response for data element ${dataElementName}`);
+        throw new Error(
+          `Delete did not return a response for data element ${dataElementName}`,
+        );
       }
 
-      logger?.info(`✅ DeleteDataElement completed successfully: ${dataElementName}`);
+      logger?.info(
+        `✅ DeleteDataElement completed successfully: ${dataElementName}`,
+      );
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          data_element_name: dataElementName,
-          transport_request: transport_request || null,
-          message: `DataElement ${dataElementName} deleted successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            data_element_name: dataElementName,
+            transport_request: transport_request || null,
+            message: `DataElement ${dataElementName} deleted successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error deleting data element ${dataElementName}: ${error?.message || error}`);
+      logger?.error(
+        `Error deleting data element ${dataElementName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to delete data element: ${error.message || String(error)}`;
@@ -88,26 +107,30 @@ export async function handleDeleteDataElement(context: HandlerContext, args: Del
         errorMessage = `DataElement ${dataElementName} is locked by another user. Cannot delete.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

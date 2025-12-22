@@ -8,18 +8,26 @@
  * - Extract session state directly from connection
  */
 
-import { extractSessionState } from './testHelpers';
-import { loadTestEnv, getSapConfigFromEnv, loadTestConfig } from './configHelpers';
-import { AbapConnection, createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
-import { generateSessionId } from '../../../lib/sessionUtils';
-import { createTestLogger } from './loggerHelpers';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { AuthBroker } from '@mcp-abap-adt/auth-broker';
 import { BtpTokenProvider } from '@mcp-abap-adt/auth-providers';
-import { getPlatformStoresAsync } from '../../../lib/stores';
-import type { ISessionStore, IServiceKeyStore } from '@mcp-abap-adt/interfaces';
+import {
+  type AbapConnection,
+  createAbapConnection,
+  type SapConfig,
+} from '@mcp-abap-adt/connection';
+import type { IServiceKeyStore, ISessionStore } from '@mcp-abap-adt/interfaces';
 import { defaultLogger } from '@mcp-abap-adt/logger';
-import * as path from 'path';
-import * as fs from 'fs';
+import { generateSessionId } from '../../../lib/sessionUtils';
+import { getPlatformStoresAsync } from '../../../lib/stores';
+import {
+  getSapConfigFromEnv,
+  loadTestConfig,
+  loadTestEnv,
+} from './configHelpers';
+import { createTestLogger } from './loggerHelpers';
+import { extractSessionState } from './testHelpers';
 
 const sessionLogger = createTestLogger('connection');
 
@@ -39,7 +47,10 @@ export interface SessionInfo {
  * 2. If no destination but .env file exists - use AuthBroker with SessionStore from .env file directory
  * 3. Fallback to getSapConfigFromEnv() if AuthBroker fails
  */
-async function createConnectionViaBroker(destination?: string, envFilePath?: string): Promise<AbapConnection | null> {
+async function createConnectionViaBroker(
+  destination?: string,
+  envFilePath?: string,
+): Promise<AbapConnection | null> {
   try {
     const config = loadTestConfig();
     const useUnsafe =
@@ -48,7 +59,8 @@ async function createConnectionViaBroker(destination?: string, envFilePath?: str
       config?.auth_broker?.unsafe_session_store === true;
 
     // Get destination from config if not provided
-    const actualDestination = destination ||
+    const actualDestination =
+      destination ||
       config?.auth_broker?.abap?.destination ||
       config?.abap?.destination ||
       config?.environment?.destination ||
@@ -68,12 +80,16 @@ async function createConnectionViaBroker(destination?: string, envFilePath?: str
     // (same logic as index.ts lines 1128-1147)
     if (!actualDestination && envFilePath) {
       const envFileDir = path.dirname(envFilePath);
-      const stores = await getPlatformStoresAsync(envFileDir, useUnsafe, 'default');
+      const stores = await getPlatformStoresAsync(
+        envFileDir,
+        useUnsafe,
+        'default',
+      );
       serviceKeyStore = stores.serviceKeyStore;
       sessionStore = stores.sessionStore;
       storeType = stores.storeType;
 
-      sessionLogger?.debug("Created SessionStore from .env file directory", {
+      sessionLogger?.debug('Created SessionStore from .env file directory', {
         envFilePath,
         envFileDir,
         destination: 'default',
@@ -82,7 +98,11 @@ async function createConnectionViaBroker(destination?: string, envFilePath?: str
       });
     } else if (actualDestination) {
       // Use destination-based stores
-      const stores = await getPlatformStoresAsync(undefined, useUnsafe, actualDestination);
+      const stores = await getPlatformStoresAsync(
+        undefined,
+        useUnsafe,
+        actualDestination,
+      );
       serviceKeyStore = stores.serviceKeyStore;
       sessionStore = stores.sessionStore;
       storeType = stores.storeType;
@@ -98,7 +118,7 @@ async function createConnectionViaBroker(destination?: string, envFilePath?: str
         tokenProvider,
       },
       'system',
-      defaultLogger
+      defaultLogger,
     );
 
     // Try to get connection config and token from broker
@@ -109,10 +129,10 @@ async function createConnectionViaBroker(destination?: string, envFilePath?: str
       if (jwtToken) {
         const config: SapConfig = {
           url: connConfig.serviceUrl,
-          authType: "jwt",
+          authType: 'jwt',
           jwtToken,
         };
-        sessionLogger?.info("Using connection from auth broker", {
+        sessionLogger?.info('Using connection from auth broker', {
           destination: brokerDestination,
           url: config.url,
           authType: config.authType,
@@ -128,7 +148,7 @@ async function createConnectionViaBroker(destination?: string, envFilePath?: str
       }
     }
   } catch (error: any) {
-    sessionLogger?.warn("Failed to create connection via AuthBroker", {
+    sessionLogger?.warn('Failed to create connection via AuthBroker', {
       error: error instanceof Error ? error.message : String(error),
     });
   }
@@ -148,12 +168,14 @@ export async function createTestConnectionAndSession(): Promise<{
   try {
     await loadTestEnv();
   } catch (error: any) {
-    sessionLogger?.warn(`[createTestConnectionAndSession] loadTestEnv failed: ${error?.message || String(error)}`);
+    sessionLogger?.warn(
+      `[createTestConnectionAndSession] loadTestEnv failed: ${error?.message || String(error)}`,
+    );
   }
 
   try {
     // Try to find .env file path (same logic as loadTestEnv)
-    let envFilePath: string | undefined = undefined;
+    let envFilePath: string | undefined;
     if (process.env.MCP_ENV_PATH) {
       const resolvedPath = path.resolve(process.env.MCP_ENV_PATH);
       if (fs.existsSync(resolvedPath)) {
@@ -178,12 +200,16 @@ export async function createTestConnectionAndSession(): Promise<{
     try {
       connection = await createConnectionViaBroker(undefined, envFilePath);
     } catch (brokerError: any) {
-      sessionLogger?.debug(`[createTestConnectionAndSession] AuthBroker failed: ${brokerError?.message || String(brokerError)}`);
+      sessionLogger?.debug(
+        `[createTestConnectionAndSession] AuthBroker failed: ${brokerError?.message || String(brokerError)}`,
+      );
     }
 
     // Fallback to getSapConfigFromEnv() if AuthBroker failed
     if (!connection) {
-      sessionLogger?.debug("[createTestConnectionAndSession] Using fallback: getSapConfigFromEnv()");
+      sessionLogger?.debug(
+        '[createTestConnectionAndSession] Using fallback: getSapConfigFromEnv()',
+      );
       const config = getSapConfigFromEnv();
 
       // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
@@ -201,11 +227,13 @@ export async function createTestConnectionAndSession(): Promise<{
 
     // Log token info from connection (what's actually used in session)
     if (process.env.DEBUG_TESTS === 'true') {
-      let connectionConfig: any = undefined;
+      let connectionConfig: any;
       try {
         connectionConfig = connection.getConfig();
       } catch (error: any) {
-        sessionLogger?.warn(`[getTestSession] Failed to get connection config: ${error?.message}`);
+        sessionLogger?.warn(
+          `[getTestSession] Failed to get connection config: ${error?.message}`,
+        );
       }
 
       const connectionConfigJwtToken = connectionConfig?.jwtToken;
@@ -215,13 +243,15 @@ export async function createTestConnectionAndSession(): Promise<{
       const refreshTokenPreview = connectionConfigRefreshToken
         ? connectionConfigRefreshToken.length > 20
           ? `${connectionConfigRefreshToken.substring(0, 10)}...${connectionConfigRefreshToken.substring(connectionConfigRefreshToken.length - 10)}`
-          : connectionConfigRefreshToken.substring(0, 10) + '...' // If too short, show only first 10
+          : `${connectionConfigRefreshToken.substring(0, 10)}...` // If too short, show only first 10
         : 'empty';
 
       sessionLogger?.debug(
         `[getTestSession] Connection tokens: ${JSON.stringify({
           hasJwtToken: !!connectionConfigJwtToken,
-          jwtTokenStart: connectionConfigJwtToken ? `${connectionConfigJwtToken.substring(0, 20)}...` : 'empty',
+          jwtTokenStart: connectionConfigJwtToken
+            ? `${connectionConfigJwtToken.substring(0, 20)}...`
+            : 'empty',
           jwtTokenEnd:
             connectionConfigJwtToken && connectionConfigJwtToken.length > 20
               ? `...${connectionConfigJwtToken.substring(connectionConfigJwtToken.length - 20)}`
@@ -239,7 +269,7 @@ export async function createTestConnectionAndSession(): Promise<{
             connectionConfig?.uaaClientId &&
             connectionConfig?.uaaClientSecret
           ),
-        })}`
+        })}`,
       );
     }
 
@@ -256,11 +286,13 @@ export async function createTestConnectionAndSession(): Promise<{
     const csrfToken = connectionAny.getCsrfToken?.() || '';
 
     if (!cookies || !csrfToken) {
-      throw new Error('Failed to get session state. Connection may not be properly initialized.');
+      throw new Error(
+        'Failed to get session state. Connection may not be properly initialized.',
+      );
     }
 
     // Get cookie store from connection if available
-    let cookieStore: Record<string, string> = {};
+    const cookieStore: Record<string, string> = {};
     try {
       // Cookie store is typically internal to connection, so we'll use empty object
       // The cookies string contains all necessary information
@@ -273,20 +305,22 @@ export async function createTestConnectionAndSession(): Promise<{
       session_state: {
         cookies: cookies || '',
         csrf_token: csrfToken || '',
-        cookie_store: cookieStore
-      }
+        cookie_store: cookieStore,
+      },
     };
 
     return {
       connection,
-      session
+      session,
     };
   } catch (error: any) {
     sessionLogger?.error(
-      `[createTestConnectionAndSession] Error caught: ${error?.message || String(error)}`
+      `[createTestConnectionAndSession] Error caught: ${error?.message || String(error)}`,
     );
     if (process.env.DEBUG_TESTS === 'true' && error?.stack) {
-      sessionLogger?.debug(`[createTestConnectionAndSession] Stack: ${error.stack}`);
+      sessionLogger?.debug(
+        `[createTestConnectionAndSession] Stack: ${error.stack}`,
+      );
     }
     throw error;
   }
@@ -307,7 +341,7 @@ export async function getTestSession(): Promise<SessionInfo> {
  */
 export function updateSessionFromResponse(
   currentSession: SessionInfo | null,
-  handlerResponse: any
+  handlerResponse: any,
 ): SessionInfo {
   const { session_id, session_state } = extractSessionState(handlerResponse);
 
@@ -316,12 +350,14 @@ export function updateSessionFromResponse(
     if (currentSession) {
       return currentSession;
     }
-    throw new Error('Handler response does not contain session information and no current session available');
+    throw new Error(
+      'Handler response does not contain session information and no current session available',
+    );
   }
 
   return {
     session_id,
-    session_state
+    session_state,
   };
 }
 
@@ -332,11 +368,13 @@ export function extractLockSession(lockResponse: any): SessionInfo {
   const { session_id, session_state } = extractSessionState(lockResponse);
 
   if (!session_id || !session_state) {
-    throw new Error('Lock response does not contain session_id and session_state');
+    throw new Error(
+      'Lock response does not contain session_id and session_state',
+    );
   }
 
   return {
     session_id,
-    session_state
+    session_state,
   };
 }

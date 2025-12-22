@@ -12,35 +12,29 @@
  * Run: npm test -- --testPathPattern=integration/domain
  */
 
-import { handleValidateDomain } from '../../../../handlers/domain/low/handleValidateDomain';
-import { handleCreateDomain } from '../../../../handlers/domain/low/handleCreateDomain';
-import { handleLockDomain } from '../../../../handlers/domain/low/handleLockDomain';
-import { handleUpdateDomain } from '../../../../handlers/domain/low/handleUpdateDomain';
-import { handleUnlockDomain } from '../../../../handlers/domain/low/handleUnlockDomain';
 import { handleActivateDomain } from '../../../../handlers/domain/low/handleActivateDomain';
+import { handleCreateDomain } from '../../../../handlers/domain/low/handleCreateDomain';
 import { handleDeleteDomain } from '../../../../handlers/domain/low/handleDeleteDomain';
-
-import { LowTester } from '../../helpers/testers/LowTester';
+import { handleLockDomain } from '../../../../handlers/domain/low/handleLockDomain';
+import { handleUnlockDomain } from '../../../../handlers/domain/low/handleUnlockDomain';
+import { handleUpdateDomain } from '../../../../handlers/domain/low/handleUpdateDomain';
+import { handleValidateDomain } from '../../../../handlers/domain/low/handleValidateDomain';
 import { getTimeout } from '../../helpers/configHelpers';
+import { LowTester } from '../../helpers/testers/LowTester';
 
 describe('Domain Low-Level Handlers Integration', () => {
   let tester: LowTester;
 
   beforeAll(async () => {
-    tester = new LowTester(
-      'create_domain_low',
-      'full_workflow',
-      'domain-low',
-      {
-        validate: handleValidateDomain,
-        create: handleCreateDomain,
-        lock: handleLockDomain,
-        update: handleUpdateDomain,
-        unlock: handleUnlockDomain,
-        activate: handleActivateDomain,
-        delete: handleDeleteDomain
-      }
-    );
+    tester = new LowTester('create_domain_low', 'full_workflow', 'domain-low', {
+      validate: handleValidateDomain,
+      create: handleCreateDomain,
+      lock: handleLockDomain,
+      update: handleUpdateDomain,
+      unlock: handleUnlockDomain,
+      activate: handleActivateDomain,
+      delete: handleDeleteDomain,
+    });
     await tester.beforeAll();
   });
 
@@ -56,7 +50,11 @@ describe('Domain Low-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it('should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate', async () => {
-    await tester.run();
-  }, getTimeout('long'));
+  it(
+    'should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate',
+    async () => {
+      await tester.run();
+    },
+    getTimeout('long'),
+  );
 });

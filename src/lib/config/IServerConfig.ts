@@ -3,7 +3,7 @@
  * Shared by both v1 and v2 servers
  */
 
-import type { TransportConfig } from "../utils.js";
+import type { TransportConfig } from '../utils.js';
 
 /** Transport type (simple string for v2) */
 export type Transport = 'stdio' | 'sse' | 'http';
@@ -87,4 +87,3 @@ export interface IServerConfig {
   /** Logger instance (v1 only) */
   logger?: any;
 }
-

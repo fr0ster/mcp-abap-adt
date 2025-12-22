@@ -1,14 +1,15 @@
-import { McpError, ErrorCode } from '../../../lib/utils';
-import * as z from 'zod';
 import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ErrorCode, McpError } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "GetProgram",
-  description: "[read-only] Retrieve ABAP program source code. Returns only the main program source code without includes or enhancements.",
+  name: 'GetProgram',
+  description:
+    '[read-only] Retrieve ABAP program source code. Returns only the main program source code without includes or enhancements.',
   inputSchema: {
-    program_name: z.string().describe("Name of the ABAP program")
-  }
+    program_name: z.string().describe('Name of the ABAP program'),
+  },
 } as const;
 
 export async function handleGetProgram(context: HandlerContext, args: any) {
@@ -26,18 +27,21 @@ export async function handleGetProgram(context: HandlerContext, args: any) {
     logger?.debug(`Successfully read program ${args.program_name}`);
     return {
       isError: false,
-      content: [{ type: "json", json: result }],
+      content: [{ type: 'json', json: result }],
     };
   } catch (error) {
-    logger?.error(`Failed to read program ${args?.program_name || ''}`, error as any);
+    logger?.error(
+      `Failed to read program ${args?.program_name || ''}`,
+      error as any,
+    );
     return {
       isError: true,
       content: [
         {
           type: 'text',
-          text: error instanceof Error ? error.message : String(error)
-        }
-      ]
+          text: error instanceof Error ? error.message : String(error),
+        },
+      ],
     };
   }
 }

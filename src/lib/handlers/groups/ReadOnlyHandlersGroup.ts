@@ -1,58 +1,98 @@
-import { BaseHandlerGroup } from "../base/BaseHandlerGroup.js";
-import { HandlerEntry } from "../interfaces.js";
-
+import {
+  TOOL_DEFINITION as GetBdef_Tool,
+  handleGetBdef,
+} from '../../../handlers/behavior_definition/readonly/handleGetBdef';
+import {
+  TOOL_DEFINITION as GetClass_Tool,
+  handleGetClass,
+} from '../../../handlers/class/readonly/handleGetClass';
+import {
+  TOOL_DEFINITION as GetDataElement_Tool,
+  handleGetDataElement,
+} from '../../../handlers/data_element/readonly/handleGetDataElement';
+import {
+  TOOL_DEFINITION as GetDomain_Tool,
+  handleGetDomain,
+} from '../../../handlers/domain/readonly/handleGetDomain';
+import {
+  TOOL_DEFINITION as GetEnhancementImpl_Tool,
+  handleGetEnhancementImpl,
+} from '../../../handlers/enhancement/readonly/handleGetEnhancementImpl';
+import {
+  TOOL_DEFINITION as GetEnhancementSpot_Tool,
+  handleGetEnhancementSpot,
+} from '../../../handlers/enhancement/readonly/handleGetEnhancementSpot';
+import {
+  TOOL_DEFINITION as GetEnhancements_Tool,
+  handleGetEnhancements,
+} from '../../../handlers/enhancement/readonly/handleGetEnhancements';
+import {
+  TOOL_DEFINITION as GetFunction_Tool,
+  handleGetFunction,
+} from '../../../handlers/function/readonly/handleGetFunction';
+import {
+  TOOL_DEFINITION as GetFunctionGroup_Tool,
+  handleGetFunctionGroup,
+} from '../../../handlers/function/readonly/handleGetFunctionGroup';
+import {
+  TOOL_DEFINITION as GetInclude_Tool,
+  handleGetInclude,
+} from '../../../handlers/include/readonly/handleGetInclude';
+import {
+  TOOL_DEFINITION as GetIncludesList_Tool,
+  handleGetIncludesList,
+} from '../../../handlers/include/readonly/handleGetIncludesList';
+import {
+  TOOL_DEFINITION as GetInterface_Tool,
+  handleGetInterface,
+} from '../../../handlers/interface/readonly/handleGetInterface';
+import {
+  TOOL_DEFINITION as GetPackage_Tool,
+  handleGetPackage,
+} from '../../../handlers/package/readonly/handleGetPackage';
+import {
+  TOOL_DEFINITION as GetProgFullCode_Tool,
+  handleGetProgFullCode,
+} from '../../../handlers/program/readonly/handleGetProgFullCode';
 // Import readonly handlers
-import { handleGetProgram } from "../../../handlers/program/readonly/handleGetProgram";
-import { handleGetClass } from "../../../handlers/class/readonly/handleGetClass";
-import { handleGetFunctionGroup } from "../../../handlers/function/readonly/handleGetFunctionGroup";
-import { handleGetFunction } from "../../../handlers/function/readonly/handleGetFunction";
-import { handleGetTable } from "../../../handlers/table/readonly/handleGetTable";
-import { handleGetStructure } from "../../../handlers/structure/readonly/handleGetStructure";
-import { handleGetTableContents } from "../../../handlers/table/readonly/handleGetTableContents";
-import { handleGetPackage } from "../../../handlers/package/readonly/handleGetPackage";
-import { handleGetInclude } from "../../../handlers/include/readonly/handleGetInclude";
-import { handleGetIncludesList } from "../../../handlers/include/readonly/handleGetIncludesList";
-import { handleGetEnhancements } from "../../../handlers/enhancement/readonly/handleGetEnhancements";
-import { handleGetEnhancementSpot } from "../../../handlers/enhancement/readonly/handleGetEnhancementSpot";
-import { handleGetEnhancementImpl } from "../../../handlers/enhancement/readonly/handleGetEnhancementImpl";
-import { handleGetBdef } from "../../../handlers/behavior_definition/readonly/handleGetBdef";
-import { handleGetInterface } from "../../../handlers/interface/readonly/handleGetInterface";
-import { handleGetDomain } from "../../../handlers/domain/readonly/handleGetDomain";
-import { handleGetDataElement } from "../../../handlers/data_element/readonly/handleGetDataElement";
-import { handleGetTransport } from "../../../handlers/transport/readonly/handleGetTransport";
-import { handleGetView } from "../../../handlers/view/readonly/handleGetView";
-import { handleGetServiceDefinition } from "../../../handlers/service_definition/readonly/handleGetServiceDefinition";
-import { handleGetProgFullCode } from "../../../handlers/program/readonly/handleGetProgFullCode";
-
 // Import TOOL_DEFINITION from handlers
-import { TOOL_DEFINITION as GetProgram_Tool } from "../../../handlers/program/readonly/handleGetProgram";
-import { TOOL_DEFINITION as GetClass_Tool } from "../../../handlers/class/readonly/handleGetClass";
-import { TOOL_DEFINITION as GetFunction_Tool } from "../../../handlers/function/readonly/handleGetFunction";
-import { TOOL_DEFINITION as GetFunctionGroup_Tool } from "../../../handlers/function/readonly/handleGetFunctionGroup";
-import { TOOL_DEFINITION as GetTable_Tool } from "../../../handlers/table/readonly/handleGetTable";
-import { TOOL_DEFINITION as GetStructure_Tool } from "../../../handlers/structure/readonly/handleGetStructure";
-import { TOOL_DEFINITION as GetTableContents_Tool } from "../../../handlers/table/readonly/handleGetTableContents";
-import { TOOL_DEFINITION as GetPackage_Tool } from "../../../handlers/package/readonly/handleGetPackage";
-import { TOOL_DEFINITION as GetInclude_Tool } from "../../../handlers/include/readonly/handleGetInclude";
-import { TOOL_DEFINITION as GetIncludesList_Tool } from "../../../handlers/include/readonly/handleGetIncludesList";
-import { TOOL_DEFINITION as GetEnhancements_Tool } from "../../../handlers/enhancement/readonly/handleGetEnhancements";
-import { TOOL_DEFINITION as GetEnhancementSpot_Tool } from "../../../handlers/enhancement/readonly/handleGetEnhancementSpot";
-import { TOOL_DEFINITION as GetEnhancementImpl_Tool } from "../../../handlers/enhancement/readonly/handleGetEnhancementImpl";
-import { TOOL_DEFINITION as GetBdef_Tool } from "../../../handlers/behavior_definition/readonly/handleGetBdef";
-import { TOOL_DEFINITION as GetInterface_Tool } from "../../../handlers/interface/readonly/handleGetInterface";
-import { TOOL_DEFINITION as GetDomain_Tool } from "../../../handlers/domain/readonly/handleGetDomain";
-import { TOOL_DEFINITION as GetDataElement_Tool } from "../../../handlers/data_element/readonly/handleGetDataElement";
-import { TOOL_DEFINITION as GetTransport_Tool } from "../../../handlers/transport/readonly/handleGetTransport";
-import { TOOL_DEFINITION as GetView_Tool } from "../../../handlers/view/readonly/handleGetView";
-import { TOOL_DEFINITION as GetServiceDefinition_Tool } from "../../../handlers/service_definition/readonly/handleGetServiceDefinition";
-import { TOOL_DEFINITION as GetProgFullCode_Tool } from "../../../handlers/program/readonly/handleGetProgFullCode";
+import {
+  TOOL_DEFINITION as GetProgram_Tool,
+  handleGetProgram,
+} from '../../../handlers/program/readonly/handleGetProgram';
+import {
+  TOOL_DEFINITION as GetServiceDefinition_Tool,
+  handleGetServiceDefinition,
+} from '../../../handlers/service_definition/readonly/handleGetServiceDefinition';
+import {
+  TOOL_DEFINITION as GetStructure_Tool,
+  handleGetStructure,
+} from '../../../handlers/structure/readonly/handleGetStructure';
+import {
+  TOOL_DEFINITION as GetTable_Tool,
+  handleGetTable,
+} from '../../../handlers/table/readonly/handleGetTable';
+import {
+  TOOL_DEFINITION as GetTableContents_Tool,
+  handleGetTableContents,
+} from '../../../handlers/table/readonly/handleGetTableContents';
+import {
+  TOOL_DEFINITION as GetTransport_Tool,
+  handleGetTransport,
+} from '../../../handlers/transport/readonly/handleGetTransport';
+import {
+  TOOL_DEFINITION as GetView_Tool,
+  handleGetView,
+} from '../../../handlers/view/readonly/handleGetView';
+import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
+import type { HandlerEntry } from '../interfaces.js';
 
 /**
  * Handler group for all readonly (read-only) handlers.
  * Contains handlers that only read data without modifying the ABAP system.
  */
 export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
-  protected groupName = "ReadOnlyHandlers";
+  protected groupName = 'ReadOnlyHandlers';
 
   /**
    * Gets all readonly handler entries

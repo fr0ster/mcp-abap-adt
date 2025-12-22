@@ -6,35 +6,44 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, restoreSessionInConnection, parseValidationResponse, AxiosResponse } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  parseValidationResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "ValidatePackageLow",
-  description: "[low-level] Validate an ABAP package name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.",
+  name: 'ValidatePackageLow',
+  description:
+    '[low-level] Validate an ABAP package name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       package_name: {
-        type: "string",
-        description: "Package name to validate (e.g., Z_MY_PROGRAM)."
+        type: 'string',
+        description: 'Package name to validate (e.g., Z_MY_PROGRAM).',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from GetSession. If not provided, a new session will be created."
+        type: 'string',
+        description:
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["package_name", "super_package"]
-  }
+    required: ['package_name', 'super_package'],
+  },
 } as const;
 
 interface ValidatePackageArgs {
@@ -53,19 +62,20 @@ interface ValidatePackageArgs {
  *
  * Uses CrudClient.validatePackage - low-level single method call
  */
-export async function handleValidatePackage(context: HandlerContext, args: ValidatePackageArgs) {
+export async function handleValidatePackage(
+  context: HandlerContext,
+  args: ValidatePackageArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      package_name,
-      super_package,
-      session_id,
-      session_state
-    } = args as ValidatePackageArgs;
+    const { package_name, super_package, session_id, session_state } =
+      args as ValidatePackageArgs;
 
     // Validation
     if (!package_name || !super_package) {
-      return return_error(new Error('package_name and super_package are required'));
+      return return_error(
+        new Error('package_name and super_package are required'),
+      );
     }
 
     const client = new CrudClient(connection);
@@ -80,11 +90,17 @@ export async function handleValidatePackage(context: HandlerContext, args: Valid
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
 
-    logger?.info(`Starting package validation: ${packageName} in ${superPackage}`);
+    logger?.info(
+      `Starting package validation: ${packageName} in ${superPackage}`,
+    );
 
     try {
       // Validate package
-      await client.validatePackage({ packageName: packageName, superPackage: superPackage, description: undefined });
+      await client.validatePackage({
+        packageName: packageName,
+        superPackage: superPackage,
+        description: undefined,
+      });
       const validationResponse = client.getValidationResponse();
       if (!validationResponse) {
         throw new Error('Validation did not return a result');
@@ -93,51 +109,61 @@ export async function handleValidatePackage(context: HandlerContext, args: Valid
 
       // Get updated session state after validation
 
-
-      logger?.info(`✅ ValidatePackage completed: ${packageName} (valid=${result.valid})`);
+      logger?.info(
+        `✅ ValidatePackage completed: ${packageName} (valid=${result.valid})`,
+      );
 
       return return_response({
-        data: JSON.stringify({
-          success: result.valid,
-          package_name: packageName,
-          super_package: superPackage,
-          validation_result: result,
-          session_id: session_id || null,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: result.valid
-            ? `Package name ${packageName} is valid and available`
-            : `Package name ${packageName} validation failed: ${result.message}`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: result.valid,
+            package_name: packageName,
+            super_package: superPackage,
+            validation_result: result,
+            session_id: session_id || null,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: result.valid
+              ? `Package name ${packageName} is valid and available`
+              : `Package name ${packageName} validation failed: ${result.message}`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error validating package ${packageName}: ${error?.message || error}`);
+      logger?.error(
+        `Error validating package ${packageName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to validate package: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
         errorMessage = `Package ${packageName} not found.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

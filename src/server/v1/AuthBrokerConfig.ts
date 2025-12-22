@@ -3,7 +3,7 @@
  * Maps v1 ServerConfig to IAuthBrokerFactoryConfig
  */
 
-import type { IAuthBrokerFactoryConfig } from "../../lib/auth/IAuthBrokerFactoryConfig.js";
+import type { IAuthBrokerFactoryConfig } from '../../lib/auth/IAuthBrokerFactoryConfig.js';
 
 export class AuthBrokerConfig implements IAuthBrokerFactoryConfig {
   defaultMcpDestination?: string;
@@ -26,7 +26,7 @@ export class AuthBrokerConfig implements IAuthBrokerFactoryConfig {
     transportType: string,
     useAuthBroker: boolean | undefined,
     browser: string | undefined,
-    logger: any
+    logger: any,
   ) {
     this.defaultMcpDestination = defaultMcpDestination;
     this.defaultDestination = defaultDestination;
@@ -40,7 +40,10 @@ export class AuthBrokerConfig implements IAuthBrokerFactoryConfig {
     // stdio: 4001 (no server port), sse: 4000 (SSE server uses 3001), http: 5000 (HTTP server uses 3000)
     if (transportType === 'sse') {
       this.browserAuthPort = 4000;
-    } else if (transportType === 'http' || transportType === 'streamable-http') {
+    } else if (
+      transportType === 'http' ||
+      transportType === 'streamable-http'
+    ) {
       this.browserAuthPort = 5000;
     } else {
       this.browserAuthPort = 4001; // stdio: use 4001 to avoid conflict with HTTP (3000) and SSE (3001)

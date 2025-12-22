@@ -5,41 +5,49 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "ActivateClassTestClassesLow",
-  description: "[low-level] Activate ABAP Unit test classes include for an existing class. Should be executed after updating and unlocking test classes.",
+  name: 'ActivateClassTestClassesLow',
+  description:
+    '[low-level] Activate ABAP Unit test classes include for an existing class. Should be executed after updating and unlocking test classes.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       class_name: {
-        type: "string",
-        description: "Class name (e.g., ZCL_MY_CLASS)."
+        type: 'string',
+        description: 'Class name (e.g., ZCL_MY_CLASS).',
       },
       test_class_name: {
-        type: "string",
-        description: "Optional ABAP Unit test class name (e.g., LTCL_MY_CLASS). Defaults to auto-detected value."
+        type: 'string',
+        description:
+          'Optional ABAP Unit test class name (e.g., LTCL_MY_CLASS). Defaults to auto-detected value.',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from GetSession. If not provided, a new session will be created."
+        type: 'string',
+        description:
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["class_name"]
-  }
+    required: ['class_name'],
+  },
 } as const;
 
 interface ActivateClassTestClassesArgs {
@@ -53,15 +61,14 @@ interface ActivateClassTestClassesArgs {
   };
 }
 
-export async function handleActivateClassTestClasses(context: HandlerContext, args: ActivateClassTestClassesArgs) {
+export async function handleActivateClassTestClasses(
+  context: HandlerContext,
+  args: ActivateClassTestClassesArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      class_name,
-      test_class_name,
-      session_id,
-      session_state
-    } = args as ActivateClassTestClassesArgs;
+    const { class_name, test_class_name, session_id, session_state } =
+      args as ActivateClassTestClassesArgs;
 
     if (!class_name) {
       return return_error(new Error('class_name is required'));
@@ -72,42 +79,49 @@ export async function handleActivateClassTestClasses(context: HandlerContext, ar
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
-          }
+    }
 
     const className = class_name.toUpperCase();
-    const testClassName = test_class_name ? test_class_name.toUpperCase() : undefined;
+    const testClassName = test_class_name
+      ? test_class_name.toUpperCase()
+      : undefined;
 
     logger?.info(`Starting test classes activation for: ${className}`);
 
     try {
       await client.activateTestClasses({
         className,
-        testClassName: testClassName ?? className
+        testClassName: testClassName ?? className,
       });
       const activationResult = client.getTestClassActivateResult();
-
 
       logger?.info(`✅ ActivateClassTestClasses completed: ${className}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          class_name: className,
-          session_id: session_id || null,
-          status: activationResult?.status,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: `Test classes for ${className} activated successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            class_name: className,
+            session_id: session_id || null,
+            status: activationResult?.status,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: `Test classes for ${className} activated successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
     } catch (error: any) {
-      logger?.error(`Error activating test classes for ${className}: ${error?.message || error}`);
-      const reason = error?.response?.status === 404
-        ? `Class ${className} not found or test classes are missing.`
-        : error?.message || String(error);
+      logger?.error(
+        `Error activating test classes for ${className}: ${error?.message || error}`,
+      );
+      const reason =
+        error?.response?.status === 404
+          ? `Class ${className} not found or test classes are missing.`
+          : error?.message || String(error);
       return return_error(new Error(reason));
     }
   } catch (error: any) {
     return return_error(error);
   }
 }
-

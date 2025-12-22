@@ -3,7 +3,7 @@
  * Allows different implementations for different server versions
  */
 
-import type { AuthBroker } from "@mcp-abap-adt/auth-broker";
+import type { AuthBroker } from '@mcp-abap-adt/auth-broker';
 
 export interface IAuthBrokerFactory {
   /**

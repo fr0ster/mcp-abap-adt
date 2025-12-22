@@ -6,26 +6,32 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "DeleteInterfaceLow",
-  description: "[low-level] Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for $TMP objects.",
+  name: 'DeleteInterfaceLow',
+  description:
+    '[low-level] Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       interface_name: {
-        type: "string",
-        description: "Interface name (e.g., Z_MY_PROGRAM)."
+        type: 'string',
+        description: 'Interface name (e.g., Z_MY_PROGRAM).',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP)."
-      }
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
+      },
     },
-    required: ["interface_name"]
-  }
+    required: ['interface_name'],
+  },
 } as const;
 
 interface DeleteInterfaceArgs {
@@ -38,13 +44,13 @@ interface DeleteInterfaceArgs {
  *
  * Uses CrudClient.deleteInterface - low-level single method call
  */
-export async function handleDeleteInterface(context: HandlerContext, args: DeleteInterfaceArgs) {
+export async function handleDeleteInterface(
+  context: HandlerContext,
+  args: DeleteInterfaceArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      interface_name,
-      transport_request
-    } = args as DeleteInterfaceArgs;
+    const { interface_name, transport_request } = args as DeleteInterfaceArgs;
 
     // Validation
     if (!interface_name) {
@@ -58,26 +64,38 @@ export async function handleDeleteInterface(context: HandlerContext, args: Delet
 
     try {
       // Delete interface
-      await client.deleteInterface({ interfaceName: interfaceName, transportRequest: transport_request });
+      await client.deleteInterface({
+        interfaceName: interfaceName,
+        transportRequest: transport_request,
+      });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {
-        throw new Error(`Delete did not return a response for interface ${interfaceName}`);
+        throw new Error(
+          `Delete did not return a response for interface ${interfaceName}`,
+        );
       }
 
-      logger?.info(`✅ DeleteInterface completed successfully: ${interfaceName}`);
+      logger?.info(
+        `✅ DeleteInterface completed successfully: ${interfaceName}`,
+      );
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          interface_name: interfaceName,
-          transport_request: transport_request || null,
-          message: `Interface ${interfaceName} deleted successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            interface_name: interfaceName,
+            transport_request: transport_request || null,
+            message: `Interface ${interfaceName} deleted successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error deleting interface ${interfaceName}: ${error?.message || error}`);
+      logger?.error(
+        `Error deleting interface ${interfaceName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to delete interface: ${error.message || String(error)}`;
@@ -88,26 +106,30 @@ export async function handleDeleteInterface(context: HandlerContext, args: Delet
         errorMessage = `Interface ${interfaceName} is locked by another user. Cannot delete.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

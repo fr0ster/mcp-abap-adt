@@ -6,35 +6,43 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "ActivateInterfaceLow",
-  description: "[low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.",
+  name: 'ActivateInterfaceLow',
+  description:
+    '[low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       interface_name: {
-        type: "string",
-        description: "Interface name (e.g., ZIF_MY_INTERFACE)."
+        type: 'string',
+        description: 'Interface name (e.g., ZIF_MY_INTERFACE).',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from GetSession. If not provided, a new session will be created."
+        type: 'string',
+        description:
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["interface_name"]
-  }
+    required: ['interface_name'],
+  },
 } as const;
 
 interface ActivateInterfaceArgs {
@@ -52,14 +60,14 @@ interface ActivateInterfaceArgs {
  *
  * Uses CrudClient.activateInterface - low-level single method call
  */
-export async function handleActivateInterface(context: HandlerContext, args: ActivateInterfaceArgs) {
+export async function handleActivateInterface(
+  context: HandlerContext,
+  args: ActivateInterfaceArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      interface_name,
-      session_id,
-      session_state
-    } = args as ActivateInterfaceArgs;
+    const { interface_name, session_id, session_state } =
+      args as ActivateInterfaceArgs;
 
     // Validation
     if (!interface_name) {
@@ -83,7 +91,9 @@ export async function handleActivateInterface(context: HandlerContext, args: Act
       const response = client.getActivateResult();
 
       if (!response) {
-        throw new Error(`Activation did not return a response for interface ${interfaceName}`);
+        throw new Error(
+          `Activation did not return a response for interface ${interfaceName}`,
+        );
       }
 
       // Parse activation response
@@ -92,58 +102,72 @@ export async function handleActivateInterface(context: HandlerContext, args: Act
 
       // Get updated session state after activation
 
-
       logger?.info(`✅ ActivateInterface completed: ${interfaceName}`);
-      logger?.debug(`Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`);
+      logger?.debug(
+        `Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`,
+      );
 
       return return_response({
-        data: JSON.stringify({
-          success,
-          interface_name: interfaceName,
-          activation: {
-            activated: activationResult.activated,
-            checked: activationResult.checked,
-            generated: activationResult.generated
+        data: JSON.stringify(
+          {
+            success,
+            interface_name: interfaceName,
+            activation: {
+              activated: activationResult.activated,
+              checked: activationResult.checked,
+              generated: activationResult.generated,
+            },
+            messages: activationResult.messages,
+            warnings: activationResult.messages.filter(
+              (m) => m.type === 'warning' || m.type === 'W',
+            ),
+            errors: activationResult.messages.filter(
+              (m) => m.type === 'error' || m.type === 'E',
+            ),
+            session_id: session_id || null,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: success
+              ? `Interface ${interfaceName} activated successfully`
+              : `Interface ${interfaceName} activation completed with ${activationResult.messages.length} message(s)`,
           },
-          messages: activationResult.messages,
-          warnings: activationResult.messages.filter(m => m.type === 'warning' || m.type === 'W'),
-          errors: activationResult.messages.filter(m => m.type === 'error' || m.type === 'E'),
-          session_id: session_id || null,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: success
-            ? `Interface ${interfaceName} activated successfully`
-            : `Interface ${interfaceName} activation completed with ${activationResult.messages.length} message(s)`
-        }, null, 2)
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error activating interface ${interfaceName}: ${error?.message || error}`);
+      logger?.error(
+        `Error activating interface ${interfaceName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to activate interface: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
         errorMessage = `Interface ${interfaceName} not found.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

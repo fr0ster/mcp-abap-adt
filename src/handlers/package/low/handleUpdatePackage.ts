@@ -5,49 +5,64 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "UpdatePackageLow",
-  description: "[low-level] Update description of an existing ABAP package. Requires lock handle from LockObject and superPackage. - use UpdatePackageSource for full workflow with lock/unlock.",
+  name: 'UpdatePackageLow',
+  description:
+    '[low-level] Update description of an existing ABAP package. Requires lock handle from LockObject and superPackage. - use UpdatePackageSource for full workflow with lock/unlock.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       package_name: {
-        type: "string",
-        description: "Package name (e.g., ZOK_TEST_0002). Package must already exist."
+        type: 'string',
+        description:
+          'Package name (e.g., ZOK_TEST_0002). Package must already exist.',
       },
       super_package: {
-        type: "string",
-        description: "Super package (parent package) name. Required for package operations."
+        type: 'string',
+        description:
+          'Super package (parent package) name. Required for package operations.',
       },
       updated_description: {
-        type: "string",
-        description: "New description for the package."
+        type: 'string',
+        description: 'New description for the package.',
       },
       lock_handle: {
-        type: "string",
-        description: "Lock handle from LockObject. Required for update operation."
+        type: 'string',
+        description:
+          'Lock handle from LockObject. Required for update operation.',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from GetSession. If not provided, a new session will be created."
+        type: 'string',
+        description:
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["package_name", "super_package", "updated_description", "lock_handle"]
-  }
+    required: [
+      'package_name',
+      'super_package',
+      'updated_description',
+      'lock_handle',
+    ],
+  },
 } as const;
 
 interface UpdatePackageArgs {
@@ -68,7 +83,10 @@ interface UpdatePackageArgs {
  *
  * Uses CrudClient.updatePackage - low-level single method call
  */
-export async function handleUpdatePackage(context: HandlerContext, args: UpdatePackageArgs) {
+export async function handleUpdatePackage(
+  context: HandlerContext,
+  args: UpdatePackageArgs,
+) {
   const { connection, logger } = context;
   try {
     const {
@@ -77,15 +95,24 @@ export async function handleUpdatePackage(context: HandlerContext, args: UpdateP
       updated_description,
       lock_handle,
       session_id,
-      session_state
+      session_state,
     } = args as UpdatePackageArgs;
 
     // Validation
-    if (!package_name || !super_package || !updated_description || !lock_handle) {
-      return return_error(new Error('package_name, super_package, updated_description, and lock_handle are required'));
+    if (
+      !package_name ||
+      !super_package ||
+      !updated_description ||
+      !lock_handle
+    ) {
+      return return_error(
+        new Error(
+          'package_name, super_package, updated_description, and lock_handle are required',
+        ),
+      );
     }
 
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -94,7 +121,7 @@ export async function handleUpdatePackage(context: HandlerContext, args: UpdateP
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const packageName = package_name.toUpperCase();
     const superPackage = super_package.toUpperCase();
@@ -103,36 +130,45 @@ export async function handleUpdatePackage(context: HandlerContext, args: UpdateP
 
     try {
       // Update package description
-      await client.updatePackage({
-        packageName,
-        superPackage,
-        updatedDescription: updated_description
-      }, lock_handle);
+      await client.updatePackage(
+        {
+          packageName,
+          superPackage,
+          updatedDescription: updated_description,
+        },
+        lock_handle,
+      );
       const updateResult = client.getUpdateResult();
 
       if (!updateResult) {
-        throw new Error(`Update did not return a response for package ${packageName}`);
+        throw new Error(
+          `Update did not return a response for package ${packageName}`,
+        );
       }
 
       // Get updated session state after update
 
-
       logger?.info(`✅ UpdatePackage completed: ${packageName}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          package_name: packageName,
-          super_package: superPackage,
-          updated_description,
-          session_id: session_id || null,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: `Package ${packageName} updated successfully. Remember to unlock using UnlockObject.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            package_name: packageName,
+            super_package: superPackage,
+            updated_description,
+            session_id: session_id || null,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: `Package ${packageName} updated successfully. Remember to unlock using UnlockObject.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error updating package ${packageName}: ${error?.message || error}`);
+      logger?.error(
+        `Error updating package ${packageName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to update package: ${error.message || String(error)}`;
@@ -141,26 +177,30 @@ export async function handleUpdatePackage(context: HandlerContext, args: UpdateP
         errorMessage = `Package ${packageName} not found.`;
       } else if (error.response?.status === 423) {
         errorMessage = `Package ${packageName} is locked by another user or lock handle is invalid.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

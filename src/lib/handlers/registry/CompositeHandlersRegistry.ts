@@ -1,5 +1,10 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { IHandlersRegistry, IHandlerGroup, ToolDefinition, ToolHandler } from "../interfaces.js";
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type {
+  IHandlerGroup,
+  IHandlersRegistry,
+  ToolDefinition,
+  ToolHandler,
+} from '../interfaces.js';
 
 /**
  * Composite handlers registry that accepts multiple handler groups via Dependency Injection
@@ -15,7 +20,10 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
    * @param handlerGroups - Array of handler groups to register
    * @param failOnDuplicate - When true, throws on duplicate tool names (useful in dev)
    */
-  constructor(handlerGroups: IHandlerGroup[] = [], failOnDuplicate: boolean = true) {
+  constructor(
+    handlerGroups: IHandlerGroup[] = [],
+    failOnDuplicate: boolean = true,
+  ) {
     this.handlerGroups = handlerGroups;
     this.failOnDuplicate = failOnDuplicate;
   }
@@ -33,7 +41,9 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
    * @param groupName - Name of the group to remove
    */
   removeHandlerGroup(groupName: string): void {
-    this.handlerGroups = this.handlerGroups.filter(g => g.getName() !== groupName);
+    this.handlerGroups = this.handlerGroups.filter(
+      (g) => g.getName() !== groupName,
+    );
   }
 
   /**
@@ -76,7 +86,7 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
     server: McpServer,
     toolName: string,
     toolDefinition: ToolDefinition,
-    handler: ToolHandler
+    handler: ToolHandler,
   ): void {
     server.registerTool(
       toolName,
@@ -84,7 +94,7 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
         description: toolDefinition.description,
         inputSchema: toolDefinition.inputSchema,
       },
-      handler as any
+      handler as any,
     );
   }
 
@@ -99,6 +109,6 @@ export class CompositeHandlersRegistry implements IHandlersRegistry {
    * Gets list of handler group names
    */
   getHandlerGroupNames(): string[] {
-    return this.handlerGroups.map(g => g.getName());
+    return this.handlerGroups.map((g) => g.getName());
   }
 }

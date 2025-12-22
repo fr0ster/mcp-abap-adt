@@ -5,40 +5,48 @@
  * Low-level handler: single method call.
  */
 
-import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "UnlockTableLow",
-  description: "[low-level] Unlock an ABAP table after modification. Must use the same session_id and lock_handle from LockTable operation.",
+  name: 'UnlockTableLow',
+  description:
+    '[low-level] Unlock an ABAP table after modification. Must use the same session_id and lock_handle from LockTable operation.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       table_name: {
-        type: "string",
-        description: "Table name (e.g., Z_MY_PROGRAM)."
+        type: 'string',
+        description: 'Table name (e.g., Z_MY_PROGRAM).',
       },
       lock_handle: {
-        type: "string",
-        description: "Lock handle from LockTable operation."
+        type: 'string',
+        description: 'Lock handle from LockTable operation.',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from LockTable operation. Must be the same as used in LockTable."
+        type: 'string',
+        description:
+          'Session ID from LockTable operation. Must be the same as used in LockTable.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from LockTable (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from LockTable (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["table_name", "lock_handle", "session_id"]
-  }
+    required: ['table_name', 'lock_handle', 'session_id'],
+  },
 } as const;
 
 interface UnlockTableArgs {
@@ -57,10 +65,14 @@ interface UnlockTableArgs {
  *
  * Uses CrudClient.unlockTable - low-level single method call
  */
-export async function handleUnlockTable(context: HandlerContext, args: UnlockTableArgs) {
+export async function handleUnlockTable(
+  context: HandlerContext,
+  args: UnlockTableArgs,
+) {
   const { connection, logger } = context;
   try {
-    const { table_name, lock_handle, session_id, session_state } = args as UnlockTableArgs;
+    const { table_name, lock_handle, session_id, session_state } =
+      args as UnlockTableArgs;
 
     const client = new CrudClient(connection);
 
@@ -73,7 +85,9 @@ export async function handleUnlockTable(context: HandlerContext, args: UnlockTab
 
     const tableName = table_name.toUpperCase();
 
-    logger?.info(`Starting table unlock: ${tableName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(
+      `Starting table unlock: ${tableName} (session: ${session_id.substring(0, 8)}...)`,
+    );
 
     try {
       // Unlock table
@@ -81,24 +95,28 @@ export async function handleUnlockTable(context: HandlerContext, args: UnlockTab
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {
-        throw new Error(`Unlock did not return a response for table ${tableName}`);
+        throw new Error(
+          `Unlock did not return a response for table ${tableName}`,
+        );
       }
 
       // Get updated session state after unlock
 
-
       logger?.info(`✅ UnlockTable completed: ${tableName}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          table_name: tableName,
-          session_id: session_id,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: `Table ${tableName} unlocked successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            table_name: tableName,
+            session_id: session_id,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: `Table ${tableName} unlocked successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
       logger?.error(`Error unlocking table ${tableName}:`, error);
 
@@ -109,26 +127,30 @@ export async function handleUnlockTable(context: HandlerContext, args: UnlockTab
         errorMessage = `Table ${tableName} not found.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockTable.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

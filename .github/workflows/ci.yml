@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run Biome lint
+        run: npx biome check src --diagnostic-level=error
+
       - name: Build project
         run: npm run build
 

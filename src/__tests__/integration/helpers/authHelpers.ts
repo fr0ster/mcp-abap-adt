@@ -5,15 +5,15 @@
  * Uses the same approach as mcp-abap-adt/src/index.ts getOrCreateAuthBroker()
  */
 
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { AuthBroker } from '@mcp-abap-adt/auth-broker';
 import { BtpTokenProvider } from '@mcp-abap-adt/auth-providers';
+import { defaultLogger } from '@mcp-abap-adt/logger';
 import { getPlatformStoresAsync } from '../../../lib/stores';
 import { getPlatformPaths } from '../../../lib/stores/platformPaths';
-import { defaultLogger } from '@mcp-abap-adt/logger';
 import { loadTestConfig } from './configHelpers';
-import * as path from 'path';
-import * as os from 'os';
-import * as fs from 'fs';
 import { createTestLogger } from './loggerHelpers';
 
 const authLogger = createTestLogger('auth');
@@ -27,13 +27,17 @@ const authLogger = createTestLogger('auth');
  * - BtpTokenProvider() for token acquisition
  * - AuthBroker with stores and token provider
  */
-export async function refreshTokensForTests(options?: { force?: boolean }): Promise<void> {
+export async function refreshTokensForTests(options?: {
+  force?: boolean;
+}): Promise<void> {
   try {
     const force = options?.force === true;
     // Skip token refresh if we already have valid tokens in .env
     // This prevents unnecessary AuthBroker calls that might try to open browser
     if (!force && process.env.SAP_JWT_TOKEN && process.env.SAP_URL) {
-      authLogger?.debug('[refreshTokensForTests] Skipping token refresh - tokens already available in .env');
+      authLogger?.debug(
+        '[refreshTokensForTests] Skipping token refresh - tokens already available in .env',
+      );
       return;
     }
 
@@ -50,7 +54,9 @@ export async function refreshTokensForTests(options?: { force?: boolean }): Prom
       config?.abap?.sessions?.destination;
 
     if (!destination) {
-      authLogger?.debug('[refreshTokensForTests] No destination found in test-config.yaml, skipping token refresh');
+      authLogger?.debug(
+        '[refreshTokensForTests] No destination found in test-config.yaml, skipping token refresh',
+      );
       return;
     }
 
@@ -69,7 +75,7 @@ export async function refreshTokensForTests(options?: { force?: boolean }): Prom
     // So we need to extract base path from service_keys_dir or sessions_dir
     const serviceKeysDir = config?.auth_broker?.paths?.service_keys_dir;
     const sessionsDir = config?.auth_broker?.paths?.sessions_dir;
-    let customPath: string | undefined = undefined;
+    let customPath: string | undefined;
 
     if (serviceKeysDir) {
       // Expand ~ to home directory and resolve to absolute path
@@ -78,50 +84,69 @@ export async function refreshTokensForTests(options?: { force?: boolean }): Prom
 
       // If path ends with 'service-keys', remove it to get base path
       // getPlatformPaths will add 'service-keys' and 'sessions' subfolders
-      if (expandedPath.endsWith('service-keys') || expandedPath.endsWith(path.join('service-keys', ''))) {
+      if (
+        expandedPath.endsWith('service-keys') ||
+        expandedPath.endsWith(path.join('service-keys', ''))
+      ) {
         customPath = path.dirname(expandedPath);
       } else {
         // If path doesn't end with 'service-keys', assume it's base path
         customPath = expandedPath;
       }
 
-      authLogger?.debug(`[refreshTokensForTests] Service keys dir from config: ${serviceKeysDir}`);
-      authLogger?.debug(`[refreshTokensForTests] Using base path for stores: ${customPath}`);
+      authLogger?.debug(
+        `[refreshTokensForTests] Service keys dir from config: ${serviceKeysDir}`,
+      );
+      authLogger?.debug(
+        `[refreshTokensForTests] Using base path for stores: ${customPath}`,
+      );
     } else if (sessionsDir) {
       // If only sessions_dir is provided, extract base path
       let expandedPath = sessionsDir.replace(/^~/, os.homedir());
       expandedPath = path.resolve(expandedPath);
 
       // If path ends with 'sessions', remove it to get base path
-      if (expandedPath.endsWith('sessions') || expandedPath.endsWith(path.join('sessions', ''))) {
+      if (
+        expandedPath.endsWith('sessions') ||
+        expandedPath.endsWith(path.join('sessions', ''))
+      ) {
         customPath = path.dirname(expandedPath);
       } else {
         // If path doesn't end with 'sessions', assume it's base path
         customPath = expandedPath;
       }
 
-      authLogger?.debug(`[refreshTokensForTests] Sessions dir from config: ${sessionsDir}`);
-      authLogger?.debug(`[refreshTokensForTests] Using base path for stores: ${customPath}`);
+      authLogger?.debug(
+        `[refreshTokensForTests] Sessions dir from config: ${sessionsDir}`,
+      );
+      authLogger?.debug(
+        `[refreshTokensForTests] Using base path for stores: ${customPath}`,
+      );
     }
 
     // Use the same approach as mcp-abap-adt/src/index.ts getOrCreateAuthBroker()
     // Get stores with auto-detection of service key format
-    const { serviceKeyStore, sessionStore, storeType } = await getPlatformStoresAsync(
-      customPath, // Use paths from test-config.yaml if available, otherwise default paths
-      useUnsafe, // File-based sessions allowed for tests
-      destination
-    );
+    const { serviceKeyStore, sessionStore, storeType } =
+      await getPlatformStoresAsync(
+        customPath, // Use paths from test-config.yaml if available, otherwise default paths
+        useUnsafe, // File-based sessions allowed for tests
+        destination,
+      );
 
     let serviceKeyExists = false;
-    authLogger?.info(`[refreshTokensForTests] Attempting to refresh tokens for destination: ${destination}`);
+    authLogger?.info(
+      `[refreshTokensForTests] Attempting to refresh tokens for destination: ${destination}`,
+    );
     if (useUnsafe) {
-      authLogger?.info('[refreshTokensForTests] Unsafe session store enabled (file-based)');
+      authLogger?.info(
+        '[refreshTokensForTests] Unsafe session store enabled (file-based)',
+      );
     }
 
     // Log where we're looking for service keys
     const serviceKeysPaths = getPlatformPaths(customPath, 'service-keys');
     authLogger?.debug(
-      `[refreshTokensForTests] Looking for service key "${destination}.json" in: ${JSON.stringify(serviceKeysPaths)}`
+      `[refreshTokensForTests] Looking for service key "${destination}.json" in: ${JSON.stringify(serviceKeysPaths)}`,
     );
 
     // Check if service key file exists
@@ -131,29 +156,39 @@ export async function refreshTokensForTests(options?: { force?: boolean }): Prom
       if (exists) {
         serviceKeyExists = true;
       }
-      authLogger?.debug(`[refreshTokensForTests]   ${exists ? '✓' : '✗'} ${serviceKeyFile}`);
+      authLogger?.debug(
+        `[refreshTokensForTests]   ${exists ? '✓' : '✗'} ${serviceKeyFile}`,
+      );
     }
 
     if (!serviceKeyExists) {
       throw new Error(
-        `Auth-broker destination \"${destination}\" not found in service-keys directories. ` +
-        `Provide ${destination}.json or disable auth-broker for tests.`
+        `Auth-broker destination "${destination}" not found in service-keys directories. ` +
+          `Provide ${destination}.json or disable auth-broker for tests.`,
       );
     }
 
     // Use existing session token if present to avoid browser auth
-    const existingConnConfig = await sessionStore.getConnectionConfig(destination);
-    if (existingConnConfig?.authorizationToken && existingConnConfig?.serviceUrl) {
+    const existingConnConfig =
+      await sessionStore.getConnectionConfig(destination);
+    if (
+      existingConnConfig?.authorizationToken &&
+      existingConnConfig?.serviceUrl
+    ) {
       process.env.SAP_URL = existingConnConfig.serviceUrl;
       process.env.SAP_JWT_TOKEN = existingConnConfig.authorizationToken;
-      authLogger?.info('[refreshTokensForTests] Using existing token from session store (no browser)');
+      authLogger?.info(
+        '[refreshTokensForTests] Using existing token from session store (no browser)',
+      );
       return;
     }
 
     // Determine token provider based on store type (same as in getOrCreateAuthBroker)
     // ABAP and BTP use BtpTokenProvider (browser-based OAuth2)
     const browserAuthPort =
-      (process.env.MCP_BROWSER_AUTH_PORT ? Number(process.env.MCP_BROWSER_AUTH_PORT) : undefined) ||
+      (process.env.MCP_BROWSER_AUTH_PORT
+        ? Number(process.env.MCP_BROWSER_AUTH_PORT)
+        : undefined) ||
       (config?.auth_broker?.browser_auth_port ?? 3101);
     const tokenProvider = new BtpTokenProvider(browserAuthPort);
 
@@ -167,7 +202,7 @@ export async function refreshTokensForTests(options?: { force?: boolean }): Prom
         tokenProvider,
       },
       'system', // Allow browser authentication if refresh token fails
-      defaultLogger
+      defaultLogger,
     );
 
     // Try to get fresh token using auth-broker
@@ -187,7 +222,9 @@ export async function refreshTokensForTests(options?: { force?: boolean }): Prom
       }
 
       if (existingConnConfig?.authorizationToken) {
-        authLogger?.info('[refreshTokensForTests] Using existing token from session store');
+        authLogger?.info(
+          '[refreshTokensForTests] Using existing token from session store',
+        );
         // Update process.env with existing token
         process.env.SAP_URL = existingConnConfig.serviceUrl;
         process.env.SAP_JWT_TOKEN = existingConnConfig.authorizationToken;
@@ -196,7 +233,9 @@ export async function refreshTokensForTests(options?: { force?: boolean }): Prom
 
       // Try to get new token using auth-broker
       // This will try refresh token first, then UAA, then browser if needed
-      authLogger?.debug('[refreshTokensForTests] Attempting to get token via auth-broker (will try refresh token, UAA, then browser if needed)');
+      authLogger?.debug(
+        '[refreshTokensForTests] Attempting to get token via auth-broker (will try refresh token, UAA, then browser if needed)',
+      );
       const token = await authBroker.getToken(destination);
       const connConfig = await authBroker.getConnectionConfig(destination);
 
@@ -221,10 +260,18 @@ export async function refreshTokensForTests(options?: { force?: boolean }): Prom
         }
 
         if (process.env.DEBUG_TESTS === 'true') {
-          authLogger?.info('[refreshTokensForTests] ✓ Tokens refreshed successfully');
-          authLogger?.debug(`[refreshTokensForTests] URL: ${connConfig.serviceUrl}`);
-          authLogger?.debug(`[refreshTokensForTests] Token length: ${token.length}`);
-          authLogger?.debug(`[refreshTokensForTests] Has refresh token: ${!!authConfig?.refreshToken}`);
+          authLogger?.info(
+            '[refreshTokensForTests] ✓ Tokens refreshed successfully',
+          );
+          authLogger?.debug(
+            `[refreshTokensForTests] URL: ${connConfig.serviceUrl}`,
+          );
+          authLogger?.debug(
+            `[refreshTokensForTests] Token length: ${token.length}`,
+          );
+          authLogger?.debug(
+            `[refreshTokensForTests] Has refresh token: ${!!authConfig?.refreshToken}`,
+          );
         }
 
         // Persist session env file explicitly (helps when session store is non-persistent)
@@ -233,33 +280,64 @@ export async function refreshTokensForTests(options?: { force?: boolean }): Prom
           const targetSessionsDir = sessionsPaths[0];
           if (targetSessionsDir) {
             fs.mkdirSync(targetSessionsDir, { recursive: true });
-            const sessionEnvPath = path.join(targetSessionsDir, `${destination}.env`);
+            const sessionEnvPath = path.join(
+              targetSessionsDir,
+              `${destination}.env`,
+            );
             const lines = [
               `SAP_URL=${connConfig.serviceUrl}`,
               `SAP_JWT_TOKEN=${connConfig.authorizationToken || token}`,
-              authConfig?.refreshToken ? `SAP_REFRESH_TOKEN=${authConfig.refreshToken}` : null,
+              authConfig?.refreshToken
+                ? `SAP_REFRESH_TOKEN=${authConfig.refreshToken}`
+                : null,
               authConfig?.uaaUrl ? `SAP_UAA_URL=${authConfig.uaaUrl}` : null,
-              authConfig?.uaaClientId ? `SAP_UAA_CLIENT_ID=${authConfig.uaaClientId}` : null,
-              authConfig?.uaaClientSecret ? `SAP_UAA_CLIENT_SECRET=${authConfig.uaaClientSecret}` : null,
-              connConfig.sapClient ? `SAP_CLIENT=${connConfig.sapClient}` : (process.env.SAP_CLIENT ? `SAP_CLIENT=${process.env.SAP_CLIENT}` : null),
-              connConfig.language ? `SAP_LANGUAGE=${connConfig.language}` : (process.env.SAP_LANGUAGE ? `SAP_LANGUAGE=${process.env.SAP_LANGUAGE}` : null),
+              authConfig?.uaaClientId
+                ? `SAP_UAA_CLIENT_ID=${authConfig.uaaClientId}`
+                : null,
+              authConfig?.uaaClientSecret
+                ? `SAP_UAA_CLIENT_SECRET=${authConfig.uaaClientSecret}`
+                : null,
+              connConfig.sapClient
+                ? `SAP_CLIENT=${connConfig.sapClient}`
+                : process.env.SAP_CLIENT
+                  ? `SAP_CLIENT=${process.env.SAP_CLIENT}`
+                  : null,
+              connConfig.language
+                ? `SAP_LANGUAGE=${connConfig.language}`
+                : process.env.SAP_LANGUAGE
+                  ? `SAP_LANGUAGE=${process.env.SAP_LANGUAGE}`
+                  : null,
             ].filter(Boolean) as string[];
-            fs.writeFileSync(sessionEnvPath, lines.join('\n'), { encoding: 'utf8' });
-            authLogger?.debug(`[refreshTokensForTests] Session env written to ${sessionEnvPath}`);
+            fs.writeFileSync(sessionEnvPath, lines.join('\n'), {
+              encoding: 'utf8',
+            });
+            authLogger?.debug(
+              `[refreshTokensForTests] Session env written to ${sessionEnvPath}`,
+            );
           }
         } catch (persistErr: any) {
-          authLogger?.warn(`[refreshTokensForTests] Failed to persist session env: ${persistErr?.message || String(persistErr)}`);
+          authLogger?.warn(
+            `[refreshTokensForTests] Failed to persist session env: ${persistErr?.message || String(persistErr)}`,
+          );
         }
       }
     } catch (error: any) {
       // If token refresh fails, log but don't fail tests
       // Tests will use existing .env tokens (may fail if expired, but that's expected)
-      authLogger?.warn(`[refreshTokensForTests] Failed to refresh tokens: ${error?.message || String(error)}`);
-      authLogger?.warn('[refreshTokensForTests] Tests will use existing .env tokens (may fail if expired)');
+      authLogger?.warn(
+        `[refreshTokensForTests] Failed to refresh tokens: ${error?.message || String(error)}`,
+      );
+      authLogger?.warn(
+        '[refreshTokensForTests] Tests will use existing .env tokens (may fail if expired)',
+      );
     }
   } catch (error: any) {
     // If AuthBroker setup fails, log but don't fail tests
-    authLogger?.warn(`[refreshTokensForTests] Failed to setup AuthBroker: ${error?.message || String(error)}`);
-    authLogger?.warn('[refreshTokensForTests] Tests will use existing .env tokens');
+    authLogger?.warn(
+      `[refreshTokensForTests] Failed to setup AuthBroker: ${error?.message || String(error)}`,
+    );
+    authLogger?.warn(
+      '[refreshTokensForTests] Tests will use existing .env tokens',
+    );
   }
 }

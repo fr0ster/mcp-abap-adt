@@ -7,89 +7,115 @@
  * Workflow: create -> activate -> verify
  */
 
-import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, safeCheckOperation  } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  ErrorCode,
+  McpError,
+  return_error,
+  return_response,
+  safeCheckOperation,
+} from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 export const TOOL_DEFINITION = {
-  name: "CreateDataElement",
-  description: "Create a new ABAP data element in SAP system with all required steps: create, activate, and verify.",
+  name: 'CreateDataElement',
+  description:
+    'Create a new ABAP data element in SAP system with all required steps: create, activate, and verify.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       data_element_name: {
-        type: "string",
-        description: "Data element name (e.g., ZZ_E_TEST_001). Must follow SAP naming conventions."
+        type: 'string',
+        description:
+          'Data element name (e.g., ZZ_E_TEST_001). Must follow SAP naming conventions.',
       },
       description: {
-        type: "string",
-        description: "Data element description. If not provided, data_element_name will be used."
+        type: 'string',
+        description:
+          'Data element description. If not provided, data_element_name will be used.',
       },
       package_name: {
-        type: "string",
-        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects)"
+        type: 'string',
+        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects)',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable packages."
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
       data_type: {
-        type: "string",
-        description: "Data type (e.g., CHAR, NUMC) or domain name when type_kind is 'domain'.",
-        default: "CHAR"
+        type: 'string',
+        description:
+          "Data type (e.g., CHAR, NUMC) or domain name when type_kind is 'domain'.",
+        default: 'CHAR',
       },
       length: {
-        type: "number",
-        description: "Data type length. Usually inherited from domain.",
-        default: 100
+        type: 'number',
+        description: 'Data type length. Usually inherited from domain.',
+        default: 100,
       },
       decimals: {
-        type: "number",
-        description: "Decimal places. Usually inherited from domain.",
-        default: 0
+        type: 'number',
+        description: 'Decimal places. Usually inherited from domain.',
+        default: 0,
       },
       short_label: {
-        type: "string",
-        description: "Short field label (max 10 chars). Applied during update step after creation."
+        type: 'string',
+        description:
+          'Short field label (max 10 chars). Applied during update step after creation.',
       },
       medium_label: {
-        type: "string",
-        description: "Medium field label (max 20 chars). Applied during update step after creation."
+        type: 'string',
+        description:
+          'Medium field label (max 20 chars). Applied during update step after creation.',
       },
       long_label: {
-        type: "string",
-        description: "Long field label (max 40 chars). Applied during update step after creation."
+        type: 'string',
+        description:
+          'Long field label (max 40 chars). Applied during update step after creation.',
       },
       heading_label: {
-        type: "string",
-        description: "Heading field label (max 55 chars). Applied during update step after creation."
+        type: 'string',
+        description:
+          'Heading field label (max 55 chars). Applied during update step after creation.',
       },
       type_kind: {
-        type: "string",
-        description: "Type kind: 'domain' (default), 'predefinedAbapType', 'refToPredefinedAbapType', 'refToDictionaryType', 'refToClifType'. If not specified, defaults to 'domain'.",
-        enum: ["domain", "predefinedAbapType", "refToPredefinedAbapType", "refToDictionaryType", "refToClifType"],
-        default: "domain"
+        type: 'string',
+        description:
+          "Type kind: 'domain' (default), 'predefinedAbapType', 'refToPredefinedAbapType', 'refToDictionaryType', 'refToClifType'. If not specified, defaults to 'domain'.",
+        enum: [
+          'domain',
+          'predefinedAbapType',
+          'refToPredefinedAbapType',
+          'refToDictionaryType',
+          'refToClifType',
+        ],
+        default: 'domain',
       },
       type_name: {
-        type: "string",
-        description: "Type name: domain name (when type_kind is 'domain'), data element name (when type_kind is 'refToDictionaryType'), or class name (when type_kind is 'refToClifType')"
+        type: 'string',
+        description:
+          "Type name: domain name (when type_kind is 'domain'), data element name (when type_kind is 'refToDictionaryType'), or class name (when type_kind is 'refToClifType')",
       },
       search_help: {
-        type: "string",
-        description: "Search help name. Applied during update step after creation."
+        type: 'string',
+        description:
+          'Search help name. Applied during update step after creation.',
       },
       search_help_parameter: {
-        type: "string",
-        description: "Search help parameter. Applied during update step after creation."
+        type: 'string',
+        description:
+          'Search help parameter. Applied during update step after creation.',
       },
       set_get_parameter: {
-        type: "string",
-        description: "Set/Get parameter ID. Applied during update step after creation."
-      }
+        type: 'string',
+        description:
+          'Set/Get parameter ID. Applied during update step after creation.',
+      },
     },
-    required: ["data_element_name", "package_name"]
-  }
+    required: ['data_element_name', 'package_name'],
+  },
 } as const;
 
 interface DataElementArgs {
@@ -104,7 +130,12 @@ interface DataElementArgs {
   medium_label?: string;
   long_label?: string;
   heading_label?: string;
-  type_kind?: 'domain' | 'predefinedAbapType' | 'refToPredefinedAbapType' | 'refToDictionaryType' | 'refToClifType';
+  type_kind?:
+    | 'domain'
+    | 'predefinedAbapType'
+    | 'refToPredefinedAbapType'
+    | 'refToDictionaryType'
+    | 'refToClifType';
   type_name?: string;
   search_help?: string;
   search_help_parameter?: string;
@@ -118,19 +149,25 @@ interface DataElementArgs {
  * Uses DataElementBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateDataElement(context: HandlerContext, args: DataElementArgs) {
+export async function handleCreateDataElement(
+  context: HandlerContext,
+  args: DataElementArgs,
+) {
   const { connection, logger } = context;
   try {
     // Validate required parameters
     if (!args?.data_element_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Data element name is required');
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'Data element name is required',
+      );
     }
     if (!args?.package_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
     }
 
     // Determine typeKind - default to 'domain' if not specified
-    const typeKind = args?.type_kind || 'domain';
+    const _typeKind = args?.type_kind || 'domain';
 
     // Validate transport_request: required for non-$TMP packages
     validateTransportRequest(args.package_name, args.transport_request);
@@ -138,7 +175,7 @@ export async function handleCreateDataElement(context: HandlerContext, args: Dat
     const typedArgs = args as DataElementArgs;
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-        const dataElementName = typedArgs.data_element_name.toUpperCase();
+    const dataElementName = typedArgs.data_element_name.toUpperCase();
 
     logger?.info(`Starting data element creation: ${dataElementName}`);
 
@@ -151,7 +188,7 @@ export async function handleCreateDataElement(context: HandlerContext, args: Dat
       await client.validateDataElement({
         dataElementName,
         packageName: typedArgs.package_name,
-        description: typedArgs.description || dataElementName
+        description: typedArgs.description || dataElementName,
       });
 
       // Determine typeKind - default to 'domain' if not specified
@@ -167,7 +204,7 @@ export async function handleCreateDataElement(context: HandlerContext, args: Dat
         typeName: typedArgs.type_name,
         length: typedArgs.length,
         decimals: typedArgs.decimals,
-        transportRequest: typedArgs.transport_request
+        transportRequest: typedArgs.transport_request,
       });
 
       // Lock
@@ -190,7 +227,7 @@ export async function handleCreateDataElement(context: HandlerContext, args: Dat
         typeName: typedArgs.type_name,
         searchHelp: typedArgs.search_help,
         searchHelpParameter: typedArgs.search_help_parameter,
-        setGetParameter: typedArgs.set_get_parameter
+        setGetParameter: typedArgs.set_get_parameter,
       };
 
       await client.updateDataElement(updateConfig, lockHandle);
@@ -201,8 +238,8 @@ export async function handleCreateDataElement(context: HandlerContext, args: Dat
           () => client.checkDataElement({ dataElementName }),
           dataElementName,
           {
-            debug: (message: string) => logger?.debug(message)
-          }
+            debug: (message: string) => logger?.debug(message),
+          },
         );
       } catch (checkError: any) {
         // If error was marked as "already checked", continue silently
@@ -223,54 +260,70 @@ export async function handleCreateDataElement(context: HandlerContext, args: Dat
       // Get data element details from create result (createDataElement already does verification)
       const createResult = client.getCreateResult();
       let dataElementDetails = null;
-      if (createResult?.data && typeof createResult.data === 'object' && 'data_element_details' in createResult.data) {
+      if (
+        createResult?.data &&
+        typeof createResult.data === 'object' &&
+        'data_element_details' in createResult.data
+      ) {
         dataElementDetails = (createResult.data as any).data_element_details;
       }
 
       // Extract version and other details from response
-      const version = createResult?.data && typeof createResult.data === 'object' && 'version' in createResult.data
-        ? (createResult.data as any).version
-        : 'unknown';
+      const version =
+        createResult?.data &&
+        typeof createResult.data === 'object' &&
+        'version' in createResult.data
+          ? (createResult.data as any).version
+          : 'unknown';
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          data_element_name: dataElementName,
-          package: typedArgs.package_name,
-          transport_request: typedArgs.transport_request,
-          data_type: typedArgs.data_type || null,
-          status: 'active',
-          version: version,
-          message: `Data element ${dataElementName} created and activated successfully`,
-          data_element_details: dataElementDetails
-        }, null, 2),
+        data: JSON.stringify(
+          {
+            success: true,
+            data_element_name: dataElementName,
+            package: typedArgs.package_name,
+            transport_request: typedArgs.transport_request,
+            data_type: typedArgs.data_type || null,
+            status: 'active',
+            version: version,
+            message: `Data element ${dataElementName} created and activated successfully`,
+            data_element_details: dataElementDetails,
+          },
+          null,
+          2,
+        ),
         status: 200,
         statusText: 'OK',
         headers: {},
-        config: {} as any
+        config: {} as any,
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error creating data element ${dataElementName}: ${error?.message || error}`);
+      logger?.error(
+        `Error creating data element ${dataElementName}: ${error?.message || error}`,
+      );
 
       // Check if data element already exists
-      if (error.message?.includes('already exists') || error.response?.data?.includes('ExceptionResourceAlreadyExists')) {
+      if (
+        error.message?.includes('already exists') ||
+        error.response?.data?.includes('ExceptionResourceAlreadyExists')
+      ) {
         throw new McpError(
           ErrorCode.InvalidParams,
-          `Data element ${dataElementName} already exists. Please delete it first or use a different name.`
+          `Data element ${dataElementName} already exists. Please delete it first or use a different name.`,
         );
       }
 
       const errorMessage = error.response?.data
-        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+        ? typeof error.response.data === 'string'
+          ? error.response.data
+          : JSON.stringify(error.response.data)
         : error.message || String(error);
 
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to create data element ${dataElementName}: ${errorMessage}`
+        `Failed to create data element ${dataElementName}: ${errorMessage}`,
       );
     }
-
   } catch (error: any) {
     if (error instanceof McpError) {
       throw error;

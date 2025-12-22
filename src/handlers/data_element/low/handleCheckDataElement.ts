@@ -6,36 +6,44 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "CheckDataElementLow",
-  description: "[low-level] Perform syntax check on an ABAP data element. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.",
+  name: 'CheckDataElementLow',
+  description:
+    '[low-level] Perform syntax check on an ABAP data element. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       data_element_name: {
-        type: "string",
-        description: "DataElement name (e.g., Z_MY_PROGRAM)."
+        type: 'string',
+        description: 'DataElement name (e.g., Z_MY_PROGRAM).',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from GetSession. If not provided, a new session will be created."
+        type: 'string',
+        description:
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["data_element_name"]
-  }
+    required: ['data_element_name'],
+  },
 } as const;
 
 interface CheckDataElementArgs {
@@ -53,14 +61,14 @@ interface CheckDataElementArgs {
  *
  * Uses CrudClient.checkDataElement - low-level single method call
  */
-export async function handleCheckDataElement(context: HandlerContext, args: CheckDataElementArgs) {
+export async function handleCheckDataElement(
+  context: HandlerContext,
+  args: CheckDataElementArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      data_element_name,
-      session_id,
-      session_state
-    } = args as CheckDataElementArgs;
+    const { data_element_name, session_id, session_state } =
+      args as CheckDataElementArgs;
 
     // Validation
     if (!data_element_name) {
@@ -74,7 +82,7 @@ export async function handleCheckDataElement(context: HandlerContext, args: Chec
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const dataElementName = data_element_name.toUpperCase();
 
@@ -86,7 +94,9 @@ export async function handleCheckDataElement(context: HandlerContext, args: Chec
       const response = client.getCheckResult();
 
       if (!response) {
-        throw new Error(`Check did not return a response for data element ${dataElementName}`);
+        throw new Error(
+          `Check did not return a response for data element ${dataElementName}`,
+        );
       }
 
       // Parse check results
@@ -94,51 +104,61 @@ export async function handleCheckDataElement(context: HandlerContext, args: Chec
 
       // Get updated session state after check
 
-
       logger?.info(`✅ CheckDataElement completed: ${dataElementName}`);
-      logger?.debug(`Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.debug(
+        `Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,
+      );
 
       return return_response({
-        data: JSON.stringify({
-          success: checkResult.success,
-          data_element_name: dataElementName,
-          check_result: checkResult,
-          session_id: session_id || null,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: checkResult.success
-            ? `DataElement ${dataElementName} has no syntax errors`
-            : `DataElement ${dataElementName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: checkResult.success,
+            data_element_name: dataElementName,
+            check_result: checkResult,
+            session_id: session_id || null,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: checkResult.success
+              ? `DataElement ${dataElementName} has no syntax errors`
+              : `DataElement ${dataElementName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error checking data element ${dataElementName}: ${error?.message || error}`);
+      logger?.error(
+        `Error checking data element ${dataElementName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to check data element: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
         errorMessage = `DataElement ${dataElementName} not found.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

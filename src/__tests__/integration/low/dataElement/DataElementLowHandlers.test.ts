@@ -12,16 +12,15 @@
  * Run: npm test -- --testPathPattern=integration/dataElement
  */
 
-import { handleValidateDataElement } from '../../../../handlers/data_element/low/handleValidateDataElement';
-import { handleCreateDataElement } from '../../../../handlers/data_element/low/handleCreateDataElement';
-import { handleLockDataElement } from '../../../../handlers/data_element/low/handleLockDataElement';
-import { handleUpdateDataElement } from '../../../../handlers/data_element/low/handleUpdateDataElement';
-import { handleUnlockDataElement } from '../../../../handlers/data_element/low/handleUnlockDataElement';
 import { handleActivateDataElement } from '../../../../handlers/data_element/low/handleActivateDataElement';
+import { handleCreateDataElement } from '../../../../handlers/data_element/low/handleCreateDataElement';
 import { handleDeleteDataElement } from '../../../../handlers/data_element/low/handleDeleteDataElement';
-
-import { LowTester } from '../../helpers/testers/LowTester';
+import { handleLockDataElement } from '../../../../handlers/data_element/low/handleLockDataElement';
+import { handleUnlockDataElement } from '../../../../handlers/data_element/low/handleUnlockDataElement';
+import { handleUpdateDataElement } from '../../../../handlers/data_element/low/handleUpdateDataElement';
+import { handleValidateDataElement } from '../../../../handlers/data_element/low/handleValidateDataElement';
 import { getTimeout } from '../../helpers/configHelpers';
+import { LowTester } from '../../helpers/testers/LowTester';
 
 describe('DataElement Low-Level Handlers Integration', () => {
   let tester: LowTester;
@@ -38,8 +37,8 @@ describe('DataElement Low-Level Handlers Integration', () => {
         update: handleUpdateDataElement,
         unlock: handleUnlockDataElement,
         activate: handleActivateDataElement,
-        delete: handleDeleteDataElement
-      }
+        delete: handleDeleteDataElement,
+      },
     );
     await tester.beforeAll();
   });
@@ -56,7 +55,11 @@ describe('DataElement Low-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it('should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate', async () => {
-    await tester.run();
-  }, getTimeout('long'));
+  it(
+    'should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate',
+    async () => {
+      await tester.run();
+    },
+    getTimeout('long'),
+  );
 });

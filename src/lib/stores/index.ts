@@ -6,20 +6,20 @@
 
 export { getPlatformPaths } from './platformPaths';
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 // Import new stores from @mcp-abap-adt/auth-stores
 import {
   AbapServiceKeyStore,
   AbapSessionStore,
-  SafeAbapSessionStore,
   BtpServiceKeyStore,
   BtpSessionStore,
-  SafeBtpSessionStore,
   JsonFileHandler,
+  SafeAbapSessionStore,
+  SafeBtpSessionStore,
 } from '@mcp-abap-adt/auth-stores';
 import type { IServiceKeyStore, ISessionStore } from '@mcp-abap-adt/interfaces';
 import { getPlatformPaths } from './platformPaths';
-import * as path from 'path';
-import * as fs from 'fs';
 
 /**
  * Auto-detect service key format and return appropriate stores
@@ -29,8 +29,12 @@ import * as fs from 'fs';
  */
 export async function detectStoreType(
   directory: string,
-  destination?: string
-): Promise<{ serviceKeyStore: IServiceKeyStore; sessionStore: ISessionStore; storeType: 'abap' | 'btp' }> {
+  destination?: string,
+): Promise<{
+  serviceKeyStore: IServiceKeyStore;
+  sessionStore: ISessionStore;
+  storeType: 'abap' | 'btp';
+}> {
   // Default to ABAP for backward compatibility
   let storeType: 'abap' | 'btp' = 'abap';
 
@@ -54,7 +58,7 @@ export async function detectStoreType(
             storeType = 'btp';
           }
         }
-      } catch (error) {
+      } catch (_error) {
         // If detection fails, default to ABAP
         storeType = 'abap';
       }
@@ -95,7 +99,7 @@ export async function detectStoreType(
 export function getPlatformStores(
   customPath?: string | string[],
   unsafe: boolean = false,
-  destination?: string
+  _destination?: string,
 ): {
   serviceKeyStore: IServiceKeyStore;
   sessionStore: ISessionStore;
@@ -134,7 +138,7 @@ export function getPlatformStores(
 export async function getPlatformStoresAsync(
   customPath?: string | string[],
   unsafe: boolean = false,
-  destination?: string
+  destination?: string,
 ): Promise<{
   serviceKeyStore: IServiceKeyStore;
   sessionStore: ISessionStore;

@@ -7,42 +7,52 @@
  * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
-import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, safeCheckOperation } from '../../../lib/utils';
-import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-
+import {
+  type AxiosResponse,
+  ErrorCode,
+  McpError,
+  return_error,
+  return_response,
+  safeCheckOperation,
+} from '../../../lib/utils';
+import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
-  name: "CreateTable",
-  description: "Create a new ABAP table via the ADT API using provided DDL. Mirrors Eclipse ADT behaviour with status/check runs, lock handling, activation and verification.",
+  name: 'CreateTable',
+  description:
+    'Create a new ABAP table via the ADT API using provided DDL. Mirrors Eclipse ADT behaviour with status/check runs, lock handling, activation and verification.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       table_name: {
-        type: "string",
-        description: "Table name (e.g., ZZ_TEST_TABLE_001). Must follow SAP naming conventions."
+        type: 'string',
+        description:
+          'Table name (e.g., ZZ_TEST_TABLE_001). Must follow SAP naming conventions.',
       },
       ddl_code: {
-        type: "string",
-        description: "Complete DDL code for table creation. Example: '@EndUserText.label : \\'My Table\\' @AbapCatalog.tableCategory : #TRANSPARENT define table ztst_table { key client : abap.clnt not null; key id : abap.char(10); name : abap.char(255); }'"
+        type: 'string',
+        description:
+          "Complete DDL code for table creation. Example: '@EndUserText.label : \\'My Table\\' @AbapCatalog.tableCategory : #TRANSPARENT define table ztst_table { key client : abap.clnt not null; key id : abap.char(10); name : abap.char(255); }'",
       },
       package_name: {
-        type: "string",
-        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects)"
+        type: 'string',
+        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects)',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable packages."
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
       activate: {
-        type: "boolean",
-        description: "Activate table after creation. Default: true. Set to false for batch operations (activate multiple objects later)."
-      }
+        type: 'boolean',
+        description:
+          'Activate table after creation. Default: true. Set to false for batch operations (activate multiple objects later).',
+      },
     },
-    required: ["table_name", "ddl_code", "package_name"]
-  }
+    required: ['table_name', 'ddl_code', 'package_name'],
+  },
 } as const;
 
 interface CreateTableArgs {
@@ -53,14 +63,16 @@ interface CreateTableArgs {
   activate?: boolean;
 }
 
-
 /**
  * Main handler for CreateTable MCP tool
  *
  * Uses TableBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateTable(context: HandlerContext, args: CreateTableArgs): Promise<any> {
+export async function handleCreateTable(
+  context: HandlerContext,
+  args: CreateTableArgs,
+): Promise<any> {
   const { connection, logger } = context;
   try {
     const createTableArgs = args as CreateTableArgs;
@@ -77,7 +89,10 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
     }
 
     // Validate transport_request: required for non-$TMP packages
-    validateTransportRequest(createTableArgs.package_name, createTableArgs.transport_request);
+    validateTransportRequest(
+      createTableArgs.package_name,
+      createTableArgs.transport_request,
+    );
 
     const tableName = createTableArgs.table_name.toUpperCase();
 
@@ -92,7 +107,7 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
       await client.validateTable({
         tableName,
         packageName: createTableArgs.package_name,
-        description: ''
+        description: '',
       });
 
       // Create
@@ -101,7 +116,7 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
         packageName: createTableArgs.package_name,
         description: '',
         ddlCode: createTableArgs.ddl_code || '',
-        transportRequest: createTableArgs.transport_request
+        transportRequest: createTableArgs.transport_request,
       });
 
       // Lock
@@ -110,39 +125,61 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
 
       try {
         // Step 1: Check new code BEFORE update (with ddlCode and version='inactive')
-        logger?.info(`[CreateTable] Checking new DDL code before update: ${tableName}`);
+        logger?.info(
+          `[CreateTable] Checking new DDL code before update: ${tableName}`,
+        );
         let checkNewCodePassed = false;
         try {
           await safeCheckOperation(
-            () => client.checkTable({ tableName }, createTableArgs.ddl_code, 'inactive'),
+            () =>
+              client.checkTable(
+                { tableName },
+                createTableArgs.ddl_code,
+                'inactive',
+              ),
             tableName,
             {
-              debug: (message: string) => logger?.debug(`[CreateTable] ${message}`)
-            }
+              debug: (message: string) =>
+                logger?.debug(`[CreateTable] ${message}`),
+            },
           );
           checkNewCodePassed = true;
           logger?.info(`[CreateTable] New code check passed: ${tableName}`);
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
           if ((checkError as any).isAlreadyChecked) {
-            logger?.info(`[CreateTable] Table ${tableName} was already checked - this is OK, continuing`);
+            logger?.info(
+              `[CreateTable] Table ${tableName} was already checked - this is OK, continuing`,
+            );
             checkNewCodePassed = true;
           } else {
             // Real check error - don't update if check failed
             logger?.error(`[CreateTable] New code check failed: ${tableName}`, {
-              error: checkError instanceof Error ? checkError.message : String(checkError)
+              error:
+                checkError instanceof Error
+                  ? checkError.message
+                  : String(checkError),
             });
-            throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+            throw new Error(
+              `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+            );
           }
         }
 
         // Step 2: Update (only if check passed)
         if (checkNewCodePassed) {
-          logger?.info(`[CreateTable] Updating table with DDL code: ${tableName}`);
-          await client.updateTable({ tableName, ddlCode: createTableArgs.ddl_code }, lockHandle);
+          logger?.info(
+            `[CreateTable] Updating table with DDL code: ${tableName}`,
+          );
+          await client.updateTable(
+            { tableName, ddlCode: createTableArgs.ddl_code },
+            lockHandle,
+          );
           logger?.info(`[CreateTable] Table source code updated: ${tableName}`);
         } else {
-          logger?.info(`[CreateTable] Skipping update - new code check failed: ${tableName}`);
+          logger?.info(
+            `[CreateTable] Skipping update - new code check failed: ${tableName}`,
+          );
         }
 
         // Step 3: Unlock (MANDATORY after lock)
@@ -156,17 +193,24 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
             () => client.checkTable({ tableName }, undefined, 'inactive'),
             tableName,
             {
-              debug: (message: string) => logger?.debug(`[CreateTable] ${message}`)
-            }
+              debug: (message: string) =>
+                logger?.debug(`[CreateTable] ${message}`),
+            },
           );
-          logger?.info(`[CreateTable] Inactive version check completed: ${tableName}`);
+          logger?.info(
+            `[CreateTable] Inactive version check completed: ${tableName}`,
+          );
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
           if ((checkError as any).isAlreadyChecked) {
-            logger?.info(`[CreateTable] Table ${tableName} was already checked - continuing`);
+            logger?.info(
+              `[CreateTable] Table ${tableName} was already checked - continuing`,
+            );
           } else {
             // Log warning but don't fail - inactive check is informational
-            logger?.warn(`[CreateTable] Inactive version check had issues: ${tableName} | ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+            logger?.warn(
+              `[CreateTable] Inactive version check had issues: ${tableName} | ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+            );
           }
         }
 
@@ -179,7 +223,9 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
         try {
           await client.unlockTable({ tableName }, lockHandle);
         } catch (unlockError) {
-          logger?.error(`Failed to unlock table after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+          logger?.error(
+            `Failed to unlock table after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
+          );
         }
         // Principle 2: first error and exit
         throw error;
@@ -194,31 +240,36 @@ export async function handleCreateTable(context: HandlerContext, args: CreateTab
           package_name: createTableArgs.package_name,
           transport_request: createTableArgs.transport_request || 'local',
           activated: shouldActivate,
-          message: `Table ${tableName} created successfully${shouldActivate ? ' and activated' : ''}`
-        })
+          message: `Table ${tableName} created successfully${shouldActivate ? ' and activated' : ''}`,
+        }),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error creating table ${tableName}: ${error?.message || error}`);
+      logger?.error(
+        `Error creating table ${tableName}: ${error?.message || error}`,
+      );
 
       // Check if table already exists
-      if (error.message?.includes('already exists') || error.response?.status === 409) {
+      if (
+        error.message?.includes('already exists') ||
+        error.response?.status === 409
+      ) {
         throw new McpError(
           ErrorCode.InvalidParams,
-          `Table ${tableName} already exists. Please delete it first or use a different name.`
+          `Table ${tableName} already exists. Please delete it first or use a different name.`,
         );
       }
 
       const errorMessage = error.response?.data
-        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+        ? typeof error.response.data === 'string'
+          ? error.response.data
+          : JSON.stringify(error.response.data)
         : error.message || String(error);
 
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to create table ${tableName}: ${errorMessage}`
+        `Failed to create table ${tableName}: ${errorMessage}`,
       );
     }
-
   } catch (error: any) {
     if (error instanceof McpError) {
       throw error;

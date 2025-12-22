@@ -3,22 +3,40 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "DeleteObjectLow",
-  description: "[low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects.",
+  name: 'DeleteObjectLow',
+  description:
+    '[low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
-      object_name: { type: "string", description: "Object name (e.g., ZCL_MY_CLASS)" },
-      object_type: { type: "string", description: "Object type (class/program/interface/function_group/function_module/table/structure/view/domain/data_element/behavior_definition/metadata_extension)" },
-      function_group_name: { type: "string", description: "Required only for function_module type" },
-      transport_request: { type: "string", description: "Transport request number" }
+      object_name: {
+        type: 'string',
+        description: 'Object name (e.g., ZCL_MY_CLASS)',
+      },
+      object_type: {
+        type: 'string',
+        description:
+          'Object type (class/program/interface/function_group/function_module/table/structure/view/domain/data_element/behavior_definition/metadata_extension)',
+      },
+      function_group_name: {
+        type: 'string',
+        description: 'Required only for function_module type',
+      },
+      transport_request: {
+        type: 'string',
+        description: 'Transport request number',
+      },
     },
-    required: ["object_name", "object_type"]
-  }
+    required: ['object_name', 'object_type'],
+  },
 } as const;
 
 interface DeleteObjectArgs {
@@ -28,112 +46,164 @@ interface DeleteObjectArgs {
   transport_request?: string;
 }
 
-export async function handleDeleteObject(context: HandlerContext, args: DeleteObjectArgs) {
+export async function handleDeleteObject(
+  context: HandlerContext,
+  args: DeleteObjectArgs,
+) {
   const { connection, logger } = context;
   try {
-    const { object_name, object_type, function_group_name, transport_request } = args as DeleteObjectArgs;
+    const { object_name, object_type, function_group_name, transport_request } =
+      args as DeleteObjectArgs;
 
     if (!object_name || !object_type) {
-      return return_error(new Error('object_name and object_type are required'));
+      return return_error(
+        new Error('object_name and object_type are required'),
+      );
     }
 
     const crudClient = new CrudClient(connection);
     const objectName = object_name.toUpperCase();
     const objectType = object_type.toLowerCase();
 
-    logger?.info(`Starting object deletion: ${objectName} (type: ${object_type})`);
+    logger?.info(
+      `Starting object deletion: ${objectName} (type: ${object_type})`,
+    );
 
     try {
-      let response;
+      let response: unknown;
 
       switch (objectType) {
         case 'class':
         case 'clas/oc':
-          await crudClient.deleteClass({ className: objectName, transportRequest: transport_request });
+          await crudClient.deleteClass({
+            className: objectName,
+            transportRequest: transport_request,
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'program':
         case 'prog/p':
-          await crudClient.deleteProgram({ programName: objectName, transportRequest: transport_request });
+          await crudClient.deleteProgram({
+            programName: objectName,
+            transportRequest: transport_request,
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'interface':
         case 'intf/oi':
-          await crudClient.deleteInterface({ interfaceName: objectName, transportRequest: transport_request });
+          await crudClient.deleteInterface({
+            interfaceName: objectName,
+            transportRequest: transport_request,
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'function_group':
         case 'fugr/f':
-          await crudClient.deleteFunctionGroup({ functionGroupName: objectName, transportRequest: transport_request });
+          await crudClient.deleteFunctionGroup({
+            functionGroupName: objectName,
+            transportRequest: transport_request,
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'function_module':
         case 'fugr/ff':
           if (!function_group_name) {
-            return return_error(new Error('function_group_name is required for function_module deletion.'));
+            return return_error(
+              new Error(
+                'function_group_name is required for function_module deletion.',
+              ),
+            );
           }
           await crudClient.deleteFunctionModule({
             functionGroupName: function_group_name.toUpperCase(),
             functionModuleName: objectName,
-            transportRequest: transport_request
+            transportRequest: transport_request,
           });
           response = crudClient.getDeleteResult();
           break;
         case 'table':
         case 'tabl/dt':
-          await crudClient.deleteTable({ tableName: objectName, transportRequest: transport_request });
+          await crudClient.deleteTable({
+            tableName: objectName,
+            transportRequest: transport_request,
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'structure':
         case 'ttyp/st':
-          await crudClient.deleteStructure({ structureName: objectName, transportRequest: transport_request });
+          await crudClient.deleteStructure({
+            structureName: objectName,
+            transportRequest: transport_request,
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'view':
         case 'ddls/df':
-          await crudClient.deleteView({ viewName: objectName, transportRequest: transport_request });
+          await crudClient.deleteView({
+            viewName: objectName,
+            transportRequest: transport_request,
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'domain':
         case 'doma/dm':
-          await crudClient.deleteDomain({ domainName: objectName, transportRequest: transport_request });
+          await crudClient.deleteDomain({
+            domainName: objectName,
+            transportRequest: transport_request,
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'data_element':
         case 'dtel/de':
-          await crudClient.deleteDataElement({ dataElementName: objectName, transportRequest: transport_request });
+          await crudClient.deleteDataElement({
+            dataElementName: objectName,
+            transportRequest: transport_request,
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'behavior_definition':
         case 'bdef/bd':
-          await crudClient.deleteBehaviorDefinition({ name: objectName, transportRequest: transport_request });
+          await crudClient.deleteBehaviorDefinition({
+            name: objectName,
+            transportRequest: transport_request,
+          });
           response = crudClient.getDeleteResult();
           break;
         case 'metadata_extension':
         case 'ddlx/ex':
-          await crudClient.deleteMetadataExtension({ name: objectName, transportRequest: transport_request });
+          await crudClient.deleteMetadataExtension({
+            name: objectName,
+            transportRequest: transport_request,
+          });
           response = crudClient.getDeleteResult();
           break;
         default:
-          return return_error(new Error(`Unsupported object_type: ${object_type}`));
+          return return_error(
+            new Error(`Unsupported object_type: ${object_type}`),
+          );
       }
 
       if (!response) {
-        throw new Error(`Delete did not return a response for object ${objectName}`);
+        throw new Error(
+          `Delete did not return a response for object ${objectName}`,
+        );
       }
 
       logger?.info(`✅ DeleteObject completed successfully: ${objectName}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          object_name: objectName,
-          object_type: objectType,
-          transport_request: transport_request || null,
-          message: `Object ${objectName} deleted successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            object_name: objectName,
+            object_type: objectType,
+            transport_request: transport_request || null,
+            message: `Object ${objectName} deleted successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
       logger?.error(`Error deleting object ${objectName}:`, error);
 
@@ -145,12 +215,20 @@ export async function handleDeleteObject(context: HandlerContext, args: DeleteOb
         errorMessage = `Object ${objectName} is locked by another user. Cannot delete.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+          const parser = new XMLParser({
+            ignoreAttributes: false,
+            attributeNamePrefix: '@_',
+          });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
@@ -161,7 +239,6 @@ export async function handleDeleteObject(context: HandlerContext, args: DeleteOb
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

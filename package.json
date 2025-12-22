@@ -44,7 +44,11 @@
     "test:high": "jest --testPathPattern=integration.*HighHandlers --passWithNoTests",
     "test:low": "jest --testPathPattern=integration.*LowHandlers --passWithNoTests",
     "test:check": "npx tsc --noEmit -p tsconfig.test.json",
-    "build": "npx tsc -p tsconfig.json",
+    "lint": "npx biome check --write src",
+    "lint:check": "npx biome check src",
+    "format": "npx biome format --write src",
+    "build": "npx biome check src --diagnostic-level=error && npx tsc -p tsconfig.json",
+    "build:fast": "npx tsc -p tsconfig.json",
     "check-todos": "node tools/check-todos.js",
     "start": "node ./bin/mcp-abap-adt.js",
     "start:http": "node ./bin/mcp-abap-adt.js --transport=http",
@@ -94,6 +98,7 @@
     "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.3.10",
     "@modelcontextprotocol/inspector": "^0.18.0",
     "@types/jest": "^29.5.0",
     "@types/js-yaml": "^4.0.9",
@@ -113,13 +118,13 @@
     "yaml": "^2.8.1"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^0.2.5",
+    "@mcp-abap-adt/adt-clients": "^0.2.6",
     "@mcp-abap-adt/auth-broker": "^0.2.9",
     "@mcp-abap-adt/auth-providers": "^0.2.4",
     "@mcp-abap-adt/auth-stores": "^0.2.8",
     "@mcp-abap-adt/connection": "^0.2.5",
     "@mcp-abap-adt/header-validator": "^0.1.8",
-    "@mcp-abap-adt/interfaces": "^0.2.5",
+    "@mcp-abap-adt/interfaces": "^0.2.6",
     "@mcp-abap-adt/logger": "^0.1.3",
     "@modelcontextprotocol/sdk": "^1.25.1",
     "axios": "^1.11.0",

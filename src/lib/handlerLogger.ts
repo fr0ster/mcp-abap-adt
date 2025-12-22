@@ -6,12 +6,16 @@ import { defaultLogger } from '@mcp-abap-adt/logger';
  * Honors AUTH_LOG_LEVEL from @mcp-abap-adt/logger; set to "error"/"warn"/"info"/"debug".
  * Use HANDLER_LOG_SILENT=true to force no-op logger for handlers.
  */
-export function getHandlerLogger(category: string, baseLogger: Logger = defaultLogger): Logger {
+export function getHandlerLogger(
+  category: string,
+  baseLogger: Logger = defaultLogger,
+): Logger {
   if (process.env.HANDLER_LOG_SILENT === 'true') {
     return noopLogger;
   }
   const prefix = `[${category}]`;
-  const wrap = (fn: (msg: string) => void) => (msg: string) => fn(`${prefix} ${msg}`);
+  const wrap = (fn: (msg: string) => void) => (msg: string) =>
+    fn(`${prefix} ${msg}`);
 
   return {
     info: wrap(baseLogger?.info.bind(baseLogger)),

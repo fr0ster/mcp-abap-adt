@@ -1,12 +1,15 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { AbapConnection, createAbapConnection } from "@mcp-abap-adt/connection";
-import { AuthBroker } from "@mcp-abap-adt/auth-broker";
-import { ConnectionContext } from "./ConnectionContext.js";
-import { IHandlersRegistry } from "../../lib/handlers/interfaces.js";
-import { CompositeHandlersRegistry } from "../../lib/handlers/registry/CompositeHandlersRegistry.js";
-import { HandlerContext } from "../../handlers/interfaces.js";
-import { defaultLogger, type Logger } from "@mcp-abap-adt/logger";
-import { registerAuthBroker } from "../../lib/utils.js";
+import type { AuthBroker } from '@mcp-abap-adt/auth-broker';
+import {
+  type AbapConnection,
+  createAbapConnection,
+} from '@mcp-abap-adt/connection';
+import { defaultLogger, type Logger } from '@mcp-abap-adt/logger';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { HandlerContext } from '../../handlers/interfaces.js';
+import type { IHandlersRegistry } from '../../lib/handlers/interfaces.js';
+import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry.js';
+import { registerAuthBroker } from '../../lib/utils.js';
+import type { ConnectionContext } from './ConnectionContext.js';
 
 /**
  * Base MCP Server class that extends SDK McpServer
@@ -34,7 +37,7 @@ export abstract class BaseMcpServer extends McpServer {
   private cachedConnection: AbapConnection | null = null;
 
   constructor(options: { name: string; version?: string; logger?: Logger }) {
-    super({ name: options.name, version: options.version ?? "1.0.0" });
+    super({ name: options.name, version: options.version ?? '1.0.0' });
     this.logger = options.logger ?? defaultLogger;
   }
 
@@ -45,13 +48,15 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected async setConnectionContext(
     destination: string,
-    authBroker: AuthBroker
+    authBroker: AuthBroker,
   ): Promise<void> {
     this.authBroker = authBroker;
     // Register broker so destination-aware connections can refresh tokens
     registerAuthBroker(destination, authBroker);
 
-    this.logger.debug(`[BaseMcpServer] Getting connection config for destination: ${destination}`);
+    this.logger.debug(
+      `[BaseMcpServer] Getting connection config for destination: ${destination}`,
+    );
 
     // Get connection parameters from broker
     // AuthBroker.getConnectionConfig() automatically checks session store first, then service key store
@@ -60,11 +65,13 @@ export abstract class BaseMcpServer extends McpServer {
     this.logger.debug(`[BaseMcpServer] Connection config result:`, {
       found: !!connectionConfig,
       destination,
-      hasServiceUrl: !!connectionConfig?.serviceUrl
+      hasServiceUrl: !!connectionConfig?.serviceUrl,
     });
 
     if (!connectionConfig) {
-      throw new Error(`Connection config not found for destination: ${destination}`);
+      throw new Error(
+        `Connection config not found for destination: ${destination}`,
+      );
     }
 
     // Try to get fresh token from broker
@@ -75,31 +82,37 @@ export abstract class BaseMcpServer extends McpServer {
     } catch (error) {
       // Broker can't provide/refresh token (e.g., no UAA credentials for .env-only setup)
       // Use existing token from connectionConfig - user is responsible for token management
-      this.logger.debug(`Broker can't refresh token, using existing token from session: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.debug(
+        `Broker can't refresh token, using existing token from session: ${error instanceof Error ? error.message : String(error)}`,
+      );
       freshToken = connectionConfig.authorizationToken;
     }
     const tokenToUse = freshToken || connectionConfig.authorizationToken || '';
 
     // Determine auth type from connection config
-    const authType = connectionConfig.authType ||
-                     (connectionConfig.username && connectionConfig.password ? 'basic' : 'jwt');
+    const authType =
+      connectionConfig.authType ||
+      (connectionConfig.username && connectionConfig.password
+        ? 'basic'
+        : 'jwt');
 
     this.connectionContext = {
       sessionId: destination,
-      connectionParams: authType === 'basic'
-        ? {
-            url: connectionConfig.serviceUrl || '',
-            authType: 'basic',
-            username: connectionConfig.username || '',
-            password: connectionConfig.password || '',
-            client: connectionConfig.sapClient || '',
-          }
-        : {
-            url: connectionConfig.serviceUrl || '',
-            authType: 'jwt',
-            jwtToken: tokenToUse, // broker keeps it fresh
-            client: connectionConfig.sapClient || '',
-          },
+      connectionParams:
+        authType === 'basic'
+          ? {
+              url: connectionConfig.serviceUrl || '',
+              authType: 'basic',
+              username: connectionConfig.username || '',
+              password: connectionConfig.password || '',
+              client: connectionConfig.sapClient || '',
+            }
+          : {
+              url: connectionConfig.serviceUrl || '',
+              authType: 'jwt',
+              jwtToken: tokenToUse, // broker keeps it fresh
+              client: connectionConfig.sapClient || '',
+            },
       metadata: {
         destination,
       },
@@ -111,20 +124,20 @@ export abstract class BaseMcpServer extends McpServer {
    * Used when x-sap-url + auth headers are provided
    */
   protected setConnectionContextFromHeaders(headers: any): void {
-    const url = headers["x-sap-url"] || headers["X-SAP-URL"];
-    const jwtToken = headers["x-sap-jwt-token"] || headers["X-SAP-JWT-Token"];
-    const username = headers["x-sap-login"] || headers["X-SAP-Login"];
-    const password = headers["x-sap-password"] || headers["X-SAP-Password"];
-    const client = headers["x-sap-client"] || headers["X-SAP-Client"] || "";
+    const url = headers['x-sap-url'] || headers['X-SAP-URL'];
+    const jwtToken = headers['x-sap-jwt-token'] || headers['X-SAP-JWT-Token'];
+    const username = headers['x-sap-login'] || headers['X-SAP-Login'];
+    const password = headers['x-sap-password'] || headers['X-SAP-Password'];
+    const client = headers['x-sap-client'] || headers['X-SAP-Client'] || '';
 
     if (!url) {
-      throw new Error("x-sap-url header is required for direct SAP connection");
+      throw new Error('x-sap-url header is required for direct SAP connection');
     }
 
     if (jwtToken) {
       // JWT auth
       this.connectionContext = {
-        sessionId: "direct-jwt",
+        sessionId: 'direct-jwt',
         connectionParams: {
           url,
           authType: 'jwt',
@@ -136,7 +149,7 @@ export abstract class BaseMcpServer extends McpServer {
     } else if (username && password) {
       // Basic auth
       this.connectionContext = {
-        sessionId: "direct-basic",
+        sessionId: 'direct-basic',
         connectionParams: {
           url,
           authType: 'basic',
@@ -147,7 +160,9 @@ export abstract class BaseMcpServer extends McpServer {
         metadata: {},
       };
     } else {
-      throw new Error("Either x-sap-jwt-token or x-sap-login+x-sap-password headers are required");
+      throw new Error(
+        'Either x-sap-jwt-token or x-sap-login+x-sap-password headers are required',
+      );
     }
   }
 
@@ -167,10 +182,14 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected async getConnection(): Promise<AbapConnection> {
     if (!this.connectionContext?.connectionParams) {
-      throw new Error('Connection context not set. Call setConnectionContext() first.');
+      throw new Error(
+        'Connection context not set. Call setConnectionContext() first.',
+      );
     }
 
-    const destination = this.connectionContext.metadata?.destination as string | undefined;
+    const destination = this.connectionContext.metadata?.destination as
+      | string
+      | undefined;
     const sessionId = this.connectionContext.sessionId;
 
     // For stdio mode: cache connection and reuse it (like v1)
@@ -181,7 +200,9 @@ export abstract class BaseMcpServer extends McpServer {
       return this.cachedConnection;
     }
 
-    const connection = createAbapConnection(this.connectionContext.connectionParams);
+    const connection = createAbapConnection(
+      this.connectionContext.connectionParams,
+    );
 
     // Cache connection for stdio mode (when sessionId === destination, it's stdio)
     // SSE/HTTP modes use different sessionId per request, so caching won't interfere
@@ -242,15 +263,18 @@ export abstract class BaseMcpServer extends McpServer {
 
             // Handle errors: if handler returns isError, throw McpError
             if (result?.isError) {
-              const { ErrorCode, McpError } = await import('@modelcontextprotocol/sdk/types.js');
-              const errorText = (result.content || [])
-                .map((item: any) => {
-                  if (item?.type === 'json' && item.json !== undefined) {
-                    return JSON.stringify(item.json);
-                  }
-                  return item?.text || String(item);
-                })
-                .join('\n') || 'Unknown error';
+              const { ErrorCode, McpError } = await import(
+                '@modelcontextprotocol/sdk/types.js'
+              );
+              const errorText =
+                (result.content || [])
+                  .map((item: any) => {
+                    if (item?.type === 'json' && item.json !== undefined) {
+                      return JSON.stringify(item.json);
+                    }
+                    return item?.text || String(item);
+                  })
+                  .join('\n') || 'Unknown error';
               throw new McpError(ErrorCode.InternalError, errorText);
             }
 
@@ -280,7 +304,7 @@ export abstract class BaseMcpServer extends McpServer {
               description: entry.toolDefinition.description,
               inputSchema: entry.toolDefinition.inputSchema,
             },
-            wrappedHandler
+            wrappedHandler,
           );
         }
       }

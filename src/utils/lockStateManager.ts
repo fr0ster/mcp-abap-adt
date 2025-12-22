@@ -3,8 +3,8 @@
  * Allows recovery and cleanup of locks after crashes or interruptions
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 export interface LockState {
   sessionId: string;
@@ -70,7 +70,7 @@ export class LockStateManager {
       fs.writeFileSync(
         this.lockFilePath,
         JSON.stringify(this.registry, null, 2),
-        'utf-8'
+        'utf-8',
       );
     } catch (error) {
       console.error(`Failed to save lock registry: ${error}`);
@@ -88,10 +88,13 @@ export class LockStateManager {
     };
 
     // Remove old lock for same object if exists
-    this.registry.locks = this.registry.locks.filter(l =>
-      !(l.objectType === lock.objectType &&
-        l.objectName === lock.objectName &&
-        l.functionGroupName === lock.functionGroupName)
+    this.registry.locks = this.registry.locks.filter(
+      (l) =>
+        !(
+          l.objectType === lock.objectType &&
+          l.objectName === lock.objectName &&
+          l.functionGroupName === lock.functionGroupName
+        ),
     );
 
     this.registry.locks.push(lockState);
@@ -101,11 +104,18 @@ export class LockStateManager {
   /**
    * Remove lock from registry
    */
-  removeLock(objectType: string, objectName: string, functionGroupName?: string): void {
-    this.registry.locks = this.registry.locks.filter(l =>
-      !(l.objectType === objectType &&
-        l.objectName === objectName &&
-        l.functionGroupName === functionGroupName)
+  removeLock(
+    objectType: string,
+    objectName: string,
+    functionGroupName?: string,
+  ): void {
+    this.registry.locks = this.registry.locks.filter(
+      (l) =>
+        !(
+          l.objectType === objectType &&
+          l.objectName === objectName &&
+          l.functionGroupName === functionGroupName
+        ),
     );
     this.saveRegistry();
   }
@@ -113,11 +123,16 @@ export class LockStateManager {
   /**
    * Get lock for specific object
    */
-  getLock(objectType: string, objectName: string, functionGroupName?: string): LockState | undefined {
-    return this.registry.locks.find(l =>
-      l.objectType === objectType &&
-      l.objectName === objectName &&
-      l.functionGroupName === functionGroupName
+  getLock(
+    objectType: string,
+    objectName: string,
+    functionGroupName?: string,
+  ): LockState | undefined {
+    return this.registry.locks.find(
+      (l) =>
+        l.objectType === objectType &&
+        l.objectName === objectName &&
+        l.functionGroupName === functionGroupName,
     );
   }
 
@@ -133,19 +148,19 @@ export class LockStateManager {
    */
   getStaleLocks(maxAgeMs: number = 30 * 60 * 1000): LockState[] {
     const now = Date.now();
-    return this.registry.locks.filter(l => now - l.timestamp > maxAgeMs);
+    return this.registry.locks.filter((l) => now - l.timestamp > maxAgeMs);
   }
 
   /**
    * Get locks from dead processes
    */
   getDeadProcessLocks(): LockState[] {
-    return this.registry.locks.filter(l => {
+    return this.registry.locks.filter((l) => {
       try {
         // Check if process is still running
         process.kill(l.pid, 0);
         return false; // Process exists
-      } catch (e) {
+      } catch (_e) {
         return true; // Process doesn't exist
       }
     });
@@ -159,7 +174,7 @@ export class LockStateManager {
     const deadProcessLocks = this.getDeadProcessLocks();
     const toCleanup = [...new Set([...staleLocks, ...deadProcessLocks])];
 
-    toCleanup.forEach(lock => {
+    toCleanup.forEach((lock) => {
       this.removeLock(lock.objectType, lock.objectName, lock.functionGroupName);
     });
 

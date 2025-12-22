@@ -6,26 +6,32 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "DeleteStructureLow",
-  description: "[low-level] Delete an ABAP structure from the SAP system via ADT deletion API. Transport request optional for $TMP objects.",
+  name: 'DeleteStructureLow',
+  description:
+    '[low-level] Delete an ABAP structure from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       structure_name: {
-        type: "string",
-        description: "Structure name (e.g., Z_MY_PROGRAM)."
+        type: 'string',
+        description: 'Structure name (e.g., Z_MY_PROGRAM).',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP)."
-      }
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
+      },
     },
-    required: ["structure_name"]
-  }
+    required: ['structure_name'],
+  },
 } as const;
 
 interface DeleteStructureArgs {
@@ -38,13 +44,13 @@ interface DeleteStructureArgs {
  *
  * Uses CrudClient.deleteStructure - low-level single method call
  */
-export async function handleDeleteStructure(context: HandlerContext, args: DeleteStructureArgs) {
+export async function handleDeleteStructure(
+  context: HandlerContext,
+  args: DeleteStructureArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      structure_name,
-      transport_request
-    } = args as DeleteStructureArgs;
+    const { structure_name, transport_request } = args as DeleteStructureArgs;
 
     // Validation
     if (!structure_name) {
@@ -58,24 +64,34 @@ export async function handleDeleteStructure(context: HandlerContext, args: Delet
 
     try {
       // Delete structure
-      await client.deleteStructure({ structureName: structureName, transportRequest: transport_request });
+      await client.deleteStructure({
+        structureName: structureName,
+        transportRequest: transport_request,
+      });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {
-        throw new Error(`Delete did not return a response for structure ${structureName}`);
+        throw new Error(
+          `Delete did not return a response for structure ${structureName}`,
+        );
       }
 
-      logger?.info(`✅ DeleteStructure completed successfully: ${structureName}`);
+      logger?.info(
+        `✅ DeleteStructure completed successfully: ${structureName}`,
+      );
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          structure_name: structureName,
-          transport_request: transport_request || null,
-          message: `Structure ${structureName} deleted successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            structure_name: structureName,
+            transport_request: transport_request || null,
+            message: `Structure ${structureName} deleted successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
       logger?.error(`Error deleting structure ${structureName}:`, error);
 
@@ -88,26 +104,30 @@ export async function handleDeleteStructure(context: HandlerContext, args: Delet
         errorMessage = `Structure ${structureName} is locked by another user. Cannot delete.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

@@ -12,35 +12,29 @@
  * Run: npm test -- --testPathPattern=integration/class
  */
 
-import { handleValidateClass } from '../../../../handlers/class/low/handleValidateClass';
-import { handleCreateClass } from '../../../../handlers/class/low/handleCreateClass';
-import { handleLockClass } from '../../../../handlers/class/low/handleLockClass';
-import { handleUpdateClass } from '../../../../handlers/class/low/handleUpdateClass';
-import { handleUnlockClass } from '../../../../handlers/class/low/handleUnlockClass';
 import { handleActivateClass } from '../../../../handlers/class/low/handleActivateClass';
+import { handleCreateClass } from '../../../../handlers/class/low/handleCreateClass';
 import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
-
-import { LowTester } from '../../helpers/testers/LowTester';
+import { handleLockClass } from '../../../../handlers/class/low/handleLockClass';
+import { handleUnlockClass } from '../../../../handlers/class/low/handleUnlockClass';
+import { handleUpdateClass } from '../../../../handlers/class/low/handleUpdateClass';
+import { handleValidateClass } from '../../../../handlers/class/low/handleValidateClass';
 import { getTimeout } from '../../helpers/configHelpers';
+import { LowTester } from '../../helpers/testers/LowTester';
 
 describe('Class Low-Level Handlers Integration', () => {
   let tester: LowTester;
 
   beforeAll(async () => {
-    tester = new LowTester(
-      'create_class_low',
-      'full_workflow',
-      'class-low',
-      {
-        validate: handleValidateClass,
-        create: handleCreateClass,
-        lock: handleLockClass,
-        update: handleUpdateClass,
-        unlock: handleUnlockClass,
-        activate: handleActivateClass,
-        delete: handleDeleteClass
-      }
-    );
+    tester = new LowTester('create_class_low', 'full_workflow', 'class-low', {
+      validate: handleValidateClass,
+      create: handleCreateClass,
+      lock: handleLockClass,
+      update: handleUpdateClass,
+      unlock: handleUnlockClass,
+      activate: handleActivateClass,
+      delete: handleDeleteClass,
+    });
     await tester.beforeAll();
   });
 
@@ -56,7 +50,11 @@ describe('Class Low-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it('should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate', async () => {
-    await tester.run();
-  }, getTimeout('long'));
+  it(
+    'should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate',
+    async () => {
+      await tester.run();
+    },
+    getTimeout('long'),
+  );
 });

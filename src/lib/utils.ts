@@ -1,19 +1,22 @@
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
-import { AxiosError, AxiosResponse } from "axios";
+import { AsyncLocalStorage } from 'node:async_hooks';
+import * as crypto from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import {
   createAbapConnection,
-  SapConfig,
-  sapConfigSignature,
   getTimeout,
   getTimeoutConfig,
-} from "@mcp-abap-adt/connection";
-import type { IAbapConnection } from "@mcp-abap-adt/interfaces";
-import { loggerAdapter } from "./loggerAdapter";
-import { logger, connectionManagerLogger } from "./logger";
-import { notifyConnectionResetListeners, registerConnectionResetHook } from "./connectionEvents";
-import { AsyncLocalStorage } from "async_hooks";
-import * as crypto from "crypto";
-import { randomUUID } from "crypto";
+  type SapConfig,
+  sapConfigSignature,
+} from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { AxiosError, type AxiosResponse } from 'axios';
+import {
+  notifyConnectionResetListeners,
+  registerConnectionResetHook,
+} from './connectionEvents';
+import { connectionManagerLogger, logger } from './logger';
+import { loggerAdapter } from './loggerAdapter';
 
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
@@ -45,7 +48,7 @@ export const sessionContext = new AsyncLocalStorage<{
 // Connection package no longer supports session storage parameter
 
 // Fixed session ID for server connection (allows session persistence across requests)
-const SERVER_SESSION_ID = 'mcp-abap-adt-session';
+const _SERVER_SESSION_ID = 'mcp-abap-adt-session';
 
 // Global AuthBroker registry for destination-based authentication
 // This allows JwtAbapConnection to access AuthBroker instances for token refresh
@@ -67,7 +70,9 @@ const authBrokerRegistry = global.__mcpAbapAdtAuthBrokerRegistry;
  */
 export function registerAuthBroker(destination: string, authBroker: any): void {
   authBrokerRegistry.set(destination, authBroker);
-  connectionManagerLogger?.debug(`[DEBUG] registerAuthBroker - Registered AuthBroker for destination "${destination}"`);
+  connectionManagerLogger?.debug(
+    `[DEBUG] registerAuthBroker - Registered AuthBroker for destination "${destination}"`,
+  );
 }
 
 /**
@@ -87,14 +92,14 @@ export type { AxiosResponse };
  * Re-exported from @mcp-abap-adt/adt-clients for backward compatibility
  * @deprecated Use encodeSapObjectName from @mcp-abap-adt/adt-clients directly
  */
-export { encodeSapObjectName } from "@mcp-abap-adt/adt-clients";
+export { encodeSapObjectName } from '@mcp-abap-adt/adt-clients';
 
 export function return_response(response: AxiosResponse) {
   return {
     isError: false,
     content: [
       {
-        type: "text",
+        type: 'text',
         text: response.data,
       },
     ],
@@ -103,7 +108,7 @@ export function return_response(response: AxiosResponse) {
 /**
  * Safely serializes an error object, avoiding circular references
  */
-function safeStringifyError(error: any): string {
+function _safeStringifyError(error: any): string {
   if (error instanceof AxiosError) {
     // For Axios errors, extract safe information
     const safeError: any = {
@@ -120,15 +125,18 @@ function safeStringifyError(error: any): string {
         try {
           // Try to stringify, but catch circular reference errors
           safeError.responseData = JSON.stringify(error.response.data, null, 2);
-        } catch (e) {
-          safeError.responseData = String(error.response.data).substring(0, 1000);
+        } catch (_e) {
+          safeError.responseData = String(error.response.data).substring(
+            0,
+            1000,
+          );
         }
       }
     }
 
     try {
       return JSON.stringify(safeError, null, 2);
-    } catch (e) {
+    } catch (_e) {
       return `AxiosError: ${error.message} (Status: ${error.response?.status})`;
     }
   } else if (error instanceof Error) {
@@ -136,7 +144,7 @@ function safeStringifyError(error: any): string {
   } else {
     try {
       return JSON.stringify(error, null, 2);
-    } catch (e) {
+    } catch (_e) {
       return String(error);
     }
   }
@@ -145,13 +153,17 @@ function safeStringifyError(error: any): string {
 /**
  * Safely logs an error without circular reference issues
  */
-export function logErrorSafely(logger: any, operationName: string, error: any): void {
+export function logErrorSafely(
+  logger: any,
+  operationName: string,
+  error: any,
+): void {
   if (!logger?.error) {
     return;
   }
 
   let errorMessage = `[ERROR] ${operationName} failed`;
-  let errorDetails: any = {};
+  const errorDetails: any = {};
 
   if (error instanceof AxiosError && error.response) {
     errorMessage += ` - Status: ${error.response.status}`;
@@ -168,9 +180,14 @@ export function logErrorSafely(logger: any, operationName: string, error: any): 
         errorDetails.responseData = error.response.data.substring(0, 500);
       } else {
         try {
-          errorDetails.responseData = JSON.stringify(error.response.data).substring(0, 500);
-        } catch (e) {
-          errorDetails.responseData = String(error.response.data).substring(0, 500);
+          errorDetails.responseData = JSON.stringify(
+            error.response.data,
+          ).substring(0, 500);
+        } catch (_e) {
+          errorDetails.responseData = String(error.response.data).substring(
+            0,
+            500,
+          );
         }
       }
     }
@@ -198,12 +215,17 @@ export function return_error(error: any) {
       const errorMessage = error.message || '';
 
       // Handle DNS resolution errors (common on Windows)
-      if (errorCode === 'ENOTFOUND' || errorMessage.includes('getaddrinfo ENOTFOUND')) {
-        const hostnameMatch = errorMessage.match(/ENOTFOUND\s+([^\s]+)/) ||
+      if (
+        errorCode === 'ENOTFOUND' ||
+        errorMessage.includes('getaddrinfo ENOTFOUND')
+      ) {
+        const hostnameMatch =
+          errorMessage.match(/ENOTFOUND\s+([^\s]+)/) ||
           errorMessage.match(/getaddrinfo ENOTFOUND\s+([^\s]+)/);
         const hostname = hostnameMatch ? hostnameMatch[1] : 'unknown host';
 
-        errorText = `DNS resolution failed: Cannot resolve hostname "${hostname}". ` +
+        errorText =
+          `DNS resolution failed: Cannot resolve hostname "${hostname}". ` +
           `Please check:\n` +
           `1. Your network connection\n` +
           `2. DNS settings (try: nslookup ${hostname})\n` +
@@ -211,12 +233,20 @@ export function return_error(error: any) {
           `4. Firewall settings\n` +
           `5. The SAP_URL in your .env file is correct\n` +
           `\nOriginal error: ${errorMessage}`;
-      } else if (errorCode === 'ECONNREFUSED' || errorMessage.includes('ECONNREFUSED')) {
-        errorText = `Connection refused: The server is not accepting connections. ` +
+      } else if (
+        errorCode === 'ECONNREFUSED' ||
+        errorMessage.includes('ECONNREFUSED')
+      ) {
+        errorText =
+          `Connection refused: The server is not accepting connections. ` +
           `Please check if the SAP system is accessible and the URL is correct.\n` +
           `\nOriginal error: ${errorMessage}`;
-      } else if (errorCode === 'ETIMEDOUT' || errorMessage.includes('ETIMEDOUT')) {
-        errorText = `Connection timeout: The request took too long to complete. ` +
+      } else if (
+        errorCode === 'ETIMEDOUT' ||
+        errorMessage.includes('ETIMEDOUT')
+      ) {
+        errorText =
+          `Connection timeout: The request took too long to complete. ` +
           `Please check your network connection and try again.\n` +
           `\nOriginal error: ${errorMessage}`;
       } else if (error.response?.data) {
@@ -235,27 +265,38 @@ export function return_error(error: any) {
                 seen.add(value);
               }
               // Remove problematic HTTP objects
-              if (key === 'socket' || key === '_httpMessage' || key === 'res' || key === 'req') {
+              if (
+                key === 'socket' ||
+                key === '_httpMessage' ||
+                key === 'res' ||
+                key === 'req'
+              ) {
                 return '[HTTP Object]';
               }
               return value;
             }).substring(0, 2000);
-          } catch (e) {
+          } catch (_e) {
             errorText = `HTTP ${error.response.status}: ${error.response.statusText || 'Error'}`;
           }
         }
       } else {
-        errorText = errorMessage || `HTTP ${error.response?.status || 'Unknown error'}`;
+        errorText =
+          errorMessage || `HTTP ${error.response?.status || 'Unknown error'}`;
       }
     } else if (error instanceof Error) {
       // Check for DNS errors in regular Error objects too
       const errorMessage = error.message || '';
-      if (errorMessage.includes('getaddrinfo ENOTFOUND') || errorMessage.includes('ENOTFOUND')) {
-        const hostnameMatch = errorMessage.match(/ENOTFOUND\s+([^\s]+)/) ||
+      if (
+        errorMessage.includes('getaddrinfo ENOTFOUND') ||
+        errorMessage.includes('ENOTFOUND')
+      ) {
+        const hostnameMatch =
+          errorMessage.match(/ENOTFOUND\s+([^\s]+)/) ||
           errorMessage.match(/getaddrinfo ENOTFOUND\s+([^\s]+)/);
         const hostname = hostnameMatch ? hostnameMatch[1] : 'unknown host';
 
-        errorText = `DNS resolution failed: Cannot resolve hostname "${hostname}". ` +
+        errorText =
+          `DNS resolution failed: Cannot resolve hostname "${hostname}". ` +
           `Please check:\n` +
           `1. Your network connection\n` +
           `2. DNS settings (try: nslookup ${hostname})\n` +
@@ -279,16 +320,21 @@ export function return_error(error: any) {
             }
             seen.add(value);
           }
-          if (key === 'socket' || key === '_httpMessage' || key === 'res' || key === 'req') {
+          if (
+            key === 'socket' ||
+            key === '_httpMessage' ||
+            key === 'res' ||
+            key === 'req'
+          ) {
             return '[HTTP Object]';
           }
           return value;
         }).substring(0, 2000);
-      } catch (e) {
+      } catch (_e) {
         errorText = String(error).substring(0, 2000);
       }
     }
-  } catch (e) {
+  } catch (_e) {
     // Fallback if all else fails
     errorText = 'An error occurred (failed to serialize error details)';
   }
@@ -297,7 +343,7 @@ export function return_error(error: any) {
     isError: true,
     content: [
       {
-        type: "text",
+        type: 'text',
         text: `Error: ${errorText}`,
       },
     ],
@@ -312,7 +358,11 @@ export function return_error(error: any) {
  * - 4 clients, each with 2 destinations = up to 8 different connections
  * - Each combination of (sessionId, config, destination) gets its own isolated connection
  */
-function generateConnectionCacheKey(sessionId: string, configSignature: string, destination?: string): string {
+function generateConnectionCacheKey(
+  sessionId: string,
+  configSignature: string,
+  destination?: string,
+): string {
   const hash = crypto.createHash('sha256');
   hash.update(sessionId);
   hash.update(configSignature);
@@ -332,7 +382,9 @@ function cleanupConnectionCache() {
   for (const [key, entry] of connectionCache.entries()) {
     const age = now.getTime() - entry.lastUsed.getTime();
     if (age > maxAge) {
-      connectionManagerLogger?.debug(`[DEBUG] Cleaning up old connection cache entry: ${key.substring(0, 16)}...`);
+      connectionManagerLogger?.debug(
+        `[DEBUG] Cleaning up old connection cache entry: ${key.substring(0, 16)}...`,
+      );
       connectionCache.delete(key);
     }
   }
@@ -341,9 +393,17 @@ function cleanupConnectionCache() {
 /**
  * Get or create connection for a specific session and config
  */
-function getConnectionForSession(sessionId: string, config: SapConfig, destination?: string): IAbapConnection {
+function getConnectionForSession(
+  sessionId: string,
+  config: SapConfig,
+  destination?: string,
+): IAbapConnection {
   const configSignature = sapConfigSignature(config);
-  const cacheKey = generateConnectionCacheKey(sessionId, configSignature, destination);
+  const cacheKey = generateConnectionCacheKey(
+    sessionId,
+    configSignature,
+    destination,
+  );
 
   // Clean up old entries periodically
   if (connectionCache.size > 100) {
@@ -353,7 +413,9 @@ function getConnectionForSession(sessionId: string, config: SapConfig, destinati
   let entry = connectionCache.get(cacheKey);
 
   if (!entry || entry.configSignature !== configSignature) {
-    connectionManagerLogger?.debug(`[DEBUG] getManagedConnection - Creating new connection for session ${sessionId.substring(0, 8)}... (cache key: ${cacheKey.substring(0, 16)}...)`);
+    connectionManagerLogger?.debug(
+      `[DEBUG] getManagedConnection - Creating new connection for session ${sessionId.substring(0, 8)}... (cache key: ${cacheKey.substring(0, 16)}...)`,
+    );
 
     // Dispose old connection if exists
     if (entry) {
@@ -364,17 +426,24 @@ function getConnectionForSession(sessionId: string, config: SapConfig, destinati
     const connectionSessionId = `mcp-abap-adt-session-${sessionId}`;
 
     // Get tokenRefresher from AuthBroker if destination is provided (for JWT connections)
-    let tokenRefresher: any = undefined;
+    let tokenRefresher: any;
     if (destination && config.authType === 'jwt') {
       const authBroker = getAuthBroker(destination);
       if (authBroker?.createTokenRefresher) {
         tokenRefresher = authBroker.createTokenRefresher(destination);
-        connectionManagerLogger?.debug(`[DEBUG] Created tokenRefresher for destination "${destination}"`);
+        connectionManagerLogger?.debug(
+          `[DEBUG] Created tokenRefresher for destination "${destination}"`,
+        );
       }
     }
 
     // Create connection with optional tokenRefresher for automatic token refresh
-    const connection = createAbapConnection(config, loggerAdapter, connectionSessionId, tokenRefresher);
+    const connection = createAbapConnection(
+      config,
+      loggerAdapter,
+      connectionSessionId,
+      tokenRefresher,
+    );
 
     // Don't call enableStatefulSession during module import - it may trigger connection attempts
     // Session ID is already set via createAbapConnection() constructor
@@ -394,7 +463,9 @@ function getConnectionForSession(sessionId: string, config: SapConfig, destinati
     connectionCache.set(cacheKey, entry);
   } else {
     entry.lastUsed = new Date();
-    connectionManagerLogger?.debug(`[DEBUG] getManagedConnection - Reusing cached connection for session ${sessionId.substring(0, 8)}...`);
+    connectionManagerLogger?.debug(
+      `[DEBUG] getManagedConnection - Reusing cached connection for session ${sessionId.substring(0, 8)}...`,
+    );
   }
 
   return entry.connection;
@@ -411,20 +482,27 @@ export function getManagedConnection(): IAbapConnection {
 
   if (context?.sessionId && context?.sapConfig) {
     // Use session-specific connection with destination for AuthBroker-based token refresh
-    return getConnectionForSession(context.sessionId, context.sapConfig, context.destination);
+    return getConnectionForSession(
+      context.sessionId,
+      context.sapConfig,
+      context.destination,
+    );
   }
 
   // Config must be provided via overrideConfig (from connection provider/broker)
   // No fallback to getConfig() - incompatible with broker-based architecture
   if (!overrideConfig) {
-    throw new Error('Connection config must be provided via overrideConfig or session context. In v2 architecture, config comes from connection provider (broker), not from environment variables.');
+    throw new Error(
+      'Connection config must be provided via overrideConfig or session context. In v2 architecture, config comes from connection provider (broker), not from environment variables.',
+    );
   }
   const config = overrideConfig;
 
   // Helper function for Windows-compatible logging
   // Only logs when DEBUG_CONNECTORS, DEBUG_TESTS, or DEBUG_ADT_TESTS is enabled
   const debugLog = (message: string): void => {
-    const debugEnabled = process.env.DEBUG_CONNECTORS === 'true' ||
+    const debugEnabled =
+      process.env.DEBUG_CONNECTORS === 'true' ||
       process.env.DEBUG_TESTS === 'true' ||
       process.env.DEBUG_ADT_TESTS === 'true';
 
@@ -435,18 +513,22 @@ export function getManagedConnection(): IAbapConnection {
     // Try stderr first
     try {
       process.stderr.write(message);
-    } catch (e) {
+    } catch (_e) {
       // Fallback to console.error for Windows
       console.error(message.trim());
     }
     // Also try to write to a debug file on Windows
     if (process.platform === 'win32') {
       try {
-        const fs = require('fs');
-        const path = require('path');
+        const fs = require('node:fs');
+        const path = require('node:path');
         const debugFile = path.join(process.cwd(), 'mcp-debug.log');
-        fs.appendFileSync(debugFile, `${new Date().toISOString()} ${message}`, 'utf8');
-      } catch (e) {
+        fs.appendFileSync(
+          debugFile,
+          `${new Date().toISOString()} ${message}`,
+          'utf8',
+        );
+      } catch (_e) {
         // Ignore file write errors
       }
     }
@@ -456,8 +538,10 @@ export function getManagedConnection(): IAbapConnection {
   // NOTE: This debug logging should NOT trigger connection attempts
   // Only log if explicitly enabled via DEBUG_CONNECTORS, DEBUG_TESTS, or DEBUG_ADT_TESTS
   if (config.url) {
-    const urlHex = Buffer.from(config.url, 'utf8').toString('hex');
-    debugLog(`[MCP-UTILS] Creating connection with URL: "${config.url}" (length: ${config.url.length})\n`);
+    const _urlHex = Buffer.from(config.url, 'utf8').toString('hex');
+    debugLog(
+      `[MCP-UTILS] Creating connection with URL: "${config.url}" (length: ${config.url.length})\n`,
+    );
   } else {
     debugLog(`[MCP-UTILS] ✗ ERROR: config.url is missing!\n`);
   }
@@ -465,25 +549,35 @@ export function getManagedConnection(): IAbapConnection {
   const signature = sapConfigSignature(config);
 
   if (!cachedConnection || cachedConfigSignature !== signature) {
-    connectionManagerLogger?.debug(`[DEBUG] getManagedConnection - Creating new connection (cached: ${!!cachedConnection}, signature changed: ${cachedConfigSignature !== signature})`);
+    connectionManagerLogger?.debug(
+      `[DEBUG] getManagedConnection - Creating new connection (cached: ${!!cachedConnection}, signature changed: ${cachedConfigSignature !== signature})`,
+    );
     if (cachedConnection) {
-      connectionManagerLogger?.debug(`[DEBUG] getManagedConnection - Old signature: ${cachedConfigSignature?.substring(0, 100)}...`);
-      connectionManagerLogger?.debug(`[DEBUG] getManagedConnection - New signature: ${signature.substring(0, 100)}...`);
+      connectionManagerLogger?.debug(
+        `[DEBUG] getManagedConnection - Old signature: ${cachedConfigSignature?.substring(0, 100)}...`,
+      );
+      connectionManagerLogger?.debug(
+        `[DEBUG] getManagedConnection - New signature: ${signature.substring(0, 100)}...`,
+      );
     }
 
     // Log refresh token availability for debugging
-    const hasRefreshToken = !!(config.refreshToken && config.refreshToken.trim());
+    const hasRefreshToken = !!config.refreshToken?.trim();
     const hasUaaUrl = !!config.uaaUrl;
     const hasUaaClientId = !!config.uaaClientId;
     const hasUaaClientSecret = !!config.uaaClientSecret;
-    connectionManagerLogger?.debug(`[DEBUG] getManagedConnection - Refresh token config:`, {
-      hasRefreshToken,
-      hasUaaUrl,
-      hasUaaClientId,
-      hasUaaClientSecret,
-      canRefresh: hasRefreshToken && hasUaaUrl && hasUaaClientId && hasUaaClientSecret,
-      configObjectId: (config as any).__debugId || 'no-id'
-    });
+    connectionManagerLogger?.debug(
+      `[DEBUG] getManagedConnection - Refresh token config:`,
+      {
+        hasRefreshToken,
+        hasUaaUrl,
+        hasUaaClientId,
+        hasUaaClientSecret,
+        canRefresh:
+          hasRefreshToken && hasUaaUrl && hasUaaClientId && hasUaaClientSecret,
+        configObjectId: (config as any).__debugId || 'no-id',
+      },
+    );
 
     /* cleanup */
 
@@ -491,21 +585,36 @@ export function getManagedConnection(): IAbapConnection {
     // When sessionContext is not available, each connection should have its own isolated session
     // This prevents cookies/CSRF tokens from being shared between different connections
     const fallbackSessionId = `mcp-abap-adt-fallback-${randomUUID()}`;
-    connectionManagerLogger?.debug(`[DEBUG] getManagedConnection - Creating fallback connection with unique session ID: ${fallbackSessionId.substring(0, 32)}...`);
+    connectionManagerLogger?.debug(
+      `[DEBUG] getManagedConnection - Creating fallback connection with unique session ID: ${fallbackSessionId.substring(0, 32)}...`,
+    );
 
-    cachedConnection = createAbapConnection(config, loggerAdapter, fallbackSessionId);
+    cachedConnection = createAbapConnection(
+      config,
+      loggerAdapter,
+      fallbackSessionId,
+    );
 
     // Verify connection has access to refresh token
     const connectionWithRefresh = cachedConnection as any;
-    if (connectionWithRefresh.getConfig && connectionWithRefresh.canRefreshToken) {
+    if (
+      connectionWithRefresh.getConfig &&
+      connectionWithRefresh.canRefreshToken
+    ) {
       const connectionConfig = connectionWithRefresh.getConfig();
       const canRefresh = connectionWithRefresh.canRefreshToken();
-      connectionManagerLogger?.debug(`[DEBUG] getManagedConnection - Connection created, refresh check:`, {
-        canRefresh,
-        connectionHasRefreshToken: !!(connectionConfig?.refreshToken),
-        connectionHasUaaUrl: !!(connectionConfig?.uaaUrl),
-        configMatches: connectionConfig === config ? 'same object ✓' : 'different object ✗'
-      });
+      connectionManagerLogger?.debug(
+        `[DEBUG] getManagedConnection - Connection created, refresh check:`,
+        {
+          canRefresh,
+          connectionHasRefreshToken: !!connectionConfig?.refreshToken,
+          connectionHasUaaUrl: !!connectionConfig?.uaaUrl,
+          configMatches:
+            connectionConfig === config
+              ? 'same object ✓'
+              : 'different object ✗',
+        },
+      );
     }
     cachedConfigSignature = signature;
 
@@ -517,7 +626,9 @@ export function getManagedConnection(): IAbapConnection {
     // This prevents unnecessary connection attempts during module import (e.g., in Jest tests)
     // The retry logic in makeAdtRequest will handle connection establishment automatically
   } else {
-    connectionManagerLogger?.debug(`[DEBUG] getManagedConnection - Reusing cached connection (signature matches)`);
+    connectionManagerLogger?.debug(
+      `[DEBUG] getManagedConnection - Reusing cached connection (signature matches)`,
+    );
   }
 
   return cachedConnection;
@@ -530,13 +641,23 @@ export function getManagedConnection(): IAbapConnection {
  * If destination is provided, removes only the connection for that specific destination.
  * If destination is not provided, removes all connections for the session (all destinations).
  */
-export function removeConnectionForSession(sessionId: string, config?: SapConfig, destination?: string) {
+export function removeConnectionForSession(
+  sessionId: string,
+  config?: SapConfig,
+  destination?: string,
+) {
   if (config) {
     const configSignature = sapConfigSignature(config);
-    const cacheKey = generateConnectionCacheKey(sessionId, configSignature, destination);
+    const cacheKey = generateConnectionCacheKey(
+      sessionId,
+      configSignature,
+      destination,
+    );
     const entry = connectionCache.get(cacheKey);
     if (entry) {
-      connectionManagerLogger?.debug(`[DEBUG] Removing connection cache entry for session ${sessionId.substring(0, 8)}... (destination: ${destination || 'none'})`);
+      connectionManagerLogger?.debug(
+        `[DEBUG] Removing connection cache entry for session ${sessionId.substring(0, 8)}... (destination: ${destination || 'none'})`,
+      );
       /* cleanup */
       connectionCache.delete(cacheKey);
     }
@@ -544,7 +665,9 @@ export function removeConnectionForSession(sessionId: string, config?: SapConfig
     // Remove all entries for this sessionId (all destinations and configs)
     for (const [key, entry] of connectionCache.entries()) {
       if (entry.sessionId === sessionId) {
-        connectionManagerLogger?.debug(`[DEBUG] Removing connection cache entry for session ${sessionId.substring(0, 8)}...`);
+        connectionManagerLogger?.debug(
+          `[DEBUG] Removing connection cache entry for session ${sessionId.substring(0, 8)}...`,
+        );
         /* cleanup */
         connectionCache.delete(key);
       }
@@ -561,7 +684,11 @@ export function removeConnectionForSession(sessionId: string, config?: SapConfig
 export async function restoreSessionInConnection(
   connection: IAbapConnection,
   sessionId: string,
-  sessionState: { cookies?: string | null; csrf_token?: string | null; cookie_store?: Record<string, string> }
+  _sessionState: {
+    cookies?: string | null;
+    csrf_token?: string | null;
+    cookie_store?: Record<string, string>;
+  },
 ): Promise<void> {
   // Cast to access internal methods (not in interface but available in implementation)
   const connectionWithStateful = connection as any;
@@ -572,23 +699,28 @@ export async function restoreSessionInConnection(
       connectionWithStateful.setSessionId(sessionId);
     }
     // Enable stateful session mode (adds x-sap-adt-sessiontype: stateful header)
-    connection.setSessionType("stateful");
+    connection.setSessionType('stateful');
   } catch (error: any) {
-    logger?.warn("Failed to restore session in connection", {
+    logger?.warn('Failed to restore session in connection', {
       sessionId,
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 }
 
 export function setConfigOverride(override?: SapConfig) {
-  connectionManagerLogger?.debug(`[DEBUG] setConfigOverride - Setting config override`, {
-    hasOverride: !!override,
-    overrideHasUrl: !!override?.url
-  });
+  connectionManagerLogger?.debug(
+    `[DEBUG] setConfigOverride - Setting config override`,
+    {
+      hasOverride: !!override,
+      overrideHasUrl: !!override?.url,
+    },
+  );
   overrideConfig = override;
   /* cleanup */
-  overrideConnection = override ? createAbapConnection(override, loggerAdapter, undefined) : undefined;
+  overrideConnection = override
+    ? createAbapConnection(override, loggerAdapter, undefined)
+    : undefined;
 
   // Reset shared connection so that it will be re-created lazily with fresh config
   /* cleanup */
@@ -598,10 +730,13 @@ export function setConfigOverride(override?: SapConfig) {
 }
 
 export function setConnectionOverride(connection?: IAbapConnection) {
-  connectionManagerLogger?.debug(`[DEBUG] setConnectionOverride - Setting connection override`, {
-    hasOverride: !!connection,
-    hadPreviousOverride: !!overrideConnection
-  });
+  connectionManagerLogger?.debug(
+    `[DEBUG] setConnectionOverride - Setting connection override`,
+    {
+      hasOverride: !!connection,
+      hadPreviousOverride: !!overrideConnection,
+    },
+  );
   // Use a local variable to avoid TDZ issues
   const currentOverride = overrideConnection;
   if (currentOverride) {
@@ -611,7 +746,7 @@ export function setConnectionOverride(connection?: IAbapConnection) {
   overrideConnection = connection;
   overrideConfig = undefined;
 
-  const currentCached = cachedConnection;
+  const _currentCached = cachedConnection;
   /* cleanup */
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
@@ -619,10 +754,13 @@ export function setConnectionOverride(connection?: IAbapConnection) {
 }
 
 export function cleanup() {
-  connectionManagerLogger?.debug(`[DEBUG] cleanup - Cleaning up all connections`, {
-    hadOverrideConnection: !!overrideConnection,
-    hadCachedConnection: !!cachedConnection
-  });
+  connectionManagerLogger?.debug(
+    `[DEBUG] cleanup - Cleaning up all connections`,
+    {
+      hadOverrideConnection: !!overrideConnection,
+      hadCachedConnection: !!cachedConnection,
+    },
+  );
   /* cleanup */
   /* cleanup */
   overrideConnection = undefined;
@@ -638,10 +776,13 @@ export function cleanup() {
  * The connection will be recreated on next getManagedConnection() call with updated signature
  */
 export function invalidateConnectionCache() {
-  connectionManagerLogger?.debug(`[DEBUG] invalidateConnectionCache - Invalidating connection cache`, {
-    hadCachedConnection: !!cachedConnection,
-    hadOverrideConnection: !!overrideConnection
-  });
+  connectionManagerLogger?.debug(
+    `[DEBUG] invalidateConnectionCache - Invalidating connection cache`,
+    {
+      hadCachedConnection: !!cachedConnection,
+      hadOverrideConnection: !!overrideConnection,
+    },
+  );
   /* cleanup */
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
@@ -658,7 +799,9 @@ export function invalidateConnectionCache() {
 registerConnectionResetHook(() => {
   // When connection is reset (e.g., after token refresh), invalidate cache
   // so that next getManagedConnection() will recreate connection with updated config
-  connectionManagerLogger?.debug(`[DEBUG] Connection reset hook - Invalidating cache due to connection reset`);
+  connectionManagerLogger?.debug(
+    `[DEBUG] Connection reset hook - Invalidating cache due to connection reset`,
+  );
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
 });
@@ -684,10 +827,18 @@ export async function makeAdtRequestWithTimeout(
   timeoutType: 'default' | 'csrf' | 'long' | number = 'default',
   data?: any,
   params?: any,
-  headers?: Record<string, string>
+  headers?: Record<string, string>,
 ) {
   const timeout = getTimeout(timeoutType);
-  return makeAdtRequest(connection, url, method, timeout, data, params, headers);
+  return makeAdtRequest(
+    connection,
+    url,
+    method,
+    timeout,
+    data,
+    params,
+    headers,
+  );
 }
 
 /**
@@ -695,12 +846,12 @@ export async function makeAdtRequestWithTimeout(
  * @deprecated Use getReadOnlyClient().fetchNodeStructure() instead
  */
 export async function fetchNodeStructure(
-  connection: IAbapConnection,
-  parentName: string,
-  parentTechName: string,
-  parentType: string,
-  nodeKey: string,
-  withShortDescriptions: boolean = true
+  _connection: IAbapConnection,
+  _parentName: string,
+  _parentTechName: string,
+  _parentType: string,
+  _nodeKey: string,
+  _withShortDescriptions: boolean = true,
 ): Promise<AxiosResponse> {
   // TODO: Add fetchNodeStructure to ReadOnlyClient
   throw new Error('fetchNodeStructure not implemented in ReadOnlyClient yet');
@@ -715,16 +866,26 @@ export async function makeAdtRequest(
   timeout: number,
   data?: any,
   params?: any,
-  headers?: Record<string, string>
+  headers?: Record<string, string>,
 ) {
-  return connection.makeAdtRequest({ url, method, timeout, data, params, headers });
+  return connection.makeAdtRequest({
+    url,
+    method,
+    timeout,
+    data,
+    params,
+    headers,
+  });
 }
 
 /**
  * Get system information from SAP ADT (for cloud systems)
  * @deprecated Use getReadOnlyClient().getSystemInformation() instead
  */
-export async function getSystemInformation(): Promise<{ systemID?: string; userName?: string } | null> {
+export async function getSystemInformation(): Promise<{
+  systemID?: string;
+  userName?: string;
+} | null> {
   // TODO: Add getSystemInformation to ReadOnlyClient
   throw new Error('getSystemInformation not implemented in ReadOnlyClient yet');
   // const { getReadOnlyClient } = await import('./clients.js');
@@ -785,21 +946,22 @@ export function parseValidationResponse(response: AxiosResponse): {
     const { XMLParser } = require('fast-xml-parser');
     const parser = new XMLParser({
       ignoreAttributes: false,
-      attributeNamePrefix: '@_'
+      attributeNamePrefix: '@_',
     });
     const result = parser.parse(response.data);
 
     // Check for exception format (<exc:exception>)
     const exception = result['exc:exception'];
     if (exception) {
-      const message = exception['message'] || '';
-      const localizedMessage = exception['localizedMessage'] || message;
+      const message = exception.message || '';
+      const localizedMessage = exception.localizedMessage || message;
       const msgText = localizedMessage || message;
       const msgLower = msgText.toLowerCase();
 
       // Check exception type - ExceptionResourceAlreadyExists means object exists
-      const exceptionType = exception['type'] || '';
-      const isResourceAlreadyExists = exceptionType === 'ExceptionResourceAlreadyExists' ||
+      const exceptionType = exception.type || '';
+      const isResourceAlreadyExists =
+        exceptionType === 'ExceptionResourceAlreadyExists' ||
         exceptionType.includes('ResourceAlreadyExists') ||
         exceptionType.includes('AlreadyExists');
 
@@ -807,50 +969,60 @@ export function parseValidationResponse(response: AxiosResponse): {
       const isInvalidClifName = exceptionType === 'InvalidClifName';
 
       // Check if message indicates object already exists
-      const exists = isResourceAlreadyExists ||
+      const exists =
+        isResourceAlreadyExists ||
         (isInvalidClifName && msgLower.includes('already exists')) ||
         msgLower.includes('already exists') ||
-        (msgLower.includes('exist') && (msgLower.includes('table') || msgLower.includes('database') || msgLower.includes('resource') || msgLower.includes('interface') || msgLower.includes('class')));
+        (msgLower.includes('exist') &&
+          (msgLower.includes('table') ||
+            msgLower.includes('database') ||
+            msgLower.includes('resource') ||
+            msgLower.includes('interface') ||
+            msgLower.includes('class')));
 
       return {
         valid: false,
         severity: 'ERROR',
         message: msgText,
-        exists: exists ? true : undefined
+        exists: exists ? true : undefined,
       };
     }
 
     // Check for standard format (<asx:abap><asx:values><DATA>)
-    const data = result['asx:abap']?.['asx:values']?.['DATA'];
+    const data = result['asx:abap']?.['asx:values']?.DATA;
     if (!data) {
       // No data means validation passed
       return { valid: true };
     }
 
     // Check for CHECK_RESULT=X (success)
-    if (data['CHECK_RESULT'] === 'X') {
+    if (data.CHECK_RESULT === 'X') {
       return { valid: true };
     }
 
     // Check for SEVERITY (error/warning)
-    const severity = data['SEVERITY'];
-    const shortText = data['SHORT_TEXT'] || '';
-    const longText = data['LONG_TEXT'] || '';
+    const severity = data.SEVERITY;
+    const shortText = data.SHORT_TEXT || '';
+    const longText = data.LONG_TEXT || '';
 
     // Check if message indicates object already exists
     const msgLower = shortText.toLowerCase();
-    const exists = msgLower.includes('already exists') ||
+    const exists =
+      msgLower.includes('already exists') ||
       msgLower.includes('does already exist') ||
-      (msgLower.includes('exist') && (msgLower.includes('resource') || msgLower.includes('definition') || msgLower.includes('object')));
+      (msgLower.includes('exist') &&
+        (msgLower.includes('resource') ||
+          msgLower.includes('definition') ||
+          msgLower.includes('object')));
 
     return {
       valid: severity !== 'ERROR',
       severity: severity,
       message: shortText,
       longText: longText,
-      exists: exists || undefined
+      exists: exists || undefined,
     };
-  } catch (error) {
+  } catch (_error) {
     // If parsing fails, check HTTP status
     if (response.status === 200) {
       return { valid: true };
@@ -860,7 +1032,10 @@ export function parseValidationResponse(response: AxiosResponse): {
 
     // Try to extract error details from response data (plain text or XML)
     if (response.data) {
-      const dataStr = typeof response.data === 'string' ? response.data : String(response.data);
+      const dataStr =
+        typeof response.data === 'string'
+          ? response.data
+          : String(response.data);
       // Try to extract meaningful error from plain text or unparsed XML
       if (dataStr.length > 0 && dataStr.length < 1000) {
         // If it's short text, use it directly (might be plain error message)
@@ -868,7 +1043,7 @@ export function parseValidationResponse(response: AxiosResponse): {
       } else if (dataStr.includes('<message>')) {
         // Try simple regex extraction for <message> tag
         const match = dataStr.match(/<message[^>]*>([^<]+)<\/message>/i);
-        if (match && match[1]) {
+        if (match?.[1]) {
           errorMessage = match[1].trim();
         }
       }
@@ -877,7 +1052,7 @@ export function parseValidationResponse(response: AxiosResponse): {
     return {
       valid: false,
       severity: 'ERROR',
-      message: errorMessage
+      message: errorMessage,
     };
   }
 }
@@ -891,9 +1066,11 @@ export function parseValidationResponse(response: AxiosResponse): {
 export function isAlreadyCheckedError(error: any): boolean {
   const errorMessage = error?.message || error?.text || String(error || '');
   const msgLower = errorMessage.toLowerCase();
-  return msgLower.includes('has been checked') ||
+  return (
+    msgLower.includes('has been checked') ||
     msgLower.includes('was checked') ||
-    msgLower.includes('already checked');
+    msgLower.includes('already checked')
+  );
 }
 
 /**
@@ -905,10 +1082,12 @@ export function isAlreadyCheckedError(error: any): boolean {
 export function isAlreadyExistsError(error: any): boolean {
   const errorMessage = error?.message || error?.text || String(error || '');
   const msgLower = errorMessage.toLowerCase();
-  return msgLower.includes('already exists') ||
+  return (
+    msgLower.includes('already exists') ||
     msgLower.includes('does already exist') ||
     msgLower.includes('resource already exists') ||
-    msgLower.includes('object already exists');
+    msgLower.includes('object already exists')
+  );
 }
 
 /**
@@ -922,7 +1101,7 @@ export function isAlreadyExistsError(error: any): boolean {
 export async function safeCheckOperation<T>(
   checkOperation: () => Promise<T>,
   objectName: string,
-  logger?: { debug?: (message: string, data?: any) => void }
+  logger?: { debug?: (message: string, data?: any) => void },
 ): Promise<T> {
   try {
     return await checkOperation();
@@ -930,11 +1109,15 @@ export async function safeCheckOperation<T>(
     if (isAlreadyCheckedError(checkError)) {
       // Object was already checked - this is OK, continue
       if (logger?.debug) {
-        logger?.debug(`${objectName} was already checked - this is OK, continuing`);
+        logger?.debug(
+          `${objectName} was already checked - this is OK, continuing`,
+        );
       }
       // Return a mock success response or rethrow with handled flag
       // For now, we'll rethrow but mark it as handled
-      const handledError = new Error(`Object ${objectName} was already checked`);
+      const handledError = new Error(
+        `Object ${objectName} was already checked`,
+      );
       (handledError as any).isAlreadyChecked = true;
       throw handledError;
     }
@@ -1334,24 +1517,24 @@ SERVICE KEYS (Destination-Based Authentication):
 }
 
 export type TransportConfig =
-  | { type: "stdio" }
+  | { type: 'stdio' }
   | {
-    type: "streamable-http";
-    host: string;
-    port: number;
-    enableJsonResponse: boolean;
-    allowedOrigins?: string[];
-    allowedHosts?: string[];
-    enableDnsRebindingProtection: boolean;
-  }
+      type: 'streamable-http';
+      host: string;
+      port: number;
+      enableJsonResponse: boolean;
+      allowedOrigins?: string[];
+      allowedHosts?: string[];
+      enableDnsRebindingProtection: boolean;
+    }
   | {
-    type: "sse";
-    host: string;
-    port: number;
-    allowedOrigins?: string[];
-    allowedHosts?: string[];
-    enableDnsRebindingProtection: boolean;
-  };
+      type: 'sse';
+      host: string;
+      port: number;
+      allowedOrigins?: string[];
+      allowedHosts?: string[];
+      enableDnsRebindingProtection: boolean;
+    };
 
 export function getArgValue(name: string): string | undefined {
   const args = process.argv;
@@ -1376,10 +1559,19 @@ export function parseBoolean(value?: string): boolean {
     return false;
   }
   const normalized = value.trim().toLowerCase();
-  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+  return (
+    normalized === '1' ||
+    normalized === 'true' ||
+    normalized === 'yes' ||
+    normalized === 'on'
+  );
 }
 
-export function resolvePortOption(argName: string, envName: string, defaultValue: number): number {
+export function resolvePortOption(
+  argName: string,
+  envName: string,
+  defaultValue: number,
+): number {
   const rawValue = getArgValue(argName) ?? process.env[envName];
   if (!rawValue) {
     return defaultValue;
@@ -1393,7 +1585,11 @@ export function resolvePortOption(argName: string, envName: string, defaultValue
   return port;
 }
 
-export function resolveBooleanOption(argName: string, envName: string, defaultValue: boolean): boolean {
+export function resolveBooleanOption(
+  argName: string,
+  envName: string,
+  defaultValue: boolean,
+): boolean {
   const argValue = getArgValue(argName);
   if (argValue !== undefined) {
     return parseBoolean(argValue);
@@ -1408,13 +1604,16 @@ export function resolveBooleanOption(argName: string, envName: string, defaultVa
   return defaultValue;
 }
 
-export function resolveListOption(argName: string, envName: string): string[] | undefined {
+export function resolveListOption(
+  argName: string,
+  envName: string,
+): string[] | undefined {
   const rawValue = getArgValue(argName) ?? process.env[envName];
   if (!rawValue) {
     return undefined;
   }
   const items = rawValue
-    .split(",")
+    .split(',')
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
   return items.length > 0 ? items : undefined;
@@ -1426,34 +1625,39 @@ export function parseTransportConfig(transportType: string): TransportConfig {
 
   if (
     normalized &&
-    normalized !== "stdio" &&
-    normalized !== "http" &&
-    normalized !== "streamable-http" &&
-    normalized !== "server" &&
-    normalized !== "sse"
+    normalized !== 'stdio' &&
+    normalized !== 'http' &&
+    normalized !== 'streamable-http' &&
+    normalized !== 'server' &&
+    normalized !== 'sse'
   ) {
     throw new Error(`Unsupported transport: ${normalized}`);
   }
 
-  const sseRequested =
-    normalized === "sse" ||
-    hasFlag("--sse");
+  const sseRequested = normalized === 'sse' || hasFlag('--sse');
 
   if (sseRequested) {
-    const port = resolvePortOption("--sse-port", "MCP_SSE_PORT", 3001);
+    const port = resolvePortOption('--sse-port', 'MCP_SSE_PORT', 3001);
     // Default to localhost (127.0.0.1) for security - only accepts local connections
     // Use 0.0.0.0 to accept connections from all interfaces (less secure)
-    const host = getArgValue("--sse-host") ?? process.env.MCP_SSE_HOST ?? "127.0.0.1";
-    const allowedOrigins = resolveListOption("--sse-allowed-origins", "MCP_SSE_ALLOWED_ORIGINS");
-    const allowedHosts = resolveListOption("--sse-allowed-hosts", "MCP_SSE_ALLOWED_HOSTS");
+    const host =
+      getArgValue('--sse-host') ?? process.env.MCP_SSE_HOST ?? '127.0.0.1';
+    const allowedOrigins = resolveListOption(
+      '--sse-allowed-origins',
+      'MCP_SSE_ALLOWED_ORIGINS',
+    );
+    const allowedHosts = resolveListOption(
+      '--sse-allowed-hosts',
+      'MCP_SSE_ALLOWED_HOSTS',
+    );
     const enableDnsRebindingProtection = resolveBooleanOption(
-      "--sse-enable-dns-protection",
-      "MCP_SSE_ENABLE_DNS_PROTECTION",
-      false
+      '--sse-enable-dns-protection',
+      'MCP_SSE_ENABLE_DNS_PROTECTION',
+      false,
     );
 
     return {
-      type: "sse",
+      type: 'sse',
       host,
       port,
       allowedOrigins,
@@ -1463,33 +1667,40 @@ export function parseTransportConfig(transportType: string): TransportConfig {
   }
 
   const httpRequested =
-    normalized === "http" ||
-    normalized === "streamable-http" ||
-    normalized === "server" ||
-    hasFlag("--http") ||
+    normalized === 'http' ||
+    normalized === 'streamable-http' ||
+    normalized === 'server' ||
+    hasFlag('--http') ||
     // Note: Default is stdio (set in runtimeConfig), so this only applies if explicitly requested
-    (!sseRequested && normalized !== "stdio");
+    (!sseRequested && normalized !== 'stdio');
 
   if (httpRequested) {
-    const port = resolvePortOption("--http-port", "MCP_HTTP_PORT", 3000);
+    const port = resolvePortOption('--http-port', 'MCP_HTTP_PORT', 3000);
     // Default to localhost (127.0.0.1) for security - only accepts local connections
     // Use 0.0.0.0 to accept connections from all interfaces (less secure)
-    const host = getArgValue("--http-host") ?? process.env.MCP_HTTP_HOST ?? "127.0.0.1";
+    const host =
+      getArgValue('--http-host') ?? process.env.MCP_HTTP_HOST ?? '127.0.0.1';
     const enableJsonResponse = resolveBooleanOption(
-      "--http-json-response",
-      "MCP_HTTP_ENABLE_JSON_RESPONSE",
-      false
+      '--http-json-response',
+      'MCP_HTTP_ENABLE_JSON_RESPONSE',
+      false,
     );
-    const allowedOrigins = resolveListOption("--http-allowed-origins", "MCP_HTTP_ALLOWED_ORIGINS");
-    const allowedHosts = resolveListOption("--http-allowed-hosts", "MCP_HTTP_ALLOWED_HOSTS");
+    const allowedOrigins = resolveListOption(
+      '--http-allowed-origins',
+      'MCP_HTTP_ALLOWED_ORIGINS',
+    );
+    const allowedHosts = resolveListOption(
+      '--http-allowed-hosts',
+      'MCP_HTTP_ALLOWED_HOSTS',
+    );
     const enableDnsRebindingProtection = resolveBooleanOption(
-      "--http-enable-dns-protection",
-      "MCP_HTTP_ENABLE_DNS_PROTECTION",
-      false
+      '--http-enable-dns-protection',
+      'MCP_HTTP_ENABLE_DNS_PROTECTION',
+      false,
     );
 
     return {
-      type: "streamable-http",
+      type: 'streamable-http',
       host,
       port,
       enableJsonResponse,
@@ -1499,7 +1710,7 @@ export function parseTransportConfig(transportType: string): TransportConfig {
     };
   }
 
-  return { type: "stdio" };
+  return { type: 'stdio' };
 }
 
 let sapConfigOverride: SapConfig | undefined;
@@ -1531,9 +1742,10 @@ export function setAbapConnectionOverride(connection?: IAbapConnection) {
 // Helper function for Windows-compatible logging
 // Only logs when DEBUG_CONNECTORS, DEBUG_TESTS, or DEBUG_ADT_TESTS is enabled
 function debugLog(message: string): void {
-  const debugEnabled = process.env.DEBUG_CONNECTORS === 'true' ||
-                       process.env.DEBUG_TESTS === 'true' ||
-                       process.env.DEBUG_ADT_TESTS === 'true';
+  const debugEnabled =
+    process.env.DEBUG_CONNECTORS === 'true' ||
+    process.env.DEBUG_TESTS === 'true' ||
+    process.env.DEBUG_ADT_TESTS === 'true';
 
   if (!debugEnabled) {
     return; // Suppress debug logs when not in debug mode
@@ -1542,25 +1754,29 @@ function debugLog(message: string): void {
   // Try stderr first
   try {
     process.stderr.write(message);
-  } catch (e) {
+  } catch (_e) {
     // Fallback to console.error for Windows
     console.error(message.trim());
   }
   // Also try to write to a debug file on Windows
   if (process.platform === 'win32') {
     try {
-      const fs = require('fs');
-      const path = require('path');
+      const fs = require('node:fs');
+      const path = require('node:path');
       const debugFile = path.join(process.cwd(), 'mcp-debug.log');
-      fs.appendFileSync(debugFile, `${new Date().toISOString()} ${message}`, 'utf8');
-    } catch (e) {
+      fs.appendFileSync(
+        debugFile,
+        `${new Date().toISOString()} ${message}`,
+        'utf8',
+      );
+    } catch (_e) {
       // Ignore file write errors
     }
   }
 }
 
 // Re-export header constants from interfaces package
-export * from "@mcp-abap-adt/interfaces";
+export * from '@mcp-abap-adt/interfaces';
 
 export function getConfig(): SapConfig {
   debugLog(`[MCP-CONFIG] getConfig() called\n`);
@@ -1575,7 +1791,9 @@ export function getConfig(): SapConfig {
   let url = process.env.SAP_URL;
   let client = process.env.SAP_CLIENT;
 
-  debugLog(`[MCP-CONFIG] Raw process.env.SAP_URL: "${url}" (type: ${typeof url}, length: ${url?.length || 0})\n`);
+  debugLog(
+    `[MCP-CONFIG] Raw process.env.SAP_URL: "${url}" (type: ${typeof url}, length: ${url?.length || 0})\n`,
+  );
 
   // URLs from .env files are expected to be clean - just trim
   if (url) {
@@ -1583,7 +1801,11 @@ export function getConfig(): SapConfig {
   } else {
     // Log if URL is missing
     debugLog(`[MCP-CONFIG] ✗ SAP_URL is missing from process.env\n`);
-    debugLog(`[MCP-CONFIG] Available env vars: ${Object.keys(process.env).filter(k => k.startsWith('SAP_')).join(', ')}\n`);
+    debugLog(
+      `[MCP-CONFIG] Available env vars: ${Object.keys(process.env)
+        .filter((k) => k.startsWith('SAP_'))
+        .join(', ')}\n`,
+    );
   }
 
   if (client) {
@@ -1591,23 +1813,28 @@ export function getConfig(): SapConfig {
   }
 
   // Auto-detect auth type: if JWT token is present, use JWT; otherwise check SAP_AUTH_TYPE or default to basic
-  let authType: SapConfig["authType"] = 'basic';
+  let authType: SapConfig['authType'] = 'basic';
   if (process.env.SAP_JWT_TOKEN) {
     authType = 'jwt';
   } else if (process.env.SAP_AUTH_TYPE) {
     const rawAuthType = process.env.SAP_AUTH_TYPE.trim();
-    authType = rawAuthType === 'xsuaa' ? 'jwt' : (rawAuthType as SapConfig["authType"]);
+    authType =
+      rawAuthType === 'xsuaa' ? 'jwt' : (rawAuthType as SapConfig['authType']);
   }
 
   if (!url) {
-    throw new Error(`Missing SAP_URL in environment variables. Please check your .env file.`);
+    throw new Error(
+      `Missing SAP_URL in environment variables. Please check your .env file.`,
+    );
   }
 
   // Final validation - URL should be clean now
   if (!/^https?:\/\//.test(url)) {
     // Log URL in hex for debugging
     const urlHex = Buffer.from(url, 'utf8').toString('hex');
-    throw new Error(`Invalid SAP_URL format: "${url}" (hex: ${urlHex.substring(0, 100)}...). Expected format: https://your-system.sap.com`);
+    throw new Error(
+      `Invalid SAP_URL format: "${url}" (hex: ${urlHex.substring(0, 100)}...). Expected format: https://your-system.sap.com`,
+    );
   }
 
   // Additional validation: try to create URL object to catch any remaining issues
@@ -1617,7 +1844,9 @@ export function getConfig(): SapConfig {
     url = testUrl.href.replace(/\/$/, ''); // Remove trailing slash if present
   } catch (urlError) {
     const urlHex = Buffer.from(url, 'utf8').toString('hex');
-    throw new Error(`Invalid SAP_URL: "${url}" (hex: ${urlHex.substring(0, 100)}...). Error: ${urlError instanceof Error ? urlError.message : urlError}`);
+    throw new Error(
+      `Invalid SAP_URL: "${url}" (hex: ${urlHex.substring(0, 100)}...). Error: ${urlError instanceof Error ? urlError.message : urlError}`,
+    );
   }
 
   // Log URL for debugging
@@ -1644,8 +1873,10 @@ export function getConfig(): SapConfig {
       config.refreshToken = refreshToken.trim();
     }
     const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
-    const uaaClientId = process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
-    const uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
+    const uaaClientId =
+      process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
+    const uaaClientSecret =
+      process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
     if (uaaUrl) config.uaaUrl = uaaUrl.trim();
     if (uaaClientId) config.uaaClientId = uaaClientId.trim();
     if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret.trim();
@@ -1653,7 +1884,9 @@ export function getConfig(): SapConfig {
     const username = process.env.SAP_USERNAME;
     const password = process.env.SAP_PASSWORD;
     if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
+      throw new Error(
+        'Missing SAP_USERNAME or SAP_PASSWORD for basic authentication',
+      );
     }
     config.username = username.trim();
     config.password = password.trim();

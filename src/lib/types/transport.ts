@@ -4,8 +4,6 @@
  * Types used by transports but not part of SDK Transport interface
  */
 
-import { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
-
 /**
  * Client information extracted from transport connection
  */
@@ -31,5 +29,5 @@ export interface IClientInfo {
 export type SessionInitializationCallback = (
   sessionId: string,
   clientInfo: IClientInfo,
-  destination?: string
+  destination?: string,
 ) => Promise<void>;

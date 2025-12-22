@@ -6,26 +6,32 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "DeleteTableLow",
-  description: "[low-level] Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for $TMP objects.",
+  name: 'DeleteTableLow',
+  description:
+    '[low-level] Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       table_name: {
-        type: "string",
-        description: "Table name (e.g., Z_MY_PROGRAM)."
+        type: 'string',
+        description: 'Table name (e.g., Z_MY_PROGRAM).',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP)."
-      }
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
+      },
     },
-    required: ["table_name"]
-  }
+    required: ['table_name'],
+  },
 } as const;
 
 interface DeleteTableArgs {
@@ -38,13 +44,13 @@ interface DeleteTableArgs {
  *
  * Uses CrudClient.deleteTable - low-level single method call
  */
-export async function handleDeleteTable(context: HandlerContext, args: DeleteTableArgs) {
+export async function handleDeleteTable(
+  context: HandlerContext,
+  args: DeleteTableArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      table_name,
-      transport_request
-    } = args as DeleteTableArgs;
+    const { table_name, transport_request } = args as DeleteTableArgs;
 
     // Validation
     if (!table_name) {
@@ -59,24 +65,32 @@ export async function handleDeleteTable(context: HandlerContext, args: DeleteTab
 
     try {
       // Delete table
-      await client.deleteTable({ tableName: tableName, transportRequest: transport_request });
+      await client.deleteTable({
+        tableName: tableName,
+        transportRequest: transport_request,
+      });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {
-        throw new Error(`Delete did not return a response for table ${tableName}`);
+        throw new Error(
+          `Delete did not return a response for table ${tableName}`,
+        );
       }
 
       logger?.info(`✅ DeleteTable completed successfully: ${tableName}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          table_name: tableName,
-          transport_request: transport_request || null,
-          message: `Table ${tableName} deleted successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            table_name: tableName,
+            transport_request: transport_request || null,
+            message: `Table ${tableName} deleted successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
       logger?.error(`Error deleting table ${tableName}:`, error);
 
@@ -89,26 +103,30 @@ export async function handleDeleteTable(context: HandlerContext, args: DeleteTab
         errorMessage = `Table ${tableName} is locked by another user. Cannot delete.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

@@ -6,43 +6,53 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, restoreSessionInConnection, parseValidationResponse, AxiosResponse } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  parseValidationResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "ValidateStructureLow",
-  description: "[low-level] Validate an ABAP structure name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.",
+  name: 'ValidateStructureLow',
+  description:
+    '[low-level] Validate an ABAP structure name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       structure_name: {
-        type: "string",
-        description: "Structure name to validate (e.g., Z_MY_PROGRAM)."
+        type: 'string',
+        description: 'Structure name to validate (e.g., Z_MY_PROGRAM).',
       },
       package_name: {
-        type: "string",
-        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation."
+        type: 'string',
+        description:
+          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.',
       },
       description: {
-        type: "string",
-        description: "Structure description. Required for validation."
+        type: 'string',
+        description: 'Structure description. Required for validation.',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from GetSession. If not provided, a new session will be created."
+        type: 'string',
+        description:
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["structure_name", "package_name", "description"]
-  }
+    required: ['structure_name', 'package_name', 'description'],
+  },
 } as const;
 
 interface ValidateStructureArgs {
@@ -62,7 +72,10 @@ interface ValidateStructureArgs {
  *
  * Uses CrudClient.validateStructure - low-level single method call
  */
-export async function handleValidateStructure(context: HandlerContext, args: ValidateStructureArgs) {
+export async function handleValidateStructure(
+  context: HandlerContext,
+  args: ValidateStructureArgs,
+) {
   const { connection, logger } = context;
   try {
     const {
@@ -70,12 +83,14 @@ export async function handleValidateStructure(context: HandlerContext, args: Val
       package_name,
       description,
       session_id,
-      session_state
+      session_state,
     } = args as ValidateStructureArgs;
 
     // Validation
     if (!structure_name || !package_name || !description) {
-      return return_error(new Error('structure_name, package_name, and description are required'));
+      return return_error(
+        new Error('structure_name, package_name, and description are required'),
+      );
     }
 
     const client = new CrudClient(connection);
@@ -85,7 +100,7 @@ export async function handleValidateStructure(context: HandlerContext, args: Val
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const structureName = structure_name.toUpperCase();
 
@@ -96,7 +111,7 @@ export async function handleValidateStructure(context: HandlerContext, args: Val
       await client.validateStructure({
         structureName: structureName,
         packageName: package_name.toUpperCase(),
-        description: description
+        description: description,
       });
       const validationResponse = client.getValidationResponse();
       if (!validationResponse) {
@@ -106,23 +121,25 @@ export async function handleValidateStructure(context: HandlerContext, args: Val
 
       // Get updated session state after validation
 
-
       logger?.info(`✅ ValidateStructure completed: ${structureName}`);
       logger?.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: result.valid,
-          structure_name: structureName,
-          validation_result: result,
-          session_id: session_id || null,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: result.valid
-            ? `Structure name ${structureName} is valid and available`
-            : `Structure name ${structureName} validation failed: ${result.message}`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: result.valid,
+            structure_name: structureName,
+            validation_result: result,
+            session_id: session_id || null,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: result.valid
+              ? `Structure name ${structureName} is valid and available`
+              : `Structure name ${structureName} validation failed: ${result.message}`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
       logger?.error(`Error validating structure ${structureName}:`, error);
 
@@ -131,26 +148,30 @@ export async function handleValidateStructure(context: HandlerContext, args: Val
 
       if (error.response?.status === 404) {
         errorMessage = `Structure ${structureName} not found.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

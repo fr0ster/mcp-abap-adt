@@ -17,9 +17,8 @@
 import { handleCreateInterface } from '../../../../handlers/interface/high/handleCreateInterface';
 import { handleUpdateInterface } from '../../../../handlers/interface/high/handleUpdateInterface';
 import { handleDeleteInterface } from '../../../../handlers/interface/low/handleDeleteInterface';
-
-import { HighTester } from '../../helpers/testers/HighTester';
 import { getTimeout } from '../../helpers/configHelpers';
+import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Interface High-Level Handlers Integration', () => {
   let tester: HighTester;
@@ -32,8 +31,8 @@ describe('Interface High-Level Handlers Integration', () => {
       {
         create: handleCreateInterface,
         update: handleUpdateInterface,
-        delete: handleDeleteInterface
-      }
+        delete: handleDeleteInterface,
+      },
     );
     await tester.beforeAll();
   });
@@ -50,7 +49,11 @@ describe('Interface High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it('should test all Interface high-level handlers', async () => {
-    await tester.run();
-  }, getTimeout('long'));
+  it(
+    'should test all Interface high-level handlers',
+    async () => {
+      await tester.run();
+    },
+    getTimeout('long'),
+  );
 });

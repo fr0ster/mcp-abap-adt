@@ -1,20 +1,20 @@
-import { CompositeHandlersRegistry } from "../../lib/handlers/registry/CompositeHandlersRegistry.js";
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { AuthBrokerFactory } from '../../lib/auth/index.js';
+import { ServerConfigManager } from '../../lib/config/index.js';
 import {
   HighLevelHandlersGroup,
   LowLevelHandlersGroup,
   ReadOnlyHandlersGroup,
   SearchHandlersGroup,
   SystemHandlersGroup,
-} from "../../lib/handlers/groups/index.js";
-import { StdioServer } from "./StdioServer.js";
-import { StreamableHttpServer } from "./StreamableHttpServer.js";
-import { SseServer } from "./SseServer.js";
-import { AuthBrokerFactory } from "../../lib/auth/index.js";
-import { AuthBrokerConfig } from "./AuthBrokerConfig.js";
-import type { HandlerContext } from "../../lib/handlers/interfaces.js";
-import { ServerConfigManager } from "../../lib/config/index.js";
-import * as fs from "fs";
-import * as path from "path";
+} from '../../lib/handlers/groups/index.js';
+import type { HandlerContext } from '../../lib/handlers/interfaces.js';
+import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry.js';
+import { AuthBrokerConfig } from './AuthBrokerConfig.js';
+import { SseServer } from './SseServer.js';
+import { StdioServer } from './StdioServer.js';
+import { StreamableHttpServer } from './StreamableHttpServer.js';
 
 const stderrLogger = {
   info: (...args: any[]) => console.error(...args),
@@ -23,18 +23,30 @@ const stderrLogger = {
   debug: (...args: any[]) => console.error(...args),
 };
 
-const silentLogger = { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} };
-const loggerForTransport = process.env.DEBUG_AUTH_LOG === "true" ? stderrLogger : silentLogger;
+const silentLogger = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  debug: () => {},
+};
+const loggerForTransport =
+  process.env.DEBUG_AUTH_LOG === 'true' ? stderrLogger : silentLogger;
 
-type Transport = "stdio" | "sse" | "http";
+type Transport = 'stdio' | 'sse' | 'http';
 
 function hasArg(name: string): boolean {
   return process.argv.includes(name);
 }
 
 function showVersion(): void {
-  const packageJsonPath = path.join(__dirname, "..", "..", "..", "package.json");
-  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+  const packageJsonPath = path.join(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    'package.json',
+  );
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
   console.log(packageJson.version);
   process.exit(0);
 }
@@ -70,12 +82,12 @@ function showHelp(): void {
 
 async function main() {
   // Check for --version first
-  if (hasArg("--version") || hasArg("-v")) {
+  if (hasArg('--version') || hasArg('-v')) {
     showVersion();
   }
 
   // Check for --help
-  if (hasArg("--help") || hasArg("-h")) {
+  if (hasArg('--help') || hasArg('-h')) {
     showHelp();
     process.exit(0);
   }
@@ -84,7 +96,10 @@ async function main() {
   const configManager = new ServerConfigManager();
   const config = await configManager.getConfig();
 
-  const baseContext = { connection: undefined as any, logger: undefined } satisfies HandlerContext;
+  const baseContext = {
+    connection: undefined as any,
+    logger: undefined,
+  } satisfies HandlerContext;
 
   // Build handlers based on exposition config (default to readonly,high)
   const exposition = config.exposition || ['readonly', 'high'];
@@ -105,28 +120,35 @@ async function main() {
   const handlersRegistry = new CompositeHandlersRegistry(handlerGroups);
 
   // Create auth broker config using adapter
-  const brokerConfig = AuthBrokerConfig.fromServerConfig(config, loggerForTransport);
+  const brokerConfig = AuthBrokerConfig.fromServerConfig(
+    config,
+    loggerForTransport,
+  );
   const authBrokerFactory = new AuthBrokerFactory(brokerConfig);
 
   // Initialize default broker (important for .env file support)
   await authBrokerFactory.initializeDefaultBroker();
 
-  if (config.transport === "stdio") {
+  if (config.transport === 'stdio') {
     if (!config.mcpDestination && !config.envFile) {
-      throw new Error("stdio requires --mcp=<destination> or --env=<path>");
+      throw new Error('stdio requires --mcp=<destination> or --env=<path>');
     }
     // For .env file, use 'default' broker; for --mcp, use specified destination
     const brokerKey = config.envFile ? 'default' : config.mcpDestination;
     const broker = await authBrokerFactory.getOrCreateAuthBroker(brokerKey);
     if (!broker) {
-      throw new Error(`Auth broker not available for ${brokerKey ?? 'default'}`);
+      throw new Error(
+        `Auth broker not available for ${brokerKey ?? 'default'}`,
+      );
     }
-    const server = new StdioServer(handlersRegistry, broker, { logger: loggerForTransport });
+    const server = new StdioServer(handlersRegistry, broker, {
+      logger: loggerForTransport,
+    });
     await server.start(brokerKey ?? 'default');
     return;
   }
 
-  if (config.transport === "sse") {
+  if (config.transport === 'sse') {
     const server = new SseServer(handlersRegistry, authBrokerFactory, {
       host: config.host,
       port: config.port,
@@ -153,6 +175,9 @@ async function main() {
 
 void main().catch((err) => {
   // eslint-disable-next-line no-console
-  console.error("[MCP] launcher failed:", err instanceof Error ? err.message : String(err));
+  console.error(
+    '[MCP] launcher failed:',
+    err instanceof Error ? err.message : String(err),
+  );
   process.exit(1);
 });

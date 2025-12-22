@@ -6,30 +6,37 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "DeletePackageLow",
-  description: "[low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects.",
+  name: 'DeletePackageLow',
+  description:
+    '[low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       package_name: {
-        type: "string",
-        description: "Package name (e.g., Z_MY_PROGRAM)."
+        type: 'string',
+        description: 'Package name (e.g., Z_MY_PROGRAM).',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP)."
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
       },
       force_new_connection: {
-        type: "boolean",
-        description: "Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false."
-      }
+        type: 'boolean',
+        description:
+          'Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.',
+      },
     },
-    required: ["package_name"]
-  }
+    required: ['package_name'],
+  },
 } as const;
 
 interface DeletePackageArgs {
@@ -43,13 +50,16 @@ interface DeletePackageArgs {
  *
  * Uses CrudClient.deletePackage - low-level single method call
  */
-export async function handleDeletePackage(context: HandlerContext, args: DeletePackageArgs) {
+export async function handleDeletePackage(
+  context: HandlerContext,
+  args: DeletePackageArgs,
+) {
   const { connection, logger } = context;
   try {
     const {
       package_name,
       transport_request,
-      force_new_connection = false
+      force_new_connection = false,
     } = args as DeletePackageArgs;
 
     // Validation
@@ -65,26 +75,36 @@ export async function handleDeletePackage(context: HandlerContext, args: DeleteP
 
     try {
       // Delete package
-      await client.deletePackage({ packageName: packageName, transportRequest: transport_request });
+      await client.deletePackage({
+        packageName: packageName,
+        transportRequest: transport_request,
+      });
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {
-        throw new Error(`Delete did not return a response for package ${packageName}`);
+        throw new Error(
+          `Delete did not return a response for package ${packageName}`,
+        );
       }
 
       logger?.info(`✅ DeletePackage completed successfully: ${packageName}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          package_name: packageName,
-          transport_request: transport_request || null,
-          message: `Package ${packageName} deleted successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            package_name: packageName,
+            transport_request: transport_request || null,
+            message: `Package ${packageName} deleted successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error deleting package ${packageName}: ${error?.message || error}`);
+      logger?.error(
+        `Error deleting package ${packageName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to delete package: ${error.message || String(error)}`;
@@ -95,26 +115,30 @@ export async function handleDeletePackage(context: HandlerContext, args: DeleteP
         errorMessage = `Package ${packageName} is locked by another user. Cannot delete.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

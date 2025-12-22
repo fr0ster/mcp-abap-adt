@@ -6,27 +6,32 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "CreateTransportLow",
-  description: "[low-level] Create a new ABAP transport request.",
+  name: 'CreateTransportLow',
+  description: '[low-level] Create a new ABAP transport request.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       description: {
-        type: "string",
-        description: "Transport request description."
+        type: 'string',
+        description: 'Transport request description.',
       },
       transport_type: {
-        type: "string",
-        description: "Transport type: 'workbench' or 'customizing' (optional, default: 'workbench').",
-        enum: ["workbench", "customizing"]
-      }
+        type: 'string',
+        description:
+          "Transport type: 'workbench' or 'customizing' (optional, default: 'workbench').",
+        enum: ['workbench', 'customizing'],
+      },
     },
-    required: ["description"]
-  }
+    required: ['description'],
+  },
 } as const;
 
 interface CreateTransportArgs {
@@ -39,23 +44,23 @@ interface CreateTransportArgs {
  *
  * Uses CrudClient.createTransport - low-level single method call
  */
-export async function handleCreateTransport(context: HandlerContext, args: CreateTransportArgs) {
+export async function handleCreateTransport(
+  context: HandlerContext,
+  args: CreateTransportArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      description,
-      transport_type
-    } = args as CreateTransportArgs;
+    const { description, transport_type } = args as CreateTransportArgs;
 
     // Validation
     if (!description) {
       return return_error(new Error('description is required'));
     }
 
-        const client = new CrudClient(connection);
+    const client = new CrudClient(connection);
 
     // Ensure connection is established
-        logger?.info(`Starting transport creation: ${description}`);
+    logger?.info(`Starting transport creation: ${description}`);
 
     try {
       // Create transport
@@ -69,14 +74,17 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
       logger?.info(`✅ CreateTransport completed`);
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          description,
-          transport_type: transport_type || 'workbench',
-          message: `Transport request created successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            description,
+            transport_type: transport_type || 'workbench',
+            message: `Transport request created successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
       logger?.error(`Error creating transport:`, error);
 
@@ -88,21 +96,22 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

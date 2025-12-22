@@ -1,45 +1,64 @@
-import { BaseHandlerGroup } from "../base/BaseHandlerGroup.js";
-import { HandlerEntry } from "../interfaces.js";
-
+import { TOOL_DEFINITION as DescribeByList_Tool } from '../../../handlers/system/readonly/handleDescribeByList';
+import { handleDescribeByList } from '../../../handlers/system/readonly/handleDescribeByList.js';
+import {
+  TOOL_DEFINITION as GetAbapAST_Tool,
+  handleGetAbapAST,
+} from '../../../handlers/system/readonly/handleGetAbapAST';
+import {
+  TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool,
+  handleGetAbapSemanticAnalysis,
+} from '../../../handlers/system/readonly/handleGetAbapSemanticAnalysis';
+import {
+  TOOL_DEFINITION as GetAbapSystemSymbols_Tool,
+  handleGetAbapSystemSymbols,
+} from '../../../handlers/system/readonly/handleGetAbapSystemSymbols';
+import {
+  TOOL_DEFINITION as GetAdtTypes_Tool,
+  handleGetAdtTypes,
+} from '../../../handlers/system/readonly/handleGetAllTypes';
+import {
+  TOOL_DEFINITION as GetInactiveObjects_Tool,
+  handleGetInactiveObjects,
+} from '../../../handlers/system/readonly/handleGetInactiveObjects';
+import {
+  TOOL_DEFINITION as GetObjectInfo_Tool,
+  handleGetObjectInfo,
+} from '../../../handlers/system/readonly/handleGetObjectInfo';
+import { TOOL_DEFINITION as GetObjectNodeFromCache_Tool } from '../../../handlers/system/readonly/handleGetObjectNodeFromCache';
+import { handleGetObjectNodeFromCache } from '../../../handlers/system/readonly/handleGetObjectNodeFromCache.js';
+import { TOOL_DEFINITION as GetObjectStructure_Tool } from '../../../handlers/system/readonly/handleGetObjectStructure';
+import { handleGetObjectStructure } from '../../../handlers/system/readonly/handleGetObjectStructure.js';
+import {
+  TOOL_DEFINITION as GetSession_Tool,
+  handleGetSession,
+} from '../../../handlers/system/readonly/handleGetSession';
+import {
+  TOOL_DEFINITION as GetSqlQuery_Tool,
+  handleGetSqlQuery,
+} from '../../../handlers/system/readonly/handleGetSqlQuery';
+import {
+  TOOL_DEFINITION as GetTransaction_Tool,
+  handleGetTransaction,
+} from '../../../handlers/system/readonly/handleGetTransaction';
 // Import system handlers
-import { handleGetTypeInfo } from "../../../handlers/system/readonly/handleGetTypeInfo";
-import { handleGetTransaction } from "../../../handlers/system/readonly/handleGetTransaction";
-import { handleGetSqlQuery } from "../../../handlers/system/readonly/handleGetSqlQuery";
-import { handleGetWhereUsed } from "../../../handlers/system/readonly/handleGetWhereUsed";
-import { handleGetObjectInfo } from "../../../handlers/system/readonly/handleGetObjectInfo";
-import { handleGetAbapAST } from "../../../handlers/system/readonly/handleGetAbapAST";
-import { handleGetAbapSemanticAnalysis } from "../../../handlers/system/readonly/handleGetAbapSemanticAnalysis";
-import { handleGetAbapSystemSymbols } from "../../../handlers/system/readonly/handleGetAbapSystemSymbols";
-import { handleGetSession } from "../../../handlers/system/readonly/handleGetSession";
-import { handleGetInactiveObjects } from "../../../handlers/system/readonly/handleGetInactiveObjects";
-import { handleGetAdtTypes } from "../../../handlers/system/readonly/handleGetAllTypes";
-import { handleGetObjectStructure } from "../../../handlers/system/readonly/handleGetObjectStructure.js";
-import { handleGetObjectNodeFromCache } from "../../../handlers/system/readonly/handleGetObjectNodeFromCache.js";
-import { handleDescribeByList } from "../../../handlers/system/readonly/handleDescribeByList.js";
-
-
 // Import TOOL_DEFINITION from handlers
-import { TOOL_DEFINITION as GetTypeInfo_Tool } from "../../../handlers/system/readonly/handleGetTypeInfo";
-import { TOOL_DEFINITION as GetTransaction_Tool } from "../../../handlers/system/readonly/handleGetTransaction";
-import { TOOL_DEFINITION as GetSqlQuery_Tool } from "../../../handlers/system/readonly/handleGetSqlQuery";
-import { TOOL_DEFINITION as GetWhereUsed_Tool } from "../../../handlers/system/readonly/handleGetWhereUsed";
-import { TOOL_DEFINITION as GetObjectInfo_Tool } from "../../../handlers/system/readonly/handleGetObjectInfo";
-import { TOOL_DEFINITION as GetAbapAST_Tool } from "../../../handlers/system/readonly/handleGetAbapAST";
-import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from "../../../handlers/system/readonly/handleGetAbapSemanticAnalysis";
-import { TOOL_DEFINITION as GetAbapSystemSymbols_Tool } from "../../../handlers/system/readonly/handleGetAbapSystemSymbols";
-import { TOOL_DEFINITION as GetSession_Tool } from "../../../handlers/system/readonly/handleGetSession";
-import { TOOL_DEFINITION as GetInactiveObjects_Tool } from "../../../handlers/system/readonly/handleGetInactiveObjects";
-import { TOOL_DEFINITION as GetAdtTypes_Tool } from "../../../handlers/system/readonly/handleGetAllTypes";
-import { TOOL_DEFINITION as GetObjectStructure_Tool } from "../../../handlers/system/readonly/handleGetObjectStructure";
-import { TOOL_DEFINITION as GetObjectNodeFromCache_Tool } from "../../../handlers/system/readonly/handleGetObjectNodeFromCache";
-import { TOOL_DEFINITION as DescribeByList_Tool } from "../../../handlers/system/readonly/handleDescribeByList";
+import {
+  TOOL_DEFINITION as GetTypeInfo_Tool,
+  handleGetTypeInfo,
+} from '../../../handlers/system/readonly/handleGetTypeInfo';
+import {
+  TOOL_DEFINITION as GetWhereUsed_Tool,
+  handleGetWhereUsed,
+} from '../../../handlers/system/readonly/handleGetWhereUsed';
+import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
+import type { HandlerEntry } from '../interfaces.js';
 
 /**
  * Handler group for all system-related handlers
  * Contains handlers for system information, analysis, and metadata operations
  */
 export class SystemHandlersGroup extends BaseHandlerGroup {
-  protected groupName = "SystemHandlers";
+  protected groupName = 'SystemHandlers';
 
   /**
    * Gets all system handler entries
@@ -85,10 +104,13 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           inputSchema: GetObjectInfo_Tool.inputSchema,
         },
         handler: async (args: any) => {
-          if (!args || typeof args !== "object") {
-            throw new Error("Missing or invalid arguments for GetObjectInfo");
+          if (!args || typeof args !== 'object') {
+            throw new Error('Missing or invalid arguments for GetObjectInfo');
           }
-          return await handleGetObjectInfo(this.context, args as { parent_type: string; parent_name: string });
+          return await handleGetObjectInfo(
+            this.context,
+            args as { parent_type: string; parent_name: string },
+          );
         },
       },
       {
@@ -105,7 +127,8 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           description: GetAbapSemanticAnalysis_Tool.description,
           inputSchema: GetAbapSemanticAnalysis_Tool.inputSchema,
         },
-        handler: (args: any) => handleGetAbapSemanticAnalysis(this.context, args),
+        handler: (args: any) =>
+          handleGetAbapSemanticAnalysis(this.context, args),
       },
       {
         toolDefinition: {
@@ -149,7 +172,10 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           inputSchema: GetObjectStructure_Tool.inputSchema,
         },
         handler: (args: any) => {
-          return handleGetObjectStructure(this.context, args as { object_type: string; object_name: string });
+          return handleGetObjectStructure(
+            this.context,
+            args as { object_type: string; object_name: string },
+          );
         },
       },
       {
@@ -159,7 +185,16 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           inputSchema: GetObjectNodeFromCache_Tool.inputSchema,
         },
         handler: (args: any) => {
-          return handleGetObjectNodeFromCache(this.context, args as { object_type: string; object_name: string } | { object_type: string; object_name: string; cache_type: string } );
+          return handleGetObjectNodeFromCache(
+            this.context,
+            args as
+              | { object_type: string; object_name: string }
+              | {
+                  object_type: string;
+                  object_name: string;
+                  cache_type: string;
+                },
+          );
         },
       },
       {
@@ -169,7 +204,16 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           inputSchema: DescribeByList_Tool.inputSchema,
         },
         handler: (args: any) => {
-          return handleDescribeByList(this.context, args as { object_type: string; object_name: string } | { object_type: string; object_name: string; cache_type: string } );
+          return handleDescribeByList(
+            this.context,
+            args as
+              | { object_type: string; object_name: string }
+              | {
+                  object_type: string;
+                  object_name: string;
+                  cache_type: string;
+                },
+          );
         },
       },
     ];

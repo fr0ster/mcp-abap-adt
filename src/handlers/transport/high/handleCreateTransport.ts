@@ -7,37 +7,45 @@
  * Workflow: create
  */
 
-import { McpError, ErrorCode, return_error, return_response } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  ErrorCode,
+  McpError,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "CreateTransport",
-  description: "Create a new ABAP transport request in SAP system for development objects.",
+  name: 'CreateTransport',
+  description:
+    'Create a new ABAP transport request in SAP system for development objects.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       transport_type: {
-        type: "string",
-        description: "Transport type: 'workbench' (cross-client) or 'customizing' (client-specific)",
-        enum: ["workbench", "customizing"],
-        default: "workbench"
+        type: 'string',
+        description:
+          "Transport type: 'workbench' (cross-client) or 'customizing' (client-specific)",
+        enum: ['workbench', 'customizing'],
+        default: 'workbench',
       },
       description: {
-        type: "string",
-        description: "Transport request description (mandatory)"
+        type: 'string',
+        description: 'Transport request description (mandatory)',
       },
       target_system: {
-        type: "string",
-        description: "Target system for transport (optional, e.g., 'PRD', 'QAS'). If not provided or empty, uses 'LOCAL'"
+        type: 'string',
+        description:
+          "Target system for transport (optional, e.g., 'PRD', 'QAS'). If not provided or empty, uses 'LOCAL'",
       },
       owner: {
-        type: "string",
-        description: "Transport owner (optional, defaults to current user)"
-      }
+        type: 'string',
+        description: 'Transport owner (optional, defaults to current user)',
+      },
     },
-    required: ["description"]
-  }
+    required: ['description'],
+  },
 } as const;
 
 interface CreateTransportArgs {
@@ -47,19 +55,24 @@ interface CreateTransportArgs {
   owner?: string;
 }
 
-
 /**
  * Main handler for CreateTransport MCP tool
  *
  * Uses TransportBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateTransport(context: HandlerContext, args: CreateTransportArgs) {
+export async function handleCreateTransport(
+  context: HandlerContext,
+  args: CreateTransportArgs,
+) {
   const { connection, logger } = context;
   try {
     // Validate required parameters
     if (!args?.description) {
-      throw new McpError(ErrorCode.InvalidParams, 'Transport description is required');
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'Transport description is required',
+      );
     }
 
     const typedArgs = args as CreateTransportArgs;
@@ -74,7 +87,9 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
       // Create transport
       await client.createTransport(
         typedArgs.description,
-        typedArgs.transport_type === 'customizing' ? 'customizing' : 'workbench'
+        typedArgs.transport_type === 'customizing'
+          ? 'customizing'
+          : 'workbench',
       );
 
       // Get create result
@@ -98,26 +113,29 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
               parseAttributeValue: true,
             });
             const result = parser.parse(createResult.data);
-            const root = result['tm:root'] || result['root'];
+            const root = result['tm:root'] || result.root;
             const request = root?.['tm:request'] || {};
             const task = request?.['tm:task'] || {};
             transportInfo = {
               transport_number: request['tm:number'] || transportNumber,
-              description: request['tm:desc'] || request['tm:description'] || typedArgs.description,
+              description:
+                request['tm:desc'] ||
+                request['tm:description'] ||
+                typedArgs.description,
               type: request['tm:type'],
               target_system: request['tm:target'],
               target_desc: request['tm:target_desc'],
               cts_project: request['tm:cts_project'],
               uri: request['tm:uri'],
-              owner: task['tm:owner'] || request['tm:owner'] || typedArgs.owner
+              owner: task['tm:owner'] || request['tm:owner'] || typedArgs.owner,
             };
-          } catch (parseError) {
+          } catch (_parseError) {
             // If parsing fails, use basic info
             transportInfo = {
               transport_number: transportNumber,
               description: typedArgs.description,
               type: typedArgs.transport_type === 'customizing' ? 'T' : 'K',
-              owner: typedArgs.owner
+              owner: typedArgs.owner,
             };
           }
         } else if (typeof createResult.data === 'object') {
@@ -134,38 +152,46 @@ export async function handleCreateTransport(context: HandlerContext, args: Creat
       }
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          transport_request: transportInfo.transport_number || transportNumber,
-          task_number: transportInfo.task_number || taskNumber,
-          description: transportInfo.description || typedArgs.description,
-          type: transportInfo.type || (typedArgs.transport_type === 'customizing' ? 'T' : 'K'),
-          target_system: transportInfo.target_system || typedArgs.target_system || 'LOCAL',
-          target_desc: transportInfo.target_desc,
-          cts_project: transportInfo.cts_project,
-          owner: transportInfo.owner || typedArgs.owner,
-          uri: transportInfo.uri,
-          message: `Transport request ${transportInfo.transport_number || transportNumber || 'unknown'} created successfully`
-        }, null, 2),
+        data: JSON.stringify(
+          {
+            success: true,
+            transport_request:
+              transportInfo.transport_number || transportNumber,
+            task_number: transportInfo.task_number || taskNumber,
+            description: transportInfo.description || typedArgs.description,
+            type:
+              transportInfo.type ||
+              (typedArgs.transport_type === 'customizing' ? 'T' : 'K'),
+            target_system:
+              transportInfo.target_system || typedArgs.target_system || 'LOCAL',
+            target_desc: transportInfo.target_desc,
+            cts_project: transportInfo.cts_project,
+            owner: transportInfo.owner || typedArgs.owner,
+            uri: transportInfo.uri,
+            message: `Transport request ${transportInfo.transport_number || transportNumber || 'unknown'} created successfully`,
+          },
+          null,
+          2,
+        ),
         status: createResult?.status || 200,
         statusText: createResult?.statusText || 'OK',
         headers: createResult?.headers || {},
-        config: createResult?.config || {} as any
+        config: createResult?.config || ({} as any),
       });
-
     } catch (error: any) {
       logger?.error(`Error creating transport:`, error);
 
       const errorMessage = error.response?.data
-        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+        ? typeof error.response.data === 'string'
+          ? error.response.data
+          : JSON.stringify(error.response.data)
         : error.message || String(error);
 
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to create transport: ${errorMessage}`
+        `Failed to create transport: ${errorMessage}`,
       );
     }
-
   } catch (error: any) {
     if (error instanceof McpError) {
       throw error;

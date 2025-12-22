@@ -7,14 +7,21 @@
  * Workflow: lock -> update -> check -> unlock -> (activate)
  */
 
-import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
-import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  ErrorCode,
+  isAlreadyExistsError,
+  McpError,
+  return_error,
+  return_response,
+  safeCheckOperation,
+} from '../../../lib/utils';
+import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
-  name: "UpdateDataElement",
+  name: 'UpdateDataElement',
   description: `Update an existing ABAP data element in SAP system.
 
 Workflow:
@@ -34,82 +41,94 @@ Supported type_kind values:
 
 Note: All provided parameters completely replace existing values. Field labels are truncated to max lengths (10/20/40/55).`,
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       data_element_name: {
-        type: "string",
-        description: "Data element name to update (e.g., ZZ_TEST_DTEL_01)"
+        type: 'string',
+        description: 'Data element name to update (e.g., ZZ_TEST_DTEL_01)',
       },
       description: {
-        type: "string",
-        description: "New data element description"
+        type: 'string',
+        description: 'New data element description',
       },
       package_name: {
-        type: "string",
-        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects)"
+        type: 'string',
+        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects)',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable packages."
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
       type_kind: {
-        type: "string",
-        description: "Type kind: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType",
-        enum: ["domain", "predefinedAbapType", "refToPredefinedAbapType", "refToDictionaryType", "refToClifType"],
-        default: "domain"
+        type: 'string',
+        description:
+          'Type kind: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType',
+        enum: [
+          'domain',
+          'predefinedAbapType',
+          'refToPredefinedAbapType',
+          'refToDictionaryType',
+          'refToClifType',
+        ],
+        default: 'domain',
       },
       type_name: {
-        type: "string",
-        description: "Type name: domain name, data element name, or class name (depending on type_kind)"
+        type: 'string',
+        description:
+          'Type name: domain name, data element name, or class name (depending on type_kind)',
       },
       data_type: {
-        type: "string",
-        description: "Data type (CHAR, NUMC, etc.) - for predefinedAbapType or refToPredefinedAbapType"
+        type: 'string',
+        description:
+          'Data type (CHAR, NUMC, etc.) - for predefinedAbapType or refToPredefinedAbapType',
       },
       length: {
-        type: "number",
-        description: "Length - for predefinedAbapType or refToPredefinedAbapType"
+        type: 'number',
+        description:
+          'Length - for predefinedAbapType or refToPredefinedAbapType',
       },
       decimals: {
-        type: "number",
-        description: "Decimals - for predefinedAbapType or refToPredefinedAbapType"
+        type: 'number',
+        description:
+          'Decimals - for predefinedAbapType or refToPredefinedAbapType',
       },
       field_label_short: {
-        type: "string",
-        description: "Short field label (max 10 chars)"
+        type: 'string',
+        description: 'Short field label (max 10 chars)',
       },
       field_label_medium: {
-        type: "string",
-        description: "Medium field label (max 20 chars)"
+        type: 'string',
+        description: 'Medium field label (max 20 chars)',
       },
       field_label_long: {
-        type: "string",
-        description: "Long field label (max 40 chars)"
+        type: 'string',
+        description: 'Long field label (max 40 chars)',
       },
       field_label_heading: {
-        type: "string",
-        description: "Heading field label (max 55 chars)"
+        type: 'string',
+        description: 'Heading field label (max 55 chars)',
       },
       search_help: {
-        type: "string",
-        description: "Search help name"
+        type: 'string',
+        description: 'Search help name',
       },
       search_help_parameter: {
-        type: "string",
-        description: "Search help parameter"
+        type: 'string',
+        description: 'Search help parameter',
       },
       set_get_parameter: {
-        type: "string",
-        description: "Set/Get parameter ID"
+        type: 'string',
+        description: 'Set/Get parameter ID',
       },
       activate: {
-        type: "boolean",
-        description: "Activate data element after update (default: true)",
-        default: true
-      }
+        type: 'boolean',
+        description: 'Activate data element after update (default: true)',
+        default: true,
+      },
     },
-    required: ["data_element_name", "package_name"]
-  }
+    required: ['data_element_name', 'package_name'],
+  },
 } as const;
 
 interface DataElementArgs {
@@ -138,11 +157,17 @@ interface DataElementArgs {
  * Uses DataElementBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleUpdateDataElement(context: HandlerContext, args: DataElementArgs) {
+export async function handleUpdateDataElement(
+  context: HandlerContext,
+  args: DataElementArgs,
+) {
   const { connection, logger } = context;
   try {
     if (!args?.data_element_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Data element name is required');
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'Data element name is required',
+      );
     }
     if (!args?.package_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
@@ -165,14 +190,16 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Dat
         | 'refToPredefinedAbapType'
         | 'refToDictionaryType'
         | 'refToClifType';
-      const rawTypeKind = (typedArgs.type_kind || 'domain').toString().toLowerCase();
+      const rawTypeKind = (typedArgs.type_kind || 'domain')
+        .toString()
+        .toLowerCase();
       const typeKindMap: Record<string, AdtClientsTypeKind> = {
         domain: 'domain',
         builtin: 'predefinedAbapType',
         predefinedabaptype: 'predefinedAbapType',
         reftopredefinedabaptype: 'refToPredefinedAbapType',
         reftodictionarytype: 'refToDictionaryType',
-        reftocliftype: 'refToClifType'
+        reftocliftype: 'refToClifType',
       };
       const typeKind = typeKindMap[rawTypeKind] || 'domain';
 
@@ -185,7 +212,7 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Dat
         await client.validateDataElement({
           dataElementName,
           packageName: typedArgs.package_name,
-          description: typedArgs.description || dataElementName
+          description: typedArgs.description || dataElementName,
         });
       } catch (validateError: any) {
         // For update operations, "already exists" is expected - object must exist
@@ -194,7 +221,9 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Dat
           throw validateError;
         }
         // "Already exists" is OK for update - continue
-        logger?.info(`Data element ${dataElementName} already exists - this is expected for update operation`);
+        logger?.info(
+          `Data element ${dataElementName} already exists - this is expected for update operation`,
+        );
       }
 
       // Lock
@@ -215,14 +244,17 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Dat
           typeName: typedArgs.type_name?.toUpperCase(),
           searchHelp: typedArgs.search_help,
           searchHelpParameter: typedArgs.search_help_parameter,
-          setGetParameter: typedArgs.set_get_parameter
+          setGetParameter: typedArgs.set_get_parameter,
         };
-        await client.updateDataElement({
-          dataElementName,
-          packageName: typedArgs.package_name,
-          description: typedArgs.description || dataElementName,
-          ...properties
-        }, lockHandle);
+        await client.updateDataElement(
+          {
+            dataElementName,
+            packageName: typedArgs.package_name,
+            description: typedArgs.description || dataElementName,
+            ...properties,
+          },
+          lockHandle,
+        );
 
         // Check
         try {
@@ -230,8 +262,8 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Dat
             () => client.checkDataElement({ dataElementName }),
             dataElementName,
             {
-              debug: (message: string) => logger?.debug(message)
-            }
+              debug: (message: string) => logger?.debug(message),
+            },
           );
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
@@ -251,9 +283,14 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Dat
       } catch (error) {
         // Try to unlock on error
         try {
-          await client.unlockDataElement({ dataElementName: dataElementName }, lockHandle);
+          await client.unlockDataElement(
+            { dataElementName: dataElementName },
+            lockHandle,
+          );
         } catch (unlockError) {
-          logger?.error(`Failed to unlock data element after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+          logger?.error(
+            `Failed to unlock data element after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
+          );
         }
         throw error;
       }
@@ -261,7 +298,11 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Dat
       // Get data element details from update result
       const updateResult = client.getUpdateResult();
       let dataElementDetails = null;
-      if (updateResult?.data && typeof updateResult.data === 'object' && 'data_element_details' in updateResult.data) {
+      if (
+        updateResult?.data &&
+        typeof updateResult.data === 'object' &&
+        'data_element_details' in updateResult.data
+      ) {
         dataElementDetails = (updateResult.data as any).data_element_details;
       }
 
@@ -274,38 +315,43 @@ export async function handleUpdateDataElement(context: HandlerContext, args: Dat
           data_type: typedArgs.data_type || null,
           status: shouldActivate ? 'active' : 'inactive',
           message: `Data element ${dataElementName} updated${shouldActivate ? ' and activated' : ''} successfully`,
-          data_element_details: dataElementDetails
-        })
+          data_element_details: dataElementDetails,
+        }),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error updating data element ${dataElementName}: ${error?.message || error}`);
+      logger?.error(
+        `Error updating data element ${dataElementName}: ${error?.message || error}`,
+      );
 
       // Handle specific error cases
-      if (error.message?.includes('not found') || error.response?.status === 404) {
+      if (
+        error.message?.includes('not found') ||
+        error.response?.status === 404
+      ) {
         throw new McpError(
           ErrorCode.InvalidParams,
-          `Data element ${dataElementName} not found.`
+          `Data element ${dataElementName} not found.`,
         );
       }
 
       if (error.message?.includes('locked') || error.response?.status === 403) {
         throw new McpError(
           ErrorCode.InternalError,
-          `Data element ${dataElementName} is locked by another user or session. Please try again later.`
+          `Data element ${dataElementName} is locked by another user or session. Please try again later.`,
         );
       }
 
       const errorMessage = error.response?.data
-        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+        ? typeof error.response.data === 'string'
+          ? error.response.data
+          : JSON.stringify(error.response.data)
         : error.message || String(error);
 
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to update data element ${dataElementName}: ${errorMessage}`
+        `Failed to update data element ${dataElementName}: ${errorMessage}`,
       );
     }
-
   } catch (error: any) {
     if (error instanceof McpError) {
       throw error;

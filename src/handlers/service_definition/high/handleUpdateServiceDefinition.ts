@@ -7,36 +7,44 @@
  * Workflow: lock -> update -> check -> unlock -> (activate)
  */
 
-import { AxiosResponse, return_error, return_response, encodeSapObjectName, safeCheckOperation, isAlreadyExistsError } from '../../../lib/utils';
-import { XMLParser } from 'fast-xml-parser';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  encodeSapObjectName,
+  return_error,
+  return_response,
+  safeCheckOperation,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "UpdateServiceDefinition",
-  description: "Update source code of an existing ABAP service definition. Uses stateful session with proper lock/unlock mechanism.",
+  name: 'UpdateServiceDefinition',
+  description:
+    'Update source code of an existing ABAP service definition. Uses stateful session with proper lock/unlock mechanism.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       service_definition_name: {
-        type: "string",
-        description: "Service definition name (e.g., ZSD_MY_SERVICE). Must exist in the system."
+        type: 'string',
+        description:
+          'Service definition name (e.g., ZSD_MY_SERVICE). Must exist in the system.',
       },
       source_code: {
-        type: "string",
-        description: "Complete service definition source code."
+        type: 'string',
+        description: 'Complete service definition source code.',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Optional if object is local or already in transport."
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Optional if object is local or already in transport.',
       },
       activate: {
-        type: "boolean",
-        description: "Activate service definition after update. Default: true."
-      }
+        type: 'boolean',
+        description: 'Activate service definition after update. Default: true.',
+      },
     },
-    required: ["service_definition_name", "source_code"]
-  }
+    required: ['service_definition_name', 'source_code'],
+  },
 } as const;
 
 interface UpdateServiceDefinitionArgs {
@@ -52,26 +60,33 @@ interface UpdateServiceDefinitionArgs {
  * Uses CrudClient for all operations
  * Session and lock management handled internally by client
  */
-export async function handleUpdateServiceDefinition(context: HandlerContext, args: UpdateServiceDefinitionArgs) {
+export async function handleUpdateServiceDefinition(
+  context: HandlerContext,
+  args: UpdateServiceDefinitionArgs,
+) {
   const { connection, logger } = context;
   try {
     const {
       service_definition_name,
       source_code,
       transport_request,
-      activate = true
+      activate = true,
     } = args as UpdateServiceDefinitionArgs;
 
     // Validation
     if (!service_definition_name || !source_code) {
-      return return_error(new Error('service_definition_name and source_code are required'));
+      return return_error(
+        new Error('service_definition_name and source_code are required'),
+      );
     }
 
-            // Get connection from session context (set by ProtocolHandler)
+    // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
     const serviceDefinitionName = service_definition_name.toUpperCase();
 
-    logger?.info(`Starting service definition source update: ${serviceDefinitionName}`);
+    logger?.info(
+      `Starting service definition source update: ${serviceDefinitionName}`,
+    );
 
     try {
       // Create client
@@ -89,7 +104,7 @@ export async function handleUpdateServiceDefinition(context: HandlerContext, arg
         // Update source code
         await client.updateServiceDefinition(
           { serviceDefinitionName, sourceCode: source_code },
-          lockHandle
+          lockHandle,
         );
 
         // Check
@@ -98,8 +113,9 @@ export async function handleUpdateServiceDefinition(context: HandlerContext, arg
             () => client.checkServiceDefinition({ serviceDefinitionName }),
             serviceDefinitionName,
             {
-              debug: (message: string) => logger?.debug(`[UpdateServiceDefinition] ${message}`)
-            }
+              debug: (message: string) =>
+                logger?.debug(`[UpdateServiceDefinition] ${message}`),
+            },
           );
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
@@ -110,7 +126,10 @@ export async function handleUpdateServiceDefinition(context: HandlerContext, arg
         }
 
         // Unlock
-        await client.unlockServiceDefinition({ serviceDefinitionName }, lockHandle);
+        await client.unlockServiceDefinition(
+          { serviceDefinitionName },
+          lockHandle,
+        );
 
         // Activate if requested
         if (shouldActivate) {
@@ -119,9 +138,15 @@ export async function handleUpdateServiceDefinition(context: HandlerContext, arg
       } catch (error) {
         // Try to unlock on error
         try {
-          await client.unlockServiceDefinition({ serviceDefinitionName: serviceDefinitionName }, lockHandle);
+          await client.unlockServiceDefinition(
+            { serviceDefinitionName: serviceDefinitionName },
+            lockHandle,
+          );
         } catch (unlockError) {
-          logger?.error('Failed to unlock service definition after error:', unlockError);
+          logger?.error(
+            'Failed to unlock service definition after error:',
+            unlockError,
+          );
         }
         throw error;
       }
@@ -130,20 +155,29 @@ export async function handleUpdateServiceDefinition(context: HandlerContext, arg
       let activationWarnings: string[] = [];
       if (shouldActivate && client.getActivateResult()) {
         const activateResponse = client.getActivateResult()!;
-        if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
-          const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+        if (
+          typeof activateResponse.data === 'string' &&
+          activateResponse.data.includes('<chkl:messages')
+        ) {
+          const parser = new XMLParser({
+            ignoreAttributes: false,
+            attributeNamePrefix: '@_',
+          });
           const result = parser.parse(activateResponse.data);
-          const messages = result?.['chkl:messages']?.['msg'];
+          const messages = result?.['chkl:messages']?.msg;
           if (messages) {
             const msgArray = Array.isArray(messages) ? messages : [messages];
-            activationWarnings = msgArray.map((msg: any) =>
-              `${msg['@_type']}: ${msg['shortText']?.['txt'] || 'Unknown'}`
+            activationWarnings = msgArray.map(
+              (msg: any) =>
+                `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
             );
           }
         }
       }
 
-      logger?.info(`✅ UpdateServiceDefinition completed successfully: ${serviceDefinitionName}`);
+      logger?.info(
+        `✅ UpdateServiceDefinition completed successfully: ${serviceDefinitionName}`,
+      );
 
       // Return success result
       const stepsCompleted = ['lock', 'update', 'check', 'unlock'];
@@ -161,8 +195,9 @@ export async function handleUpdateServiceDefinition(context: HandlerContext, arg
           : `Service Definition ${serviceDefinitionName} updated successfully (not activated)`,
         uri: `/sap/bc/adt/ddic/srvd/sources/${encodeSapObjectName(serviceDefinitionName)}`,
         steps_completed: stepsCompleted,
-        activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined,
-        source_size_bytes: source_code.length
+        activation_warnings:
+          activationWarnings.length > 0 ? activationWarnings : undefined,
+        source_size_bytes: source_code.length,
       };
 
       return return_response({
@@ -170,19 +205,24 @@ export async function handleUpdateServiceDefinition(context: HandlerContext, arg
         status: 200,
         statusText: 'OK',
         headers: {},
-        config: {} as any
+        config: {} as any,
       });
-
     } catch (error: any) {
-      logger?.error(`Error updating service definition source ${serviceDefinitionName}:`, error);
+      logger?.error(
+        `Error updating service definition source ${serviceDefinitionName}:`,
+        error,
+      );
 
       const errorMessage = error.response?.data
-        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+        ? typeof error.response.data === 'string'
+          ? error.response.data
+          : JSON.stringify(error.response.data)
         : error.message || String(error);
 
-      return return_error(new Error(`Failed to update service definition: ${errorMessage}`));
+      return return_error(
+        new Error(`Failed to update service definition: ${errorMessage}`),
+      );
     }
-
   } catch (error: any) {
     return return_error(error);
   }

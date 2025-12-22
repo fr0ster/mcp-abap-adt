@@ -1,14 +1,17 @@
-import { McpError, ErrorCode } from '../../../lib/utils';
-import * as z from 'zod';
 import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ErrorCode, McpError } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "GetDomain",
-  description: "[read-only] Retrieve ABAP domain structure and properties from SAP system.",
+  name: 'GetDomain',
+  description:
+    '[read-only] Retrieve ABAP domain structure and properties from SAP system.',
   inputSchema: {
-    domain_name: z.string().describe("Domain name (e.g., MATNR, CHAR20, ZZ_TEST_DOMAIN)")
-  }
+    domain_name: z
+      .string()
+      .describe('Domain name (e.g., MATNR, CHAR20, ZZ_TEST_DOMAIN)'),
+  },
 } as const;
 
 export async function handleGetDomain(context: HandlerContext, args: any) {
@@ -26,18 +29,21 @@ export async function handleGetDomain(context: HandlerContext, args: any) {
     logger?.debug(`Successfully read domain ${args.domain_name}`);
     return {
       isError: false,
-      content: [{ type: "json", json: result }],
+      content: [{ type: 'json', json: result }],
     };
   } catch (error) {
-    logger?.error(`Failed to read domain ${args?.domain_name || ''}`, error as any);
+    logger?.error(
+      `Failed to read domain ${args?.domain_name || ''}`,
+      error as any,
+    );
     return {
       isError: true,
       content: [
         {
           type: 'text',
-          text: error instanceof Error ? error.message : String(error)
-        }
-      ]
+          text: error instanceof Error ? error.message : String(error),
+        },
+      ],
     };
   }
 }

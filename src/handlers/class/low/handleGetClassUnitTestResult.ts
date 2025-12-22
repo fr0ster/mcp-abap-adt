@@ -5,46 +5,53 @@
  * Low-level handler: single method call.
  */
 
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "GetClassUnitTestResultLow",
-  description: "[low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id.",
+  name: 'GetClassUnitTestResultLow',
+  description:
+    '[low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       run_id: {
-        type: "string",
-        description: "Run identifier returned by RunClassUnitTestsLow."
+        type: 'string',
+        description: 'Run identifier returned by RunClassUnitTestsLow.',
       },
       with_navigation_uris: {
-        type: "boolean",
-        description: "Optional flag to request navigation URIs in SAP response (default true)."
+        type: 'boolean',
+        description:
+          'Optional flag to request navigation URIs in SAP response (default true).',
       },
       format: {
-        type: "string",
-        enum: ["abapunit", "junit"],
-        description: "Preferred response format. Defaults to 'abapunit'."
+        type: 'string',
+        enum: ['abapunit', 'junit'],
+        description: "Preferred response format. Defaults to 'abapunit'.",
       },
       session_id: {
-        type: "string",
-        description: "Session ID from GetSession. If not provided, a new session will be created."
+        type: 'string',
+        description:
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["run_id"]
-  }
+    required: ['run_id'],
+  },
 } as const;
 
 interface GetResultArgs {
@@ -59,16 +66,14 @@ interface GetResultArgs {
   };
 }
 
-export async function handleGetClassUnitTestResult(context: HandlerContext, args: GetResultArgs) {
+export async function handleGetClassUnitTestResult(
+  context: HandlerContext,
+  args: GetResultArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      run_id,
-      with_navigation_uris,
-      format,
-      session_id,
-      session_state
-    } = args as GetResultArgs;
+    const { run_id, with_navigation_uris, format, session_id, session_state } =
+      args as GetResultArgs;
 
     if (!run_id) {
       return return_error(new Error('run_id is required'));
@@ -79,14 +84,14 @@ export async function handleGetClassUnitTestResult(context: HandlerContext, args
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
-          }
+    }
 
     logger?.info(`Fetching ABAP Unit result for run ${run_id}`);
 
     try {
       await client.getClassUnitTestRunResult(run_id, {
         withNavigationUris: with_navigation_uris,
-        format
+        format,
       });
 
       const resultResponse = client.getAbapUnitResultResponse();
@@ -97,11 +102,12 @@ export async function handleGetClassUnitTestResult(context: HandlerContext, args
 
       return return_response(resultResponse);
     } catch (error: any) {
-      logger?.error(`Error retrieving ABAP Unit result for run ${run_id}: ${error?.message || error}`);
+      logger?.error(
+        `Error retrieving ABAP Unit result for run ${run_id}: ${error?.message || error}`,
+      );
       return return_error(new Error(error?.message || String(error)));
     }
   } catch (error: any) {
     return return_error(error);
   }
 }
-

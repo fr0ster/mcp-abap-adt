@@ -6,51 +6,62 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
-import { generateSessionId } from '../../../lib/sessionUtils';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { generateSessionId } from '../../../lib/sessionUtils';
+import {
+  type AxiosResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "CheckTableLow",
-  description: "[low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Requires session_id for stateful operations. Can use session_id and session_state from GetSession to maintain the same session. If ddl_code is provided, validates new/unsaved code (will be base64 encoded in request).",
+  name: 'CheckTableLow',
+  description:
+    '[low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Requires session_id for stateful operations. Can use session_id and session_state from GetSession to maintain the same session. If ddl_code is provided, validates new/unsaved code (will be base64 encoded in request).',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       table_name: {
-        type: "string",
-        description: "Table name (e.g., Z_MY_TABLE)"
+        type: 'string',
+        description: 'Table name (e.g., Z_MY_TABLE)',
       },
       ddl_code: {
-        type: "string",
-        description: "Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body."
+        type: 'string',
+        description:
+          'Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.',
       },
       version: {
-        type: "string",
-        description: "Version to check: 'active' (last activated), 'inactive' (current unsaved), or 'new' (for new code validation). Default: new",
-        enum: ["active", "inactive", "new"]
+        type: 'string',
+        description:
+          "Version to check: 'active' (last activated), 'inactive' (current unsaved), or 'new' (for new code validation). Default: new",
+        enum: ['active', 'inactive', 'new'],
       },
       reporter: {
-        type: "string",
-        description: "Check reporter: 'tableStatusCheck' or 'abapCheckRun'. Default: abapCheckRun",
-        enum: ["tableStatusCheck", "abapCheckRun"]
+        type: 'string',
+        description:
+          "Check reporter: 'tableStatusCheck' or 'abapCheckRun'. Default: abapCheckRun",
+        enum: ['tableStatusCheck', 'abapCheckRun'],
       },
       session_id: {
-        type: "string",
-        description: "Session ID from GetSession. If not provided, a new session will be created."
+        type: 'string',
+        description:
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["table_name"]
-  }
+    required: ['table_name'],
+  },
 } as const;
 
 interface CheckTableArgs {
@@ -69,7 +80,10 @@ interface CheckTableArgs {
 /**
  * Main handler for CheckTable MCP tool
  */
-export async function handleCheckTable(context: HandlerContext, args: CheckTableArgs) {
+export async function handleCheckTable(
+  context: HandlerContext,
+  args: CheckTableArgs,
+) {
   const { connection, logger } = context;
   try {
     const {
@@ -78,7 +92,7 @@ export async function handleCheckTable(context: HandlerContext, args: CheckTable
       version = 'new',
       reporter = 'abapCheckRun',
       session_id,
-      session_state
+      session_state,
     } = args as CheckTableArgs;
 
     if (!table_name) {
@@ -86,14 +100,16 @@ export async function handleCheckTable(context: HandlerContext, args: CheckTable
     }
 
     const validReporters = ['tableStatusCheck', 'abapCheckRun'];
-    const checkReporter = (reporter && validReporters.includes(reporter))
-      ? reporter as 'tableStatusCheck' | 'abapCheckRun'
-      : 'abapCheckRun';
+    const checkReporter =
+      reporter && validReporters.includes(reporter)
+        ? (reporter as 'tableStatusCheck' | 'abapCheckRun')
+        : 'abapCheckRun';
 
     const validVersions = ['active', 'inactive', 'new'];
-    const checkVersion = (version && validVersions.includes(version.toLowerCase()))
-      ? version.toLowerCase() as 'active' | 'inactive' | 'new'
-      : 'new';
+    const checkVersion =
+      version && validVersions.includes(version.toLowerCase())
+        ? (version.toLowerCase() as 'active' | 'inactive' | 'new')
+        : 'new';
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -104,7 +120,9 @@ export async function handleCheckTable(context: HandlerContext, args: CheckTable
     const sessionId = session_id || generateSessionId();
     const tableName = table_name.toUpperCase();
 
-    logger?.info(`Starting table check: ${tableName} (reporter: ${checkReporter}, version: ${checkVersion}, session: ${sessionId.substring(0, 8)}..., ${ddl_code ? 'with new code' : 'saved version'})`);
+    logger?.info(
+      `Starting table check: ${tableName} (reporter: ${checkReporter}, version: ${checkVersion}, session: ${sessionId.substring(0, 8)}..., ${ddl_code ? 'with new code' : 'saved version'})`,
+    );
 
     try {
       const builder = new CrudClient(connection);
@@ -122,26 +140,30 @@ export async function handleCheckTable(context: HandlerContext, args: CheckTable
 
       // Get updated session state after check
 
-
       logger?.info(`✅ CheckTable completed: ${tableName}`);
       logger?.info(`   Status: ${checkResult.status}`);
-      logger?.info(`   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`);
+      logger?.info(
+        `   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,
+      );
 
       return return_response({
-        data: JSON.stringify({
-          success: checkResult.success,
-          table_name: tableName,
-          version: checkVersion,
-          reporter: checkReporter,
-          check_result: checkResult,
-          session_id: sessionId,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: checkResult.success
-            ? `Table ${tableName} has no syntax errors`
-            : `Table ${tableName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: checkResult.success,
+            table_name: tableName,
+            version: checkVersion,
+            reporter: checkReporter,
+            check_result: checkResult,
+            session_id: sessionId,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: checkResult.success
+              ? `Table ${tableName} has no syntax errors`
+              : `Table ${tableName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
       logger?.error(`Error checking table ${tableName}:`, error);
 
@@ -149,26 +171,30 @@ export async function handleCheckTable(context: HandlerContext, args: CheckTable
 
       if (error.response?.status === 404) {
         errorMessage = `Table ${tableName} not found.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

@@ -1,22 +1,26 @@
-import { BaseHandlerGroup } from "../base/BaseHandlerGroup.js";
-import { HandlerEntry } from "../interfaces.js";
-
+import {
+  TOOL_DEFINITION as GetObjectsByType_Tool,
+  handleGetObjectsByType,
+} from '../../../handlers/search/readonly/handleGetObjectsByType';
+import {
+  TOOL_DEFINITION as GetObjectsList_Tool,
+  handleGetObjectsList,
+} from '../../../handlers/search/readonly/handleGetObjectsList';
 // Import search handlers
-import { handleSearchObject } from "../../../handlers/search/readonly/handleSearchObject";
-import { handleGetObjectsList } from "../../../handlers/search/readonly/handleGetObjectsList";
-import { handleGetObjectsByType } from "../../../handlers/search/readonly/handleGetObjectsByType";
-
 // Import TOOL_DEFINITION from handlers
-import { TOOL_DEFINITION as SearchObject_Tool } from "../../../handlers/search/readonly/handleSearchObject";
-import { TOOL_DEFINITION as GetObjectsList_Tool } from "../../../handlers/search/readonly/handleGetObjectsList";
-import { TOOL_DEFINITION as GetObjectsByType_Tool } from "../../../handlers/search/readonly/handleGetObjectsByType";
+import {
+  handleSearchObject,
+  TOOL_DEFINITION as SearchObject_Tool,
+} from '../../../handlers/search/readonly/handleSearchObject';
+import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
+import type { HandlerEntry } from '../interfaces.js';
 
 /**
  * Handler group for all search-related handlers
  * Contains handlers for searching and listing objects in the ABAP system
  */
 export class SearchHandlersGroup extends BaseHandlerGroup {
-  protected groupName = "SearchHandlers";
+  protected groupName = 'SearchHandlers';
 
   /**
    * Gets all search handler entries
@@ -39,7 +43,10 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
           inputSchema: GetObjectsList_Tool.inputSchema,
         },
         handler: (args: any) => {
-          return handleGetObjectsList(this.context, args as { object_type: string });
+          return handleGetObjectsList(
+            this.context,
+            args as { object_type: string },
+          );
         },
       },
       {
@@ -49,7 +56,10 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
           inputSchema: GetObjectsByType_Tool.inputSchema,
         },
         handler: (args: any) => {
-          return handleGetObjectsByType(this.context, args as { object_type: string });
+          return handleGetObjectsByType(
+            this.context,
+            args as { object_type: string },
+          );
         },
       },
     ];

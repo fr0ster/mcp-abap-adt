@@ -17,24 +17,18 @@
 import { handleCreateDomain } from '../../../../handlers/domain/high/handleCreateDomain';
 import { handleUpdateDomain } from '../../../../handlers/domain/high/handleUpdateDomain';
 import { handleDeleteDomain } from '../../../../handlers/domain/low/handleDeleteDomain';
-
-import { HighTester } from '../../helpers/testers/HighTester';
 import { getTimeout } from '../../helpers/configHelpers';
+import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('Domain High-Level Handlers Integration', () => {
   let tester: HighTester;
 
   beforeAll(async () => {
-    tester = new HighTester(
-      'create_domain',
-      'builder_domain',
-      'domain-high',
-      {
-        create: handleCreateDomain,
-        update: handleUpdateDomain,
-        delete: handleDeleteDomain
-      }
-    );
+    tester = new HighTester('create_domain', 'builder_domain', 'domain-high', {
+      create: handleCreateDomain,
+      update: handleUpdateDomain,
+      delete: handleDeleteDomain,
+    });
     await tester.beforeAll();
   });
 
@@ -50,7 +44,11 @@ describe('Domain High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it('should test all Domain high-level handlers', async () => {
-    await tester.run();
-  }, getTimeout('long'));
+  it(
+    'should test all Domain high-level handlers',
+    async () => {
+      await tester.run();
+    },
+    getTimeout('long'),
+  );
 });

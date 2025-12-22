@@ -29,10 +29,10 @@
  * @see doc/architecture/STATEFUL_SESSION_GUIDE.md for detailed documentation
  */
 
-import * as crypto from 'crypto';
-import { AxiosResponse } from 'axios';
+import * as crypto from 'node:crypto';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { makeAdtRequestWithTimeout } from './utils';
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 
 /**
  * Generate unique session ID for ADT stateful operations
@@ -125,7 +125,7 @@ export async function makeAdtRequestWithSession(
   method: string,
   sessionId: string,
   data?: any,
-  additionalHeaders?: Record<string, string>
+  additionalHeaders?: Record<string, string>,
 ): Promise<AxiosResponse> {
   // Resolve to full URL if relative path provided
   const baseUrl = await connection.getBaseUrl();
@@ -136,15 +136,23 @@ export async function makeAdtRequestWithSession(
 
   // Build headers with stateful session identifiers
   const headers: Record<string, string> = {
-    'sap-adt-connection-id': sessionId,      // Same for all requests in operation
-    'sap-adt-request-id': requestId,         // Unique for this request
-    'x-sap-adt-sessiontype': 'stateful',     // Declares stateful session
-    'X-sap-adt-profiling': 'server-time',    // Performance profiling
-    ...additionalHeaders                      // Merge any custom headers
+    'sap-adt-connection-id': sessionId, // Same for all requests in operation
+    'sap-adt-request-id': requestId, // Unique for this request
+    'x-sap-adt-sessiontype': 'stateful', // Declares stateful session
+    'X-sap-adt-profiling': 'server-time', // Performance profiling
+    ...additionalHeaders, // Merge any custom headers
   };
 
   // Make request using standard timeout handling
-  return makeAdtRequestWithTimeout(connection, fullUrl, method, 'default', data, undefined, headers);
+  return makeAdtRequestWithTimeout(
+    connection,
+    fullUrl,
+    method,
+    'default',
+    data,
+    undefined,
+    headers,
+  );
 }
 
 /**
@@ -166,7 +174,7 @@ export async function makeAdtRequestStateless(
   method: string,
   sessionId: string,
   data?: any,
-  additionalHeaders?: Record<string, string>
+  additionalHeaders?: Record<string, string>,
 ): Promise<AxiosResponse> {
   const baseUrl = await connection.getBaseUrl();
   const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
@@ -176,8 +184,16 @@ export async function makeAdtRequestStateless(
     'sap-adt-connection-id': sessionId,
     'sap-adt-request-id': requestId,
     'X-sap-adt-profiling': 'server-time',
-    ...additionalHeaders
+    ...additionalHeaders,
   };
 
-  return makeAdtRequestWithTimeout(connection, fullUrl, method, 'default', data, undefined, headers);
+  return makeAdtRequestWithTimeout(
+    connection,
+    fullUrl,
+    method,
+    'default',
+    data,
+    undefined,
+    headers,
+  );
 }

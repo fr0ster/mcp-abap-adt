@@ -1,6 +1,10 @@
-import { McpError, ErrorCode } from '../../../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, logger, encodeSapObjectName  } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  ErrorCode,
+  encodeSapObjectName,
+  McpError,
+  makeAdtRequestWithTimeout,
+} from '../../../lib/utils';
 
 // TODO: Migrate to infrastructure module
 // This handler uses direct ADT endpoint: /sap/bc/adt/bo/behaviordefinitions/{name}/source/main
@@ -8,29 +12,28 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 // Need infrastructure.readBehaviorDefinition() that returns source code
 
 export const TOOL_DEFINITION = {
-  "name": "GetBdef",
-  "description": "[read-only] Retrieve the source code of a BDEF (Behavior Definition) for a CDS entity.",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "bdef_name": {
-        "type": "string",
-        "description": "Name of the BDEF (Behavior Definition)"
-      }
+  name: 'GetBdef',
+  description:
+    '[read-only] Retrieve the source code of a BDEF (Behavior Definition) for a CDS entity.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      bdef_name: {
+        type: 'string',
+        description: 'Name of the BDEF (Behavior Definition)',
+      },
     },
-    "required": [
-      "bdef_name"
-    ]
-  }
+    required: ['bdef_name'],
+  },
 } as const;
 
 /**
  * Interface for BDEF (Behavior Definition) response
  */
 export interface BdefResponse {
-    bdef_name: string;
-    source_code?: string;
-    functions?: Array<{ name: string; description?: string }>;
+  bdef_name: string;
+  source_code?: string;
+  functions?: Array<{ name: string; description?: string }>;
 }
 
 /**
@@ -46,62 +49,79 @@ export interface BdefResponse {
  *   - In case of error, an error object with details about the failure
  */
 export async function handleGetBdef(context: HandlerContext, args: any) {
-    const { connection, logger } = context;
-    try {
-        logger?.info('handleGetBdef called with args:', args);
+  const { connection, logger } = context;
+  try {
+    logger?.info('handleGetBdef called with args:', args);
 
-        if (!args?.bdef_name) {
-            throw new McpError(ErrorCode.InvalidParams, 'BDEF name is required');
-        }
-
-        const bdefName = args.bdef_name;
-        const bdefUri = args.bdef_uri; // Optional: full ADT URI
-
-        logger?.info(`Getting BDEF source for: ${bdefName}${bdefUri ? ` (uri: ${bdefUri})` : ''}`);
-
-        // Always use the simple, direct endpoint as in the Python code
-        const endpoint = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(bdefName)}/source/main`;
-        logger?.info(`Requesting BDEF source from: ${endpoint}`);
-        const response = await makeAdtRequestWithTimeout(connection, endpoint, 'GET', 'default', undefined, undefined, {
-            'Accept': 'text/plain'
-        });
-
-        if (response.status === 200 && typeof response.data === "string") {
-            const result = {
-                isError: false,
-                content: [
-                    {
-                        type: "json",
-                        json: {
-                            bdef_name: bdefName,
-                            source_code: response.data
-                        }
-                    }
-                ]
-            };
-            if (args.filePath) {
-                const fs = require('fs');
-                fs.writeFileSync(args.filePath, JSON.stringify(result, null, 2), 'utf-8');
-            }
-            return result;
-        } else if (response.status === 404) {
-            throw new McpError(ErrorCode.InternalError, `Behavior definition '${bdefName}' not found`);
-        } else {
-            throw new McpError(
-                ErrorCode.InternalError,
-                `Failed to retrieve BDEF ${bdefName}. Status: ${response.status}`
-            );
-        }
-    } catch (error) {
-        // MCP-compliant error response: always return content[] with type "text"
-        return {
-            isError: true,
-            content: [
-                {
-                    type: "text",
-                    text: `ADT error: ${String(error)}`
-                }
-            ]
-        };
+    if (!args?.bdef_name) {
+      throw new McpError(ErrorCode.InvalidParams, 'BDEF name is required');
     }
+
+    const bdefName = args.bdef_name;
+    const bdefUri = args.bdef_uri; // Optional: full ADT URI
+
+    logger?.info(
+      `Getting BDEF source for: ${bdefName}${bdefUri ? ` (uri: ${bdefUri})` : ''}`,
+    );
+
+    // Always use the simple, direct endpoint as in the Python code
+    const endpoint = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(bdefName)}/source/main`;
+    logger?.info(`Requesting BDEF source from: ${endpoint}`);
+    const response = await makeAdtRequestWithTimeout(
+      connection,
+      endpoint,
+      'GET',
+      'default',
+      undefined,
+      undefined,
+      {
+        Accept: 'text/plain',
+      },
+    );
+
+    if (response.status === 200 && typeof response.data === 'string') {
+      const result = {
+        isError: false,
+        content: [
+          {
+            type: 'json',
+            json: {
+              bdef_name: bdefName,
+              source_code: response.data,
+            },
+          },
+        ],
+      };
+      if (args.filePath) {
+        const fs = require('node:fs');
+        fs.writeFileSync(
+          args.filePath,
+          JSON.stringify(result, null, 2),
+          'utf-8',
+        );
+      }
+      return result;
+    } else if (response.status === 404) {
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Behavior definition '${bdefName}' not found`,
+      );
+    } else {
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to retrieve BDEF ${bdefName}. Status: ${response.status}`,
+      );
+    }
+  } catch (error) {
+    // MCP-compliant error response: always return content[] with type "text"
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: `ADT error: ${String(error)}`,
+        },
+      ],
+    };
+  }
 }

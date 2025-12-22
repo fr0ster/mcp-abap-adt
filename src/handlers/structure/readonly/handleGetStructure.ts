@@ -1,14 +1,14 @@
-import { McpError, ErrorCode } from '../../../lib/utils';
-import * as z from 'zod';
 import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
+import * as z from 'zod';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ErrorCode, McpError } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "GetStructure",
-  description: "[read-only] Retrieve ABAP Structure.",
+  name: 'GetStructure',
+  description: '[read-only] Retrieve ABAP Structure.',
   inputSchema: {
-    structure_name: z.string().describe("Name of the ABAP Structure")
-  }
+    structure_name: z.string().describe('Name of the ABAP Structure'),
+  },
 } as const;
 
 export async function handleGetStructure(context: HandlerContext, args: any) {
@@ -26,18 +26,21 @@ export async function handleGetStructure(context: HandlerContext, args: any) {
     logger?.debug(`Successfully read structure ${args.structure_name}`);
     return {
       isError: false,
-      content: [{ type: "json", json: result }],
+      content: [{ type: 'json', json: result }],
     };
   } catch (error) {
-    logger?.error(`Failed to read structure ${args?.structure_name || ''}`, error as any);
+    logger?.error(
+      `Failed to read structure ${args?.structure_name || ''}`,
+      error as any,
+    );
     return {
       isError: true,
       content: [
         {
           type: 'text',
-          text: error instanceof Error ? error.message : String(error)
-        }
-      ]
+          text: error instanceof Error ? error.message : String(error),
+        },
+      ],
     };
   }
 }

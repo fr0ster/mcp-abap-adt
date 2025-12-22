@@ -12,16 +12,15 @@
  * Run: npm test -- --testPathPattern=integration/metadataExtension
  */
 
-import { handleValidateMetadataExtension } from '../../../../handlers/ddlx/low/handleValidateMetadataExtension';
-import { handleCreateMetadataExtension } from '../../../../handlers/ddlx/low/handleCreateMetadataExtension';
-import { handleLockMetadataExtension } from '../../../../handlers/ddlx/low/handleLockMetadataExtension';
-import { handleUpdateMetadataExtension } from '../../../../handlers/ddlx/low/handleUpdateMetadataExtension';
-import { handleUnlockMetadataExtension } from '../../../../handlers/ddlx/low/handleUnlockMetadataExtension';
 import { handleActivateMetadataExtension } from '../../../../handlers/ddlx/low/handleActivateMetadataExtension';
+import { handleCreateMetadataExtension } from '../../../../handlers/ddlx/low/handleCreateMetadataExtension';
 import { handleDeleteMetadataExtension } from '../../../../handlers/ddlx/low/handleDeleteMetadataExtension';
-
-import { LowTester } from '../../helpers/testers/LowTester';
+import { handleLockMetadataExtension } from '../../../../handlers/ddlx/low/handleLockMetadataExtension';
+import { handleUnlockMetadataExtension } from '../../../../handlers/ddlx/low/handleUnlockMetadataExtension';
+import { handleUpdateMetadataExtension } from '../../../../handlers/ddlx/low/handleUpdateMetadataExtension';
+import { handleValidateMetadataExtension } from '../../../../handlers/ddlx/low/handleValidateMetadataExtension';
 import { getTimeout } from '../../helpers/configHelpers';
+import { LowTester } from '../../helpers/testers/LowTester';
 
 describe('MetadataExtension Low-Level Handlers Integration', () => {
   let tester: LowTester;
@@ -38,8 +37,8 @@ describe('MetadataExtension Low-Level Handlers Integration', () => {
         update: handleUpdateMetadataExtension,
         unlock: handleUnlockMetadataExtension,
         activate: handleActivateMetadataExtension,
-        delete: handleDeleteMetadataExtension
-      }
+        delete: handleDeleteMetadataExtension,
+      },
     );
     await tester.beforeAll();
   });
@@ -56,7 +55,11 @@ describe('MetadataExtension Low-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it('should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate', async () => {
-    await tester.run();
-  }, getTimeout('long'));
+  it(
+    'should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate',
+    async () => {
+      await tester.run();
+    },
+    getTimeout('long'),
+  );
 });

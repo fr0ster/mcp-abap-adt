@@ -7,10 +7,15 @@
  * @deprecated Use LambdaTester instead
  */
 
+import type { HandlerContext } from '../../../../lib/handlers/interfaces';
+import {
+  createHandlerContext,
+  delay,
+  extractLockHandle,
+  parseHandlerResponse,
+} from '../testHelpers';
 import { LambdaTester, type TLambda } from './LambdaTester';
 import type { LambdaTesterContext } from './types';
-import type { HandlerContext } from '../../../../lib/handlers/interfaces';
-import { createHandlerContext, parseHandlerResponse, extractLockHandle, delay } from '../testHelpers';
 
 // Handler function type: (context: HandlerContext, args: any) => Promise<any>
 type HandlerFunction = (context: HandlerContext, args: any) => Promise<any>;
@@ -35,7 +40,7 @@ export class LowTester extends LambdaTester {
     handlerName: string,
     testCaseName: string,
     logPrefix: string,
-    workflowFunctions: LowWorkflowFunctions
+    workflowFunctions: LowWorkflowFunctions,
   ) {
     super(handlerName, testCaseName, logPrefix);
     this.workflowFunctions = workflowFunctions;
@@ -72,27 +77,35 @@ export class LowTester extends LambdaTester {
           await delay(2000); // Ensure object is ready for deletion
           const handlerContext = createHandlerContext({
             connection,
-            logger: logger || undefined
+            logger: logger || undefined,
           });
           const deleteArgs = this.buildDeleteArgs(context);
-          const deleteResponse = await deleteFunction(handlerContext, deleteArgs);
+          const deleteResponse = await deleteFunction(
+            handlerContext,
+            deleteArgs,
+          );
 
           if (deleteResponse?.isError) {
-            const errorMsg = deleteResponse.content?.[0]?.text || 'Unknown error';
+            const errorMsg =
+              deleteResponse.content?.[0]?.text || 'Unknown error';
             logger?.warn?.(`Delete failed (ignored in cleanup): ${errorMsg}`);
           } else {
             logger?.success?.(`✅ cleanup: deleted ${objectName} successfully`);
           }
         } catch (error: any) {
-          logger?.warn?.(`Cleanup delete error (ignored): ${error?.message || String(error)}`);
+          logger?.warn?.(
+            `Cleanup delete error (ignored): ${error?.message || String(error)}`,
+          );
         }
       };
       return;
     }
 
     // Cleanup lambda is mandatory - either provide it or include delete function in workflowFunctions
-    throw new Error('Cleanup lambda is mandatory. Either provide cleanupAfter lambda in beforeAll() method, ' +
-      'or include delete function in workflowFunctions. The test decides whether to run it via YAML config (skip_cleanup or cleanup_after flags).');
+    throw new Error(
+      'Cleanup lambda is mandatory. Either provide cleanupAfter lambda in beforeAll() method, ' +
+        'or include delete function in workflowFunctions. The test decides whether to run it via YAML config (skip_cleanup or cleanup_after flags).',
+    );
   }
 
   async run(): Promise<void> {
@@ -111,7 +124,7 @@ export class LowTester extends LambdaTester {
 
     const handlerContext = createHandlerContext({
       connection: this.context.connection,
-      logger: this.context.logger
+      logger: this.context.logger,
     });
 
     try {
@@ -128,7 +141,10 @@ export class LowTester extends LambdaTester {
 
       if (this.workflowFunctions.lock) {
         const args = this.buildLockArgs(this.context);
-        const lockResponse = await this.workflowFunctions.lock(handlerContext, args);
+        const lockResponse = await this.workflowFunctions.lock(
+          handlerContext,
+          args,
+        );
         // Extract and store lock handle for subsequent operations
         if (lockResponse && !lockResponse.isError) {
           const lockData = parseHandlerResponse(lockResponse);
@@ -155,7 +171,7 @@ export class LowTester extends LambdaTester {
       }
     } catch (error: any) {
       // Check if error is a skip condition
-      if (error.message && error.message.startsWith('SKIP:')) {
+      if (error.message?.startsWith('SKIP:')) {
         const skipReason = error.message.replace(/^SKIP:\s*/, '');
         this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
         return;
@@ -167,7 +183,8 @@ export class LowTester extends LambdaTester {
   }
 
   private buildValidateArgs(context: LambdaTesterContext): any {
-    const { objectName, params, packageName, transportRequest, session } = context;
+    const { objectName, params, packageName, transportRequest, session } =
+      context;
     // Extract object-specific name field (class_name, table_name, etc.)
     const nameField = this.getNameField();
     return {
@@ -177,12 +194,13 @@ export class LowTester extends LambdaTester {
       ...(params.superclass && { superclass: params.superclass }),
       ...(transportRequest && { transport_request: transportRequest }),
       ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state })
+      ...(session?.session_state && { session_state: session.session_state }),
     };
   }
 
   private buildCreateArgs(context: LambdaTesterContext): any {
-    const { objectName, params, packageName, transportRequest, session } = context;
+    const { objectName, params, packageName, transportRequest, session } =
+      context;
     const nameField = this.getNameField();
     return {
       [nameField]: objectName,
@@ -192,7 +210,7 @@ export class LowTester extends LambdaTester {
       ...(params.superclass && { superclass: params.superclass }),
       ...(transportRequest && { transport_request: transportRequest }),
       ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state })
+      ...(session?.session_state && { session_state: session.session_state }),
     };
   }
 
@@ -202,7 +220,7 @@ export class LowTester extends LambdaTester {
     return {
       [nameField]: objectName,
       ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state })
+      ...(session?.session_state && { session_state: session.session_state }),
     };
   }
 
@@ -214,7 +232,7 @@ export class LowTester extends LambdaTester {
       source_code: params.source_code || params.update_source_code || '',
       lock_handle: lockHandle || context.lockHandle,
       ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state })
+      ...(session?.session_state && { session_state: session.session_state }),
     };
   }
 
@@ -225,7 +243,7 @@ export class LowTester extends LambdaTester {
       [nameField]: objectName,
       lock_handle: lockHandle || context.lockHandle,
       ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state })
+      ...(session?.session_state && { session_state: session.session_state }),
     };
   }
 
@@ -236,7 +254,7 @@ export class LowTester extends LambdaTester {
       [nameField]: objectName,
       ...(transportRequest && { transport_request: transportRequest }),
       ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state })
+      ...(session?.session_state && { session_state: session.session_state }),
     };
   }
 
@@ -247,7 +265,7 @@ export class LowTester extends LambdaTester {
       [nameField]: objectName,
       ...(transportRequest && { transport_request: transportRequest }),
       ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state })
+      ...(session?.session_state && { session_state: session.session_state }),
     };
   }
 
@@ -285,4 +303,3 @@ export class LowTester extends LambdaTester {
     await this.cleanupAfter();
   }
 }
-

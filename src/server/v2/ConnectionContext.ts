@@ -1,4 +1,4 @@
-import { SapConfig } from "@mcp-abap-adt/connection";
+import type { SapConfig } from '@mcp-abap-adt/connection';
 
 /**
  * Connection context for MCP server

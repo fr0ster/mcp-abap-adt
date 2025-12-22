@@ -11,11 +11,16 @@
  * Uses dependency injection pattern to reuse existing yamlConfig infrastructure
  */
 
-import { parseConfigArg, applyYamlConfigToArgs, loadYamlConfig, generateConfigTemplateIfNeeded } from "./yamlConfig.js";
-import type { IServerConfig, Transport, HandlerSet } from "./IServerConfig.js";
-import { ArgumentsParser } from "./ArgumentsParser.js";
+import { ArgumentsParser } from './ArgumentsParser.js';
+import type { HandlerSet, IServerConfig, Transport } from './IServerConfig.js';
+import {
+  applyYamlConfigToArgs,
+  generateConfigTemplateIfNeeded,
+  loadYamlConfig,
+  parseConfigArg,
+} from './yamlConfig.js';
 
-export type { Transport, HandlerSet } from "./IServerConfig.js";
+export type { HandlerSet, Transport } from './IServerConfig.js';
 
 // ============================================================================
 // SERVER CONFIGURATION MANAGER CLASS
@@ -105,7 +110,9 @@ export class ServerConfigManager {
       host: ArgumentsParser.getArgument('--host') || parsed.httpHost,
       port: this.parsePort() || parsed.httpPort,
       httpJsonResponse: parsed.httpJsonResponse || undefined,
-      httpPath: ArgumentsParser.getArgument('--path') || ArgumentsParser.getArgument('--http-path'),
+      httpPath:
+        ArgumentsParser.getArgument('--path') ||
+        ArgumentsParser.getArgument('--http-path'),
       ssePath: ArgumentsParser.getArgument('--sse-path'),
       postPath: ArgumentsParser.getArgument('--post-path'),
       envFile: parsed.env,
@@ -146,9 +153,9 @@ export class ServerConfigManager {
 
     return value
       .split(',')
-      .map(s => s.trim())
-      .filter((s): s is HandlerSet =>
-        s === 'readonly' || s === 'high' || s === 'low'
+      .map((s) => s.trim())
+      .filter(
+        (s): s is HandlerSet => s === 'readonly' || s === 'high' || s === 'low',
       );
   }
 

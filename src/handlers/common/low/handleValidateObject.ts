@@ -5,61 +5,89 @@
  * Connection management handled internally.
  */
 
-import { return_error, return_response, parseValidationResponse, restoreSessionInConnection, AxiosResponse } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  parseValidationResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "ValidateObjectLow",
-  description: "[low-level] Validate an ABAP object name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.",
+  name: 'ValidateObjectLow',
+  description:
+    '[low-level] Validate an ABAP object name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       object_name: {
-        type: "string",
-        description: "Object name to validate (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE)"
+        type: 'string',
+        description:
+          'Object name to validate (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE)',
       },
       object_type: {
-        type: "string",
-        description: "Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'behavior_implementation', 'metadata_extension'",
-        enum: ["class", "program", "interface", "function_group", "table", "structure", "view", "domain", "data_element", "package", "behavior_definition", "behavior_implementation", "metadata_extension"]
+        type: 'string',
+        description:
+          "Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'behavior_implementation', 'metadata_extension'",
+        enum: [
+          'class',
+          'program',
+          'interface',
+          'function_group',
+          'table',
+          'structure',
+          'view',
+          'domain',
+          'data_element',
+          'package',
+          'behavior_definition',
+          'behavior_implementation',
+          'metadata_extension',
+        ],
       },
       behavior_definition: {
-        type: "string",
-        description: "Optional behavior definition name (required for behavior_implementation validation)"
+        type: 'string',
+        description:
+          'Optional behavior definition name (required for behavior_implementation validation)',
       },
       root_entity: {
-        type: "string",
-        description: "Root entity name (required for behavior_definition validation)"
+        type: 'string',
+        description:
+          'Root entity name (required for behavior_definition validation)',
       },
       implementation_type: {
-        type: "string",
-        description: "Implementation type: 'Managed', 'Unmanaged', or 'External' (required for behavior_definition validation)"
+        type: 'string',
+        description:
+          "Implementation type: 'Managed', 'Unmanaged', or 'External' (required for behavior_definition validation)",
       },
       package_name: {
-        type: "string",
-        description: "Optional package name for validation"
+        type: 'string',
+        description: 'Optional package name for validation',
       },
       description: {
-        type: "string",
-        description: "Optional description for validation"
+        type: 'string',
+        description: 'Optional description for validation',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from GetSession. If not provided, a new session will be created."
+        type: 'string',
+        description:
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["object_name", "object_type"]
-  }
+    required: ['object_name', 'object_type'],
+  },
 } as const;
 
 interface ValidateObjectArgs {
@@ -84,7 +112,10 @@ interface ValidateObjectArgs {
  * Uses validateObjectName from @mcp-abap-adt/adt-clients/core for all operations
  * Connection management handled internally
  */
-export async function handleValidateObject(context: HandlerContext, args: ValidateObjectArgs) {
+export async function handleValidateObject(
+  context: HandlerContext,
+  args: ValidateObjectArgs,
+) {
   const { connection, logger } = context;
   try {
     const {
@@ -96,44 +127,66 @@ export async function handleValidateObject(context: HandlerContext, args: Valida
       root_entity,
       implementation_type,
       session_id,
-      session_state
+      session_state,
     } = args as ValidateObjectArgs;
 
     // Validation
     if (!object_name || !object_type) {
-      return return_error(new Error('object_name and object_type are required'));
+      return return_error(
+        new Error('object_name and object_type are required'),
+      );
     }
 
-    const validTypes = ['class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'behavior_implementation', 'metadata_extension', 'ddlx/ex'];
+    const validTypes = [
+      'class',
+      'program',
+      'interface',
+      'function_group',
+      'table',
+      'structure',
+      'view',
+      'domain',
+      'data_element',
+      'package',
+      'behavior_definition',
+      'behavior_implementation',
+      'metadata_extension',
+      'ddlx/ex',
+    ];
     const normalizedType = object_type.toLowerCase();
     if (!validTypes.includes(normalizedType)) {
-      return return_error(new Error(`Invalid object_type. Must be one of: ${validTypes.join(', ')}`));
+      return return_error(
+        new Error(
+          `Invalid object_type. Must be one of: ${validTypes.join(', ')}`,
+        ),
+      );
     }
 
-        const validationClient = new CrudClient(connection);
+    const validationClient = new CrudClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
       // Ensure connection is established
-          }
+    }
 
     const objectName = object_name.toUpperCase();
 
-    logger?.info(`Starting object validation: ${objectName} (type: ${object_type})`);
+    logger?.info(
+      `Starting object validation: ${objectName} (type: ${object_type})`,
+    );
 
     try {
-
       // Validate object using specific validation method based on type
       let result: any;
 
       switch (normalizedType) {
-        case 'program':
+        case 'program': {
           await validationClient.validateProgram({
             programName: objectName,
             packageName: package_name || undefined,
-            description: description || undefined
+            description: description || undefined,
           });
           const programResponse = validationClient.getValidationResponse();
           if (!programResponse) {
@@ -141,11 +194,12 @@ export async function handleValidateObject(context: HandlerContext, args: Valida
           }
           result = parseValidationResponse(programResponse);
           break;
-        case 'class':
+        }
+        case 'class': {
           await validationClient.validateClass({
             className: objectName,
             packageName: package_name || undefined,
-            description: description || undefined
+            description: description || undefined,
           });
           const classResponse = validationClient.getValidationResponse();
           if (!classResponse) {
@@ -153,11 +207,12 @@ export async function handleValidateObject(context: HandlerContext, args: Valida
           }
           result = parseValidationResponse(classResponse);
           break;
-        case 'interface':
+        }
+        case 'interface': {
           await validationClient.validateInterface({
             interfaceName: objectName,
             packageName: package_name || undefined,
-            description: description || undefined
+            description: description || undefined,
           });
           const interfaceResponse = validationClient.getValidationResponse();
           if (!interfaceResponse) {
@@ -165,22 +220,25 @@ export async function handleValidateObject(context: HandlerContext, args: Valida
           }
           result = parseValidationResponse(interfaceResponse);
           break;
-        case 'function_group':
+        }
+        case 'function_group': {
           await validationClient.validateFunctionGroup({
             functionGroupName: objectName,
-            description: description || undefined
+            description: description || undefined,
           });
-          const functionGroupResponse = validationClient.getValidationResponse();
+          const functionGroupResponse =
+            validationClient.getValidationResponse();
           if (!functionGroupResponse) {
             throw new Error('Validation did not return a result');
           }
           result = parseValidationResponse(functionGroupResponse);
           break;
-        case 'table':
+        }
+        case 'table': {
           await validationClient.validateTable({
             tableName: objectName,
             packageName: package_name || undefined,
-            description: description || undefined
+            description: description || undefined,
           });
           const tableResponse = validationClient.getValidationResponse();
           if (!tableResponse) {
@@ -188,11 +246,12 @@ export async function handleValidateObject(context: HandlerContext, args: Valida
           }
           result = parseValidationResponse(tableResponse);
           break;
-        case 'structure':
+        }
+        case 'structure': {
           await validationClient.validateStructure({
             structureName: objectName,
             packageName: package_name || undefined,
-            description: description || undefined
+            description: description || undefined,
           });
           const structureResponse = validationClient.getValidationResponse();
           if (!structureResponse) {
@@ -200,11 +259,12 @@ export async function handleValidateObject(context: HandlerContext, args: Valida
           }
           result = parseValidationResponse(structureResponse);
           break;
-        case 'view':
+        }
+        case 'view': {
           await validationClient.validateView({
             viewName: objectName,
             packageName: package_name || undefined,
-            description: description || undefined
+            description: description || undefined,
           });
           const viewResponse = validationClient.getValidationResponse();
           if (!viewResponse) {
@@ -212,11 +272,12 @@ export async function handleValidateObject(context: HandlerContext, args: Valida
           }
           result = parseValidationResponse(viewResponse);
           break;
-        case 'domain':
+        }
+        case 'domain': {
           await validationClient.validateDomain({
             domainName: objectName,
             packageName: package_name || undefined,
-            description: description || undefined
+            description: description || undefined,
           });
           const domainResponse = validationClient.getValidationResponse();
           if (!domainResponse) {
@@ -224,11 +285,12 @@ export async function handleValidateObject(context: HandlerContext, args: Valida
           }
           result = parseValidationResponse(domainResponse);
           break;
-        case 'data_element':
+        }
+        case 'data_element': {
           await validationClient.validateDataElement({
             dataElementName: objectName,
             packageName: package_name || undefined,
-            description: description || undefined
+            description: description || undefined,
           });
           const dataElementResponse = validationClient.getValidationResponse();
           if (!dataElementResponse) {
@@ -236,11 +298,12 @@ export async function handleValidateObject(context: HandlerContext, args: Valida
           }
           result = parseValidationResponse(dataElementResponse);
           break;
-        case 'package':
+        }
+        case 'package': {
           await validationClient.validatePackage({
             packageName: objectName,
             superPackage: undefined, // package doesn't have superPackage in args
-            description: description || undefined
+            description: description || undefined,
           });
           const packageResponse = validationClient.getValidationResponse();
           if (!packageResponse) {
@@ -248,84 +311,127 @@ export async function handleValidateObject(context: HandlerContext, args: Valida
           }
           result = parseValidationResponse(packageResponse);
           break;
-        case 'behavior_definition':
-          if (!package_name || !description || !root_entity || !implementation_type) {
-            return return_error(new Error('Behavior definition validation requires packageName, description, rootEntity, and implementationType parameters'));
+        }
+        case 'behavior_definition': {
+          if (
+            !package_name ||
+            !description ||
+            !root_entity ||
+            !implementation_type
+          ) {
+            return return_error(
+              new Error(
+                'Behavior definition validation requires packageName, description, rootEntity, and implementationType parameters',
+              ),
+            );
           }
-          const validImplementationTypes = ['Managed', 'Unmanaged', 'Abstract', 'Projection'];
-          const normalizedImplementationType = implementation_type.charAt(0).toUpperCase() + implementation_type.slice(1).toLowerCase();
-          if (!validImplementationTypes.includes(normalizedImplementationType)) {
-            return return_error(new Error(`Invalid implementationType. Must be one of: ${validImplementationTypes.join(', ')}`));
+          const validImplementationTypes = [
+            'Managed',
+            'Unmanaged',
+            'Abstract',
+            'Projection',
+          ];
+          const normalizedImplementationType =
+            implementation_type.charAt(0).toUpperCase() +
+            implementation_type.slice(1).toLowerCase();
+          if (
+            !validImplementationTypes.includes(normalizedImplementationType)
+          ) {
+            return return_error(
+              new Error(
+                `Invalid implementationType. Must be one of: ${validImplementationTypes.join(', ')}`,
+              ),
+            );
           }
           await validationClient.validateBehaviorDefinition({
             name: objectName,
             packageName: package_name,
             description: description,
             rootEntity: root_entity,
-            implementationType: normalizedImplementationType as 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection'
+            implementationType: normalizedImplementationType as
+              | 'Managed'
+              | 'Unmanaged'
+              | 'Abstract'
+              | 'Projection',
           });
-          const behaviorDefinitionResponse = validationClient.getValidationResponse();
+          const behaviorDefinitionResponse =
+            validationClient.getValidationResponse();
           if (!behaviorDefinitionResponse) {
             throw new Error('Validation did not return a result');
           }
           result = parseValidationResponse(behaviorDefinitionResponse);
           break;
-        case 'behavior_implementation':
+        }
+        case 'behavior_implementation': {
           if (!package_name) {
-            return return_error(new Error('Behavior implementation validation requires packageName parameter'));
+            return return_error(
+              new Error(
+                'Behavior implementation validation requires packageName parameter',
+              ),
+            );
           }
           await validationClient.validateBehaviorImplementation({
             className: objectName,
             packageName: package_name,
             behaviorDefinition: behavior_definition || '',
-            ...(description && { description })
+            ...(description && { description }),
           });
-          const behaviorImplementationResponse = validationClient.getValidationResponse();
+          const behaviorImplementationResponse =
+            validationClient.getValidationResponse();
           if (!behaviorImplementationResponse) {
             throw new Error('Validation did not return a result');
           }
           result = parseValidationResponse(behaviorImplementationResponse);
           break;
+        }
         case 'metadata_extension':
-        case 'ddlx/ex':
+        case 'ddlx/ex': {
           if (!package_name || !description) {
-            return return_error(new Error('Metadata extension validation requires description and packageName parameters'));
+            return return_error(
+              new Error(
+                'Metadata extension validation requires description and packageName parameters',
+              ),
+            );
           }
           await validationClient.validateMetadataExtension({
             name: objectName,
             description: description,
-            packageName: package_name
+            packageName: package_name,
           });
-          const metadataExtensionResponse = validationClient.getValidationResponse();
+          const metadataExtensionResponse =
+            validationClient.getValidationResponse();
           if (!metadataExtensionResponse) {
             throw new Error('Validation did not return a result');
           }
           result = parseValidationResponse(metadataExtensionResponse);
           break;
+        }
         default:
           throw new Error(`Unsupported object type: ${object_type}`);
       }
 
       // Get updated session state after validation
 
-
       logger?.info(`✅ ValidateObject completed: ${objectName}`);
       logger?.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: result.valid,
-          object_name: objectName,
-          object_type,
-          validation_result: result,
-          session_id: session_id || null,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: result.valid
-            ? `Object name ${objectName} is valid and available`
-            : `Object name ${objectName} validation failed: ${result.message}`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: result.valid,
+            object_name: objectName,
+            object_type,
+            validation_result: result,
+            session_id: session_id || null,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: result.valid
+              ? `Object name ${objectName} is valid and available`
+              : `Object name ${objectName} validation failed: ${result.message}`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
       logger?.error(`ValidateObject ${objectName}`, error);
 
@@ -334,26 +440,30 @@ export async function handleValidateObject(context: HandlerContext, args: Valida
 
       if (error.response?.status === 404) {
         errorMessage = `Object ${objectName} not found.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

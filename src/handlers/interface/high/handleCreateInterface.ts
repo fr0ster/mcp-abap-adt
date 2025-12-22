@@ -8,44 +8,55 @@
  */
 
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, safeCheckOperation, encodeSapObjectName, AxiosResponse } from '../../../lib/utils';
-import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  encodeSapObjectName,
+  return_error,
+  return_response,
+  safeCheckOperation,
+} from '../../../lib/utils';
+import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
-  name: "CreateInterface",
-  description: "Create a new ABAP interface in SAP system with source code. Interfaces define method signatures, events, and types for implementation by classes. Uses stateful session for proper lock management.",
+  name: 'CreateInterface',
+  description:
+    'Create a new ABAP interface in SAP system with source code. Interfaces define method signatures, events, and types for implementation by classes. Uses stateful session for proper lock management.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       interface_name: {
-        type: "string",
-        description: "Interface name (e.g., ZIF_TEST_INTERFACE_001). Must follow SAP naming conventions (start with Z or Y)."
+        type: 'string',
+        description:
+          'Interface name (e.g., ZIF_TEST_INTERFACE_001). Must follow SAP naming conventions (start with Z or Y).',
       },
       description: {
-        type: "string",
-        description: "Interface description. If not provided, interface_name will be used."
+        type: 'string',
+        description:
+          'Interface description. If not provided, interface_name will be used.',
       },
       package_name: {
-        type: "string",
-        description: "Package name (e.g., ZOK_LAB, $TMP for local objects)"
+        type: 'string',
+        description: 'Package name (e.g., ZOK_LAB, $TMP for local objects)',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable packages."
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
       source_code: {
-        type: "string",
-        description: "Complete ABAP interface source code with INTERFACE...ENDINTERFACE section. If not provided, generates minimal template."
+        type: 'string',
+        description:
+          'Complete ABAP interface source code with INTERFACE...ENDINTERFACE section. If not provided, generates minimal template.',
       },
       activate: {
-        type: "boolean",
-        description: "Activate interface after creation. Default: true. Set to false for batch operations (activate multiple objects later)."
-      }
+        type: 'boolean',
+        description:
+          'Activate interface after creation. Default: true. Set to false for batch operations (activate multiple objects later).',
+      },
     },
-    required: ["interface_name", "package_name"]
-  }
+    required: ['interface_name', 'package_name'],
+  },
 } as const;
 
 interface CreateInterfaceArgs {
@@ -60,7 +71,10 @@ interface CreateInterfaceArgs {
 /**
  * Generate minimal interface source code if not provided
  */
-function generateInterfaceTemplate(interfaceName: string, description: string): string {
+function generateInterfaceTemplate(
+  interfaceName: string,
+  description: string,
+): string {
   return `INTERFACE ${interfaceName}
   PUBLIC.
 
@@ -72,14 +86,16 @@ function generateInterfaceTemplate(interfaceName: string, description: string): 
 ENDINTERFACE.`;
 }
 
-
 /**
  * Main handler for CreateInterface MCP tool
  *
  * Uses InterfaceBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by client
  */
-export async function handleCreateInterface(context: HandlerContext, args: CreateInterfaceArgs) {
+export async function handleCreateInterface(
+  context: HandlerContext,
+  args: CreateInterfaceArgs,
+) {
   const { connection, logger } = context;
   try {
     // Validate required parameters
@@ -102,22 +118,36 @@ export async function handleCreateInterface(context: HandlerContext, args: Creat
 
     logger?.info(`Starting interface creation: ${interfaceName}`);
 
-            try {
+    try {
       // Get configuration from environment variables
-            // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
-            // Create connection directly for this handler call
+      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
+      // Create connection directly for this handler call
       // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-      logger?.debug(`[CreateInterface] Created separate connection for handler call: ${interfaceName}`);
+      // Connection is managed and cached per session, with proper token refresh via AuthBroker
+      logger?.debug(
+        `[CreateInterface] Created separate connection for handler call: ${interfaceName}`,
+      );
     } catch (connectionError: any) {
-      const errorMessage = connectionError instanceof Error ? connectionError.message : String(connectionError);
-      logger?.error(`[CreateInterface] Failed to create connection: ${errorMessage}`);
-      return return_error(new Error(`Failed to create connection: ${errorMessage}`));
+      const errorMessage =
+        connectionError instanceof Error
+          ? connectionError.message
+          : String(connectionError);
+      logger?.error(
+        `[CreateInterface] Failed to create connection: ${errorMessage}`,
+      );
+      return return_error(
+        new Error(`Failed to create connection: ${errorMessage}`),
+      );
     }
 
     try {
       // Generate source code if not provided
-      const sourceCode = typedArgs.source_code || generateInterfaceTemplate(interfaceName, typedArgs.description || interfaceName);
+      const sourceCode =
+        typedArgs.source_code ||
+        generateInterfaceTemplate(
+          interfaceName,
+          typedArgs.description || interfaceName,
+        );
 
       // Create CrudClient
       const client = new CrudClient(connection);
@@ -132,68 +162,105 @@ export async function handleCreateInterface(context: HandlerContext, args: Creat
           interfaceName,
           description,
           packageName,
-          transportRequest
+          transportRequest,
         });
         await client.lockInterface({ interfaceName });
         const lockHandle = client.getLockHandle();
 
         try {
           // Step 1: Check new code BEFORE update (with sourceCode and version='inactive')
-          logger?.info(`[CreateInterface] Checking new code before update: ${interfaceName}`);
+          logger?.info(
+            `[CreateInterface] Checking new code before update: ${interfaceName}`,
+          );
           let checkNewCodePassed = false;
           try {
             await safeCheckOperation(
-              () => client.checkInterface({ interfaceName }, sourceCode, 'inactive'),
+              () =>
+                client.checkInterface(
+                  { interfaceName },
+                  sourceCode,
+                  'inactive',
+                ),
               interfaceName,
               {
-                debug: (message: string) => logger?.debug(`[CreateInterface] ${message}`)
-              }
+                debug: (message: string) =>
+                  logger?.debug(`[CreateInterface] ${message}`),
+              },
             );
             checkNewCodePassed = true;
-            logger?.info(`[CreateInterface] New code check passed: ${interfaceName}`);
+            logger?.info(
+              `[CreateInterface] New code check passed: ${interfaceName}`,
+            );
           } catch (checkError: any) {
             // If error was marked as "already checked", continue silently
             if ((checkError as any).isAlreadyChecked) {
-              logger?.info(`[CreateInterface] Interface ${interfaceName} was already checked - continuing`);
+              logger?.info(
+                `[CreateInterface] Interface ${interfaceName} was already checked - continuing`,
+              );
               checkNewCodePassed = true;
             } else {
               // Real check error - don't update if check failed
-              logger?.error(`[CreateInterface] New code check failed: ${interfaceName} | ${checkError instanceof Error ? checkError.message : String(checkError)}`);
-              throw new Error(`New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+              logger?.error(
+                `[CreateInterface] New code check failed: ${interfaceName} | ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+              );
+              throw new Error(
+                `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+              );
             }
           }
 
           // Step 2: Update (only if check passed)
           if (checkNewCodePassed) {
-            logger?.info(`[CreateInterface] Updating interface source code: ${interfaceName}`);
-            await client.updateInterface({ interfaceName, sourceCode }, lockHandle);
-            logger?.info(`[CreateInterface] Interface source code updated: ${interfaceName}`);
+            logger?.info(
+              `[CreateInterface] Updating interface source code: ${interfaceName}`,
+            );
+            await client.updateInterface(
+              { interfaceName, sourceCode },
+              lockHandle,
+            );
+            logger?.info(
+              `[CreateInterface] Interface source code updated: ${interfaceName}`,
+            );
           } else {
-            logger?.info(`[CreateInterface] Skipping update - new code check failed: ${interfaceName}`);
+            logger?.info(
+              `[CreateInterface] Skipping update - new code check failed: ${interfaceName}`,
+            );
           }
 
           // Step 3: Unlock (MANDATORY after lock)
           await client.unlockInterface({ interfaceName }, lockHandle);
-          logger?.info(`[CreateInterface] Interface unlocked: ${interfaceName}`);
+          logger?.info(
+            `[CreateInterface] Interface unlocked: ${interfaceName}`,
+          );
 
           // Step 4: Check inactive version (after unlock)
-          logger?.info(`[CreateInterface] Checking inactive version: ${interfaceName}`);
+          logger?.info(
+            `[CreateInterface] Checking inactive version: ${interfaceName}`,
+          );
           try {
             await safeCheckOperation(
-              () => client.checkInterface({ interfaceName }, undefined, 'inactive'),
+              () =>
+                client.checkInterface({ interfaceName }, undefined, 'inactive'),
               interfaceName,
               {
-                debug: (message: string) => logger?.debug(`[CreateInterface] ${message}`)
-              }
+                debug: (message: string) =>
+                  logger?.debug(`[CreateInterface] ${message}`),
+              },
             );
-            logger?.info(`[CreateInterface] Inactive version check completed: ${interfaceName}`);
+            logger?.info(
+              `[CreateInterface] Inactive version check completed: ${interfaceName}`,
+            );
           } catch (checkError: any) {
             // If error was marked as "already checked", continue silently
             if ((checkError as any).isAlreadyChecked) {
-              logger?.info(`[CreateInterface] Interface ${interfaceName} was already checked - continuing`);
+              logger?.info(
+                `[CreateInterface] Interface ${interfaceName} was already checked - continuing`,
+              );
             } else {
               // Log warning but don't fail - inactive check is informational
-              logger?.warn(`[CreateInterface] Inactive version check had issues: ${interfaceName} | ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+              logger?.warn(
+                `[CreateInterface] Inactive version check had issues: ${interfaceName} | ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+              );
             }
           }
 
@@ -206,13 +273,17 @@ export async function handleCreateInterface(context: HandlerContext, args: Creat
           try {
             await client.unlockInterface({ interfaceName }, lockHandle);
           } catch (unlockError) {
-            logger?.error(`Failed to unlock interface after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+            logger?.error(
+              `Failed to unlock interface after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
+            );
           }
           // Principle 2: first error and exit
           throw error;
         }
       } catch (error) {
-        logger?.error(`Interface creation chain failed: ${error instanceof Error ? error.message : String(error)}`);
+        logger?.error(
+          `Interface creation chain failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
         throw error;
       }
 
@@ -220,21 +291,36 @@ export async function handleCreateInterface(context: HandlerContext, args: Creat
       let activationWarnings: string[] = [];
       if (shouldActivate && client.getActivateResult()) {
         const activateResponse = client.getActivateResult()!;
-        if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
-          const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+        if (
+          typeof activateResponse.data === 'string' &&
+          activateResponse.data.includes('<chkl:messages')
+        ) {
+          const parser = new XMLParser({
+            ignoreAttributes: false,
+            attributeNamePrefix: '@_',
+          });
           const result = parser.parse(activateResponse.data);
-          const messages = result?.['chkl:messages']?.['msg'];
+          const messages = result?.['chkl:messages']?.msg;
           if (messages) {
             const msgArray = Array.isArray(messages) ? messages : [messages];
-            activationWarnings = msgArray.map((msg: any) =>
-              `${msg['@_type']}: ${msg['shortText']?.['txt'] || 'Unknown'}`
+            activationWarnings = msgArray.map(
+              (msg: any) =>
+                `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
             );
           }
         }
       }
 
       // Return success result
-      const stepsCompleted = ['validate', 'create', 'lock', 'check_new_code', 'update', 'unlock', 'check_inactive'];
+      const stepsCompleted = [
+        'validate',
+        'create',
+        'lock',
+        'check_new_code',
+        'update',
+        'unlock',
+        'check_inactive',
+      ];
       if (shouldActivate) {
         stepsCompleted.push('activate');
       }
@@ -250,7 +336,8 @@ export async function handleCreateInterface(context: HandlerContext, args: Creat
           : `Interface ${interfaceName} created successfully (not activated)`,
         uri: `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName).toLowerCase()}`,
         steps_completed: stepsCompleted,
-        activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined
+        activation_warnings:
+          activationWarnings.length > 0 ? activationWarnings : undefined,
       };
 
       return return_response({
@@ -258,15 +345,18 @@ export async function handleCreateInterface(context: HandlerContext, args: Creat
         status: 200,
         statusText: 'OK',
         headers: {},
-        config: {} as any
+        config: {} as any,
       });
-
     } catch (error: any) {
-      logger?.error(`Interface creation failed: ${error instanceof Error ? error.message : String(error)}`);
+      logger?.error(
+        `Interface creation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return return_error(error);
     }
   } catch (error: any) {
-    logger?.error(`CreateInterface handler error: ${error instanceof Error ? error.message : String(error)}`);
+    logger?.error(
+      `CreateInterface handler error: ${error instanceof Error ? error.message : String(error)}`,
+    );
     return return_error(error);
   }
 }

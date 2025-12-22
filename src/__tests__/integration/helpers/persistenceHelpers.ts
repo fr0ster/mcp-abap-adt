@@ -1,6 +1,10 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { getCleanupAfter, getLockConfig, getSessionConfig } from './configHelpers';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import {
+  getCleanupAfter,
+  getLockConfig,
+  getSessionConfig,
+} from './configHelpers';
 
 type SessionState = {
   cookies?: string;
@@ -55,7 +59,11 @@ function encodeMaybe(value: any): { raw?: any; base64?: string } {
 /**
  * Save session snapshot for diagnostics
  */
-export function saveSessionSnapshot(testLabel: string, session: SessionInfo, extra: Record<string, any> = {}): SnapshotPaths {
+export function saveSessionSnapshot(
+  testLabel: string,
+  session: SessionInfo,
+  extra: Record<string, any> = {},
+): SnapshotPaths {
   const cfg = getSessionConfig();
   if (cfg.persist_session === false) {
     return {};
@@ -74,9 +82,9 @@ export function saveSessionSnapshot(testLabel: string, session: SessionInfo, ext
     session_state: {
       cookies: session.session_state?.cookies || '',
       csrf_token: session.session_state?.csrf_token || '',
-      cookie_store: encodeMaybe(session.session_state?.cookie_store)
+      cookie_store: encodeMaybe(session.session_state?.cookie_store),
     },
-    extra
+    extra,
   };
 
   fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8');
@@ -90,7 +98,7 @@ export function saveLockSnapshot(
   testLabel: string,
   objectInfo: ObjectInfo,
   lockHandle: string | undefined | null,
-  session: SessionInfo | null
+  session: SessionInfo | null,
 ): SnapshotPaths {
   const cfg = getLockConfig();
   if (cfg.persist_locks === false) {
@@ -109,9 +117,9 @@ export function saveLockSnapshot(
     object: {
       type: objectInfo.object_type,
       name: objectInfo.object_name,
-      transport_request: objectInfo.transport_request
+      transport_request: objectInfo.transport_request,
     },
-    lock_handle: lockHandle || null
+    lock_handle: lockHandle || null,
   };
 
   if (session) {
@@ -119,7 +127,7 @@ export function saveLockSnapshot(
     payload.session_state = {
       cookies: session.session_state?.cookies || '',
       csrf_token: session.session_state?.csrf_token || '',
-      cookie_store: encodeMaybe(session.session_state?.cookie_store)
+      cookie_store: encodeMaybe(session.session_state?.cookie_store),
     };
   }
 
@@ -130,7 +138,10 @@ export function saveLockSnapshot(
 /**
  * Cleanup session snapshot if policy allows
  */
-export function cleanupSessionSnapshot(snapshotPath: string | undefined, shouldCleanup: boolean) {
+export function cleanupSessionSnapshot(
+  snapshotPath: string | undefined,
+  shouldCleanup: boolean,
+) {
   if (!snapshotPath) return;
   const cfg = getSessionConfig();
   if (cfg.cleanup_session_after_test !== true) {
@@ -158,16 +169,25 @@ export function persistDiagnostics(
     lockHandle?: string | null;
     objectInfo?: ObjectInfo;
     extra?: Record<string, any>;
-  }
+  },
 ): SnapshotPaths {
   const paths: SnapshotPaths = {};
   if (opts.session) {
-    const { sessionPath } = saveSessionSnapshot(testLabel, opts.session, opts.extra || {});
+    const { sessionPath } = saveSessionSnapshot(
+      testLabel,
+      opts.session,
+      opts.extra || {},
+    );
     paths.sessionPath = sessionPath;
   }
 
   if (opts.lockHandle && opts.objectInfo) {
-    const { lockPath } = saveLockSnapshot(testLabel, opts.objectInfo, opts.lockHandle, opts.session || null);
+    const { lockPath } = saveLockSnapshot(
+      testLabel,
+      opts.objectInfo,
+      opts.lockHandle,
+      opts.session || null,
+    );
     paths.lockPath = lockPath;
   }
 
@@ -177,11 +197,10 @@ export function persistDiagnostics(
 /**
  * Convenience helper to cleanup persisted diagnostics according to policy.
  */
-export function cleanupDiagnostics(
-  paths: SnapshotPaths,
-  testCase?: any
-): void {
-  const shouldCleanup = getCleanupAfter(testCase) && getSessionConfig().cleanup_session_after_test === true;
+export function cleanupDiagnostics(paths: SnapshotPaths, testCase?: any): void {
+  const shouldCleanup =
+    getCleanupAfter(testCase) &&
+    getSessionConfig().cleanup_session_after_test === true;
   cleanupSessionSnapshot(paths.sessionPath, shouldCleanup);
   // Lock files are retained unless an explicit policy is added; no removal here.
 }
@@ -194,7 +213,7 @@ export function createDiagnosticsTracker(
   testLabel: string,
   testCase?: any,
   session?: SessionInfo | null,
-  extra: Record<string, any> = {}
+  extra: Record<string, any> = {},
 ) {
   let paths: SnapshotPaths = {};
 
@@ -203,25 +222,29 @@ export function createDiagnosticsTracker(
       session,
       extra: {
         ...extra,
-        test_case: testCase?.name
-      }
+        test_case: testCase?.name,
+      },
     });
   }
 
   return {
-    persistLock(lockSession?: SessionInfo | null, lockHandle?: string | null, objectInfo?: ObjectInfo) {
+    persistLock(
+      lockSession?: SessionInfo | null,
+      lockHandle?: string | null,
+      objectInfo?: ObjectInfo,
+    ) {
       if (!lockHandle || !objectInfo) return;
       paths = {
         ...paths,
         ...persistDiagnostics(testLabel, {
           session: lockSession || session || null,
           lockHandle,
-          objectInfo
-        })
+          objectInfo,
+        }),
       };
     },
     cleanup() {
       cleanupDiagnostics(paths, testCase);
-    }
+    },
   };
 }

@@ -3,19 +3,19 @@
 type ObjectsListCacheType = any | null;
 
 class ObjectsListCache {
-    private cache: ObjectsListCacheType = null;
+  private cache: ObjectsListCacheType = null;
 
-    setCache(data: any) {
-        this.cache = data;
-    }
+  setCache(data: any) {
+    this.cache = data;
+  }
 
-    getCache(): ObjectsListCacheType {
-        return this.cache;
-    }
+  getCache(): ObjectsListCacheType {
+    return this.cache;
+  }
 
-    clearCache() {
-        this.cache = null;
-    }
+  clearCache() {
+    this.cache = null;
+  }
 }
 
 export const objectsListCache = new ObjectsListCache();

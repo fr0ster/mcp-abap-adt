@@ -1,35 +1,38 @@
-import { HandlerContext } from '../../../lib/handlers/interfaces';
-import { McpError, ErrorCode } from '../../../lib/utils';
-import { makeAdtRequestWithTimeout, return_error, logger, encodeSapObjectName } from '../../../lib/utils';
-import { writeResultToFile  } from '../../../lib/writeResultToFile';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  ErrorCode,
+  encodeSapObjectName,
+  logger,
+  McpError,
+  makeAdtRequestWithTimeout,
+} from '../../../lib/utils';
+import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
-  "name": "GetEnhancementSpot",
-  "description": "[read-only] Retrieve metadata and list of implementations for a specific enhancement spot.",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "enhancement_spot": {
-        "type": "string",
-        "description": "Name of the enhancement spot"
-      }
+  name: 'GetEnhancementSpot',
+  description:
+    '[read-only] Retrieve metadata and list of implementations for a specific enhancement spot.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      enhancement_spot: {
+        type: 'string',
+        description: 'Name of the enhancement spot',
+      },
     },
-    "required": [
-      "enhancement_spot"
-    ]
-  }
+    required: ['enhancement_spot'],
+  },
 } as const;
 
 /**
  * Interface for enhancement spot response
  */
 export interface EnhancementSpotResponse {
-    enhancement_spot: string;
-    metadata: {
-        description?: string;
-        type?: string;
-        status?: string;
-    };
+  enhancement_spot: string;
+  metadata: {
+    description?: string;
+    type?: string;
+    status?: string;
+  };
 }
 
 /**
@@ -38,59 +41,71 @@ export interface EnhancementSpotResponse {
  * @returns Metadata object with description, type, status, and functions (implementations)
  */
 function parseEnhancementSpotMetadata(xmlData: string): any {
-    const metadata: any = {};
-    try {
-        // Spot name, description, type, package
-        const nameMatch = xmlData.match(/adtcore:name="([^"]*)"/);
-        if (nameMatch && nameMatch[1]) metadata.name = nameMatch[1];
-        const descMatch = xmlData.match(/adtcore:description="([^"]*)"/);
-        if (descMatch && descMatch[1]) metadata.description = descMatch[1];
-        const typeMatch = xmlData.match(/adtcore:type="([^"]*)"/);
-        if (typeMatch && typeMatch[1]) metadata.type = typeMatch[1];
-        const pkgMatch = xmlData.match(/adtcore:packageRef[^>]+adtcore:name="([^"]*)"/);
-        if (pkgMatch && pkgMatch[1]) metadata.package = pkgMatch[1];
+  const metadata: any = {};
+  try {
+    // Spot name, description, type, package
+    const nameMatch = xmlData.match(/adtcore:name="([^"]*)"/);
+    if (nameMatch?.[1]) metadata.name = nameMatch[1];
+    const descMatch = xmlData.match(/adtcore:description="([^"]*)"/);
+    if (descMatch?.[1]) metadata.description = descMatch[1];
+    const typeMatch = xmlData.match(/adtcore:type="([^"]*)"/);
+    if (typeMatch?.[1]) metadata.type = typeMatch[1];
+    const pkgMatch = xmlData.match(
+      /adtcore:packageRef[^>]+adtcore:name="([^"]*)"/,
+    );
+    if (pkgMatch?.[1]) metadata.package = pkgMatch[1];
 
-        // Interface reference
-        const ifaceMatch = xmlData.match(/<enhs:interface[^>]*adtcore:name="([^"]*)"/);
-        if (ifaceMatch && ifaceMatch[1]) metadata.interface = ifaceMatch[1];
+    // Interface reference
+    const ifaceMatch = xmlData.match(
+      /<enhs:interface[^>]*adtcore:name="([^"]*)"/,
+    );
+    if (ifaceMatch?.[1]) metadata.interface = ifaceMatch[1];
 
-        // BAdI definitions
-        const badiDefs: Array<any> = [];
-        const badiDefRegex = /<enhs:badiDefinition[\s\S]*?<\/enhs:badiDefinition>/g;
-        let badiMatch;
-        while ((badiMatch = badiDefRegex.exec(xmlData)) !== null) {
-            const block = badiMatch[0];
-            const badiName = (block.match(/enhs:name="([^"]*)"/) || [])[1];
-            const badiShort = (block.match(/enhs:shorttext="([^"]*)"/) || [])[1];
-            const badiIface = (block.match(/<enhs:interface[^>]*adtcore:name="([^"]*)"/) || [])[1];
-            badiDefs.push({
-                name: badiName,
-                shorttext: badiShort,
-                interface: badiIface
-            });
-        }
-        if (badiDefs.length > 0) metadata.badi_definitions = badiDefs;
-
-        // All atom:link rels
-        const links: Array<any> = [];
-        const linkRegex = /<atom:link ([^>]+)\/>/g;
-        let linkMatch;
-        while ((linkMatch = linkRegex.exec(xmlData)) !== null) {
-            const attrs = linkMatch[1];
-            const href = (attrs.match(/href="([^"]*)"/) || [])[1];
-            const rel = (attrs.match(/rel="([^"]*)"/) || [])[1];
-            const type = (attrs.match(/type="([^"]*)"/) || [])[1];
-            const title = (attrs.match(/title="([^"]*)"/) || [])[1];
-            links.push({ href, rel, type, title });
-        }
-        if (links.length > 0) metadata.links = links;
-
-        logger?.info(`Parsed structured metadata for enhancement spot:`, metadata);
-        return metadata;
-    } catch (parseError) {
-        logger?.error('Failed to parse enhancement spot XML metadata:', parseError);
-        return {};
+    // BAdI definitions
+    const badiDefs: Array<{
+      name: string;
+      shorttext: string;
+      interface: string;
+    }> = [];
+    const badiDefRegex = /<enhs:badiDefinition[\s\S]*?<\/enhs:badiDefinition>/g;
+    let badiMatch: RegExpExecArray | null = badiDefRegex.exec(xmlData);
+    while (badiMatch !== null) {
+      const block = badiMatch[0];
+      const badiName = (block.match(/enhs:name="([^"]*)"/) || [])[1];
+      const badiShort = (block.match(/enhs:shorttext="([^"]*)"/) || [])[1];
+      const badiIface = (block.match(
+        /<enhs:interface[^>]*adtcore:name="([^"]*)"/,
+      ) || [])[1];
+      badiDefs.push({
+        name: badiName,
+        shorttext: badiShort,
+        interface: badiIface,
+      });
+      badiMatch = badiDefRegex.exec(xmlData);
     }
+    if (badiDefs.length > 0) metadata.badi_definitions = badiDefs;
+
+    // All atom:link rels
+    const links: Array<any> = [];
+    const linkRegex = /<atom:link ([^>]+)\/>/g;
+    let linkMatch: RegExpExecArray | null = linkRegex.exec(xmlData);
+    while (linkMatch !== null) {
+      const attrs = linkMatch[1];
+      const href = (attrs.match(/href="([^"]*)"/) || [])[1];
+      const rel = (attrs.match(/rel="([^"]*)"/) || [])[1];
+      const type = (attrs.match(/type="([^"]*)"/) || [])[1];
+      const title = (attrs.match(/title="([^"]*)"/) || [])[1];
+      links.push({ href, rel, type, title });
+      linkMatch = linkRegex.exec(xmlData);
+    }
+    if (links.length > 0) metadata.links = links;
+
+    logger?.info(`Parsed structured metadata for enhancement spot:`, metadata);
+    return metadata;
+  } catch (parseError) {
+    logger?.error('Failed to parse enhancement spot XML metadata:', parseError);
+    return {};
+  }
 }
 
 /**
@@ -107,67 +122,78 @@ function parseEnhancementSpotMetadata(xmlData: string): any {
  *   - raw_xml: The raw XML response from the ADT API for debugging purposes.
  *   - In case of error, an error object with details about the failure.
  */
-export async function handleGetEnhancementSpot(context: HandlerContext, args: any) {
+export async function handleGetEnhancementSpot(
+  context: HandlerContext,
+  args: any,
+) {
   const { connection, logger } = context;
-    try {
-        logger?.info('handleGetEnhancementSpot called with args:', args);
+  try {
+    logger?.info('handleGetEnhancementSpot called with args:', args);
 
-        if (!args?.enhancement_spot) {
-            throw new McpError(ErrorCode.InvalidParams, 'Enhancement spot is required');
-        }
-
-        const enhancementSpot = args.enhancement_spot;
-
-        logger?.info(`Getting metadata for enhancement spot: ${enhancementSpot}`);
-
-        // Build the ADT URL for the specific enhancement spot (Eclipse uses /sap/bc/adt/enhancements/enhsxsb/{spot_name})
-        const url = `/sap/bc/adt/enhancements/enhsxsb/${encodeSapObjectName(enhancementSpot)}`;
-
-        logger?.info(`Enhancement spot URL: ${url}`);
-
-        const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default', {
-            'Accept': 'application/vnd.sap.adt.enhancements.v1+xml'
-        });
-
-        if (response.status === 200 && response.data) {
-            // Parse the XML to extract metadata
-            const metadata = parseEnhancementSpotMetadata(response.data);
-
-            const enhancementSpotResponse: EnhancementSpotResponse = {
-                enhancement_spot: enhancementSpot,
-                metadata: metadata
-            };
-
-            const result = {
-                isError: false,
-                content: [
-                    {
-                        type: "json",
-                        json: enhancementSpotResponse
-                    }
-                ]
-            };
-            if (args.filePath) {
-                writeResultToFile(JSON.stringify(result, null, 2), args.filePath);
-            }
-            return result;
-        } else {
-            throw new McpError(
-                ErrorCode.InternalError,
-                `Failed to retrieve metadata for enhancement spot ${enhancementSpot}. Status: ${response.status}`
-            );
-        }
-
-    } catch (error) {
-        // MCP-compliant error response: always return content[] with type "text"
-        return {
-            isError: true,
-            content: [
-                {
-                    type: "text",
-                    text: `ADT error: ${String(error)}`
-                }
-            ]
-        };
+    if (!args?.enhancement_spot) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'Enhancement spot is required',
+      );
     }
+
+    const enhancementSpot = args.enhancement_spot;
+
+    logger?.info(`Getting metadata for enhancement spot: ${enhancementSpot}`);
+
+    // Build the ADT URL for the specific enhancement spot (Eclipse uses /sap/bc/adt/enhancements/enhsxsb/{spot_name})
+    const url = `/sap/bc/adt/enhancements/enhsxsb/${encodeSapObjectName(enhancementSpot)}`;
+
+    logger?.info(`Enhancement spot URL: ${url}`);
+
+    const response = await makeAdtRequestWithTimeout(
+      connection,
+      url,
+      'GET',
+      'default',
+      {
+        Accept: 'application/vnd.sap.adt.enhancements.v1+xml',
+      },
+    );
+
+    if (response.status === 200 && response.data) {
+      // Parse the XML to extract metadata
+      const metadata = parseEnhancementSpotMetadata(response.data);
+
+      const enhancementSpotResponse: EnhancementSpotResponse = {
+        enhancement_spot: enhancementSpot,
+        metadata: metadata,
+      };
+
+      const result = {
+        isError: false,
+        content: [
+          {
+            type: 'json',
+            json: enhancementSpotResponse,
+          },
+        ],
+      };
+      if (args.filePath) {
+        writeResultToFile(JSON.stringify(result, null, 2), args.filePath);
+      }
+      return result;
+    } else {
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to retrieve metadata for enhancement spot ${enhancementSpot}. Status: ${response.status}`,
+      );
+    }
+  } catch (error) {
+    // MCP-compliant error response: always return content[] with type "text"
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: `ADT error: ${String(error)}`,
+        },
+      ],
+    };
+  }
 }

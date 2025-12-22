@@ -1,8 +1,12 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { IHandlerGroup, HandlerEntry, ToolHandler } from "../interfaces.js";
-import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
-import * as z from "zod";
-import type { HandlerContext } from "../../../handlers/interfaces.js";
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import * as z from 'zod';
+import type { HandlerContext } from '../../../handlers/interfaces.js';
+import type {
+  HandlerEntry,
+  IHandlerGroup,
+  ToolHandler,
+} from '../interfaces.js';
 
 /**
  * Base class for handler groups
@@ -39,7 +43,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
         entry.toolDefinition.name,
         entry.toolDefinition.description,
         entry.toolDefinition.inputSchema,
-        entry.handler
+        entry.handler,
       );
     }
   }
@@ -50,16 +54,31 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
    */
   protected jsonSchemaToZod(jsonSchema: any): any {
     // If already a Zod schema object (object with Zod fields), return as-is
-    if (jsonSchema && typeof jsonSchema === 'object' && !jsonSchema.type && !jsonSchema.properties) {
+    if (
+      jsonSchema &&
+      typeof jsonSchema === 'object' &&
+      !jsonSchema.type &&
+      !jsonSchema.properties
+    ) {
       // Check if it looks like a Zod schema object (has Zod types as values)
       const firstValue = Object.values(jsonSchema)[0];
-      if (firstValue && ((firstValue as any).def || (firstValue as any)._def || typeof (firstValue as any).parse === 'function')) {
+      if (
+        firstValue &&
+        ((firstValue as any).def ||
+          (firstValue as any)._def ||
+          typeof (firstValue as any).parse === 'function')
+      ) {
         return jsonSchema;
       }
     }
 
     // If it's a JSON Schema object
-    if (jsonSchema && typeof jsonSchema === 'object' && jsonSchema.type === 'object' && jsonSchema.properties) {
+    if (
+      jsonSchema &&
+      typeof jsonSchema === 'object' &&
+      jsonSchema.type === 'object' &&
+      jsonSchema.properties
+    ) {
       const zodShape: Record<string, z.ZodTypeAny> = {};
       const required = jsonSchema.required || [];
 
@@ -68,7 +87,11 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
         let zodType: z.ZodTypeAny;
 
         if (propSchema.type === 'string') {
-          if (propSchema.enum && Array.isArray(propSchema.enum) && propSchema.enum.length > 0) {
+          if (
+            propSchema.enum &&
+            Array.isArray(propSchema.enum) &&
+            propSchema.enum.length > 0
+          ) {
             // Use z.enum() for enum values (requires at least 1 element, but z.enum needs 2+)
             if (propSchema.enum.length === 1) {
               zodType = z.literal(propSchema.enum[0]);
@@ -78,7 +101,10 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           } else {
             zodType = z.string();
           }
-        } else if (propSchema.type === 'number' || propSchema.type === 'integer') {
+        } else if (
+          propSchema.type === 'number' ||
+          propSchema.type === 'integer'
+        ) {
           zodType = z.number();
         } else if (propSchema.type === 'boolean') {
           zodType = z.boolean();
@@ -94,20 +120,31 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
             // For nested objects in arrays, create object schema
             const nestedShape: Record<string, z.ZodTypeAny> = {};
             const nestedRequired = items.required || [];
-            for (const [nestedKey, nestedProp] of Object.entries(items.properties)) {
+            for (const [nestedKey, nestedProp] of Object.entries(
+              items.properties,
+            )) {
               const nestedPropSchema = nestedProp as any;
               let nestedZodType: z.ZodTypeAny;
               if (nestedPropSchema.type === 'string') {
-                if (nestedPropSchema.enum && Array.isArray(nestedPropSchema.enum) && nestedPropSchema.enum.length > 0) {
+                if (
+                  nestedPropSchema.enum &&
+                  Array.isArray(nestedPropSchema.enum) &&
+                  nestedPropSchema.enum.length > 0
+                ) {
                   if (nestedPropSchema.enum.length === 1) {
                     nestedZodType = z.literal(nestedPropSchema.enum[0]);
                   } else {
-                    nestedZodType = z.enum(nestedPropSchema.enum as [string, ...string[]]);
+                    nestedZodType = z.enum(
+                      nestedPropSchema.enum as [string, ...string[]],
+                    );
                   }
                 } else {
                   nestedZodType = z.string();
                 }
-              } else if (nestedPropSchema.type === 'number' || nestedPropSchema.type === 'integer') {
+              } else if (
+                nestedPropSchema.type === 'number' ||
+                nestedPropSchema.type === 'integer'
+              ) {
                 nestedZodType = z.number();
               } else if (nestedPropSchema.type === 'boolean') {
                 nestedZodType = z.boolean();
@@ -121,7 +158,9 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
                 nestedZodType = nestedZodType.optional();
               }
               if (nestedPropSchema.description) {
-                nestedZodType = nestedZodType.describe(nestedPropSchema.description);
+                nestedZodType = nestedZodType.describe(
+                  nestedPropSchema.description,
+                );
               }
               nestedShape[nestedKey] = nestedZodType;
             }
@@ -133,16 +172,26 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           // For nested objects, create object schema
           const nestedShape: Record<string, z.ZodTypeAny> = {};
           const nestedRequired = propSchema.required || [];
-          for (const [nestedKey, nestedProp] of Object.entries(propSchema.properties)) {
+          for (const [nestedKey, nestedProp] of Object.entries(
+            propSchema.properties,
+          )) {
             const nestedPropSchema = nestedProp as any;
             let nestedZodType: z.ZodTypeAny;
             if (nestedPropSchema.type === 'string') {
-              if (nestedPropSchema.enum && Array.isArray(nestedPropSchema.enum)) {
-                nestedZodType = z.enum(nestedPropSchema.enum as [string, ...string[]]);
+              if (
+                nestedPropSchema.enum &&
+                Array.isArray(nestedPropSchema.enum)
+              ) {
+                nestedZodType = z.enum(
+                  nestedPropSchema.enum as [string, ...string[]],
+                );
               } else {
                 nestedZodType = z.string();
               }
-            } else if (nestedPropSchema.type === 'number' || nestedPropSchema.type === 'integer') {
+            } else if (
+              nestedPropSchema.type === 'number' ||
+              nestedPropSchema.type === 'integer'
+            ) {
               nestedZodType = z.number();
             } else if (nestedPropSchema.type === 'boolean') {
               nestedZodType = z.boolean();
@@ -156,7 +205,9 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
               nestedZodType = nestedZodType.optional();
             }
             if (nestedPropSchema.description) {
-              nestedZodType = nestedZodType.describe(nestedPropSchema.description);
+              nestedZodType = nestedZodType.describe(
+                nestedPropSchema.description,
+              );
             }
             nestedShape[nestedKey] = nestedZodType;
           }
@@ -205,12 +256,16 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
     toolName: string,
     description: string,
     inputSchema: any,
-    handler: ToolHandler
+    handler: ToolHandler,
   ): void {
     // Convert JSON Schema to Zod if needed, otherwise pass as-is
-    const zodSchema = (inputSchema && typeof inputSchema === 'object' && inputSchema.type === 'object' && inputSchema.properties)
-      ? this.jsonSchemaToZod(inputSchema)
-      : inputSchema;
+    const zodSchema =
+      inputSchema &&
+      typeof inputSchema === 'object' &&
+      inputSchema.type === 'object' &&
+      inputSchema.properties
+        ? this.jsonSchemaToZod(inputSchema)
+        : inputSchema;
 
     server.registerTool(
       toolName,
@@ -223,33 +278,34 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
 
         // If error, throw it
         if (result.isError) {
-          const errorText = result.content
-            ?.map((item: any) => {
-              if (item?.type === "json" && item.json !== undefined) {
-                return JSON.stringify(item.json);
-              }
-              return item?.text || String(item);
-            })
-            .join("\n") || "Unknown error";
+          const errorText =
+            result.content
+              ?.map((item: any) => {
+                if (item?.type === 'json' && item.json !== undefined) {
+                  return JSON.stringify(item.json);
+                }
+                return item?.text || String(item);
+              })
+              .join('\n') || 'Unknown error';
           throw new McpError(ErrorCode.InternalError, errorText);
         }
 
         // Convert content to MCP format - JSON items become text
         const content = (result.content || []).map((item: any) => {
-          if (item?.type === "json" && item.json !== undefined) {
+          if (item?.type === 'json' && item.json !== undefined) {
             return {
-              type: "text" as const,
+              type: 'text' as const,
               text: JSON.stringify(item.json),
             };
           }
           return {
-            type: "text" as const,
-            text: item?.text || String(item || ""),
+            type: 'text' as const,
+            text: item?.text || String(item || ''),
           };
         });
 
         return { content };
-      }
+      },
     );
   }
 }

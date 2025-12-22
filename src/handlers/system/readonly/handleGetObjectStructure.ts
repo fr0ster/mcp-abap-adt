@@ -6,40 +6,41 @@
  * This handler uses makeAdtRequestWithTimeout directly and should be moved to adt-clients infrastructure module
  */
 
-import { makeAdtRequestWithTimeout } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { makeAdtRequestWithTimeout } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
-  name: "GetObjectStructure",
-  description: "[read-only] Retrieve ADT object structure as a compact JSON tree.",
+  name: 'GetObjectStructure',
+  description:
+    '[read-only] Retrieve ADT object structure as a compact JSON tree.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       objecttype: {
-        type: "string",
-        description: "ADT object type (e.g. DDLS/DF)"
+        type: 'string',
+        description: 'ADT object type (e.g. DDLS/DF)',
       },
       objectname: {
-        type: "string",
-        description: "ADT object name (e.g. /CBY/ACQ_DDL)"
-      }
+        type: 'string',
+        description: 'ADT object name (e.g. /CBY/ACQ_DDL)',
+      },
     },
-    required: ["objecttype", "objectname"]
-  }
+    required: ['objecttype', 'objectname'],
+  },
 } as const;
 
 // Build nested tree from flat node list (nodeid/parentid)
 function buildNestedTree(flatNodes: any[]) {
   const nodeMap: Record<string, any> = {};
-  flatNodes.forEach(node => {
+  flatNodes.forEach((node) => {
     nodeMap[node.nodeid] = {
       objecttype: node.objecttype,
       objectname: node.objectname,
-      children: []
+      children: [],
     };
   });
   const roots: any[] = [];
-  flatNodes.forEach(node => {
+  flatNodes.forEach((node) => {
     if (node.parentid && nodeMap[node.parentid]) {
       nodeMap[node.parentid].children.push(nodeMap[node.nodeid]);
     } else {
@@ -55,31 +56,48 @@ function serializeTree(tree: any[], indent: string = ''): string {
   for (const node of tree) {
     result += `${indent}- ${node.objecttype}: ${node.objectname}\n`;
     if (node.children && node.children.length > 0) {
-      result += serializeTree(node.children, indent + '  ');
+      result += serializeTree(node.children, `${indent}  `);
     }
   }
   return result;
 }
 
-export async function handleGetObjectStructure(context: HandlerContext, args: any) {
+export async function handleGetObjectStructure(
+  context: HandlerContext,
+  args: any,
+) {
   const { connection, logger } = context;
   try {
     const url = `/sap/bc/adt/repository/objectstructure?objecttype=${encodeURIComponent(args.objecttype)}&objectname=${encodeURIComponent(args.objectname)}`;
-    const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
-    logger?.info(`Fetched object structure for ${args.objecttype}/${args.objectname}`);
+    const response = await makeAdtRequestWithTimeout(
+      connection,
+      url,
+      'GET',
+      'default',
+    );
+    logger?.info(
+      `Fetched object structure for ${args.objecttype}/${args.objectname}`,
+    );
 
     // Parse XML response
-    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '',
+    });
     const parsed = parser.parse(response.data);
 
     // Get flat node list
-    let nodes = parsed['projectexplorer:objectstructure']?.['projectexplorer:node'];
+    let nodes =
+      parsed['projectexplorer:objectstructure']?.['projectexplorer:node'];
     if (!nodes) {
       return {
         isError: true,
         content: [
-          { type: "text", text: "No nodes found in object structure response." }
-        ]
+          {
+            type: 'text',
+            text: 'No nodes found in object structure response.',
+          },
+        ],
       };
     }
     // Ensure nodes is always an array
@@ -89,27 +107,30 @@ export async function handleGetObjectStructure(context: HandlerContext, args: an
     const tree = buildNestedTree(nodes);
 
     // Serialize to MCP-compatible text format
-    const treeText = 'tree:\n' + serializeTree(tree);
+    const treeText = `tree:\n${serializeTree(tree)}`;
 
     return {
       isError: false,
       content: [
         {
-          type: "text",
-          text: treeText
-        }
-      ]
+          type: 'text',
+          text: treeText,
+        },
+      ],
     };
   } catch (error) {
-    logger?.error(`Failed to fetch object structure for ${args?.objecttype}/${args?.objectname}`, error as any);
+    logger?.error(
+      `Failed to fetch object structure for ${args?.objecttype}/${args?.objectname}`,
+      error as any,
+    );
     return {
       isError: true,
       content: [
         {
-          type: "text",
-          text: `ADT error: ${String(error)}`
-        }
-      ]
+          type: 'text',
+          text: `ADT error: ${String(error)}`,
+        },
+      ],
     };
   }
 }

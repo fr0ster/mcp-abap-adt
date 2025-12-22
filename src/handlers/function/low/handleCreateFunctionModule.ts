@@ -5,52 +5,66 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "CreateFunctionModuleLow",
-  description: "[low-level] Create a new ABAP function module. - use CreateFunctionModule (high-level) for full workflow with validation, lock, update, check, unlock, and activate.",
+  name: 'CreateFunctionModuleLow',
+  description:
+    '[low-level] Create a new ABAP function module. - use CreateFunctionModule (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       function_module_name: {
-        type: "string",
-        description: "Function module name (e.g., Z_MY_FUNCTION)."
+        type: 'string',
+        description: 'Function module name (e.g., Z_MY_FUNCTION).',
       },
       function_group_name: {
-        type: "string",
-        description: "Function group name (e.g., ZFG_MY_GROUP)."
+        type: 'string',
+        description: 'Function group name (e.g., ZFG_MY_GROUP).',
       },
       description: {
-        type: "string",
-        description: "Function module description."
+        type: 'string',
+        description: 'Function module description.',
       },
       package_name: {
-        type: "string",
-        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects)."
+        type: 'string',
+        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects).',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable packages."
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from GetSession. If not provided, a new session will be created."
+        type: 'string',
+        description:
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["function_module_name", "function_group_name", "description", "package_name"]
-  }
+    required: [
+      'function_module_name',
+      'function_group_name',
+      'description',
+      'package_name',
+    ],
+  },
 } as const;
 
 interface CreateFunctionModuleArgs {
@@ -72,7 +86,10 @@ interface CreateFunctionModuleArgs {
  *
  * Uses CrudClient.createFunctionModule - low-level single method call
  */
-export async function handleCreateFunctionModule(context: HandlerContext, args: CreateFunctionModuleArgs) {
+export async function handleCreateFunctionModule(
+  context: HandlerContext,
+  args: CreateFunctionModuleArgs,
+) {
   const { connection, logger } = context;
   try {
     const {
@@ -82,12 +99,21 @@ export async function handleCreateFunctionModule(context: HandlerContext, args: 
       package_name,
       transport_request,
       session_id,
-      session_state
+      session_state,
     } = args as CreateFunctionModuleArgs;
 
     // Validation
-    if (!function_module_name || !function_group_name || !description || !package_name) {
-      return return_error(new Error('function_module_name, function_group_name, description, and package_name are required'));
+    if (
+      !function_module_name ||
+      !function_group_name ||
+      !description ||
+      !package_name
+    ) {
+      return return_error(
+        new Error(
+          'function_module_name, function_group_name, description, and package_name are required',
+        ),
+      );
     }
 
     const client = new CrudClient(connection);
@@ -101,7 +127,9 @@ export async function handleCreateFunctionModule(context: HandlerContext, args: 
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
 
-    logger?.info(`Starting function module creation: ${functionModuleName} in ${functionGroupName}`);
+    logger?.info(
+      `Starting function module creation: ${functionModuleName} in ${functionGroupName}`,
+    );
 
     try {
       // Create function module
@@ -111,61 +139,71 @@ export async function handleCreateFunctionModule(context: HandlerContext, args: 
         description,
         packageName: package_name,
         sourceCode: '',
-        transportRequest: transport_request
+        transportRequest: transport_request,
       });
       const createResult = client.getCreateResult();
 
       if (!createResult) {
-        throw new Error(`Create did not return a response for function module ${functionModuleName}`);
+        throw new Error(
+          `Create did not return a response for function module ${functionModuleName}`,
+        );
       }
 
       // Get updated session state after create
 
-
       logger?.info(`✅ CreateFunctionModule completed: ${functionModuleName}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          function_module_name: functionModuleName,
-          function_group_name: functionGroupName,
-          description,
-          package_name: package_name,
-          transport_request: transport_request || null,
-          session_id: session_id || null,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: `Function module ${functionModuleName} created successfully. Use LockFunctionModule and UpdateFunctionModule to add source code, then UnlockFunctionModule and ActivateObject.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            function_module_name: functionModuleName,
+            function_group_name: functionGroupName,
+            description,
+            package_name: package_name,
+            transport_request: transport_request || null,
+            session_id: session_id || null,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: `Function module ${functionModuleName} created successfully. Use LockFunctionModule and UpdateFunctionModule to add source code, then UnlockFunctionModule and ActivateObject.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error creating function module ${functionModuleName}: ${error?.message || error}`);
+      logger?.error(
+        `Error creating function module ${functionModuleName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to create function module: ${error.message || String(error)}`;
 
       if (error.response?.status === 409) {
         errorMessage = `Function module ${functionModuleName} already exists.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

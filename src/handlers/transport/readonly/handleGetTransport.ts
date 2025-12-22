@@ -14,33 +14,40 @@
  * This handler provides richer functionality that should be added to adt-clients
  */
 
-import { McpError, ErrorCode, makeAdtRequestWithTimeout, return_error, return_response, AxiosResponse } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  ErrorCode,
+  McpError,
+  makeAdtRequestWithTimeout,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "GetTransport",
-  description: "[read-only] Retrieve ABAP transport request information including metadata, included objects, and status from SAP system.",
+  name: 'GetTransport',
+  description:
+    '[read-only] Retrieve ABAP transport request information including metadata, included objects, and status from SAP system.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       transport_number: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635, DEVK905123)"
+        type: 'string',
+        description: 'Transport request number (e.g., E19K905635, DEVK905123)',
       },
       include_objects: {
-        type: "boolean",
-        description: "Include list of objects in transport (default: true)",
-        default: true
+        type: 'boolean',
+        description: 'Include list of objects in transport (default: true)',
+        default: true,
       },
       include_tasks: {
-        type: "boolean",
-        description: "Include list of tasks in transport (default: true)",
-        default: true
-      }
+        type: 'boolean',
+        description: 'Include list of tasks in transport (default: true)',
+        default: true,
+      },
     },
-    required: ["transport_number"]
-  }
+    required: ['transport_number'],
+  },
 } as const;
 
 interface GetTransportArgs {
@@ -52,23 +59,30 @@ interface GetTransportArgs {
 /**
  * Parse transport request XML response
  */
-function parseTransportXml(xmlData: string, includeObjects: boolean = true, includeTasks: boolean = true): any {
+function parseTransportXml(
+  xmlData: string,
+  includeObjects: boolean = true,
+  includeTasks: boolean = true,
+): any {
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '',
     textNodeName: '_text',
     parseAttributeValue: true,
-    isArray: (name, jpath, isLeafNode, isAttribute) => {
+    isArray: (name, _jpath, _isLeafNode, _isAttribute) => {
       // Arrays for multiple objects/tasks
       return ['tm:object', 'tm:task', 'object', 'task'].includes(name);
-    }
+    },
   });
 
   const result = parser.parse(xmlData);
-  const root = result['tm:root'] || result['root'];
+  const root = result['tm:root'] || result.root;
 
   if (!root) {
-    throw new McpError(ErrorCode.InternalError, 'Invalid transport XML structure - no tm:root found');
+    throw new McpError(
+      ErrorCode.InternalError,
+      'Invalid transport XML structure - no tm:root found',
+    );
   }
 
   // Get detailed transport info from tm:request inside tm:root
@@ -76,22 +90,27 @@ function parseTransportXml(xmlData: string, includeObjects: boolean = true, incl
 
   // Extract basic transport information from both root attributes and request details
   const transportInfo = {
-    number: root['adtcore:name'] || request['tm:number'] || root['name'],
-    description: request['tm:desc'] || request['description'] || root['tm:description'],
-    type: request['tm:type'] || root['tm:object_type'] || root['type'],
+    number: root['adtcore:name'] || request['tm:number'] || root.name,
+    description:
+      request['tm:desc'] || request.description || root['tm:description'],
+    type: request['tm:type'] || root['tm:object_type'] || root.type,
     status: request['tm:status'] || root['tm:status'],
     status_text: request['tm:status_text'],
     owner: request['tm:owner'] || root['tm:owner'],
     target_system: request['tm:target'] || root['tm:target'],
     target_desc: request['tm:target_desc'],
-    created_at: root['adtcore:createdAt'] || request['tm:createdAt'] || root['createdAt'],
-    created_by: root['adtcore:createdBy'] || request['tm:createdBy'] || root['createdBy'],
-    changed_at: root['adtcore:changedAt'] || request['tm:changedAt'] || root['changedAt'],
-    changed_by: root['adtcore:changedBy'] || request['tm:changedBy'] || root['changedBy'],
-    release_date: request['tm:releaseDate'] || root['releaseDate'],
+    created_at:
+      root['adtcore:createdAt'] || request['tm:createdAt'] || root.createdAt,
+    created_by:
+      root['adtcore:createdBy'] || request['tm:createdBy'] || root.createdBy,
+    changed_at:
+      root['adtcore:changedAt'] || request['tm:changedAt'] || root.changedAt,
+    changed_by:
+      root['adtcore:changedBy'] || request['tm:changedBy'] || root.changedBy,
+    release_date: request['tm:releaseDate'] || root.releaseDate,
     client: request['tm:source_client'] || root['tm:client'],
     cts_project: request['tm:cts_project'],
-    cts_project_desc: request['tm:cts_project_desc']
+    cts_project_desc: request['tm:cts_project_desc'],
   };
 
   // Extract objects if requested
@@ -99,7 +118,7 @@ function parseTransportXml(xmlData: string, includeObjects: boolean = true, incl
   if (includeObjects && request['tm:all_objects']) {
     const objectList = request['tm:all_objects']['tm:abap_object'] || [];
     objects = Array.isArray(objectList) ? objectList : [objectList];
-    objects = objects.map(obj => ({
+    objects = objects.map((obj) => ({
       name: obj['tm:name'],
       type: obj['tm:type'],
       wbtype: obj['tm:wbtype'],
@@ -107,15 +126,17 @@ function parseTransportXml(xmlData: string, includeObjects: boolean = true, incl
       description: obj['tm:obj_desc'],
       position: obj['tm:position'],
       lock_status: obj['tm:lock_status'],
-      info: obj['tm:obj_info']
+      info: obj['tm:obj_info'],
     }));
   }
 
   // Extract tasks if requested
   let tasks: any[] = [];
   if (includeTasks && request['tm:task']) {
-    const taskList = Array.isArray(request['tm:task']) ? request['tm:task'] : [request['tm:task']];
-    tasks = taskList.map(task => ({
+    const taskList = Array.isArray(request['tm:task'])
+      ? request['tm:task']
+      : [request['tm:task']];
+    tasks = taskList.map((task) => ({
       number: task['tm:number'],
       parent: task['tm:parent'],
       description: task['tm:desc'],
@@ -127,13 +148,18 @@ function parseTransportXml(xmlData: string, includeObjects: boolean = true, incl
       target_desc: task['tm:target_desc'],
       client: task['tm:source_client'],
       created_at: task['tm:lastchanged_timestamp'],
-      objects: task['tm:abap_object'] ? (Array.isArray(task['tm:abap_object']) ? task['tm:abap_object'] : [task['tm:abap_object']]).map(obj => ({
-        name: obj['tm:name'],
-        type: obj['tm:type'],
-        wbtype: obj['tm:wbtype'],
-        description: obj['tm:obj_desc'],
-        position: obj['tm:position']
-      })) : []
+      objects: task['tm:abap_object']
+        ? (Array.isArray(task['tm:abap_object'])
+            ? task['tm:abap_object']
+            : [task['tm:abap_object']]
+          ).map((obj) => ({
+            name: obj['tm:name'],
+            type: obj['tm:type'],
+            wbtype: obj['tm:wbtype'],
+            description: obj['tm:obj_desc'],
+            position: obj['tm:position'],
+          }))
+        : [],
     }));
   }
 
@@ -142,19 +168,25 @@ function parseTransportXml(xmlData: string, includeObjects: boolean = true, incl
     objects: includeObjects ? objects : undefined,
     tasks: includeTasks ? tasks : undefined,
     object_count: objects.length,
-    task_count: tasks.length
+    task_count: tasks.length,
   };
 }
 
 /**
  * Main handler for GetTransport MCP tool
  */
-export async function handleGetTransport(context: HandlerContext, args: GetTransportArgs) {
+export async function handleGetTransport(
+  context: HandlerContext,
+  args: GetTransportArgs,
+) {
   const { connection, logger } = context;
   try {
     // Validate required parameters
     if (!args?.transport_number) {
-      throw new McpError(ErrorCode.InvalidParams, 'Transport number is required');
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'Transport number is required',
+      );
     }
 
     const typedArgs = args as GetTransportArgs;
@@ -162,7 +194,9 @@ export async function handleGetTransport(context: HandlerContext, args: GetTrans
     const includeTasks = typedArgs.include_tasks !== false;
 
     logger?.debug(`GetTransport: ${typedArgs.transport_number}`);
-    logger?.debug(`Include objects: ${includeObjects}, Include tasks: ${includeTasks}`);
+    logger?.debug(
+      `Include objects: ${includeObjects}, Include tasks: ${includeTasks}`,
+    );
 
     let url = `/sap/bc/adt/cts/transportrequests/${typedArgs.transport_number}`;
 
@@ -175,32 +209,47 @@ export async function handleGetTransport(context: HandlerContext, args: GetTrans
     }
 
     const headers = {
-      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
+      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
     };
 
     logger?.debug(`GET from: ${url}`);
 
     // Get transport request
-    const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default', undefined, undefined, headers);
+    const response = await makeAdtRequestWithTimeout(
+      connection,
+      url,
+      'GET',
+      'default',
+      undefined,
+      undefined,
+      headers,
+    );
 
     logger?.debug(`GetTransport response status: ${response.status}`);
 
     // Parse XML response
-    const transportData = parseTransportXml(response.data, includeObjects, includeTasks);
+    const transportData = parseTransportXml(
+      response.data,
+      includeObjects,
+      includeTasks,
+    );
 
     return return_response({
-      data: JSON.stringify({
-        success: true,
-        transport_number: typedArgs.transport_number,
-        ...transportData,
-        message: `Transport ${typedArgs.transport_number} retrieved successfully`
-      }, null, 2),
+      data: JSON.stringify(
+        {
+          success: true,
+          transport_number: typedArgs.transport_number,
+          ...transportData,
+          message: `Transport ${typedArgs.transport_number} retrieved successfully`,
+        },
+        null,
+        2,
+      ),
       status: response.status,
       statusText: response.statusText,
       headers: response.headers,
-      config: response.config
+      config: response.config,
     });
-
   } catch (error) {
     if (error instanceof McpError) {
       throw error;

@@ -12,16 +12,15 @@
  * Run: npm test -- --testPathPattern=integration/behaviorDefinition
  */
 
-import { handleValidateBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleValidateBehaviorDefinition';
-import { handleCreateBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleCreateBehaviorDefinition';
-import { handleLockBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleLockBehaviorDefinition';
-import { handleUpdateBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleUpdateBehaviorDefinition';
-import { handleUnlockBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleUnlockBehaviorDefinition';
 import { handleActivateBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
+import { handleCreateBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleCreateBehaviorDefinition';
 import { handleDeleteBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleDeleteBehaviorDefinition';
-
-import { LowTester } from '../../helpers/testers/LowTester';
+import { handleLockBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleLockBehaviorDefinition';
+import { handleUnlockBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleUnlockBehaviorDefinition';
+import { handleUpdateBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleUpdateBehaviorDefinition';
+import { handleValidateBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleValidateBehaviorDefinition';
 import { getTimeout } from '../../helpers/configHelpers';
+import { LowTester } from '../../helpers/testers/LowTester';
 
 describe('BehaviorDefinition Low-Level Handlers Integration', () => {
   let tester: LowTester;
@@ -38,8 +37,8 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
         update: handleUpdateBehaviorDefinition,
         unlock: handleUnlockBehaviorDefinition,
         activate: handleActivateBehaviorDefinition,
-        delete: handleDeleteBehaviorDefinition
-      }
+        delete: handleDeleteBehaviorDefinition,
+      },
     );
     await tester.beforeAll();
   });
@@ -56,7 +55,11 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it('should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate', async () => {
-    await tester.run();
-  }, getTimeout('long'));
+  it(
+    'should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate',
+    async () => {
+      await tester.run();
+    },
+    getTimeout('long'),
+  );
 });

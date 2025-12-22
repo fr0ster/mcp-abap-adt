@@ -1,15 +1,19 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { AbapConnection } from "@mcp-abap-adt/connection";
-import type { Logger } from "@mcp-abap-adt/logger";
-import { defaultLogger } from "@mcp-abap-adt/logger";
-import { HandlerContext } from "../../handlers/interfaces.js";
-import { IHandlersRegistry, IHandlerGroup, HandlerEntry } from "./interfaces.js";
-import { CompositeHandlersRegistry } from "./registry/CompositeHandlersRegistry.js";
-import { ReadOnlyHandlersGroup } from "./groups/ReadOnlyHandlersGroup.js";
-import { HighLevelHandlersGroup } from "./groups/HighLevelHandlersGroup.js";
-import { LowLevelHandlersGroup } from "./groups/LowLevelHandlersGroup.js";
-import { SystemHandlersGroup } from "./groups/SystemHandlersGroup.js";
-import { SearchHandlersGroup } from "./groups/SearchHandlersGroup.js";
+import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { Logger } from '@mcp-abap-adt/logger';
+import { defaultLogger } from '@mcp-abap-adt/logger';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { HandlerContext } from '../../handlers/interfaces.js';
+import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
+import { LowLevelHandlersGroup } from './groups/LowLevelHandlersGroup.js';
+import { ReadOnlyHandlersGroup } from './groups/ReadOnlyHandlersGroup.js';
+import { SearchHandlersGroup } from './groups/SearchHandlersGroup.js';
+import { SystemHandlersGroup } from './groups/SystemHandlersGroup.js';
+import type {
+  HandlerEntry,
+  IHandlerGroup,
+  IHandlersRegistry,
+} from './interfaces.js';
+import { CompositeHandlersRegistry } from './registry/CompositeHandlersRegistry.js';
 
 /**
  * Options for creating handler exporter
@@ -120,7 +124,7 @@ export class HandlerExporter {
    * Get list of tool names
    */
   getToolNames(): string[] {
-    return this.getHandlerEntries().map(e => e.toolDefinition.name);
+    return this.getHandlerEntries().map((e) => e.toolDefinition.name);
   }
 
   /**
@@ -143,7 +147,7 @@ export class HandlerExporter {
   registerOnServer(
     server: McpServer,
     connectionProvider: () => AbapConnection | Promise<AbapConnection>,
-    logger?: Logger
+    logger?: Logger,
   ): void {
     const log = logger ?? this.logger;
 
@@ -163,15 +167,18 @@ export class HandlerExporter {
 
           // Handle errors: if handler returns isError, throw McpError
           if (result?.isError) {
-            const { ErrorCode, McpError } = await import('@modelcontextprotocol/sdk/types.js');
-            const errorText = (result.content || [])
-              .map((item: any) => {
-                if (item?.type === 'json' && item.json !== undefined) {
-                  return JSON.stringify(item.json);
-                }
-                return item?.text || String(item);
-              })
-              .join('\n') || 'Unknown error';
+            const { ErrorCode, McpError } = await import(
+              '@modelcontextprotocol/sdk/types.js'
+            );
+            const errorText =
+              (result.content || [])
+                .map((item: any) => {
+                  if (item?.type === 'json' && item.json !== undefined) {
+                    return JSON.stringify(item.json);
+                  }
+                  return item?.text || String(item);
+                })
+                .join('\n') || 'Unknown error';
             throw new McpError(ErrorCode.InternalError, errorText);
           }
 
@@ -199,12 +206,14 @@ export class HandlerExporter {
             description: entry.toolDefinition.description,
             inputSchema: entry.toolDefinition.inputSchema,
           },
-          wrappedHandler
+          wrappedHandler,
         );
       }
     }
 
-    log.info?.(`[HandlerExporter] Registered ${this.getToolNames().length} tools on server`);
+    log.info?.(
+      `[HandlerExporter] Registered ${this.getToolNames().length} tools on server`,
+    );
   }
 }
 

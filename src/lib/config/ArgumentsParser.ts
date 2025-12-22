@@ -4,8 +4,8 @@
  * Used by both old server (mcp_abap_adt_server) and new servers
  */
 
-import * as path from "path";
-import * as fs from "fs";
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 export interface ParsedArguments {
   /** Default MCP destination from --mcp parameter */
@@ -76,18 +76,22 @@ export class ArgumentsParser {
     };
 
     // Helper to resolve port option
-    const resolvePortOption = (argName: string, envName: string, defaultValue: number): number => {
+    const resolvePortOption = (
+      argName: string,
+      envName: string,
+      defaultValue: number,
+    ): number => {
       const argValue = getArgValue(argName);
       if (argValue) {
         const port = parseInt(argValue, 10);
-        if (!isNaN(port) && port > 0 && port <= 65535) {
+        if (!Number.isNaN(port) && port > 0 && port <= 65535) {
           return port;
         }
       }
       const envValue = process.env[envName];
       if (envValue) {
         const port = parseInt(envValue, 10);
-        if (!isNaN(port) && port > 0 && port <= 65535) {
+        if (!Number.isNaN(port) && port > 0 && port <= 65535) {
           return port;
         }
       }
@@ -95,7 +99,10 @@ export class ArgumentsParser {
     };
 
     // Helper to resolve list option
-    const resolveListOption = (argName: string, envName: string): string[] | undefined => {
+    const resolveListOption = (
+      argName: string,
+      envName: string,
+    ): string[] | undefined => {
       const argValue = getArgValue(argName);
       const envValue = process.env[envName];
       const combined = argValue || envValue;
@@ -111,22 +118,22 @@ export class ArgumentsParser {
     const resolveBooleanOption = (
       argName: string,
       envName: string,
-      defaultValue: boolean
+      defaultValue: boolean,
     ): boolean => {
       if (hasFlag(argName)) return true;
       const envValue = process.env[envName];
-      if (envValue === "true") return true;
-      if (envValue === "false") return false;
+      if (envValue === 'true') return true;
+      if (envValue === 'false') return false;
       return defaultValue;
     };
 
     // Parse --mcp
-    result.mcp = getArgValue("--mcp");
+    result.mcp = getArgValue('--mcp');
 
     // Parse --env
-    const envArg = getArgValue("--env");
+    const envArg = getArgValue('--env');
     if (envArg) {
-      if (envArg.startsWith(".\\") || envArg.startsWith("./")) {
+      if (envArg.startsWith('.\\') || envArg.startsWith('./')) {
         result.env = path.resolve(process.cwd(), envArg);
       } else {
         result.env = envArg;
@@ -137,7 +144,7 @@ export class ArgumentsParser {
         result.env = envPath;
       } else {
         // Check for .env in current directory
-        const cwdEnvPath = path.resolve(process.cwd(), ".env");
+        const cwdEnvPath = path.resolve(process.cwd(), '.env');
         if (fs.existsSync(cwdEnvPath)) {
           result.env = cwdEnvPath;
         }
@@ -145,66 +152,68 @@ export class ArgumentsParser {
     }
 
     // Parse --auth-broker-path
-    result.authBrokerPath = getArgValue("--auth-broker-path");
+    result.authBrokerPath = getArgValue('--auth-broker-path');
 
     // Parse --unsafe
-    result.unsafe = hasFlag("--unsafe") || process.env.MCP_UNSAFE === "true";
+    result.unsafe = hasFlag('--unsafe') || process.env.MCP_UNSAFE === 'true';
 
     // Parse --auth-broker
     result.useAuthBroker =
-      hasFlag("--auth-broker") || process.env.MCP_USE_AUTH_BROKER === "true";
+      hasFlag('--auth-broker') || process.env.MCP_USE_AUTH_BROKER === 'true';
 
     // Parse --config
-    result.config = getArgValue("--config");
+    result.config = getArgValue('--config');
 
     // Parse transport
-    result.transport = getArgValue("--transport") || process.env.MCP_TRANSPORT;
+    result.transport = getArgValue('--transport') || process.env.MCP_TRANSPORT;
     // Auto-detect stdio mode when stdin is not a TTY
     if (!result.transport && !process.stdin.isTTY) {
-      result.transport = "stdio";
+      result.transport = 'stdio';
     }
     // Default to stdio if not specified
     if (!result.transport) {
-      result.transport = "stdio";
+      result.transport = 'stdio';
     }
 
     // Parse HTTP options
-    result.httpPort = resolvePortOption("--http-port", "MCP_HTTP_PORT", 3000);
-    result.httpHost = getArgValue("--http-host") || process.env.MCP_HTTP_HOST || "127.0.0.1";
+    result.httpPort = resolvePortOption('--http-port', 'MCP_HTTP_PORT', 3000);
+    result.httpHost =
+      getArgValue('--http-host') || process.env.MCP_HTTP_HOST || '127.0.0.1';
     result.httpJsonResponse = resolveBooleanOption(
-      "--http-json-response",
-      "MCP_HTTP_ENABLE_JSON_RESPONSE",
-      false
+      '--http-json-response',
+      'MCP_HTTP_ENABLE_JSON_RESPONSE',
+      false,
     );
     result.httpAllowedOrigins = resolveListOption(
-      "--http-allowed-origins",
-      "MCP_HTTP_ALLOWED_ORIGINS"
+      '--http-allowed-origins',
+      'MCP_HTTP_ALLOWED_ORIGINS',
     );
     result.httpAllowedHosts = resolveListOption(
-      "--http-allowed-hosts",
-      "MCP_HTTP_ALLOWED_HOSTS"
+      '--http-allowed-hosts',
+      'MCP_HTTP_ALLOWED_HOSTS',
     );
     result.httpEnableDnsProtection = resolveBooleanOption(
-      "--http-enable-dns-protection",
-      "MCP_HTTP_ENABLE_DNS_PROTECTION",
-      false
+      '--http-enable-dns-protection',
+      'MCP_HTTP_ENABLE_DNS_PROTECTION',
+      false,
     );
 
     // Parse SSE options
-    result.ssePort = resolvePortOption("--sse-port", "MCP_SSE_PORT", 3001);
-    result.sseHost = getArgValue("--sse-host") || process.env.MCP_SSE_HOST || "127.0.0.1";
+    result.ssePort = resolvePortOption('--sse-port', 'MCP_SSE_PORT', 3001);
+    result.sseHost =
+      getArgValue('--sse-host') || process.env.MCP_SSE_HOST || '127.0.0.1';
     result.sseAllowedOrigins = resolveListOption(
-      "--sse-allowed-origins",
-      "MCP_SSE_ALLOWED_ORIGINS"
+      '--sse-allowed-origins',
+      'MCP_SSE_ALLOWED_ORIGINS',
     );
     result.sseAllowedHosts = resolveListOption(
-      "--sse-allowed-hosts",
-      "MCP_SSE_ALLOWED_HOSTS"
+      '--sse-allowed-hosts',
+      'MCP_SSE_ALLOWED_HOSTS',
     );
     result.sseEnableDnsProtection = resolveBooleanOption(
-      "--sse-enable-dns-protection",
-      "MCP_SSE_ENABLE_DNS_PROTECTION",
-      false
+      '--sse-enable-dns-protection',
+      'MCP_SSE_ENABLE_DNS_PROTECTION',
+      false,
     );
 
     return result;
@@ -233,4 +242,3 @@ export class ArgumentsParser {
     return process.argv.includes(name);
   }
 }
-

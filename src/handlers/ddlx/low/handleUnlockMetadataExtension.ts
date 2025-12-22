@@ -5,40 +5,48 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "UnlockMetadataExtensionLow",
-  description: "[low-level] Unlock an ABAP metadata extension after modification. Must use the same session_id and lock_handle from LockMetadataExtension operation.",
+  name: 'UnlockMetadataExtensionLow',
+  description:
+    '[low-level] Unlock an ABAP metadata extension after modification. Must use the same session_id and lock_handle from LockMetadataExtension operation.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       objName: {
-        type: "string",
-        description: "MetadataExtension name (e.g., Z_MY_PROGRAM)."
+        type: 'string',
+        description: 'MetadataExtension name (e.g., Z_MY_PROGRAM).',
       },
       lock_handle: {
-        type: "string",
-        description: "Lock handle from LockMetadataExtension operation."
+        type: 'string',
+        description: 'Lock handle from LockMetadataExtension operation.',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from LockMetadataExtension operation. Must be the same as used in LockMetadataExtension."
+        type: 'string',
+        description:
+          'Session ID from LockMetadataExtension operation. Must be the same as used in LockMetadataExtension.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from LockMetadataExtension (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from LockMetadataExtension (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["name", "lock_handle", "session_id"]
-  }
+    required: ['name', 'lock_handle', 'session_id'],
+  },
 } as const;
 
 interface UnlockMetadataExtensionArgs {
@@ -57,19 +65,20 @@ interface UnlockMetadataExtensionArgs {
  *
  * Uses CrudClient.unlockMetadataExtension - low-level single method call
  */
-export async function handleUnlockMetadataExtension(context: HandlerContext, args: UnlockMetadataExtensionArgs) {
+export async function handleUnlockMetadataExtension(
+  context: HandlerContext,
+  args: UnlockMetadataExtensionArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      name,
-      lock_handle,
-      session_id,
-      session_state
-    } = args as UnlockMetadataExtensionArgs;
+    const { name, lock_handle, session_id, session_state } =
+      args as UnlockMetadataExtensionArgs;
 
     // Validation
     if (!name || !lock_handle || !session_id) {
-      return return_error(new Error('name, lock_handle, and session_id are required'));
+      return return_error(
+        new Error('name, lock_handle, and session_id are required'),
+      );
     }
 
     const client = new CrudClient(connection);
@@ -81,7 +90,9 @@ export async function handleUnlockMetadataExtension(context: HandlerContext, arg
 
     const ddlxName = name.toUpperCase();
 
-    logger?.info(`Starting metadata extension unlock: ${ddlxName} (session: ${session_id.substring(0, 8)}...)`);
+    logger?.info(
+      `Starting metadata extension unlock: ${ddlxName} (session: ${session_id.substring(0, 8)}...)`,
+    );
 
     try {
       // Unlock metadata extension
@@ -89,26 +100,32 @@ export async function handleUnlockMetadataExtension(context: HandlerContext, arg
       const unlockResult = client.getUnlockResult();
 
       if (!unlockResult) {
-        throw new Error(`Unlock did not return a response for metadata extension ${ddlxName}`);
+        throw new Error(
+          `Unlock did not return a response for metadata extension ${ddlxName}`,
+        );
       }
 
       // Get updated session state after unlock
 
-
       logger?.info(`✅ UnlockMetadataExtension completed: ${ddlxName}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          name: ddlxName,
-          session_id: session_id,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: `MetadataExtension ${ddlxName} unlocked successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            name: ddlxName,
+            session_id: session_id,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: `MetadataExtension ${ddlxName} unlocked successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error unlocking metadata extension ${ddlxName}: ${error?.message || error}`);
+      logger?.error(
+        `Error unlocking metadata extension ${ddlxName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to unlock metadata extension: ${error.message || String(error)}`;
@@ -117,26 +134,30 @@ export async function handleUnlockMetadataExtension(context: HandlerContext, arg
         errorMessage = `MetadataExtension ${ddlxName} not found.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockMetadataExtension.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

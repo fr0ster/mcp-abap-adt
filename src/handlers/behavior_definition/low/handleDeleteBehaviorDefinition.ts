@@ -5,28 +5,34 @@
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, AxiosResponse } from '../../../lib/utils';
-import { HandlerContext } from '../../../lib/handlers/interfaces';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "DeleteBehaviorDefinitionLow",
-  description: "[low-level] Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.",
+  name: 'DeleteBehaviorDefinitionLow',
+  description:
+    '[low-level] Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       name: {
-        type: "string",
-        description: "BehaviorDefinition name (e.g., ZI_MY_BDEF)."
+        type: 'string',
+        description: 'BehaviorDefinition name (e.g., ZI_MY_BDEF).',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP)."
-      }
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
+      },
     },
-    required: ["name"]
-  }
+    required: ['name'],
+  },
 } as const;
 
 interface DeleteBehaviorDefinitionArgs {
@@ -39,13 +45,13 @@ interface DeleteBehaviorDefinitionArgs {
  *
  * Uses CrudClient.deleteBehaviorDefinition - low-level single method call
  */
-export async function handleDeleteBehaviorDefinition(context: HandlerContext, args: DeleteBehaviorDefinitionArgs) {
+export async function handleDeleteBehaviorDefinition(
+  context: HandlerContext,
+  args: DeleteBehaviorDefinitionArgs,
+) {
   const { connection, logger } = context;
   try {
-    const {
-      name,
-      transport_request
-    } = args as DeleteBehaviorDefinitionArgs;
+    const { name, transport_request } = args as DeleteBehaviorDefinitionArgs;
 
     // Validation
     if (!name) {
@@ -59,30 +65,40 @@ export async function handleDeleteBehaviorDefinition(context: HandlerContext, ar
 
     try {
       // Delete behavior definition - using types from adt-clients
-      const deleteConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> & Partial<Pick<BehaviorDefinitionBuilderConfig, 'transportRequest'>> = {
+      const deleteConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> &
+        Partial<Pick<BehaviorDefinitionBuilderConfig, 'transportRequest'>> = {
         name: bdefName,
-        ...(transport_request && { transportRequest: transport_request })
+        ...(transport_request && { transportRequest: transport_request }),
       };
       await client.deleteBehaviorDefinition(deleteConfig);
       const deleteResult = client.getDeleteResult();
 
       if (!deleteResult) {
-        throw new Error(`Delete did not return a response for behavior definition ${bdefName}`);
+        throw new Error(
+          `Delete did not return a response for behavior definition ${bdefName}`,
+        );
       }
 
-      logger?.info(`✅ DeleteBehaviorDefinition completed successfully: ${bdefName}`);
+      logger?.info(
+        `✅ DeleteBehaviorDefinition completed successfully: ${bdefName}`,
+      );
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          name: bdefName,
-          transport_request: transport_request || null,
-          message: `BehaviorDefinition ${bdefName} deleted successfully.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            name: bdefName,
+            transport_request: transport_request || null,
+            message: `BehaviorDefinition ${bdefName} deleted successfully.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error deleting behavior definition ${bdefName}: ${error?.message || error}`);
+      logger?.error(
+        `Error deleting behavior definition ${bdefName}: ${error?.message || error}`,
+      );
 
       // Parse error message
       let errorMessage = `Failed to delete behavior definition: ${error.message || String(error)}`;
@@ -93,26 +109,30 @@ export async function handleDeleteBehaviorDefinition(context: HandlerContext, ar
         errorMessage = `BehaviorDefinition ${bdefName} is locked by another user. Cannot delete.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (error.response?.data && typeof error.response.data === 'string') {
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({
             ignoreAttributes: false,
-            attributeNamePrefix: '@_'
+            attributeNamePrefix: '@_',
           });
           const errorData = parser.parse(error.response.data);
-          const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
           if (errorMsg) {
             errorMessage = `SAP Error: ${errorMsg}`;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parse errors
         }
       }
 
       return return_error(new Error(errorMessage));
     }
-
   } catch (error: any) {
     return return_error(error);
   }

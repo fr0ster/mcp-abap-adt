@@ -1,21 +1,21 @@
-import fs from "fs";
-import path from "path";
+import fs from 'node:fs';
+import path from 'node:path';
 
 export function parseEnvArg(): string | undefined {
   const args = process.argv;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg.startsWith("--env=")) {
-      const envPath = arg.slice("--env=".length);
+    if (arg.startsWith('--env=')) {
+      const envPath = arg.slice('--env='.length);
       if (envPath.length === 0) continue;
-      if (envPath.startsWith(".\\") || envPath.startsWith("./")) {
+      if (envPath.startsWith('.\\') || envPath.startsWith('./')) {
         return path.resolve(process.cwd(), envPath);
       }
       return envPath;
-    } else if (arg === "--env" && i + 1 < args.length) {
+    } else if (arg === '--env' && i + 1 < args.length) {
       const envPath = args[i + 1];
-      if (!envPath || envPath.startsWith("-")) continue;
-      if (envPath.startsWith(".\\") || envPath.startsWith("./")) {
+      if (!envPath || envPath.startsWith('-')) continue;
+      if (envPath.startsWith('.\\') || envPath.startsWith('./')) {
         return path.resolve(process.cwd(), envPath);
       }
       return envPath;
@@ -28,9 +28,9 @@ export function parseAuthBrokerPathArg(): string | undefined {
   const args = process.argv;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg.startsWith("--auth-broker-path=")) {
-      return arg.slice("--auth-broker-path=".length);
-    } else if (arg === "--auth-broker-path" && i + 1 < args.length) {
+    if (arg.startsWith('--auth-broker-path=')) {
+      return arg.slice('--auth-broker-path='.length);
+    } else if (arg === '--auth-broker-path' && i + 1 < args.length) {
       return args[i + 1];
     }
   }
@@ -41,9 +41,9 @@ export function parseMcpDestinationArg(): string | undefined {
   const args = process.argv;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg.startsWith("--mcp=")) {
-      return arg.slice("--mcp=".length);
-    } else if (arg === "--mcp" && i + 1 < args.length) {
+    if (arg.startsWith('--mcp=')) {
+      return arg.slice('--mcp='.length);
+    } else if (arg === '--mcp' && i + 1 < args.length) {
       return args[i + 1];
     }
   }
@@ -54,9 +54,9 @@ export function parseBrowserArg(): string | undefined {
   const args = process.argv;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg.startsWith("--browser=")) {
-      return arg.slice("--browser=".length);
-    } else if (arg === "--browser" && i + 1 < args.length) {
+    if (arg.startsWith('--browser=')) {
+      return arg.slice('--browser='.length);
+    } else if (arg === '--browser' && i + 1 < args.length) {
       return args[i + 1];
     }
   }
@@ -70,11 +70,11 @@ export function getTransportType(): string | null {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     // Check for --transport=value format
-    if (arg.startsWith("--transport=")) {
-      return arg.slice("--transport=".length);
+    if (arg.startsWith('--transport=')) {
+      return arg.slice('--transport='.length);
     }
     // Check for --transport value format
-    if (arg === "--transport" && i + 1 < args.length) {
+    if (arg === '--transport' && i + 1 < args.length) {
       return args[i + 1];
     }
   }
@@ -85,42 +85,61 @@ export function getTransportType(): string | null {
   // Auto-detect stdio mode when stdin is not a TTY (e.g., when run by inspector)
   // Only if no explicit transport was set via argv or env
   if (!process.stdin.isTTY) {
-    return "stdio";
+    return 'stdio';
   }
   return null;
 }
 
 export function resolveEnvFromCwd(): string | undefined {
-  const cwdEnvPath = path.resolve(process.cwd(), ".env");
+  const cwdEnvPath = path.resolve(process.cwd(), '.env');
   return fs.existsSync(cwdEnvPath) ? cwdEnvPath : undefined;
 }
 
 export function buildRuntimeConfig() {
-  const useAuthBroker = process.argv.includes("--auth-broker") || process.env.MCP_USE_AUTH_BROKER === "true";
-  const isTestEnv = process.env.JEST_WORKER_ID !== undefined || process.env.NODE_ENV === "test";
+  const useAuthBroker =
+    process.argv.includes('--auth-broker') ||
+    process.env.MCP_USE_AUTH_BROKER === 'true';
+  const isTestEnv =
+    process.env.JEST_WORKER_ID !== undefined || process.env.NODE_ENV === 'test';
   const authBrokerPath = parseAuthBrokerPathArg();
   const defaultMcpDestination = parseMcpDestinationArg();
   const browser = parseBrowserArg();
-  const unsafe = process.argv.includes("--unsafe") || process.env.MCP_UNSAFE === "true";
+  const unsafe =
+    process.argv.includes('--unsafe') || process.env.MCP_UNSAFE === 'true';
   const explicitTransportType = getTransportType();
   // Check if transport was explicitly set (not auto-detected)
-  const hasExplicitTransportArg = process.argv.some((arg, i) =>
-    arg.startsWith("--transport=") || (arg === "--transport" && i + 1 < process.argv.length)
+  const hasExplicitTransportArg = process.argv.some(
+    (arg, i) =>
+      arg.startsWith('--transport=') ||
+      (arg === '--transport' && i + 1 < process.argv.length),
   );
   // If transport was auto-detected (not explicitly set), consider it as explicit for stdio mode
   // This allows stdio mode to work when run by inspector without --transport=stdio argument
-  const isAutoDetectedStdio = explicitTransportType === "stdio" && !hasExplicitTransportArg && !process.env.MCP_TRANSPORT;
+  const isAutoDetectedStdio =
+    explicitTransportType === 'stdio' &&
+    !hasExplicitTransportArg &&
+    !process.env.MCP_TRANSPORT;
   // Default transport is stdio (for MCP clients like Cline, Cursor, Claude Desktop)
   // Auto-detects stdio when stdin is not TTY (e.g., piped or run by MCP client)
   // For HTTP/SSE, explicitly use --transport=http or --transport=sse
-  const transportType = explicitTransportType || "stdio";
-  const isHttp = transportType === "http" || transportType === "streamable-http" || transportType === "server";
-  const isSse = transportType === "sse";
-  const isStdio = transportType === "stdio";
+  const transportType = explicitTransportType || 'stdio';
+  const isHttp =
+    transportType === 'http' ||
+    transportType === 'streamable-http' ||
+    transportType === 'server';
+  const isSse = transportType === 'sse';
+  const isStdio = transportType === 'stdio';
   // For auto-detected stdio, treat it as explicit for env mandatory check
-  const effectiveExplicitTransportType = isAutoDetectedStdio ? "stdio" : explicitTransportType;
-  const isEnvMandatory = effectiveExplicitTransportType !== null && (isStdio || isSse) && !defaultMcpDestination && !useAuthBroker && !isTestEnv;
-  let envFilePath = parseEnvArg() ?? process.env.MCP_ENV_PATH;
+  const effectiveExplicitTransportType = isAutoDetectedStdio
+    ? 'stdio'
+    : explicitTransportType;
+  const isEnvMandatory =
+    effectiveExplicitTransportType !== null &&
+    (isStdio || isSse) &&
+    !defaultMcpDestination &&
+    !useAuthBroker &&
+    !isTestEnv;
+  const envFilePath = parseEnvArg() ?? process.env.MCP_ENV_PATH;
 
   return {
     useAuthBroker,

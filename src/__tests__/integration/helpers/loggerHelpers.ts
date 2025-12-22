@@ -1,7 +1,7 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { Logger } from '@mcp-abap-adt/logger';
-import { LogLevel, DefaultLogger } from '@mcp-abap-adt/logger';
+import { DefaultLogger, LogLevel } from '@mcp-abap-adt/logger';
 
 export type LoggerWithExtras = Logger & {
   browserAuth: (message: string) => void;
@@ -63,11 +63,15 @@ function formatPrefix(category: string): string {
     return `[${short}]`;
   }
   const color =
-    category === 'test' ? COLORS.cyan :
-    category === 'connection' ? COLORS.green :
-    category === 'auth' ? COLORS.magenta :
-    category === 'adt' ? COLORS.yellow :
-    COLORS.cyan;
+    category === 'test'
+      ? COLORS.cyan
+      : category === 'connection'
+        ? COLORS.green
+        : category === 'auth'
+          ? COLORS.magenta
+          : category === 'adt'
+            ? COLORS.yellow
+            : COLORS.cyan;
   return `${color}[${short}]${COLORS.reset}`;
 }
 
@@ -95,7 +99,8 @@ function createFileSinkAppender() {
 }
 
 const appendToFile = createFileSinkAppender();
-const resolvedLogLevel = process.env.TEST_LOG_SILENT === 'true' ? null : resolveLogLevel();
+const resolvedLogLevel =
+  process.env.TEST_LOG_SILENT === 'true' ? null : resolveLogLevel();
 
 /**
  * Create a prefixed test logger for integration tests.
@@ -112,38 +117,47 @@ export function createTestLogger(category: string): LoggerWithExtras {
   const prefix = formatPrefix(category);
   const baseLogger = new DefaultLogger(level);
 
-  const emit = (messageLevel: LogLevel, fn: (msg: string) => void) => (message: string) => {
-    if (level < messageLevel) return;
-    const line = `${prefix} ${message}`;
-    fn(line);
-    if (appendToFile) {
-      appendToFile(`[${new Date().toISOString()}] ${line}`);
-    }
-  };
+  const emit =
+    (messageLevel: LogLevel, fn: (msg: string) => void) =>
+    (message: string) => {
+      if (level < messageLevel) return;
+      const line = `${prefix} ${message}`;
+      fn(line);
+      if (appendToFile) {
+        appendToFile(`[${new Date().toISOString()}] ${line}`);
+      }
+    };
 
-  const info = emit(LogLevel.INFO, msg => baseLogger?.info(msg));
-  const debug = emit(LogLevel.DEBUG, msg => baseLogger?.debug(msg));
-  const warn = emit(LogLevel.WARN, msg => baseLogger?.warn(msg));
-  const error = emit(LogLevel.ERROR, msg => baseLogger?.error(msg));
+  const info = emit(LogLevel.INFO, (msg) => baseLogger?.info(msg));
+  const debug = emit(LogLevel.DEBUG, (msg) => baseLogger?.debug(msg));
+  const warn = emit(LogLevel.WARN, (msg) => baseLogger?.warn(msg));
+  const error = emit(LogLevel.ERROR, (msg) => baseLogger?.error(msg));
 
   return {
     info,
     debug,
     warn,
     error,
-    browserAuth: emit(LogLevel.INFO, msg => baseLogger?.info(`🌐 ${msg}`)),
-    refresh: emit(LogLevel.INFO, msg => baseLogger?.info(`🔄 ${msg}`)),
-    success: emit(LogLevel.INFO, msg => baseLogger?.info(`✅ ${msg}`)),
-    browserUrl: emit(LogLevel.INFO, msg => baseLogger?.info(`🔗 ${msg}`)),
-    browserOpening: emit(LogLevel.DEBUG, msg => baseLogger?.debug(`🌐 ${msg}`)),
-    testSkip: emit(LogLevel.INFO, msg => baseLogger?.info(`⏭️  ${msg}`)),
+    browserAuth: emit(LogLevel.INFO, (msg) => baseLogger?.info(`🌐 ${msg}`)),
+    refresh: emit(LogLevel.INFO, (msg) => baseLogger?.info(`🔄 ${msg}`)),
+    success: emit(LogLevel.INFO, (msg) => baseLogger?.info(`✅ ${msg}`)),
+    browserUrl: emit(LogLevel.INFO, (msg) => baseLogger?.info(`🔗 ${msg}`)),
+    browserOpening: emit(LogLevel.DEBUG, (msg) =>
+      baseLogger?.debug(`🌐 ${msg}`),
+    ),
+    testSkip: emit(LogLevel.INFO, (msg) => baseLogger?.info(`⏭️  ${msg}`)),
   };
 }
 
 /**
  * Helper to log structured object actions in tests.
  */
-export function logObjectAction(logger: Logger, action: string, objectName: string, extra?: Record<string, any>) {
+export function logObjectAction(
+  logger: Logger,
+  action: string,
+  objectName: string,
+  extra?: Record<string, any>,
+) {
   const payload = extra ? ` ${JSON.stringify(extra)}` : '';
   logger?.info(`${action} ${objectName}${payload}`);
 }

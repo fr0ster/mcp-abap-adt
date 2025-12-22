@@ -10,7 +10,7 @@
  * - jwt auth + serviceKeyPath: serviceKeyStore + sessionStore + tokenProvider
  */
 
-import type { ILogger } from "@mcp-abap-adt/interfaces";
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 
 /**
  * Connection configuration from any source (.env, service key, headers)
@@ -80,6 +80,6 @@ export interface IBrokerSessionConfig {
  * Broker creation mode based on authType and available data
  */
 export type BrokerMode =
-  | 'session-only'      // basic auth: only sessionStore
-  | 'session-provider'  // jwt auth: sessionStore + tokenProvider
-  | 'full';             // jwt + serviceKey: all stores + provider
+  | 'session-only' // basic auth: only sessionStore
+  | 'session-provider' // jwt auth: sessionStore + tokenProvider
+  | 'full'; // jwt + serviceKey: all stores + provider

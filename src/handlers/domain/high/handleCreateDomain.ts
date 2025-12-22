@@ -7,93 +7,107 @@
  * Workflow: create -> check -> unlock -> (activate)
  */
 
-import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { return_error, return_response, safeCheckOperation } from '../../../lib/utils';
-import { validateTransportRequest } from '../../../utils/transportValidation';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  ErrorCode,
+  McpError,
+  return_error,
+  return_response,
+  safeCheckOperation,
+} from '../../../lib/utils';
+import { validateTransportRequest } from '../../../utils/transportValidation';
 
 export const TOOL_DEFINITION = {
-  name: "CreateDomain",
-  description: "Create a new ABAP domain in SAP system with all required steps: lock, create, check, unlock, activate, and verify.",
+  name: 'CreateDomain',
+  description:
+    'Create a new ABAP domain in SAP system with all required steps: lock, create, check, unlock, activate, and verify.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       domain_name: {
-        type: "string",
-        description: "Domain name (e.g., ZZ_TEST_0001). Must follow SAP naming conventions."
+        type: 'string',
+        description:
+          'Domain name (e.g., ZZ_TEST_0001). Must follow SAP naming conventions.',
       },
       description: {
-        type: "string",
-        description: "(optional) Domain description. If not provided, domain_name will be used."
+        type: 'string',
+        description:
+          '(optional) Domain description. If not provided, domain_name will be used.',
       },
       package_name: {
-        type: "string",
-        description: "(optional) Package name (e.g., ZOK_LOCAL, $TMP for local objects)"
+        type: 'string',
+        description:
+          '(optional) Package name (e.g., ZOK_LOCAL, $TMP for local objects)',
       },
       transport_request: {
-        type: "string",
-        description: "(optional) Transport request number (e.g., E19K905635). Required for transportable packages."
+        type: 'string',
+        description:
+          '(optional) Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
       datatype: {
-        type: "string",
-        description: "(optional) Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.",
-        default: "CHAR"
+        type: 'string',
+        description:
+          '(optional) Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.',
+        default: 'CHAR',
       },
       length: {
-        type: "number",
-        description: "(optional) Field length (max depends on datatype)",
-        default: 100
+        type: 'number',
+        description: '(optional) Field length (max depends on datatype)',
+        default: 100,
       },
       decimals: {
-        type: "number",
-        description: "(optional) Decimal places (for DEC, CURR, QUAN types)",
-        default: 0
+        type: 'number',
+        description: '(optional) Decimal places (for DEC, CURR, QUAN types)',
+        default: 0,
       },
       conversion_exit: {
-        type: "string",
-        description: "(optional) Conversion exit routine name (without CONVERSION_EXIT_ prefix)"
+        type: 'string',
+        description:
+          '(optional) Conversion exit routine name (without CONVERSION_EXIT_ prefix)',
       },
       lowercase: {
-        type: "boolean",
-        description: "(optional) Allow lowercase input",
-        default: false
+        type: 'boolean',
+        description: '(optional) Allow lowercase input',
+        default: false,
       },
       sign_exists: {
-        type: "boolean",
-        description: "(optional) Field has sign (+/-)",
-        default: false
+        type: 'boolean',
+        description: '(optional) Field has sign (+/-)',
+        default: false,
       },
       value_table: {
-        type: "string",
-        description: "(optional) Value table name for foreign key relationship"
+        type: 'string',
+        description: '(optional) Value table name for foreign key relationship',
       },
       activate: {
-        type: "boolean",
-        description: "(optional) Activate domain after creation (default: true)",
-        default: true
+        type: 'boolean',
+        description:
+          '(optional) Activate domain after creation (default: true)',
+        default: true,
       },
       fixed_values: {
-        type: "array",
-        description: "(optional) Array of fixed values for domain value range",
+        type: 'array',
+        description: '(optional) Array of fixed values for domain value range',
         items: {
-          type: "object",
+          type: 'object',
           properties: {
             low: {
-              type: "string",
-              description: "Fixed value (e.g., '001', 'A')"
+              type: 'string',
+              description: "Fixed value (e.g., '001', 'A')",
             },
             text: {
-              type: "string",
-              description: "Description text for the fixed value"
-            }
+              type: 'string',
+              description: 'Description text for the fixed value',
+            },
           },
-          required: ["low", "text"]
-        }
-      }
+          required: ['low', 'text'],
+        },
+      },
     },
-    required: ["domain_name"]
-  }
+    required: ['domain_name'],
+  },
 } as const;
 
 interface DomainArgs {
@@ -119,7 +133,10 @@ interface DomainArgs {
  * Uses DomainBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleCreateDomain(context: HandlerContext, args: DomainArgs) {
+export async function handleCreateDomain(
+  context: HandlerContext,
+  args: DomainArgs,
+) {
   const { connection, logger } = context;
   try {
     // Validate required parameters
@@ -131,7 +148,11 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
     }
 
     // Validate transport_request: required for non-$TMP, non-ZLOCAL packages
-    validateTransportRequest(args.package_name, args.transport_request, args.super_package);
+    validateTransportRequest(
+      args.package_name,
+      args.transport_request,
+      args.super_package,
+    );
 
     const typedArgs = args as DomainArgs;
     const domainName = typedArgs.domain_name.toUpperCase();
@@ -147,7 +168,7 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
       await client.validateDomain({
         domainName,
         packageName: typedArgs.package_name,
-        description: typedArgs.description || domainName
+        description: typedArgs.description || domainName,
       });
 
       // Create
@@ -155,7 +176,7 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
         domainName,
         description: typedArgs.description || domainName,
         packageName: typedArgs.package_name,
-        transportRequest: typedArgs.transport_request
+        transportRequest: typedArgs.transport_request,
       });
 
       // Lock
@@ -163,19 +184,22 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
       const lockHandle = client.getLockHandle();
 
       // Update with properties
-      await client.updateDomain({
-        domainName,
-        packageName: typedArgs.package_name,
-        description: typedArgs.description || domainName,
-        datatype: typedArgs.datatype || 'CHAR',
-        length: typedArgs.length || 100,
-        decimals: typedArgs.decimals || 0,
-        conversion_exit: typedArgs.conversion_exit,
-        lowercase: typedArgs.lowercase || false,
-        sign_exists: typedArgs.sign_exists || false,
-        value_table: typedArgs.value_table,
-        fixed_values: typedArgs.fixed_values
-      }, lockHandle);
+      await client.updateDomain(
+        {
+          domainName,
+          packageName: typedArgs.package_name,
+          description: typedArgs.description || domainName,
+          datatype: typedArgs.datatype || 'CHAR',
+          length: typedArgs.length || 100,
+          decimals: typedArgs.decimals || 0,
+          conversion_exit: typedArgs.conversion_exit,
+          lowercase: typedArgs.lowercase || false,
+          sign_exists: typedArgs.sign_exists || false,
+          value_table: typedArgs.value_table,
+          fixed_values: typedArgs.fixed_values,
+        },
+        lockHandle,
+      );
 
       // Check
       try {
@@ -183,13 +207,15 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
           () => client.checkDomain({ domainName }),
           domainName,
           {
-            debug: (message: string) => logger?.debug(message)
-          }
+            debug: (message: string) => logger?.debug(message),
+          },
         );
       } catch (checkError: any) {
         // If error was marked as "already checked", continue silently
         if ((checkError as any).isAlreadyChecked) {
-          logger?.debug(`Domain ${domainName} was already checked - continuing`);
+          logger?.debug(
+            `Domain ${domainName} was already checked - continuing`,
+          );
         } else {
           // Real check error - rethrow
           throw checkError;
@@ -209,7 +235,11 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
       // Get domain details from create result (createDomain already does verification)
       const createResult = client.getCreateResult();
       let domainDetails = null;
-      if (createResult?.data && typeof createResult.data === 'object' && 'domain_details' in createResult.data) {
+      if (
+        createResult?.data &&
+        typeof createResult.data === 'object' &&
+        'domain_details' in createResult.data
+      ) {
         domainDetails = (createResult.data as any).domain_details;
       }
 
@@ -223,18 +253,22 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
           transport_request: typedArgs.transport_request,
           status: shouldActivate ? 'active' : 'inactive',
           message: `Domain ${domainName} created${shouldActivate ? ' and activated' : ''} successfully`,
-          domain_details: domainDetails
-        })
+          domain_details: domainDetails,
+        }),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error creating domain ${domainName}: ${error?.message || error}`);
+      logger?.error(
+        `Error creating domain ${domainName}: ${error?.message || error}`,
+      );
 
       // Check if domain already exists
-      if (error.message?.includes('already exists') || error.response?.data?.includes('ExceptionResourceAlreadyExists')) {
+      if (
+        error.message?.includes('already exists') ||
+        error.response?.data?.includes('ExceptionResourceAlreadyExists')
+      ) {
         throw new McpError(
           ErrorCode.InvalidParams,
-          `Domain ${domainName} already exists. Please delete it first or use a different name.`
+          `Domain ${domainName} already exists. Please delete it first or use a different name.`,
         );
       }
 
@@ -246,7 +280,7 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
         } else {
           try {
             errorMessage = JSON.stringify(error.response.data);
-          } catch (e) {
+          } catch (_e) {
             errorMessage = String(error.response.data).substring(0, 500);
           }
         }
@@ -256,10 +290,9 @@ export async function handleCreateDomain(context: HandlerContext, args: DomainAr
 
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to create domain ${domainName}: ${errorMessage}`
+        `Failed to create domain ${domainName}: ${errorMessage}`,
       );
     }
-
   } catch (error) {
     if (error instanceof McpError) {
       throw error;

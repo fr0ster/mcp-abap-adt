@@ -1,5 +1,3 @@
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-
 /**
  * Validates transport request requirement based on package name.
  * If transport_request is not provided, we assume it's a local object and let SAP handle the validation.
@@ -10,9 +8,9 @@ import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
  * @param superPackage - The super package name (optional, not used for validation)
  */
 export function validateTransportRequest(
-  packageName: string,
-  transportRequest: string | undefined,
-  superPackage?: string
+  _packageName: string,
+  _transportRequest: string | undefined,
+  _superPackage?: string,
 ): void {
   // No strict validation - if transport_request is missing, we assume local object
   // SAP will return an error if transport is actually required

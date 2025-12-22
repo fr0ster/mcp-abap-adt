@@ -8,14 +8,20 @@
  * Note: No validation step - lock will fail if domain doesn't exist
  */
 
-import { McpError, ErrorCode, AxiosResponse } from '../../../lib/utils';
-import { validateTransportRequest } from '../../../utils/transportValidation.js';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
-import { return_error, return_response, safeCheckOperation } from '../../../lib/utils';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  ErrorCode,
+  McpError,
+  return_error,
+  return_response,
+  safeCheckOperation,
+} from '../../../lib/utils';
+import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
-  name: "UpdateDomain",
+  name: 'UpdateDomain',
   description: `Update an existing ABAP domain in SAP system.
 
 Workflow:
@@ -28,78 +34,81 @@ Workflow:
 
 Note: All provided parameters completely replace existing values. Use GetDomain first to see current values if needed.`,
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       domain_name: {
-        type: "string",
-        description: "Domain name to update (e.g., ZZ_TEST_0001)"
+        type: 'string',
+        description: 'Domain name to update (e.g., ZZ_TEST_0001)',
       },
       description: {
-        type: "string",
-        description: "New domain description (optional)"
+        type: 'string',
+        description: 'New domain description (optional)',
       },
       package_name: {
-        type: "string",
-        description: "Package name (e.g., ZOK_LOCAL, $TMP for local objects)"
+        type: 'string',
+        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects)',
       },
       transport_request: {
-        type: "string",
-        description: "Transport request number (e.g., E19K905635). Required for transportable packages."
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
       datatype: {
-        type: "string",
-        description: "Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc."
+        type: 'string',
+        description:
+          'Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.',
       },
       length: {
-        type: "number",
-        description: "Field length (max depends on datatype)"
+        type: 'number',
+        description: 'Field length (max depends on datatype)',
       },
       decimals: {
-        type: "number",
-        description: "Decimal places (for DEC, CURR, QUAN types)"
+        type: 'number',
+        description: 'Decimal places (for DEC, CURR, QUAN types)',
       },
       conversion_exit: {
-        type: "string",
-        description: "Conversion exit routine name (without CONVERSION_EXIT_ prefix)"
+        type: 'string',
+        description:
+          'Conversion exit routine name (without CONVERSION_EXIT_ prefix)',
       },
       lowercase: {
-        type: "boolean",
-        description: "Allow lowercase input"
+        type: 'boolean',
+        description: 'Allow lowercase input',
       },
       sign_exists: {
-        type: "boolean",
-        description: "Field has sign (+/-)"
+        type: 'boolean',
+        description: 'Field has sign (+/-)',
       },
       value_table: {
-        type: "string",
-        description: "Value table name for foreign key relationship"
+        type: 'string',
+        description: 'Value table name for foreign key relationship',
       },
       activate: {
-        type: "boolean",
-        description: "Activate domain after update (default: true)",
-        default: true
+        type: 'boolean',
+        description: 'Activate domain after update (default: true)',
+        default: true,
       },
       fixed_values: {
-        type: "array",
-        description: "Array of fixed values for domain value range",
+        type: 'array',
+        description: 'Array of fixed values for domain value range',
         items: {
-          type: "object",
+          type: 'object',
           properties: {
             low: {
-              type: "string",
-              description: "Fixed value (e.g., '001', 'A')"
+              type: 'string',
+              description: "Fixed value (e.g., '001', 'A')",
             },
             text: {
-              type: "string",
-              description: "Description text for the fixed value"
-            }
+              type: 'string',
+              description: 'Description text for the fixed value',
+            },
           },
-          required: ["low", "text"]
-        }
-      }
+          required: ['low', 'text'],
+        },
+      },
     },
-    required: ["domain_name", "package_name"]
-  }
+    required: ['domain_name', 'package_name'],
+  },
 } as const;
 
 interface DomainArgs {
@@ -124,7 +133,10 @@ interface DomainArgs {
  * Uses DomainBuilder from @mcp-abap-adt/adt-clients for all operations
  * Session and lock management handled internally by builder
  */
-export async function handleUpdateDomain(context: HandlerContext, args: DomainArgs) {
+export async function handleUpdateDomain(
+  context: HandlerContext,
+  args: DomainArgs,
+) {
   const { connection, logger } = context;
   try {
     if (!args?.domain_name) {
@@ -149,7 +161,10 @@ export async function handleUpdateDomain(context: HandlerContext, args: DomainAr
 
       // Lock domain (will fail if domain doesn't exist)
       // Pass packageName to lockDomain so builder is created with correct config from the start
-      await client.lockDomain({ domainName, packageName: typedArgs.package_name } as any);
+      await client.lockDomain({
+        domainName,
+        packageName: typedArgs.package_name,
+      } as any);
       const lockHandle = client.getLockHandle();
 
       try {
@@ -165,7 +180,7 @@ export async function handleUpdateDomain(context: HandlerContext, args: DomainAr
           lowercase: typedArgs.lowercase,
           signExists: typedArgs.sign_exists,
           valueTable: typedArgs.value_table,
-          fixedValues: typedArgs.fixed_values
+          fixedValues: typedArgs.fixed_values,
         };
         await client.updateDomain(properties, lockHandle);
 
@@ -175,8 +190,8 @@ export async function handleUpdateDomain(context: HandlerContext, args: DomainAr
             () => client.checkDomain({ domainName }),
             domainName,
             {
-              debug: (message: string) => logger?.debug(message)
-            }
+              debug: (message: string) => logger?.debug(message),
+            },
           );
         } catch (checkError: any) {
           // If error was marked as "already checked", continue silently
@@ -198,7 +213,9 @@ export async function handleUpdateDomain(context: HandlerContext, args: DomainAr
         try {
           await client.unlockDomain({ domainName }, lockHandle);
         } catch (unlockError) {
-          logger?.error(`Failed to unlock domain after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`);
+          logger?.error(
+            `Failed to unlock domain after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
+          );
         }
         throw error;
       }
@@ -206,7 +223,11 @@ export async function handleUpdateDomain(context: HandlerContext, args: DomainAr
       // Get domain details from update result
       const updateResult = client.getUpdateResult();
       let domainDetails = null;
-      if (updateResult?.data && typeof updateResult.data === 'object' && 'domain_details' in updateResult.data) {
+      if (
+        updateResult?.data &&
+        typeof updateResult.data === 'object' &&
+        'domain_details' in updateResult.data
+      ) {
         domainDetails = (updateResult.data as any).domain_details;
       }
 
@@ -218,38 +239,43 @@ export async function handleUpdateDomain(context: HandlerContext, args: DomainAr
           transport_request: typedArgs.transport_request,
           status: shouldActivate ? 'active' : 'inactive',
           message: `Domain ${domainName} updated${shouldActivate ? ' and activated' : ''} successfully`,
-          domain_details: domainDetails
-        })
+          domain_details: domainDetails,
+        }),
       } as AxiosResponse);
-
     } catch (error: any) {
-      logger?.error(`Error updating domain ${domainName}: ${error?.message || error}`);
+      logger?.error(
+        `Error updating domain ${domainName}: ${error?.message || error}`,
+      );
 
       // Handle specific error cases
-      if (error.message?.includes('not found') || error.response?.status === 404) {
+      if (
+        error.message?.includes('not found') ||
+        error.response?.status === 404
+      ) {
         throw new McpError(
           ErrorCode.InvalidParams,
-          `Domain ${domainName} not found.`
+          `Domain ${domainName} not found.`,
         );
       }
 
       if (error.message?.includes('locked') || error.response?.status === 403) {
         throw new McpError(
           ErrorCode.InternalError,
-          `Domain ${domainName} is locked by another user or session. Please try again later.`
+          `Domain ${domainName} is locked by another user or session. Please try again later.`,
         );
       }
 
       const errorMessage = error.response?.data
-        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+        ? typeof error.response.data === 'string'
+          ? error.response.data
+          : JSON.stringify(error.response.data)
         : error.message || String(error);
 
       throw new McpError(
         ErrorCode.InternalError,
-        `Failed to update domain ${domainName}: ${errorMessage}`
+        `Failed to update domain ${domainName}: ${errorMessage}`,
       );
     }
-
   } catch (error: any) {
     if (error instanceof McpError) {
       throw error;

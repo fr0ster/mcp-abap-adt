@@ -5,40 +5,47 @@
  * Low-level handler: single method call.
  */
 
-import { return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "GetClassUnitTestStatusLow",
-  description: "[low-level] Retrieve ABAP Unit run status XML for a previously started run_id.",
+  name: 'GetClassUnitTestStatusLow',
+  description:
+    '[low-level] Retrieve ABAP Unit run status XML for a previously started run_id.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       run_id: {
-        type: "string",
-        description: "Run identifier returned by RunClassUnitTestsLow."
+        type: 'string',
+        description: 'Run identifier returned by RunClassUnitTestsLow.',
       },
       with_long_polling: {
-        type: "boolean",
-        description: "Optional flag to enable SAP long-polling (default true)."
+        type: 'boolean',
+        description: 'Optional flag to enable SAP long-polling (default true).',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from GetSession. If not provided, a new session will be created."
+        type: 'string',
+        description:
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["run_id"]
-  }
+    required: ['run_id'],
+  },
 } as const;
 
 interface GetStatusArgs {
@@ -52,14 +59,17 @@ interface GetStatusArgs {
   };
 }
 
-export async function handleGetClassUnitTestStatus(context: HandlerContext, args: GetStatusArgs) {
+export async function handleGetClassUnitTestStatus(
+  context: HandlerContext,
+  args: GetStatusArgs,
+) {
   const { connection, logger } = context;
   try {
     const {
       run_id,
       with_long_polling = true,
       session_id,
-      session_state
+      session_state,
     } = args as GetStatusArgs;
 
     if (!run_id) {
@@ -84,11 +94,12 @@ export async function handleGetClassUnitTestStatus(context: HandlerContext, args
 
       return return_response(statusResponse);
     } catch (error: any) {
-      logger?.error(`Error retrieving ABAP Unit status for run ${run_id}: ${error?.message || error}`);
+      logger?.error(
+        `Error retrieving ABAP Unit status for run ${run_id}: ${error?.message || error}`,
+      );
       return return_error(new Error(error?.message || String(error)));
     }
   } catch (error: any) {
     return return_error(error);
   }
 }
-

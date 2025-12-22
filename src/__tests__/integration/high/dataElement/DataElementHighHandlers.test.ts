@@ -17,9 +17,8 @@
 import { handleCreateDataElement } from '../../../../handlers/data_element/high/handleCreateDataElement';
 import { handleUpdateDataElement } from '../../../../handlers/data_element/high/handleUpdateDataElement';
 import { handleDeleteDataElement } from '../../../../handlers/data_element/low/handleDeleteDataElement';
-
-import { HighTester } from '../../helpers/testers/HighTester';
 import { getTimeout } from '../../helpers/configHelpers';
+import { HighTester } from '../../helpers/testers/HighTester';
 
 describe('DataElement High-Level Handlers Integration', () => {
   let tester: HighTester;
@@ -32,8 +31,8 @@ describe('DataElement High-Level Handlers Integration', () => {
       {
         create: handleCreateDataElement,
         update: handleUpdateDataElement,
-        delete: handleDeleteDataElement
-      }
+        delete: handleDeleteDataElement,
+      },
     );
     await tester.beforeAll();
   });
@@ -50,7 +49,11 @@ describe('DataElement High-Level Handlers Integration', () => {
     await tester.afterEach();
   });
 
-  it('should test all DataElement high-level handlers', async () => {
-    await tester.run();
-  }, getTimeout('long'));
+  it(
+    'should test all DataElement high-level handlers',
+    async () => {
+      await tester.run();
+    },
+    getTimeout('long'),
+  );
 });

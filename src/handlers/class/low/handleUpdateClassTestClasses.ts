@@ -5,44 +5,52 @@
  * Low-level handler: single method call.
  */
 
-import { AxiosResponse, return_error, return_response, logger as baseLogger, restoreSessionInConnection } from '../../../lib/utils';
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: "UpdateClassTestClassesLow",
-  description: "[low-level] Upload ABAP Unit test include source code for an existing class. Requires test_classes_lock_handle from LockClassTestClassesLow.",
+  name: 'UpdateClassTestClassesLow',
+  description:
+    '[low-level] Upload ABAP Unit test include source code for an existing class. Requires test_classes_lock_handle from LockClassTestClassesLow.',
   inputSchema: {
-    type: "object",
+    type: 'object',
     properties: {
       class_name: {
-        type: "string",
-        description: "Class name (e.g., ZCL_MY_CLASS)."
+        type: 'string',
+        description: 'Class name (e.g., ZCL_MY_CLASS).',
       },
       test_class_source: {
-        type: "string",
-        description: "Complete ABAP Unit test class source code."
+        type: 'string',
+        description: 'Complete ABAP Unit test class source code.',
       },
       lock_handle: {
-        type: "string",
-        description: "Test classes lock handle from LockClassTestClassesLow."
+        type: 'string',
+        description: 'Test classes lock handle from LockClassTestClassesLow.',
       },
       session_id: {
-        type: "string",
-        description: "Session ID from GetSession. If not provided, a new session will be created."
+        type: 'string',
+        description:
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
-        type: "object",
-        description: "Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.",
+        type: 'object',
+        description:
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
-          cookies: { type: "string" },
-          csrf_token: { type: "string" },
-          cookie_store: { type: "object" }
-        }
-      }
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
     },
-    required: ["class_name", "test_class_source", "lock_handle"]
-  }
+    required: ['class_name', 'test_class_source', 'lock_handle'],
+  },
 } as const;
 
 interface UpdateClassTestClassesArgs {
@@ -57,7 +65,10 @@ interface UpdateClassTestClassesArgs {
   };
 }
 
-export async function handleUpdateClassTestClasses(context: HandlerContext, args: UpdateClassTestClassesArgs) {
+export async function handleUpdateClassTestClasses(
+  context: HandlerContext,
+  args: UpdateClassTestClassesArgs,
+) {
   const { connection, logger } = context;
   try {
     const {
@@ -65,11 +76,15 @@ export async function handleUpdateClassTestClasses(context: HandlerContext, args
       test_class_source,
       lock_handle,
       session_id,
-      session_state
+      session_state,
     } = args as UpdateClassTestClassesArgs;
 
     if (!class_name || !test_class_source || !lock_handle) {
-      return return_error(new Error('class_name, test_class_source, and lock_handle are required'));
+      return return_error(
+        new Error(
+          'class_name, test_class_source, and lock_handle are required',
+        ),
+      );
     }
 
     const client = new CrudClient(connection);
@@ -77,42 +92,50 @@ export async function handleUpdateClassTestClasses(context: HandlerContext, args
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
     } else {
-          }
+    }
 
     const className = class_name.toUpperCase();
     logger?.info(`Starting test classes update for: ${className}`);
 
     try {
-      await client.updateClassTestIncludes({
-        className,
-        testClassCode: test_class_source
-      }, lock_handle);
+      await client.updateClassTestIncludes(
+        {
+          className,
+          testClassCode: test_class_source,
+        },
+        lock_handle,
+      );
       const updateResult = client.getTestClassUpdateResult();
-
 
       logger?.info(`✅ UpdateClassTestClasses completed: ${className}`);
 
       return return_response({
-        data: JSON.stringify({
-          success: true,
-          class_name: className,
-          session_id: session_id || null,
-          status: updateResult?.status,
-          session_state: null, // Session state management is now handled by auth-broker,
-          message: `Test classes for ${className} updated successfully. Remember to unlock using UnlockClassTestClassesLow.`
-        }, null, 2)
+        data: JSON.stringify(
+          {
+            success: true,
+            class_name: className,
+            session_id: session_id || null,
+            status: updateResult?.status,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: `Test classes for ${className} updated successfully. Remember to unlock using UnlockClassTestClassesLow.`,
+          },
+          null,
+          2,
+        ),
       } as AxiosResponse);
     } catch (error: any) {
-      logger?.error(`Error updating test classes for ${className}: ${error?.message || error}`);
-      const reason = error?.response?.status === 404
-        ? `Class ${className} not found.`
-        : error?.response?.status === 423
-        ? `Test classes for ${className} are locked by another user or lock handle is invalid.`
-        : error?.message || String(error);
+      logger?.error(
+        `Error updating test classes for ${className}: ${error?.message || error}`,
+      );
+      const reason =
+        error?.response?.status === 404
+          ? `Class ${className} not found.`
+          : error?.response?.status === 423
+            ? `Test classes for ${className} are locked by another user or lock handle is invalid.`
+            : error?.message || String(error);
       return return_error(new Error(reason));
     }
   } catch (error: any) {
     return return_error(error);
   }
 }
-

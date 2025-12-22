@@ -16,9 +16,10 @@ export class StdioLogger {
 
   error(message: string, ...args: any[]): void {
     // Write errors to stderr for stdio transport
-    const errorMsg = args.length > 0
-      ? `${message} ${args.map(a => a instanceof Error ? a.message : JSON.stringify(a)).join(' ')}`
-      : message;
+    const errorMsg =
+      args.length > 0
+        ? `${message} ${args.map((a) => (a instanceof Error ? a.message : JSON.stringify(a))).join(' ')}`
+        : message;
     process.stderr.write(`[ERROR] ${errorMsg}\n`);
   }
 

@@ -2,6 +2,38 @@
 
 ## [Unreleased]
 
+## [1.2.4] - 2025-12-22
+### Changed
+- **Migrated from ESLint+Prettier to Biome**
+  - Removed ESLint and Prettier dependencies
+  - Added @biomejs/biome for faster linting and formatting
+  - Configured Biome with strict rules for production code
+  - Relaxed rules for test files (noImplicitAnyLet, noExplicitAny)
+  - Updated package.json scripts: `lint`, `lint:check`, `format`
+  - Updated `npm run build` to include Biome check before TypeScript compilation
+
+### Fixed
+- Fixed TypeScript errors in production code:
+  - `handleGetAbapAST.ts` - Fixed regex match types and while loop patterns in 4 methods
+  - `handleGetObjectInfo.ts` - Added type annotation for `packageName`
+  - `handleDescribeByList.ts` - Added type annotation for `parsed`
+  - `handleValidateDataElement.ts` - Added type assertion for `AxiosResponse`
+  - `handleCreateClass.ts` - Added `ClassBuilderState` type import
+  - `handleDeleteObject.ts` - Changed `any` to `unknown` for response
+  - `handleGetEnhancementSpot.ts` - Fixed array types and while loops
+  - `handleGetProgFullCode.ts` - Fixed 3 while loops with regex.exec() pattern
+- All production code now passes strict Biome rules (no implicit any, no assignments in expressions)
+
+### Added
+- Added Biome check to CI workflow (`.github/workflows/ci.yml`)
+- Added Biome check to Release workflow (`.github/workflows/release.yml`)
+
+### Dependencies
+- Updated `@mcp-abap-adt/adt-clients` to ^0.2.6
+- Updated `@mcp-abap-adt/adt-interfaces` to ^0.2.6
+- Added `@biomejs/biome` ^2.3.10 as devDependency
+- Removed `eslint` and `prettier` dependencies
+
 ## [1.2.3] - 2025-12-22
 ### Fixed
 - Removed unused import of `IAbapConnectionExtended` from `@mcp-abap-adt/interfaces`

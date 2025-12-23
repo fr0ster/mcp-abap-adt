@@ -1,13 +1,9 @@
-import { getAuthHeaders, getBaseUrl } from '../lib/utils';
+import { getBaseUrl } from '../lib/utils';
 
 describe('Utility Functions', () => {
   describe('URL and Header Helpers', () => {
     it('should export getBaseUrl function', () => {
       expect(typeof getBaseUrl).toBe('function');
-    });
-
-    it('should export getAuthHeaders function', () => {
-      expect(typeof getAuthHeaders).toBe('function');
     });
   });
 

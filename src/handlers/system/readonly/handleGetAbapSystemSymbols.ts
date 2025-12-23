@@ -1,9 +1,9 @@
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
-import { handleGetClass } from '../../class/readonly/handleGetClass';
+import { handleGetClass } from '../../class/high/handleGetClass';
 import { handleGetFunction } from '../../function/readonly/handleGetFunction';
-import { handleGetInterface } from '../../interface/readonly/handleGetInterface';
+import { handleGetInterface } from '../../interface/high/handleGetInterface';
 export const TOOL_DEFINITION = {
   name: 'GetAbapSystemSymbols',
   description:
@@ -545,7 +545,7 @@ class AbapSystemSymbolResolver {
         };
       }
       const contentItem = classInfo.content[0];
-      if (!contentItem || !('json' in contentItem)) {
+      if (!contentItem) {
         return {
           ...symbol,
           systemInfo: {
@@ -554,7 +554,17 @@ class AbapSystemSymbolResolver {
           },
         };
       }
-      const classData = contentItem.json;
+      // Parse JSON from text field (handleGetClass returns text with JSON string)
+      let classData: any = {};
+      if ('json' in contentItem) {
+        classData = contentItem.json;
+      } else if ('text' in contentItem && contentItem.text) {
+        try {
+          classData = JSON.parse(contentItem.text);
+        } catch {
+          // If parsing fails, use empty object
+        }
+      }
       return {
         ...symbol,
         systemInfo: {
@@ -656,7 +666,7 @@ class AbapSystemSymbolResolver {
       }
 
       const contentItem = interfaceInfo.content[0];
-      if (!contentItem || !('json' in contentItem)) {
+      if (!contentItem) {
         return {
           ...symbol,
           systemInfo: {
@@ -665,7 +675,17 @@ class AbapSystemSymbolResolver {
           },
         };
       }
-      const interfaceData = contentItem.json;
+      // Parse JSON from text field (handleGetInterface returns text with JSON string)
+      let interfaceData: any = {};
+      if ('json' in contentItem) {
+        interfaceData = contentItem.json;
+      } else if ('text' in contentItem && contentItem.text) {
+        try {
+          interfaceData = JSON.parse(contentItem.text);
+        } catch {
+          // If parsing fails, use empty object
+        }
+      }
       return {
         ...symbol,
         systemInfo: {

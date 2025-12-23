@@ -60,7 +60,11 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
   beforeAll(async () => {
     try {
       connection = getManagedConnection();
-      await connection.connect();
+      // connect() is not part of IAbapConnection interface, use type assertion
+      const connectionAny = connection as any;
+      if (connectionAny.connect) {
+        await connectionAny.connect();
+      }
       const sessionId = generateSessionId();
       session = await getTestSession();
       hasConfig = true;
@@ -327,8 +331,6 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
             {
               class_name: className,
               lock_handle: lockHandle,
-              session_id: lockSession.session_id,
-              session_state: lockSession.session_state,
             },
           );
 
@@ -398,8 +400,6 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
                     {
                       class_name: className,
                       lock_handle: lockHandleForCleanup,
-                      session_id: lockSessionForCleanup.session_id,
-                      session_state: lockSessionForCleanup.session_state,
                     },
                   );
                 } catch (unlockError: any) {

@@ -289,7 +289,8 @@ function loadAllTools() {
 
     // Extract all TOOL_DEFINITION imports from handler groups
     // Pattern: import { TOOL_DEFINITION as XXX_Tool } from '../../../handlers/category/level/handlerFile';
-    const importMatches = content.matchAll(/import \{ TOOL_DEFINITION as (\w+)_Tool \} from ['"]\.\.\/\.\.\/\.\.\/handlers\/(.+?)['"];/g);
+    // Supports both single-line and multi-line imports
+    const importMatches = content.matchAll(/import \{[\s\S]*?TOOL_DEFINITION as (\w+)_Tool[\s\S]*?\} from ['"]\.\.\/\.\.\/\.\.\/handlers\/(.+?)['"];/g);
 
     for (const match of importMatches) {
       const handlerRelativePath = match[2]; // e.g., "program/readonly/handleGetProgram"

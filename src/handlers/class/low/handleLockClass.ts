@@ -9,7 +9,6 @@ import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
-  restoreSessionInConnection,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -17,28 +16,13 @@ import {
 export const TOOL_DEFINITION = {
   name: 'LockClassLow',
   description:
-    '[low-level] Lock an ABAP class for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.',
+    '[low-level] Lock an ABAP class for modification. Uses session from HandlerContext. Returns lock handle that must be used in subsequent update/unlock operations.',
   inputSchema: {
     type: 'object',
     properties: {
       class_name: {
         type: 'string',
         description: 'Class name (e.g., ZCL_MY_CLASS).',
-      },
-      session_id: {
-        type: 'string',
-        description:
-          'Session ID from GetSession. If not provided, a new session will be created.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
       },
     },
     required: ['class_name'],
@@ -47,12 +31,6 @@ export const TOOL_DEFINITION = {
 
 interface LockClassArgs {
   class_name: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 }
 
 /**
@@ -66,7 +44,7 @@ export async function handleLockClass(
 ) {
   const { connection, logger } = context;
   try {
-    const { class_name, session_id, session_state } = args as LockClassArgs;
+    const { class_name } = args as LockClassArgs;
 
     // Validation
     if (!class_name) {
@@ -74,11 +52,6 @@ export async function handleLockClass(
     }
 
     const client = new CrudClient(connection);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
 
     const className = class_name.toUpperCase();
 
@@ -95,8 +68,6 @@ export async function handleLockClass(
         );
       }
 
-      // Get updated session state after lock
-
       logger?.info(`✅ LockClass completed: ${className}`);
       logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
@@ -105,10 +76,8 @@ export async function handleLockClass(
           {
             success: true,
             class_name: className,
-            session_id: session_id || null,
             lock_handle: lockHandle,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Class ${className} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`,
+            message: `Class ${className} locked successfully. Use this lock_handle for subsequent update/unlock operations.`,
           },
           null,
           2,

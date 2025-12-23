@@ -9,7 +9,6 @@ import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
-  restoreSessionInConnection,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -17,7 +16,7 @@ import {
 export const TOOL_DEFINITION = {
   name: 'UnlockClassLow',
   description:
-    '[low-level] Unlock an ABAP class after modification. Must use the same session_id and lock_handle from LockClass operation.',
+    '[low-level] Unlock an ABAP class after modification. Uses session from HandlerContext. Must use the same lock_handle from LockClass operation.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -29,35 +28,14 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Lock handle from LockClass operation.',
       },
-      session_id: {
-        type: 'string',
-        description:
-          'Session ID from LockClass operation. Must be the same as used in LockClass.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          'Session state from LockClass (cookies, csrf_token, cookie_store). Required if session_id is provided.',
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
     },
-    required: ['class_name', 'lock_handle', 'session_id'],
+    required: ['class_name', 'lock_handle'],
   },
 } as const;
 
 interface UnlockClassArgs {
   class_name: string;
   lock_handle: string;
-  session_id: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 }
 
 /**
@@ -71,28 +49,18 @@ export async function handleUnlockClass(
 ) {
   const { connection, logger } = context;
   try {
-    const { class_name, lock_handle, session_id, session_state } =
-      args as UnlockClassArgs;
+    const { class_name, lock_handle } = args as UnlockClassArgs;
 
     // Validation
-    if (!class_name || !lock_handle || !session_id) {
-      return return_error(
-        new Error('class_name, lock_handle, and session_id are required'),
-      );
+    if (!class_name || !lock_handle) {
+      return return_error(new Error('class_name and lock_handle are required'));
     }
 
     const client = new CrudClient(connection);
 
-    // Restore session state if provided
-    if (session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
     const className = class_name.toUpperCase();
 
-    logger?.info(
-      `Starting class unlock: ${className} (session: ${session_id.substring(0, 8)}...)`,
-    );
+    logger?.info(`Starting class unlock: ${className}`);
 
     try {
       // Unlock class
@@ -105,8 +73,6 @@ export async function handleUnlockClass(
         );
       }
 
-      // Get updated session state after unlock
-
       logger?.info(`✅ UnlockClass completed: ${className}`);
 
       return return_response({
@@ -114,8 +80,6 @@ export async function handleUnlockClass(
           {
             success: true,
             class_name: className,
-            session_id: session_id,
-            session_state: null, // Session state management is now handled by auth-broker,
             message: `Class ${className} unlocked successfully.`,
           },
           null,
@@ -133,7 +97,7 @@ export async function handleUnlockClass(
       if (error.response?.status === 404) {
         errorMessage = `Class ${className} not found.`;
       } else if (error.response?.status === 400) {
-        errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockClass.`;
+        errorMessage = `Invalid lock handle. Make sure you're using the same lock_handle from LockClass.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

@@ -10,6 +10,7 @@ import type { HandlerContext } from '../../handlers/interfaces.js';
 // dotenv removed - using manual .env parsing for all modes to avoid stdout pollution
 
 import { handleCreateBehaviorDefinition } from '../../handlers/behavior_definition/high/handleCreateBehaviorDefinition';
+import { handleGetBehaviorDefinition } from '../../handlers/behavior_definition/high/handleGetBehaviorDefinition';
 import { handleUpdateBehaviorDefinition as handleUpdateBehaviorDefinitionHigh } from '../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
 import { handleActivateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
 import { handleCheckBehaviorDefinition } from '../../handlers/behavior_definition/low/handleCheckBehaviorDefinition';
@@ -19,10 +20,10 @@ import { handleLockBehaviorDefinition } from '../../handlers/behavior_definition
 import { handleUnlockBehaviorDefinition } from '../../handlers/behavior_definition/low/handleUnlockBehaviorDefinition';
 import { handleUpdateBehaviorDefinition as handleUpdateBehaviorDefinitionLow } from '../../handlers/behavior_definition/low/handleUpdateBehaviorDefinition';
 import { handleValidateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleValidateBehaviorDefinition';
-import { handleGetBdef } from '../../handlers/behavior_definition/readonly/handleGetBdef';
 import { handleCreateBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleUpdateBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
 import { handleCreateClass } from '../../handlers/class/high/handleCreateClass';
+import { handleGetClass } from '../../handlers/class/high/handleGetClass';
 // import { handleActivateObject } from "../../handlers/common/low/handleActivateObject";
 // import { handleDeleteObject } from "../../handlers/common/low/handleDeleteObject";
 // import { handleCheckObject } from "../../handlers/common/low/handleCheckObject";
@@ -43,11 +44,11 @@ import { handleUnlockClassTestClasses } from '../../handlers/class/low/handleUnl
 import { handleUpdateClass as handleUpdateClassLow } from '../../handlers/class/low/handleUpdateClass';
 import { handleUpdateClassTestClasses } from '../../handlers/class/low/handleUpdateClassTestClasses';
 import { handleValidateClass } from '../../handlers/class/low/handleValidateClass';
-import { handleGetClass } from '../../handlers/class/readonly/handleGetClass';
 import { handleLockObject } from '../../handlers/common/low/handleLockObject';
 import { handleUnlockObject } from '../../handlers/common/low/handleUnlockObject';
 import { handleValidateObject } from '../../handlers/common/low/handleValidateObject';
 import { handleCreateDataElement } from '../../handlers/data_element/high/handleCreateDataElement';
+import { handleGetDataElement } from '../../handlers/data_element/high/handleGetDataElement';
 import { handleUpdateDataElement as handleUpdateDataElementHigh } from '../../handlers/data_element/high/handleUpdateDataElement';
 import { handleActivateDataElement } from '../../handlers/data_element/low/handleActivateDataElement';
 import { handleCheckDataElement } from '../../handlers/data_element/low/handleCheckDataElement';
@@ -57,7 +58,6 @@ import { handleLockDataElement } from '../../handlers/data_element/low/handleLoc
 import { handleUnlockDataElement } from '../../handlers/data_element/low/handleUnlockDataElement';
 import { handleUpdateDataElement } from '../../handlers/data_element/low/handleUpdateDataElement';
 import { handleValidateDataElement } from '../../handlers/data_element/low/handleValidateDataElement';
-import { handleGetDataElement } from '../../handlers/data_element/readonly/handleGetDataElement';
 import { handleCreateMetadataExtension } from '../../handlers/ddlx/high/handleCreateMetadataExtension';
 import { handleUpdateMetadataExtension as handleUpdateMetadataExtensionHigh } from '../../handlers/ddlx/high/handleUpdateMetadataExtension';
 import { handleActivateMetadataExtension } from '../../handlers/ddlx/low/handleActivateMetadataExtension';
@@ -69,6 +69,7 @@ import { handleUnlockMetadataExtension } from '../../handlers/ddlx/low/handleUnl
 import { handleUpdateMetadataExtension as handleUpdateMetadataExtensionLow } from '../../handlers/ddlx/low/handleUpdateMetadataExtension';
 import { handleValidateMetadataExtension } from '../../handlers/ddlx/low/handleValidateMetadataExtension';
 import { handleCreateDomain } from '../../handlers/domain/high/handleCreateDomain';
+import { handleGetDomain } from '../../handlers/domain/high/handleGetDomain';
 import { handleUpdateDomain as handleUpdateDomainHigh } from '../../handlers/domain/high/handleUpdateDomain';
 import { handleActivateDomain } from '../../handlers/domain/low/handleActivateDomain';
 import { handleCheckDomain } from '../../handlers/domain/low/handleCheckDomain';
@@ -78,7 +79,6 @@ import { handleLockDomain } from '../../handlers/domain/low/handleLockDomain';
 import { handleUnlockDomain } from '../../handlers/domain/low/handleUnlockDomain';
 import { handleUpdateDomain } from '../../handlers/domain/low/handleUpdateDomain';
 import { handleValidateDomain } from '../../handlers/domain/low/handleValidateDomain';
-import { handleGetDomain } from '../../handlers/domain/readonly/handleGetDomain';
 import { handleGetEnhancementImpl } from '../../handlers/enhancement/readonly/handleGetEnhancementImpl';
 import { handleGetEnhancementSpot } from '../../handlers/enhancement/readonly/handleGetEnhancementSpot';
 import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
@@ -102,10 +102,11 @@ import { handleUpdateFunctionModule as handleUpdateFunctionModuleLow } from '../
 import { handleValidateFunctionGroup } from '../../handlers/function/low/handleValidateFunctionGroup';
 import { handleValidateFunctionModule } from '../../handlers/function/low/handleValidateFunctionModule';
 import { handleGetFunction } from '../../handlers/function/readonly/handleGetFunction';
-import { handleGetFunctionGroup } from '../../handlers/function/readonly/handleGetFunctionGroup';
+import { handleGetFunctionGroup } from '../../handlers/function_group/high/handleGetFunctionGroup';
 import { handleGetInclude } from '../../handlers/include/readonly/handleGetInclude';
 import { handleGetIncludesList } from '../../handlers/include/readonly/handleGetIncludesList';
 import { handleCreateInterface } from '../../handlers/interface/high/handleCreateInterface';
+import { handleGetInterface } from '../../handlers/interface/high/handleGetInterface';
 import { handleUpdateInterface as handleUpdateInterfaceHigh } from '../../handlers/interface/high/handleUpdateInterface';
 import { handleActivateInterface } from '../../handlers/interface/low/handleActivateInterface';
 import { handleCheckInterface } from '../../handlers/interface/low/handleCheckInterface';
@@ -115,7 +116,6 @@ import { handleLockInterface } from '../../handlers/interface/low/handleLockInte
 import { handleUnlockInterface } from '../../handlers/interface/low/handleUnlockInterface';
 import { handleUpdateInterface as handleUpdateInterfaceLow } from '../../handlers/interface/low/handleUpdateInterface';
 import { handleValidateInterface } from '../../handlers/interface/low/handleValidateInterface';
-import { handleGetInterface } from '../../handlers/interface/readonly/handleGetInterface';
 import { handleCreatePackage } from '../../handlers/package/high/handleCreatePackage';
 import { handleCheckPackage } from '../../handlers/package/low/handleCheckPackage';
 import { handleCreatePackage as handleCreatePackageLow } from '../../handlers/package/low/handleCreatePackage';
@@ -126,6 +126,9 @@ import { handleUpdatePackage } from '../../handlers/package/low/handleUpdatePack
 import { handleValidatePackage } from '../../handlers/package/low/handleValidatePackage';
 import { handleGetPackage } from '../../handlers/package/readonly/handleGetPackage';
 import { handleCreateProgram } from '../../handlers/program/high/handleCreateProgram';
+// Import handler functions
+// Import handler functions
+import { handleGetProgram } from '../../handlers/program/high/handleGetProgram';
 import { handleUpdateProgram as handleUpdateProgramHigh } from '../../handlers/program/high/handleUpdateProgram';
 import { handleActivateProgram } from '../../handlers/program/low/handleActivateProgram';
 import { handleCheckProgram } from '../../handlers/program/low/handleCheckProgram';
@@ -136,16 +139,14 @@ import { handleUnlockProgram } from '../../handlers/program/low/handleUnlockProg
 import { handleUpdateProgram as handleUpdateProgramLow } from '../../handlers/program/low/handleUpdateProgram';
 import { handleValidateProgram } from '../../handlers/program/low/handleValidateProgram';
 import { handleGetProgFullCode } from '../../handlers/program/readonly/handleGetProgFullCode';
-// Import handler functions
-// Import handler functions
-import { handleGetProgram } from '../../handlers/program/readonly/handleGetProgram';
 import { handleGetObjectsByType } from '../../handlers/search/readonly/handleGetObjectsByType';
 import { handleGetObjectsList } from '../../handlers/search/readonly/handleGetObjectsList';
 import { handleSearchObject } from '../../handlers/search/readonly/handleSearchObject';
 import { handleCreateServiceDefinition } from '../../handlers/service_definition/high/handleCreateServiceDefinition';
+import { handleGetServiceDefinition } from '../../handlers/service_definition/high/handleGetServiceDefinition';
 import { handleUpdateServiceDefinition } from '../../handlers/service_definition/high/handleUpdateServiceDefinition';
-import { handleGetServiceDefinition } from '../../handlers/service_definition/readonly/handleGetServiceDefinition';
 import { handleCreateStructure } from '../../handlers/structure/high/handleCreateStructure';
+import { handleGetStructure } from '../../handlers/structure/high/handleGetStructure';
 import { handleUpdateStructure as handleUpdateStructureHigh } from '../../handlers/structure/high/handleUpdateStructure';
 import { handleActivateStructure } from '../../handlers/structure/low/handleActivateStructure';
 import { handleCheckStructure } from '../../handlers/structure/low/handleCheckStructure';
@@ -155,7 +156,6 @@ import { handleLockStructure } from '../../handlers/structure/low/handleLockStru
 import { handleUnlockStructure } from '../../handlers/structure/low/handleUnlockStructure';
 import { handleUpdateStructure as handleUpdateStructureLow } from '../../handlers/structure/low/handleUpdateStructure';
 import { handleValidateStructure } from '../../handlers/structure/low/handleValidateStructure';
-import { handleGetStructure } from '../../handlers/structure/readonly/handleGetStructure';
 import { handleDescribeByList } from '../../handlers/system/readonly/handleDescribeByList';
 import { handleGetAbapAST } from '../../handlers/system/readonly/handleGetAbapAST';
 import { handleGetAbapSemanticAnalysis } from '../../handlers/system/readonly/handleGetAbapSemanticAnalysis';
@@ -170,6 +170,7 @@ import { handleGetTransaction } from '../../handlers/system/readonly/handleGetTr
 import { handleGetTypeInfo } from '../../handlers/system/readonly/handleGetTypeInfo';
 import { handleGetWhereUsed } from '../../handlers/system/readonly/handleGetWhereUsed';
 import { handleCreateTable } from '../../handlers/table/high/handleCreateTable';
+import { handleGetTable } from '../../handlers/table/high/handleGetTable';
 import { handleUpdateTable as handleUpdateTableHigh } from '../../handlers/table/high/handleUpdateTable';
 import { handleActivateTable } from '../../handlers/table/low/handleActivateTable';
 import { handleCheckTable } from '../../handlers/table/low/handleCheckTable';
@@ -179,12 +180,12 @@ import { handleLockTable } from '../../handlers/table/low/handleLockTable';
 import { handleUnlockTable } from '../../handlers/table/low/handleUnlockTable';
 import { handleUpdateTable as handleUpdateTableLow } from '../../handlers/table/low/handleUpdateTable';
 import { handleValidateTable } from '../../handlers/table/low/handleValidateTable';
-import { handleGetTable } from '../../handlers/table/readonly/handleGetTable';
 import { handleGetTableContents } from '../../handlers/table/readonly/handleGetTableContents';
 import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
 import { handleCreateTransport as handleCreateTransportLow } from '../../handlers/transport/low/handleCreateTransport';
 import { handleGetTransport } from '../../handlers/transport/readonly/handleGetTransport';
 import { handleCreateView } from '../../handlers/view/high/handleCreateView';
+import { handleGetView } from '../../handlers/view/high/handleGetView';
 import { handleUpdateView as handleUpdateViewHigh } from '../../handlers/view/high/handleUpdateView';
 import { handleActivateView } from '../../handlers/view/low/handleActivateView';
 import { handleCheckView } from '../../handlers/view/low/handleCheckView';
@@ -194,13 +195,13 @@ import { handleLockView } from '../../handlers/view/low/handleLockView';
 import { handleUnlockView } from '../../handlers/view/low/handleUnlockView';
 import { handleUpdateView as handleUpdateViewLow } from '../../handlers/view/low/handleUpdateView';
 import { handleValidateView } from '../../handlers/view/low/handleValidateView';
-import { handleGetView } from '../../handlers/view/readonly/handleGetView';
 
 // Import logger
 
 // Import tool registry
 
 import { TOOL_DEFINITION as CreateBdef_Tool } from '../../handlers/behavior_definition/high/handleCreateBehaviorDefinition';
+import { TOOL_DEFINITION as GetBehaviorDefinition_Tool } from '../../handlers/behavior_definition/high/handleGetBehaviorDefinition';
 import { TOOL_DEFINITION as UpdateBdef_Tool } from '../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
 import { TOOL_DEFINITION as ActivateBehaviorDefinition_Tool } from '../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
 import { TOOL_DEFINITION as CheckBehaviorDefinition_Tool } from '../../handlers/behavior_definition/low/handleCheckBehaviorDefinition';
@@ -210,10 +211,10 @@ import { TOOL_DEFINITION as LockBehaviorDefinition_Tool } from '../../handlers/b
 import { TOOL_DEFINITION as UnlockBehaviorDefinition_Tool } from '../../handlers/behavior_definition/low/handleUnlockBehaviorDefinition';
 import { TOOL_DEFINITION as UpdateBehaviorDefinitionLow_Tool } from '../../handlers/behavior_definition/low/handleUpdateBehaviorDefinition';
 import { TOOL_DEFINITION as ValidateBehaviorDefinition_Tool } from '../../handlers/behavior_definition/low/handleValidateBehaviorDefinition';
-import { TOOL_DEFINITION as GetBdef_Tool } from '../../handlers/behavior_definition/readonly/handleGetBdef';
 import { TOOL_DEFINITION as CreateBehaviorImplementation_Tool } from '../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { TOOL_DEFINITION as UpdateBehaviorImplementation_Tool } from '../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
 import { TOOL_DEFINITION as CreateClass_Tool } from '../../handlers/class/high/handleCreateClass';
+import { TOOL_DEFINITION as GetClass_Tool } from '../../handlers/class/high/handleGetClass';
 // import { TOOL_DEFINITION as ActivateObject_Tool } from "../../handlers/common/low/handleActivateObject";
 // import { TOOL_DEFINITION as DeleteObject_Tool } from "../../handlers/common/low/handleDeleteObject";
 // import { TOOL_DEFINITION as CheckObject_Tool } from "../../handlers/common/low/handleCheckObject";
@@ -234,11 +235,11 @@ import { TOOL_DEFINITION as UnlockClassTestClasses_Tool } from '../../handlers/c
 import { TOOL_DEFINITION as UpdateClass_Tool } from '../../handlers/class/low/handleUpdateClass';
 import { TOOL_DEFINITION as UpdateClassTestClasses_Tool } from '../../handlers/class/low/handleUpdateClassTestClasses';
 import { TOOL_DEFINITION as ValidateClass_Tool } from '../../handlers/class/low/handleValidateClass';
-import { TOOL_DEFINITION as GetClass_Tool } from '../../handlers/class/readonly/handleGetClass';
 import { TOOL_DEFINITION as LockObject_Tool } from '../../handlers/common/low/handleLockObject';
 import { TOOL_DEFINITION as UnlockObject_Tool } from '../../handlers/common/low/handleUnlockObject';
 import { TOOL_DEFINITION as ValidateObject_Tool } from '../../handlers/common/low/handleValidateObject';
 import { TOOL_DEFINITION as CreateDataElement_Tool } from '../../handlers/data_element/high/handleCreateDataElement';
+import { TOOL_DEFINITION as GetDataElement_Tool } from '../../handlers/data_element/high/handleGetDataElement';
 import { TOOL_DEFINITION as UpdateDataElementHigh_Tool } from '../../handlers/data_element/high/handleUpdateDataElement';
 import { TOOL_DEFINITION as ActivateDataElement_Tool } from '../../handlers/data_element/low/handleActivateDataElement';
 import { TOOL_DEFINITION as CheckDataElement_Tool } from '../../handlers/data_element/low/handleCheckDataElement';
@@ -248,7 +249,6 @@ import { TOOL_DEFINITION as LockDataElement_Tool } from '../../handlers/data_ele
 import { TOOL_DEFINITION as UnlockDataElement_Tool } from '../../handlers/data_element/low/handleUnlockDataElement';
 import { TOOL_DEFINITION as UpdateDataElementLow_Tool } from '../../handlers/data_element/low/handleUpdateDataElement';
 import { TOOL_DEFINITION as ValidateDataElement_Tool } from '../../handlers/data_element/low/handleValidateDataElement';
-import { TOOL_DEFINITION as GetDataElement_Tool } from '../../handlers/data_element/readonly/handleGetDataElement';
 import { TOOL_DEFINITION as CreateDdlx_Tool } from '../../handlers/ddlx/high/handleCreateMetadataExtension';
 import { TOOL_DEFINITION as UpdateDdlx_Tool } from '../../handlers/ddlx/high/handleUpdateMetadataExtension';
 import { TOOL_DEFINITION as ActivateMetadataExtension_Tool } from '../../handlers/ddlx/low/handleActivateMetadataExtension';
@@ -260,6 +260,7 @@ import { TOOL_DEFINITION as UnlockMetadataExtension_Tool } from '../../handlers/
 import { TOOL_DEFINITION as UpdateMetadataExtensionLow_Tool } from '../../handlers/ddlx/low/handleUpdateMetadataExtension';
 import { TOOL_DEFINITION as ValidateMetadataExtension_Tool } from '../../handlers/ddlx/low/handleValidateMetadataExtension';
 import { TOOL_DEFINITION as CreateDomain_Tool } from '../../handlers/domain/high/handleCreateDomain';
+import { TOOL_DEFINITION as GetDomain_Tool } from '../../handlers/domain/high/handleGetDomain';
 import { TOOL_DEFINITION as UpdateDomainHigh_Tool } from '../../handlers/domain/high/handleUpdateDomain';
 import { TOOL_DEFINITION as ActivateDomain_Tool } from '../../handlers/domain/low/handleActivateDomain';
 import { TOOL_DEFINITION as CheckDomain_Tool } from '../../handlers/domain/low/handleCheckDomain';
@@ -269,7 +270,6 @@ import { TOOL_DEFINITION as LockDomain_Tool } from '../../handlers/domain/low/ha
 import { TOOL_DEFINITION as UnlockDomain_Tool } from '../../handlers/domain/low/handleUnlockDomain';
 import { TOOL_DEFINITION as UpdateDomainLow_Tool } from '../../handlers/domain/low/handleUpdateDomain';
 import { TOOL_DEFINITION as ValidateDomain_Tool } from '../../handlers/domain/low/handleValidateDomain';
-import { TOOL_DEFINITION as GetDomain_Tool } from '../../handlers/domain/readonly/handleGetDomain';
 import { TOOL_DEFINITION as GetEnhancementImpl_Tool } from '../../handlers/enhancement/readonly/handleGetEnhancementImpl';
 import { TOOL_DEFINITION as GetEnhancementSpot_Tool } from '../../handlers/enhancement/readonly/handleGetEnhancementSpot';
 import { TOOL_DEFINITION as GetEnhancements_Tool } from '../../handlers/enhancement/readonly/handleGetEnhancements';
@@ -293,10 +293,11 @@ import { TOOL_DEFINITION as UpdateFunctionModule_Tool } from '../../handlers/fun
 import { TOOL_DEFINITION as ValidateFunctionGroup_Tool } from '../../handlers/function/low/handleValidateFunctionGroup';
 import { TOOL_DEFINITION as ValidateFunctionModule_Tool } from '../../handlers/function/low/handleValidateFunctionModule';
 import { TOOL_DEFINITION as GetFunction_Tool } from '../../handlers/function/readonly/handleGetFunction';
-import { TOOL_DEFINITION as GetFunctionGroup_Tool } from '../../handlers/function/readonly/handleGetFunctionGroup';
+import { TOOL_DEFINITION as GetFunctionGroup_Tool } from '../../handlers/function_group/high/handleGetFunctionGroup';
 import { TOOL_DEFINITION as GetInclude_Tool } from '../../handlers/include/readonly/handleGetInclude';
 import { TOOL_DEFINITION as GetIncludesList_Tool } from '../../handlers/include/readonly/handleGetIncludesList';
 import { TOOL_DEFINITION as CreateInterface_Tool } from '../../handlers/interface/high/handleCreateInterface';
+import { TOOL_DEFINITION as GetInterface_Tool } from '../../handlers/interface/high/handleGetInterface';
 import { TOOL_DEFINITION as UpdateInterfaceHigh_Tool } from '../../handlers/interface/high/handleUpdateInterface';
 import { TOOL_DEFINITION as ActivateInterface_Tool } from '../../handlers/interface/low/handleActivateInterface';
 import { TOOL_DEFINITION as CheckInterface_Tool } from '../../handlers/interface/low/handleCheckInterface';
@@ -306,7 +307,6 @@ import { TOOL_DEFINITION as LockInterface_Tool } from '../../handlers/interface/
 import { TOOL_DEFINITION as UnlockInterface_Tool } from '../../handlers/interface/low/handleUnlockInterface';
 import { TOOL_DEFINITION as UpdateInterface_Tool } from '../../handlers/interface/low/handleUpdateInterface';
 import { TOOL_DEFINITION as ValidateInterface_Tool } from '../../handlers/interface/low/handleValidateInterface';
-import { TOOL_DEFINITION as GetInterface_Tool } from '../../handlers/interface/readonly/handleGetInterface';
 import { TOOL_DEFINITION as CreatePackage_Tool } from '../../handlers/package/high/handleCreatePackage';
 import { TOOL_DEFINITION as CheckPackage_Tool } from '../../handlers/package/low/handleCheckPackage';
 import { TOOL_DEFINITION as CreatePackageLow_Tool } from '../../handlers/package/low/handleCreatePackage';
@@ -317,6 +317,8 @@ import { TOOL_DEFINITION as UpdatePackage_Tool } from '../../handlers/package/lo
 import { TOOL_DEFINITION as ValidatePackage_Tool } from '../../handlers/package/low/handleValidatePackage';
 import { TOOL_DEFINITION as GetPackage_Tool } from '../../handlers/package/readonly/handleGetPackage';
 import { TOOL_DEFINITION as CreateProgram_Tool } from '../../handlers/program/high/handleCreateProgram';
+// Import TOOL_DEFINITION from handlers
+import { TOOL_DEFINITION as GetProgram_Tool } from '../../handlers/program/high/handleGetProgram';
 import { TOOL_DEFINITION as UpdateProgramHigh_Tool } from '../../handlers/program/high/handleUpdateProgram';
 import { TOOL_DEFINITION as ActivateProgram_Tool } from '../../handlers/program/low/handleActivateProgram';
 import { TOOL_DEFINITION as CheckProgram_Tool } from '../../handlers/program/low/handleCheckProgram';
@@ -327,15 +329,14 @@ import { TOOL_DEFINITION as UnlockProgram_Tool } from '../../handlers/program/lo
 import { TOOL_DEFINITION as UpdateProgram_Tool } from '../../handlers/program/low/handleUpdateProgram';
 import { TOOL_DEFINITION as ValidateProgram_Tool } from '../../handlers/program/low/handleValidateProgram';
 import { TOOL_DEFINITION as GetProgFullCode_Tool } from '../../handlers/program/readonly/handleGetProgFullCode';
-// Import TOOL_DEFINITION from handlers
-import { TOOL_DEFINITION as GetProgram_Tool } from '../../handlers/program/readonly/handleGetProgram';
 import { TOOL_DEFINITION as GetObjectsByType_Tool } from '../../handlers/search/readonly/handleGetObjectsByType';
 import { TOOL_DEFINITION as GetObjectsList_Tool } from '../../handlers/search/readonly/handleGetObjectsList';
 import { TOOL_DEFINITION as SearchObject_Tool } from '../../handlers/search/readonly/handleSearchObject';
 import { TOOL_DEFINITION as CreateServiceDefinition_Tool } from '../../handlers/service_definition/high/handleCreateServiceDefinition';
+import { TOOL_DEFINITION as GetServiceDefinition_Tool } from '../../handlers/service_definition/high/handleGetServiceDefinition';
 import { TOOL_DEFINITION as UpdateServiceDefinition_Tool } from '../../handlers/service_definition/high/handleUpdateServiceDefinition';
-import { TOOL_DEFINITION as GetServiceDefinition_Tool } from '../../handlers/service_definition/readonly/handleGetServiceDefinition';
 import { TOOL_DEFINITION as CreateStructure_Tool } from '../../handlers/structure/high/handleCreateStructure';
+import { TOOL_DEFINITION as GetStructure_Tool } from '../../handlers/structure/high/handleGetStructure';
 import { TOOL_DEFINITION as UpdateStructureHigh_Tool } from '../../handlers/structure/high/handleUpdateStructure';
 import { TOOL_DEFINITION as ActivateStructure_Tool } from '../../handlers/structure/low/handleActivateStructure';
 import { TOOL_DEFINITION as CheckStructure_Tool } from '../../handlers/structure/low/handleCheckStructure';
@@ -345,7 +346,6 @@ import { TOOL_DEFINITION as LockStructure_Tool } from '../../handlers/structure/
 import { TOOL_DEFINITION as UnlockStructure_Tool } from '../../handlers/structure/low/handleUnlockStructure';
 import { TOOL_DEFINITION as UpdateStructureLow_Tool } from '../../handlers/structure/low/handleUpdateStructure';
 import { TOOL_DEFINITION as ValidateStructure_Tool } from '../../handlers/structure/low/handleValidateStructure';
-import { TOOL_DEFINITION as GetStructure_Tool } from '../../handlers/structure/readonly/handleGetStructure';
 import { TOOL_DEFINITION as DescribeByList_Tool } from '../../handlers/system/readonly/handleDescribeByList';
 import { TOOL_DEFINITION as GetAbapAST_Tool } from '../../handlers/system/readonly/handleGetAbapAST';
 import { TOOL_DEFINITION as GetAbapSemanticAnalysis_Tool } from '../../handlers/system/readonly/handleGetAbapSemanticAnalysis';
@@ -360,6 +360,7 @@ import { TOOL_DEFINITION as GetTransaction_Tool } from '../../handlers/system/re
 import { TOOL_DEFINITION as GetTypeInfo_Tool } from '../../handlers/system/readonly/handleGetTypeInfo';
 import { TOOL_DEFINITION as GetWhereUsed_Tool } from '../../handlers/system/readonly/handleGetWhereUsed';
 import { TOOL_DEFINITION as CreateTable_Tool } from '../../handlers/table/high/handleCreateTable';
+import { TOOL_DEFINITION as GetTable_Tool } from '../../handlers/table/high/handleGetTable';
 import { TOOL_DEFINITION as UpdateTableHigh_Tool } from '../../handlers/table/high/handleUpdateTable';
 import { TOOL_DEFINITION as ActivateTable_Tool } from '../../handlers/table/low/handleActivateTable';
 import { TOOL_DEFINITION as CheckTable_Tool } from '../../handlers/table/low/handleCheckTable';
@@ -369,12 +370,12 @@ import { TOOL_DEFINITION as LockTable_Tool } from '../../handlers/table/low/hand
 import { TOOL_DEFINITION as UnlockTable_Tool } from '../../handlers/table/low/handleUnlockTable';
 import { TOOL_DEFINITION as UpdateTableLow_Tool } from '../../handlers/table/low/handleUpdateTable';
 import { TOOL_DEFINITION as ValidateTable_Tool } from '../../handlers/table/low/handleValidateTable';
-import { TOOL_DEFINITION as GetTable_Tool } from '../../handlers/table/readonly/handleGetTable';
 import { TOOL_DEFINITION as GetTableContents_Tool } from '../../handlers/table/readonly/handleGetTableContents';
 import { TOOL_DEFINITION as CreateTransport_Tool } from '../../handlers/transport/high/handleCreateTransport';
 import { TOOL_DEFINITION as CreateTransportLow_Tool } from '../../handlers/transport/low/handleCreateTransport';
 import { TOOL_DEFINITION as GetTransport_Tool } from '../../handlers/transport/readonly/handleGetTransport';
 import { TOOL_DEFINITION as CreateView_Tool } from '../../handlers/view/high/handleCreateView';
+import { TOOL_DEFINITION as GetView_Tool } from '../../handlers/view/high/handleGetView';
 import { TOOL_DEFINITION as UpdateViewHigh_Tool } from '../../handlers/view/high/handleUpdateView';
 import { TOOL_DEFINITION as ActivateView_Tool } from '../../handlers/view/low/handleActivateView';
 import { TOOL_DEFINITION as CheckView_Tool } from '../../handlers/view/low/handleCheckView';
@@ -384,7 +385,6 @@ import { TOOL_DEFINITION as LockView_Tool } from '../../handlers/view/low/handle
 import { TOOL_DEFINITION as UnlockView_Tool } from '../../handlers/view/low/handleUnlockView';
 import { TOOL_DEFINITION as UpdateView_Tool } from '../../handlers/view/low/handleUpdateView';
 import { TOOL_DEFINITION as ValidateView_Tool } from '../../handlers/view/low/handleValidateView';
-import { TOOL_DEFINITION as GetView_Tool } from '../../handlers/view/readonly/handleGetView';
 
 /**
  * Server class for interacting with ABAP systems via ADT.
@@ -831,13 +831,27 @@ export class McpHandlers {
           return handleGetEnhancementImpl(context, args);
         },
       );
+      // Keep GetBdef name for v1 compatibility, but use high-level handler internally
       this.registerToolOnServer(
         server,
-        GetBdef_Tool.name,
-        GetBdef_Tool.description,
-        GetBdef_Tool.inputSchema as any,
+        'GetBdef',
+        GetBehaviorDefinition_Tool.description,
+        {
+          type: 'object',
+          properties: {
+            bdef_name: {
+              type: 'string',
+              description: 'Name of the BDEF (Behavior Definition)',
+            },
+          },
+          required: ['bdef_name'],
+        } as any,
         (args: any) => {
-          return handleGetBdef(context, args);
+          // Adapter: convert bdef_name to behavior_definition_name for high-level handler
+          return handleGetBehaviorDefinition(context, {
+            behavior_definition_name: args.bdef_name,
+            version: 'active', // Default to active version
+          });
         },
       );
       this.registerToolOnServer(

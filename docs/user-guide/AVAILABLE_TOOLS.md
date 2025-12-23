@@ -9,31 +9,48 @@ This document contains a complete list of all tools (functions) provided by the 
 
 ## 📊 Tool Summary
 
-- Total tools: 184
-- High-level tools: 30
+- Total tools: 219
+- High-level tools: 76
 - Low-level tools: 116
-- Read-only tools: 38
+- Read-only tools: 27
 - Other tools: 0
 
 ## 📋 Navigation
 
 The navigation below mirrors the document structure for easier discovery.
 
-- [Programs, Classes, Functions](#programs,-classes,-functions) (51 tools – 8 high-level, 38 low-level, 5 read-only)
+- [Programs, Classes, Functions](#programs,-classes,-functions) (68 tools – 28 high-level, 38 low-level, 2 read-only)
   - [Read-Only Tools](#programs,-classes,-functions-read-only)
-    - [GetClass](#getclass-readonly)
     - [GetFunction](#getfunction-readonly)
-    - [GetFunctionGroup](#getfunctiongroup-readonly)
     - [GetProgFullCode](#getprogfullcode-readonly)
-    - [GetProgram](#getprogram-readonly)
   - [High-Level Tools](#programs,-classes,-functions-high-level)
     - [CreateClass](#createclass-high)
     - [CreateFunctionGroup](#createfunctiongroup-high)
     - [CreateFunctionModule](#createfunctionmodule-high)
+    - [CreateLocalDefinitions](#createlocaldefinitions-high)
+    - [CreateLocalMacros](#createlocalmacros-high)
+    - [CreateLocalTestClass](#createlocaltestclass-high)
+    - [CreateLocalTypes](#createlocaltypes-high)
     - [CreateProgram](#createprogram-high)
+    - [DeleteClass](#deleteclass-high)
+    - [DeleteLocalDefinitions](#deletelocaldefinitions-high)
+    - [DeleteLocalMacros](#deletelocalmacros-high)
+    - [DeleteLocalTestClass](#deletelocaltestclass-high)
+    - [DeleteLocalTypes](#deletelocaltypes-high)
+    - [DeleteProgram](#deleteprogram-high)
+    - [GetClass](#getclass-high)
+    - [GetLocalDefinitions](#getlocaldefinitions-high)
+    - [GetLocalMacros](#getlocalmacros-high)
+    - [GetLocalTestClass](#getlocaltestclass-high)
+    - [GetLocalTypes](#getlocaltypes-high)
+    - [GetProgram](#getprogram-high)
     - [UpdateClass](#updateclass-high)
     - [UpdateFunctionGroup](#updatefunctiongroup-high)
     - [UpdateFunctionModule](#updatefunctionmodule-high)
+    - [UpdateLocalDefinitions](#updatelocaldefinitions-high)
+    - [UpdateLocalMacros](#updatelocalmacros-high)
+    - [UpdateLocalTestClass](#updatelocaltestclass-high)
+    - [UpdateLocalTypes](#updatelocaltypes-high)
     - [UpdateProgram](#updateprogram-high)
   - [Low-Level Tools](#programs,-classes,-functions-low-level)
     - [ActivateClassLow](#activateclasslow-low)
@@ -74,15 +91,9 @@ The navigation below mirrors the document structure for easier discovery.
     - [ValidateFunctionGroupLow](#validatefunctiongrouplow-low)
     - [ValidateFunctionModuleLow](#validatefunctionmodulelow-low)
     - [ValidateProgramLow](#validateprogramlow-low)
-- [Tables and Structures](#tables-and-structures) (59 tools – 12 high-level, 40 low-level, 7 read-only)
+- [Tables and Structures](#tables-and-structures) (65 tools – 24 high-level, 40 low-level, 1 read-only)
   - [Read-Only Tools](#tables-and-structures-read-only)
-    - [GetDataElement](#getdataelement-readonly)
-    - [GetDomain](#getdomain-readonly)
-    - [GetServiceDefinition](#getservicedefinition-readonly)
-    - [GetStructure](#getstructure-readonly)
-    - [GetTable](#gettable-readonly)
     - [GetTableContents](#gettablecontents-readonly)
-    - [GetView](#getview-readonly)
   - [High-Level Tools](#tables-and-structures-high-level)
     - [CreateDataElement](#createdataelement-high)
     - [CreateDomain](#createdomain-high)
@@ -90,6 +101,18 @@ The navigation below mirrors the document structure for easier discovery.
     - [CreateStructure](#createstructure-high)
     - [CreateTable](#createtable-high)
     - [CreateView](#createview-high)
+    - [DeleteDataElement](#deletedataelement-high)
+    - [DeleteDomain](#deletedomain-high)
+    - [DeleteServiceDefinition](#deleteservicedefinition-high)
+    - [DeleteStructure](#deletestructure-high)
+    - [DeleteTable](#deletetable-high)
+    - [DeleteView](#deleteview-high)
+    - [GetDataElement](#getdataelement-high)
+    - [GetDomain](#getdomain-high)
+    - [GetServiceDefinition](#getservicedefinition-high)
+    - [GetStructure](#getstructure-high)
+    - [GetTable](#gettable-high)
+    - [GetView](#getview-high)
     - [UpdateDataElement](#updatedataelement-high)
     - [UpdateDomain](#updatedomain-high)
     - [UpdateServiceDefinition](#updateservicedefinition-high)
@@ -137,13 +160,14 @@ The navigation below mirrors the document structure for easier discovery.
     - [ValidateStructureLow](#validatestructurelow-low)
     - [ValidateTableLow](#validatetablelow-low)
     - [ValidateViewLow](#validateviewlow-low)
-- [Packages and Interfaces](#packages-and-interfaces) (20 tools – 3 high-level, 15 low-level, 2 read-only)
+- [Packages and Interfaces](#packages-and-interfaces) (21 tools – 5 high-level, 15 low-level, 1 read-only)
   - [Read-Only Tools](#packages-and-interfaces-read-only)
-    - [GetInterface](#getinterface-readonly)
     - [GetPackage](#getpackage-readonly)
   - [High-Level Tools](#packages-and-interfaces-high-level)
     - [CreateInterface](#createinterface-high)
     - [CreatePackage](#createpackage-high)
+    - [DeleteInterface](#deleteinterface-high)
+    - [GetInterface](#getinterface-high)
     - [UpdateInterface](#updateinterface-high)
   - [Low-Level Tools](#packages-and-interfaces-low-level)
     - [ActivateInterfaceLow](#activateinterfacelow-low)
@@ -217,32 +241,8 @@ The navigation below mirrors the document structure for easier discovery.
 
 *Read-only tools retrieve information without modifying the system.*
 
-### GetClass {#getclass-readonly}
-**Description:** [read-only] Retrieve ABAP class source code.
-
-**Parameters:** None
-
-**Example:**
-```json
-{}
-```
-
----
-
 ### GetFunction {#getfunction-readonly}
 **Description:** [read-only] Retrieve ABAP Function Module source code.
-
-**Parameters:** None
-
-**Example:**
-```json
-{}
-```
-
----
-
-### GetFunctionGroup {#getfunctiongroup-readonly}
-**Description:** [read-only] Retrieve ABAP Function Group source code.
 
 **Parameters:** None
 
@@ -265,18 +265,6 @@ The navigation below mirrors the document structure for easier discovery.
 {
   "type": "\"PROG/P\""
 }
-```
-
----
-
-### GetProgram {#getprogram-readonly}
-**Description:** [read-only] Retrieve ABAP program source code. Returns only the main program source code without includes or enhancements.
-
-**Parameters:** None
-
-**Example:**
-```json
-{}
 ```
 
 ---
@@ -351,6 +339,83 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
+### CreateLocalDefinitions {#createlocaldefinitions-high}
+**Description:** Create local definitions in an ABAP class (definitions include). Manages lock, check, update, unlock, and optional activation.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `definitions_code` (string, required) - Source code for local definitions.
+- `transport_request` (string, optional) - Transport request number.
+- `activate_on_create` (boolean, optional (default: "false")) - Activate parent class after creating. Default: false
+
+**Example:**
+```json
+{
+  "definitions_code": "\"example_value\"",
+  "activate_on_create": "false"
+}
+```
+
+---
+
+### CreateLocalMacros {#createlocalmacros-high}
+**Description:** Create local macros in an ABAP class (macros include). Manages lock, check, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `macros_code` (string, required) - Source code for local macros.
+- `transport_request` (string, optional) - Transport request number.
+- `activate_on_create` (boolean, optional (default: "false")) - Activate parent class after creating. Default: false
+
+**Example:**
+```json
+{
+  "macros_code": "\"example_value\"",
+  "activate_on_create": "false"
+}
+```
+
+---
+
+### CreateLocalTestClass {#createlocaltestclass-high}
+**Description:** Create a local test class in an ABAP class. Manages lock, check, update, unlock, and optional activation of parent class.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `test_class_code` (string, required) - Source code for the local test class.
+- `test_class_name` (string, optional) - Optional test class name (e.g., lcl_test).
+- `transport_request` (string, optional) - Transport request number (required for transportable objects).
+- `activate_on_create` (boolean, optional (default: "false")) - Activate parent class after creating test class. Default: false
+
+**Example:**
+```json
+{
+  "test_class_code": "\"example_value\"",
+  "activate_on_create": "false"
+}
+```
+
+---
+
+### CreateLocalTypes {#createlocaltypes-high}
+**Description:** Create local types in an ABAP class (implementations include). Manages lock, check, update, unlock, and optional activation.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `local_types_code` (string, required) - Source code for local types.
+- `transport_request` (string, optional) - Transport request number.
+- `activate_on_create` (boolean, optional (default: "false")) - Activate parent class after creating. Default: false
+
+**Example:**
+```json
+{
+  "local_types_code": "\"PROG/P\"",
+  "activate_on_create": "false"
+}
+```
+
+---
+
 ### CreateProgram {#createprogram-high}
 **Description:** Create a new ABAP program (report) in SAP system with source code. Supports executable programs, includes, module pools. Uses stateful session for proper lock management.
 
@@ -368,6 +433,198 @@ The navigation below mirrors the document structure for easier discovery.
 ```json
 {
   "package_name": "\"ZMY_PACKAGE_NAME\""
+}
+```
+
+---
+
+### DeleteClass {#deleteclass-high}
+**Description:** Delete an ABAP class from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Class name (e.g., ZCL_MY_CLASS).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### DeleteLocalDefinitions {#deletelocaldefinitions-high}
+**Description:** Delete local definitions from an ABAP class by clearing the definitions include. Manages lock, update, unlock, and optional activation.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `transport_request` (string, optional) - Transport request number.
+- `activate_on_delete` (boolean, optional (default: "false")) - Activate parent class after deleting. Default: false
+
+**Example:**
+```json
+{
+  "activate_on_delete": "false"
+}
+```
+
+---
+
+### DeleteLocalMacros {#deletelocalmacros-high}
+**Description:** Delete local macros from an ABAP class by clearing the macros include. Manages lock, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `transport_request` (string, optional) - Transport request number.
+- `activate_on_delete` (boolean, optional (default: "false")) - Activate parent class after deleting. Default: false
+
+**Example:**
+```json
+{
+  "activate_on_delete": "false"
+}
+```
+
+---
+
+### DeleteLocalTestClass {#deletelocaltestclass-high}
+**Description:** Delete a local test class from an ABAP class by clearing the testclasses include. Manages lock, update, unlock, and optional activation of parent class.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `transport_request` (string, optional) - Transport request number (required for transportable objects).
+- `activate_on_delete` (boolean, optional (default: "false")) - Activate parent class after deleting test class. Default: false
+
+**Example:**
+```json
+{
+  "activate_on_delete": "false"
+}
+```
+
+---
+
+### DeleteLocalTypes {#deletelocaltypes-high}
+**Description:** Delete local types from an ABAP class by clearing the implementations include. Manages lock, update, unlock, and optional activation.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `transport_request` (string, optional) - Transport request number.
+- `activate_on_delete` (boolean, optional (default: "false")) - Activate parent class after deleting. Default: false
+
+**Example:**
+```json
+{
+  "activate_on_delete": "false"
+}
+```
+
+---
+
+### DeleteProgram {#deleteprogram-high}
+**Description:** Delete an ABAP program from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Program name (e.g., Z_MY_PROGRAM).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### GetClass {#getclass-high}
+**Description:** Retrieve ABAP class source code. Supports reading active or inactive version.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Class name (e.g., ZCL_MY_CLASS).
+- `version` (string, optional (default: "active")) - Version to read: 
+
+**Example:**
+```json
+{
+  "version": "\"example_value\""
+}
+```
+
+---
+
+### GetLocalDefinitions {#getlocaldefinitions-high}
+**Description:** Retrieve local definitions source code from a class (definitions include). Supports reading active or inactive version.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `version` (string, optional (default: "active")) - Version to read: 
+
+**Example:**
+```json
+{
+  "version": "\"example_value\""
+}
+```
+
+---
+
+### GetLocalMacros {#getlocalmacros-high}
+**Description:** Retrieve local macros source code from a class (macros include). Supports reading active or inactive version. Note: Macros are supported in older ABAP versions but not in newer ones.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `version` (string, optional (default: "active")) - Version to read: 
+
+**Example:**
+```json
+{
+  "version": "\"example_value\""
+}
+```
+
+---
+
+### GetLocalTestClass {#getlocaltestclass-high}
+**Description:** Retrieve local test class source code from a class. Supports reading active or inactive version.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `version` (string, optional (default: "active")) - Version to read: 
+
+**Example:**
+```json
+{
+  "version": "\"example_value\""
+}
+```
+
+---
+
+### GetLocalTypes {#getlocaltypes-high}
+**Description:** Retrieve local types source code from a class (implementations include). Supports reading active or inactive version.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `version` (string, optional (default: "active")) - Version to read: 
+
+**Example:**
+```json
+{
+  "version": "\"example_value\""
+}
+```
+
+---
+
+### GetProgram {#getprogram-high}
+**Description:** Retrieve ABAP program definition. Supports reading active or inactive version.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Program name (e.g., Z_MY_PROGRAM).
+- `version` (string, optional (default: "active")) - Version to read: 
+
+**Example:**
+```json
+{
+  "version": "\"example_value\""
 }
 ```
 
@@ -422,6 +679,82 @@ The navigation below mirrors the document structure for easier discovery.
 {
   "function_module_name": "\"ZMY_FUNCTION_MODULE_NAME\"",
   "source_code": "\"example_value\""
+}
+```
+
+---
+
+### UpdateLocalDefinitions {#updatelocaldefinitions-high}
+**Description:** Update local definitions in an ABAP class (definitions include). Manages lock, check, update, unlock, and optional activation.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `definitions_code` (string, required) - Updated source code for local definitions.
+- `transport_request` (string, optional) - Transport request number.
+- `activate_on_update` (boolean, optional (default: "false")) - Activate parent class after updating. Default: false
+
+**Example:**
+```json
+{
+  "definitions_code": "\"example_value\"",
+  "activate_on_update": "false"
+}
+```
+
+---
+
+### UpdateLocalMacros {#updatelocalmacros-high}
+**Description:** Update local macros in an ABAP class (macros include). Manages lock, check, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `macros_code` (string, required) - Updated source code for local macros.
+- `transport_request` (string, optional) - Transport request number.
+- `activate_on_update` (boolean, optional (default: "false")) - Activate parent class after updating. Default: false
+
+**Example:**
+```json
+{
+  "macros_code": "\"example_value\"",
+  "activate_on_update": "false"
+}
+```
+
+---
+
+### UpdateLocalTestClass {#updatelocaltestclass-high}
+**Description:** Update a local test class in an ABAP class. Manages lock, check, update, unlock, and optional activation of parent class.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `test_class_code` (string, required) - Updated source code for the local test class.
+- `transport_request` (string, optional) - Transport request number (required for transportable objects).
+- `activate_on_update` (boolean, optional (default: "false")) - Activate parent class after updating test class. Default: false
+
+**Example:**
+```json
+{
+  "test_class_code": "\"example_value\"",
+  "activate_on_update": "false"
+}
+```
+
+---
+
+### UpdateLocalTypes {#updatelocaltypes-high}
+**Description:** Update local types in an ABAP class (implementations include). Manages lock, check, update, unlock, and optional activation.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent class name (e.g., ZCL_MY_CLASS).
+- `local_types_code` (string, required) - Updated source code for local types.
+- `transport_request` (string, optional) - Transport request number.
+- `activate_on_update` (boolean, optional (default: "false")) - Activate parent class after updating. Default: false
+
+**Example:**
+```json
+{
+  "local_types_code": "\"PROG/P\"",
+  "activate_on_update": "false"
 }
 ```
 
@@ -783,12 +1116,10 @@ The navigation below mirrors the document structure for easier discovery.
 ---
 
 ### LockClassLow {#lockclasslow-low}
-**Description:** [low-level] Lock an ABAP class for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
+**Description:** [low-level] Lock an ABAP class for modification. Uses session from HandlerContext. Returns lock handle that must be used in subsequent update/unlock operations.
 
 **Parameters:**
 - `inputSchema` (string, optional) - Class name (e.g., ZCL_MY_CLASS).
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
 **Example:**
 ```json
@@ -881,19 +1212,16 @@ The navigation below mirrors the document structure for easier discovery.
 ---
 
 ### UnlockClassLow {#unlockclasslow-low}
-**Description:** [low-level] Unlock an ABAP class after modification. Must use the same session_id and lock_handle from LockClass operation.
+**Description:** [low-level] Unlock an ABAP class after modification. Uses session from HandlerContext. Must use the same lock_handle from LockClass operation.
 
 **Parameters:**
 - `inputSchema` (string, optional) - Class name (e.g., ZCL_MY_CLASS).
 - `lock_handle` (string, required) - Lock handle from LockClass operation.
-- `session_id` (string, required) - Session ID from LockClass operation. Must be the same as used in LockClass.
-- `session_state` (object, optional) - Session state from LockClass (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
 **Example:**
 ```json
 {
-  "lock_handle": "\"example_value\"",
-  "session_id": "\"example_value\""
+  "lock_handle": "\"example_value\""
 }
 ```
 
@@ -977,14 +1305,12 @@ The navigation below mirrors the document structure for easier discovery.
 ---
 
 ### UpdateClassLow {#updateclasslow-low}
-**Description:** [low-level] Update source code of an existing ABAP class. Requires lock handle from LockObject. - use UpdateClass (high-level) for full workflow with lock/unlock/activate.
+**Description:** [low-level] Update source code of an existing ABAP class. Uses session from HandlerContext. Requires lock handle from LockClass operation. - use UpdateClass (high-level) for full workflow with lock/unlock/activate.
 
 **Parameters:**
 - `inputSchema` (string, optional) - Class name (e.g., ZCL_TEST_CLASS_001). Class must already exist.
 - `source_code` (string, required) - Complete ABAP class source code including CLASS DEFINITION and IMPLEMENTATION sections.
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `lock_handle` (string, required) - Lock handle from LockClass operation. Required for update operation.
 
 **Example:**
 ```json
@@ -1141,82 +1467,10 @@ The navigation below mirrors the document structure for easier discovery.
 
 *Read-only tools retrieve information without modifying the system.*
 
-### GetDataElement {#getdataelement-readonly}
-**Description:** [read-only] Retrieve ABAP data element information including type definition, field labels, and metadata from SAP system via ADT API.
-
-**Parameters:** None
-
-**Example:**
-```json
-{}
-```
-
----
-
-### GetDomain {#getdomain-readonly}
-**Description:** [read-only] Retrieve ABAP domain structure and properties from SAP system.
-
-**Parameters:** None
-
-**Example:**
-```json
-{}
-```
-
----
-
-### GetServiceDefinition {#getservicedefinition-readonly}
-**Description:** [read-only] Retrieve ABAP CDS Service Definition metadata and source code.
-
-**Parameters:** None
-
-**Example:**
-```json
-{}
-```
-
----
-
-### GetStructure {#getstructure-readonly}
-**Description:** [read-only] Retrieve ABAP Structure.
-
-**Parameters:** None
-
-**Example:**
-```json
-{}
-```
-
----
-
-### GetTable {#gettable-readonly}
-**Description:** [read-only] Retrieve ABAP table structure.
-
-**Parameters:** None
-
-**Example:**
-```json
-{}
-```
-
----
-
 ### GetTableContents {#gettablecontents-readonly}
 **Description:** [read-only] Retrieve contents of an ABAP table.
 
 > **⚠️ ABAP Cloud Limitation:** Direct access to table data through ADT Data Preview is blocked by SAP BTP backend policies. When authenticating via JWT/XSUAA, the server will return a descriptive error. This function works only for on-premise systems.
-
-**Parameters:** None
-
-**Example:**
-```json
-{}
-```
-
----
-
-### GetView {#getview-readonly}
-**Description:** [read-only] Retrieve ABAP database view definition including tables, fields, joins, and selection conditions.
 
 **Parameters:** None
 
@@ -1385,6 +1639,186 @@ The navigation below mirrors the document structure for easier discovery.
 {
   "ddl_source": "\"example_value\"",
   "package_name": "\"ZMY_PACKAGE_NAME\""
+}
+```
+
+---
+
+### DeleteDataElement {#deletedataelement-high}
+**Description:** Delete an ABAP data element from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Data element name (e.g., Z_MY_DATA_ELEMENT).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### DeleteDomain {#deletedomain-high}
+**Description:** Delete an ABAP domain from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Domain name (e.g., Z_MY_DOMAIN).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### DeleteServiceDefinition {#deleteservicedefinition-high}
+**Description:** Delete an ABAP service definition from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+
+**Parameters:**
+- `inputSchema` (string, optional) - ServiceDefinition name (e.g., Z_MY_SERVICEDEFINITION).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### DeleteStructure {#deletestructure-high}
+**Description:** Delete an ABAP structure from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Structure name (e.g., Z_MY_STRUCTURE).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### DeleteTable {#deletetable-high}
+**Description:** Delete an ABAP table from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Table name (e.g., Z_MY_TABLE).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### DeleteView {#deleteview-high}
+**Description:** Delete an ABAP view from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+
+**Parameters:**
+- `inputSchema` (string, optional) - View name (e.g., Z_MY_VIEW).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### GetDataElement {#getdataelement-high}
+**Description:** Retrieve ABAP data element definition. Supports reading active or inactive version.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Data element name (e.g., Z_MY_DATA_ELEMENT).
+- `version` (string, optional (default: "active")) - Version to read: 
+
+**Example:**
+```json
+{
+  "version": "\"example_value\""
+}
+```
+
+---
+
+### GetDomain {#getdomain-high}
+**Description:** Retrieve ABAP domain definition. Supports reading active or inactive version.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Domain name (e.g., Z_MY_DOMAIN).
+- `version` (string, optional (default: "active")) - Version to read: 
+
+**Example:**
+```json
+{
+  "version": "\"example_value\""
+}
+```
+
+---
+
+### GetServiceDefinition {#getservicedefinition-high}
+**Description:** Retrieve ABAP service definition definition. Supports reading active or inactive version.
+
+**Parameters:**
+- `inputSchema` (string, optional) - ServiceDefinition name (e.g., Z_MY_SERVICEDEFINITION).
+- `version` (string, optional (default: "active")) - Version to read: 
+
+**Example:**
+```json
+{
+  "version": "\"example_value\""
+}
+```
+
+---
+
+### GetStructure {#getstructure-high}
+**Description:** Retrieve ABAP structure definition. Supports reading active or inactive version.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Structure name (e.g., Z_MY_STRUCTURE).
+- `version` (string, optional (default: "active")) - Version to read: 
+
+**Example:**
+```json
+{
+  "version": "\"example_value\""
+}
+```
+
+---
+
+### GetTable {#gettable-high}
+**Description:** Retrieve ABAP table definition. Supports reading active or inactive version.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Table name (e.g., Z_MY_TABLE).
+- `version` (string, optional (default: "active")) - Version to read: 
+
+**Example:**
+```json
+{
+  "version": "\"example_value\""
+}
+```
+
+---
+
+### GetView {#getview-high}
+**Description:** Retrieve ABAP view definition. Supports reading active or inactive version.
+
+**Parameters:**
+- `inputSchema` (string, optional) - View name (e.g., Z_MY_VIEW).
+- `version` (string, optional (default: "active")) - Version to read: 
+
+**Example:**
+```json
+{
+  "version": "\"example_value\""
 }
 ```
 
@@ -2247,18 +2681,6 @@ The navigation below mirrors the document structure for easier discovery.
 
 *Read-only tools retrieve information without modifying the system.*
 
-### GetInterface {#getinterface-readonly}
-**Description:** [read-only] Retrieve ABAP interface source code.
-
-**Parameters:** None
-
-**Example:**
-```json
-{}
-```
-
----
-
 ### GetPackage {#getpackage-readonly}
 **Description:** [read-only] Retrieve ABAP package details.
 
@@ -2304,6 +2726,36 @@ The navigation below mirrors the document structure for easier discovery.
 **Example:**
 ```json
 {}
+```
+
+---
+
+### DeleteInterface {#deleteinterface-high}
+**Description:** Delete an ABAP interface from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Interface name (e.g., Z_MY_INTERFACE).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+**Example:**
+```json
+{}
+```
+
+---
+
+### GetInterface {#getinterface-high}
+**Description:** Retrieve ABAP interface definition. Supports reading active or inactive version.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Interface name (e.g., Z_MY_INTERFACE).
+- `version` (string, optional (default: "active")) - Version to read: 
+
+**Example:**
+```json
+{
+  "version": "\"example_value\""
+}
 ```
 
 ---
@@ -2626,11 +3078,18 @@ The navigation below mirrors the document structure for easier discovery.
 ### GetIncludesList {#getincludeslist-readonly}
 **Description:** [read-only] Recursively discover and list ALL include files within an ABAP program or include.
 
-**Parameters:** None
+**Parameters:**
+- `inputSchema` (string, optional) - Name of the ABAP program or include
+- `object_type` (string, required) - [read-only] ADT object type (e.g. PROG/P, PROG/I, FUGR, CLAS/OC)
+- `detailed` (boolean, optional (default: "false")) - [read-only] If true, returns structured JSON with metadata and raw XML.
+- `timeout` (number, optional) - [read-only] Timeout in ms for each ADT request.
 
 **Example:**
 ```json
-{}
+{
+  "object_type": "\"PROG/P\"",
+  "detailed": "false"
+}
 ```
 
 ---
@@ -2795,11 +3254,15 @@ The navigation below mirrors the document structure for easier discovery.
 
 > **⚠️ ABAP Cloud Limitation:** Direct execution of SQL queries through ADT Data Preview is blocked by SAP BTP backend policies. When authenticating via JWT/XSUAA, the server will return a descriptive error. This function works only for on-premise systems.
 
-**Parameters:** None
+**Parameters:**
+- `inputSchema` (string, optional) - SQL query to execute
+- `row_number` (number, optional (default: "100")) - [read-only] Maximum number of rows to return
 
 **Example:**
 ```json
-{}
+{
+  "row_number": "100"
+}
 ```
 
 ---
@@ -2807,7 +3270,8 @@ The navigation below mirrors the document structure for easier discovery.
 ### GetTransaction {#gettransaction-readonly}
 **Description:** [read-only] Retrieve ABAP transaction details.
 
-**Parameters:** None
+**Parameters:**
+- `inputSchema` (string, optional) - Name of the ABAP transaction
 
 **Example:**
 ```json
@@ -2819,7 +3283,8 @@ The navigation below mirrors the document structure for easier discovery.
 ### GetTypeInfo {#gettypeinfo-readonly}
 **Description:** [read-only] Retrieve ABAP type information.
 
-**Parameters:** None
+**Parameters:**
+- `inputSchema` (string, optional) - Name of the ABAP type
 
 **Example:**
 ```json
@@ -2829,13 +3294,19 @@ The navigation below mirrors the document structure for easier discovery.
 ---
 
 ### GetWhereUsed {#getwhereused-readonly}
-**Description:** [read-only] Retrieve where-used references for ABAP objects via ADT usageReferences.
+**Description:** [read-only] Retrieve where-used references for ABAP objects via ADT usageReferences. Uses Eclipse ADT-compatible two-step workflow with optional scope customization.
 
-**Parameters:** None
+**Parameters:**
+- `inputSchema` (string, optional) - Name of the ABAP object
+- `object_type` (string, required) - Type of the ABAP object (class, interface, program, table, etc.)
+- `enable_all_types` (boolean, optional (default: "false")) - If true, searches in all available object types (Eclipse 
 
 **Example:**
 ```json
-{}
+{
+  "object_type": "\"PROG/P\"",
+  "enable_all_types": "false"
+}
 ```
 
 ---
@@ -2979,11 +3450,15 @@ The navigation below mirrors the document structure for easier discovery.
 ### GetEnhancementImpl {#getenhancementimpl-readonly}
 **Description:** [read-only] Retrieve source code of a specific enhancement implementation by its name and enhancement spot.
 
-**Parameters:** None
+**Parameters:**
+- `inputSchema` (string, optional) - Name of the enhancement spot
+- `enhancement_name` (string, required) - [read-only] Name of the enhancement implementation
 
 **Example:**
 ```json
-{}
+{
+  "enhancement_name": "\"ZMY_ENHANCEMENT_NAME\""
+}
 ```
 
 ---
@@ -2991,11 +3466,15 @@ The navigation below mirrors the document structure for easier discovery.
 ### GetEnhancements {#getenhancements-readonly}
 **Description:** [read-only] Retrieve a list of enhancements for a given ABAP object.
 
-**Parameters:** None
+**Parameters:**
+- `inputSchema` (string, optional) - Name of the ABAP object
+- `object_type` (string, required) - [read-only] Type of the ABAP object
 
 **Example:**
 ```json
-{}
+{
+  "object_type": "\"PROG/P\""
+}
 ```
 
 ---
@@ -3003,7 +3482,8 @@ The navigation below mirrors the document structure for easier discovery.
 ### GetEnhancementSpot {#getenhancementspot-readonly}
 **Description:** [read-only] Retrieve metadata and list of implementations for a specific enhancement spot.
 
-**Parameters:** None
+**Parameters:**
+- `inputSchema` (string, optional) - Name of the enhancement spot
 
 **Example:**
 ```json
@@ -3233,6 +3713,6 @@ All functions return MCP-compliant responses in the following format:
 
 ---
 
-*Last updated: 2025-12-20*
+*Last updated: 2025-12-23*
 *Document version: 1.0*
 *Generated automatically from TOOL_DEFINITION exports*

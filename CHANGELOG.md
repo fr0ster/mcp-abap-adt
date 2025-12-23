@@ -2,6 +2,38 @@
 
 ## [Unreleased]
 
+## [1.2.5] - 2025-12-23
+### Removed
+- **Removed duplicate readonly handlers that duplicate high-level CRUD operations**
+  - Deleted `handleGetClass.ts` (replaced by high-level `GetClass`)
+  - Deleted `handleGetDomain.ts` (replaced by high-level `GetDomain`)
+  - Deleted `handleGetDataElement.ts` (replaced by high-level `GetDataElement`)
+  - Deleted `handleGetTable.ts` (replaced by high-level `GetTable`)
+  - Deleted `handleGetStructure.ts` (replaced by high-level `GetStructure`)
+  - Deleted `handleGetView.ts` (replaced by high-level `GetView`)
+  - Deleted `handleGetServiceDefinition.ts` (replaced by high-level `GetServiceDefinition`)
+  - Deleted `handleGetProgram.ts` (replaced by high-level `GetProgram`)
+  - Deleted `handleGetInterface.ts` (replaced by high-level `GetInterface`)
+  - Deleted `handleGetFunctionGroup.ts` (replaced by high-level `GetFunctionGroup`)
+  - Deleted `handleGetBdef.ts` (replaced by high-level `GetBehaviorDefinition`)
+
+### Changed
+- **v1 server now uses high-level handlers instead of readonly duplicates**
+  - `GetClass`, `GetDomain`, `GetDataElement`, `GetTable`, `GetStructure`, `GetView`, `GetServiceDefinition`, `GetProgram`, `GetInterface`, `GetFunctionGroup` now use high-level handlers internally
+  - `GetBdef` now uses `GetBehaviorDefinition` high-level handler with parameter adapter for backward compatibility
+  - All high-level handlers support `version` parameter (active/inactive) for better flexibility
+
+### Fixed
+- Fixed TypeScript type errors in `handleGetAbapSystemSymbols.ts`
+  - Added proper JSON parsing for `GetClass` and `GetInterface` responses
+  - Fixed type assertions for class and interface data
+- Fixed TypeScript type error in `utils.ts`
+  - Added type assertion for `makeAdtRequest` return type
+- Fixed documentation generator (`tools/generate-tools-docs.js`)
+  - Updated regex pattern to support multi-line imports in handler groups
+  - Now correctly detects all handlers including system and search handlers
+  - Documentation now includes all 219 tools (76 high-level, 116 low-level, 27 read-only)
+
 ## [1.2.4] - 2025-12-22
 ### Changed
 - **Migrated from ESLint+Prettier to Biome**

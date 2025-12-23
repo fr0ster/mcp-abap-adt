@@ -2,8 +2,10 @@
  * Integration tests for Class High-Level Handlers
  *
  * Tests all high-level handlers for Class module:
+ * - GetClass (high-level) - read class source code
  * - CreateClass (high-level) - handles create, lock, update, check, unlock, activate
  * - UpdateClass (high-level) - handles lock, update, check, unlock, activate
+ * - DeleteClass (high-level) - handles delete with deletion check
  *
  * Enable debug logs:
  *   DEBUG_TESTS=true         - Test execution logs
@@ -15,8 +17,9 @@
  */
 
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
+import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
+import { handleGetClass } from '../../../../handlers/class/high/handleGetClass';
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
-import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { updateSessionFromResponse } from '../../helpers/sessionHelpers';
@@ -95,6 +98,10 @@ describe('Class High-Level Handlers Integration', () => {
 
         expect(objectName).toBeDefined();
         expect(objectName).not.toBe('');
+        if (!objectName) {
+          fail('objectName is required');
+        }
+        const className = objectName;
 
         // Step 1: Create
         logger?.info(`   • create: ${objectName}`);
@@ -187,7 +194,7 @@ describe('Class High-Level Handlers Integration', () => {
         }
 
         const updateResponse = await handleUpdateClass(updateCtx, {
-          class_name: objectName!,
+          class_name: className,
           source_code: updatedSourceCode,
           activate: true,
         });
@@ -233,6 +240,58 @@ describe('Class High-Level Handlers Integration', () => {
         }
 
         logger?.success(`✅ update: ${objectName} completed successfully`);
+
+        // Step 3: Get (read)
+        logger?.info(`   • get: ${objectName}`);
+        const getLogger = createTestLogger('class-high-get');
+        const getCtx = createHandlerContext({
+          connection,
+          logger: getLogger,
+        });
+        const getResponse = await handleGetClass(getCtx, {
+          class_name: className,
+          version: 'active',
+        });
+
+        expect(getResponse.isError).toBe(false);
+        if (getResponse.isError) {
+          const errorMsg = extractErrorMessage(getResponse);
+          fail(`Get failed: ${errorMsg}`);
+        }
+
+        const getData = parseHandlerResponse(getResponse);
+        expect(getData.success).toBe(true);
+        expect(getData.class_name).toBe(objectName);
+        expect(getData.source_code).toBeDefined();
+        expect(typeof getData.source_code).toBe('string');
+
+        logger?.success(`✅ get: ${objectName} completed successfully`);
+
+        // Step 4: Delete (high-level)
+        logger?.info(`   • delete (high): ${objectName}`);
+        const deleteLogger = createTestLogger('class-high-delete');
+        const deleteCtx = createHandlerContext({
+          connection,
+          logger: deleteLogger,
+        });
+        const deleteResponse = await handleDeleteClass(deleteCtx, {
+          class_name: className,
+          ...(transportRequest && { transport_request: transportRequest }),
+        });
+
+        expect(deleteResponse.isError).toBe(false);
+        if (deleteResponse.isError) {
+          const errorMsg = extractErrorMessage(deleteResponse);
+          logger?.warn(`Delete failed: ${errorMsg}`);
+          // Don't fail test - object might already be deleted or cleanup will handle it
+        } else {
+          const deleteData = parseHandlerResponse(deleteResponse);
+          expect(deleteData.success).toBe(true);
+          expect(deleteData.class_name).toBe(objectName);
+          logger?.success(
+            `✅ delete (high): ${objectName} completed successfully`,
+          );
+        }
       });
     },
     getTimeout('long'),

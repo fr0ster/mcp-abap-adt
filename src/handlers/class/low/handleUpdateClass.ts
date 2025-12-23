@@ -9,7 +9,6 @@ import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
-  restoreSessionInConnection,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -17,7 +16,7 @@ import {
 export const TOOL_DEFINITION = {
   name: 'UpdateClassLow',
   description:
-    '[low-level] Update source code of an existing ABAP class. Requires lock handle from LockObject. - use UpdateClass (high-level) for full workflow with lock/unlock/activate.',
+    '[low-level] Update source code of an existing ABAP class. Uses session from HandlerContext. Requires lock handle from LockClass operation. - use UpdateClass (high-level) for full workflow with lock/unlock/activate.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -34,22 +33,7 @@ export const TOOL_DEFINITION = {
       lock_handle: {
         type: 'string',
         description:
-          'Lock handle from LockObject. Required for update operation.',
-      },
-      session_id: {
-        type: 'string',
-        description:
-          'Session ID from GetSession. If not provided, a new session will be created.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
+          'Lock handle from LockClass operation. Required for update operation.',
       },
     },
     required: ['class_name', 'source_code', 'lock_handle'],
@@ -60,12 +44,6 @@ interface UpdateClassArgs {
   class_name: string;
   source_code: string;
   lock_handle: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 }
 
 /**
@@ -79,8 +57,7 @@ export async function handleUpdateClass(
 ) {
   const { connection, logger } = context;
   try {
-    const { class_name, source_code, lock_handle, session_id, session_state } =
-      args as UpdateClassArgs;
+    const { class_name, source_code, lock_handle } = args as UpdateClassArgs;
 
     // Validation
     if (!class_name || !source_code || !lock_handle) {
@@ -90,11 +67,6 @@ export async function handleUpdateClass(
     }
 
     const client = new CrudClient(connection);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
 
     const className = class_name.toUpperCase();
 
@@ -114,8 +86,6 @@ export async function handleUpdateClass(
         );
       }
 
-      // Get updated session state after update
-
       logger?.info(`✅ UpdateClass completed: ${className}`);
 
       return return_response({
@@ -123,9 +93,7 @@ export async function handleUpdateClass(
           {
             success: true,
             class_name: className,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Class ${className} updated successfully. Remember to unlock using UnlockObject.`,
+            message: `Class ${className} updated successfully. Remember to unlock using UnlockClassLow.`,
           },
           null,
           2,

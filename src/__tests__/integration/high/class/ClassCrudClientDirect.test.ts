@@ -116,7 +116,11 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
           }
         }
 
-        await connection.connect();
+        // connect() is not part of IAbapConnection interface, use type assertion
+        const connectionAny = connection as any;
+        if (connectionAny.connect) {
+          await connectionAny.connect();
+        }
         client = new CrudClient(connection);
         isCloud = isCloudConnection(); // Uses getManagedConnection internally, but we have separate connection
 
@@ -167,7 +171,11 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       if (!packageName) {
         testLogger?.info('⏭️  Skipping test: package_name not configured');
         if (connection) {
-          connection.reset();
+          // reset() is not part of IAbapConnection interface, use type assertion
+          const connectionAny = connection as any;
+          if (connectionAny.reset) {
+            connectionAny.reset();
+          }
         }
         return;
       }
@@ -202,7 +210,11 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       if (!client) {
         testLogger?.info('⏭️  Skipping test: Client not initialized');
         if (connection) {
-          connection.reset();
+          // reset() is not part of IAbapConnection interface, use type assertion
+          const connectionAny = connection as any;
+          if (connectionAny.reset) {
+            connectionAny.reset();
+          }
         }
         return;
       }
@@ -216,7 +228,11 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
       if (!preCheckResult.success) {
         testLogger?.info(`⏭️  Skipping test: ${preCheckResult.reason}`);
         if (connection) {
-          connection.reset();
+          // reset() is not part of IAbapConnection interface, use type assertion
+          const connectionAny = connection as any;
+          if (connectionAny.reset) {
+            connectionAny.reset();
+          }
         }
         return;
       }
@@ -415,7 +431,11 @@ describe('Class CrudClient Direct (Reference Implementation)', () => {
         // Cleanup: Reset connection created for this test
         if (connection) {
           try {
-            connection.reset();
+            // reset() is not part of IAbapConnection interface, use type assertion
+            const connectionAny = connection as any;
+            if (connectionAny.reset) {
+              connectionAny.reset();
+            }
             debugLog('CLEANUP', `Reset test connection`);
           } catch (resetError: any) {
             debugLog(

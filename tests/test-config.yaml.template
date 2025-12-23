@@ -411,6 +411,89 @@ create_class:
         # Delete step (will be executed after update)
         delete_after_test: true
         delete_object_type: "CLAS/OC"
+    - name: "builder_class"
+      enabled: false
+      description: "High-level test for ClassHighHandlers and ClassLocalIncludesHandlers: create → update → get → delete class with local includes"
+      params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
+        # Create step
+        class_name: "<YOUR_CLASS_NAME>"
+        description: "Test ABAP Class created via MCP ABAP ADT for high-level handlers"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
+        superclass: ""
+        final: false
+        abstract: false
+        create_protected: false
+        source_code: |
+          CLASS <YOUR_CLASS_NAME> DEFINITION
+            PUBLIC
+            FINAL
+            CREATE PUBLIC .
+
+            PUBLIC SECTION.
+              METHODS: constructor.
+            PROTECTED SECTION.
+            PRIVATE SECTION.
+          ENDCLASS.
+
+          CLASS <YOUR_CLASS_NAME> IMPLEMENTATION.
+            METHOD constructor.
+              " Initialization logic here
+              WRITE: / 'Class instance created'.
+            ENDMETHOD.
+          ENDCLASS.
+        # Update step (will be executed after create)
+        update_source_code: |
+          CLASS <YOUR_CLASS_NAME> DEFINITION
+            PUBLIC
+            FINAL
+            CREATE PUBLIC .
+
+            PUBLIC SECTION.
+              METHODS:
+                constructor,
+                get_message RETURNING VALUE(rv_message) TYPE string.
+            PROTECTED SECTION.
+            PRIVATE SECTION.
+          ENDCLASS.
+
+          CLASS <YOUR_CLASS_NAME> IMPLEMENTATION.
+            METHOD constructor.
+              " Updated initialization logic
+              WRITE: / 'Class instance created - UPDATED'.
+            ENDMETHOD.
+
+            METHOD get_message.
+              rv_message = 'Updated message from MCP test'.
+            ENDMETHOD.
+          ENDCLASS.
+        update_activate: true
+      # Parameters group for ClassLocalIncludesHandlers test
+      params_groups:
+        builder_class:
+          class_name: "<YOUR_CLASS_NAME>"
+          description: "Test ABAP Class for local includes handlers"
+          package_name: "<YOUR_PACKAGE_NAME>"
+          # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
+          source_code: |
+            CLASS <YOUR_CLASS_NAME> DEFINITION
+              PUBLIC
+              FINAL
+              CREATE PUBLIC .
+
+              PUBLIC SECTION.
+                METHODS: constructor.
+              PROTECTED SECTION.
+              PRIVATE SECTION.
+            ENDCLASS.
+
+            CLASS <YOUR_CLASS_NAME> IMPLEMENTATION.
+              METHOD constructor.
+                " Initialization logic here
+                WRITE: / 'Class instance created'.
+              ENDMETHOD.
+            ENDCLASS.
 
 # Step 1.5: CrudClient Direct test (reference implementation - uses CrudClient without handlers)
 
@@ -1458,5 +1541,38 @@ whereused_readonly:
         # Test objects for where-used analysis
         test_class: "CL_ABAP_CHAR_UTILITIES"  # Standard SAP class for testing
         test_table: "SCARR"                    # Standard SAP table (Flight: Airlines)
+
+# ============================================================================
+# CLASS UNIT TEST - Low-Level and High-Level Handlers
+# ============================================================================
+
+# Class Unit Test (Low-Level and High-Level)
+class_unit_test:
+  test_cases:
+    - name: "full_workflow"
+      enabled: false
+      description: "Full workflow test for unit test handlers: Lock → Update → Unlock → Activate → Run → GetStatus → GetResult (low-level) or RunUnitTest → GetUnitTest (high-level)"
+      params:
+        # Container class that contains the test class
+        container_class_name: "<YOUR_CONTAINER_CLASS_NAME>"
+        # Test class name inside the container class's testclasses include
+        test_class_name: "<YOUR_TEST_CLASS_NAME>"
+        # Optional: test class source code (if not provided, default test class will be used)
+        test_class_source: |
+          CLASS <YOUR_TEST_CLASS_NAME> DEFINITION FINAL
+            FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+            PRIVATE SECTION.
+              METHODS test_method FOR TESTING.
+          ENDCLASS.
+          CLASS <YOUR_TEST_CLASS_NAME> IMPLEMENTATION.
+            METHOD test_method.
+              cl_abap_unit_assert=>assert_true( abap_true ).
+            ENDMETHOD.
+          ENDCLASS.
+        # For high-level handlers (RunUnitTest, GetUnitTest)
+        test_class:
+          container_class: "<YOUR_CONTAINER_CLASS_NAME>"
+          name: "<YOUR_TEST_CLASS_NAME>"
+          run_unit_test: true  # Enable unit test run for high-level handlers
 
 # Step 3: Read-only test (separate read-only handler)

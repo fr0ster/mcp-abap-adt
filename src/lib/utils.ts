@@ -828,7 +828,7 @@ export async function makeAdtRequestWithTimeout(
   data?: any,
   params?: any,
   headers?: Record<string, string>,
-) {
+): Promise<AxiosResponse> {
   const timeout = getTimeout(timeoutType);
   return makeAdtRequest(
     connection,
@@ -867,7 +867,7 @@ export async function makeAdtRequest(
   data?: any,
   params?: any,
   headers?: Record<string, string>,
-) {
+): Promise<AxiosResponse> {
   return connection.makeAdtRequest({
     url,
     method,
@@ -875,7 +875,7 @@ export async function makeAdtRequest(
     data,
     params,
     headers,
-  });
+  }) as Promise<AxiosResponse>;
 }
 
 /**

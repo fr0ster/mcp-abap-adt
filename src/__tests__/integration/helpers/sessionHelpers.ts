@@ -229,7 +229,8 @@ export async function createTestConnectionAndSession(): Promise<{
     if (process.env.DEBUG_TESTS === 'true') {
       let connectionConfig: any;
       try {
-        connectionConfig = connection.getConfig();
+        // getConfig() is not part of IAbapConnection interface, use type assertion
+        connectionConfig = (connection as any).getConfig?.();
       } catch (error: any) {
         sessionLogger?.warn(
           `[getTestSession] Failed to get connection config: ${error?.message}`,
@@ -274,14 +275,17 @@ export async function createTestConnectionAndSession(): Promise<{
     }
 
     // Connect once (same as adt-clients tests - no double connect)
-    await connection.connect();
+    // connect() is not part of IAbapConnection interface, use type assertion
+    const connectionAny = connection as any;
+    if (connectionAny.connect) {
+      await connectionAny.connect();
+    }
 
     // Generate session ID
     const sessionId = generateSessionId();
 
     // Get session state directly from connection (same as adt-clients tests)
     // Note: getCookies() and getCsrfToken() exist in concrete classes but not in IAbapConnection interface
-    const connectionAny = connection as any;
     const cookies = connectionAny.getCookies?.() || '';
     const csrfToken = connectionAny.getCsrfToken?.() || '';
 

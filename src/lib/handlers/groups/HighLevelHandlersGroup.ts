@@ -3,6 +3,14 @@ import {
   handleCreateBehaviorDefinition,
 } from '../../../handlers/behavior_definition/high/handleCreateBehaviorDefinition';
 import {
+  TOOL_DEFINITION as DeleteBehaviorDefinition_Tool,
+  handleDeleteBehaviorDefinition,
+} from '../../../handlers/behavior_definition/high/handleDeleteBehaviorDefinition';
+import {
+  TOOL_DEFINITION as GetBehaviorDefinition_Tool,
+  handleGetBehaviorDefinition,
+} from '../../../handlers/behavior_definition/high/handleGetBehaviorDefinition';
+import {
   handleUpdateBehaviorDefinition as handleUpdateBehaviorDefinitionHigh,
   TOOL_DEFINITION as UpdateBdef_Tool,
 } from '../../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
@@ -10,6 +18,14 @@ import {
   TOOL_DEFINITION as CreateBehaviorImplementation_Tool,
   handleCreateBehaviorImplementation,
 } from '../../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
+import {
+  TOOL_DEFINITION as DeleteBehaviorImplementation_Tool,
+  handleDeleteBehaviorImplementation,
+} from '../../../handlers/behavior_implementation/high/handleDeleteBehaviorImplementation';
+import {
+  TOOL_DEFINITION as GetBehaviorImplementation_Tool,
+  handleGetBehaviorImplementation,
+} from '../../../handlers/behavior_implementation/high/handleGetBehaviorImplementation';
 import {
   handleUpdateBehaviorImplementation,
   TOOL_DEFINITION as UpdateBehaviorImplementation_Tool,
@@ -19,13 +35,93 @@ import {
   handleCreateClass,
 } from '../../../handlers/class/high/handleCreateClass';
 import {
+  TOOL_DEFINITION as CreateLocalDefinitions_Tool,
+  handleCreateLocalDefinitions,
+} from '../../../handlers/class/high/handleCreateLocalDefinitions';
+import {
+  TOOL_DEFINITION as CreateLocalMacros_Tool,
+  handleCreateLocalMacros,
+} from '../../../handlers/class/high/handleCreateLocalMacros';
+import {
+  TOOL_DEFINITION as CreateLocalTestClass_Tool,
+  handleCreateLocalTestClass,
+} from '../../../handlers/class/high/handleCreateLocalTestClass';
+import {
+  TOOL_DEFINITION as CreateLocalTypes_Tool,
+  handleCreateLocalTypes,
+} from '../../../handlers/class/high/handleCreateLocalTypes';
+import {
+  TOOL_DEFINITION as DeleteClass_Tool,
+  handleDeleteClass,
+} from '../../../handlers/class/high/handleDeleteClass';
+import {
+  TOOL_DEFINITION as DeleteLocalDefinitions_Tool,
+  handleDeleteLocalDefinitions,
+} from '../../../handlers/class/high/handleDeleteLocalDefinitions';
+import {
+  TOOL_DEFINITION as DeleteLocalMacros_Tool,
+  handleDeleteLocalMacros,
+} from '../../../handlers/class/high/handleDeleteLocalMacros';
+import {
+  TOOL_DEFINITION as DeleteLocalTestClass_Tool,
+  handleDeleteLocalTestClass,
+} from '../../../handlers/class/high/handleDeleteLocalTestClass';
+import {
+  TOOL_DEFINITION as DeleteLocalTypes_Tool,
+  handleDeleteLocalTypes,
+} from '../../../handlers/class/high/handleDeleteLocalTypes';
+import {
+  TOOL_DEFINITION as GetClass_Tool,
+  handleGetClass,
+} from '../../../handlers/class/high/handleGetClass';
+import {
+  TOOL_DEFINITION as GetLocalDefinitions_Tool,
+  handleGetLocalDefinitions,
+} from '../../../handlers/class/high/handleGetLocalDefinitions';
+import {
+  TOOL_DEFINITION as GetLocalMacros_Tool,
+  handleGetLocalMacros,
+} from '../../../handlers/class/high/handleGetLocalMacros';
+import {
+  TOOL_DEFINITION as GetLocalTestClass_Tool,
+  handleGetLocalTestClass,
+} from '../../../handlers/class/high/handleGetLocalTestClass';
+import {
+  TOOL_DEFINITION as GetLocalTypes_Tool,
+  handleGetLocalTypes,
+} from '../../../handlers/class/high/handleGetLocalTypes';
+import {
   handleUpdateClass as handleUpdateClassHigh,
   TOOL_DEFINITION as UpdateClassHigh_Tool,
 } from '../../../handlers/class/high/handleUpdateClass';
 import {
+  handleUpdateLocalDefinitions,
+  TOOL_DEFINITION as UpdateLocalDefinitions_Tool,
+} from '../../../handlers/class/high/handleUpdateLocalDefinitions';
+import {
+  handleUpdateLocalMacros,
+  TOOL_DEFINITION as UpdateLocalMacros_Tool,
+} from '../../../handlers/class/high/handleUpdateLocalMacros';
+import {
+  handleUpdateLocalTestClass,
+  TOOL_DEFINITION as UpdateLocalTestClass_Tool,
+} from '../../../handlers/class/high/handleUpdateLocalTestClass';
+import {
+  handleUpdateLocalTypes,
+  TOOL_DEFINITION as UpdateLocalTypes_Tool,
+} from '../../../handlers/class/high/handleUpdateLocalTypes';
+import {
   TOOL_DEFINITION as CreateDataElement_Tool,
   handleCreateDataElement,
 } from '../../../handlers/data_element/high/handleCreateDataElement';
+import {
+  TOOL_DEFINITION as DeleteDataElement_Tool,
+  handleDeleteDataElement,
+} from '../../../handlers/data_element/high/handleDeleteDataElement';
+import {
+  TOOL_DEFINITION as GetDataElement_Tool,
+  handleGetDataElement,
+} from '../../../handlers/data_element/high/handleGetDataElement';
 import {
   handleUpdateDataElement as handleUpdateDataElementHigh,
   TOOL_DEFINITION as UpdateDataElementHigh_Tool,
@@ -42,6 +138,14 @@ import {
   TOOL_DEFINITION as CreateDomain_Tool,
   handleCreateDomain,
 } from '../../../handlers/domain/high/handleCreateDomain';
+import {
+  TOOL_DEFINITION as DeleteDomain_Tool,
+  handleDeleteDomain,
+} from '../../../handlers/domain/high/handleDeleteDomain';
+import {
+  TOOL_DEFINITION as GetDomain_Tool,
+  handleGetDomain,
+} from '../../../handlers/domain/high/handleGetDomain';
 import {
   handleUpdateDomain as handleUpdateDomainHigh,
   TOOL_DEFINITION as UpdateDomainHigh_Tool,
@@ -63,13 +167,45 @@ import {
   TOOL_DEFINITION as UpdateFunctionModuleHigh_Tool,
 } from '../../../handlers/function/high/handleUpdateFunctionModule';
 import {
+  TOOL_DEFINITION as DeleteFunctionGroup_Tool,
+  handleDeleteFunctionGroup,
+} from '../../../handlers/function_group/high/handleDeleteFunctionGroup';
+import {
+  TOOL_DEFINITION as GetFunctionGroup_Tool,
+  handleGetFunctionGroup,
+} from '../../../handlers/function_group/high/handleGetFunctionGroup';
+import {
+  TOOL_DEFINITION as DeleteFunctionModule_Tool,
+  handleDeleteFunctionModule,
+} from '../../../handlers/function_module/high/handleDeleteFunctionModule';
+import {
+  TOOL_DEFINITION as GetFunctionModule_Tool,
+  handleGetFunctionModule,
+} from '../../../handlers/function_module/high/handleGetFunctionModule';
+import {
   TOOL_DEFINITION as CreateInterface_Tool,
   handleCreateInterface,
 } from '../../../handlers/interface/high/handleCreateInterface';
 import {
+  TOOL_DEFINITION as DeleteInterface_Tool,
+  handleDeleteInterface,
+} from '../../../handlers/interface/high/handleDeleteInterface';
+import {
+  TOOL_DEFINITION as GetInterface_Tool,
+  handleGetInterface,
+} from '../../../handlers/interface/high/handleGetInterface';
+import {
   handleUpdateInterface as handleUpdateInterfaceHigh,
   TOOL_DEFINITION as UpdateInterfaceHigh_Tool,
 } from '../../../handlers/interface/high/handleUpdateInterface';
+import {
+  TOOL_DEFINITION as DeleteMetadataExtension_Tool,
+  handleDeleteMetadataExtension,
+} from '../../../handlers/metadata_extension/high/handleDeleteMetadataExtension';
+import {
+  TOOL_DEFINITION as GetMetadataExtension_Tool,
+  handleGetMetadataExtension,
+} from '../../../handlers/metadata_extension/high/handleGetMetadataExtension';
 // Import high-level handlers
 // Import TOOL_DEFINITION from handlers
 import {
@@ -81,6 +217,14 @@ import {
   handleCreateProgram,
 } from '../../../handlers/program/high/handleCreateProgram';
 import {
+  TOOL_DEFINITION as DeleteProgram_Tool,
+  handleDeleteProgram,
+} from '../../../handlers/program/high/handleDeleteProgram';
+import {
+  TOOL_DEFINITION as GetProgram_Tool,
+  handleGetProgram,
+} from '../../../handlers/program/high/handleGetProgram';
+import {
   handleUpdateProgram as handleUpdateProgramHigh,
   TOOL_DEFINITION as UpdateProgramHigh_Tool,
 } from '../../../handlers/program/high/handleUpdateProgram';
@@ -88,6 +232,14 @@ import {
   TOOL_DEFINITION as CreateServiceDefinition_Tool,
   handleCreateServiceDefinition,
 } from '../../../handlers/service_definition/high/handleCreateServiceDefinition';
+import {
+  TOOL_DEFINITION as DeleteServiceDefinition_Tool,
+  handleDeleteServiceDefinition,
+} from '../../../handlers/service_definition/high/handleDeleteServiceDefinition';
+import {
+  TOOL_DEFINITION as GetServiceDefinition_Tool,
+  handleGetServiceDefinition,
+} from '../../../handlers/service_definition/high/handleGetServiceDefinition';
 import {
   handleUpdateServiceDefinition,
   TOOL_DEFINITION as UpdateServiceDefinition_Tool,
@@ -97,6 +249,14 @@ import {
   handleCreateStructure,
 } from '../../../handlers/structure/high/handleCreateStructure';
 import {
+  TOOL_DEFINITION as DeleteStructure_Tool,
+  handleDeleteStructure,
+} from '../../../handlers/structure/high/handleDeleteStructure';
+import {
+  TOOL_DEFINITION as GetStructure_Tool,
+  handleGetStructure,
+} from '../../../handlers/structure/high/handleGetStructure';
+import {
   handleUpdateStructure as handleUpdateStructureHigh,
   TOOL_DEFINITION as UpdateStructureHigh_Tool,
 } from '../../../handlers/structure/high/handleUpdateStructure';
@@ -104,6 +264,14 @@ import {
   TOOL_DEFINITION as CreateTable_Tool,
   handleCreateTable,
 } from '../../../handlers/table/high/handleCreateTable';
+import {
+  TOOL_DEFINITION as DeleteTable_Tool,
+  handleDeleteTable,
+} from '../../../handlers/table/high/handleDeleteTable';
+import {
+  TOOL_DEFINITION as GetTable_Tool,
+  handleGetTable,
+} from '../../../handlers/table/high/handleGetTable';
 import {
   handleUpdateTable as handleUpdateTableHigh,
   TOOL_DEFINITION as UpdateTableHigh_Tool,
@@ -113,9 +281,25 @@ import {
   handleCreateTransport,
 } from '../../../handlers/transport/high/handleCreateTransport';
 import {
+  TOOL_DEFINITION as GetUnitTest_Tool,
+  handleGetUnitTest,
+} from '../../../handlers/unit_test/high/handleGetUnitTest';
+import {
+  handleRunUnitTest,
+  TOOL_DEFINITION as RunUnitTest_Tool,
+} from '../../../handlers/unit_test/high/handleRunUnitTest';
+import {
   TOOL_DEFINITION as CreateView_Tool,
   handleCreateView,
 } from '../../../handlers/view/high/handleCreateView';
+import {
+  TOOL_DEFINITION as DeleteView_Tool,
+  handleDeleteView,
+} from '../../../handlers/view/high/handleDeleteView';
+import {
+  TOOL_DEFINITION as GetView_Tool,
+  handleGetView,
+} from '../../../handlers/view/high/handleGetView';
 import {
   handleUpdateView as handleUpdateViewHigh,
   TOOL_DEFINITION as UpdateViewHigh_Tool,
@@ -153,11 +337,27 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: GetDomain_Tool.name,
+          description: GetDomain_Tool.description,
+          inputSchema: GetDomain_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetDomain(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: UpdateDomainHigh_Tool.name,
           description: UpdateDomainHigh_Tool.description,
           inputSchema: UpdateDomainHigh_Tool.inputSchema,
         },
         handler: (args: any) => handleUpdateDomainHigh(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: DeleteDomain_Tool.name,
+          description: DeleteDomain_Tool.description,
+          inputSchema: DeleteDomain_Tool.inputSchema,
+        },
+        handler: (args: any) => handleDeleteDomain(this.context, args),
       },
       {
         toolDefinition: {
@@ -169,11 +369,27 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: GetDataElement_Tool.name,
+          description: GetDataElement_Tool.description,
+          inputSchema: GetDataElement_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetDataElement(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: UpdateDataElementHigh_Tool.name,
           description: UpdateDataElementHigh_Tool.description,
           inputSchema: UpdateDataElementHigh_Tool.inputSchema,
         },
         handler: (args: any) => handleUpdateDataElementHigh(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: DeleteDataElement_Tool.name,
+          description: DeleteDataElement_Tool.description,
+          inputSchema: DeleteDataElement_Tool.inputSchema,
+        },
+        handler: (args: any) => handleDeleteDataElement(this.context, args),
       },
       {
         toolDefinition: {
@@ -193,11 +409,27 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: GetTable_Tool.name,
+          description: GetTable_Tool.description,
+          inputSchema: GetTable_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetTable(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: UpdateTableHigh_Tool.name,
           description: UpdateTableHigh_Tool.description,
           inputSchema: UpdateTableHigh_Tool.inputSchema,
         },
         handler: (args: any) => handleUpdateTableHigh(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: DeleteTable_Tool.name,
+          description: DeleteTable_Tool.description,
+          inputSchema: DeleteTable_Tool.inputSchema,
+        },
+        handler: (args: any) => handleDeleteTable(this.context, args),
       },
       {
         toolDefinition: {
@@ -209,11 +441,27 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: GetStructure_Tool.name,
+          description: GetStructure_Tool.description,
+          inputSchema: GetStructure_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetStructure(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: UpdateStructureHigh_Tool.name,
           description: UpdateStructureHigh_Tool.description,
           inputSchema: UpdateStructureHigh_Tool.inputSchema,
         },
         handler: (args: any) => handleUpdateStructureHigh(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: DeleteStructure_Tool.name,
+          description: DeleteStructure_Tool.description,
+          inputSchema: DeleteStructure_Tool.inputSchema,
+        },
+        handler: (args: any) => handleDeleteStructure(this.context, args),
       },
       {
         toolDefinition: {
@@ -225,11 +473,27 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: GetView_Tool.name,
+          description: GetView_Tool.description,
+          inputSchema: GetView_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetView(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: UpdateViewHigh_Tool.name,
           description: UpdateViewHigh_Tool.description,
           inputSchema: UpdateViewHigh_Tool.inputSchema,
         },
         handler: (args: any) => handleUpdateViewHigh(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: DeleteView_Tool.name,
+          description: DeleteView_Tool.description,
+          inputSchema: DeleteView_Tool.inputSchema,
+        },
+        handler: (args: any) => handleDeleteView(this.context, args),
       },
       {
         toolDefinition: {
@@ -242,12 +506,37 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: GetServiceDefinition_Tool.name,
+          description: GetServiceDefinition_Tool.description,
+          inputSchema: GetServiceDefinition_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetServiceDefinition(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: UpdateServiceDefinition_Tool.name,
           description: UpdateServiceDefinition_Tool.description,
           inputSchema: UpdateServiceDefinition_Tool.inputSchema,
         },
         handler: (args: any) =>
           handleUpdateServiceDefinition(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: DeleteServiceDefinition_Tool.name,
+          description: DeleteServiceDefinition_Tool.description,
+          inputSchema: DeleteServiceDefinition_Tool.inputSchema,
+        },
+        handler: (args: any) =>
+          handleDeleteServiceDefinition(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetClass_Tool.name,
+          description: GetClass_Tool.description,
+          inputSchema: GetClass_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetClass(this.context, args),
       },
       {
         toolDefinition: {
@@ -267,11 +556,174 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: DeleteClass_Tool.name,
+          description: DeleteClass_Tool.description,
+          inputSchema: DeleteClass_Tool.inputSchema,
+        },
+        handler: (args: any) => handleDeleteClass(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: RunUnitTest_Tool.name,
+          description: RunUnitTest_Tool.description,
+          inputSchema: RunUnitTest_Tool.inputSchema,
+        },
+        handler: (args: any) => handleRunUnitTest(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetUnitTest_Tool.name,
+          description: GetUnitTest_Tool.description,
+          inputSchema: GetUnitTest_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetUnitTest(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetLocalTestClass_Tool.name,
+          description: GetLocalTestClass_Tool.description,
+          inputSchema: GetLocalTestClass_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetLocalTestClass(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: CreateLocalTestClass_Tool.name,
+          description: CreateLocalTestClass_Tool.description,
+          inputSchema: CreateLocalTestClass_Tool.inputSchema,
+        },
+        handler: (args: any) => handleCreateLocalTestClass(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: UpdateLocalTestClass_Tool.name,
+          description: UpdateLocalTestClass_Tool.description,
+          inputSchema: UpdateLocalTestClass_Tool.inputSchema,
+        },
+        handler: (args: any) => handleUpdateLocalTestClass(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: DeleteLocalTestClass_Tool.name,
+          description: DeleteLocalTestClass_Tool.description,
+          inputSchema: DeleteLocalTestClass_Tool.inputSchema,
+        },
+        handler: (args: any) => handleDeleteLocalTestClass(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetLocalTypes_Tool.name,
+          description: GetLocalTypes_Tool.description,
+          inputSchema: GetLocalTypes_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetLocalTypes(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: CreateLocalTypes_Tool.name,
+          description: CreateLocalTypes_Tool.description,
+          inputSchema: CreateLocalTypes_Tool.inputSchema,
+        },
+        handler: (args: any) => handleCreateLocalTypes(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: UpdateLocalTypes_Tool.name,
+          description: UpdateLocalTypes_Tool.description,
+          inputSchema: UpdateLocalTypes_Tool.inputSchema,
+        },
+        handler: (args: any) => handleUpdateLocalTypes(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: DeleteLocalTypes_Tool.name,
+          description: DeleteLocalTypes_Tool.description,
+          inputSchema: DeleteLocalTypes_Tool.inputSchema,
+        },
+        handler: (args: any) => handleDeleteLocalTypes(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetLocalDefinitions_Tool.name,
+          description: GetLocalDefinitions_Tool.description,
+          inputSchema: GetLocalDefinitions_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetLocalDefinitions(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: CreateLocalDefinitions_Tool.name,
+          description: CreateLocalDefinitions_Tool.description,
+          inputSchema: CreateLocalDefinitions_Tool.inputSchema,
+        },
+        handler: (args: any) =>
+          handleCreateLocalDefinitions(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: UpdateLocalDefinitions_Tool.name,
+          description: UpdateLocalDefinitions_Tool.description,
+          inputSchema: UpdateLocalDefinitions_Tool.inputSchema,
+        },
+        handler: (args: any) =>
+          handleUpdateLocalDefinitions(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: DeleteLocalDefinitions_Tool.name,
+          description: DeleteLocalDefinitions_Tool.description,
+          inputSchema: DeleteLocalDefinitions_Tool.inputSchema,
+        },
+        handler: (args: any) =>
+          handleDeleteLocalDefinitions(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetLocalMacros_Tool.name,
+          description: GetLocalMacros_Tool.description,
+          inputSchema: GetLocalMacros_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetLocalMacros(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: CreateLocalMacros_Tool.name,
+          description: CreateLocalMacros_Tool.description,
+          inputSchema: CreateLocalMacros_Tool.inputSchema,
+        },
+        handler: (args: any) => handleCreateLocalMacros(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: UpdateLocalMacros_Tool.name,
+          description: UpdateLocalMacros_Tool.description,
+          inputSchema: UpdateLocalMacros_Tool.inputSchema,
+        },
+        handler: (args: any) => handleUpdateLocalMacros(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: DeleteLocalMacros_Tool.name,
+          description: DeleteLocalMacros_Tool.description,
+          inputSchema: DeleteLocalMacros_Tool.inputSchema,
+        },
+        handler: (args: any) => handleDeleteLocalMacros(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: CreateProgram_Tool.name,
           description: CreateProgram_Tool.description,
           inputSchema: CreateProgram_Tool.inputSchema,
         },
         handler: (args: any) => handleCreateProgram(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetProgram_Tool.name,
+          description: GetProgram_Tool.description,
+          inputSchema: GetProgram_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetProgram(this.context, args),
       },
       {
         toolDefinition: {
@@ -283,11 +735,27 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: DeleteProgram_Tool.name,
+          description: DeleteProgram_Tool.description,
+          inputSchema: DeleteProgram_Tool.inputSchema,
+        },
+        handler: (args: any) => handleDeleteProgram(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: CreateInterface_Tool.name,
           description: CreateInterface_Tool.description,
           inputSchema: CreateInterface_Tool.inputSchema,
         },
         handler: (args: any) => handleCreateInterface(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetInterface_Tool.name,
+          description: GetInterface_Tool.description,
+          inputSchema: GetInterface_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetInterface(this.context, args),
       },
       {
         toolDefinition: {
@@ -299,11 +767,27 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: DeleteInterface_Tool.name,
+          description: DeleteInterface_Tool.description,
+          inputSchema: DeleteInterface_Tool.inputSchema,
+        },
+        handler: (args: any) => handleDeleteInterface(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: CreateFunctionGroup_Tool.name,
           description: CreateFunctionGroup_Tool.description,
           inputSchema: CreateFunctionGroup_Tool.inputSchema,
         },
         handler: (args: any) => handleCreateFunctionGroup(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetFunctionGroup_Tool.name,
+          description: GetFunctionGroup_Tool.description,
+          inputSchema: GetFunctionGroup_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetFunctionGroup(this.context, args),
       },
       {
         toolDefinition: {
@@ -315,11 +799,27 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: DeleteFunctionGroup_Tool.name,
+          description: DeleteFunctionGroup_Tool.description,
+          inputSchema: DeleteFunctionGroup_Tool.inputSchema,
+        },
+        handler: (args: any) => handleDeleteFunctionGroup(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: CreateFunctionModule_Tool.name,
           description: CreateFunctionModule_Tool.description,
           inputSchema: CreateFunctionModule_Tool.inputSchema,
         },
         handler: (args: any) => handleCreateFunctionModule(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetFunctionModule_Tool.name,
+          description: GetFunctionModule_Tool.description,
+          inputSchema: GetFunctionModule_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetFunctionModule(this.context, args),
       },
       {
         toolDefinition: {
@@ -332,12 +832,28 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: DeleteFunctionModule_Tool.name,
+          description: DeleteFunctionModule_Tool.description,
+          inputSchema: DeleteFunctionModule_Tool.inputSchema,
+        },
+        handler: (args: any) => handleDeleteFunctionModule(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: CreateBdef_Tool.name,
           description: CreateBdef_Tool.description,
           inputSchema: CreateBdef_Tool.inputSchema,
         },
         handler: (args: any) =>
           handleCreateBehaviorDefinition(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetBehaviorDefinition_Tool.name,
+          description: GetBehaviorDefinition_Tool.description,
+          inputSchema: GetBehaviorDefinition_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetBehaviorDefinition(this.context, args),
       },
       {
         toolDefinition: {
@@ -350,12 +866,30 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: DeleteBehaviorDefinition_Tool.name,
+          description: DeleteBehaviorDefinition_Tool.description,
+          inputSchema: DeleteBehaviorDefinition_Tool.inputSchema,
+        },
+        handler: (args: any) =>
+          handleDeleteBehaviorDefinition(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: CreateBehaviorImplementation_Tool.name,
           description: CreateBehaviorImplementation_Tool.description,
           inputSchema: CreateBehaviorImplementation_Tool.inputSchema,
         },
         handler: (args: any) =>
           handleCreateBehaviorImplementation(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetBehaviorImplementation_Tool.name,
+          description: GetBehaviorImplementation_Tool.description,
+          inputSchema: GetBehaviorImplementation_Tool.inputSchema,
+        },
+        handler: (args: any) =>
+          handleGetBehaviorImplementation(this.context, args),
       },
       {
         toolDefinition: {
@@ -368,6 +902,15 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: DeleteBehaviorImplementation_Tool.name,
+          description: DeleteBehaviorImplementation_Tool.description,
+          inputSchema: DeleteBehaviorImplementation_Tool.inputSchema,
+        },
+        handler: (args: any) =>
+          handleDeleteBehaviorImplementation(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: CreateDdlx_Tool.name,
           description: CreateDdlx_Tool.description,
           inputSchema: CreateDdlx_Tool.inputSchema,
@@ -377,12 +920,29 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: GetMetadataExtension_Tool.name,
+          description: GetMetadataExtension_Tool.description,
+          inputSchema: GetMetadataExtension_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetMetadataExtension(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: UpdateDdlx_Tool.name,
           description: UpdateDdlx_Tool.description,
           inputSchema: UpdateDdlx_Tool.inputSchema,
         },
         handler: (args: any) =>
           handleUpdateMetadataExtensionHigh(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: DeleteMetadataExtension_Tool.name,
+          description: DeleteMetadataExtension_Tool.description,
+          inputSchema: DeleteMetadataExtension_Tool.inputSchema,
+        },
+        handler: (args: any) =>
+          handleDeleteMetadataExtension(this.context, args),
       },
     ];
   }

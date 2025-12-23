@@ -134,17 +134,20 @@ async function main() {
       throw new Error('stdio requires --mcp=<destination> or --env=<path>');
     }
     // For .env file, use 'default' broker; for --mcp, use specified destination
-    const brokerKey = config.envFile ? 'default' : config.mcpDestination;
+    // Priority: --mcp takes precedence over auto-detected .env file
+    const brokerKey =
+      config.mcpDestination ?? (config.envFile ? 'default' : undefined);
+    if (!brokerKey) {
+      throw new Error('stdio requires --mcp=<destination> or --env=<path>');
+    }
     const broker = await authBrokerFactory.getOrCreateAuthBroker(brokerKey);
     if (!broker) {
-      throw new Error(
-        `Auth broker not available for ${brokerKey ?? 'default'}`,
-      );
+      throw new Error(`Auth broker not available for ${brokerKey}`);
     }
     const server = new StdioServer(handlersRegistry, broker, {
       logger: loggerForTransport,
     });
-    await server.start(brokerKey ?? 'default');
+    await server.start(brokerKey);
     return;
   }
 
@@ -154,7 +157,8 @@ async function main() {
       port: config.port,
       ssePath: config.ssePath,
       postPath: config.postPath,
-      defaultDestination: config.envFile ? 'default' : config.mcpDestination,
+      defaultDestination:
+        config.mcpDestination ?? (config.envFile ? 'default' : undefined),
       logger: loggerForTransport,
     });
     await server.start();
@@ -167,7 +171,8 @@ async function main() {
     port: config.port,
     enableJsonResponse: config.httpJsonResponse,
     path: config.httpPath,
-    defaultDestination: config.envFile ? 'default' : config.mcpDestination,
+    defaultDestination:
+      config.mcpDestination ?? (config.envFile ? 'default' : undefined),
     logger: loggerForTransport,
   });
   await server.start();

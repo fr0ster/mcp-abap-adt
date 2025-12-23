@@ -8,6 +8,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../handlers/interfaces.js';
 import type { IHandlersRegistry } from '../../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry.js';
+import { jsonSchemaToZod } from '../../lib/handlers/utils/schemaUtils.js';
 import { registerAuthBroker } from '../../lib/utils.js';
 import type { ConnectionContext } from './ConnectionContext.js';
 
@@ -296,13 +297,22 @@ export abstract class BaseMcpServer extends McpServer {
             return { content };
           };
 
+          // Convert JSON Schema to Zod if needed, otherwise pass as-is
+          const zodSchema =
+            entry.toolDefinition.inputSchema &&
+            typeof entry.toolDefinition.inputSchema === 'object' &&
+            entry.toolDefinition.inputSchema.type === 'object' &&
+            entry.toolDefinition.inputSchema.properties
+              ? jsonSchemaToZod(entry.toolDefinition.inputSchema)
+              : entry.toolDefinition.inputSchema;
+
           // Register wrapped handler via SDK registerTool
           // Note: connection is NOT part of MCP tool signature
           this.registerTool(
             entry.toolDefinition.name,
             {
               description: entry.toolDefinition.description,
-              inputSchema: entry.toolDefinition.inputSchema,
+              inputSchema: zodSchema,
             },
             wrappedHandler,
           );

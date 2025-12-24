@@ -39,6 +39,15 @@ import { handleGetClassUnitTestStatus } from '../../handlers/class/low/handleGet
 import { handleLockClass } from '../../handlers/class/low/handleLockClass';
 import { handleLockClassTestClasses } from '../../handlers/class/low/handleLockClassTestClasses';
 import { handleRunClassUnitTests } from '../../handlers/class/low/handleRunClassUnitTests';
+import { handleCreateCdsUnitTest } from '../../handlers/unit_test/high/handleCreateCdsUnitTest';
+import { handleCreateUnitTest } from '../../handlers/unit_test/high/handleCreateUnitTest';
+import { handleDeleteCdsUnitTest } from '../../handlers/unit_test/high/handleDeleteCdsUnitTest';
+import { handleDeleteUnitTest } from '../../handlers/unit_test/high/handleDeleteUnitTest';
+import { handleGetCdsUnitTest } from '../../handlers/unit_test/high/handleGetCdsUnitTest';
+import { handleGetUnitTest } from '../../handlers/unit_test/high/handleGetUnitTest';
+import { handleRunUnitTest } from '../../handlers/unit_test/high/handleRunUnitTest';
+import { handleUpdateCdsUnitTest } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest';
+import { handleUpdateUnitTest } from '../../handlers/unit_test/high/handleUpdateUnitTest';
 import { handleUnlockClass } from '../../handlers/class/low/handleUnlockClass';
 import { handleUnlockClassTestClasses } from '../../handlers/class/low/handleUnlockClassTestClasses';
 import { handleUpdateClass as handleUpdateClassLow } from '../../handlers/class/low/handleUpdateClass';
@@ -230,6 +239,15 @@ import { TOOL_DEFINITION as GetClassUnitTestStatus_Tool } from '../../handlers/c
 import { TOOL_DEFINITION as LockClass_Tool } from '../../handlers/class/low/handleLockClass';
 import { TOOL_DEFINITION as LockClassTestClasses_Tool } from '../../handlers/class/low/handleLockClassTestClasses';
 import { TOOL_DEFINITION as RunClassUnitTests_Tool } from '../../handlers/class/low/handleRunClassUnitTests';
+import { TOOL_DEFINITION as CreateCdsUnitTest_Tool } from '../../handlers/unit_test/high/handleCreateCdsUnitTest';
+import { TOOL_DEFINITION as CreateUnitTest_Tool } from '../../handlers/unit_test/high/handleCreateUnitTest';
+import { TOOL_DEFINITION as DeleteCdsUnitTest_Tool } from '../../handlers/unit_test/high/handleDeleteCdsUnitTest';
+import { TOOL_DEFINITION as DeleteUnitTest_Tool } from '../../handlers/unit_test/high/handleDeleteUnitTest';
+import { TOOL_DEFINITION as GetCdsUnitTest_Tool } from '../../handlers/unit_test/high/handleGetCdsUnitTest';
+import { TOOL_DEFINITION as GetUnitTest_Tool } from '../../handlers/unit_test/high/handleGetUnitTest';
+import { TOOL_DEFINITION as RunUnitTest_Tool } from '../../handlers/unit_test/high/handleRunUnitTest';
+import { TOOL_DEFINITION as UpdateCdsUnitTest_Tool } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest';
+import { TOOL_DEFINITION as UpdateUnitTest_Tool } from '../../handlers/unit_test/high/handleUpdateUnitTest';
 import { TOOL_DEFINITION as UnlockClass_Tool } from '../../handlers/class/low/handleUnlockClass';
 import { TOOL_DEFINITION as UnlockClassTestClasses_Tool } from '../../handlers/class/low/handleUnlockClassTestClasses';
 import { TOOL_DEFINITION as UpdateClass_Tool } from '../../handlers/class/low/handleUpdateClass';
@@ -1732,6 +1750,87 @@ export class McpHandlers {
         UpdateClassHigh_Tool.inputSchema as any,
         (args: any) => {
           return handleUpdateClassHigh(context, args);
+        },
+      );
+      this.registerToolOnServer(
+        server,
+        CreateUnitTest_Tool.name,
+        CreateUnitTest_Tool.description,
+        CreateUnitTest_Tool.inputSchema as any,
+        (args: any) => {
+          return handleCreateUnitTest(context, args);
+        },
+      );
+      this.registerToolOnServer(
+        server,
+        RunUnitTest_Tool.name,
+        RunUnitTest_Tool.description,
+        RunUnitTest_Tool.inputSchema as any,
+        (args: any) => {
+          return handleRunUnitTest(context, args);
+        },
+      );
+      this.registerToolOnServer(
+        server,
+        GetUnitTest_Tool.name,
+        GetUnitTest_Tool.description,
+        GetUnitTest_Tool.inputSchema as any,
+        (args: any) => {
+          return handleGetUnitTest(context, args);
+        },
+      );
+      this.registerToolOnServer(
+        server,
+        UpdateUnitTest_Tool.name,
+        UpdateUnitTest_Tool.description,
+        UpdateUnitTest_Tool.inputSchema as any,
+        (args: any) => {
+          return handleUpdateUnitTest(context, args);
+        },
+      );
+      this.registerToolOnServer(
+        server,
+        DeleteUnitTest_Tool.name,
+        DeleteUnitTest_Tool.description,
+        DeleteUnitTest_Tool.inputSchema as any,
+        (args: any) => {
+          return handleDeleteUnitTest(context, args);
+        },
+      );
+      this.registerToolOnServer(
+        server,
+        CreateCdsUnitTest_Tool.name,
+        CreateCdsUnitTest_Tool.description,
+        CreateCdsUnitTest_Tool.inputSchema as any,
+        (args: any) => {
+          return handleCreateCdsUnitTest(context, args);
+        },
+      );
+      this.registerToolOnServer(
+        server,
+        GetCdsUnitTest_Tool.name,
+        GetCdsUnitTest_Tool.description,
+        GetCdsUnitTest_Tool.inputSchema as any,
+        (args: any) => {
+          return handleGetCdsUnitTest(context, args);
+        },
+      );
+      this.registerToolOnServer(
+        server,
+        UpdateCdsUnitTest_Tool.name,
+        UpdateCdsUnitTest_Tool.description,
+        UpdateCdsUnitTest_Tool.inputSchema as any,
+        (args: any) => {
+          return handleUpdateCdsUnitTest(context, args);
+        },
+      );
+      this.registerToolOnServer(
+        server,
+        DeleteCdsUnitTest_Tool.name,
+        DeleteCdsUnitTest_Tool.description,
+        DeleteCdsUnitTest_Tool.inputSchema as any,
+        (args: any) => {
+          return handleDeleteCdsUnitTest(context, args);
         },
       );
       this.registerToolOnServer(

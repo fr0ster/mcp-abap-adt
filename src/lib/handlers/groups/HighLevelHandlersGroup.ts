@@ -281,6 +281,14 @@ import {
   handleCreateTransport,
 } from '../../../handlers/transport/high/handleCreateTransport';
 import {
+  TOOL_DEFINITION as CreateUnitTest_Tool,
+  handleCreateUnitTest,
+} from '../../../handlers/unit_test/high/handleCreateUnitTest';
+import {
+  TOOL_DEFINITION as DeleteUnitTest_Tool,
+  handleDeleteUnitTest,
+} from '../../../handlers/unit_test/high/handleDeleteUnitTest';
+import {
   TOOL_DEFINITION as GetUnitTest_Tool,
   handleGetUnitTest,
 } from '../../../handlers/unit_test/high/handleGetUnitTest';
@@ -288,6 +296,26 @@ import {
   handleRunUnitTest,
   TOOL_DEFINITION as RunUnitTest_Tool,
 } from '../../../handlers/unit_test/high/handleRunUnitTest';
+import {
+  TOOL_DEFINITION as UpdateUnitTest_Tool,
+  handleUpdateUnitTest,
+} from '../../../handlers/unit_test/high/handleUpdateUnitTest';
+import {
+  TOOL_DEFINITION as CreateCdsUnitTest_Tool,
+  handleCreateCdsUnitTest,
+} from '../../../handlers/unit_test/high/handleCreateCdsUnitTest';
+import {
+  TOOL_DEFINITION as DeleteCdsUnitTest_Tool,
+  handleDeleteCdsUnitTest,
+} from '../../../handlers/unit_test/high/handleDeleteCdsUnitTest';
+import {
+  TOOL_DEFINITION as GetCdsUnitTest_Tool,
+  handleGetCdsUnitTest,
+} from '../../../handlers/unit_test/high/handleGetCdsUnitTest';
+import {
+  TOOL_DEFINITION as UpdateCdsUnitTest_Tool,
+  handleUpdateCdsUnitTest,
+} from '../../../handlers/unit_test/high/handleUpdateCdsUnitTest';
 import {
   TOOL_DEFINITION as CreateView_Tool,
   handleCreateView,
@@ -564,6 +592,14 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: CreateUnitTest_Tool.name,
+          description: CreateUnitTest_Tool.description,
+          inputSchema: CreateUnitTest_Tool.inputSchema,
+        },
+        handler: (args: any) => handleCreateUnitTest(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: RunUnitTest_Tool.name,
           description: RunUnitTest_Tool.description,
           inputSchema: RunUnitTest_Tool.inputSchema,
@@ -577,6 +613,54 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           inputSchema: GetUnitTest_Tool.inputSchema,
         },
         handler: (args: any) => handleGetUnitTest(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: UpdateUnitTest_Tool.name,
+          description: UpdateUnitTest_Tool.description,
+          inputSchema: UpdateUnitTest_Tool.inputSchema,
+        },
+        handler: (args: any) => handleUpdateUnitTest(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: DeleteUnitTest_Tool.name,
+          description: DeleteUnitTest_Tool.description,
+          inputSchema: DeleteUnitTest_Tool.inputSchema,
+        },
+        handler: (args: any) => handleDeleteUnitTest(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: CreateCdsUnitTest_Tool.name,
+          description: CreateCdsUnitTest_Tool.description,
+          inputSchema: CreateCdsUnitTest_Tool.inputSchema,
+        },
+        handler: (args: any) => handleCreateCdsUnitTest(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetCdsUnitTest_Tool.name,
+          description: GetCdsUnitTest_Tool.description,
+          inputSchema: GetCdsUnitTest_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetCdsUnitTest(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: UpdateCdsUnitTest_Tool.name,
+          description: UpdateCdsUnitTest_Tool.description,
+          inputSchema: UpdateCdsUnitTest_Tool.inputSchema,
+        },
+        handler: (args: any) => handleUpdateCdsUnitTest(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: DeleteCdsUnitTest_Tool.name,
+          description: DeleteCdsUnitTest_Tool.description,
+          inputSchema: DeleteCdsUnitTest_Tool.inputSchema,
+        },
+        handler: (args: any) => handleDeleteCdsUnitTest(this.context, args),
       },
       {
         toolDefinition: {

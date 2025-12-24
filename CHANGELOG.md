@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [1.2.6] - 2025-12-23
+### Fixed
+- Fixed LICENSE file - corrected copyright attribution (removed incorrect fork author)
+- Fixed TypeScript compilation errors in test files:
+  - Updated `handlers.test.ts` to use high-level handlers instead of removed readonly handlers
+  - Removed non-existent `getAuthHeaders` import from `utils.test.ts`
+  - Fixed `sessionHelpers.ts` - added type assertions for connection methods not in `IAbapConnection` interface (`getConfig`, `connect`)
+  - Fixed `ClassCrudClientDirect.test.ts` - added type assertions for `connect()` and `reset()` methods
+  - Fixed `BehaviorImplementationLowHandlers.test.ts` - removed invalid `session_id` and `session_state` parameters from `UnlockClassArgs`
+
 ## [1.2.5] - 2025-12-23
 ### Removed
 - **Removed duplicate readonly handlers that duplicate high-level CRUD operations**

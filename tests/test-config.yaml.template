@@ -1575,4 +1575,56 @@ class_unit_test:
           name: "<YOUR_TEST_CLASS_NAME>"
           run_unit_test: true  # Enable unit test run for high-level handlers
 
+# ============================================================================
+# CDS UNIT TEST - High-Level Handlers
+# ============================================================================
+
+cds_unit_test:
+  test_cases:
+    - name: "full_workflow"
+      enabled: false
+      description: "Full workflow test for CDS unit test handlers: Create → Update → Run → Get → Delete"
+      params:
+        class_name: "<YOUR_CDS_UNIT_TEST_CLASS_NAME>"
+        test_class_name: "<YOUR_CDS_TEST_CLASS_NAME>"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        cds_view_name: "<YOUR_CDS_VIEW_NAME>"
+        description: "CDS unit test class"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional for local packages
+        class_template: |
+          CLASS <YOUR_CDS_UNIT_TEST_CLASS_NAME> DEFINITION
+            PUBLIC
+            FINAL
+            CREATE PUBLIC .
+
+            PUBLIC SECTION.
+            PROTECTED SECTION.
+            PRIVATE SECTION.
+          ENDCLASS.
+
+          CLASS <YOUR_CDS_UNIT_TEST_CLASS_NAME> IMPLEMENTATION.
+          ENDCLASS.
+        test_class_source: |
+          CLASS <YOUR_CDS_TEST_CLASS_NAME> DEFINITION FINAL
+            FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+            PRIVATE SECTION.
+              METHODS test_method FOR TESTING.
+          ENDCLASS.
+          CLASS <YOUR_CDS_TEST_CLASS_NAME> IMPLEMENTATION.
+            METHOD test_method.
+              cl_abap_unit_assert=>assert_true( abap_true ).
+            ENDMETHOD.
+          ENDCLASS.
+        update_test_class_source: |
+          CLASS <YOUR_CDS_TEST_CLASS_NAME> DEFINITION FINAL
+            FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+            PRIVATE SECTION.
+              METHODS test_method FOR TESTING.
+          ENDCLASS.
+          CLASS <YOUR_CDS_TEST_CLASS_NAME> IMPLEMENTATION.
+            METHOD test_method.
+              cl_abap_unit_assert=>assert_true( abap_true ).
+            ENDMETHOD.
+          ENDCLASS.
+
 # Step 3: Read-only test (separate read-only handler)

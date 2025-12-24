@@ -14,8 +14,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdateCdsUnitTest',
-  description:
-    'Update a CDS unit test class local test class source code.',
+  description: 'Update a CDS unit test class local test class source code.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -83,9 +82,7 @@ export async function handleUpdateCdsUnitTest(
         );
       }
 
-      logger?.info(
-        `✅ UpdateCdsUnitTest completed successfully: ${className}`,
-      );
+      logger?.info(`✅ UpdateCdsUnitTest completed successfully: ${className}`);
 
       return return_response({
         data: JSON.stringify(

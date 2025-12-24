@@ -52,7 +52,9 @@ export async function handleGetCdsUnitTest(
     const client = new AdtClient(connection, logger);
     const cdsUnitTest = client.getCdsUnitTest();
 
-    logger?.info(`Reading CDS unit test run status/result for run_id: ${run_id}`);
+    logger?.info(
+      `Reading CDS unit test run status/result for run_id: ${run_id}`,
+    );
 
     try {
       const readResult = await cdsUnitTest.read({ runId: run_id });

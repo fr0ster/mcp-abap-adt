@@ -281,41 +281,57 @@ import {
   handleCreateTransport,
 } from '../../../handlers/transport/high/handleCreateTransport';
 import {
-  TOOL_DEFINITION as CreateUnitTest_Tool,
-  handleCreateUnitTest,
-} from '../../../handlers/unit_test/high/handleCreateUnitTest';
-import {
-  TOOL_DEFINITION as DeleteUnitTest_Tool,
-  handleDeleteUnitTest,
-} from '../../../handlers/unit_test/high/handleDeleteUnitTest';
-import {
-  TOOL_DEFINITION as GetUnitTest_Tool,
-  handleGetUnitTest,
-} from '../../../handlers/unit_test/high/handleGetUnitTest';
-import {
-  handleRunUnitTest,
-  TOOL_DEFINITION as RunUnitTest_Tool,
-} from '../../../handlers/unit_test/high/handleRunUnitTest';
-import {
-  TOOL_DEFINITION as UpdateUnitTest_Tool,
-  handleUpdateUnitTest,
-} from '../../../handlers/unit_test/high/handleUpdateUnitTest';
-import {
   TOOL_DEFINITION as CreateCdsUnitTest_Tool,
   handleCreateCdsUnitTest,
 } from '../../../handlers/unit_test/high/handleCreateCdsUnitTest';
+import {
+  TOOL_DEFINITION as CreateUnitTest_Tool,
+  handleCreateUnitTest,
+} from '../../../handlers/unit_test/high/handleCreateUnitTest';
 import {
   TOOL_DEFINITION as DeleteCdsUnitTest_Tool,
   handleDeleteCdsUnitTest,
 } from '../../../handlers/unit_test/high/handleDeleteCdsUnitTest';
 import {
+  TOOL_DEFINITION as DeleteUnitTest_Tool,
+  handleDeleteUnitTest,
+} from '../../../handlers/unit_test/high/handleDeleteUnitTest';
+import {
   TOOL_DEFINITION as GetCdsUnitTest_Tool,
   handleGetCdsUnitTest,
 } from '../../../handlers/unit_test/high/handleGetCdsUnitTest';
 import {
-  TOOL_DEFINITION as UpdateCdsUnitTest_Tool,
+  TOOL_DEFINITION as GetCdsUnitTestResult_Tool,
+  handleGetCdsUnitTestResult,
+} from '../../../handlers/unit_test/high/handleGetCdsUnitTestResult';
+import {
+  TOOL_DEFINITION as GetCdsUnitTestStatus_Tool,
+  handleGetCdsUnitTestStatus,
+} from '../../../handlers/unit_test/high/handleGetCdsUnitTestStatus';
+import {
+  TOOL_DEFINITION as GetUnitTest_Tool,
+  handleGetUnitTest,
+} from '../../../handlers/unit_test/high/handleGetUnitTest';
+import {
+  TOOL_DEFINITION as GetUnitTestResult_Tool,
+  handleGetUnitTestResult,
+} from '../../../handlers/unit_test/high/handleGetUnitTestResult';
+import {
+  TOOL_DEFINITION as GetUnitTestStatus_Tool,
+  handleGetUnitTestStatus,
+} from '../../../handlers/unit_test/high/handleGetUnitTestStatus';
+import {
+  handleRunUnitTest,
+  TOOL_DEFINITION as RunUnitTest_Tool,
+} from '../../../handlers/unit_test/high/handleRunUnitTest';
+import {
   handleUpdateCdsUnitTest,
+  TOOL_DEFINITION as UpdateCdsUnitTest_Tool,
 } from '../../../handlers/unit_test/high/handleUpdateCdsUnitTest';
+import {
+  handleUpdateUnitTest,
+  TOOL_DEFINITION as UpdateUnitTest_Tool,
+} from '../../../handlers/unit_test/high/handleUpdateUnitTest';
 import {
   TOOL_DEFINITION as CreateView_Tool,
   handleCreateView,
@@ -616,6 +632,22 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
+          name: GetUnitTestStatus_Tool.name,
+          description: GetUnitTestStatus_Tool.description,
+          inputSchema: GetUnitTestStatus_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetUnitTestStatus(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetUnitTestResult_Tool.name,
+          description: GetUnitTestResult_Tool.description,
+          inputSchema: GetUnitTestResult_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetUnitTestResult(this.context, args),
+      },
+      {
+        toolDefinition: {
           name: UpdateUnitTest_Tool.name,
           description: UpdateUnitTest_Tool.description,
           inputSchema: UpdateUnitTest_Tool.inputSchema,
@@ -645,6 +677,22 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           inputSchema: GetCdsUnitTest_Tool.inputSchema,
         },
         handler: (args: any) => handleGetCdsUnitTest(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetCdsUnitTestStatus_Tool.name,
+          description: GetCdsUnitTestStatus_Tool.description,
+          inputSchema: GetCdsUnitTestStatus_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetCdsUnitTestStatus(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetCdsUnitTestResult_Tool.name,
+          description: GetCdsUnitTestResult_Tool.description,
+          inputSchema: GetCdsUnitTestResult_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetCdsUnitTestResult(this.context, args),
       },
       {
         toolDefinition: {

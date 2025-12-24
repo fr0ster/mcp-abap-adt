@@ -73,9 +73,7 @@ export async function handleDeleteCdsUnitTest(
         );
       }
 
-      logger?.info(
-        `✅ DeleteCdsUnitTest completed successfully: ${className}`,
-      );
+      logger?.info(`✅ DeleteCdsUnitTest completed successfully: ${className}`);
 
       return return_response({
         data: JSON.stringify(

@@ -47,7 +47,7 @@ Update all test workflow functions to use `createHandlerContext` helper, which i
 - [ ] Update read-only tests (if any use workflow functions)
 
 ### Direct Handler Calls (Non-Workflow Function Tests)
-- [ ] `ClassUnitTestHandlers.test.ts` - Update direct handler calls
+- [ ] `src/__tests__/integration/low/unitTest/ClassUnitTestHandlers.test.ts` - Update direct handler calls
 - [ ] `ClassCrudClientDirect.test.ts` - Update direct handler calls
 - [ ] Any other tests with direct handler calls
 

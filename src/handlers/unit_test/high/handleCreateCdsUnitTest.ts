@@ -133,9 +133,7 @@ export async function handleCreateCdsUnitTest(
         );
       }
 
-      logger?.info(
-        `✅ CreateCdsUnitTest completed successfully: ${className}`,
-      );
+      logger?.info(`✅ CreateCdsUnitTest completed successfully: ${className}`);
 
       return return_response({
         data: JSON.stringify(

@@ -37,7 +37,7 @@ Progress is tracked by ticking the checkboxes below in _this_ file.
     - [x] Low: behaviorDefinition, behaviorImplementation, metadataExtension.
     - [ ] High: behaviorDefinition, behaviorImplementation, metadataExtension.
   - [ ] Unit test container:
-    - [x] Low/high: unitTest/ClassUnitTestHandlers.test.ts.
+    - [x] Low/high: src/__tests__/integration/low/unitTest/ClassUnitTestHandlers.test.ts.
   - [ ] Pattern: create tracker after session, `persistLock` after lock, `cleanup` in `finally`.
 - [ ] **Cleanup behavior**
   - Delete session files on success when `cleanup_session_after_test=true`.

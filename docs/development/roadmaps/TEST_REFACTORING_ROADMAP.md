@@ -97,7 +97,7 @@ LambdaTester (single class for all test types)
     - [ ] `PackageLowHandlers.test.ts`
   - [ ] Read-only tests (if any)
   - [ ] Other tests:
-    - [ ] `ClassUnitTestHandlers.test.ts` (if applicable)
+    - [ ] `src/__tests__/integration/low/unitTest/ClassUnitTestHandlers.test.ts` (if applicable)
     - [ ] `ClassCrudClientDirect.test.ts` (if applicable)
 
 ### Phase 3: Testing & Validation

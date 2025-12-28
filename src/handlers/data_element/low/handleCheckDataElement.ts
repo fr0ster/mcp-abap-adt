@@ -1,11 +1,11 @@
 /**
  * CheckDataElement Handler - Syntax check for ABAP DataElement
  *
- * Uses CrudClient.checkDataElement from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.checkDataElement from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -59,7 +59,7 @@ interface CheckDataElementArgs {
 /**
  * Main handler for CheckDataElement MCP tool
  *
- * Uses CrudClient.checkDataElement - low-level single method call
+ * Uses AdtClient.checkDataElement - low-level single method call
  */
 export async function handleCheckDataElement(
   context: HandlerContext,
@@ -75,7 +75,7 @@ export async function handleCheckDataElement(
       return return_error(new Error('data_element_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -90,8 +90,10 @@ export async function handleCheckDataElement(
 
     try {
       // Check data element
-      await client.checkDataElement({ dataElementName: dataElementName });
-      const response = client.getCheckResult();
+      const checkState = await client
+        .getDataElement()
+        .check({ dataElementName: dataElementName });
+      const response = checkState.checkResult;
 
       if (!response) {
         throw new Error(
@@ -100,7 +102,7 @@ export async function handleCheckDataElement(
       }
 
       // Parse check results
-      const checkResult = parseCheckRunResponse(response);
+      const checkResult = parseCheckRunResponse(response as AxiosResponse);
 
       // Get updated session state after check
 

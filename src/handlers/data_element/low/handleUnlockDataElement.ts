@@ -1,11 +1,11 @@
 /**
  * UnlockDataElement Handler - Unlock ABAP DataElement
  *
- * Uses CrudClient.unlockDataElement from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.unlockDataElement from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -63,7 +63,7 @@ interface UnlockDataElementArgs {
 /**
  * Main handler for UnlockDataElement MCP tool
  *
- * Uses CrudClient.unlockDataElement - low-level single method call
+ * Uses AdtClient.unlockDataElement - low-level single method call
  */
 export async function handleUnlockDataElement(
   context: HandlerContext,
@@ -83,7 +83,7 @@ export async function handleUnlockDataElement(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     // Restore session state if provided
     if (session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -97,11 +97,10 @@ export async function handleUnlockDataElement(
 
     try {
       // Unlock data element
-      await client.unlockDataElement(
-        { dataElementName: dataElementName },
-        lock_handle,
-      );
-      const unlockResult = client.getUnlockResult();
+      const unlockState = await client
+        .getDataElement()
+        .unlock({ dataElementName: dataElementName }, lock_handle);
+      const unlockResult = unlockState.unlockResult;
 
       if (!unlockResult) {
         logger?.error(

@@ -7,7 +7,7 @@
  * Workflow: validate -> lock -> update -> check -> unlock -> (activate)
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 
@@ -97,26 +97,25 @@ export async function handleUpdateFunctionModule(
     );
 
     try {
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
       const shouldActivate = args.activate === true;
 
       // Execute operation chain: lock -> update -> check -> unlock -> (activate)
       let lockHandle: string | undefined;
       try {
-        await client.lockFunctionModule({
+        lockHandle = await client.getFunctionModule().lock({
           functionModuleName,
           functionGroupName,
         });
-        lockHandle = client.getLockHandle();
-        await client.updateFunctionModule(
+        await client.getFunctionModule().update(
           {
             functionModuleName,
             functionGroupName,
             sourceCode: args.source_code,
           },
-          lockHandle,
+          { lockHandle },
         );
-        await client.checkFunctionModule({
+        await client.getFunctionModule().check({
           functionModuleName,
           functionGroupName,
         });
@@ -124,10 +123,9 @@ export async function handleUpdateFunctionModule(
         // Always unlock if we got a lock handle
         if (lockHandle) {
           try {
-            await client.unlockFunctionModule(
-              { functionModuleName, functionGroupName },
-              lockHandle,
-            );
+            await client
+              .getFunctionModule()
+              .unlock({ functionModuleName, functionGroupName }, lockHandle);
           } catch (unlockError: any) {
             logger?.warn(
               `Failed to unlock function module ${functionModuleName}: ${unlockError?.message || unlockError}`,
@@ -138,7 +136,7 @@ export async function handleUpdateFunctionModule(
 
       // Activate if requested (after unlock)
       if (shouldActivate) {
-        await client.activateFunctionModule({
+        await client.getFunctionModule().activate({
           functionModuleName,
           functionGroupName,
         });

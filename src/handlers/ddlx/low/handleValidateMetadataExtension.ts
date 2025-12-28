@@ -1,11 +1,11 @@
 /**
  * ValidateMetadataExtension Handler - Validate ABAP MetadataExtension Name
  *
- * Uses CrudClient.validateMetadataExtension from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.validateMetadataExtension from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -61,7 +61,7 @@ interface ValidateMetadataExtensionArgs {
 /**
  * Main handler for ValidateMetadataExtension MCP tool
  *
- * Uses CrudClient.validateMetadataExtension - low-level single method call
+ * Uses AdtClient.validateMetadataExtension - low-level single method call
  */
 export async function handleValidateMetadataExtension(
   context: HandlerContext,
@@ -79,7 +79,7 @@ export async function handleValidateMetadataExtension(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -94,16 +94,18 @@ export async function handleValidateMetadataExtension(
 
     try {
       // Validate metadata extension
-      await client.validateMetadataExtension({
+      const validationState = await client.getMetadataExtension().validate({
         name: ddlxName,
         description: description || '',
         packageName: package_name || '',
       });
-      const validationResponse = client.getValidationResponse();
+      const validationResponse = validationState.validationResponse;
       if (!validationResponse) {
         throw new Error('Validation did not return a result');
       }
-      const result = parseValidationResponse(validationResponse);
+      const result = parseValidationResponse(
+        validationResponse as AxiosResponse,
+      );
 
       // Get updated session state after validation
 

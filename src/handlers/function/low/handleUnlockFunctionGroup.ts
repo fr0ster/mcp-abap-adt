@@ -1,11 +1,11 @@
 /**
  * UnlockFunctionGroup Handler - Unlock ABAP FunctionGroup
  *
- * Uses CrudClient.unlockFunctionGroup from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.unlockFunctionGroup from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -63,7 +63,7 @@ interface UnlockFunctionGroupArgs {
 /**
  * Main handler for UnlockFunctionGroup MCP tool
  *
- * Uses CrudClient.unlockFunctionGroup - low-level single method call
+ * Uses AdtClient.unlockFunctionGroup - low-level single method call
  */
 export async function handleUnlockFunctionGroup(
   context: HandlerContext,
@@ -83,7 +83,7 @@ export async function handleUnlockFunctionGroup(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     // Restore session state if provided
     if (session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -99,11 +99,10 @@ export async function handleUnlockFunctionGroup(
 
     try {
       // Unlock function group
-      await client.unlockFunctionGroup(
-        { functionGroupName: functionGroupName },
-        lock_handle,
-      );
-      const unlockResult = client.getUnlockResult();
+      const unlockState = await client
+        .getFunctionGroup()
+        .unlock({ functionGroupName: functionGroupName }, lock_handle);
+      const unlockResult = unlockState.unlockResult;
 
       if (!unlockResult) {
         throw new Error(

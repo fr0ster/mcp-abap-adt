@@ -80,21 +80,19 @@ auth_broker:
   browser_auth_port: 3101
   # Paths configuration (applies to both ABAP and BTP/XSUAA)
   paths:
-    # Directory where service key JSON files are stored
-    # Service key files: <destination>.json (e.g., TRIAL.json, mcp.json)
+    # Base directory for auth broker storage
+    # This is a BASE path - the system will automatically create service-keys/ and sessions/ subdirectories inside it
+    # Service key files: <base_path>/service-keys/<destination>.json (e.g., TRIAL.json, mcp.json)
+    # Session files: <base_path>/sessions/<destination>.env (e.g., TRIAL.env, mcp.env)
     # Supports ~ (home directory) expansion on Unix
     # Default values:
-    #   Unix: ~/.config/mcp-abap-adt/service-keys
-    #   Windows: %USERPROFILE%\Documents\mcp-abap-adt\service-keys
-    service_keys_dir: <SERVICE_KEYS_DIR>  # ⚠️ UPDATE: Replace with your service keys directory path
-
-    # Directory where session ENV files are stored
-    # Session files: <destination>.env (e.g., TRIAL.env, mcp.env)
-    # Supports ~ (home directory) expansion on Unix
-    # Default values:
-    #   Unix: ~/.config/mcp-abap-adt/sessions
-    #   Windows: %USERPROFILE%\Documents\mcp-abap-adt\sessions
-    sessions_dir: <SESSIONS_DIR>  # ⚠️ UPDATE: Replace with your sessions directory path
+    #   Unix: ~/.config/mcp-abap-adt
+    #   Windows: %USERPROFILE%\Documents\mcp-abap-adt
+    # ⚠️ IMPORTANT: This is a BASE path, not the service-keys or sessions directory itself!
+    # Example: ~/.config/mcp-abap-adt will create:
+    #   - ~/.config/mcp-abap-adt/service-keys/<destination>.json
+    #   - ~/.config/mcp-abap-adt/sessions/<destination>.env
+    service_keys_dir: <BASE_PATH>  # ⚠️ UPDATE: Replace with your base directory path (e.g., ~/.config/mcp-abap-adt)
 
   # ABAP destination configuration (for on-premise or cloud ABAP systems)
   abap:
@@ -1541,6 +1539,59 @@ whereused_readonly:
         # Test objects for where-used analysis
         test_class: "CL_ABAP_CHAR_UTILITIES"  # Standard SAP class for testing
         test_table: "SCARR"                    # Standard SAP table (Flight: Airlines)
+
+# ============================================================================
+# SYSTEM LOW-LEVEL HANDLERS
+# ============================================================================
+
+# System Low-Level Handlers (VirtualFolders, NodeStructure, ObjectStructure)
+system_low_handlers:
+  test_cases:
+    - name: "test_system_low"
+      enabled: true
+      description: "System low-level handlers tests"
+      params:
+        # Test package for virtual folders and node structure
+        test_package: "<YOUR_TEST_PACKAGE>"  # ⚠️ UPDATE: Replace with your test package name
+        # Test class for node structure and object structure
+        test_class: "<YOUR_TEST_CLASS>"  # ⚠️ UPDATE: Replace with existing class name in your system
+        # Test program for node structure and object structure
+        test_program: "<YOUR_TEST_PROGRAM>"  # ⚠️ UPDATE: Replace with existing program name in your system
+        # Test interface for node structure and object structure
+        test_interface: "<YOUR_TEST_INTERFACE>"  # ⚠️ UPDATE: Replace with existing interface name in your system
+        # Test table for object structure
+        test_table: "<YOUR_TEST_TABLE>"  # ⚠️ UPDATE: Replace with existing table name in your system
+        # Virtual folders search patterns
+        virtual_folders_pattern_default: "*"  # Default search pattern (can be customized)
+        virtual_folders_pattern_custom: "Z*"  # Custom search pattern for testing (can be customized)
+        # Virtual folders preselection facets
+        virtual_folders_facets: ["package", "group", "type"]  # Facet order (can be customized)
+        # Node structure settings
+        node_structure_with_descriptions: true  # Include short descriptions in node structure
+        # Object structure settings
+        object_structure_include_metadata: true  # Include metadata in object structure
+
+# ============================================================================
+# SYSTEM HIGH-LEVEL HANDLERS
+# ============================================================================
+
+# System High-Level Handlers (PackageTree)
+system_high_handlers:
+  test_cases:
+    - name: "test_system_high"
+      enabled: true
+      description: "System high-level handlers tests"
+      params:
+        # Test package for package tree
+        test_package: "<YOUR_TEST_PACKAGE>"  # ⚠️ UPDATE: Replace with your test package name
+        # Package tree settings
+        package_tree_include_subpackages: true  # Include subpackages in tree (can be customized)
+        package_tree_max_depth: 5  # Maximum depth for recursive package traversal (can be customized)
+        package_tree_include_descriptions: true  # Include object descriptions in response (can be customized)
+        # Test package with subpackages (for testing recursive traversal)
+        test_package_with_subpackages: "<YOUR_TEST_PACKAGE_WITH_SUBPACKAGES>"  # ⚠️ UPDATE: Replace with package that has subpackages
+        # Invalid package name for error handling tests
+        test_invalid_package: "INVALID_PACKAGE_XYZ_123"  # Invalid package name for error tests (can be customized)
 
 # ============================================================================
 # CLASS UNIT TEST - Low-Level and High-Level Handlers

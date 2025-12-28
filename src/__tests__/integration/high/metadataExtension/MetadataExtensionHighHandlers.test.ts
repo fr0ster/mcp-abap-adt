@@ -72,7 +72,7 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
     'should test all MetadataExtension high-level handlers',
     async () => {
       if (!hasConfig || !connection || !session) {
-        console.log(
+        testLogger.info(
           '⏭️  Skipping test: No configuration, connection or session',
         );
         return;
@@ -84,7 +84,7 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
         'full_workflow',
       );
       if (!testCase) {
-        console.log('⏭️  Skipping test: No test case configuration');
+        testLogger.info('⏭️  Skipping test: No test case configuration');
         return;
       }
 
@@ -103,7 +103,7 @@ annotate view ZI_TEST_ENTITY with {
 
       try {
         // Step 1: Test CreateMetadataExtension (High-Level)
-        console.log(`📦 High Create: Creating ${ddlxName}...`);
+        testLogger.info(`📦 High Create: Creating ${ddlxName}...`);
         let createResponse;
         try {
           createResponse = await handleCreateMetadataExtension(
@@ -124,7 +124,7 @@ annotate view ZI_TEST_ENTITY with {
             errorMsg.includes('does already exist') ||
             errorMsg.includes('ResourceAlreadyExists')
           ) {
-            console.log(
+            testLogger.warn(
               `⚠️  MetadataExtension ${ddlxName} appears to exist, attempting cleanup...`,
             );
             try {
@@ -135,7 +135,7 @@ annotate view ZI_TEST_ENTITY with {
                   transport_request: transportRequest,
                 },
               );
-              console.log(
+              testLogger.info(
                 `🧹 Cleaned up existing metadata extension ${ddlxName}, retrying create...`,
               );
               // Retry create after cleanup
@@ -151,13 +151,13 @@ annotate view ZI_TEST_ENTITY with {
               );
             } catch (deleteError: any) {
               // If delete fails (object doesn't exist), it was a false positive from validation
-              console.log(
+              testLogger.info(
                 `⏭️  High Create failed for ${ddlxName}: doesn't actually exist (validation false positive), skipping test`,
               );
               return;
             }
           } else {
-            console.log(
+            testLogger.info(
               `⏭️  High Create failed for ${ddlxName}: ${errorMsg}, skipping test`,
             );
             return;
@@ -172,7 +172,7 @@ annotate view ZI_TEST_ENTITY with {
             errorMsg.includes('does already exist') ||
             errorMsg.includes('ResourceAlreadyExists')
           ) {
-            console.log(
+            testLogger.info(
               `⏭️  High Create failed for ${ddlxName}: ${errorMsg}, skipping test`,
             );
             return;
@@ -183,12 +183,12 @@ annotate view ZI_TEST_ENTITY with {
         const createData = parseHandlerResponse(createResponse);
         expect(createData.success).toBe(true);
         expect(createData.name).toBe(ddlxName);
-        console.log(`✅ High Create: Created ${ddlxName} successfully`);
+        testLogger.info(`✅ High Create: Created ${ddlxName} successfully`);
 
         await delay(getOperationDelay('create', testCase));
 
         // Step 2: Test UpdateMetadataExtension (High-Level)
-        console.log(`📝 High Update: Updating ${ddlxName}...`);
+        testLogger.info(`📝 High Update: Updating ${ddlxName}...`);
         const updatedSourceCode = `@Metadata.layer: #CORE
 annotate view ZI_TEST_ENTITY with {
   @EndUserText.label: '${description} (updated)'
@@ -215,7 +215,7 @@ annotate view ZI_TEST_ENTITY with {
             errorMsg.includes('InvalidObjName') ||
             errorMsg.includes('not found')
           ) {
-            console.log(
+            testLogger.info(
               `⏭️  High Update failed for ${ddlxName}: ${errorMsg}, skipping test`,
             );
             return;
@@ -225,7 +225,7 @@ annotate view ZI_TEST_ENTITY with {
 
         if (updateResponse.isError) {
           const errorMsg = updateResponse.content[0]?.text || 'Unknown error';
-          console.log(
+          testLogger.info(
             `⏭️  High Update failed for ${ddlxName}: ${errorMsg}, skipping test`,
           );
           return;
@@ -234,14 +234,14 @@ annotate view ZI_TEST_ENTITY with {
         const updateData = parseHandlerResponse(updateResponse);
         expect(updateData.success).toBe(true);
         expect(updateData.name).toBe(ddlxName);
-        console.log(`✅ High Update: Updated ${ddlxName} successfully`);
+        testLogger.info(`✅ High Update: Updated ${ddlxName} successfully`);
 
         await delay(getOperationDelay('update', testCase));
-        console.log(
+        testLogger.info(
           `✅ Full high-level workflow completed successfully for ${ddlxName}`,
         );
       } catch (error: any) {
-        console.error(`❌ Test failed: ${error.message}`);
+        testLogger.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
         // Cleanup: Optionally delete test metadata extension
@@ -260,23 +260,23 @@ annotate view ZI_TEST_ENTITY with {
               );
 
               if (!deleteResponse.isError) {
-                console.log(
+                testLogger.info(
                   `🧹 Cleaned up test metadata extension: ${ddlxName}`,
                 );
               } else {
                 const errorMsg =
                   deleteResponse.content[0]?.text || 'Unknown error';
-                console.warn(
+                testLogger.warn(
                   `⚠️  Failed to delete metadata extension ${ddlxName}: ${errorMsg}`,
                 );
               }
             } else {
-              console.log(
+              testLogger.warn(
                 `⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${ddlxName}`,
               );
             }
           } catch (cleanupError) {
-            console.warn(
+            testLogger.warn(
               `⚠️  Failed to cleanup test metadata extension ${ddlxName}: ${cleanupError}`,
             );
           }

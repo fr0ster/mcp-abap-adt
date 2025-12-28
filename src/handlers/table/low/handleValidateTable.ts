@@ -4,8 +4,8 @@
  * Uses validateTableName from @mcp-abap-adt/adt-clients/core/table for table-specific validation.
  */
 
-import type { TableBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { ITableConfig } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -56,10 +56,7 @@ export const TOOL_DEFINITION = {
 } as const;
 
 interface ValidateTableArgs
-  extends Pick<
-    TableBuilderConfig,
-    'tableName' | 'packageName' | 'description'
-  > {
+  extends Pick<ITableConfig, 'tableName' | 'packageName' | 'description'> {
   table_name: string;
   package_name: string;
   description: string;
@@ -99,18 +96,20 @@ export async function handleValidateTable(
     logger?.info(`Starting table validation: ${tableName}`);
 
     try {
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
 
-      await client.validateTable({
+      const validationState = await client.getTable().validate({
         tableName: tableName,
         packageName: package_name.toUpperCase(),
         description: description,
       });
-      const validationResponse = client.getValidationResponse();
+      const validationResponse = validationState.validationResponse;
       if (!validationResponse) {
         throw new Error('Validation did not return a result');
       }
-      const result = parseValidationResponse(validationResponse);
+      const result = parseValidationResponse(
+        validationResponse as AxiosResponse,
+      );
 
       // Get updated session state after validation
 

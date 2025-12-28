@@ -1,13 +1,13 @@
 /**
  * UpdateServiceDefinition Handler - Update Existing ABAP Service Definition Source
  *
- * Uses CrudClient from @mcp-abap-adt/adt-clients for all operations.
+ * Uses AdtClient from @mcp-abap-adt/adt-clients for all operations.
  * Session and lock management handled internally by client.
  *
  * Workflow: lock -> update -> check -> unlock -> (activate)
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -57,7 +57,7 @@ interface UpdateServiceDefinitionArgs {
 /**
  * Main handler for UpdateServiceDefinition MCP tool
  *
- * Uses CrudClient for all operations
+ * Uses AdtClient for all operations
  * Session and lock management handled internally by client
  */
 export async function handleUpdateServiceDefinition(
@@ -90,27 +90,32 @@ export async function handleUpdateServiceDefinition(
 
     try {
       // Create client
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
 
       // Build operation chain: lock -> update -> check -> unlock -> (activate)
       // Note: No validation needed for update - service definition must already exist
       const shouldActivate = activate !== false; // Default to true if not specified
 
       // Lock
-      await client.lockServiceDefinition({ serviceDefinitionName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client
+        .getServiceDefinition()
+        .lock({ serviceDefinitionName });
+      let activateResponse: any | undefined;
 
       try {
         // Update source code
-        await client.updateServiceDefinition(
-          { serviceDefinitionName, sourceCode: source_code },
-          lockHandle,
-        );
+        await client
+          .getServiceDefinition()
+          .update(
+            { serviceDefinitionName, sourceCode: source_code },
+            { lockHandle },
+          );
 
         // Check
         try {
           await safeCheckOperation(
-            () => client.checkServiceDefinition({ serviceDefinitionName }),
+            () =>
+              client.getServiceDefinition().check({ serviceDefinitionName }),
             serviceDefinitionName,
             {
               debug: (message: string) =>
@@ -126,22 +131,26 @@ export async function handleUpdateServiceDefinition(
         }
 
         // Unlock
-        await client.unlockServiceDefinition(
-          { serviceDefinitionName },
-          lockHandle,
-        );
+        await client
+          .getServiceDefinition()
+          .unlock({ serviceDefinitionName }, lockHandle);
 
         // Activate if requested
         if (shouldActivate) {
-          await client.activateServiceDefinition({ serviceDefinitionName });
+          const activateState = await client
+            .getServiceDefinition()
+            .activate({ serviceDefinitionName });
+          activateResponse = activateState.activateResult;
         }
       } catch (error) {
         // Try to unlock on error
         try {
-          await client.unlockServiceDefinition(
-            { serviceDefinitionName: serviceDefinitionName },
-            lockHandle,
-          );
+          await client
+            .getServiceDefinition()
+            .unlock(
+              { serviceDefinitionName: serviceDefinitionName },
+              lockHandle,
+            );
         } catch (unlockError) {
           logger?.error(
             'Failed to unlock service definition after error:',
@@ -153,25 +162,24 @@ export async function handleUpdateServiceDefinition(
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];
-      if (shouldActivate && client.getActivateResult()) {
-        const activateResponse = client.getActivateResult()!;
-        if (
-          typeof activateResponse.data === 'string' &&
-          activateResponse.data.includes('<chkl:messages')
-        ) {
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const result = parser.parse(activateResponse.data);
-          const messages = result?.['chkl:messages']?.msg;
-          if (messages) {
-            const msgArray = Array.isArray(messages) ? messages : [messages];
-            activationWarnings = msgArray.map(
-              (msg: any) =>
-                `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-            );
-          }
+      if (
+        shouldActivate &&
+        activateResponse &&
+        typeof activateResponse.data === 'string' &&
+        activateResponse.data.includes('<chkl:messages')
+      ) {
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@_',
+        });
+        const result = parser.parse(activateResponse.data);
+        const messages = result?.['chkl:messages']?.msg;
+        if (messages) {
+          const msgArray = Array.isArray(messages) ? messages : [messages];
+          activationWarnings = msgArray.map(
+            (msg: any) =>
+              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
+          );
         }
       }
 

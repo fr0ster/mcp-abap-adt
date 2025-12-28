@@ -1,20 +1,19 @@
 /**
  * UpdateBehaviorImplementation Handler - Update Existing ABAP Behavior Implementation
  *
- * Uses CrudClient from @mcp-abap-adt/adt-clients for all operations.
+ * Uses AdtClient from @mcp-abap-adt/adt-clients for all operations.
  * Session and lock management handled internally by client.
  *
  * Workflow: lock -> update main source -> update implementations -> check -> unlock -> (activate)
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   encodeSapObjectName,
   return_error,
   return_response,
-  safeCheckOperation,
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -65,7 +64,7 @@ interface UpdateBehaviorImplementationArgs {
 /**
  * Main handler for UpdateBehaviorImplementation MCP tool
  *
- * Uses CrudClient for all operations
+ * Uses AdtClient for all operations
  * Session and lock management handled internally by client
  */
 export async function handleUpdateBehaviorImplementation(
@@ -101,90 +100,42 @@ export async function handleUpdateBehaviorImplementation(
 
     try {
       // Create client
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
 
-      // Build operation chain: lock -> update main source -> update implementations -> check -> unlock -> (activate)
-      // Note: No validation needed for update - behavior implementation must already exist
+      // Update behavior implementation using AdtClient chain
       const shouldActivate = activate !== false; // Default to true if not specified
+      const updateState = await client.getBehaviorImplementation().update(
+        {
+          className,
+          behaviorDefinition,
+          implementationCode: implementation_code,
+          transportRequest: transport_request,
+        },
+        { activateOnUpdate: shouldActivate },
+      );
 
-      // Lock
-      await client.lockClass({ className });
-      const lockHandle = client.getLockHandle();
-
-      try {
-        // Update main source with "FOR BEHAVIOR OF" clause
-        await client.updateBehaviorImplementationMainSource(
-          { className, behaviorDefinition },
-          lockHandle,
-        );
-
-        // Update implementations include
-        await client.updateBehaviorImplementation(
-          {
-            className,
-            behaviorDefinition,
-            implementationCode: implementation_code,
-          },
-          lockHandle,
-        );
-
-        // Check
-        try {
-          await safeCheckOperation(
-            () => client.checkClass({ className }),
-            className,
-            {
-              debug: (message: string) => logger?.debug(message),
-            },
-          );
-        } catch (checkError: any) {
-          // If error was marked as "already checked", continue silently
-          if (!(checkError as any).isAlreadyChecked) {
-            // Real check error - rethrow
-            throw checkError;
-          }
-        }
-
-        // Unlock
-        await client.unlockClass({ className }, lockHandle);
-
-        // Activate if requested
-        if (shouldActivate) {
-          await client.activateClass({ className });
-        }
-      } catch (error) {
-        // Try to unlock on error
-        try {
-          await client.unlockClass({ className: className }, lockHandle);
-        } catch (unlockError) {
-          logger?.error(
-            `Failed to unlock behavior implementation after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
-          );
-        }
-        throw error;
-      }
+      const activateResponse = updateState.activateResult;
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];
-      if (shouldActivate && client.getActivateResult()) {
-        const activateResponse = client.getActivateResult()!;
-        if (
-          typeof activateResponse.data === 'string' &&
-          activateResponse.data.includes('<chkl:messages')
-        ) {
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const result = parser.parse(activateResponse.data);
-          const messages = result?.['chkl:messages']?.msg;
-          if (messages) {
-            const msgArray = Array.isArray(messages) ? messages : [messages];
-            activationWarnings = msgArray.map(
-              (msg: any) =>
-                `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-            );
-          }
+      if (
+        shouldActivate &&
+        activateResponse &&
+        typeof activateResponse.data === 'string' &&
+        activateResponse.data.includes('<chkl:messages')
+      ) {
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@_',
+        });
+        const result = parser.parse(activateResponse.data);
+        const messages = result?.['chkl:messages']?.msg;
+        if (messages) {
+          const msgArray = Array.isArray(messages) ? messages : [messages];
+          activationWarnings = msgArray.map(
+            (msg: any) =>
+              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
+          );
         }
       }
 

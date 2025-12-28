@@ -1,11 +1,11 @@
 /**
  * CheckPackage Handler - Syntax check for ABAP Package
  *
- * Uses CrudClient.checkPackage from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.checkPackage from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -65,7 +65,7 @@ interface CheckPackageArgs {
 /**
  * Main handler for CheckPackage MCP tool
  *
- * Uses CrudClient.checkPackage - low-level single method call
+ * Uses AdtClient.checkPackage - low-level single method call
  */
 export async function handleCheckPackage(
   context: HandlerContext,
@@ -83,7 +83,7 @@ export async function handleCheckPackage(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -99,11 +99,11 @@ export async function handleCheckPackage(
 
     try {
       // Check package
-      await client.checkPackage({
+      const checkState = await client.getPackage().check({
         packageName: packageName,
         superPackage: superPackage,
       });
-      const response = client.getCheckResult();
+      const response = checkState.checkResult;
 
       if (!response) {
         throw new Error(
@@ -112,7 +112,7 @@ export async function handleCheckPackage(
       }
 
       // Parse check results
-      const checkResult = parseCheckRunResponse(response);
+      const checkResult = parseCheckRunResponse(response as AxiosResponse);
 
       // Get updated session state after check
 

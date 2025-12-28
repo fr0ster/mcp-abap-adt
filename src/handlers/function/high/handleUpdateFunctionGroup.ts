@@ -11,7 +11,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';.
  * Workflow: lock -> get current -> update metadata -> unlock
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   encodeSapObjectName,
@@ -81,14 +81,15 @@ export async function handleUpdateFunctionGroup(
     );
 
     try {
-      // Use CrudClient for lock/unlock
-      const crudClient = new CrudClient(connection);
+      // Use AdtClient for lock/unlock
+      const crudClient = new AdtClient(connection);
 
       let lockHandle: string | undefined;
       try {
         // Lock function group
-        await crudClient.lockFunctionGroup({ functionGroupName });
-        lockHandle = crudClient.getLockHandle();
+        lockHandle = await crudClient
+          .getFunctionGroup()
+          .lock({ functionGroupName });
         if (!lockHandle) {
           throw new Error('Failed to acquire lock handle');
         }
@@ -96,10 +97,12 @@ export async function handleUpdateFunctionGroup(
         // Small delay to ensure lock is fully established
         await new Promise((resolve) => setTimeout(resolve, 200));
 
-        // Get current XML using CrudClient (same connection, same session as lock)
+        // Get current XML using AdtClient (same connection, same session as lock)
         // This ensures we use the same session that was used for locking
-        await crudClient.readFunctionGroup(functionGroupName);
-        const currentResponse = crudClient.getReadResult();
+        const readState = await crudClient
+          .getFunctionGroup()
+          .read({ functionGroupName });
+        const currentResponse = readState?.readResult;
         if (!currentResponse) {
           throw new Error('Failed to get current function group data');
         }
@@ -135,10 +138,9 @@ export async function handleUpdateFunctionGroup(
         // Always unlock if we got a lock handle
         if (lockHandle) {
           try {
-            await crudClient.unlockFunctionGroup(
-              { functionGroupName },
-              lockHandle,
-            );
+            await crudClient
+              .getFunctionGroup()
+              .unlock({ functionGroupName }, lockHandle);
           } catch (unlockError: any) {
             logger?.warn(
               `Failed to unlock function group ${functionGroupName}: ${unlockError?.message || unlockError}`,

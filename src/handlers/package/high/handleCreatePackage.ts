@@ -7,8 +7,8 @@
  * Workflow: validate -> create -> check
  */
 
-import type { PackageBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { IPackageConfig } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -111,20 +111,24 @@ export async function handleCreatePackage(
 
     logger?.info(`Starting package creation: ${packageName}`);
 
-    try {
-      const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
+    try {
       // Validate
-      await client.validatePackage({
+      await client.getPackage().validate({
         packageName: packageName,
         superPackage: typedArgs.super_package,
-        description: '',
+        description: typedArgs.description || packageName,
+        softwareComponent: typedArgs.software_component,
+        transportLayer: typedArgs.transport_layer,
+        transportRequest: typedArgs.transport_request,
+        applicationComponent: typedArgs.application_component,
       });
 
       // Create - build config object with proper typing
-      const createConfig: Partial<PackageBuilderConfig> &
+      const createConfig: Partial<IPackageConfig> &
         Pick<
-          PackageBuilderConfig,
+          IPackageConfig,
           'packageName' | 'superPackage' | 'description' | 'softwareComponent'
         > = {
         packageName,
@@ -153,10 +157,10 @@ export async function handleCreatePackage(
         `[CreatePackage] softwareComponent in config: ${createConfig.softwareComponent || 'undefined'}`,
       );
 
-      await client.createPackage(createConfig);
+      await client.getPackage().create(createConfig);
 
       // Check
-      await client.checkPackage({
+      await client.getPackage().check({
         packageName: packageName,
         superPackage: typedArgs.super_package,
       });
@@ -183,6 +187,20 @@ export async function handleCreatePackage(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(`CreatePackage ${packageName}`, error);
+      const responseData =
+        typeof error.response?.data === 'string'
+          ? error.response.data
+          : error.response?.data
+            ? JSON.stringify(error.response.data)
+            : '';
+      const responseSnippet = responseData
+        ? responseData.slice(0, 1000)
+        : undefined;
+      if (responseSnippet) {
+        logger?.warn(
+          `CreatePackage returned HTTP ${error.response?.status} for ${packageName}. Response: ${responseSnippet}`,
+        );
+      }
 
       // Check for authentication errors (expired tokens)
       if (
@@ -230,6 +248,47 @@ export async function handleCreatePackage(
           ? error.response.data
           : JSON.stringify(error.response.data)
         : error.message || String(error);
+
+      if (
+        error.response?.status === 404 &&
+        typeof errorMessage === 'string' &&
+        errorMessage.includes('Error while importing object')
+      ) {
+        try {
+          const readState = await client
+            .getPackage()
+            .read({ packageName: packageName }, 'active', {
+              withLongPolling: true,
+            });
+          if (readState?.readResult) {
+            logger?.warn(
+              `CreatePackage returned import error, but ${packageName} is readable; continuing as success`,
+            );
+            return return_response({
+              data: JSON.stringify(
+                {
+                  success: true,
+                  package_name: packageName,
+                  description: typedArgs.description || packageName,
+                  super_package: typedArgs.super_package,
+                  package_type: typedArgs.package_type || 'development',
+                  software_component: typedArgs.software_component || null,
+                  transport_layer: typedArgs.transport_layer || null,
+                  transport_request: typedArgs.transport_request || null,
+                  uri: `/sap/bc/adt/packages/${packageName.toLowerCase()}`,
+                  warning:
+                    'Import warning during create (404). Object verified by read.',
+                  message: `Package ${packageName} created successfully (import warning ignored).`,
+                },
+                null,
+                2,
+              ),
+            } as AxiosResponse);
+          }
+        } catch (_readError) {
+          // Fall through to standard error handling below.
+        }
+      }
 
       throw new McpError(
         ErrorCode.InternalError,

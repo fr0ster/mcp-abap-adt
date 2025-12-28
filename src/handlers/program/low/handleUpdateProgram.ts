@@ -1,11 +1,11 @@
 /**
  * UpdateProgram Handler - Update ABAP Program Source Code
  *
- * Uses CrudClient.updateProgram from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.updateProgram from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -71,7 +71,7 @@ interface UpdateProgramArgs {
 /**
  * Main handler for UpdateProgram MCP tool
  *
- * Uses CrudClient.updateProgram - low-level single method call
+ * Uses AdtClient.updateProgram - low-level single method call
  */
 export async function handleUpdateProgram(
   context: HandlerContext,
@@ -103,7 +103,7 @@ export async function handleUpdateProgram(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -116,11 +116,13 @@ export async function handleUpdateProgram(
 
     try {
       // Update program with source code
-      await client.updateProgram(
-        { programName: programName, sourceCode: source_code },
-        lock_handle,
-      );
-      const updateResult = client.getUpdateResult();
+      const updateState = await client
+        .getProgram()
+        .update(
+          { programName: programName, sourceCode: source_code },
+          { lockHandle: lock_handle },
+        );
+      const updateResult = updateState.updateResult;
 
       if (!updateResult) {
         throw new Error(

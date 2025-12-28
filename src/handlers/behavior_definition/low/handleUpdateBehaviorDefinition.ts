@@ -1,12 +1,12 @@
 /**
  * UpdateBehaviorDefinition Handler - Update ABAP Behavior Definition Source Code
  *
- * Uses CrudClient.updateBehaviorDefinition from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.updateBehaviorDefinition from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { IBehaviorDefinitionConfig } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -71,7 +71,7 @@ interface UpdateBehaviorDefinitionArgs {
 /**
  * Main handler for UpdateBehaviorDefinition MCP tool
  *
- * Uses CrudClient.updateBehaviorDefinition - low-level single method call
+ * Uses AdtClient.updateBehaviorDefinition - low-level single method call
  */
 export async function handleUpdateBehaviorDefinition(
   context: HandlerContext,
@@ -89,7 +89,7 @@ export async function handleUpdateBehaviorDefinition(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -107,14 +107,16 @@ export async function handleUpdateBehaviorDefinition(
     try {
       // Update behavior definition with source code - using types from adt-clients
       const updateConfig: Pick<
-        BehaviorDefinitionBuilderConfig,
+        IBehaviorDefinitionConfig,
         'name' | 'sourceCode'
       > = {
         name: behaviorDefinitionName,
         sourceCode: source_code,
       };
-      await client.updateBehaviorDefinition(updateConfig, lock_handle);
-      const updateResult = client.getUpdateResult();
+      const updateState = await client
+        .getBehaviorDefinition()
+        .update(updateConfig, { lockHandle: lock_handle });
+      const updateResult = updateState.updateResult;
 
       if (!updateResult) {
         throw new Error(

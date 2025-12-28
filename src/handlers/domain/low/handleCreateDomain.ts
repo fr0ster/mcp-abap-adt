@@ -1,11 +1,11 @@
 /**
  * CreateDomain Handler - Create ABAP Domain
  *
- * Uses CrudClient.createDomain from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.createDomain from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -75,7 +75,7 @@ interface CreateDomainArgs {
 /**
  * Main handler for CreateDomain MCP tool
  *
- * Uses CrudClient.createDomain - low-level single method call
+ * Uses AdtClient.createDomain - low-level single method call
  */
 export async function handleCreateDomain(
   context: HandlerContext,
@@ -99,7 +99,7 @@ export async function handleCreateDomain(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -112,13 +112,13 @@ export async function handleCreateDomain(
 
     try {
       // Create domain
-      await client.createDomain({
+      const createState = await client.getDomain().create({
         domainName,
         description,
         packageName: package_name,
         transportRequest: transport_request,
       });
-      const createResult = client.getCreateResult();
+      const createResult = createState.createResult;
 
       if (!createResult) {
         throw new Error(

@@ -7,7 +7,7 @@
  * Workflow: lock -> update -> check -> unlock -> (activate)
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -204,12 +204,13 @@ export async function handleUpdateDataElement(
       const typeKind = typeKindMap[rawTypeKind] || 'domain';
 
       // Create client
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Validate (for update, "already exists" is expected - object must exist)
+      let updateState: any | undefined;
       try {
-        await client.validateDataElement({
+        await client.getDataElement().validate({
           dataElementName,
           packageName: typedArgs.package_name,
           description: typedArgs.description || dataElementName,
@@ -227,8 +228,9 @@ export async function handleUpdateDataElement(
       }
 
       // Lock
-      await client.lockDataElement({ dataElementName: dataElementName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client
+        .getDataElement()
+        .lock({ dataElementName: dataElementName });
 
       try {
         // Update with properties
@@ -246,20 +248,20 @@ export async function handleUpdateDataElement(
           searchHelpParameter: typedArgs.search_help_parameter,
           setGetParameter: typedArgs.set_get_parameter,
         };
-        await client.updateDataElement(
+        updateState = await client.getDataElement().update(
           {
             dataElementName,
             packageName: typedArgs.package_name,
             description: typedArgs.description || dataElementName,
             ...properties,
           },
-          lockHandle,
+          { lockHandle },
         );
 
         // Check
         try {
           await safeCheckOperation(
-            () => client.checkDataElement({ dataElementName }),
+            () => client.getDataElement().check({ dataElementName }),
             dataElementName,
             {
               debug: (message: string) => logger?.debug(message),
@@ -274,19 +276,18 @@ export async function handleUpdateDataElement(
         }
 
         // Unlock
-        await client.unlockDataElement({ dataElementName }, lockHandle);
+        await client.getDataElement().unlock({ dataElementName }, lockHandle);
 
         // Activate if requested
         if (shouldActivate) {
-          await client.activateDataElement({ dataElementName });
+          await client.getDataElement().activate({ dataElementName });
         }
       } catch (error) {
         // Try to unlock on error
         try {
-          await client.unlockDataElement(
-            { dataElementName: dataElementName },
-            lockHandle,
-          );
+          await client
+            .getDataElement()
+            .unlock({ dataElementName: dataElementName }, lockHandle);
         } catch (unlockError) {
           logger?.error(
             `Failed to unlock data element after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
@@ -296,7 +297,7 @@ export async function handleUpdateDataElement(
       }
 
       // Get data element details from update result
-      const updateResult = client.getUpdateResult();
+      const updateResult = updateState?.updateResult;
       let dataElementDetails = null;
       if (
         updateResult?.data &&

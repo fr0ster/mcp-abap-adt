@@ -1,11 +1,11 @@
 /**
  * LockDataElement Handler - Lock ABAP DataElement
  *
- * Uses CrudClient.lockDataElement from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.lockDataElement from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -58,7 +58,7 @@ interface LockDataElementArgs {
 /**
  * Main handler for LockDataElement MCP tool
  *
- * Uses CrudClient.lockDataElement - low-level single method call
+ * Uses AdtClient.lockDataElement - low-level single method call
  */
 export async function handleLockDataElement(
   context: HandlerContext,
@@ -74,7 +74,7 @@ export async function handleLockDataElement(
       return return_error(new Error('data_element_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -88,8 +88,9 @@ export async function handleLockDataElement(
 
     try {
       // Lock data element
-      await client.lockDataElement({ dataElementName: dataElementName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client
+        .getDataElement()
+        .lock({ dataElementName: dataElementName });
 
       if (!lockHandle) {
         logger?.error(

@@ -1,11 +1,11 @@
 /**
  * ValidateDomain Handler - Validate ABAP Domain Name
  *
- * Uses CrudClient.validateDomain from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.validateDomain from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -69,7 +69,7 @@ interface ValidateDomainArgs {
 /**
  * Main handler for ValidateDomain MCP tool
  *
- * Uses CrudClient.validateDomain - low-level single method call
+ * Uses AdtClient.validateDomain - low-level single method call
  */
 export async function handleValidateDomain(
   context: HandlerContext,
@@ -92,7 +92,7 @@ export async function handleValidateDomain(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -104,17 +104,19 @@ export async function handleValidateDomain(
     logger?.info(`Starting domain validation: ${domainName}`);
 
     try {
-      // Validate domain using CrudClient
-      await client.validateDomain({
+      // Validate domain using AdtClient
+      const validationState = await client.getDomain().validate({
         domainName,
         description: description,
         packageName: package_name.toUpperCase(),
       });
-      const validationResponse = client.getValidationResponse();
+      const validationResponse = validationState.validationResponse;
       if (!validationResponse) {
         throw new Error('Validation did not return a result');
       }
-      const result = parseValidationResponse(validationResponse);
+      const result = parseValidationResponse(
+        validationResponse as AxiosResponse,
+      );
 
       // Get updated session state after validation
 

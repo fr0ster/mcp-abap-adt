@@ -1,5 +1,6 @@
 import type { SearchObjectsParams } from '@mcp-abap-adt/adt-clients';
-import { SharedBuilder } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError, return_response } from '../../../lib/utils';
@@ -56,8 +57,8 @@ export async function handleSearchObject(context: HandlerContext, args: any) {
       throw new McpError(ErrorCode.InvalidParams, 'object_name is required');
     }
 
-    // Use SharedBuilder from @mcp-abap-adt/adt-clients
-    const sharedBuilder = new SharedBuilder(connection);
+    const client = new AdtClient(connection, logger);
+    const utils = client.getUtils();
 
     const searchParams: SearchObjectsParams = {
       query: object_name,
@@ -71,8 +72,7 @@ export async function handleSearchObject(context: HandlerContext, args: any) {
     logger?.info(
       `Searching objects: query=${object_name}${object_type ? ` type=${object_type}` : ''}`,
     );
-    await sharedBuilder.search(searchParams);
-    const response = sharedBuilder.getSearchResult();
+    const response = await utils.searchObjects(searchParams);
 
     if (!response) {
       throw new Error('Search failed: no response received');
@@ -82,7 +82,7 @@ export async function handleSearchObject(context: HandlerContext, args: any) {
     const adtError = detectAdtSearchError(response);
     if (adtError) return adtError;
 
-    const result = return_response(response);
+    const result = return_response(response as IAdtResponse);
     const { isError, ...rest } = result;
 
     // Detect empty XML (<adtcore:objectReferences/>) results

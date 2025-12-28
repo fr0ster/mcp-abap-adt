@@ -154,7 +154,12 @@ Auth broker is created from configuration and used to get connection context:
 // Create auth broker from service key store
 const serviceKeyStore = new AbapServiceKeyStore(config.serviceKeysPath);
 const sessionStore = new AbapSessionStore();
-const tokenProvider = new BtpTokenProvider();
+const tokenProvider = new AuthorizationCodeProvider({
+  uaaUrl: 'https://auth.example.com',
+  clientId: '...',
+  clientSecret: '...',
+  browser: 'system',
+});
 
 const authBrokerFactory = new AuthBrokerFactory(
   serviceKeyStore,

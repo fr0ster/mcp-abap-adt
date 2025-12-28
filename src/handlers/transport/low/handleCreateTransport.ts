@@ -1,11 +1,11 @@
 /**
  * CreateTransport Handler - Create ABAP Transport Request
  *
- * Uses CrudClient.createTransport from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.createTransport from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -42,7 +42,7 @@ interface CreateTransportArgs {
 /**
  * Main handler for CreateTransport MCP tool
  *
- * Uses CrudClient.createTransport - low-level single method call
+ * Uses AdtClient.createTransport - low-level single method call
  */
 export async function handleCreateTransport(
   context: HandlerContext,
@@ -57,15 +57,18 @@ export async function handleCreateTransport(
       return return_error(new Error('description is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Ensure connection is established
     logger?.info(`Starting transport creation: ${description}`);
 
     try {
       // Create transport
-      await client.createTransport(description, transport_type);
-      const createResult = client.getCreateResult();
+      const createState = await client.getRequest().create({
+        description,
+        transportType: transport_type || 'workbench',
+      });
+      const createResult = createState.createResult;
 
       if (!createResult) {
         throw new Error(`Create did not return a response for transport`);

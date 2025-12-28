@@ -1,11 +1,11 @@
 /**
  * LockClassTestClasses Handler - Lock ABAP Unit test include for a class
  *
- * Uses CrudClient.lockTestClasses from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.lockTestClasses from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -68,7 +68,7 @@ export async function handleLockClassTestClasses(
       return return_error(new Error('class_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -79,8 +79,8 @@ export async function handleLockClassTestClasses(
     logger?.info(`Starting test classes lock for: ${className}`);
 
     try {
-      await client.lockTestClasses({ className });
-      const lockHandle = client.getTestClassLockHandle();
+      const classClient = client.getClass() as any;
+      const lockHandle = await classClient.lockTestClasses({ className });
 
       if (!lockHandle) {
         throw new Error(

@@ -32,23 +32,34 @@ export function getPlatformPaths(
   const isWindows = process.platform === 'win32';
 
   // Priority 1: Custom path from constructor
+  // customPath is ALWAYS a base path - we add subfolder to it
   if (customPath) {
     if (Array.isArray(customPath)) {
       // For arrays, add subfolder to each path if subfolder is specified
       paths.push(
         ...customPath.map((p) => {
-          const resolved = path.resolve(p);
+          let resolved = path.resolve(p);
+          // If path already ends with subfolder, use parent directory as base
+          if (subfolder && path.basename(resolved) === subfolder) {
+            resolved = path.dirname(resolved);
+          }
           return subfolder ? path.join(resolved, subfolder) : resolved;
         }),
       );
     } else {
       // For single path, add subfolder if specified
-      const resolved = path.resolve(customPath);
+      // customPath is ALWAYS a base path - we add subfolder to it
+      let resolved = path.resolve(customPath);
+      // If path already ends with subfolder, use parent directory as base
+      if (subfolder && path.basename(resolved) === subfolder) {
+        resolved = path.dirname(resolved);
+      }
       paths.push(subfolder ? path.join(resolved, subfolder) : resolved);
     }
   }
 
   // Priority 2: AUTH_BROKER_PATH environment variable
+  // AUTH_BROKER_PATH is ALWAYS a base path - we add subfolder to it
   const envPath = process.env.AUTH_BROKER_PATH;
   if (envPath) {
     // Support both colon (Unix) and semicolon (Windows) separators
@@ -58,7 +69,11 @@ export function getPlatformPaths(
       .filter((p) => p.length > 0);
     paths.push(
       ...envPaths.map((p) => {
-        const resolved = path.resolve(p);
+        let resolved = path.resolve(p);
+        // If path already ends with subfolder, use parent directory as base
+        if (subfolder && path.basename(resolved) === subfolder) {
+          resolved = path.dirname(resolved);
+        }
         return subfolder ? path.join(resolved, subfolder) : resolved;
       }),
     );

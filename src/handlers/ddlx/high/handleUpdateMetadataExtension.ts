@@ -2,7 +2,7 @@
  * UpdateMetadataExtension Handler - ABAP Metadata Extension Update via ADT API
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
@@ -53,33 +53,32 @@ export async function handleUpdateMetadataExtension(
   const name = args.name.toUpperCase();
 
   try {
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const shouldActivate = args.activate !== false;
     let lockHandle = args.lock_handle;
 
     // Lock if not provided
     if (!lockHandle) {
-      await client.lockMetadataExtension({ name: name });
-      lockHandle = client.getLockHandle();
+      lockHandle = await client.getMetadataExtension().lock({ name: name });
     }
 
     // Update
-    await client.updateMetadataExtension(
+    await client.getMetadataExtension().update(
       {
         name,
         sourceCode: args.source_code,
       },
-      lockHandle,
+      { lockHandle },
     );
 
     // Unlock if we locked it internally
     if (!args.lock_handle) {
-      await client.unlockMetadataExtension({ name: name }, lockHandle);
+      await client.getMetadataExtension().unlock({ name: name }, lockHandle);
     }
 
     // Activate if requested
     if (shouldActivate) {
-      await client.activateMetadataExtension({ name: name });
+      await client.getMetadataExtension().activate({ name: name });
     }
 
     const result = {

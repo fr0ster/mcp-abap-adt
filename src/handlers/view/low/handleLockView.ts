@@ -1,11 +1,11 @@
 /**
  * LockView Handler - Lock ABAP View
  *
- * Uses CrudClient.lockView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.lockView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -58,7 +58,7 @@ interface LockViewArgs {
 /**
  * Main handler for LockView MCP tool
  *
- * Uses CrudClient.lockView - low-level single method call
+ * Uses AdtClient.lockView - low-level single method call
  */
 export async function handleLockView(
   context: HandlerContext,
@@ -73,7 +73,7 @@ export async function handleLockView(
       return return_error(new Error('view_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -88,8 +88,7 @@ export async function handleLockView(
 
     try {
       // Lock view
-      await client.lockView({ viewName: viewName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client.getView().lock({ viewName: viewName });
 
       if (!lockHandle) {
         throw new Error(

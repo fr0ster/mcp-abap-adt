@@ -1,11 +1,11 @@
 /**
  * CreateStructure Handler - Create ABAP Structure
  *
- * Uses CrudClient.createStructure from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.createStructure from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -84,7 +84,7 @@ interface CreateStructureArgs {
 /**
  * Main handler for CreateStructure MCP tool
  *
- * Uses CrudClient.createStructure - low-level single method call
+ * Uses AdtClient.createStructure - low-level single method call
  */
 export async function handleCreateStructure(
   context: HandlerContext,
@@ -108,7 +108,7 @@ export async function handleCreateStructure(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -123,14 +123,14 @@ export async function handleCreateStructure(
 
     try {
       // Create structure
-      await client.createStructure({
+      const createState = await client.getStructure().create({
         structureName,
         description,
         packageName: package_name,
         ddlCode: '',
         transportRequest: transport_request,
       });
-      const createResult = client.getCreateResult();
+      const createResult = createState.createResult;
 
       if (!createResult) {
         throw new Error(

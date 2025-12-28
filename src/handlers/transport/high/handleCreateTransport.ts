@@ -7,7 +7,7 @@
  * Workflow: create
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   ErrorCode,
@@ -82,18 +82,21 @@ export async function handleCreateTransport(
 
     try {
       // Create client
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
 
       // Create transport
-      await client.createTransport(
-        typedArgs.description,
-        typedArgs.transport_type === 'customizing'
-          ? 'customizing'
-          : 'workbench',
-      );
+      const createState = await client.getRequest().create({
+        description: typedArgs.description,
+        transportType:
+          typedArgs.transport_type === 'customizing'
+            ? 'customizing'
+            : 'workbench',
+        targetSystem: typedArgs.target_system,
+        owner: typedArgs.owner,
+      });
 
       // Get create result
-      const createResult = client.getCreateResult();
+      const createResult = createState.createResult;
 
       logger?.info(`✅ CreateTransport completed successfully`);
 
@@ -175,7 +178,7 @@ export async function handleCreateTransport(
         ),
         status: createResult?.status || 200,
         statusText: createResult?.statusText || 'OK',
-        headers: createResult?.headers || {},
+        headers: (createResult?.headers || {}) as any,
         config: createResult?.config || ({} as any),
       });
     } catch (error: any) {

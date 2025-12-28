@@ -1,12 +1,12 @@
 /**
  * CreateBehaviorImplementation Handler - Create ABAP Behavior Implementation Class
  *
- * Uses CrudClient.createBehaviorImplementation from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.createBehaviorImplementation from @mcp-abap-adt/adt-clients.
  * Low-level handler: full workflow (create, lock, update main source, update implementations, unlock, activate).
  */
 
-import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { IBehaviorImplementationConfig } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -92,7 +92,7 @@ interface CreateBehaviorImplementationArgs {
 /**
  * Main handler for CreateBehaviorImplementation MCP tool
  *
- * Uses CrudClient.createBehaviorImplementation - full workflow
+ * Uses AdtClient.createBehaviorImplementation - full workflow
  */
 export async function handleCreateBehaviorImplementation(
   context: HandlerContext,
@@ -120,7 +120,7 @@ export async function handleCreateBehaviorImplementation(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -138,9 +138,9 @@ export async function handleCreateBehaviorImplementation(
 
     try {
       // Create behavior implementation (full workflow)
-      const createConfig: Partial<BehaviorImplementationBuilderConfig> &
+      const createConfig: Partial<IBehaviorImplementationConfig> &
         Pick<
-          BehaviorImplementationBuilderConfig,
+          IBehaviorImplementationConfig,
           'className' | 'packageName' | 'behaviorDefinition'
         > = {
         className: className,
@@ -151,8 +151,10 @@ export async function handleCreateBehaviorImplementation(
         ...(implementation_code && { sourceCode: implementation_code }),
       };
 
-      await client.createBehaviorImplementation(createConfig);
-      const createResult = client.getCreateResult();
+      const createState = await client
+        .getBehaviorImplementation()
+        .create(createConfig);
+      const createResult = createState.createResult;
 
       if (!createResult) {
         throw new Error(

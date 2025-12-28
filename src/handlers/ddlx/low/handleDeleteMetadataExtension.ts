@@ -1,11 +1,11 @@
 /**
  * DeleteMetadataExtension Handler - Delete ABAP MetadataExtension
  *
- * Uses CrudClient.deleteMetadataExtension from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.deleteMetadataExtension from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -42,7 +42,7 @@ interface DeleteMetadataExtensionArgs {
 /**
  * Main handler for DeleteMetadataExtension MCP tool
  *
- * Uses CrudClient.deleteMetadataExtension - low-level single method call
+ * Uses AdtClient.deleteMetadataExtension - low-level single method call
  */
 export async function handleDeleteMetadataExtension(
   context: HandlerContext,
@@ -57,18 +57,18 @@ export async function handleDeleteMetadataExtension(
       return return_error(new Error('name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const ddlxName = name.toUpperCase();
 
     logger?.info(`Starting metadata extension deletion: ${ddlxName}`);
 
     try {
       // Delete metadata extension
-      await client.deleteMetadataExtension({
+      const deleteState = await client.getMetadataExtension().delete({
         name: ddlxName,
         transportRequest: transport_request,
       });
-      const deleteResult = client.getDeleteResult();
+      const deleteResult = deleteState.deleteResult;
 
       if (!deleteResult) {
         throw new Error(

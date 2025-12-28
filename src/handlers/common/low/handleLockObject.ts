@@ -1,11 +1,11 @@
 /**
  * LockObject Handler - Lock ABAP object for modification via ADT API
  *
- * Uses CrudClient lock methods for specific object types.
+ * Uses AdtClient lock methods for specific object types.
  * Returns lock handle that must be reused with the same session.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import {
@@ -126,7 +126,7 @@ export async function handleLockObject(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -145,20 +145,22 @@ export async function handleLockObject(
 
       switch (objectType) {
         case 'class':
-          await client.lockClass({ className: objectName });
-          lockHandle = client.getLockHandle();
+          lockHandle = await client.getClass().lock({ className: objectName });
           break;
         case 'program':
-          await client.lockProgram({ programName: objectName });
-          lockHandle = client.getLockHandle();
+          lockHandle = await client
+            .getProgram()
+            .lock({ programName: objectName });
           break;
         case 'interface':
-          await client.lockInterface({ interfaceName: objectName });
-          lockHandle = client.getLockHandle();
+          lockHandle = await client
+            .getInterface()
+            .lock({ interfaceName: objectName });
           break;
         case 'function_group':
-          await client.lockFunctionGroup({ functionGroupName: objectName });
-          lockHandle = client.getLockHandle();
+          lockHandle = await client
+            .getFunctionGroup()
+            .lock({ functionGroupName: objectName });
           break;
         case 'function_module':
           return return_error(
@@ -167,32 +169,35 @@ export async function handleLockObject(
             ),
           );
         case 'table':
-          await client.lockTable({ tableName: objectName });
-          lockHandle = client.getLockHandle();
+          lockHandle = await client.getTable().lock({ tableName: objectName });
           break;
         case 'structure':
-          await client.lockStructure({ structureName: objectName });
-          lockHandle = client.getLockHandle();
+          lockHandle = await client
+            .getStructure()
+            .lock({ structureName: objectName });
           break;
         case 'view':
-          await client.lockView({ viewName: objectName });
-          lockHandle = client.getLockHandle();
+          lockHandle = await client.getView().lock({ viewName: objectName });
           break;
         case 'domain':
-          await client.lockDomain({ domainName: objectName });
-          lockHandle = client.getLockHandle();
+          lockHandle = await client
+            .getDomain()
+            .lock({ domainName: objectName });
           break;
         case 'data_element':
-          await client.lockDataElement({ dataElementName: objectName });
-          lockHandle = client.getLockHandle();
+          lockHandle = await client
+            .getDataElement()
+            .lock({ dataElementName: objectName });
           break;
         case 'behavior_definition':
-          await client.lockBehaviorDefinition({ name: objectName });
-          lockHandle = client.getLockHandle();
+          lockHandle = await client
+            .getBehaviorDefinition()
+            .lock({ name: objectName });
           break;
         case 'metadata_extension':
-          await client.lockMetadataExtension({ name: objectName });
-          lockHandle = client.getLockHandle();
+          lockHandle = await client
+            .getMetadataExtension()
+            .lock({ name: objectName });
           break;
         case 'package':
           if (!super_package) {
@@ -200,11 +205,10 @@ export async function handleLockObject(
               new Error('super_package is required for package locking.'),
             );
           }
-          await client.lockPackage({
+          lockHandle = await client.getPackage().lock({
             packageName: objectName,
             superPackage: super_package.toUpperCase(),
           });
-          lockHandle = client.getLockHandle();
           break;
         default:
           return return_error(

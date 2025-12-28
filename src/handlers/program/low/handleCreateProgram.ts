@@ -1,11 +1,11 @@
 /**
  * CreateProgram Handler - Create ABAP Program
  *
- * Uses CrudClient.createProgram from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.createProgram from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -87,7 +87,7 @@ interface CreateProgramArgs {
 /**
  * Main handler for CreateProgram MCP tool
  *
- * Uses CrudClient.createProgram - low-level single method call
+ * Uses AdtClient.createProgram - low-level single method call
  */
 export async function handleCreateProgram(
   context: HandlerContext,
@@ -122,7 +122,7 @@ export async function handleCreateProgram(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -137,7 +137,7 @@ export async function handleCreateProgram(
 
     try {
       // Create program
-      await client.createProgram({
+      const createState = await client.getProgram().create({
         programName,
         description,
         packageName: package_name,
@@ -145,7 +145,7 @@ export async function handleCreateProgram(
         programType: program_type,
         application,
       });
-      const createResult = client.getCreateResult();
+      const createResult = createState.createResult;
 
       if (!createResult) {
         throw new Error(

@@ -5,7 +5,7 @@
  * Supports checking existing classes or hypothetical source code.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -109,15 +109,17 @@ export async function handleCheckClass(
     );
 
     try {
-      const client = new CrudClient(connection);
-      await client.checkClass({ className }, checkVersion, source_code);
-      const response = client.getCheckResult();
+      const client = new AdtClient(connection);
+      const checkState = await client
+        .getClass()
+        .check({ className, sourceCode: source_code }, checkVersion);
+      const response = checkState.checkResult;
       if (!response) {
         throw new Error('Class check did not return a response');
       }
 
       // Parse check results
-      const checkResult = parseCheckRunResponse(response);
+      const checkResult = parseCheckRunResponse(response as AxiosResponse);
 
       // Get updated session state after check
 

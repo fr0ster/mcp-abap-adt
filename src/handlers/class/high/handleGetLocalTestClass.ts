@@ -6,12 +6,9 @@
  */
 
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetLocalTestClass',
@@ -99,7 +96,7 @@ export async function handleGetLocalTestClass(
           null,
           2,
         ),
-      } as AxiosResponse);
+      } as IAdtResponse);
     } catch (error: any) {
       logger?.error(
         `Error reading local test class for ${className}: ${error?.message || error}`,
@@ -112,6 +109,8 @@ export async function handleGetLocalTestClass(
         errorMessage = `Local test class for ${className} not found.`;
       } else if (error.response?.status === 423) {
         errorMessage = `Class ${className} is locked by another user.`;
+      } else if (error.response?.status === 406) {
+        errorMessage = `Local test class read not supported on this system (HTTP 406).`;
       }
 
       return return_error(new Error(errorMessage));

@@ -1,11 +1,11 @@
 /**
  * UpdateView Handler - Update ABAP View DDL Source
  *
- * Uses CrudClient.updateView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.updateView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -71,7 +71,7 @@ interface UpdateViewArgs {
 /**
  * Main handler for UpdateView MCP tool
  *
- * Uses CrudClient.updateView - low-level single method call
+ * Uses AdtClient.updateView - low-level single method call
  */
 export async function handleUpdateView(
   context: HandlerContext,
@@ -89,7 +89,7 @@ export async function handleUpdateView(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -104,11 +104,13 @@ export async function handleUpdateView(
 
     try {
       // Update view with DDL source
-      await client.updateView(
-        { viewName: viewName, ddlSource: ddl_source },
-        lock_handle,
-      );
-      const updateResult = client.getUpdateResult();
+      const updateState = await client
+        .getView()
+        .update(
+          { viewName: viewName, ddlSource: ddl_source },
+          { lockHandle: lock_handle },
+        );
+      const updateResult = updateState.updateResult;
 
       if (!updateResult) {
         throw new Error(

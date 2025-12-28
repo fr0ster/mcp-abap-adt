@@ -7,7 +7,7 @@
  * Workflow: validate -> create -> lock -> update -> check -> unlock -> (activate)
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -100,11 +100,11 @@ export async function handleCreateFunctionModule(
 
     try {
       // Create client
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Validate
-      await client.validateFunctionModule({
+      await client.getFunctionModule().validate({
         functionModuleName,
         functionGroupName,
         packageName: '',
@@ -113,7 +113,7 @@ export async function handleCreateFunctionModule(
 
       // Create
       // Note: Package name inherited from parent function group
-      await client.createFunctionModule({
+      await client.getFunctionModule().create({
         functionModuleName,
         functionGroupName,
         description: typedArgs.description || functionModuleName,
@@ -125,24 +125,23 @@ export async function handleCreateFunctionModule(
       let lockHandle: string | undefined;
       try {
         // Lock
-        await client.lockFunctionModule({
+        lockHandle = await client.getFunctionModule().lock({
           functionModuleName,
           functionGroupName,
         });
-        lockHandle = client.getLockHandle();
 
         // Update with source code
-        await client.updateFunctionModule(
+        await client.getFunctionModule().update(
           {
             functionModuleName,
             functionGroupName,
             sourceCode: typedArgs.source_code,
           },
-          lockHandle,
+          { lockHandle },
         );
 
         // Check
-        await client.checkFunctionModule({
+        await client.getFunctionModule().check({
           functionModuleName,
           functionGroupName,
         });
@@ -150,10 +149,9 @@ export async function handleCreateFunctionModule(
         // Always unlock if we got a lock handle
         if (lockHandle) {
           try {
-            await client.unlockFunctionModule(
-              { functionModuleName, functionGroupName },
-              lockHandle,
-            );
+            await client
+              .getFunctionModule()
+              .unlock({ functionModuleName, functionGroupName }, lockHandle);
           } catch (unlockError: any) {
             logger?.warn(
               `Failed to unlock function module ${functionModuleName}: ${unlockError?.message || unlockError}`,
@@ -164,7 +162,7 @@ export async function handleCreateFunctionModule(
 
       // Activate if requested
       if (shouldActivate) {
-        await client.activateFunctionModule({
+        await client.getFunctionModule().activate({
           functionModuleName,
           functionGroupName,
         });

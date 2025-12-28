@@ -1,11 +1,11 @@
 /**
  * CheckDomain Handler - Syntax check for ABAP Domain
  *
- * Uses CrudClient.checkDomain from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.checkDomain from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -59,7 +59,7 @@ interface CheckDomainArgs {
 /**
  * Main handler for CheckDomain MCP tool
  *
- * Uses CrudClient.checkDomain - low-level single method call
+ * Uses AdtClient.checkDomain - low-level single method call
  */
 export async function handleCheckDomain(
   context: HandlerContext,
@@ -74,7 +74,7 @@ export async function handleCheckDomain(
       return return_error(new Error('domain_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -87,8 +87,10 @@ export async function handleCheckDomain(
 
     try {
       // Check domain
-      await client.checkDomain({ domainName: domainName });
-      const response = client.getCheckResult();
+      const checkState = await client
+        .getDomain()
+        .check({ domainName: domainName });
+      const response = checkState.checkResult;
 
       if (!response) {
         throw new Error(
@@ -97,7 +99,7 @@ export async function handleCheckDomain(
       }
 
       // Parse check results
-      const checkResult = parseCheckRunResponse(response);
+      const checkResult = parseCheckRunResponse(response as AxiosResponse);
 
       // Get updated session state after check
 

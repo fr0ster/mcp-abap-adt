@@ -7,7 +7,7 @@
  * Workflow: create -> activate -> verify
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -181,11 +181,11 @@ export async function handleCreateDataElement(
 
     try {
       // Create client
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Validate
-      await client.validateDataElement({
+      await client.getDataElement().validate({
         dataElementName,
         packageName: typedArgs.package_name,
         description: typedArgs.description || dataElementName,
@@ -195,7 +195,7 @@ export async function handleCreateDataElement(
       const typeKind = typedArgs.type_kind || 'domain';
 
       // Create
-      await client.createDataElement({
+      const createState = await client.getDataElement().create({
         dataElementName,
         description: typedArgs.description || dataElementName,
         packageName: typedArgs.package_name,
@@ -208,8 +208,9 @@ export async function handleCreateDataElement(
       });
 
       // Lock
-      await client.lockDataElement({ dataElementName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client
+        .getDataElement()
+        .lock({ dataElementName });
 
       // Update with properties
       const updateConfig: any = {
@@ -230,12 +231,14 @@ export async function handleCreateDataElement(
         setGetParameter: typedArgs.set_get_parameter,
       };
 
-      await client.updateDataElement(updateConfig, lockHandle);
+      await client
+        .getDataElement()
+        .update(updateConfig, { lockHandle: lockHandle });
 
       // Check
       try {
         await safeCheckOperation(
-          () => client.checkDataElement({ dataElementName }),
+          () => client.getDataElement().check({ dataElementName }),
           dataElementName,
           {
             debug: (message: string) => logger?.debug(message),
@@ -250,15 +253,15 @@ export async function handleCreateDataElement(
       }
 
       // Unlock
-      await client.unlockDataElement({ dataElementName }, lockHandle);
+      await client.getDataElement().unlock({ dataElementName }, lockHandle);
 
       // Activate if requested
       if (shouldActivate) {
-        await client.activateDataElement({ dataElementName });
+        await client.getDataElement().activate({ dataElementName });
       }
 
       // Get data element details from create result (createDataElement already does verification)
-      const createResult = client.getCreateResult();
+      const createResult = createState.createResult;
       let dataElementDetails = null;
       if (
         createResult?.data &&

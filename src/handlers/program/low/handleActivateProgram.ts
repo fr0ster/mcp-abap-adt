@@ -1,15 +1,16 @@
 /**
  * ActivateProgram Handler - Activate ABAP Program
  *
- * Uses CrudClient.activateProgram from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.activateProgram from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
   isCloudConnection,
+  parseActivationResponse,
   restoreSessionInConnection,
   return_error,
   return_response,
@@ -59,7 +60,7 @@ interface ActivateProgramArgs {
 /**
  * Main handler for ActivateProgram MCP tool
  *
- * Uses CrudClient.activateProgram - low-level single method call
+ * Uses AdtClient.activateProgram - low-level single method call
  */
 export async function handleActivateProgram(
   context: HandlerContext,
@@ -84,7 +85,7 @@ export async function handleActivateProgram(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -99,8 +100,10 @@ export async function handleActivateProgram(
 
     try {
       // Activate program
-      await client.activateProgram({ programName: programName });
-      const response = client.getActivateResult();
+      const activateState = await client
+        .getProgram()
+        .activate({ programName: programName });
+      const response = activateState.activateResult;
 
       if (!response) {
         throw new Error(
@@ -109,7 +112,7 @@ export async function handleActivateProgram(
       }
 
       // Parse activation response
-      const activationResult = client.parseActivationResponse(response.data);
+      const activationResult = parseActivationResponse(response.data);
       const success = activationResult.activated && activationResult.checked;
 
       // Get updated session state after activation

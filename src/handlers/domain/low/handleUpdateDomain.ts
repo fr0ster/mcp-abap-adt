@@ -1,11 +1,11 @@
 /**
  * UpdateDomain Handler - Update ABAP Domain Properties
  *
- * Uses CrudClient.updateDomain from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.updateDomain from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -71,7 +71,7 @@ interface UpdateDomainArgs {
 /**
  * Main handler for UpdateDomain MCP tool
  *
- * Uses CrudClient.updateDomain - low-level single method call
+ * Uses AdtClient.updateDomain - low-level single method call
  */
 export async function handleUpdateDomain(
   context: HandlerContext,
@@ -89,7 +89,7 @@ export async function handleUpdateDomain(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     const domainName = domain_name.toUpperCase();
 
@@ -102,15 +102,15 @@ export async function handleUpdateDomain(
 
     try {
       // Update domain with properties
-      await client.updateDomain(
+      const updateState = await client.getDomain().update(
         {
           domainName,
           packageName: properties.package_name || properties.packageName,
           description: properties.description || '',
         },
-        lock_handle,
+        { lockHandle: lock_handle },
       );
-      const updateResult = client.getUpdateResult();
+      const updateResult = updateState.updateResult;
 
       if (!updateResult) {
         throw new Error(

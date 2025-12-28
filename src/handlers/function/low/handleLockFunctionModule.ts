@@ -1,11 +1,11 @@
 /**
  * LockFunctionModule Handler - Lock ABAP Function Module
  *
- * Uses CrudClient.lockFunctionModule from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.lockFunctionModule from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -63,7 +63,7 @@ interface LockFunctionModuleArgs {
 /**
  * Main handler for LockFunctionModule MCP tool
  *
- * Uses CrudClient.lockFunctionModule - low-level single method call
+ * Uses AdtClient.lockFunctionModule - low-level single method call
  */
 export async function handleLockFunctionModule(
   context: HandlerContext,
@@ -85,7 +85,7 @@ export async function handleLockFunctionModule(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -102,11 +102,10 @@ export async function handleLockFunctionModule(
 
     try {
       // Lock function module
-      await client.lockFunctionModule({
+      const lockHandle = await client.getFunctionModule().lock({
         functionModuleName: functionModuleName,
         functionGroupName: functionGroupName,
       });
-      const lockHandle = client.getLockHandle();
 
       if (!lockHandle) {
         throw new Error(

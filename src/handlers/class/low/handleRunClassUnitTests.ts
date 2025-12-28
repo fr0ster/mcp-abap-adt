@@ -1,11 +1,11 @@
 /**
  * RunClassUnitTests Handler - Start ABAP Unit run for class-based tests
  *
- * Uses CrudClient.runClassUnitTests from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.runClassUnitTests from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -170,7 +170,7 @@ export async function handleRunClassUnitTests(
       };
     });
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -198,9 +198,9 @@ export async function handleRunClassUnitTests(
     );
 
     try {
-      await client.runClassUnitTests(formattedTests, options);
-      const runResponse = client.getAbapUnitRunResponse();
-      const runId = client.getAbapUnitRunId();
+      const unitTest = client.getUnitTest() as any;
+      const runId = await unitTest.run(formattedTests, options);
+      const runResponse = unitTest.getStatusResponse?.();
 
       if (!runId) {
         throw new Error(

@@ -5,7 +5,7 @@
  * Requires session_id for stateful operations.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { generateSessionId } from '../../../lib/sessionUtils';
@@ -125,18 +125,20 @@ export async function handleCheckTable(
     );
 
     try {
-      const builder = new CrudClient(connection);
+      const builder = new AdtClient(connection);
 
       // Check table with optional source code (for validating new/unsaved code)
       // If ddl_code is provided, it will be base64 encoded in the request body
-      await builder.checkTable({ tableName }, ddl_code, checkVersion);
-      const response = builder.getCheckResult();
+      const checkState = await builder
+        .getTable()
+        .check({ tableName, ddlCode: ddl_code }, checkVersion);
+      const response = checkState.checkResult;
       if (!response) {
         throw new Error('Table check did not return a response');
       }
 
       // Parse check results
-      const checkResult = parseCheckRunResponse(response);
+      const checkResult = parseCheckRunResponse(response as AxiosResponse);
 
       // Get updated session state after check
 

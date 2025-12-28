@@ -7,7 +7,7 @@
  * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -36,6 +36,10 @@ export const TOOL_DEFINITION = {
         description:
           "Complete DDL code for table creation. Example: '@EndUserText.label : \\'My Table\\' @AbapCatalog.tableCategory : #TRANSPARENT define table ztst_table { key client : abap.clnt not null; key id : abap.char(10); name : abap.char(255); }'",
       },
+      description: {
+        type: 'string',
+        description: 'Table description for validation and creation.',
+      },
       package_name: {
         type: 'string',
         description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects)',
@@ -58,6 +62,7 @@ export const TOOL_DEFINITION = {
 interface CreateTableArgs {
   table_name: string;
   ddl_code: string;
+  description?: string;
   package_name: string;
   transport_request?: string;
   activate?: boolean;
@@ -100,28 +105,27 @@ export async function handleCreateTable(
 
     try {
       // Create client
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
       const shouldActivate = createTableArgs.activate !== false; // Default to true if not specified
 
       // Validate
-      await client.validateTable({
+      await client.getTable().validate({
         tableName,
         packageName: createTableArgs.package_name,
-        description: '',
+        description: createTableArgs.description || tableName,
       });
 
       // Create
-      await client.createTable({
+      await client.getTable().create({
         tableName,
         packageName: createTableArgs.package_name,
-        description: '',
+        description: createTableArgs.description || tableName,
         ddlCode: createTableArgs.ddl_code || '',
         transportRequest: createTableArgs.transport_request,
       });
 
       // Lock
-      await client.lockTable({ tableName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client.getTable().lock({ tableName });
 
       try {
         // Step 1: Check new code BEFORE update (with ddlCode and version='inactive')
@@ -132,11 +136,12 @@ export async function handleCreateTable(
         try {
           await safeCheckOperation(
             () =>
-              client.checkTable(
-                { tableName },
-                createTableArgs.ddl_code,
-                'inactive',
-              ),
+              client
+                .getTable()
+                .check(
+                  { tableName, ddlCode: createTableArgs.ddl_code },
+                  'inactive',
+                ),
             tableName,
             {
               debug: (message: string) =>
@@ -171,10 +176,12 @@ export async function handleCreateTable(
           logger?.info(
             `[CreateTable] Updating table with DDL code: ${tableName}`,
           );
-          await client.updateTable(
-            { tableName, ddlCode: createTableArgs.ddl_code },
-            lockHandle,
-          );
+          await client
+            .getTable()
+            .update(
+              { tableName, ddlCode: createTableArgs.ddl_code },
+              { lockHandle },
+            );
           logger?.info(`[CreateTable] Table source code updated: ${tableName}`);
         } else {
           logger?.info(
@@ -183,14 +190,14 @@ export async function handleCreateTable(
         }
 
         // Step 3: Unlock (MANDATORY after lock)
-        await client.unlockTable({ tableName }, lockHandle);
+        await client.getTable().unlock({ tableName }, lockHandle);
         logger?.info(`[CreateTable] Table unlocked: ${tableName}`);
 
         // Step 4: Check inactive version (after unlock)
         logger?.info(`[CreateTable] Checking inactive version: ${tableName}`);
         try {
           await safeCheckOperation(
-            () => client.checkTable({ tableName }, undefined, 'inactive'),
+            () => client.getTable().check({ tableName }, 'inactive'),
             tableName,
             {
               debug: (message: string) =>
@@ -216,12 +223,12 @@ export async function handleCreateTable(
 
         // Activate
         if (shouldActivate) {
-          await client.activateTable({ tableName });
+          await client.getTable().activate({ tableName });
         }
       } catch (error) {
         // Unlock on error (principle 1: if lock was done, unlock is mandatory)
         try {
-          await client.unlockTable({ tableName }, lockHandle);
+          await client.getTable().unlock({ tableName }, lockHandle);
         } catch (unlockError) {
           logger?.error(
             `Failed to unlock table after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,

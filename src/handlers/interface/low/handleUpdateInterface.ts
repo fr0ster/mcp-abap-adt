@@ -1,11 +1,11 @@
 /**
  * UpdateInterface Handler - Update ABAP Interface Source Code
  *
- * Uses CrudClient.updateInterface from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.updateInterface from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -70,7 +70,7 @@ interface UpdateInterfaceArgs {
 /**
  * Main handler for UpdateInterface MCP tool
  *
- * Uses CrudClient.updateInterface - low-level single method call
+ * Uses AdtClient.updateInterface - low-level single method call
  */
 export async function handleUpdateInterface(
   context: HandlerContext,
@@ -93,7 +93,7 @@ export async function handleUpdateInterface(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -108,11 +108,13 @@ export async function handleUpdateInterface(
 
     try {
       // Update interface with source code
-      await client.updateInterface(
-        { interfaceName: interfaceName, sourceCode: source_code },
-        lock_handle,
-      );
-      const updateResult = client.getUpdateResult();
+      const updateState = await client
+        .getInterface()
+        .update(
+          { interfaceName: interfaceName, sourceCode: source_code },
+          { lockHandle: lock_handle },
+        );
+      const updateResult = updateState.updateResult;
 
       if (!updateResult) {
         throw new Error(

@@ -6,7 +6,6 @@
  */
 
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
-import * as z from 'zod';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,

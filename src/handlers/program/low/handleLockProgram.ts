@@ -1,11 +1,11 @@
 /**
  * LockProgram Handler - Lock ABAP Program
  *
- * Uses CrudClient.lockProgram from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.lockProgram from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -59,7 +59,7 @@ interface LockProgramArgs {
 /**
  * Main handler for LockProgram MCP tool
  *
- * Uses CrudClient.lockProgram - low-level single method call
+ * Uses AdtClient.lockProgram - low-level single method call
  */
 export async function handleLockProgram(
   context: HandlerContext,
@@ -83,7 +83,7 @@ export async function handleLockProgram(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -97,8 +97,9 @@ export async function handleLockProgram(
 
     try {
       // Lock program
-      await client.lockProgram({ programName: programName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client.getProgram().lock({
+        programName: programName,
+      });
 
       if (!lockHandle) {
         throw new Error(

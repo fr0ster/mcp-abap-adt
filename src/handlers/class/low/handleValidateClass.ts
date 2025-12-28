@@ -5,7 +5,7 @@
  * Supports package, description, and superclass validation.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -106,23 +106,26 @@ export async function handleValidateClass(
     logger?.info(`Starting class validation: ${className}`);
 
     try {
-      const builder = new CrudClient(connection);
+      const builder = new AdtClient(connection);
 
       // validateClass may throw for non-400 errors, but returns response for 400
       let validationResponse: AxiosResponse | undefined;
+      let validationState: any | undefined;
       try {
-        await builder.validateClass({
+        validationState = await builder.getClass().validate({
           className,
           packageName: package_name.toUpperCase(),
           description: description,
           superclass: superclass,
         });
-        validationResponse = builder.getValidationResponse();
+        validationResponse = validationState.validationResponse as
+          | AxiosResponse
+          | undefined;
       } catch (error: any) {
         // For 400 errors, ClassBuilder.validate() returns error.response instead of throwing
         // But if it still throws, try to get response from builder state
         if (error.response && error.response.status === 400) {
-          validationResponse = error.response;
+          validationResponse = error.response as AxiosResponse;
         } else {
           // For non-400 errors, re-throw to be handled below
           throw error;
@@ -131,7 +134,9 @@ export async function handleValidateClass(
 
       // If no response, try to get it from builder (should not happen, but safety check)
       if (!validationResponse) {
-        validationResponse = builder.getValidationResponse();
+        validationResponse = validationState?.validationResponse as
+          | AxiosResponse
+          | undefined;
       }
 
       if (!validationResponse) {
@@ -139,7 +144,9 @@ export async function handleValidateClass(
       }
 
       // Parse validation response (works for both 200 and 400 responses)
-      const result = parseValidationResponse(validationResponse);
+      const result = parseValidationResponse(
+        validationResponse as AxiosResponse,
+      );
 
       // Get updated session state after validation
 

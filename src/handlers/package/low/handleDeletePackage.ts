@@ -1,11 +1,12 @@
 /**
  * DeletePackage Handler - Delete ABAP Package
  *
- * Uses CrudClient.deletePackage from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.deletePackage from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -34,6 +35,11 @@ export const TOOL_DEFINITION = {
         description:
           'Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.',
       },
+      connection_config: {
+        type: 'object',
+        description:
+          'Optional SAP connection config to create a fresh connection for deletion. Useful when the existing connection config is unavailable.',
+      },
     },
     required: ['package_name'],
   },
@@ -43,12 +49,13 @@ interface DeletePackageArgs {
   package_name: string;
   transport_request?: string;
   force_new_connection?: boolean;
+  connection_config?: SapConfig;
 }
 
 /**
  * Main handler for DeletePackage MCP tool
  *
- * Uses CrudClient.deletePackage - low-level single method call
+ * Uses AdtClient.deletePackage - low-level single method call
  */
 export async function handleDeletePackage(
   context: HandlerContext,
@@ -60,6 +67,7 @@ export async function handleDeletePackage(
       package_name,
       transport_request,
       force_new_connection = false,
+      connection_config,
     } = args as DeletePackageArgs;
 
     // Validation
@@ -69,17 +77,45 @@ export async function handleDeletePackage(
 
     const packageName = package_name.toUpperCase();
 
-    const client = new CrudClient(connection);
+    let deleteConnection = connection;
+    if (force_new_connection) {
+      const connectionConfig =
+        connection_config ||
+        (connection as any).getConfig?.() ||
+        (connection as any).config;
+      if (!connectionConfig) {
+        logger?.warn(
+          `DeletePackage requested fresh connection, but connection config is unavailable; falling back to existing connection for ${packageName}`,
+        );
+      } else {
+        try {
+          deleteConnection = createAbapConnection(
+            connectionConfig,
+            logger || null,
+          );
+          logger?.info(
+            `DeletePackage using fresh connection for ${packageName} (force_new_connection=true)`,
+          );
+        } catch (createError: any) {
+          logger?.warn(
+            `DeletePackage failed to create fresh connection for ${packageName}, falling back to existing connection: ${
+              createError?.message || createError
+            }`,
+          );
+        }
+      }
+    }
+    const client = new AdtClient(deleteConnection);
 
     logger?.info(`Starting package deletion: ${packageName}`);
 
     try {
       // Delete package
-      await client.deletePackage({
+      const deleteState = await client.getPackage().delete({
         packageName: packageName,
         transportRequest: transport_request,
       });
-      const deleteResult = client.getDeleteResult();
+      const deleteResult = deleteState.deleteResult;
 
       if (!deleteResult) {
         throw new Error(

@@ -1,11 +1,11 @@
 /**
  * CheckView Handler - Syntax check for ABAP View
  *
- * Uses CrudClient.checkView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.checkView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -72,7 +72,7 @@ interface CheckViewArgs {
 /**
  * Main handler for CheckView MCP tool
  *
- * Uses CrudClient.checkView - low-level single method call
+ * Uses AdtClient.checkView - low-level single method call
  */
 export async function handleCheckView(
   context: HandlerContext,
@@ -93,7 +93,7 @@ export async function handleCheckView(
       return return_error(new Error('view_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -117,15 +117,17 @@ export async function handleCheckView(
     try {
       // Check view with optional source code (for validating new/unsaved code)
       // If ddl_source is provided, it will be base64 encoded in the request body
-      await client.checkView({ viewName: viewName }, ddl_source, checkVersion);
-      const response = client.getCheckResult();
+      const checkState = await client
+        .getView()
+        .check({ viewName: viewName, ddlSource: ddl_source }, checkVersion);
+      const response = checkState.checkResult;
 
       if (!response) {
         throw new Error(`Check did not return a response for view ${viewName}`);
       }
 
       // Parse check results
-      const checkResult = parseCheckRunResponse(response);
+      const checkResult = parseCheckRunResponse(response as AxiosResponse);
 
       // Get updated session state after check
 

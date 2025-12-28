@@ -1,14 +1,15 @@
 /**
  * ActivateFunctionModule Handler - Activate ABAP Function Module
  *
- * Uses CrudClient.activateFunctionModule from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.activateFunctionModule from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
+  parseActivationResponse,
   restoreSessionInConnection,
   return_error,
   return_response,
@@ -63,7 +64,7 @@ interface ActivateFunctionModuleArgs {
 /**
  * Main handler for ActivateFunctionModule MCP tool
  *
- * Uses CrudClient.activateFunctionModule - low-level single method call
+ * Uses AdtClient.activateFunctionModule - low-level single method call
  */
 export async function handleActivateFunctionModule(
   context: HandlerContext,
@@ -86,7 +87,7 @@ export async function handleActivateFunctionModule(
       return return_error(new Error('function_group_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -103,11 +104,11 @@ export async function handleActivateFunctionModule(
 
     try {
       // Activate function module
-      await client.activateFunctionModule({
+      const activateState = await client.getFunctionModule().activate({
         functionModuleName: functionModuleName,
         functionGroupName: functionGroupName,
       });
-      const response = client.getActivateResult();
+      const response = activateState.activateResult;
 
       if (!response) {
         throw new Error(
@@ -116,7 +117,7 @@ export async function handleActivateFunctionModule(
       }
 
       // Parse activation response
-      const activationResult = client.parseActivationResponse(response.data);
+      const activationResult = parseActivationResponse(response.data);
       const success = activationResult.activated && activationResult.checked;
 
       // Get updated session state after activation

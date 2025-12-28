@@ -1,11 +1,11 @@
 /**
  * ValidateFunctionGroup Handler - Validate ABAP FunctionGroup Name
  *
- * Uses CrudClient.validateFunctionGroup from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.validateFunctionGroup from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -25,6 +25,10 @@ export const TOOL_DEFINITION = {
       function_group_name: {
         type: 'string',
         description: 'FunctionGroup name to validate (e.g., Z_MY_PROGRAM).',
+      },
+      package_name: {
+        type: 'string',
+        description: 'Package name for validation (optional but recommended).',
       },
       description: {
         type: 'string',
@@ -52,6 +56,7 @@ export const TOOL_DEFINITION = {
 
 interface ValidateFunctionGroupArgs {
   function_group_name: string;
+  package_name?: string;
   description?: string;
   session_id?: string;
   session_state?: {
@@ -64,7 +69,7 @@ interface ValidateFunctionGroupArgs {
 /**
  * Main handler for ValidateFunctionGroup MCP tool
  *
- * Uses CrudClient.validateFunctionGroup - low-level single method call
+ * Uses AdtClient.validateFunctionGroup - low-level single method call
  */
 export async function handleValidateFunctionGroup(
   context: HandlerContext,
@@ -80,7 +85,7 @@ export async function handleValidateFunctionGroup(
       return return_error(new Error('function_group_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -90,6 +95,7 @@ export async function handleValidateFunctionGroup(
     }
 
     const functionGroupName = function_group_name.toUpperCase();
+    const packageName = args.package_name?.toUpperCase();
 
     logger?.info(`Starting function group validation: ${functionGroupName}`);
 
@@ -97,15 +103,18 @@ export async function handleValidateFunctionGroup(
       // Validate function group
       // Ensure description is not empty (required for validation)
       const validationDescription = description || functionGroupName;
-      await client.validateFunctionGroup({
+      const validationState = await client.getFunctionGroup().validate({
         functionGroupName: functionGroupName,
+        packageName,
         description: validationDescription,
       });
-      const validationResponse = client.getValidationResponse();
+      const validationResponse = validationState.validationResponse;
       if (!validationResponse) {
         throw new Error('Validation did not return a result');
       }
-      const result = parseValidationResponse(validationResponse);
+      const result = parseValidationResponse(
+        validationResponse as AxiosResponse,
+      );
 
       // Get updated session state after validation
 

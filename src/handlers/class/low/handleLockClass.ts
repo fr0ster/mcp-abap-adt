@@ -1,11 +1,11 @@
 /**
  * LockClass Handler - Lock ABAP Class
  *
- * Uses CrudClient.lockClass from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.lockClass from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -36,7 +36,7 @@ interface LockClassArgs {
 /**
  * Main handler for LockClass MCP tool
  *
- * Uses CrudClient.lockClass - low-level single method call
+ * Uses AdtClient.lockClass - low-level single method call
  */
 export async function handleLockClass(
   context: HandlerContext,
@@ -51,7 +51,7 @@ export async function handleLockClass(
       return return_error(new Error('class_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     const className = class_name.toUpperCase();
 
@@ -59,8 +59,7 @@ export async function handleLockClass(
 
     try {
       // Lock class
-      await client.lockClass({ className });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client.getClass().lock({ className });
 
       if (!lockHandle) {
         throw new Error(

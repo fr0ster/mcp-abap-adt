@@ -1,11 +1,11 @@
 /**
  * UpdateTable Handler - Update ABAP Table DDL Source
  *
- * Uses CrudClient.updateTable from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.updateTable from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -76,7 +76,7 @@ interface UpdateTableArgs {
 /**
  * Main handler for UpdateTable MCP tool
  *
- * Uses CrudClient.updateTable - low-level single method call
+ * Uses AdtClient.updateTable - low-level single method call
  */
 export async function handleUpdateTable(
   context: HandlerContext,
@@ -100,7 +100,7 @@ export async function handleUpdateTable(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -113,15 +113,15 @@ export async function handleUpdateTable(
 
     try {
       // Update table with DDL code
-      await client.updateTable(
+      const updateState = await client.getTable().update(
         {
           tableName: tableName,
           ddlCode: ddl_code,
           transportRequest: transport_request,
         },
-        lock_handle,
+        { lockHandle: lock_handle },
       );
-      const updateResult = client.getUpdateResult();
+      const updateResult = updateState.updateResult;
 
       if (!updateResult) {
         throw new Error(

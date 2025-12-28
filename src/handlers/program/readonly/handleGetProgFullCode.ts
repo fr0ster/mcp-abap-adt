@@ -55,7 +55,7 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
-import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleGetInclude } from '../../include/readonly/handleGetInclude';
 
@@ -116,23 +116,18 @@ export async function handleGetProgFullCode(
     let codeObjects: any[] = [];
     if (typeUpper === 'PROG/P') {
       // Get main program code
-      const client = new ReadOnlyClient(connection);
-      await client.readProgram(name);
-      const progResult = client.getProgramReadResult();
+      const client = new AdtClient(connection);
+      const progState = await client.getProgram().read({
+        programName: name,
+      });
+      const progResult = progState?.readResult;
       let progCode: string | null = null;
 
-      // Get source code from IProgramConfig
-      if (progResult?.sourceCode) {
-        progCode = progResult.sourceCode;
-      } else {
-        // Fallback: try to get from raw readResult
-        const rawResult = client.getReadResult();
-        if (rawResult?.data) {
-          if (typeof rawResult.data === 'string') {
-            progCode = rawResult.data;
-          } else {
-            progCode = JSON.stringify(rawResult.data);
-          }
+      if (progResult?.data) {
+        if (typeof progResult.data === 'string') {
+          progCode = progResult.data;
+        } else {
+          progCode = JSON.stringify(progResult.data);
         }
       }
 
@@ -209,12 +204,13 @@ export async function handleGetProgFullCode(
       }
     } else if (typeUpper === 'FUGR') {
       // Get function group main code
-      const client = new ReadOnlyClient(connection);
-      await client.readFunctionGroup(name);
+      const client = new AdtClient(connection);
+      const fgState = await client.getFunctionGroup().read({
+        functionGroupName: name,
+      });
       let fgCode: string | null = null;
 
-      // FunctionGroupConfig doesn't have sourceCode field, need to get from raw readResult
-      const rawResult = client.getReadResult();
+      const rawResult = fgState?.readResult;
       if (rawResult?.data) {
         if (typeof rawResult.data === 'string') {
           fgCode = rawResult.data;

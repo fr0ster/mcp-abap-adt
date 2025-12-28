@@ -9,7 +9,7 @@ import type { SapConfig } from '@mcp-abap-adt/connection';
 import * as dotenv from 'dotenv';
 import * as yaml from 'yaml';
 import { invalidateConnectionCache } from '../../../lib/utils';
-import { refreshTokensForTests } from './authHelpers';
+import { setupAuthBrokerForTests } from './authHelpers';
 import { createTestLogger } from './loggerHelpers';
 
 const configLogger = createTestLogger('config');
@@ -23,11 +23,20 @@ let brokerSucceeded = false;
 function resolveUseAuthBrokerFlag(): boolean {
   try {
     const cfg = loadTestConfig();
+    // If destination is specified, always use auth-broker (ignore .env)
+    const hasDestination =
+      !!cfg?.auth_broker?.abap?.destination ||
+      !!cfg?.abap?.destination ||
+      !!cfg?.environment?.destination ||
+      !!cfg?.abap?.service_keys?.destination ||
+      !!cfg?.abap?.sessions?.destination;
+
     return (
       process.env.MCP_USE_AUTH_BROKER === 'true' ||
       cfg?.auth_broker?.use_auth_broker === true ||
       cfg?.environment?.use_auth_broker === true ||
-      !!cfg?.auth_broker // prefer auth-broker if config section exists
+      !!cfg?.auth_broker || // prefer auth-broker if config section exists
+      hasDestination // if destination is specified, always use auth-broker
     );
   } catch {
     return process.env.MCP_USE_AUTH_BROKER === 'true';
@@ -65,8 +74,8 @@ export async function loadTestEnv(): Promise<void> {
     throw envLoadError;
   }
 
-  // Prevent index.ts env auto-load / HTTP-mode logs during tests
-  process.env.MCP_SKIP_ENV_LOAD = 'true';
+  // // Prevent index.ts env auto-load / HTTP-mode logs during tests
+  // process.env.MCP_SKIP_ENV_LOAD = 'true';
 
   const useAuthBroker = resolveUseAuthBrokerFlag();
   const useUnsafe = resolveUnsafeFlag();
@@ -81,7 +90,7 @@ export async function loadTestEnv(): Promise<void> {
   if (useAuthBroker) {
     try {
       brokerAttempted = true;
-      await refreshTokensForTests({ force: true });
+      await setupAuthBrokerForTests({ force: true });
       brokerOk = !!process.env.SAP_URL;
       brokerSucceeded = brokerOk;
     } catch (error: any) {
@@ -90,8 +99,18 @@ export async function loadTestEnv(): Promise<void> {
       );
     }
 
-    // If broker succeeded, we’re done (no .env fallback when broker is configured)
+    // If broker succeeded, we're done (no .env fallback when broker is configured)
     if (brokerOk && process.env.SAP_URL) {
+      envLoaded = true;
+      return;
+    }
+
+    // If useAuthBroker is true (destination specified), don't fall back to .env
+    // This ensures that when destination is configured, we always use auth-broker
+    if (useAuthBroker) {
+      configLogger?.warn(
+        `[DEBUG] loadTestEnv - Auth-broker failed but destination is configured. Not loading .env file.`,
+      );
       envLoaded = true;
       return;
     }
@@ -179,7 +198,7 @@ export async function loadTestEnv(): Promise<void> {
       if (useAuthBroker && !brokerAttempted && !process.env.SAP_URL) {
         try {
           brokerAttempted = true;
-          await refreshTokensForTests({ force: true });
+          await setupAuthBrokerForTests({ force: true });
           brokerOk = !!process.env.SAP_URL;
           brokerSucceeded = brokerOk;
         } catch (error: any) {
@@ -563,7 +582,7 @@ export function isCloudConnection(): boolean {
 /**
  * Pre-check test parameters before running test
  * Verifies package existence and logs transport request if specified
- * @param client - CrudClient instance (optional, if not provided, checks are skipped)
+ * @param client - AdtClient instance (optional, if not provided, checks are skipped)
  * @param packageName - Package name to verify (optional)
  * @param transportRequest - Transport request (optional, only logged)
  * @param superPackage - Super package (parent package) to verify (optional, for package tests)
@@ -583,7 +602,7 @@ export async function preCheckTestParameters(
       configLogger?.debug(
         `[PRE_CHECK] Checking super package (parent) existence: ${superPackage}`,
       );
-      const superPackageCheck = await client.checkPackage({
+      const superPackageCheck = await client.getPackage().check({
         packageName: superPackage,
         superPackage: undefined,
       });
@@ -622,7 +641,7 @@ export async function preCheckTestParameters(
       configLogger?.debug(
         `[PRE_CHECK] Checking package existence: ${packageName}`,
       );
-      const packageCheck = await client.checkPackage({
+      const packageCheck = await client.getPackage().check({
         packageName,
         superPackage: undefined,
       });

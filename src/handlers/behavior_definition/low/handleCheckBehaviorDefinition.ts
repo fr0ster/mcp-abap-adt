@@ -1,12 +1,12 @@
 /**
  * CheckBehaviorDefinition Handler - Syntax check for ABAP BehaviorDefinition
  *
- * Uses CrudClient.checkBehaviorDefinition from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.checkBehaviorDefinition from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { IBehaviorDefinitionConfig } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -60,7 +60,7 @@ interface CheckBehaviorDefinitionArgs {
 /**
  * Main handler for CheckBehaviorDefinition MCP tool
  *
- * Uses CrudClient.checkBehaviorDefinition - low-level single method call
+ * Uses AdtClient.checkBehaviorDefinition - low-level single method call
  */
 export async function handleCheckBehaviorDefinition(
   context: HandlerContext,
@@ -76,7 +76,7 @@ export async function handleCheckBehaviorDefinition(
       return return_error(new Error('name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -91,11 +91,13 @@ export async function handleCheckBehaviorDefinition(
 
     try {
       // Check behavior definition - using types from adt-clients
-      const checkConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = {
+      const checkConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
         name: bdefName,
       };
-      await client.checkBehaviorDefinition(checkConfig);
-      const response = client.getCheckResult();
+      const checkState = await client
+        .getBehaviorDefinition()
+        .check(checkConfig);
+      const response = checkState.checkResult;
 
       if (!response) {
         throw new Error(
@@ -104,7 +106,7 @@ export async function handleCheckBehaviorDefinition(
       }
 
       // Parse check results
-      const checkResult = parseCheckRunResponse(response);
+      const checkResult = parseCheckRunResponse(response as AxiosResponse);
 
       // Get updated session state after check
 

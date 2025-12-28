@@ -1,3 +1,4 @@
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
 import type { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 
@@ -29,7 +30,7 @@ export interface ParsedCheckRunResult {
 }
 
 export function parseCheckRunResponse(
-  response: AxiosResponse,
+  response: IAdtResponse | AxiosResponse,
 ): ParsedCheckRunResult {
   const parser = new XMLParser({
     ignoreAttributes: false,

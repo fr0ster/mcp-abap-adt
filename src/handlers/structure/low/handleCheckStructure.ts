@@ -1,11 +1,11 @@
 /**
  * CheckStructure Handler - Syntax check for ABAP Structure
  *
- * Uses CrudClient.checkStructure from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.checkStructure from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -72,7 +72,7 @@ interface CheckStructureArgs {
 /**
  * Main handler for CheckStructure MCP tool
  *
- * Uses CrudClient.checkStructure - low-level single method call
+ * Uses AdtClient.checkStructure - low-level single method call
  */
 export async function handleCheckStructure(
   context: HandlerContext,
@@ -93,7 +93,7 @@ export async function handleCheckStructure(
       return return_error(new Error('structure_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -117,12 +117,10 @@ export async function handleCheckStructure(
     try {
       // Check structure with optional source code (for validating new/unsaved code)
       // If ddl_code is provided, it will be base64 encoded in the request body
-      await client.checkStructure(
-        { structureName: structureName },
-        ddl_code,
-        checkVersion,
-      );
-      const response = client.getCheckResult();
+      const checkState = await client
+        .getStructure()
+        .check({ structureName, ddlCode: ddl_code }, checkVersion);
+      const response = checkState.checkResult;
 
       if (!response) {
         throw new Error(
@@ -131,7 +129,7 @@ export async function handleCheckStructure(
       }
 
       // Parse check results
-      const checkResult = parseCheckRunResponse(response);
+      const checkResult = parseCheckRunResponse(response as AxiosResponse);
 
       // Get updated session state after check
 

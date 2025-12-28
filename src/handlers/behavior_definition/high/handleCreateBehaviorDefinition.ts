@@ -3,10 +3,10 @@
  */
 
 import type {
-  BehaviorDefinitionBuilderConfig,
   BehaviorDefinitionImplementationType,
+  IBehaviorDefinitionConfig,
 } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
@@ -91,12 +91,12 @@ export async function handleCreateBehaviorDefinition(
   logger?.info(`Starting BDEF creation: ${name}`);
 
   try {
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const shouldActivate = args.activate !== false;
 
     // Create - using types from adt-clients
     const createConfig: Pick<
-      BehaviorDefinitionBuilderConfig,
+      IBehaviorDefinitionConfig,
       | 'name'
       | 'description'
       | 'packageName'
@@ -111,40 +111,39 @@ export async function handleCreateBehaviorDefinition(
       rootEntity: args.root_entity,
       implementationType: args.implementation_type,
     };
-    await client.createBehaviorDefinition(createConfig);
+    await client.getBehaviorDefinition().create(createConfig);
 
     // Lock - using types from adt-clients
-    const lockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = { name };
-    await client.lockBehaviorDefinition(lockConfig);
-    const lockHandle = client.getLockHandle();
+    const lockConfig: Pick<IBehaviorDefinitionConfig, 'name'> = { name };
+    const lockHandle = await client.getBehaviorDefinition().lock(lockConfig);
 
     try {
       // Check (optional, but good practice) - using types from adt-clients
-      const checkConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = {
+      const checkConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
         name,
       };
-      await client.checkBehaviorDefinition(checkConfig);
+      await client.getBehaviorDefinition().check(checkConfig);
 
       // Unlock - using types from adt-clients
-      const unlockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = {
+      const unlockConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
         name,
       };
-      await client.unlockBehaviorDefinition(unlockConfig, lockHandle);
+      await client.getBehaviorDefinition().unlock(unlockConfig, lockHandle);
 
       // Activate if requested - using types from adt-clients
       if (shouldActivate) {
-        const activateConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = {
+        const activateConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
           name,
         };
-        await client.activateBehaviorDefinition(activateConfig);
+        await client.getBehaviorDefinition().activate(activateConfig);
       }
     } catch (error) {
       // Unlock on error (principle 1: if lock was done, unlock is mandatory)
       try {
-        const unlockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = {
+        const unlockConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
           name,
         };
-        await client.unlockBehaviorDefinition(unlockConfig, lockHandle);
+        await client.getBehaviorDefinition().unlock(unlockConfig, lockHandle);
       } catch (unlockError) {
         logger?.error(
           `Failed to unlock behavior definition after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,

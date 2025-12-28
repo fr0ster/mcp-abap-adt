@@ -8,7 +8,7 @@ import {
   type SapConfig,
   sapConfigSignature,
 } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError, type AxiosResponse } from 'axios';
 import {
@@ -88,13 +88,14 @@ export { McpError, ErrorCode, getTimeout, getTimeoutConfig, logger };
 export type { AxiosResponse };
 
 /**
- * Encodes SAP object names for use in URLs
- * Re-exported from @mcp-abap-adt/adt-clients for backward compatibility
- * @deprecated Use encodeSapObjectName from @mcp-abap-adt/adt-clients directly
+ * Encodes SAP object names for use in URLs.
+ * Mirrors @mcp-abap-adt/adt-clients internal util but avoids unstable exports.
  */
-export { encodeSapObjectName } from '@mcp-abap-adt/adt-clients';
+export function encodeSapObjectName(objectName: string): string {
+  return encodeURIComponent(objectName);
+}
 
-export function return_response(response: AxiosResponse) {
+export function return_response(response: IAdtResponse | AxiosResponse) {
   return {
     isError: false,
     content: [
@@ -843,7 +844,7 @@ export async function makeAdtRequestWithTimeout(
 
 /**
  * Fetches node structure from SAP ADT repository
- * @deprecated Use getReadOnlyClient().fetchNodeStructure() instead
+ * @deprecated Use getAdtClient().fetchNodeStructure() instead
  */
 export async function fetchNodeStructure(
   _connection: IAbapConnection,
@@ -853,10 +854,10 @@ export async function fetchNodeStructure(
   _nodeKey: string,
   _withShortDescriptions: boolean = true,
 ): Promise<AxiosResponse> {
-  // TODO: Add fetchNodeStructure to ReadOnlyClient
-  throw new Error('fetchNodeStructure not implemented in ReadOnlyClient yet');
-  // const { getReadOnlyClient } = await import('./clients.js');
-  // return getReadOnlyClient().fetchNodeStructure(parentName, parentTechName, parentType, nodeKey, withShortDescriptions);
+  // TODO: Add fetchNodeStructure to AdtClient
+  throw new Error('fetchNodeStructure not implemented in AdtClient yet');
+  // const { getAdtClient } = await import('./clients.js');
+  // return getAdtClient().fetchNodeStructure(parentName, parentTechName, parentType, nodeKey, withShortDescriptions);
 }
 
 export async function makeAdtRequest(
@@ -880,16 +881,16 @@ export async function makeAdtRequest(
 
 /**
  * Get system information from SAP ADT (for cloud systems)
- * @deprecated Use getReadOnlyClient().getSystemInformation() instead
+ * @deprecated Use getAdtClient().getSystemInformation() instead
  */
 export async function getSystemInformation(): Promise<{
   systemID?: string;
   userName?: string;
 } | null> {
-  // TODO: Add getSystemInformation to ReadOnlyClient
-  throw new Error('getSystemInformation not implemented in ReadOnlyClient yet');
-  // const { getReadOnlyClient } = await import('./clients.js');
-  // return getReadOnlyClient().getSystemInformation();
+  // TODO: Add getSystemInformation to AdtClient
+  throw new Error('getSystemInformation not implemented in AdtClient yet');
+  // const { getAdtClient } = await import('./clients.js');
+  // return getAdtClient().getSystemInformation();
 }
 
 /**
@@ -932,10 +933,12 @@ export function isCloudConnection(config?: SapConfig): boolean {
 /**
  * Parse validation response from ADT
  * Checks for CHECK_RESULT=X (success) or SEVERITY=ERROR with message
- * @param response - AxiosResponse from validation endpoint
+ * @param response - IAdtResponse or AxiosResponse from validation endpoint
  * @returns Parsed validation result with valid, severity, message, exists fields
  */
-export function parseValidationResponse(response: AxiosResponse): {
+export function parseValidationResponse(
+  response: IAdtResponse | AxiosResponse,
+): {
   valid: boolean;
   severity?: string;
   message?: string;
@@ -1081,7 +1084,13 @@ export function isAlreadyCheckedError(error: any): boolean {
  */
 export function isAlreadyExistsError(error: any): boolean {
   const errorMessage = error?.message || error?.text || String(error || '');
-  const msgLower = errorMessage.toLowerCase();
+  const responseData =
+    typeof error?.response?.data === 'string'
+      ? error.response.data
+      : error?.response?.data
+        ? JSON.stringify(error.response.data)
+        : '';
+  const msgLower = `${errorMessage} ${responseData}`.toLowerCase();
   return (
     msgLower.includes('already exists') ||
     msgLower.includes('does already exist') ||
@@ -1893,4 +1902,67 @@ export function getConfig(): SapConfig {
   }
 
   return config;
+}
+
+export function parseActivationResponse(responseData: any) {
+  const { XMLParser } = require('fast-xml-parser');
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '@_',
+    parseAttributeValue: true,
+  });
+
+  try {
+    const data =
+      typeof responseData === 'string'
+        ? responseData
+        : responseData?.data || JSON.stringify(responseData);
+    const result = parser.parse(data);
+    const properties = result['chkl:messages']?.['chkl:properties'];
+    const activated =
+      properties?.['@_activationExecuted'] === 'true' ||
+      properties?.['@_activationExecuted'] === true;
+    const checked =
+      properties?.['@_checkExecuted'] === 'true' ||
+      properties?.['@_checkExecuted'] === true;
+    const generated =
+      properties?.['@_generationExecuted'] === 'true' ||
+      properties?.['@_generationExecuted'] === true;
+    const messages: Array<{
+      type: string;
+      text: string;
+      line?: number;
+      column?: number;
+    }> = [];
+    const msgData = result['chkl:messages']?.msg;
+    if (msgData) {
+      const msgArray = Array.isArray(msgData) ? msgData : [msgData];
+      msgArray.forEach((msg: any) => {
+        messages.push({
+          type: msg['@_type'] || 'info',
+          text: msg.shortText?.txt || msg.shortText || 'Unknown message',
+          line: msg['@_line'],
+          column: msg['@_column'],
+        });
+      });
+    }
+    return {
+      activated,
+      checked,
+      generated,
+      messages,
+    };
+  } catch (error) {
+    return {
+      activated: false,
+      checked: false,
+      generated: false,
+      messages: [
+        {
+          type: 'error',
+          text: `Failed to parse activation response: ${error}`,
+        },
+      ],
+    };
+  }
 }

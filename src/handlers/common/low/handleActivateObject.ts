@@ -2,9 +2,13 @@
  * ActivateObject Handler - Universal ABAP Object Activation via ADT API
  */
 
-import { CrudClient, type ObjectReference } from '@mcp-abap-adt/adt-clients';
+import { AdtClient, type ObjectReference } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import {
+  parseActivationResponse,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ActivateObjectLow',
@@ -70,7 +74,7 @@ export async function handleActivateObject(
     }
 
     const preaudit = args.preaudit !== false; // default true
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     logger?.info(`Starting activation of ${args.objects.length} object(s)`);
 
@@ -84,13 +88,12 @@ export async function handleActivateObject(
         `Activating objects: ${activationObjects.map((o) => o.name).join(', ')}`,
       );
 
-      const response = await client.activateObjectsGroup(
-        activationObjects,
-        preaudit,
-      );
+      const response = await client
+        .getUtils()
+        .activateObjectsGroup(activationObjects, preaudit);
       logger?.debug(`Activation response status: ${response.status}`);
 
-      const activationResult = client.parseActivationResponse(response.data);
+      const activationResult = parseActivationResponse(response.data);
       const success = activationResult.activated && activationResult.checked;
 
       const result = {

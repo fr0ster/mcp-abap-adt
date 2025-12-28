@@ -1,11 +1,11 @@
 /**
  * DeleteStructure Handler - Delete ABAP Structure
  *
- * Uses CrudClient.deleteStructure from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.deleteStructure from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -42,7 +42,7 @@ interface DeleteStructureArgs {
 /**
  * Main handler for DeleteStructure MCP tool
  *
- * Uses CrudClient.deleteStructure - low-level single method call
+ * Uses AdtClient.deleteStructure - low-level single method call
  */
 export async function handleDeleteStructure(
   context: HandlerContext,
@@ -57,18 +57,18 @@ export async function handleDeleteStructure(
       return return_error(new Error('structure_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const structureName = structure_name.toUpperCase();
 
     logger?.info(`Starting structure deletion: ${structureName}`);
 
     try {
       // Delete structure
-      await client.deleteStructure({
+      const deleteState = await client.getStructure().delete({
         structureName: structureName,
         transportRequest: transport_request,
       });
-      const deleteResult = client.getDeleteResult();
+      const deleteResult = deleteState.deleteResult;
 
       if (!deleteResult) {
         throw new Error(

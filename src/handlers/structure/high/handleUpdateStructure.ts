@@ -7,7 +7,7 @@
  * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -109,15 +109,15 @@ export async function handleUpdateStructure(
 
     try {
       // Create client
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
 
       // Build operation chain: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
       // Note: No validation needed for update - structure must already exist
       const shouldActivate = activate !== false; // Default to true if not specified
+      let activateResponse: any | undefined;
 
       // Lock
-      await client.lockStructure({ structureName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client.getStructure().lock({ structureName });
 
       try {
         // Step 1: Check new code BEFORE update (with ddlCode and version='inactive')
@@ -128,7 +128,9 @@ export async function handleUpdateStructure(
         try {
           await safeCheckOperation(
             () =>
-              client.checkStructure({ structureName }, ddl_code, 'inactive'),
+              client
+                .getStructure()
+                .check({ structureName, ddlCode: ddl_code }, 'inactive'),
             structureName,
             {
               debug: (message: string) =>
@@ -168,10 +170,9 @@ export async function handleUpdateStructure(
           logger?.info(
             `[UpdateStructure] Updating structure with DDL code: ${structureName}`,
           );
-          await client.updateStructure(
-            { structureName, ddlCode: ddl_code },
-            lockHandle,
-          );
+          await client
+            .getStructure()
+            .update({ structureName, ddlCode: ddl_code }, { lockHandle });
           logger?.info(
             `[UpdateStructure] Structure source code updated: ${structureName}`,
           );
@@ -182,7 +183,7 @@ export async function handleUpdateStructure(
         }
 
         // Step 3: Unlock (MANDATORY after lock)
-        await client.unlockStructure({ structureName }, lockHandle);
+        await client.getStructure().unlock({ structureName }, lockHandle);
         logger?.info(`[UpdateStructure] Structure unlocked: ${structureName}`);
 
         // Step 4: Check inactive version (after unlock)
@@ -191,8 +192,7 @@ export async function handleUpdateStructure(
         );
         try {
           await safeCheckOperation(
-            () =>
-              client.checkStructure({ structureName }, undefined, 'inactive'),
+            () => client.getStructure().check({ structureName }, 'inactive'),
             structureName,
             {
               debug: (message: string) =>
@@ -224,15 +224,17 @@ export async function handleUpdateStructure(
 
         // Activate if requested
         if (shouldActivate) {
-          await client.activateStructure({ structureName });
+          const activateState = await client
+            .getStructure()
+            .activate({ structureName });
+          activateResponse = activateState.activateResult;
         }
       } catch (error) {
         // Try to unlock on error
         try {
-          await client.unlockStructure(
-            { structureName: structureName },
-            lockHandle,
-          );
+          await client
+            .getStructure()
+            .unlock({ structureName: structureName }, lockHandle);
         } catch (unlockError) {
           logger?.error('Failed to unlock structure after error:', unlockError);
         }
@@ -241,25 +243,24 @@ export async function handleUpdateStructure(
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];
-      if (shouldActivate && client.getActivateResult()) {
-        const activateResponse = client.getActivateResult()!;
-        if (
-          typeof activateResponse.data === 'string' &&
-          activateResponse.data.includes('<chkl:messages')
-        ) {
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const result = parser.parse(activateResponse.data);
-          const messages = result?.['chkl:messages']?.msg;
-          if (messages) {
-            const msgArray = Array.isArray(messages) ? messages : [messages];
-            activationWarnings = msgArray.map(
-              (msg: any) =>
-                `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-            );
-          }
+      if (
+        shouldActivate &&
+        activateResponse &&
+        typeof activateResponse.data === 'string' &&
+        activateResponse.data.includes('<chkl:messages')
+      ) {
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@_',
+        });
+        const result = parser.parse(activateResponse.data);
+        const messages = result?.['chkl:messages']?.msg;
+        if (messages) {
+          const msgArray = Array.isArray(messages) ? messages : [messages];
+          activationWarnings = msgArray.map(
+            (msg: any) =>
+              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
+          );
         }
       }
 

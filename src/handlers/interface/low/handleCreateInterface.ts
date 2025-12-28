@@ -1,11 +1,11 @@
 /**
  * CreateInterface Handler - Create ABAP Interface
  *
- * Uses CrudClient.createInterface from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.createInterface from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -75,7 +75,7 @@ interface CreateInterfaceArgs {
 /**
  * Main handler for CreateInterface MCP tool
  *
- * Uses CrudClient.createInterface - low-level single method call
+ * Uses AdtClient.createInterface - low-level single method call
  */
 export async function handleCreateInterface(
   context: HandlerContext,
@@ -99,7 +99,7 @@ export async function handleCreateInterface(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -112,13 +112,13 @@ export async function handleCreateInterface(
 
     try {
       // Create interface
-      await client.createInterface({
+      const createState = await client.getInterface().create({
         interfaceName,
         description,
         packageName: package_name,
         transportRequest: transport_request,
       });
-      const createResult = client.getCreateResult();
+      const createResult = createState.createResult;
 
       if (!createResult) {
         throw new Error(

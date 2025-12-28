@@ -36,7 +36,7 @@ Each test file follows this pattern:
 
 1. **Setup**: Load configuration, create connection, get session
 2. **Test Workflow**: Execute handler functions in sequence (GetSession → Validate → Create → Lock → Update → Unlock → Activate)
-3. **Cleanup**: Delete test objects, reset connection
+3. **Cleanup**: Delete test objects (runs in `afterEach` even if the test fails)
 
 ## Example Test Structure
 
@@ -128,7 +128,7 @@ describe('Class Low-Level Handlers Integration', () => {
   });
   
   afterAll(async () => {
-    // Cleanup: Delete test object
+    // Cleanup: Delete test object (manual tests only)
     if (sessionId && sessionState) {
       await handleDeleteClassLow({
         class_name: 'ZADT_TEST_CLASS_001',
@@ -199,7 +199,10 @@ Common helpers are available in `helpers/`:
 
 1. **Session Management**: Always use `session_id` and `session_state` from Lock response for Update and Unlock operations
 2. **Error Handling**: Always check `result.isError` before parsing response
-3. **Cleanup**: Always delete test objects in `afterAll` to avoid cluttering the system
+3. **Cleanup**:
+   - `LowTester`/`HighTester` run cleanup automatically in `afterEach` (even on failures), unless disabled via YAML (`skip_cleanup=true` or `cleanup_after=false`).
+   - For manual tests (no tester wrappers), delete objects explicitly in `afterAll`/`finally`.
+   - If a test creates **multiple objects** (e.g., domain + data element + structure), add extra cleanup steps for the additional objects.
 4. **Timeouts**: Use appropriate timeouts for long-running operations
 5. **Delays**: Add delays between operations to allow SAP to process changes
 

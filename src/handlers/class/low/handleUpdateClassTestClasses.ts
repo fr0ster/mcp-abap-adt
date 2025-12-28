@@ -1,11 +1,11 @@
 /**
  * UpdateClassTestClasses Handler - Update ABAP Unit test include for a class
  *
- * Uses CrudClient.updateClassTestIncludes from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.updateClassTestIncludes from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -87,7 +87,7 @@ export async function handleUpdateClassTestClasses(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -98,14 +98,14 @@ export async function handleUpdateClassTestClasses(
     logger?.info(`Starting test classes update for: ${className}`);
 
     try {
-      await client.updateClassTestIncludes(
+      const updateState = await client.getLocalTestClass().update(
         {
           className,
           testClassCode: test_class_source,
         },
-        lock_handle,
+        { lockHandle: lock_handle },
       );
-      const updateResult = client.getTestClassUpdateResult();
+      const updateResult = updateState.updateResult;
 
       logger?.info(`✅ UpdateClassTestClasses completed: ${className}`);
 

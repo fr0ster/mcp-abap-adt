@@ -5,7 +5,7 @@
  * Requires function group name.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -104,19 +104,21 @@ export async function handleValidateFunctionModule(
     );
 
     try {
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
 
-      await client.validateFunctionModule({
+      const validationState = await client.getFunctionModule().validate({
         functionModuleName: functionModuleName,
         functionGroupName: functionGroupName,
         packageName: undefined,
         description: description,
       });
-      const validationResponse = client.getValidationResponse();
+      const validationResponse = validationState.validationResponse;
       if (!validationResponse) {
         throw new Error('Validation did not return a result');
       }
-      const result = parseValidationResponse(validationResponse);
+      const result = parseValidationResponse(
+        validationResponse as AxiosResponse,
+      );
       if (!result) {
         throw new Error('Validation did not return a result');
       }

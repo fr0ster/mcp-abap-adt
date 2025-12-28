@@ -11,16 +11,21 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { AuthBroker } from '@mcp-abap-adt/auth-broker';
-import { BtpTokenProvider } from '@mcp-abap-adt/auth-providers';
+import { AuthorizationCodeProvider } from '@mcp-abap-adt/auth-providers';
 import {
   type AbapConnection,
   createAbapConnection,
   type SapConfig,
 } from '@mcp-abap-adt/connection';
 import type { IServiceKeyStore, ISessionStore } from '@mcp-abap-adt/interfaces';
-import { defaultLogger } from '@mcp-abap-adt/logger';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { getPlatformStoresAsync } from '../../../lib/stores';
+import {
+  createBrokerLogger,
+  createConnectionLogger,
+  createProviderLogger,
+  createStoreLogger,
+} from './authHelpers';
 import {
   getSapConfigFromEnv,
   loadTestConfig,
@@ -30,6 +35,35 @@ import { createTestLogger } from './loggerHelpers';
 import { extractSessionState } from './testHelpers';
 
 const sessionLogger = createTestLogger('connection');
+
+function wrapLegacyTokenProvider(
+  provider: AuthorizationCodeProvider,
+): AuthorizationCodeProvider & {
+  getConnectionConfig: (
+    _authConfig: unknown,
+    _options?: unknown,
+  ) => Promise<{
+    connectionConfig: { authorizationToken?: string };
+    refreshToken?: string;
+  }>;
+} {
+  if (typeof (provider as any).getConnectionConfig === 'function') {
+    return provider as any;
+  }
+
+  return {
+    getTokens: provider.getTokens.bind(provider),
+    getConnectionConfig: async () => {
+      const tokenResult = await provider.getTokens();
+      return {
+        connectionConfig: {
+          authorizationToken: tokenResult.authorizationToken,
+        },
+        refreshToken: tokenResult.refreshToken,
+      };
+    },
+  } as any;
+}
 
 export interface SessionInfo {
   session_id: string;
@@ -76,6 +110,9 @@ async function createConnectionViaBroker(
     let serviceKeyStore: IServiceKeyStore;
     let storeType: 'abap' | 'btp';
 
+    // Create loggers based on environment variables
+    const storeLogger = createStoreLogger();
+
     // If no destination but .env file exists, create SessionStore from .env file directory
     // (same logic as index.ts lines 1128-1147)
     if (!actualDestination && envFilePath) {
@@ -84,6 +121,7 @@ async function createConnectionViaBroker(
         envFileDir,
         useUnsafe,
         'default',
+        storeLogger,
       );
       serviceKeyStore = stores.serviceKeyStore;
       sessionStore = stores.sessionStore;
@@ -102,6 +140,7 @@ async function createConnectionViaBroker(
         undefined,
         useUnsafe,
         actualDestination,
+        storeLogger,
       );
       serviceKeyStore = stores.serviceKeyStore;
       sessionStore = stores.sessionStore;
@@ -110,7 +149,33 @@ async function createConnectionViaBroker(
       return null;
     }
 
-    const tokenProvider = new BtpTokenProvider();
+    const brokerDestination = actualDestination || 'default';
+    const authConfig =
+      (await sessionStore.getAuthorizationConfig(brokerDestination)) ||
+      (await serviceKeyStore.getAuthorizationConfig(brokerDestination));
+    if (!authConfig) {
+      throw new Error(
+        `Missing authorization config for destination "${brokerDestination}".`,
+      );
+    }
+    const sessionConnConfig =
+      await sessionStore.getConnectionConfig(brokerDestination);
+
+    // Create loggers based on environment variables (storeLogger already created above)
+    const providerLogger = createProviderLogger();
+    const brokerLogger = createBrokerLogger();
+
+    const tokenProvider = wrapLegacyTokenProvider(
+      new AuthorizationCodeProvider({
+        uaaUrl: authConfig.uaaUrl,
+        clientId: authConfig.uaaClientId,
+        clientSecret: authConfig.uaaClientSecret,
+        refreshToken: authConfig.refreshToken,
+        accessToken: sessionConnConfig?.authorizationToken,
+        browser: 'system',
+        logger: providerLogger,
+      }),
+    );
     const authBroker = new AuthBroker(
       {
         serviceKeyStore,
@@ -118,11 +183,10 @@ async function createConnectionViaBroker(
         tokenProvider,
       },
       'system',
-      defaultLogger,
+      brokerLogger,
     );
 
     // Try to get connection config and token from broker
-    const brokerDestination = actualDestination || 'default';
     const connConfig = await authBroker.getConnectionConfig(brokerDestination);
     if (connConfig?.serviceUrl) {
       const jwtToken = await authBroker.getToken(brokerDestination);
@@ -137,14 +201,15 @@ async function createConnectionViaBroker(
           url: config.url,
           authType: config.authType,
         });
-        const connectionLogger = {
-          debug: sessionLogger?.debug,
-          info: sessionLogger?.info,
-          warn: sessionLogger?.warn,
-          error: sessionLogger?.error,
-          csrfToken: sessionLogger?.debug,
-        };
-        return createAbapConnection(config, connectionLogger);
+        // Only pass connection logger if DEBUG_CONNECTION is set
+        const connectionLogger = createConnectionLogger();
+        const connectionLoggerWithCsrf = connectionLogger
+          ? {
+              ...connectionLogger,
+              csrfToken: connectionLogger.debug,
+            }
+          : undefined;
+        return createAbapConnection(config, connectionLoggerWithCsrf);
       }
     }
   } catch (error: any) {
@@ -212,17 +277,17 @@ export async function createTestConnectionAndSession(): Promise<{
       );
       const config = getSapConfigFromEnv();
 
-      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
-      const connectionLogger = {
-        debug: sessionLogger?.debug,
-        info: sessionLogger?.info,
-        warn: sessionLogger?.warn,
-        error: sessionLogger?.error,
-        csrfToken: sessionLogger?.debug,
-      };
+      // Only pass connection logger if DEBUG_CONNECTION is set
+      const connectionLogger = createConnectionLogger();
+      const connectionLoggerWithCsrf = connectionLogger
+        ? {
+            ...connectionLogger,
+            csrfToken: connectionLogger.debug,
+          }
+        : undefined;
 
       // Create connection directly (fallback when AuthBroker is not available)
-      connection = createAbapConnection(config, connectionLogger);
+      connection = createAbapConnection(config, connectionLoggerWithCsrf);
     }
 
     // Log token info from connection (what's actually used in session)

@@ -1,11 +1,11 @@
 /**
  * UpdatePackage Handler - Update ABAP Package Description
  *
- * Uses CrudClient.updatePackage from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.updatePackage from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -81,7 +81,7 @@ interface UpdatePackageArgs {
 /**
  * Main handler for UpdatePackage MCP tool
  *
- * Uses CrudClient.updatePackage - low-level single method call
+ * Uses AdtClient.updatePackage - low-level single method call
  */
 export async function handleUpdatePackage(
   context: HandlerContext,
@@ -112,7 +112,7 @@ export async function handleUpdatePackage(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -130,15 +130,15 @@ export async function handleUpdatePackage(
 
     try {
       // Update package description
-      await client.updatePackage(
+      const updateState = await client.getPackage().update(
         {
           packageName,
           superPackage,
           updatedDescription: updated_description,
         },
-        lock_handle,
+        { lockHandle: lock_handle },
       );
-      const updateResult = client.getUpdateResult();
+      const updateResult = updateState.updateResult;
 
       if (!updateResult) {
         throw new Error(

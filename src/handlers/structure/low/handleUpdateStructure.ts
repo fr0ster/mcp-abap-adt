@@ -1,11 +1,11 @@
 /**
  * UpdateStructure Handler - Update ABAP Structure DDL Source
  *
- * Uses CrudClient.updateStructure from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.updateStructure from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -70,7 +70,7 @@ interface UpdateStructureArgs {
 /**
  * Main handler for UpdateStructure MCP tool
  *
- * Uses CrudClient.updateStructure - low-level single method call
+ * Uses AdtClient.updateStructure - low-level single method call
  */
 export async function handleUpdateStructure(
   context: HandlerContext,
@@ -88,7 +88,7 @@ export async function handleUpdateStructure(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -103,11 +103,13 @@ export async function handleUpdateStructure(
 
     try {
       // Update structure with DDL code
-      await client.updateStructure(
-        { structureName: structureName, ddlCode: ddl_code },
-        lock_handle,
-      );
-      const updateResult = client.getUpdateResult();
+      const updateState = await client
+        .getStructure()
+        .update(
+          { structureName: structureName, ddlCode: ddl_code },
+          { lockHandle: lock_handle },
+        );
+      const updateResult = updateState.updateResult;
 
       if (!updateResult) {
         throw new Error(

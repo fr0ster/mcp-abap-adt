@@ -1,12 +1,11 @@
 /**
  * LockBehaviorImplementation Handler - Lock ABAP Behavior Implementation Class
  *
- * Uses CrudClient.lockClass from @mcp-abap-adt/adt-clients (BehaviorImplementation extends ClassBuilder).
+ * Uses AdtClient.lockClass from @mcp-abap-adt/adt-clients (BehaviorImplementation extends ClassBuilder).
  * Low-level handler: single method call.
  */
 
-import type { ClassBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -60,7 +59,7 @@ interface LockBehaviorImplementationArgs {
 /**
  * Main handler for LockBehaviorImplementation MCP tool
  *
- * Uses CrudClient.lockClass - BehaviorImplementation extends ClassBuilder
+ * Uses AdtClient.lockClass - BehaviorImplementation extends ClassBuilder
  */
 export async function handleLockBehaviorImplementation(
   context: HandlerContext,
@@ -76,7 +75,7 @@ export async function handleLockBehaviorImplementation(
       return return_error(new Error('class_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -91,9 +90,7 @@ export async function handleLockBehaviorImplementation(
 
     try {
       // Lock class (BehaviorImplementation extends ClassBuilder)
-      const lockConfig: Pick<ClassBuilderConfig, 'className'> = { className };
-      await client.lockClass(lockConfig);
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client.getClass().lock({ className });
 
       if (!lockHandle) {
         throw new Error(

@@ -618,7 +618,7 @@ class AbapSystemSymbolResolver {
           },
         };
       }
-      const functionData = contentItem.json;
+      const functionData = contentItem.json as Record<string, any> | undefined;
       return {
         ...symbol,
         systemInfo: {

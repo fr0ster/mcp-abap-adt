@@ -7,7 +7,7 @@
  * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -107,15 +107,15 @@ export async function handleUpdateTable(
 
     try {
       // Create client
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
 
       // Build operation chain: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
       // Note: No validation needed for update - table must already exist
       const shouldActivate = activate !== false; // Default to true if not specified
+      let activateResponse: any | undefined;
 
       // Lock
-      await client.lockTable({ tableName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client.getTable().lock({ tableName });
 
       try {
         // Step 1: Check new code BEFORE update (with ddlCode and version='inactive')
@@ -125,7 +125,10 @@ export async function handleUpdateTable(
         let checkNewCodePassed = false;
         try {
           await safeCheckOperation(
-            () => client.checkTable({ tableName }, ddl_code, 'inactive'),
+            () =>
+              client
+                .getTable()
+                .check({ tableName, ddlCode: ddl_code }, 'inactive'),
             tableName,
             {
               debug: (message: string) =>
@@ -160,13 +163,13 @@ export async function handleUpdateTable(
           logger?.info(
             `[UpdateTable] Updating table with DDL code: ${tableName}`,
           );
-          await client.updateTable(
+          await client.getTable().update(
             {
               tableName,
               ddlCode: ddl_code,
               transportRequest: transport_request,
             },
-            lockHandle,
+            { lockHandle },
           );
           logger?.info(`[UpdateTable] Table source code updated: ${tableName}`);
         } else {
@@ -176,14 +179,14 @@ export async function handleUpdateTable(
         }
 
         // Step 3: Unlock (MANDATORY after lock)
-        await client.unlockTable({ tableName }, lockHandle);
+        await client.getTable().unlock({ tableName }, lockHandle);
         logger?.info(`[UpdateTable] Table unlocked: ${tableName}`);
 
         // Step 4: Check inactive version (after unlock)
         logger?.info(`[UpdateTable] Checking inactive version: ${tableName}`);
         try {
           await safeCheckOperation(
-            () => client.checkTable({ tableName }, undefined, 'inactive'),
+            () => client.getTable().check({ tableName }, 'inactive'),
             tableName,
             {
               debug: (message: string) =>
@@ -215,12 +218,13 @@ export async function handleUpdateTable(
 
         // Activate if requested
         if (shouldActivate) {
-          await client.activateTable({ tableName });
+          const activateState = await client.getTable().activate({ tableName });
+          activateResponse = activateState.activateResult;
         }
       } catch (error) {
         // Try to unlock on error
         try {
-          await client.unlockTable({ tableName: tableName }, lockHandle);
+          await client.getTable().unlock({ tableName: tableName }, lockHandle);
         } catch (unlockError) {
           logger?.error('Failed to unlock table after error:', unlockError);
         }
@@ -229,25 +233,24 @@ export async function handleUpdateTable(
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];
-      if (shouldActivate && client.getActivateResult()) {
-        const activateResponse = client.getActivateResult()!;
-        if (
-          typeof activateResponse.data === 'string' &&
-          activateResponse.data.includes('<chkl:messages')
-        ) {
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const result = parser.parse(activateResponse.data);
-          const messages = result?.['chkl:messages']?.msg;
-          if (messages) {
-            const msgArray = Array.isArray(messages) ? messages : [messages];
-            activationWarnings = msgArray.map(
-              (msg: any) =>
-                `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-            );
-          }
+      if (
+        shouldActivate &&
+        activateResponse &&
+        typeof activateResponse.data === 'string' &&
+        activateResponse.data.includes('<chkl:messages')
+      ) {
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@_',
+        });
+        const result = parser.parse(activateResponse.data);
+        const messages = result?.['chkl:messages']?.msg;
+        if (messages) {
+          const msgArray = Array.isArray(messages) ? messages : [messages];
+          activationWarnings = msgArray.map(
+            (msg: any) =>
+              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
+          );
         }
       }
 

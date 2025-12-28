@@ -10,7 +10,7 @@ import { writeResultToFile } from '../../../lib/writeResultToFile';
 
 // TODO: Migrate to infrastructure module
 // This handler uses getPackageContents() from @mcp-abap-adt/adt-clients/src/core/package/read.ts
-// ReadOnlyClient.readPackage() doesn't return package contents
+// AdtClient.getPackage().read() doesn't return package contents
 // Need infrastructure module with method that returns parsed package contents
 
 export const TOOL_DEFINITION = {

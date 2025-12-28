@@ -1,14 +1,15 @@
 /**
  * ActivateStructure Handler - Activate ABAP Structure
  *
- * Uses CrudClient.activateStructure from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.activateStructure from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
+  parseActivationResponse,
   restoreSessionInConnection,
   return_error,
   return_response,
@@ -58,7 +59,7 @@ interface ActivateStructureArgs {
 /**
  * Main handler for ActivateStructure MCP tool
  *
- * Uses CrudClient.activateStructure - low-level single method call
+ * Uses AdtClient.activateStructure - low-level single method call
  */
 export async function handleActivateStructure(
   context: HandlerContext,
@@ -74,7 +75,7 @@ export async function handleActivateStructure(
       return return_error(new Error('structure_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -89,8 +90,10 @@ export async function handleActivateStructure(
 
     try {
       // Activate structure
-      await client.activateStructure({ structureName: structureName });
-      const response = client.getActivateResult();
+      const activateState = await client
+        .getStructure()
+        .activate({ structureName: structureName });
+      const response = activateState.activateResult;
 
       if (!response) {
         throw new Error(
@@ -99,7 +102,7 @@ export async function handleActivateStructure(
       }
 
       // Parse activation response
-      const activationResult = client.parseActivationResponse(response.data);
+      const activationResult = parseActivationResponse(response.data);
       const success = activationResult.activated && activationResult.checked;
 
       // Get updated session state after activation

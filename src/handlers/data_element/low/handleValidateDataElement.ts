@@ -1,11 +1,11 @@
 /**
  * ValidateDataElement Handler - Validate ABAP DataElement Name
  *
- * Uses CrudClient.validateDataElement from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.validateDataElement from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -70,7 +70,7 @@ interface ValidateDataElementArgs {
 /**
  * Main handler for ValidateDataElement MCP tool
  *
- * Uses CrudClient.validateDataElement - low-level single method call
+ * Uses AdtClient.validateDataElement - low-level single method call
  */
 export async function handleValidateDataElement(
   context: HandlerContext,
@@ -95,7 +95,7 @@ export async function handleValidateDataElement(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -111,12 +111,12 @@ export async function handleValidateDataElement(
       // Validate data element
       let validationResponse: unknown;
       try {
-        await client.validateDataElement({
+        const validationState = await client.getDataElement().validate({
           dataElementName: dataElementName,
           packageName: package_name.toUpperCase(),
           description: description,
         });
-        validationResponse = client.getValidationResponse();
+        validationResponse = validationState.validationResponse;
       } catch (validateError: any) {
         // If validation throws an error with response, use it
         if (validateError.response) {

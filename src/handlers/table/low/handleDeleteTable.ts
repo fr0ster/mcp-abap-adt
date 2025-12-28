@@ -1,11 +1,11 @@
 /**
  * DeleteTable Handler - Delete ABAP Table
  *
- * Uses CrudClient.deleteTable from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.deleteTable from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -42,7 +42,7 @@ interface DeleteTableArgs {
 /**
  * Main handler for DeleteTable MCP tool
  *
- * Uses CrudClient.deleteTable - low-level single method call
+ * Uses AdtClient.deleteTable - low-level single method call
  */
 export async function handleDeleteTable(
   context: HandlerContext,
@@ -57,7 +57,7 @@ export async function handleDeleteTable(
       return return_error(new Error('table_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     const tableName = table_name.toUpperCase();
 
@@ -65,11 +65,11 @@ export async function handleDeleteTable(
 
     try {
       // Delete table
-      await client.deleteTable({
+      const deleteState = await client.getTable().delete({
         tableName: tableName,
         transportRequest: transport_request,
       });
-      const deleteResult = client.getDeleteResult();
+      const deleteResult = deleteState.deleteResult;
 
       if (!deleteResult) {
         throw new Error(

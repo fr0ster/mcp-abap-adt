@@ -1,11 +1,11 @@
 /**
  * LockFunctionGroup Handler - Lock ABAP FunctionGroup
  *
- * Uses CrudClient.lockFunctionGroup from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.lockFunctionGroup from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -58,7 +58,7 @@ interface LockFunctionGroupArgs {
 /**
  * Main handler for LockFunctionGroup MCP tool
  *
- * Uses CrudClient.lockFunctionGroup - low-level single method call
+ * Uses AdtClient.lockFunctionGroup - low-level single method call
  */
 export async function handleLockFunctionGroup(
   context: HandlerContext,
@@ -74,7 +74,7 @@ export async function handleLockFunctionGroup(
       return return_error(new Error('function_group_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -89,8 +89,9 @@ export async function handleLockFunctionGroup(
 
     try {
       // Lock function group
-      await client.lockFunctionGroup({ functionGroupName: functionGroupName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client
+        .getFunctionGroup()
+        .lock({ functionGroupName: functionGroupName });
 
       if (!lockHandle) {
         throw new Error(

@@ -1,12 +1,12 @@
 /**
  * CreateTable Handler - Create ABAP Table
  *
- * Uses CrudClient.createTable from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.createTable from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import type { TableBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { ITableConfig } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -58,7 +58,7 @@ export const TOOL_DEFINITION = {
 
 interface CreateTableArgs
   extends Pick<
-    TableBuilderConfig,
+    ITableConfig,
     'tableName' | 'packageName' | 'transportRequest' | 'description'
   > {
   table_name: string;
@@ -78,7 +78,7 @@ interface CreateTableArgs
 /**
  * Main handler for CreateTable MCP tool
  *
- * Uses CrudClient.createTable - low-level single method call
+ * Uses AdtClient.createTable - low-level single method call
  */
 export async function handleCreateTable(
   context: HandlerContext,
@@ -101,7 +101,7 @@ export async function handleCreateTable(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -116,14 +116,14 @@ export async function handleCreateTable(
 
     try {
       // Create table
-      await client.createTable({
+      const createState = await client.getTable().create({
         tableName,
         packageName: package_name,
         description: '',
         ddlCode: '',
         transportRequest: transport_request,
       });
-      const createResult = client.getCreateResult();
+      const createResult = createState.createResult;
 
       if (!createResult) {
         throw new Error(

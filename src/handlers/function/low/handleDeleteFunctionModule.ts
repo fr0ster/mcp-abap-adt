@@ -1,11 +1,11 @@
 /**
  * DeleteFunctionModule Handler - Delete ABAP Function Module
  *
- * Uses CrudClient.deleteFunctionModule from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.deleteFunctionModule from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -47,7 +47,7 @@ interface DeleteFunctionModuleArgs {
 /**
  * Main handler for DeleteFunctionModule MCP tool
  *
- * Uses CrudClient.deleteFunctionModule - low-level single method call
+ * Uses AdtClient.deleteFunctionModule - low-level single method call
  */
 export async function handleDeleteFunctionModule(
   context: HandlerContext,
@@ -65,7 +65,7 @@ export async function handleDeleteFunctionModule(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
     logger?.info(
@@ -74,12 +74,12 @@ export async function handleDeleteFunctionModule(
 
     try {
       // Delete function module
-      await client.deleteFunctionModule({
+      const deleteState = await client.getFunctionModule().delete({
         functionModuleName: functionModuleName,
         functionGroupName: functionGroupName,
         transportRequest: transport_request,
       });
-      const deleteResult = client.getDeleteResult();
+      const deleteResult = deleteState.deleteResult;
 
       if (!deleteResult) {
         throw new Error(

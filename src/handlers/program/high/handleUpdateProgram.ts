@@ -4,7 +4,7 @@
  * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -94,13 +94,14 @@ export async function handleUpdateProgram(
   }
 
   try {
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const shouldActivate = args.activate === true; // Default to false if not specified
+    let lockHandle: string | undefined;
+    let activateResponse: any | undefined;
 
     // Lock
     logger?.debug(`Locking program: ${programName}`);
-    await client.lockProgram({ programName });
-    const lockHandle = client.getLockHandle();
+    lockHandle = await client.getProgram().lock({ programName });
     logger?.debug(
       `Program locked: ${programName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
     );
@@ -112,7 +113,9 @@ export async function handleUpdateProgram(
       try {
         await safeCheckOperation(
           () =>
-            client.checkProgram({ programName }, 'inactive', args.source_code),
+            client
+              .getProgram()
+              .check({ programName, sourceCode: args.source_code }, 'inactive'),
           programName,
           {
             debug: (message: string) => logger?.debug(message),
@@ -139,10 +142,12 @@ export async function handleUpdateProgram(
       // Update (only if check passed)
       if (checkNewCodePassed) {
         logger?.debug(`Updating program source code: ${programName}`);
-        await client.updateProgram(
-          { programName, sourceCode: args.source_code },
-          lockHandle,
-        );
+        await client
+          .getProgram()
+          .update(
+            { programName, sourceCode: args.source_code },
+            { lockHandle },
+          );
         logger?.info(`Program source code updated: ${programName}`);
       } else {
         logger?.warn(`Skipping update - new code check failed: ${programName}`);
@@ -150,14 +155,14 @@ export async function handleUpdateProgram(
 
       // Unlock (MANDATORY)
       logger?.debug(`Unlocking program: ${programName}`);
-      await client.unlockProgram({ programName }, lockHandle);
+      await client.getProgram().unlock({ programName }, lockHandle);
       logger?.info(`Program unlocked: ${programName}`);
 
       // Check inactive version (after unlock)
       logger?.debug(`Checking inactive version: ${programName}`);
       try {
         await safeCheckOperation(
-          () => client.checkProgram({ programName }, 'inactive'),
+          () => client.getProgram().check({ programName }, 'inactive'),
           programName,
           {
             debug: (message: string) => logger?.debug(message),
@@ -180,7 +185,10 @@ export async function handleUpdateProgram(
       if (shouldActivate) {
         logger?.debug(`Activating program: ${programName}`);
         try {
-          await client.activateProgram({ programName });
+          const activateState = await client.getProgram().activate({
+            programName,
+          });
+          activateResponse = activateState.activateResult;
           logger?.info(`Program activated: ${programName}`);
         } catch (activationError: any) {
           logger?.error(
@@ -196,25 +204,24 @@ export async function handleUpdateProgram(
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];
-      if (shouldActivate && client.getActivateResult()) {
-        const activateResponse = client.getActivateResult()!;
-        if (
-          typeof activateResponse.data === 'string' &&
-          activateResponse.data.includes('<chkl:messages')
-        ) {
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const result = parser.parse(activateResponse.data);
-          const messages = result?.['chkl:messages']?.msg;
-          if (messages) {
-            const msgArray = Array.isArray(messages) ? messages : [messages];
-            activationWarnings = msgArray.map(
-              (msg: any) =>
-                `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-            );
-          }
+      if (
+        shouldActivate &&
+        activateResponse &&
+        typeof activateResponse.data === 'string' &&
+        activateResponse.data.includes('<chkl:messages')
+      ) {
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@_',
+        });
+        const result = parser.parse(activateResponse.data);
+        const messages = result?.['chkl:messages']?.msg;
+        if (messages) {
+          const msgArray = Array.isArray(messages) ? messages : [messages];
+          activationWarnings = msgArray.map(
+            (msg: any) =>
+              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
+          );
         }
       }
 
@@ -252,12 +259,11 @@ export async function handleUpdateProgram(
     } catch (workflowError: any) {
       // On error, ensure we attempt unlock
       try {
-        const lockHandle = client.getLockHandle();
         if (lockHandle) {
           logger?.warn(
             `Attempting unlock after error for program ${programName}`,
           );
-          await client.unlockProgram({ programName }, lockHandle);
+          await client.getProgram().unlock({ programName }, lockHandle);
           logger?.warn(`Unlocked program after error: ${programName}`);
         }
       } catch (unlockError: any) {

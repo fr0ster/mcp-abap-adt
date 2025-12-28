@@ -7,7 +7,7 @@
  * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -149,23 +149,23 @@ export async function handleCreateInterface(
           typedArgs.description || interfaceName,
         );
 
-      // Create CrudClient
-      const client = new CrudClient(connection);
+      // Create AdtClient
+      const client = new AdtClient(connection);
       const description = typedArgs.description || interfaceName;
       const packageName = typedArgs.package_name;
       const transportRequest = typedArgs.transport_request || '';
       const shouldActivate = typedArgs.activate !== false;
+      let activateResponse: any | undefined;
 
       // Execute the workflow
       try {
-        await client.createInterface({
+        await client.getInterface().create({
           interfaceName,
           description,
           packageName,
           transportRequest,
         });
-        await client.lockInterface({ interfaceName });
-        const lockHandle = client.getLockHandle();
+        const lockHandle = await client.getInterface().lock({ interfaceName });
 
         try {
           // Step 1: Check new code BEFORE update (with sourceCode and version='inactive')
@@ -176,11 +176,9 @@ export async function handleCreateInterface(
           try {
             await safeCheckOperation(
               () =>
-                client.checkInterface(
-                  { interfaceName },
-                  sourceCode,
-                  'inactive',
-                ),
+                client
+                  .getInterface()
+                  .check({ interfaceName, sourceCode }, 'inactive'),
               interfaceName,
               {
                 debug: (message: string) =>
@@ -214,10 +212,9 @@ export async function handleCreateInterface(
             logger?.info(
               `[CreateInterface] Updating interface source code: ${interfaceName}`,
             );
-            await client.updateInterface(
-              { interfaceName, sourceCode },
-              lockHandle,
-            );
+            await client
+              .getInterface()
+              .update({ interfaceName, sourceCode }, { lockHandle });
             logger?.info(
               `[CreateInterface] Interface source code updated: ${interfaceName}`,
             );
@@ -228,7 +225,7 @@ export async function handleCreateInterface(
           }
 
           // Step 3: Unlock (MANDATORY after lock)
-          await client.unlockInterface({ interfaceName }, lockHandle);
+          await client.getInterface().unlock({ interfaceName }, lockHandle);
           logger?.info(
             `[CreateInterface] Interface unlocked: ${interfaceName}`,
           );
@@ -239,8 +236,7 @@ export async function handleCreateInterface(
           );
           try {
             await safeCheckOperation(
-              () =>
-                client.checkInterface({ interfaceName }, undefined, 'inactive'),
+              () => client.getInterface().check({ interfaceName }, 'inactive'),
               interfaceName,
               {
                 debug: (message: string) =>
@@ -266,12 +262,15 @@ export async function handleCreateInterface(
 
           // Step 5: Activate
           if (shouldActivate) {
-            await client.activateInterface({ interfaceName });
+            const activateState = await client
+              .getInterface()
+              .activate({ interfaceName });
+            activateResponse = activateState.activateResult;
           }
         } catch (error) {
           // Unlock on error (principle 1: if lock was done, unlock is mandatory)
           try {
-            await client.unlockInterface({ interfaceName }, lockHandle);
+            await client.getInterface().unlock({ interfaceName }, lockHandle);
           } catch (unlockError) {
             logger?.error(
               `Failed to unlock interface after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
@@ -289,25 +288,24 @@ export async function handleCreateInterface(
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];
-      if (shouldActivate && client.getActivateResult()) {
-        const activateResponse = client.getActivateResult()!;
-        if (
-          typeof activateResponse.data === 'string' &&
-          activateResponse.data.includes('<chkl:messages')
-        ) {
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const result = parser.parse(activateResponse.data);
-          const messages = result?.['chkl:messages']?.msg;
-          if (messages) {
-            const msgArray = Array.isArray(messages) ? messages : [messages];
-            activationWarnings = msgArray.map(
-              (msg: any) =>
-                `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-            );
-          }
+      if (
+        shouldActivate &&
+        activateResponse &&
+        typeof activateResponse.data === 'string' &&
+        activateResponse.data.includes('<chkl:messages')
+      ) {
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@_',
+        });
+        const result = parser.parse(activateResponse.data);
+        const messages = result?.['chkl:messages']?.msg;
+        if (messages) {
+          const msgArray = Array.isArray(messages) ? messages : [messages];
+          activationWarnings = msgArray.map(
+            (msg: any) =>
+              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
+          );
         }
       }
 

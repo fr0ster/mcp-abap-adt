@@ -7,7 +7,7 @@
  * Workflow: validate -> create -> lock -> check (inactive version) -> unlock -> (activate)
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -213,18 +213,18 @@ export async function handleCreateStructure(
 
     try {
       // Create client
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
       const shouldActivate = createStructureArgs.activate !== false; // Default to true if not specified
 
       // Validate
-      await client.validateStructure({
+      await client.getStructure().validate({
         structureName,
         packageName: createStructureArgs.package_name,
         description: createStructureArgs.description || structureName,
       });
 
       // Create
-      await client.createStructure({
+      await client.getStructure().create({
         structureName,
         description: createStructureArgs.description || structureName,
         packageName: createStructureArgs.package_name,
@@ -233,16 +233,15 @@ export async function handleCreateStructure(
       });
 
       // Lock
-      await client.lockStructure({ structureName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client.getStructure().lock({ structureName });
 
       try {
         // Note: StructureBuilder internally generates DDL from fields/includes
         // For now, skip update as structure creation already includes field definitions
-        // TODO: Implement DDL generation or enhance CrudClient to accept fields directly
+        // TODO: Implement DDL generation or enhance AdtClient to accept fields directly
 
         // Unlock (MANDATORY after lock)
-        await client.unlockStructure({ structureName }, lockHandle);
+        await client.getStructure().unlock({ structureName }, lockHandle);
         logger?.info(`[CreateStructure] Structure unlocked: ${structureName}`);
 
         // Check inactive version (after unlock)
@@ -251,8 +250,7 @@ export async function handleCreateStructure(
         );
         try {
           await safeCheckOperation(
-            () =>
-              client.checkStructure({ structureName }, undefined, 'inactive'),
+            () => client.getStructure().check({ structureName }, 'inactive'),
             structureName,
             {
               debug: (message: string) =>
@@ -284,12 +282,12 @@ export async function handleCreateStructure(
 
         // Activate
         if (shouldActivate) {
-          await client.activateStructure({ structureName });
+          await client.getStructure().activate({ structureName });
         }
       } catch (error) {
         // Unlock on error (principle 1: if lock was done, unlock is mandatory)
         try {
-          await client.unlockStructure({ structureName }, lockHandle);
+          await client.getStructure().unlock({ structureName }, lockHandle);
         } catch (unlockError) {
           logger?.error('Failed to unlock structure after error:', unlockError);
         }

@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [1.2.8] - 2025-12-28
+### Changed
+- Test cleanup documentation updated to clarify `afterEach` behavior and multi-object cleanup requirements.
+- Test runners (`LowTester`/`HighTester`) now emit step-level flow logs for validate/create/lock/update/unlock/activate.
+- Package cleanup can use a fresh connection with optional `connection_config` for locked session cases.
+
+### Fixed
+- Package create now treats ADT "import" 404 as success when the package is readable.
+- Function group/module low-level create handles transient 400/empty responses with read verification.
+- Table create now validates and creates with explicit descriptions to satisfy ADT requirements.
+- Package low-level tests avoid double-unlock during cleanup.
+
+## [1.2.7] - 2025-12-27
+### Changed
+- GetPackageTree now builds the tree from node-structure traversal to preserve package/subpackage hierarchy and ordering.
+- Package tree nodes now include `adtType`, normalized `type`, `codeFormat`, and `restoreStatus` for parity with backup tooling.
+- Migrated handler usage to `AdtClient` now that `CrudClient`/`ReadOnlyClient` are removed in `@mcp-abap-adt/adt-clients`.
+
+### Fixed
+- Updated handler typings to match `@mcp-abap-adt/adt-clients@0.3.2` (I* config/state interfaces).
+- SearchObject now uses `AdtUtils.searchObjects` instead of the removed `SharedBuilder` export.
+- Restored `encodeSapObjectName` helper in `utils` to avoid relying on unstable client exports.
+
 ## [1.2.6] - 2025-12-23
 ### Fixed
 - Fixed LICENSE file - corrected copyright attribution (removed incorrect fork author)

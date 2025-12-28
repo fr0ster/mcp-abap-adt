@@ -1,14 +1,15 @@
 /**
  * ActivateDataElement Handler - Activate ABAP Data Element
  *
- * Uses CrudClient.activateDataElement from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.activateDataElement from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
+  parseActivationResponse,
   restoreSessionInConnection,
   return_error,
   return_response,
@@ -58,7 +59,7 @@ interface ActivateDataElementArgs {
 /**
  * Main handler for ActivateDataElement MCP tool
  *
- * Uses CrudClient.activateDataElement - low-level single method call
+ * Uses AdtClient.activateDataElement - low-level single method call
  */
 export async function handleActivateDataElement(
   context: HandlerContext,
@@ -74,7 +75,7 @@ export async function handleActivateDataElement(
       return return_error(new Error('data_element_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -89,8 +90,10 @@ export async function handleActivateDataElement(
 
     try {
       // Activate data element
-      await client.activateDataElement({ dataElementName: dataElementName });
-      const response = client.getActivateResult();
+      const activateState = await client
+        .getDataElement()
+        .activate({ dataElementName: dataElementName });
+      const response = activateState.activateResult;
 
       if (!response) {
         logger?.error(
@@ -102,7 +105,7 @@ export async function handleActivateDataElement(
       }
 
       // Parse activation response
-      const activationResult = client.parseActivationResponse(response.data);
+      const activationResult = parseActivationResponse(response.data);
       const success = activationResult.activated && activationResult.checked;
 
       // Get updated session state after activation

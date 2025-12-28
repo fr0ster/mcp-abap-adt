@@ -1,11 +1,11 @@
 /**
  * UnlockView Handler - Unlock ABAP View
  *
- * Uses CrudClient.unlockView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.unlockView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -63,7 +63,7 @@ interface UnlockViewArgs {
 /**
  * Main handler for UnlockView MCP tool
  *
- * Uses CrudClient.unlockView - low-level single method call
+ * Uses AdtClient.unlockView - low-level single method call
  */
 export async function handleUnlockView(
   context: HandlerContext,
@@ -81,7 +81,7 @@ export async function handleUnlockView(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -98,8 +98,10 @@ export async function handleUnlockView(
 
     try {
       // Unlock view
-      await client.unlockView({ viewName: viewName }, lock_handle);
-      const unlockResult = client.getUnlockResult();
+      const unlockState = await client
+        .getView()
+        .unlock({ viewName: viewName }, lock_handle);
+      const unlockResult = unlockState.unlockResult;
 
       if (!unlockResult) {
         throw new Error(

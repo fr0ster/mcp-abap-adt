@@ -7,7 +7,7 @@
  * Workflow: validate -> create -> (activate)
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -89,15 +89,16 @@ export async function handleCreateFunctionGroup(
 
     try {
       // Create client
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Validate
       logger?.info(
         `Validating function group: ${functionGroupName} with package: ${typedArgs.package_name}`,
       );
+      let validationState: any;
       try {
-        await client.validateFunctionGroup({
+        validationState = await client.getFunctionGroup().validate({
           functionGroupName,
           description: typedArgs.description || functionGroupName,
           packageName: typedArgs.package_name,
@@ -119,8 +120,9 @@ export async function handleCreateFunctionGroup(
           // If validation throws an error, try to parse the response if available
           if (validationError.response) {
             const validationResponse = validationError.response;
-            const validationResult =
-              parseValidationResponse(validationResponse);
+            const validationResult = parseValidationResponse(
+              validationResponse as AxiosResponse,
+            );
             if (validationResult && !validationResult.valid) {
               const errorMessage =
                 validationResult.message || 'Unknown validation error';
@@ -145,7 +147,7 @@ export async function handleCreateFunctionGroup(
       }
 
       // Check validation result
-      const validationResponse = client.getValidationResponse();
+      const validationResponse = validationState.validationResponse;
       if (!validationResponse) {
         return return_error(
           new Error(
@@ -154,7 +156,9 @@ export async function handleCreateFunctionGroup(
         );
       }
 
-      const validationResult = parseValidationResponse(validationResponse);
+      const validationResult = parseValidationResponse(
+        validationResponse as AxiosResponse,
+      );
       if (!validationResult || !validationResult.valid) {
         // Try to extract more detailed error message from response
         let errorMessage =
@@ -213,7 +217,7 @@ export async function handleCreateFunctionGroup(
 
       // Create
       logger?.info(`Creating function group: ${functionGroupName}`);
-      await client.createFunctionGroup({
+      await client.getFunctionGroup().create({
         functionGroupName,
         description: typedArgs.description || functionGroupName,
         packageName: typedArgs.package_name,
@@ -222,7 +226,7 @@ export async function handleCreateFunctionGroup(
 
       // Activate if requested
       if (shouldActivate) {
-        await client.activateFunctionGroup({ functionGroupName });
+        await client.getFunctionGroup().activate({ functionGroupName });
       }
 
       logger?.info(

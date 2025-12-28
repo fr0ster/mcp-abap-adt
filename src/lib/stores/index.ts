@@ -18,7 +18,11 @@ import {
   SafeAbapSessionStore,
   SafeBtpSessionStore,
 } from '@mcp-abap-adt/auth-stores';
-import type { IServiceKeyStore, ISessionStore } from '@mcp-abap-adt/interfaces';
+import type {
+  ILogger,
+  IServiceKeyStore,
+  ISessionStore,
+} from '@mcp-abap-adt/interfaces';
 import { getPlatformPaths } from './platformPaths';
 
 /**
@@ -30,6 +34,7 @@ import { getPlatformPaths } from './platformPaths';
 export async function detectStoreType(
   directory: string,
   destination?: string,
+  logger?: ILogger,
 ): Promise<{
   serviceKeyStore: IServiceKeyStore;
   sessionStore: ISessionStore;
@@ -69,14 +74,14 @@ export async function detectStoreType(
   switch (storeType) {
     case 'abap':
       return {
-        serviceKeyStore: new AbapServiceKeyStore(directory),
-        sessionStore: new AbapSessionStore(directory),
+        serviceKeyStore: new AbapServiceKeyStore(directory, logger),
+        sessionStore: new AbapSessionStore(directory, logger),
         storeType: 'abap',
       };
     case 'btp':
       return {
-        serviceKeyStore: new BtpServiceKeyStore(directory),
-        sessionStore: new BtpSessionStore(directory, ''),
+        serviceKeyStore: new BtpServiceKeyStore(directory, logger),
+        sessionStore: new BtpSessionStore(directory, '', logger),
         storeType: 'btp',
       };
     // XSUAA format uses BTP stores (BTP uses XSUAA service key format)
@@ -139,6 +144,7 @@ export async function getPlatformStoresAsync(
   customPath?: string | string[],
   unsafe: boolean = false,
   destination?: string,
+  logger?: ILogger,
 ): Promise<{
   serviceKeyStore: IServiceKeyStore;
   sessionStore: ISessionStore;
@@ -153,26 +159,26 @@ export async function getPlatformStoresAsync(
   const sessionsDir = sessionsPaths[0];
 
   // Auto-detect store type
-  const detected = await detectStoreType(serviceKeysDir, destination);
+  const detected = await detectStoreType(serviceKeysDir, destination, logger);
 
   // Use file-based or in-memory session store based on unsafe flag
   let sessionStore: ISessionStore;
   if (unsafe) {
     switch (detected.storeType) {
       case 'abap':
-        sessionStore = new AbapSessionStore(sessionsDir);
+        sessionStore = new AbapSessionStore(sessionsDir, logger);
         break;
       case 'btp':
-        sessionStore = new BtpSessionStore(sessionsDir, '');
+        sessionStore = new BtpSessionStore(sessionsDir, '', logger);
         break;
     }
   } else {
     switch (detected.storeType) {
       case 'abap':
-        sessionStore = new SafeAbapSessionStore();
+        sessionStore = new SafeAbapSessionStore(logger);
         break;
       case 'btp':
-        sessionStore = new SafeBtpSessionStore('');
+        sessionStore = new SafeBtpSessionStore('', logger);
         break;
     }
   }

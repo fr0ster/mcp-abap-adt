@@ -1,11 +1,11 @@
 /**
  * UnlockObject Handler - Unlock ABAP object after modification via ADT API
  *
- * Uses CrudClient unlock methods for specific object types.
+ * Uses AdtClient unlock methods for specific object types.
  * Must reuse session_id and lock_handle from LockObject.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -122,7 +122,7 @@ export async function handleUnlockObject(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     if (session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -138,22 +138,24 @@ export async function handleUnlockObject(
     try {
       switch (objectType) {
         case 'class':
-          await client.unlockClass({ className: objectName }, lock_handle);
+          await client
+            .getClass()
+            .unlock({ className: objectName }, lock_handle);
           break;
         case 'program':
-          await client.unlockProgram({ programName: objectName }, lock_handle);
+          await client
+            .getProgram()
+            .unlock({ programName: objectName }, lock_handle);
           break;
         case 'interface':
-          await client.unlockInterface(
-            { interfaceName: objectName },
-            lock_handle,
-          );
+          await client
+            .getInterface()
+            .unlock({ interfaceName: objectName }, lock_handle);
           break;
         case 'function_group':
-          await client.unlockFunctionGroup(
-            { functionGroupName: objectName },
-            lock_handle,
-          );
+          await client
+            .getFunctionGroup()
+            .unlock({ functionGroupName: objectName }, lock_handle);
           break;
         case 'function_module':
           return return_error(
@@ -162,40 +164,42 @@ export async function handleUnlockObject(
             ),
           );
         case 'table':
-          await client.unlockTable({ tableName: objectName }, lock_handle);
+          await client
+            .getTable()
+            .unlock({ tableName: objectName }, lock_handle);
           break;
         case 'structure':
-          await client.unlockStructure(
-            { structureName: objectName },
-            lock_handle,
-          );
+          await client
+            .getStructure()
+            .unlock({ structureName: objectName }, lock_handle);
           break;
         case 'view':
-          await client.unlockView({ viewName: objectName }, lock_handle);
+          await client.getView().unlock({ viewName: objectName }, lock_handle);
           break;
         case 'domain':
-          await client.unlockDomain({ domainName: objectName }, lock_handle);
+          await client
+            .getDomain()
+            .unlock({ domainName: objectName }, lock_handle);
           break;
         case 'data_element':
-          await client.unlockDataElement(
-            { dataElementName: objectName },
-            lock_handle,
-          );
+          await client
+            .getDataElement()
+            .unlock({ dataElementName: objectName }, lock_handle);
           break;
         case 'package':
-          await client.unlockPackage({ packageName: objectName }, lock_handle);
+          await client
+            .getPackage()
+            .unlock({ packageName: objectName }, lock_handle);
           break;
         case 'behavior_definition':
-          await client.unlockBehaviorDefinition(
-            { name: objectName },
-            lock_handle,
-          );
+          await client
+            .getBehaviorDefinition()
+            .unlock({ name: objectName }, lock_handle);
           break;
         case 'metadata_extension':
-          await client.unlockMetadataExtension(
-            { name: objectName },
-            lock_handle,
-          );
+          await client
+            .getMetadataExtension()
+            .unlock({ name: objectName }, lock_handle);
           break;
         default:
           return return_error(

@@ -1,14 +1,14 @@
 /**
  * CreateBehaviorImplementation Handler - ABAP Behavior Implementation Creation via ADT API
  *
- * Uses CrudClient from @mcp-abap-adt/adt-clients for all operations.
+ * Uses AdtClient from @mcp-abap-adt/adt-clients for all operations.
  * Session and lock management handled internally by client.
  *
  * Workflow: create -> lock -> update main source -> update implementations -> unlock -> activate
  */
 
-import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { IBehaviorImplementationConfig } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -77,7 +77,7 @@ interface CreateBehaviorImplementationArgs {
 /**
  * Main handler for CreateBehaviorImplementation MCP tool
  *
- * Uses CrudClient.createBehaviorImplementation - full workflow
+ * Uses AdtClient.createBehaviorImplementation - full workflow
  */
 export async function handleCreateBehaviorImplementation(
   context: HandlerContext,
@@ -115,13 +115,13 @@ export async function handleCreateBehaviorImplementation(
 
     try {
       // Create client
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Create behavior implementation (full workflow)
-      const createConfig: Partial<BehaviorImplementationBuilderConfig> &
+      const createConfig: Partial<IBehaviorImplementationConfig> &
         Pick<
-          BehaviorImplementationBuilderConfig,
+          IBehaviorImplementationConfig,
           'className' | 'packageName' | 'behaviorDefinition'
         > = {
         className: className,
@@ -134,8 +134,10 @@ export async function handleCreateBehaviorImplementation(
         }),
       };
 
-      await client.createBehaviorImplementation(createConfig);
-      const createResult = client.getCreateResult();
+      const createState = await client
+        .getBehaviorImplementation()
+        .create(createConfig);
+      const createResult = createState.createResult;
 
       if (!createResult) {
         throw new Error(
@@ -145,25 +147,25 @@ export async function handleCreateBehaviorImplementation(
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];
-      if (shouldActivate && client.getActivateResult()) {
-        const activateResponse = client.getActivateResult()!;
-        if (
-          typeof activateResponse.data === 'string' &&
-          activateResponse.data.includes('<chkl:messages')
-        ) {
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const result = parser.parse(activateResponse.data);
-          const messages = result?.['chkl:messages']?.msg;
-          if (messages) {
-            const msgArray = Array.isArray(messages) ? messages : [messages];
-            activationWarnings = msgArray.map(
-              (msg: any) =>
-                `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-            );
-          }
+      const activateResponse = createState.activateResult;
+      if (
+        shouldActivate &&
+        activateResponse &&
+        typeof activateResponse.data === 'string' &&
+        activateResponse.data.includes('<chkl:messages')
+      ) {
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@_',
+        });
+        const result = parser.parse(activateResponse.data);
+        const messages = result?.['chkl:messages']?.msg;
+        if (messages) {
+          const msgArray = Array.isArray(messages) ? messages : [messages];
+          activationWarnings = msgArray.map(
+            (msg: any) =>
+              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
+          );
         }
       }
 

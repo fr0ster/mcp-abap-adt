@@ -1,11 +1,11 @@
 /**
  * DeleteFunctionGroup Handler - Delete ABAP FunctionGroup
  *
- * Uses CrudClient.deleteFunctionGroup from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.deleteFunctionGroup from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -42,7 +42,7 @@ interface DeleteFunctionGroupArgs {
 /**
  * Main handler for DeleteFunctionGroup MCP tool
  *
- * Uses CrudClient.deleteFunctionGroup - low-level single method call
+ * Uses AdtClient.deleteFunctionGroup - low-level single method call
  */
 export async function handleDeleteFunctionGroup(
   context: HandlerContext,
@@ -58,17 +58,17 @@ export async function handleDeleteFunctionGroup(
       return return_error(new Error('function_group_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const functionGroupName = function_group_name.toUpperCase();
     logger?.info(`Starting function group deletion: ${functionGroupName}`);
 
     try {
       // Delete function group
-      await client.deleteFunctionGroup({
+      const deleteState = await client.getFunctionGroup().delete({
         functionGroupName: functionGroupName,
         transportRequest: transport_request,
       });
-      const deleteResult = client.getDeleteResult();
+      const deleteResult = deleteState.deleteResult;
 
       if (!deleteResult) {
         throw new Error(

@@ -1,11 +1,11 @@
 /**
  * DeleteInterface Handler - Delete ABAP Interface
  *
- * Uses CrudClient.deleteInterface from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.deleteInterface from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -42,7 +42,7 @@ interface DeleteInterfaceArgs {
 /**
  * Main handler for DeleteInterface MCP tool
  *
- * Uses CrudClient.deleteInterface - low-level single method call
+ * Uses AdtClient.deleteInterface - low-level single method call
  */
 export async function handleDeleteInterface(
   context: HandlerContext,
@@ -57,18 +57,18 @@ export async function handleDeleteInterface(
       return return_error(new Error('interface_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const interfaceName = interface_name.toUpperCase();
 
     logger?.info(`Starting interface deletion: ${interfaceName}`);
 
     try {
       // Delete interface
-      await client.deleteInterface({
+      const deleteState = await client.getInterface().delete({
         interfaceName: interfaceName,
         transportRequest: transport_request,
       });
-      const deleteResult = client.getDeleteResult();
+      const deleteResult = deleteState.deleteResult;
 
       if (!deleteResult) {
         throw new Error(

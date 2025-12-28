@@ -1,12 +1,12 @@
 /**
  * ValidateBehaviorImplementation Handler - Validate ABAP Behavior Implementation Class Name
  *
- * Uses CrudClient.validateBehaviorImplementation from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.validateBehaviorImplementation from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import type { BehaviorImplementationBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { IBehaviorImplementationConfig } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -83,7 +83,7 @@ interface ValidateBehaviorImplementationArgs {
 /**
  * Main handler for ValidateBehaviorImplementation MCP tool
  *
- * Uses CrudClient.validateBehaviorImplementation - low-level single method call
+ * Uses AdtClient.validateBehaviorImplementation - low-level single method call
  */
 export async function handleValidateBehaviorImplementation(
   context: HandlerContext,
@@ -109,7 +109,7 @@ export async function handleValidateBehaviorImplementation(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -127,9 +127,9 @@ export async function handleValidateBehaviorImplementation(
 
     try {
       // Validate behavior implementation
-      const validateConfig: Partial<BehaviorImplementationBuilderConfig> &
+      const validateConfig: Partial<IBehaviorImplementationConfig> &
         Pick<
-          BehaviorImplementationBuilderConfig,
+          IBehaviorImplementationConfig,
           'className' | 'packageName' | 'behaviorDefinition'
         > = {
         className: className,
@@ -137,12 +137,16 @@ export async function handleValidateBehaviorImplementation(
         packageName: package_name.toUpperCase(),
         description: description,
       };
-      await client.validateBehaviorImplementation(validateConfig);
-      const validationResponse = client.getValidationResponse();
+      const validationState = await client
+        .getBehaviorImplementation()
+        .validate(validateConfig);
+      const validationResponse = validationState.validationResponse;
       if (!validationResponse) {
         throw new Error('Validation did not return a result');
       }
-      const result = parseValidationResponse(validationResponse);
+      const result = parseValidationResponse(
+        validationResponse as AxiosResponse,
+      );
 
       // Get updated session state after validation
 

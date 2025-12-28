@@ -1,14 +1,14 @@
 /**
  * CreateServiceDefinition Handler - ABAP Service Definition Creation via ADT API
  *
- * Uses CrudClient from @mcp-abap-adt/adt-clients for all operations.
+ * Uses AdtClient from @mcp-abap-adt/adt-clients for all operations.
  * Session and lock management handled internally by client.
  *
  * Workflow: validate -> create -> (activate)
  */
 
-import type { ServiceDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { IServiceDefinitionConfig } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -70,7 +70,7 @@ interface CreateServiceDefinitionArgs {
 /**
  * Main handler for CreateServiceDefinition MCP tool
  *
- * Uses CrudClient.createServiceDefinition
+ * Uses AdtClient.createServiceDefinition
  */
 export async function handleCreateServiceDefinition(
   context: HandlerContext,
@@ -106,19 +106,20 @@ export async function handleCreateServiceDefinition(
 
     try {
       // Create client
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
+      let activateResponse: any | undefined;
 
       // Validate
-      await client.validateServiceDefinition({
+      await client.getServiceDefinition().validate({
         serviceDefinitionName,
         description: typedArgs.description || serviceDefinitionName,
       });
 
       // Create
-      const createConfig: Partial<ServiceDefinitionBuilderConfig> &
+      const createConfig: Partial<IServiceDefinitionConfig> &
         Pick<
-          ServiceDefinitionBuilderConfig,
+          IServiceDefinitionConfig,
           'serviceDefinitionName' | 'packageName' | 'description'
         > = {
         serviceDefinitionName,
@@ -128,8 +129,10 @@ export async function handleCreateServiceDefinition(
         ...(typedArgs.source_code && { sourceCode: typedArgs.source_code }),
       };
 
-      await client.createServiceDefinition(createConfig);
-      const createResult = client.getCreateResult();
+      const createState = await client
+        .getServiceDefinition()
+        .create(createConfig);
+      const createResult = createState.createResult;
 
       if (!createResult) {
         throw new Error(
@@ -139,30 +142,32 @@ export async function handleCreateServiceDefinition(
 
       // Activate if requested
       if (shouldActivate) {
-        await client.activateServiceDefinition({ serviceDefinitionName });
+        const activateState = await client
+          .getServiceDefinition()
+          .activate({ serviceDefinitionName });
+        activateResponse = activateState.activateResult;
       }
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];
-      if (shouldActivate && client.getActivateResult()) {
-        const activateResponse = client.getActivateResult()!;
-        if (
-          typeof activateResponse.data === 'string' &&
-          activateResponse.data.includes('<chkl:messages')
-        ) {
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const result = parser.parse(activateResponse.data);
-          const messages = result?.['chkl:messages']?.msg;
-          if (messages) {
-            const msgArray = Array.isArray(messages) ? messages : [messages];
-            activationWarnings = msgArray.map(
-              (msg: any) =>
-                `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-            );
-          }
+      if (
+        shouldActivate &&
+        activateResponse &&
+        typeof activateResponse.data === 'string' &&
+        activateResponse.data.includes('<chkl:messages')
+      ) {
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@_',
+        });
+        const result = parser.parse(activateResponse.data);
+        const messages = result?.['chkl:messages']?.msg;
+        if (messages) {
+          const msgArray = Array.isArray(messages) ? messages : [messages];
+          activationWarnings = msgArray.map(
+            (msg: any) =>
+              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
+          );
         }
       }
 

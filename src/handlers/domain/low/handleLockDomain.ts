@@ -1,11 +1,11 @@
 /**
  * LockDomain Handler - Lock ABAP Domain
  *
- * Uses CrudClient.lockDomain from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.lockDomain from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -58,7 +58,7 @@ interface LockDomainArgs {
 /**
  * Main handler for LockDomain MCP tool
  *
- * Uses CrudClient.lockDomain - low-level single method call
+ * Uses AdtClient.lockDomain - low-level single method call
  */
 export async function handleLockDomain(
   context: HandlerContext,
@@ -73,7 +73,7 @@ export async function handleLockDomain(
       return return_error(new Error('domain_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     const domainName = domain_name.toUpperCase();
 
@@ -86,8 +86,7 @@ export async function handleLockDomain(
 
     try {
       // Lock domain
-      await client.lockDomain({ domainName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client.getDomain().lock({ domainName });
 
       if (!lockHandle) {
         throw new Error(

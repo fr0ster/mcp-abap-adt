@@ -1,11 +1,11 @@
 /**
  * LockPackage Handler - Lock ABAP Package
  *
- * Uses CrudClient.lockPackage from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.lockPackage from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -64,7 +64,7 @@ interface LockPackageArgs {
 /**
  * Main handler for LockPackage MCP tool
  *
- * Uses CrudClient.lockPackage - low-level single method call
+ * Uses AdtClient.lockPackage - low-level single method call
  */
 export async function handleLockPackage(
   context: HandlerContext,
@@ -82,7 +82,7 @@ export async function handleLockPackage(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       // CRITICAL: Use restoreSessionInConnection to properly restore session
@@ -97,8 +97,9 @@ export async function handleLockPackage(
 
     try {
       // Lock package
-      await client.lockPackage({ packageName, superPackage });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client
+        .getPackage()
+        .lock({ packageName, superPackage });
 
       if (!lockHandle) {
         throw new Error(

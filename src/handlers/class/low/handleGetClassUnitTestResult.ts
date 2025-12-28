@@ -1,11 +1,12 @@
 /**
  * GetClassUnitTestResult Handler - Fetch ABAP Unit run result
  *
- * Uses CrudClient.getClassUnitTestRunResult from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.getUnitTest().getResult from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   restoreSessionInConnection,
@@ -79,7 +80,7 @@ export async function handleGetClassUnitTestResult(
       return return_error(new Error('run_id is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -89,18 +90,17 @@ export async function handleGetClassUnitTestResult(
     logger?.info(`Fetching ABAP Unit result for run ${run_id}`);
 
     try {
-      await client.getClassUnitTestRunResult(run_id, {
+      const unitTest = client.getUnitTest() as any;
+      const resultResponse = await unitTest.getResult(run_id, {
         withNavigationUris: with_navigation_uris,
         format,
       });
-
-      const resultResponse = client.getAbapUnitResultResponse();
 
       if (!resultResponse) {
         throw new Error('SAP did not return ABAP Unit result response');
       }
 
-      return return_response(resultResponse);
+      return return_response(resultResponse as IAdtResponse);
     } catch (error: any) {
       logger?.error(
         `Error retrieving ABAP Unit result for run ${run_id}: ${error?.message || error}`,

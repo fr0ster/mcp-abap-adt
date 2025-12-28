@@ -1,15 +1,15 @@
 /**
  * ValidateBehaviorDefinition Handler - Validate ABAP BehaviorDefinition Name
  *
- * Uses CrudClient.validateBehaviorDefinition from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.validateBehaviorDefinition from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
 import type {
   BehaviorDefinitionImplementationType,
-  BehaviorDefinitionValidationParams,
+  IBehaviorDefinitionValidationParams,
 } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -92,7 +92,7 @@ interface ValidateBehaviorDefinitionArgs {
 /**
  * Main handler for ValidateBehaviorDefinition MCP tool
  *
- * Uses CrudClient.validateBehaviorDefinition - low-level single method call
+ * Uses AdtClient.validateBehaviorDefinition - low-level single method call
  */
 export async function handleValidateBehaviorDefinition(
   context: HandlerContext,
@@ -125,7 +125,7 @@ export async function handleValidateBehaviorDefinition(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -139,11 +139,11 @@ export async function handleValidateBehaviorDefinition(
     logger?.info(`Starting behavior definition validation: ${bdefName}`);
 
     try {
-      // Validate behavior definition - using BehaviorDefinitionValidationParams from adt-clients
+      // Validate behavior definition - using IBehaviorDefinitionValidationParams from adt-clients
       // Note: In SAP ADT validation API, objname and rootEntity are both required parameters
       // but they must have the same value (one value in two parameters)
       // We use root_entity for both since it's the actual CDS view name
-      const validateParams: BehaviorDefinitionValidationParams = {
+      const validateParams: IBehaviorDefinitionValidationParams = {
         objname: root_entity, // objname - same as rootEntity
         rootEntity: root_entity, // rootEntity - CDS view name
         description: description,
@@ -151,21 +151,23 @@ export async function handleValidateBehaviorDefinition(
         implementationType: implementation_type,
       };
 
-      // CrudClient.validateBehaviorDefinition expects BehaviorDefinitionBuilderConfig,
-      // but we use BehaviorDefinitionValidationParams structure for clarity
-      // Convert to the format expected by CrudClient
-      await client.validateBehaviorDefinition({
+      // AdtClient.validateBehaviorDefinition expects IBehaviorDefinitionConfig,
+      // but we use IBehaviorDefinitionValidationParams structure for clarity
+      // Convert to the format expected by AdtClient
+      const validationState = await client.getBehaviorDefinition().validate({
         name: validateParams.objname,
         rootEntity: validateParams.rootEntity,
         description: validateParams.description,
         packageName: validateParams.package,
         implementationType: validateParams.implementationType,
       });
-      const validationResponse = client.getValidationResponse();
+      const validationResponse = validationState.validationResponse;
       if (!validationResponse) {
         throw new Error('Validation did not return a result');
       }
-      const result = parseValidationResponse(validationResponse);
+      const result = parseValidationResponse(
+        validationResponse as AxiosResponse,
+      );
 
       // Get updated session state after validation
 

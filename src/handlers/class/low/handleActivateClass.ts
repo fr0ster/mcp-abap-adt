@@ -1,14 +1,15 @@
 /**
  * ActivateClass Handler - Activate ABAP Class
  *
- * Uses CrudClient.activateClass from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.activateClass from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
+  parseActivationResponse,
   restoreSessionInConnection,
   return_error,
   return_response,
@@ -58,7 +59,7 @@ interface ActivateClassArgs {
 /**
  * Main handler for ActivateClass MCP tool
  *
- * Uses CrudClient.activateClass - low-level single method call
+ * Uses AdtClient.activateClass - low-level single method call
  */
 export async function handleActivateClass(
   context: HandlerContext,
@@ -73,7 +74,7 @@ export async function handleActivateClass(
       return return_error(new Error('class_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -86,8 +87,8 @@ export async function handleActivateClass(
 
     try {
       // Activate class
-      await client.activateClass({ className });
-      const response = client.getActivateResult();
+      const activateState = await client.getClass().activate({ className });
+      const response = activateState.activateResult;
 
       if (!response) {
         throw new Error(
@@ -96,7 +97,7 @@ export async function handleActivateClass(
       }
 
       // Parse activation response
-      const activationResult = client.parseActivationResponse(response.data);
+      const activationResult = parseActivationResponse(response.data);
       const success = activationResult.activated && activationResult.checked;
 
       // Get updated session state after activation

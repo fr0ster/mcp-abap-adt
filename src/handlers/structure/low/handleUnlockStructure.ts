@@ -1,11 +1,11 @@
 /**
  * UnlockStructure Handler - Unlock ABAP Structure
  *
- * Uses CrudClient.unlockStructure from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.unlockStructure from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -63,7 +63,7 @@ interface UnlockStructureArgs {
 /**
  * Main handler for UnlockStructure MCP tool
  *
- * Uses CrudClient.unlockStructure - low-level single method call
+ * Uses AdtClient.unlockStructure - low-level single method call
  */
 export async function handleUnlockStructure(
   context: HandlerContext,
@@ -81,7 +81,7 @@ export async function handleUnlockStructure(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_state) {
@@ -98,11 +98,10 @@ export async function handleUnlockStructure(
 
     try {
       // Unlock structure
-      await client.unlockStructure(
-        { structureName: structureName },
-        lock_handle,
-      );
-      const unlockResult = client.getUnlockResult();
+      const unlockState = await client
+        .getStructure()
+        .unlock({ structureName: structureName }, lock_handle);
+      const unlockResult = unlockState.unlockResult;
 
       if (!unlockResult) {
         throw new Error(

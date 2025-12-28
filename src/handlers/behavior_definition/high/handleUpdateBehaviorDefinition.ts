@@ -2,8 +2,8 @@
  * UpdateBehaviorDefinition Handler - ABAP Behavior Definition Update via ADT API
  */
 
-import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { IBehaviorDefinitionConfig } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
@@ -58,43 +58,42 @@ export async function handleUpdateBehaviorDefinition(
   logger?.info(`Starting BDEF update: ${name}`);
 
   try {
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const shouldActivate = args.activate !== false;
     let lockHandle = args.lock_handle;
 
     // Lock if not provided - using types from adt-clients
     if (!lockHandle) {
-      const lockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = {
+      const lockConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
         name,
       };
-      await client.lockBehaviorDefinition(lockConfig);
-      lockHandle = client.getLockHandle();
+      lockHandle = await client.getBehaviorDefinition().lock(lockConfig);
     }
 
     // Update - using types from adt-clients
-    const updateConfig: Pick<
-      BehaviorDefinitionBuilderConfig,
-      'name' | 'sourceCode'
-    > = {
-      name,
-      sourceCode: args.source_code,
-    };
-    await client.updateBehaviorDefinition(updateConfig, lockHandle);
+    const updateConfig: Pick<IBehaviorDefinitionConfig, 'name' | 'sourceCode'> =
+      {
+        name,
+        sourceCode: args.source_code,
+      };
+    await client
+      .getBehaviorDefinition()
+      .update(updateConfig, { lockHandle: lockHandle });
 
     // Unlock if we locked it internally - using types from adt-clients
     if (!args.lock_handle) {
-      const unlockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = {
+      const unlockConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
         name,
       };
-      await client.unlockBehaviorDefinition(unlockConfig, lockHandle);
+      await client.getBehaviorDefinition().unlock(unlockConfig, lockHandle);
     }
 
     // Activate if requested - using types from adt-clients
     if (shouldActivate) {
-      const activateConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = {
+      const activateConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
         name,
       };
-      await client.activateBehaviorDefinition(activateConfig);
+      await client.getBehaviorDefinition().activate(activateConfig);
     }
 
     const result = {

@@ -71,7 +71,7 @@ describe('Package High-Level Handlers Integration', () => {
     'should test all Package high-level handlers',
     async () => {
       if (!hasConfig || !connection || !session) {
-        console.log(
+        testLogger.info(
           '⏭️  Skipping test: No configuration, connection or session',
         );
         return;
@@ -81,7 +81,7 @@ describe('Package High-Level Handlers Integration', () => {
       const testCase = getEnabledTestCase('create_package', 'builder_package');
 
       if (!testCase) {
-        console.log('⏭️  Skipping test: No test case configuration');
+        testLogger.info('⏭️  Skipping test: No test case configuration');
         return;
       }
 
@@ -94,13 +94,13 @@ describe('Package High-Level Handlers Integration', () => {
         testCase.params?.description || `Test package for high-level handler`;
 
       if (!packageName) {
-        console.log('⏭️  Skipping test: test_package not configured');
+        testLogger.info('⏭️  Skipping test: test_package not configured');
         return;
       }
 
       try {
         // Step 1: Create
-        console.log(`📦 High Create: Creating package ${packageName}...`);
+        testLogger.info(`📦 High Create: Creating package ${packageName}...`);
         let createResponse;
         try {
           const createArgs = {
@@ -127,7 +127,7 @@ describe('Package High-Level Handlers Integration', () => {
             errorMsgLower.includes('exceptionresourcealreadyexists') ||
             errorMsg.includes('InvalidObjName')
           ) {
-            console.log(
+            testLogger.info(
               `⏭️  Package ${packageName} already exists, skipping test`,
             );
             return;
@@ -144,7 +144,7 @@ describe('Package High-Level Handlers Integration', () => {
             errorMsgLower.includes('does already exist') ||
             errorMsgLower.includes('exceptionresourcealreadyexists')
           ) {
-            console.log(
+            testLogger.info(
               `⏭️  Package ${packageName} already exists, skipping test`,
             );
             return;
@@ -155,7 +155,7 @@ describe('Package High-Level Handlers Integration', () => {
         const createData = parseHandlerResponse(createResponse);
         expect(createData.success).toBe(true);
         expect(createData.package_name).toBe(packageName);
-        console.log(
+        testLogger.info(
           `✅ High Create: Created package ${packageName} successfully`,
         );
 
@@ -166,7 +166,7 @@ describe('Package High-Level Handlers Integration', () => {
 
         await delay(getOperationDelay('create', testCase));
       } catch (error: any) {
-        console.error(`❌ Test failed: ${error.message}`);
+        testLogger.error(`❌ Test failed: ${error.message}`);
         throw error;
       } finally {
         // Cleanup: Optionally delete test package
@@ -181,37 +181,39 @@ describe('Package High-Level Handlers Integration', () => {
               // Wait before delete to ensure package is unlocked after create
               await delay(getOperationDelay('delete', testCase));
 
-              console.log(
+              testLogger.info(
                 `🧹 Cleanup: Deleting test package ${packageName}...`,
               );
+              const cleanupConfig = (connection as any).getConfig?.();
               const deleteResponse = await handleDeletePackage(
                 { connection, logger: testLogger },
                 {
                   package_name: packageName,
                   transport_request: transportRequest,
                   force_new_connection: true,
+                  connection_config: cleanupConfig,
                 },
               );
 
               if (deleteResponse.isError) {
                 const errorMsg =
                   deleteResponse.content[0]?.text || 'Unknown error';
-                console.warn(
+                testLogger.warn(
                   `⚠️  Failed to cleanup test package ${packageName}: ${errorMsg}`,
                 );
               } else {
-                console.log(
+                testLogger.info(
                   `✅ Cleanup: Deleted test package ${packageName} successfully`,
                 );
               }
             } else {
-              console.log(
+              testLogger.warn(
                 `⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${packageName}`,
               );
             }
           } catch (cleanupError: any) {
             const errorMsg = cleanupError.message || String(cleanupError);
-            console.warn(
+            testLogger.warn(
               `⚠️  Failed to cleanup test package ${packageName}: ${errorMsg}`,
             );
           }

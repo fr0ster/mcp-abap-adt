@@ -1,12 +1,12 @@
 /**
  * CreatePackage Handler - Create ABAP Package
  *
- * Uses CrudClient.createPackage from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.createPackage from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import type { PackageBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { IPackageConfig } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -15,10 +15,10 @@ import {
   return_response,
 } from '../../../lib/utils';
 
-// Type matching CrudClient.createPackage signature
-type CreatePackageConfig = Partial<PackageBuilderConfig> &
+// Type matching AdtClient.createPackage signature
+type CreatePackageConfig = Partial<IPackageConfig> &
   Pick<
-    PackageBuilderConfig,
+    IPackageConfig,
     'packageName' | 'superPackage' | 'description' | 'softwareComponent'
   >;
 
@@ -107,7 +107,7 @@ interface CreatePackageArgs {
 /**
  * Main handler for CreatePackage MCP tool
  *
- * Uses CrudClient.createPackage - low-level single method call
+ * Uses AdtClient.createPackage - low-level single method call
  */
 export async function handleCreatePackage(
   context: HandlerContext,
@@ -135,7 +135,7 @@ export async function handleCreatePackage(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -168,9 +168,8 @@ export async function handleCreatePackage(
       if (application_component) {
         createConfig.applicationComponent = application_component;
       }
-      await client.createPackage(createConfig);
-
-      const createResult = client.getCreateResult();
+      const createState = await client.getPackage().create(createConfig);
+      const createResult = createState.createResult;
 
       if (!createResult) {
         throw new Error(

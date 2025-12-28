@@ -4,7 +4,7 @@
  * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -98,12 +98,13 @@ export async function handleCreateView(context: HandlerContext, params: any) {
   }
 
   try {
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const shouldActivate = args.activate !== false; // default true
+    let lockHandle: string | undefined;
 
     // Validate
     logger?.debug(`Validating view: ${viewName}`);
-    await client.validateView({
+    await client.getView().validate({
       viewName,
       packageName: args.package_name,
       description: args.description || viewName,
@@ -112,7 +113,7 @@ export async function handleCreateView(context: HandlerContext, params: any) {
 
     // Create
     logger?.debug(`Creating view: ${viewName}`);
-    await client.createView({
+    await client.getView().create({
       viewName,
       description: args.description || viewName,
       packageName: args.package_name,
@@ -123,8 +124,7 @@ export async function handleCreateView(context: HandlerContext, params: any) {
 
     // Lock
     logger?.debug(`Locking view: ${viewName}`);
-    await client.lockView({ viewName });
-    const lockHandle = client.getLockHandle();
+    lockHandle = await client.getView().lock({ viewName });
     logger?.debug(
       `View locked: ${viewName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
     );
@@ -135,7 +135,10 @@ export async function handleCreateView(context: HandlerContext, params: any) {
       let checkNewCodePassed = false;
       try {
         await safeCheckOperation(
-          () => client.checkView({ viewName }, args.ddl_source, 'inactive'),
+          () =>
+            client
+              .getView()
+              .check({ viewName, ddlSource: args.ddl_source }, 'inactive'),
           viewName,
           {
             debug: (message: string) => logger?.debug(message),
@@ -160,10 +163,9 @@ export async function handleCreateView(context: HandlerContext, params: any) {
       // Update (only if check passed)
       if (checkNewCodePassed) {
         logger?.debug(`Updating view DDL source: ${viewName}`);
-        await client.updateView(
-          { viewName, ddlSource: args.ddl_source },
-          lockHandle,
-        );
+        await client
+          .getView()
+          .update({ viewName, ddlSource: args.ddl_source }, { lockHandle });
         logger?.info(`View DDL source updated: ${viewName}`);
       } else {
         logger?.warn(`Skipping update - new code check failed: ${viewName}`);
@@ -171,14 +173,17 @@ export async function handleCreateView(context: HandlerContext, params: any) {
 
       // Unlock (MANDATORY)
       logger?.debug(`Unlocking view: ${viewName}`);
-      await client.unlockView({ viewName }, lockHandle);
+      await client.getView().unlock({ viewName }, lockHandle);
       logger?.info(`View unlocked: ${viewName}`);
 
       // Check inactive version (after unlock)
       logger?.debug(`Checking inactive version: ${viewName}`);
       try {
         await safeCheckOperation(
-          () => client.checkView({ viewName }, undefined, 'inactive'),
+          () =>
+            client
+              .getView()
+              .check({ viewName, ddlSource: args.ddl_source }, 'inactive'),
           viewName,
           {
             debug: (message: string) => logger?.debug(message),
@@ -196,10 +201,12 @@ export async function handleCreateView(context: HandlerContext, params: any) {
       }
 
       // Activate if requested
+      let activateResponse: any | undefined;
       if (shouldActivate) {
         logger?.debug(`Activating view: ${viewName}`);
         try {
-          await client.activateView({ viewName });
+          const activateState = await client.getView().activate({ viewName });
+          activateResponse = activateState.activateResult;
           logger?.info(`View activated: ${viewName}`);
         } catch (activationError: any) {
           logger?.error(
@@ -215,8 +222,7 @@ export async function handleCreateView(context: HandlerContext, params: any) {
 
       // Parse activation warnings if activation was performed
       let activationWarnings: string[] = [];
-      if (shouldActivate && client.getActivateResult()) {
-        const activateResponse = client.getActivateResult()!;
+      if (shouldActivate && activateResponse) {
         if (
           typeof activateResponse.data === 'string' &&
           activateResponse.data.includes('<chkl:messages')
@@ -271,10 +277,9 @@ export async function handleCreateView(context: HandlerContext, params: any) {
     } catch (workflowError: any) {
       // On error, ensure we attempt unlock
       try {
-        const lockHandle = client.getLockHandle();
         if (lockHandle) {
           logger?.warn(`Attempting unlock after error for view ${viewName}`);
-          await client.unlockView({ viewName }, lockHandle);
+          await client.getView().unlock({ viewName }, lockHandle);
           logger?.warn(`Unlocked view after error: ${viewName}`);
         }
       } catch (unlockError: any) {

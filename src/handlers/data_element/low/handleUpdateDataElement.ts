@@ -1,11 +1,11 @@
 /**
  * UpdateDataElement Handler - Update ABAP Data Element Properties
  *
- * Uses CrudClient.updateDataElement from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.updateDataElement from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -71,7 +71,7 @@ interface UpdateDataElementArgs {
 /**
  * Main handler for UpdateDataElement MCP tool
  *
- * Uses CrudClient.updateDataElement - low-level single method call
+ * Uses AdtClient.updateDataElement - low-level single method call
  */
 export async function handleUpdateDataElement(
   context: HandlerContext,
@@ -96,7 +96,7 @@ export async function handleUpdateDataElement(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -157,8 +157,10 @@ export async function handleUpdateDataElement(
       });
 
       // Update data element with properties
-      await client.updateDataElement(updateConfig, lock_handle);
-      const updateResult = client.getUpdateResult();
+      const updateState = await client
+        .getDataElement()
+        .update(updateConfig, { lockHandle: lock_handle });
+      const updateResult = updateState.updateResult;
 
       if (!updateResult) {
         logger?.error(

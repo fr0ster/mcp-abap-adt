@@ -1,11 +1,11 @@
 /**
  * DeleteProgram Handler - Delete ABAP Program
  *
- * Uses CrudClient.deleteProgram from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.deleteProgram from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -43,7 +43,7 @@ interface DeleteProgramArgs {
 /**
  * Main handler for DeleteProgram MCP tool
  *
- * Uses CrudClient.deleteProgram - low-level single method call
+ * Uses AdtClient.deleteProgram - low-level single method call
  */
 export async function handleDeleteProgram(
   context: HandlerContext,
@@ -67,18 +67,18 @@ export async function handleDeleteProgram(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const programName = program_name.toUpperCase();
 
     logger?.info(`Starting program deletion: ${programName}`);
 
     try {
       // Delete program
-      await client.deleteProgram({
+      const deleteState = await client.getProgram().delete({
         programName: programName,
         transportRequest: transport_request,
       });
-      const deleteResult = client.getDeleteResult();
+      const deleteResult = deleteState.deleteResult;
 
       if (!deleteResult) {
         throw new Error(

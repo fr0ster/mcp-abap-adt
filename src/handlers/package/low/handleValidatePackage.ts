@@ -1,11 +1,11 @@
 /**
  * ValidatePackage Handler - Validate ABAP Package Name
  *
- * Uses CrudClient.validatePackage from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.validatePackage from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -60,7 +60,7 @@ interface ValidatePackageArgs {
 /**
  * Main handler for ValidatePackage MCP tool
  *
- * Uses CrudClient.validatePackage - low-level single method call
+ * Uses AdtClient.validatePackage - low-level single method call
  */
 export async function handleValidatePackage(
   context: HandlerContext,
@@ -78,7 +78,7 @@ export async function handleValidatePackage(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -96,16 +96,18 @@ export async function handleValidatePackage(
 
     try {
       // Validate package
-      await client.validatePackage({
+      const validationState = await client.getPackage().validate({
         packageName: packageName,
         superPackage: superPackage,
         description: undefined,
       });
-      const validationResponse = client.getValidationResponse();
+      const validationResponse = validationState.validationResponse;
       if (!validationResponse) {
         throw new Error('Validation did not return a result');
       }
-      const result = parseValidationResponse(validationResponse);
+      const result = parseValidationResponse(
+        validationResponse as AxiosResponse,
+      );
 
       // Get updated session state after validation
 

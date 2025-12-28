@@ -9,9 +9,9 @@ This document contains a complete list of all tools (functions) provided by the 
 
 ## 📊 Tool Summary
 
-- Total tools: 219
-- High-level tools: 76
-- Low-level tools: 116
+- Total tools: 234
+- High-level tools: 88
+- Low-level tools: 119
 - Read-only tools: 27
 - Other tools: 0
 
@@ -189,7 +189,7 @@ The navigation below mirrors the document structure for easier discovery.
   - [Read-Only Tools](#includes-and-hierarchies-read-only)
     - [GetInclude](#getinclude-readonly)
     - [GetIncludesList](#getincludeslist-readonly)
-- [Types, Descriptions, Metadata](#types,-descriptions,-metadata) (14 tools – 14 read-only)
+- [Types, Descriptions, Metadata](#types,-descriptions,-metadata) (18 tools – 1 high-level, 3 low-level, 14 read-only)
   - [Read-Only Tools](#types,-descriptions,-metadata-read-only)
     - [DescribeByList](#describebylist-readonly)
     - [GetAbapAST](#getabapast-readonly)
@@ -205,6 +205,12 @@ The navigation below mirrors the document structure for easier discovery.
     - [GetTransaction](#gettransaction-readonly)
     - [GetTypeInfo](#gettypeinfo-readonly)
     - [GetWhereUsed](#getwhereused-readonly)
+  - [High-Level Tools](#types,-descriptions,-metadata-high-level)
+    - [GetPackageTree](#getpackagetree-high)
+  - [Low-Level Tools](#types,-descriptions,-metadata-low-level)
+    - [GetNodeStructureLow](#getnodestructurelow-low)
+    - [GetObjectStructureLow](#getobjectstructurelow-low)
+    - [GetVirtualFoldersLow](#getvirtualfolderslow-low)
 - [Search, SQL, Transactions](#search,-sql,-transactions) (6 tools – 1 high-level, 1 low-level, 4 read-only)
   - [Read-Only Tools](#search,-sql,-transactions-read-only)
     - [GetObjectsByType](#getobjectsbytype-readonly)
@@ -780,7 +786,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ### Low-Level Tools {#programs,-classes,-functions-low-level}
 
-*Low-level tools perform a single operation (one method call to CrudClient).*
+*Low-level tools perform a single operation (one method call to AdtClient).*
 
 ### ActivateClassLow {#activateclasslow-low}
 **Description:** [low-level] Activate an ABAP class. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
@@ -1960,7 +1966,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ### Low-Level Tools {#tables-and-structures-low-level}
 
-*Low-level tools perform a single operation (one method call to CrudClient).*
+*Low-level tools perform a single operation (one method call to AdtClient).*
 
 ### ActivateDataElementLow {#activatedataelementlow-low}
 **Description:** [low-level] Activate an ABAP data element. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
@@ -2781,7 +2787,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ### Low-Level Tools {#packages-and-interfaces-low-level}
 
-*Low-level tools perform a single operation (one method call to CrudClient).*
+*Low-level tools perform a single operation (one method call to AdtClient).*
 
 ### ActivateInterfaceLow {#activateinterfacelow-low}
 **Description:** [low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
@@ -3312,6 +3318,98 @@ The navigation below mirrors the document structure for easier discovery.
 ---
 
 
+### High-Level Tools {#types,-descriptions,-metadata-high-level}
+
+*High-level tools perform a chain of operations (e.g., validate → lock → update → check → unlock → activate).*
+
+### GetPackageTree {#getpackagetree-high}
+**Description:** [high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Package name (e.g., 
+- `include_subpackages` (boolean, optional (default: "true")) - Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true
+- `max_depth` (integer, optional (default: "5")) - Maximum depth for recursive package traversal. Default: 5
+- `include_descriptions` (boolean, optional (default: "true")) - Include object descriptions in response. Default: true
+- `debug` (boolean, optional (default: "false")) - Include diagnostic metadata in response (counts, types, hierarchy info). Default: false
+
+**Example:**
+```json
+{
+  "include_subpackages": "true",
+  "max_depth": "\"example\"",
+  "include_descriptions": "true",
+  "debug": "false"
+}
+```
+
+---
+
+
+### Low-Level Tools {#types,-descriptions,-metadata-low-level}
+
+*Low-level tools perform a single operation (one method call to AdtClient).*
+
+### GetNodeStructureLow {#getnodestructurelow-low}
+**Description:** [low-level] Fetch node structure from ADT repository. Used for object tree navigation and structure discovery. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Parent object type (e.g., 
+- `parent_name` (string, required) - Parent object name
+- `node_id` (string, optional (default: "0000 for root). Use to fetch child nodes.")) - Optional node ID (default: 
+- `with_short_descriptions` (boolean, optional (default: "true")) - Include short descriptions in response
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{
+  "parent_name": "\"ZMY_PARENT_NAME\"",
+  "node_id": "\"example_value\"",
+  "with_short_descriptions": "true"
+}
+```
+
+---
+
+### GetObjectStructureLow {#getobjectstructurelow-low}
+**Description:** [low-level] Retrieve ADT object structure as compact JSON tree. Returns XML response with object structure tree. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Object type (e.g., 
+- `object_name` (string, required) - Object name (e.g., 
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+**Example:**
+```json
+{
+  "object_name": "\"ZMY_OBJECT_NAME\""
+}
+```
+
+---
+
+### GetVirtualFoldersLow {#getvirtualfolderslow-low}
+**Description:** [low-level] Retrieve hierarchical virtual folder contents from ADT information system. Used for browsing ABAP objects by package, group, type, etc.
+
+**Parameters:**
+- `inputSchema` (string, optional (default: "*")) - Object search pattern (e.g., 
+- `preselection` (string, optional) - Facet name (e.g., 
+- `with_versions` (boolean, optional (default: "false")) - Include version information in response
+- `ignore_short_descriptions` (boolean, optional (default: "false")) - Ignore short descriptions in response
+
+**Example:**
+```json
+{
+  "inputSchema": "\"example_value\"",
+  "with_versions": "false",
+  "ignore_short_descriptions": "false"
+}
+```
+
+---
+
+
 ## Search, SQL, Transactions
 
 ### Read-Only Tools {#search,-sql,-transactions-read-only}
@@ -3422,7 +3520,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ### Low-Level Tools {#search,-sql,-transactions-low-level}
 
-*Low-level tools perform a single operation (one method call to CrudClient).*
+*Low-level tools perform a single operation (one method call to AdtClient).*
 
 ### CreateTransportLow {#createtransportlow-low}
 **Description:** [low-level] Create a new ABAP transport request.
@@ -3537,7 +3635,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ### Low-Level Tools {#enhancements-low-level}
 
-*Low-level tools perform a single operation (one method call to CrudClient).*
+*Low-level tools perform a single operation (one method call to AdtClient).*
 
 ### ActivateMetadataExtensionLow {#activatemetadataextensionlow-low}
 **Description:** [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
@@ -3713,6 +3811,6 @@ All functions return MCP-compliant responses in the following format:
 
 ---
 
-*Last updated: 2025-12-23*
+*Last updated: 2025-12-27*
 *Document version: 1.0*
 *Generated automatically from TOOL_DEFINITION exports*

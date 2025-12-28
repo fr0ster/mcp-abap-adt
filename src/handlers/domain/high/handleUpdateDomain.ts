@@ -8,7 +8,7 @@
  * Note: No validation step - lock will fail if domain doesn't exist
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -156,16 +156,17 @@ export async function handleUpdateDomain(
 
     try {
       // Create client
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Lock domain (will fail if domain doesn't exist)
       // Pass packageName to lockDomain so builder is created with correct config from the start
-      await client.lockDomain({
+      const lockHandle = await client.getDomain().lock({
         domainName,
         packageName: typedArgs.package_name,
       } as any);
-      const lockHandle = client.getLockHandle();
+
+      let updateState: any;
 
       try {
         // Update with properties (packageName and description are required)
@@ -182,12 +183,14 @@ export async function handleUpdateDomain(
           valueTable: typedArgs.value_table,
           fixedValues: typedArgs.fixed_values,
         };
-        await client.updateDomain(properties, lockHandle);
+        updateState = await client
+          .getDomain()
+          .update(properties, { lockHandle: lockHandle });
 
         // Check
         try {
           await safeCheckOperation(
-            () => client.checkDomain({ domainName }),
+            () => client.getDomain().check({ domainName }),
             domainName,
             {
               debug: (message: string) => logger?.debug(message),
@@ -202,16 +205,16 @@ export async function handleUpdateDomain(
         }
 
         // Unlock
-        await client.unlockDomain({ domainName }, lockHandle);
+        await client.getDomain().unlock({ domainName }, lockHandle);
 
         // Activate if requested
         if (shouldActivate) {
-          await client.activateDomain({ domainName });
+          await client.getDomain().activate({ domainName });
         }
       } catch (error) {
         // Try to unlock on error
         try {
-          await client.unlockDomain({ domainName }, lockHandle);
+          await client.getDomain().unlock({ domainName }, lockHandle);
         } catch (unlockError) {
           logger?.error(
             `Failed to unlock domain after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
@@ -221,7 +224,7 @@ export async function handleUpdateDomain(
       }
 
       // Get domain details from update result
-      const updateResult = client.getUpdateResult();
+      const updateResult = updateState.updateResult;
       let domainDetails = null;
       if (
         updateResult?.data &&

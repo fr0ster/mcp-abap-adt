@@ -1,11 +1,11 @@
 /**
  * ValidateInterface Handler - Validate ABAP Interface Name
  *
- * Uses CrudClient.validateInterface from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.validateInterface from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -70,7 +70,7 @@ interface ValidateInterfaceArgs {
 /**
  * Main handler for ValidateInterface MCP tool
  *
- * Uses CrudClient.validateInterface - low-level single method call
+ * Uses AdtClient.validateInterface - low-level single method call
  */
 export async function handleValidateInterface(
   context: HandlerContext,
@@ -93,7 +93,7 @@ export async function handleValidateInterface(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -106,16 +106,18 @@ export async function handleValidateInterface(
 
     try {
       // Validate interface
-      await client.validateInterface({
+      const validationState = await client.getInterface().validate({
         interfaceName: interfaceName,
         packageName: package_name.toUpperCase(),
         description: description,
       });
-      const validationResponse = client.getValidationResponse();
+      const validationResponse = validationState.validationResponse;
       if (!validationResponse) {
         throw new Error('Validation did not return a result');
       }
-      const result = parseValidationResponse(validationResponse);
+      const result = parseValidationResponse(
+        validationResponse as AxiosResponse,
+      );
 
       // Get updated session state after validation
 

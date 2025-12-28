@@ -11,7 +11,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { AuthBroker } from '@mcp-abap-adt/auth-broker';
-import { BtpTokenProvider } from '@mcp-abap-adt/auth-providers';
+import { AuthorizationCodeProvider } from '@mcp-abap-adt/auth-providers';
 import {
   AbapServiceKeyStore,
   AbapSessionStore,
@@ -22,9 +22,13 @@ import {
   SafeBtpSessionStore,
 } from '@mcp-abap-adt/auth-stores';
 import type {
+  IAuthorizationConfig,
+  IConnectionConfig,
   ILogger,
   IServiceKeyStore,
   ISessionStore,
+  ITokenProvider,
+  ITokenResult,
 } from '@mcp-abap-adt/interfaces';
 import { defaultLogger } from '@mcp-abap-adt/logger';
 import { detectStoreType } from '../stores';
@@ -93,7 +97,9 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       return;
     }
 
-    const logger = this.config.logger || defaultLogger;
+    // Only use logger if explicitly provided (no fallback to defaultLogger)
+    // This prevents unwanted logging when DEBUG variables are not set
+    const logger = this.config.logger;
     const defaultMcpDestination = this.config.defaultMcpDestination;
     const envFilePath = this.config.envFilePath;
     const useAuthBroker =
@@ -106,7 +112,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     const isSse = transportType === 'sse';
     const isHttp = transportType === 'http';
 
-    logger.debug('[BrokerFactory] initializeDefaultBroker called', {
+    logger?.debug('[BrokerFactory] initializeDefaultBroker called', {
       type: 'BROKER_INIT_START',
       defaultMcpDestination,
       envFilePath,
@@ -159,7 +165,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     // Use EnvFileSessionStore directly - no need for separate session store
     else if (envFilePath && (isStdio || isSse || isHttp)) {
       shouldCreateDefault = true;
-      logger.debug('Variant 2: --env specified, using EnvFileSessionStore', {
+      logger?.debug('Variant 2: --env specified, using EnvFileSessionStore', {
         envFilePath,
         isStdio,
         isSse,
@@ -193,12 +199,12 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     }
 
     if (shouldCreateDefault && defaultBrokerConfig) {
-      logger.debug('Creating default broker', {
+      logger?.debug('Creating default broker', {
         shouldCreateDefault,
         hasConfig: !!defaultBrokerConfig,
       });
       try {
-        logger.debug('Initializing default broker', {
+        logger?.debug('Initializing default broker', {
           type: 'DEFAULT_BROKER_INIT_START',
           hasServiceKeyStore: defaultBrokerConfig.hasServiceKeyStore,
           serviceKeyDestination: defaultBrokerConfig.serviceKeyDestination,
@@ -243,7 +249,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
                   logger,
                 );
               } catch (error) {
-                logger.error('Failed to load .env file into session store', {
+                logger?.debug('Failed to load .env file into session store', {
                   type: 'ENV_LOAD_FAILED',
                   envFilePath: defaultBrokerConfig.envFileToLoad,
                   error: error instanceof Error ? error.message : String(error),
@@ -256,7 +262,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
 
         this.defaultBrokerInitialized = true;
 
-        logger.info('Default broker initialized', {
+        logger?.debug('Default broker initialized', {
           type: 'DEFAULT_BROKER_INIT_SUCCESS',
           hasServiceKeyStore: defaultBrokerConfig.hasServiceKeyStore,
           serviceKeyDestination: defaultBrokerConfig.serviceKeyDestination,
@@ -267,14 +273,14 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
           useEnvFileStore: defaultBrokerConfig.useEnvFileStore,
         });
       } catch (error) {
-        logger.error('Failed to initialize default broker', {
+        logger?.debug('Failed to initialize default broker', {
           type: 'DEFAULT_BROKER_INIT_FAILED',
           error: error instanceof Error ? error.message : String(error),
         });
         // Don't throw - server can still work without default broker
       }
     } else {
-      logger.debug('Default broker not created (no conditions met)', {
+      logger?.debug('Default broker not created (no conditions met)', {
         type: 'DEFAULT_BROKER_NOT_CREATED',
         hasMcpDestination: !!defaultMcpDestination,
         hasEnvFilePath: !!envFilePath,
@@ -328,7 +334,9 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
 
     // Get or create broker for specific destination
     if (!this.authBrokers.has(destination)) {
-      const logger = this.config.logger || defaultLogger;
+      // Only use logger if explicitly provided (no fallback to defaultLogger)
+      // This prevents unwanted logging when DEBUG variables are not set
+      const logger = this.config.logger;
       const unsafe = this.config.unsafe || false;
       const customPath = this.config.authBrokerPath
         ? path.resolve(this.config.authBrokerPath)
@@ -351,7 +359,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
           unsafe,
         );
       } catch (error) {
-        logger.error('Failed to create AuthBroker for destination', {
+        logger?.debug('Failed to create AuthBroker for destination', {
           type: 'AUTH_BROKER_CREATE_FAILED',
           destination,
           error: error instanceof Error ? error.message : String(error),
@@ -375,7 +383,13 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     storeType: 'abap' | 'btp',
     unsafe: boolean,
   ): Promise<void> {
-    const logger = this.config.logger || defaultLogger;
+    // Only use logger if explicitly provided (no fallback to defaultLogger)
+    // This prevents unwanted logging when DEBUG variables are not set
+    const logger = this.config.logger;
+    // Only use specific loggers if DEBUG variables are set, no fallback
+    const storeLogger = this.config.storeLogger;
+    const _providerLogger = this.config.providerLogger;
+    const brokerLogger = this.config.brokerLogger;
     const customPath = this.config.authBrokerPath
       ? path.resolve(this.config.authBrokerPath)
       : undefined;
@@ -394,17 +408,17 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
           case 'abap':
             stores = {
               serviceKeyStore: hasServiceKeyStore
-                ? new AbapServiceKeyStore(serviceKeysDir)
+                ? new AbapServiceKeyStore(serviceKeysDir, storeLogger)
                 : undefined,
-              sessionStore: new AbapSessionStore(sessionsDir),
+              sessionStore: new AbapSessionStore(sessionsDir, storeLogger),
             };
             break;
           case 'btp':
             stores = {
               serviceKeyStore: hasServiceKeyStore
-                ? new BtpServiceKeyStore(serviceKeysDir)
+                ? new BtpServiceKeyStore(serviceKeysDir, storeLogger)
                 : undefined,
-              sessionStore: new BtpSessionStore(sessionsDir, ''),
+              sessionStore: new BtpSessionStore(sessionsDir, '', storeLogger),
             };
             break;
         }
@@ -414,17 +428,17 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
             // Use safe in-memory store to avoid stale/locked files in ~/.config
             stores = {
               serviceKeyStore: hasServiceKeyStore
-                ? new AbapServiceKeyStore(serviceKeysDir)
+                ? new AbapServiceKeyStore(serviceKeysDir, storeLogger)
                 : undefined,
-              sessionStore: new SafeAbapSessionStore(undefined, undefined),
+              sessionStore: new SafeAbapSessionStore(storeLogger, undefined),
             };
             break;
           case 'btp':
             stores = {
               serviceKeyStore: hasServiceKeyStore
-                ? new BtpServiceKeyStore(serviceKeysDir)
+                ? new BtpServiceKeyStore(serviceKeysDir, storeLogger)
                 : undefined,
-              sessionStore: new SafeBtpSessionStore(''),
+              sessionStore: new SafeBtpSessionStore('', storeLogger),
             };
             break;
         }
@@ -432,7 +446,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
 
       this.sharedStores.set(storeKey, stores);
 
-      logger.debug('Created shared stores', {
+      logger?.debug('Created shared stores', {
         type: 'SHARED_STORES_CREATED',
         storeKey,
         storeType,
@@ -446,13 +460,19 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       if (hasServiceKeyStore && !stores.serviceKeyStore) {
         switch (storeType) {
           case 'abap':
-            stores.serviceKeyStore = new AbapServiceKeyStore(serviceKeysDir);
+            stores.serviceKeyStore = new AbapServiceKeyStore(
+              serviceKeysDir,
+              storeLogger,
+            );
             break;
           case 'btp':
-            stores.serviceKeyStore = new BtpServiceKeyStore(serviceKeysDir);
+            stores.serviceKeyStore = new BtpServiceKeyStore(
+              serviceKeysDir,
+              storeLogger,
+            );
             break;
         }
-        logger.debug('Added serviceKeyStore to existing shared stores', {
+        logger?.debug('Added serviceKeyStore to existing shared stores', {
           type: 'SERVICE_KEY_STORE_ADDED',
           storeKey,
           storeType,
@@ -461,13 +481,19 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     }
 
     const { serviceKeyStore, sessionStore } = stores;
-
-    // Create token provider with browser auth port from config (to avoid port conflicts)
-    const tokenProvider = new BtpTokenProvider(this.config.browserAuthPort);
+    const destination = serviceKeyDestination || brokerKey;
 
     // Pre-seed session store with data from service key (without tokens) to avoid stale/absent configs
     if (hasServiceKeyStore && serviceKeyDestination) {
       try {
+        logger?.debug('Starting session seed from service key', {
+          type: 'SESSION_SEED_START',
+          brokerKey,
+          serviceKeyDestination,
+          hasServiceKeyStore: !!serviceKeyStore,
+          hasSessionStore: !!sessionStore,
+        });
+
         const skConn = await serviceKeyStore?.getConnectionConfig?.(
           serviceKeyDestination,
         );
@@ -475,27 +501,105 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
           serviceKeyDestination,
         );
 
-        if (skConn && sessionStore?.setConnectionConfig) {
+        logger?.debug('Service key data retrieved', {
+          type: 'SESSION_SEED_DATA_RETRIEVED',
+          brokerKey,
+          serviceKeyDestination,
+          hasConnConfig: !!skConn,
+          hasAuthConfig: !!skAuth,
+          serviceUrl: skConn?.serviceUrl,
+          serviceUrlLength: skConn?.serviceUrl?.length || 0,
+        });
+
+        // Only seed connection config if serviceUrl is present
+        if (skConn?.serviceUrl && sessionStore?.setConnectionConfig) {
+          logger?.debug('Seeding connection config', {
+            type: 'SESSION_SEED_CONN_START',
+            brokerKey,
+            serviceKeyDestination,
+            serviceUrl: skConn.serviceUrl.substring(0, 50),
+          });
           await sessionStore.setConnectionConfig(serviceKeyDestination, {
             ...skConn,
             authorizationToken: undefined,
           });
+          logger?.debug('Session store seeded with connection config', {
+            type: 'SESSION_SEED_CONN_SUCCESS',
+            brokerKey,
+            serviceKeyDestination,
+            serviceUrl: skConn.serviceUrl.substring(0, 50),
+          });
+        } else if (skConn && !skConn.serviceUrl) {
+          logger?.debug(
+            `Service key for ${serviceKeyDestination} does not contain serviceUrl. Skipping connection config seed.`,
+            {
+              type: 'SESSION_SEED_SKIP_NO_SERVICE_URL',
+              brokerKey,
+              serviceKeyDestination,
+            },
+          );
+        } else if (!skConn) {
+          logger?.debug(
+            `Service key store returned null connection config for ${serviceKeyDestination}`,
+            {
+              type: 'SESSION_SEED_NO_CONN_CONFIG',
+              brokerKey,
+              serviceKeyDestination,
+            },
+          );
         }
+
         if (skAuth && sessionStore?.setAuthorizationConfig) {
+          logger?.debug('Seeding authorization config', {
+            type: 'SESSION_SEED_AUTH_START',
+            brokerKey,
+            serviceKeyDestination,
+          });
           await sessionStore.setAuthorizationConfig(
             serviceKeyDestination,
             skAuth,
           );
+          logger?.debug('Session store seeded with authorization config', {
+            type: 'SESSION_SEED_AUTH_SUCCESS',
+            brokerKey,
+            serviceKeyDestination,
+          });
+        } else if (!skAuth) {
+          logger?.debug(
+            `Service key store returned null authorization config for ${serviceKeyDestination}`,
+            {
+              type: 'SESSION_SEED_NO_AUTH_CONFIG',
+              brokerKey,
+              serviceKeyDestination,
+            },
+          );
         }
       } catch (e) {
-        logger.warn('Failed to seed session store from service key', {
+        logger?.debug('Failed to seed session store from service key', {
           type: 'SESSION_SEED_FAILED',
           brokerKey,
           serviceKeyDestination,
           error: (e as Error)?.message,
+          stack: (e as Error)?.stack,
         });
+        // Don't throw - broker will try to get serviceUrl from serviceKeyStore when needed
       }
+    } else {
+      logger?.debug('Skipping session seed', {
+        type: 'SESSION_SEED_SKIPPED',
+        brokerKey,
+        hasServiceKeyStore,
+        serviceKeyDestination,
+      });
     }
+
+    const tokenProvider = await this.createTokenProviderForDestination(
+      destination,
+      storeType,
+      sessionStore,
+      serviceKeyStore,
+      logger,
+    );
 
     // Create AuthBroker
     const authBroker = new AuthBroker(
@@ -503,17 +607,14 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
         serviceKeyStore: hasServiceKeyStore ? serviceKeyStore : undefined,
         sessionStore,
         tokenProvider,
-        // Allow client_credentials flow for all store types (including ABAP)
-        // This prevents browser auth conflicts when UAA credentials are available
-        allowClientCredentials: true,
       } as any,
       this.config.browser || 'system',
-      logger,
+      brokerLogger,
     );
 
     this.authBrokers.set(brokerKey, authBroker);
 
-    logger.info('AuthBroker created', {
+    logger?.debug('AuthBroker created', {
       type: 'AUTH_BROKER_CREATED',
       brokerKey,
       hasServiceKeyStore,
@@ -532,10 +633,14 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   private async createBrokerWithEnvFileStore(
     brokerKey: string,
     envFilePath: string,
-    logger: ILogger,
+    logger: ILogger | undefined,
   ): Promise<void> {
+    // Only use specific loggers if DEBUG variables are set, no fallback
+    const storeLogger = this.config.storeLogger;
+    const providerLogger = this.config.providerLogger;
+    const brokerLogger = this.config.brokerLogger;
     // Create EnvFileSessionStore that reads from specified .env file
-    const sessionStore = new EnvFileSessionStore(envFilePath, logger);
+    const sessionStore = new EnvFileSessionStore(envFilePath, storeLogger);
 
     // Get auth type from .env file to determine if we need token provider
     const authType = sessionStore.getAuthType();
@@ -546,16 +651,20 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       );
     }
 
-    logger.debug('Creating broker with EnvFileSessionStore', {
+    logger?.debug('Creating broker with EnvFileSessionStore', {
       type: 'ENV_FILE_STORE_CREATE',
       brokerKey,
       envFilePath,
       authType,
     });
 
-    // Create token provider for JWT auth (needed for token refresh)
-    // For basic auth, tokenProvider is not used but AuthBroker still expects it
-    const tokenProvider = new BtpTokenProvider(this.config.browserAuthPort);
+    const tokenProvider = await this.createTokenProviderForDestination(
+      brokerKey,
+      'abap',
+      sessionStore,
+      undefined,
+      providerLogger,
+    );
 
     // Create AuthBroker with EnvFileSessionStore
     const authBroker = new AuthBroker(
@@ -563,15 +672,14 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
         serviceKeyStore: undefined, // No service key store for --env mode
         sessionStore,
         tokenProvider,
-        allowClientCredentials: authType === 'jwt', // Only for JWT
       } as any,
       this.config.browser || 'system',
-      logger,
+      brokerLogger,
     );
 
     this.authBrokers.set(brokerKey, authBroker);
 
-    logger.info('AuthBroker created with EnvFileSessionStore', {
+    logger?.debug('AuthBroker created with EnvFileSessionStore', {
       type: 'AUTH_BROKER_CREATED_ENV_FILE',
       brokerKey,
       envFilePath,
@@ -591,13 +699,13 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     envFilePath: string,
     destination: string,
     broker: AuthBroker,
-    logger: ILogger,
+    logger: ILogger | undefined,
   ): Promise<'basic' | 'jwt'> {
     if (!fs.existsSync(envFilePath)) {
       throw new Error(`.env file not found: ${envFilePath}`);
     }
 
-    logger.debug('Loading .env file into session store', {
+    logger?.debug('Loading .env file into session store', {
       type: 'ENV_LOAD_START',
       envFilePath,
       destination,
@@ -671,7 +779,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     const sessionStore = (broker as any).sessionStore as ISessionStore;
     if (sessionStore?.setConnectionConfig) {
       await sessionStore.setConnectionConfig(destination, connectionConfig);
-      logger.info('.env file loaded into session store', {
+      logger?.debug('.env file loaded into session store', {
         type: 'ENV_LOAD_SUCCESS',
         destination,
         serviceUrl: connectionConfig.serviceUrl,
@@ -681,7 +789,132 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       throw new Error('Session store does not support setConnectionConfig');
     }
 
+    if (authType === 'jwt') {
+      const hasUaaConfig =
+        envVars.SAP_UAA_URL &&
+        envVars.SAP_UAA_CLIENT_ID &&
+        envVars.SAP_UAA_CLIENT_SECRET;
+      if (hasUaaConfig && sessionStore?.setAuthorizationConfig) {
+        await sessionStore.setAuthorizationConfig(destination, {
+          uaaUrl: envVars.SAP_UAA_URL,
+          uaaClientId: envVars.SAP_UAA_CLIENT_ID,
+          uaaClientSecret: envVars.SAP_UAA_CLIENT_SECRET,
+          refreshToken: envVars.SAP_REFRESH_TOKEN,
+        });
+      }
+    }
+
     return authType;
+  }
+
+  private async createTokenProviderForDestination(
+    destination: string,
+    storeType: 'abap' | 'btp',
+    sessionStore: ISessionStore,
+    serviceKeyStore: IServiceKeyStore | undefined,
+    logger: ILogger | undefined,
+  ): Promise<ITokenProvider> {
+    // Use providerLogger only if DEBUG_PROVIDER is set, otherwise undefined (no logging)
+    const providerLogger = this.config.providerLogger;
+    let authConfig: IAuthorizationConfig | null = null;
+    let connConfig: IConnectionConfig | null = null;
+
+    try {
+      connConfig = await sessionStore.getConnectionConfig(destination);
+    } catch (error) {
+      logger?.debug('Failed to read connection config for token provider', {
+        destination,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    try {
+      authConfig = await sessionStore.getAuthorizationConfig(destination);
+    } catch (error) {
+      logger?.debug('Failed to read auth config from session store', {
+        destination,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    if (!authConfig && serviceKeyStore?.getAuthorizationConfig) {
+      try {
+        authConfig = await serviceKeyStore.getAuthorizationConfig(destination);
+      } catch (error) {
+        logger?.debug('Failed to read auth config from service key store', {
+          destination,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (!authConfig) {
+      return this.wrapLegacyTokenProvider({
+        getTokens: async (): Promise<ITokenResult> => {
+          throw new Error(
+            `Authorization config is required for destination "${destination}". Provide a service key or session with UAA credentials.`,
+          );
+        },
+      });
+    }
+
+    const providerConfig = {
+      uaaUrl: authConfig.uaaUrl,
+      clientId: authConfig.uaaClientId,
+      clientSecret: authConfig.uaaClientSecret,
+      refreshToken: authConfig.refreshToken,
+      accessToken: connConfig?.authorizationToken,
+      browser: this.config.browser || 'system',
+      redirectPort: this.config.browserAuthPort,
+      logger: providerLogger,
+    };
+
+    // For mcp-abap-adt, AuthorizationCodeProvider is the only provider used
+    // Both 'abap' and 'btp' store types use AuthorizationCodeProvider
+    if (storeType === 'btp' || storeType === 'abap') {
+      return this.wrapLegacyTokenProvider(
+        new AuthorizationCodeProvider(providerConfig),
+      );
+    }
+
+    // This should never happen, but throw error for safety
+    throw new Error(
+      `Unsupported store type "${storeType}" for destination "${destination}". Only 'abap' and 'btp' are supported.`,
+    );
+  }
+
+  private wrapLegacyTokenProvider(
+    tokenProvider: ITokenProvider,
+  ): ITokenProvider & {
+    getConnectionConfig?: (
+      _authConfig: unknown,
+      _options?: unknown,
+    ) => Promise<{
+      connectionConfig: { authorizationToken?: string };
+      refreshToken?: string;
+    }>;
+  } {
+    if (typeof tokenProvider.getTokens !== 'function') {
+      throw new Error('AuthBrokerFactory: tokenProvider.getTokens is required');
+    }
+    if (typeof (tokenProvider as any).getConnectionConfig === 'function') {
+      return tokenProvider as any;
+    }
+
+    const getTokens = tokenProvider.getTokens.bind(tokenProvider);
+
+    return {
+      getTokens,
+      getConnectionConfig: async () => {
+        const tokenResult = await getTokens();
+        return {
+          connectionConfig: {
+            authorizationToken: tokenResult.authorizationToken,
+          },
+          refreshToken: tokenResult.refreshToken,
+        };
+      },
+    };
   }
 
   /**

@@ -1,11 +1,11 @@
 /**
  * UnlockTable Handler - Unlock ABAP Table
  *
- * Uses CrudClient.unlockTable from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.unlockTable from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -63,7 +63,7 @@ interface UnlockTableArgs {
 /**
  * Main handler for UnlockTable MCP tool
  *
- * Uses CrudClient.unlockTable - low-level single method call
+ * Uses AdtClient.unlockTable - low-level single method call
  */
 export async function handleUnlockTable(
   context: HandlerContext,
@@ -74,7 +74,7 @@ export async function handleUnlockTable(
     const { table_name, lock_handle, session_id, session_state } =
       args as UnlockTableArgs;
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_state) {
@@ -91,8 +91,10 @@ export async function handleUnlockTable(
 
     try {
       // Unlock table
-      await client.unlockTable({ tableName: tableName }, lock_handle);
-      const unlockResult = client.getUnlockResult();
+      const unlockState = await client
+        .getTable()
+        .unlock({ tableName: tableName }, lock_handle);
+      const unlockResult = unlockState.unlockResult;
 
       if (!unlockResult) {
         throw new Error(

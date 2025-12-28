@@ -1,11 +1,11 @@
 /**
  * ValidateStructure Handler - Validate ABAP Structure Name
  *
- * Uses CrudClient.validateStructure from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.validateStructure from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -70,7 +70,7 @@ interface ValidateStructureArgs {
 /**
  * Main handler for ValidateStructure MCP tool
  *
- * Uses CrudClient.validateStructure - low-level single method call
+ * Uses AdtClient.validateStructure - low-level single method call
  */
 export async function handleValidateStructure(
   context: HandlerContext,
@@ -93,7 +93,7 @@ export async function handleValidateStructure(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -108,16 +108,18 @@ export async function handleValidateStructure(
 
     try {
       // Validate structure
-      await client.validateStructure({
+      const validationState = await client.getStructure().validate({
         structureName: structureName,
         packageName: package_name.toUpperCase(),
         description: description,
       });
-      const validationResponse = client.getValidationResponse();
+      const validationResponse = validationState.validationResponse;
       if (!validationResponse) {
         throw new Error('Validation did not return a result');
       }
-      const result = parseValidationResponse(validationResponse);
+      const result = parseValidationResponse(
+        validationResponse as AxiosResponse,
+      );
 
       // Get updated session state after validation
 

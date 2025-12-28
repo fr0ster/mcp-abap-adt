@@ -29,6 +29,12 @@ export interface IAuthBrokerFactoryConfig {
    * - 'none': Logs URL and rejects immediately (automated tests)
    */
   browser?: string;
-  /** Logger instance */
+  /** Logger instance (used as fallback if specific loggers are not provided) */
   logger?: ILogger;
+  /** Optional logger for stores (service key store, session store) */
+  storeLogger?: ILogger;
+  /** Optional logger for token provider */
+  providerLogger?: ILogger;
+  /** Optional logger for auth broker */
+  brokerLogger?: ILogger;
 }

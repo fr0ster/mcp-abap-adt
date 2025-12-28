@@ -1,11 +1,11 @@
 /**
  * CheckMetadataExtension Handler - Syntax check for ABAP MetadataExtension
  *
- * Uses CrudClient.checkMetadataExtension from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.checkMetadataExtension from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -59,7 +59,7 @@ interface CheckMetadataExtensionArgs {
 /**
  * Main handler for CheckMetadataExtension MCP tool
  *
- * Uses CrudClient.checkMetadataExtension - low-level single method call
+ * Uses AdtClient.checkMetadataExtension - low-level single method call
  */
 export async function handleCheckMetadataExtension(
   context: HandlerContext,
@@ -75,7 +75,7 @@ export async function handleCheckMetadataExtension(
       return return_error(new Error('name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -90,8 +90,10 @@ export async function handleCheckMetadataExtension(
 
     try {
       // Check metadata extension
-      await client.checkMetadataExtension({ name: ddlxName });
-      const response = client.getCheckResult();
+      const checkState = await client
+        .getMetadataExtension()
+        .check({ name: ddlxName });
+      const response = checkState.checkResult;
 
       if (!response) {
         throw new Error(
@@ -100,7 +102,7 @@ export async function handleCheckMetadataExtension(
       }
 
       // Parse check results
-      const checkResult = parseCheckRunResponse(response);
+      const checkResult = parseCheckRunResponse(response as AxiosResponse);
 
       // Get updated session state after check
 

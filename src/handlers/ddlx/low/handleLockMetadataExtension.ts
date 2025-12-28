@@ -1,11 +1,11 @@
 /**
  * LockMetadataExtension Handler - Lock ABAP MetadataExtension
  *
- * Uses CrudClient.lockMetadataExtension from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.lockMetadataExtension from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -58,7 +58,7 @@ interface LockMetadataExtensionArgs {
 /**
  * Main handler for LockMetadataExtension MCP tool
  *
- * Uses CrudClient.lockMetadataExtension - low-level single method call
+ * Uses AdtClient.lockMetadataExtension - low-level single method call
  */
 export async function handleLockMetadataExtension(
   context: HandlerContext,
@@ -74,7 +74,7 @@ export async function handleLockMetadataExtension(
       return return_error(new Error('name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -89,8 +89,9 @@ export async function handleLockMetadataExtension(
 
     try {
       // Lock metadata extension
-      await client.lockMetadataExtension({ name: ddlxName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client
+        .getMetadataExtension()
+        .lock({ name: ddlxName });
 
       if (!lockHandle) {
         throw new Error(

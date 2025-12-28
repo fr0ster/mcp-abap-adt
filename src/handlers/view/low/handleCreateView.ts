@@ -1,11 +1,11 @@
 /**
  * CreateView Handler - Create ABAP View
  *
- * Uses CrudClient.createView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.createView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -84,7 +84,7 @@ interface CreateViewArgs {
 /**
  * Main handler for CreateView MCP tool
  *
- * Uses CrudClient.createView - low-level single method call
+ * Uses AdtClient.createView - low-level single method call
  */
 export async function handleCreateView(
   context: HandlerContext,
@@ -108,7 +108,7 @@ export async function handleCreateView(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -123,14 +123,14 @@ export async function handleCreateView(
 
     try {
       // Create view
-      await client.createView({
+      const createState = await client.getView().create({
         viewName,
         description,
         packageName: package_name,
         ddlSource: '',
         transportRequest: transport_request,
       });
-      const createResult = client.getCreateResult();
+      const createResult = createState.createResult;
 
       if (!createResult) {
         throw new Error(

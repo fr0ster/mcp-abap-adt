@@ -126,20 +126,26 @@ export class LowTester extends LambdaTester {
       connection: this.context.connection,
       logger: this.context.logger,
     });
+    const logger = this.context.logger;
 
     try {
       // Execute workflow in order: validate -> create -> lock -> update -> unlock -> activate
       if (this.workflowFunctions.validate) {
+        logger?.info(`   • validate ${this.context.objectName}`);
         const args = this.buildValidateArgs(this.context);
         await this.workflowFunctions.validate(handlerContext, args);
+        logger?.info(`   ✅ validate completed`);
       }
 
       if (this.workflowFunctions.create) {
+        logger?.info(`   • create ${this.context.objectName}`);
         const args = this.buildCreateArgs(this.context);
         await this.workflowFunctions.create(handlerContext, args);
+        logger?.info(`   ✅ create completed`);
       }
 
       if (this.workflowFunctions.lock) {
+        logger?.info(`   • lock ${this.context.objectName}`);
         const args = this.buildLockArgs(this.context);
         const lockResponse = await this.workflowFunctions.lock(
           handlerContext,
@@ -153,21 +159,28 @@ export class LowTester extends LambdaTester {
             this.context.lockHandle = lockHandle;
           }
         }
+        logger?.info(`   ✅ lock completed`);
       }
 
       if (this.workflowFunctions.update) {
+        logger?.info(`   • update ${this.context.objectName}`);
         const args = this.buildUpdateArgs(this.context);
         await this.workflowFunctions.update(handlerContext, args);
+        logger?.info(`   ✅ update completed`);
       }
 
       if (this.workflowFunctions.unlock) {
+        logger?.info(`   • unlock ${this.context.objectName}`);
         const args = this.buildUnlockArgs(this.context);
         await this.workflowFunctions.unlock(handlerContext, args);
+        logger?.info(`   ✅ unlock completed`);
       }
 
       if (this.workflowFunctions.activate) {
+        logger?.info(`   • activate ${this.context.objectName}`);
         const args = this.buildActivateArgs(this.context);
         await this.workflowFunctions.activate(handlerContext, args);
+        logger?.info(`   ✅ activate completed`);
       }
     } catch (error: any) {
       // Check if error is a skip condition

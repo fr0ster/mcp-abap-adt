@@ -1,11 +1,11 @@
 /**
  * ValidateView Handler - Validate ABAP View Name
  *
- * Uses CrudClient.validateView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.validateView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -70,7 +70,7 @@ interface ValidateViewArgs {
 /**
  * Main handler for ValidateView MCP tool
  *
- * Uses CrudClient.validateView - low-level single method call
+ * Uses AdtClient.validateView - low-level single method call
  */
 export async function handleValidateView(
   context: HandlerContext,
@@ -88,7 +88,7 @@ export async function handleValidateView(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -103,16 +103,18 @@ export async function handleValidateView(
 
     try {
       // Validate view
-      await client.validateView({
+      const validationState = await client.getView().validate({
         viewName: viewName,
         packageName: package_name.toUpperCase(),
         description: description,
       });
-      const validationResponse = client.getValidationResponse();
+      const validationResponse = validationState.validationResponse;
       if (!validationResponse) {
         throw new Error('Validation did not return a result');
       }
-      const result = parseValidationResponse(validationResponse);
+      const result = parseValidationResponse(
+        validationResponse as AxiosResponse,
+      );
 
       // Get updated session state after validation
 

@@ -66,6 +66,16 @@ See [Installation Guide](../installation/INSTALLATION.md) for full instructions.
 3. **Explore available tools**: See [AVAILABLE_TOOLS.md](AVAILABLE_TOOLS.md) for a complete list of tools you can use
 4. **Learn workflows**: See [scenarios/](scenarios/) for step-by-step guides on creating ABAP objects using low-level handlers
 
+## Package Tree Output
+
+`GetPackageTree` returns a package root with nested subpackages and a flat list of
+objects for each package. Each object includes:
+
+- `adtType` (ADT type string, e.g. `CLAS/OC`)
+- `type` (normalized object type)
+- `codeFormat` (`source` or `xml`)
+- `restoreStatus` (`ok` or `not-implemented`)
+
 ## Command Reference
 
 After installing from package, these commands are available:

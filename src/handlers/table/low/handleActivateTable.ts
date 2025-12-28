@@ -1,14 +1,15 @@
 /**
  * ActivateTable Handler - Activate ABAP Table
  *
- * Uses CrudClient.activateTable from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.activateTable from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
+  parseActivationResponse,
   restoreSessionInConnection,
   return_error,
   return_response,
@@ -58,7 +59,7 @@ interface ActivateTableArgs {
 /**
  * Main handler for ActivateTable MCP tool
  *
- * Uses CrudClient.activateTable - low-level single method call
+ * Uses AdtClient.activateTable - low-level single method call
  */
 export async function handleActivateTable(
   context: HandlerContext,
@@ -73,7 +74,7 @@ export async function handleActivateTable(
       return return_error(new Error('table_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -88,8 +89,10 @@ export async function handleActivateTable(
 
     try {
       // Activate table
-      await client.activateTable({ tableName: tableName });
-      const response = client.getActivateResult();
+      const activateState = await client
+        .getTable()
+        .activate({ tableName: tableName });
+      const response = activateState.activateResult;
 
       if (!response) {
         throw new Error(
@@ -98,7 +101,7 @@ export async function handleActivateTable(
       }
 
       // Parse activation response
-      const activationResult = client.parseActivationResponse(response.data);
+      const activationResult = parseActivationResponse(response.data);
       const success = activationResult.activated && activationResult.checked;
 
       // Get updated session state after activation

@@ -90,6 +90,15 @@ export async function handleGetLocalTypes(
         ),
       } as AxiosResponse);
     } catch (error: any) {
+      const status = error?.response?.status;
+      const url = error?.response?.config?.url;
+      const rawData = error?.response?.data;
+      const responseSnippet =
+        typeof rawData === 'string' ? rawData.slice(0, 800) : rawData;
+      logger?.warn(
+        `GetLocalTypes failed (HTTP ${status ?? 'unknown'}) for ${className}${url ? ` at ${url}` : ''}`,
+        responseSnippet ? { response: responseSnippet } : undefined,
+      );
       logger?.error(
         `Error reading local types for ${className}: ${error?.message || error}`,
       );
@@ -100,6 +109,13 @@ export async function handleGetLocalTypes(
         errorMessage = `Local types for ${className} not found.`;
       } else if (error.response?.status === 423) {
         errorMessage = `Class ${className} is locked by another user.`;
+      } else if (error.response?.status === 406) {
+        const status = error?.response?.status;
+        const url = error?.response?.config?.url;
+        const rawData = error?.response?.data;
+        const responseSnippet =
+          typeof rawData === 'string' ? rawData.slice(0, 800) : rawData;
+        errorMessage = `Local types read not supported on this system (HTTP ${status}). ${url ? `URL: ${url}. ` : ''}${responseSnippet ? `Response: ${typeof responseSnippet === 'string' ? responseSnippet : JSON.stringify(responseSnippet)}` : ''}`;
       }
 
       return return_error(new Error(errorMessage));

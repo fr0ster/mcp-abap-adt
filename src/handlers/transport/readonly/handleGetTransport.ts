@@ -7,8 +7,8 @@
  * - Included objects and tasks
  * - Change history
  *
- * @TODO Migrate to infrastructure module or enhance ReadOnlyClient.readTransport()
- * Current ReadOnlyClient.readTransport() doesn't support:
+ * @TODO Migrate to infrastructure module or enhance AdtClient.getRequest().read()
+ * Current AdtClient.getRequest().read() doesn't support:
  * - includeObjects and includeTasks query parameters
  * - XML parsing (returns raw AxiosResponse)
  * This handler provides richer functionality that should be added to adt-clients

@@ -1,11 +1,11 @@
 /**
  * UpdateClass Handler - Update ABAP Class Source Code
  *
- * Uses CrudClient.updateClass from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.updateClass from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -49,7 +49,7 @@ interface UpdateClassArgs {
 /**
  * Main handler for UpdateClass MCP tool
  *
- * Uses CrudClient.updateClass - low-level single method call
+ * Uses AdtClient.updateClass - low-level single method call
  */
 export async function handleUpdateClass(
   context: HandlerContext,
@@ -66,7 +66,7 @@ export async function handleUpdateClass(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     const className = class_name.toUpperCase();
 
@@ -74,11 +74,13 @@ export async function handleUpdateClass(
 
     try {
       // Update class with source code
-      await client.updateClass(
-        { className, sourceCode: source_code },
-        lock_handle,
-      );
-      const updateResult = client.getUpdateResult();
+      const updateState = await client
+        .getClass()
+        .update(
+          { className, sourceCode: source_code },
+          { lockHandle: lock_handle },
+        );
+      const updateResult = updateState.updateResult;
 
       if (!updateResult) {
         throw new Error(

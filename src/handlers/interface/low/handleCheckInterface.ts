@@ -1,11 +1,11 @@
 /**
  * CheckInterface Handler - Syntax check for ABAP Interface
  *
- * Uses CrudClient.checkInterface from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.checkInterface from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -59,7 +59,7 @@ interface CheckInterfaceArgs {
 /**
  * Main handler for CheckInterface MCP tool
  *
- * Uses CrudClient.checkInterface - low-level single method call
+ * Uses AdtClient.checkInterface - low-level single method call
  */
 export async function handleCheckInterface(
   context: HandlerContext,
@@ -75,7 +75,7 @@ export async function handleCheckInterface(
       return return_error(new Error('interface_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -88,8 +88,10 @@ export async function handleCheckInterface(
 
     try {
       // Check interface
-      await client.checkInterface({ interfaceName: interfaceName });
-      const response = client.getCheckResult();
+      const checkState = await client
+        .getInterface()
+        .check({ interfaceName: interfaceName });
+      const response = checkState.checkResult;
 
       if (!response) {
         throw new Error(
@@ -98,7 +100,7 @@ export async function handleCheckInterface(
       }
 
       // Parse check results
-      const checkResult = parseCheckRunResponse(response);
+      const checkResult = parseCheckRunResponse(response as AxiosResponse);
 
       // Get updated session state after check
 

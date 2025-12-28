@@ -1,12 +1,12 @@
 /**
  * LockBehaviorDefinition Handler - Lock ABAP Behavior Definition
  *
- * Uses CrudClient.lockBehaviorDefinition from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.lockBehaviorDefinition from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { IBehaviorDefinitionConfig } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -59,7 +59,7 @@ interface LockBehaviorDefinitionArgs {
 /**
  * Main handler for LockBehaviorDefinition MCP tool
  *
- * Uses CrudClient.lockBehaviorDefinition - low-level single method call
+ * Uses AdtClient.lockBehaviorDefinition - low-level single method call
  */
 export async function handleLockBehaviorDefinition(
   context: HandlerContext,
@@ -75,7 +75,7 @@ export async function handleLockBehaviorDefinition(
       return return_error(new Error('name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -90,11 +90,10 @@ export async function handleLockBehaviorDefinition(
 
     try {
       // Lock behavior definition - using types from adt-clients
-      const lockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = {
+      const lockConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
         name: bdefName,
       };
-      await client.lockBehaviorDefinition(lockConfig);
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client.getBehaviorDefinition().lock(lockConfig);
 
       if (!lockHandle) {
         throw new Error(

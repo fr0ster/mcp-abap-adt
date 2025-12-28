@@ -1,11 +1,11 @@
 /**
  * DeleteView Handler - Delete ABAP View
  *
- * Uses CrudClient.deleteView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.deleteView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -42,7 +42,7 @@ interface DeleteViewArgs {
 /**
  * Main handler for DeleteView MCP tool
  *
- * Uses CrudClient.deleteView - low-level single method call
+ * Uses AdtClient.deleteView - low-level single method call
  */
 export async function handleDeleteView(
   context: HandlerContext,
@@ -57,18 +57,18 @@ export async function handleDeleteView(
       return return_error(new Error('view_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const viewName = view_name.toUpperCase();
 
     logger?.info(`Starting view deletion: ${viewName}`);
 
     try {
       // Delete view
-      await client.deleteView({
+      const deleteState = await client.getView().delete({
         viewName: viewName,
         transportRequest: transport_request,
       });
-      const deleteResult = client.getDeleteResult();
+      const deleteResult = deleteState.deleteResult;
 
       if (!deleteResult) {
         throw new Error(

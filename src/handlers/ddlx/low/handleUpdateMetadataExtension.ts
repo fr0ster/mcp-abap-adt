@@ -1,11 +1,11 @@
 /**
  * UpdateMetadataExtension Handler - Update ABAP Metadata Extension Source Code
  *
- * Uses CrudClient.updateMetadataExtension from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.updateMetadataExtension from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -70,7 +70,7 @@ interface UpdateMetadataExtensionArgs {
 /**
  * Main handler for UpdateMetadataExtension MCP tool
  *
- * Uses CrudClient.updateMetadataExtension - low-level single method call
+ * Uses AdtClient.updateMetadataExtension - low-level single method call
  */
 export async function handleUpdateMetadataExtension(
   context: HandlerContext,
@@ -88,7 +88,7 @@ export async function handleUpdateMetadataExtension(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -105,14 +105,14 @@ export async function handleUpdateMetadataExtension(
 
     try {
       // Update metadata extension with source code
-      await client.updateMetadataExtension(
+      const updateState = await client.getMetadataExtension().update(
         {
           name: metadataExtensionName,
           sourceCode: source_code,
         },
-        lock_handle,
+        { lockHandle: lock_handle },
       );
-      const updateResult = client.getUpdateResult();
+      const updateResult = updateState.updateResult;
 
       if (!updateResult) {
         throw new Error(

@@ -1,14 +1,15 @@
 /**
  * ActivateMetadataExtension Handler - Activate ABAP Metadata Extension
  *
- * Uses CrudClient.activateMetadataExtension from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.activateMetadataExtension from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
+  parseActivationResponse,
   restoreSessionInConnection,
   return_error,
   return_response,
@@ -58,7 +59,7 @@ interface ActivateMetadataExtensionArgs {
 /**
  * Main handler for ActivateMetadataExtension MCP tool
  *
- * Uses CrudClient.activateMetadataExtension - low-level single method call
+ * Uses AdtClient.activateMetadataExtension - low-level single method call
  */
 export async function handleActivateMetadataExtension(
   context: HandlerContext,
@@ -74,7 +75,7 @@ export async function handleActivateMetadataExtension(
       return return_error(new Error('name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -91,8 +92,10 @@ export async function handleActivateMetadataExtension(
 
     try {
       // Activate metadata extension
-      await client.activateMetadataExtension({ name: metadataExtensionName });
-      const response = client.getActivateResult();
+      const activateState = await client
+        .getMetadataExtension()
+        .activate({ name: metadataExtensionName });
+      const response = activateState.activateResult;
 
       if (!response) {
         throw new Error(
@@ -101,7 +104,7 @@ export async function handleActivateMetadataExtension(
       }
 
       // Parse activation response
-      const activationResult = client.parseActivationResponse(response.data);
+      const activationResult = parseActivationResponse(response.data);
       const success = activationResult.activated && activationResult.checked;
 
       // Get updated session state after activation

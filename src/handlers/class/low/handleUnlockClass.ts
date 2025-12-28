@@ -1,11 +1,11 @@
 /**
  * UnlockClass Handler - Unlock ABAP Class
  *
- * Uses CrudClient.unlockClass from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.unlockClass from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -41,7 +41,7 @@ interface UnlockClassArgs {
 /**
  * Main handler for UnlockClass MCP tool
  *
- * Uses CrudClient.unlockClass - low-level single method call
+ * Uses AdtClient.unlockClass - low-level single method call
  */
 export async function handleUnlockClass(
   context: HandlerContext,
@@ -56,7 +56,7 @@ export async function handleUnlockClass(
       return return_error(new Error('class_name and lock_handle are required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     const className = class_name.toUpperCase();
 
@@ -64,8 +64,10 @@ export async function handleUnlockClass(
 
     try {
       // Unlock class
-      await client.unlockClass({ className }, lock_handle);
-      const unlockResult = client.getUnlockResult();
+      const unlockState = await client
+        .getClass()
+        .unlock({ className }, lock_handle);
+      const unlockResult = unlockState.unlockResult;
 
       if (!unlockResult) {
         throw new Error(

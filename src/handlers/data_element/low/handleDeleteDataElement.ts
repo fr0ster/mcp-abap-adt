@@ -1,11 +1,11 @@
 /**
  * DeleteDataElement Handler - Delete ABAP DataElement
  *
- * Uses CrudClient.deleteDataElement from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.deleteDataElement from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -42,7 +42,7 @@ interface DeleteDataElementArgs {
 /**
  * Main handler for DeleteDataElement MCP tool
  *
- * Uses CrudClient.deleteDataElement - low-level single method call
+ * Uses AdtClient.deleteDataElement - low-level single method call
  */
 export async function handleDeleteDataElement(
   context: HandlerContext,
@@ -58,18 +58,18 @@ export async function handleDeleteDataElement(
       return return_error(new Error('data_element_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const dataElementName = data_element_name.toUpperCase();
 
     logger?.info(`Starting data element deletion: ${dataElementName}`);
 
     try {
       // Delete data element
-      await client.deleteDataElement({
+      const deleteState = await client.getDataElement().delete({
         dataElementName: dataElementName,
         transportRequest: transport_request,
       });
-      const deleteResult = client.getDeleteResult();
+      const deleteResult = deleteState.deleteResult;
 
       if (!deleteResult) {
         throw new Error(

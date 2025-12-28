@@ -1,11 +1,11 @@
 /**
  * UnlockPackage Handler - Unlock ABAP Package
  *
- * Uses CrudClient.unlockPackage from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.unlockPackage from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -70,7 +70,7 @@ interface UnlockPackageArgs {
 /**
  * Main handler for UnlockPackage MCP tool
  *
- * Uses CrudClient.unlockPackage - low-level single method call
+ * Uses AdtClient.unlockPackage - low-level single method call
  */
 export async function handleUnlockPackage(
   context: HandlerContext,
@@ -95,7 +95,7 @@ export async function handleUnlockPackage(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_state) {
@@ -114,21 +114,11 @@ export async function handleUnlockPackage(
     );
 
     try {
-      // Get builder instance and set lockHandle in state before unlock
-      // This is needed because PackageBuilder.unlock() checks this.state.lockHandle,
-      // but CrudClient.unlockPackage() only sets (builder as any).lockHandle
-      const builder = (client as any).getPackageBuilder({
-        packageName,
-        superPackage,
-      });
-      if (builder) {
-        // Set lockHandle in state so unlock() can find it
-        (builder as any).state.lockHandle = lock_handle;
-      }
-
-      // Unlock package using CrudClient (with proper session state restored)
-      await client.unlockPackage({ packageName, superPackage }, lock_handle);
-      const unlockResult = client.getUnlockResult();
+      // Unlock package using AdtClient (with proper session state restored)
+      const unlockState = await client
+        .getPackage()
+        .unlock({ packageName, superPackage }, lock_handle);
+      const unlockResult = unlockState.unlockResult;
 
       if (!unlockResult) {
         throw new Error(

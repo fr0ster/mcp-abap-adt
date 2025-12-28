@@ -1,15 +1,15 @@
 /**
  * CreateBehaviorDefinition Handler - Create ABAP Behavior Definition
  *
- * Uses CrudClient.createBehaviorDefinition from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.createBehaviorDefinition from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
 import type {
-  BehaviorDefinitionBuilderConfig,
   BehaviorDefinitionImplementationType,
+  IBehaviorDefinitionConfig,
 } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -96,7 +96,7 @@ interface CreateBehaviorDefinitionArgs {
 /**
  * Main handler for CreateBehaviorDefinition MCP tool
  *
- * Uses CrudClient.createBehaviorDefinition - low-level single method call
+ * Uses AdtClient.createBehaviorDefinition - low-level single method call
  */
 export async function handleCreateBehaviorDefinition(
   context: HandlerContext,
@@ -131,7 +131,7 @@ export async function handleCreateBehaviorDefinition(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -147,7 +147,7 @@ export async function handleCreateBehaviorDefinition(
     try {
       // Create behavior definition - using types from adt-clients
       const createConfig: Pick<
-        BehaviorDefinitionBuilderConfig,
+        IBehaviorDefinitionConfig,
         | 'name'
         | 'description'
         | 'packageName'
@@ -162,8 +162,10 @@ export async function handleCreateBehaviorDefinition(
         rootEntity: root_entity,
         implementationType: implementation_type,
       };
-      await client.createBehaviorDefinition(createConfig);
-      const createResult = client.getCreateResult();
+      const createState = await client
+        .getBehaviorDefinition()
+        .create(createConfig);
+      const createResult = createState.createResult;
 
       if (!createResult) {
         throw new Error(

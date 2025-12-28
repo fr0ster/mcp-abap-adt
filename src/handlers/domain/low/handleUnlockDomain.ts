@@ -1,11 +1,11 @@
 /**
  * UnlockDomain Handler - Unlock ABAP Domain
  *
- * Uses CrudClient.unlockDomain from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.unlockDomain from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -63,7 +63,7 @@ interface UnlockDomainArgs {
 /**
  * Main handler for UnlockDomain MCP tool
  *
- * Uses CrudClient.unlockDomain - low-level single method call
+ * Uses AdtClient.unlockDomain - low-level single method call
  */
 export async function handleUnlockDomain(
   context: HandlerContext,
@@ -81,7 +81,7 @@ export async function handleUnlockDomain(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     const domainName = domain_name.toUpperCase();
 
@@ -115,10 +115,12 @@ export async function handleUnlockDomain(
     try {
       // Unlock domain
       logger?.debug(
-        `Calling client.unlockDomain({ domainName: ${domainName} }, ${lock_handle})`,
+        `Calling client.getDomain().unlock({ domainName: ${domainName} }, ${lock_handle})`,
       );
-      await client.unlockDomain({ domainName }, lock_handle);
-      const unlockResult = client.getUnlockResult();
+      const unlockState = await client
+        .getDomain()
+        .unlock({ domainName }, lock_handle);
+      const unlockResult = unlockState.unlockResult;
 
       if (!unlockResult) {
         throw new Error(

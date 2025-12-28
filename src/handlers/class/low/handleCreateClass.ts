@@ -1,11 +1,11 @@
 /**
  * CreateClass Handler - Create ABAP Class
  *
- * Uses CrudClient.createClass from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.createClass from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -94,7 +94,7 @@ interface CreateClassArgs {
 /**
  * Main handler for CreateClass MCP tool
  *
- * Uses CrudClient.createClass - low-level single method call
+ * Uses AdtClient.createClass - low-level single method call
  */
 export async function handleCreateClass(
   context: HandlerContext,
@@ -132,7 +132,7 @@ export async function handleCreateClass(
       logger?.debug(`Connection can refresh token: ${canRefresh}`);
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     const className = class_name.toUpperCase();
 
@@ -140,7 +140,7 @@ export async function handleCreateClass(
 
     try {
       // Create class
-      await client.createClass({
+      const createState = await client.getClass().create({
         className,
         description,
         packageName: package_name,
@@ -150,7 +150,7 @@ export async function handleCreateClass(
         abstract,
         createProtected: create_protected,
       });
-      const createResult = client.getCreateResult();
+      const createResult = createState.createResult;
 
       if (!createResult) {
         throw new Error(

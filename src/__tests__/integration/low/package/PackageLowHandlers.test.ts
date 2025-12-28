@@ -13,7 +13,7 @@
  * Run: npm test -- --testPathPattern=integration/package
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { handleCreatePackage } from '../../../../handlers/package/low/handleCreatePackage';
 import { handleDeletePackage } from '../../../../handlers/package/low/handleDeletePackage';
@@ -68,21 +68,21 @@ describe('Package Low-Level Handlers Integration', () => {
       const defaultPackage = config.environment?.default_package;
       if (defaultPackage && connection) {
         try {
-          const client = new CrudClient(connection);
-          const defaultPackageCheck = await client.checkPackage({
+          const client = new AdtClient(connection);
+          const defaultPackageCheck = await client.getPackage().check({
             packageName: defaultPackage.trim(),
             superPackage: undefined,
           });
-          if (defaultPackageCheck?.status === 200) {
+          if (defaultPackageCheck?.checkResult?.status === 200) {
             defaultPackageExists = true;
             if (process.env.DEBUG_TESTS === 'true') {
-              console.log(
+              testLogger?.debug(
                 `[PRE_CHECK] ✓ Default package ${defaultPackage} exists and is accessible`,
               );
             }
           } else {
             console.error(
-              `❌ Default package ${defaultPackage} check returned status ${defaultPackageCheck?.status}. All package tests will fail.`,
+              `❌ Default package ${defaultPackage} check returned status ${defaultPackageCheck?.checkResult?.status}. All package tests will fail.`,
             );
           }
         } catch (defaultPackageError: any) {
@@ -143,14 +143,14 @@ describe('Package Low-Level Handlers Integration', () => {
           !testCase ||
           !testPackageName
         ) {
-          console.log(
+          testLogger?.info(
             '⏭️  Skipping test: No configuration, connection or test case',
           );
           return;
         }
 
         if (!defaultPackageExists) {
-          console.log(
+          testLogger?.info(
             '⏭️  Skipping test: Default package does not exist or is not accessible',
           );
           return;
@@ -290,7 +290,7 @@ describe('Package Low-Level Handlers Integration', () => {
               errorMsg.includes('already exists') ||
               errorMsg.includes('does already exist')
             ) {
-              console.log(
+              testLogger?.info(
                 `⏭️  Package ${packageName} already exists, skipping test`,
               );
               return;
@@ -374,6 +374,8 @@ describe('Package Low-Level Handlers Integration', () => {
           expect(unlockData.session_id).toBe(lockSession.session_id);
 
           session = updateSessionFromResponse(session, unlockData);
+          lockHandleForCleanup = null;
+          lockSessionForCleanup = null;
           await delay(getOperationDelay('unlock', testCase));
 
           // Store session for cleanup (after unlock, use updated session)
@@ -400,7 +402,7 @@ describe('Package Low-Level Handlers Integration', () => {
             stackLines.find(
               (line: string) =>
                 (line.includes('PackageBuilder') ||
-                  line.includes('CrudClient.createPackage') ||
+                  line.includes('AdtClient.createPackage') ||
                   line.includes('handleCreatePackage') ||
                   line.includes('createPackage')) &&
                 !line.includes('test.ts') &&
@@ -447,12 +449,14 @@ describe('Package Low-Level Handlers Integration', () => {
                 testLogger?.info(
                   `🧹 Cleanup: Deleting package ${packageName}...`,
                 );
+                const cleanupConfig = (connection as any).getConfig?.();
                 const deleteResponse = await handleDeletePackage(
                   { connection, logger: testLogger },
                   {
                     package_name: packageName,
                     transport_request: transportRequest,
                     force_new_connection: true,
+                    connection_config: cleanupConfig,
                   },
                 );
 

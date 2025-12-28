@@ -1,11 +1,11 @@
 /**
  * DeleteClass Handler - Delete ABAP Class
  *
- * Uses CrudClient.deleteClass from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.deleteClass from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -41,7 +41,7 @@ interface DeleteClassArgs {
 /**
  * Main handler for DeleteClass MCP tool
  *
- * Uses CrudClient.deleteClass - low-level single method call
+ * Uses AdtClient.deleteClass - low-level single method call
  */
 export async function handleDeleteClass(
   context: HandlerContext,
@@ -56,18 +56,18 @@ export async function handleDeleteClass(
       return return_error(new Error('class_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const className = class_name.toUpperCase();
 
     logger?.info(`Starting class deletion: ${className}`);
 
     try {
       // Delete class
-      await client.deleteClass({
+      const deleteState = await client.getClass().delete({
         className,
         transportRequest: transport_request,
       });
-      const deleteResult = client.getDeleteResult();
+      const deleteResult = deleteState.deleteResult;
 
       if (!deleteResult) {
         throw new Error(

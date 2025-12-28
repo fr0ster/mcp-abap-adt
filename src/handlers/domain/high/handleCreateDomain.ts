@@ -7,7 +7,7 @@
  * Workflow: create -> check -> unlock -> (activate)
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -161,18 +161,18 @@ export async function handleCreateDomain(
 
     try {
       // Create client
-      const client = new CrudClient(connection);
+      const client = new AdtClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Validate
-      await client.validateDomain({
+      await client.getDomain().validate({
         domainName,
         packageName: typedArgs.package_name,
         description: typedArgs.description || domainName,
       });
 
       // Create
-      await client.createDomain({
+      const createState = await client.getDomain().create({
         domainName,
         description: typedArgs.description || domainName,
         packageName: typedArgs.package_name,
@@ -180,11 +180,10 @@ export async function handleCreateDomain(
       });
 
       // Lock
-      await client.lockDomain({ domainName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client.getDomain().lock({ domainName });
 
       // Update with properties
-      await client.updateDomain(
+      await client.getDomain().update(
         {
           domainName,
           packageName: typedArgs.package_name,
@@ -198,13 +197,13 @@ export async function handleCreateDomain(
           value_table: typedArgs.value_table,
           fixed_values: typedArgs.fixed_values,
         },
-        lockHandle,
+        { lockHandle },
       );
 
       // Check
       try {
         await safeCheckOperation(
-          () => client.checkDomain({ domainName }),
+          () => client.getDomain().check({ domainName }),
           domainName,
           {
             debug: (message: string) => logger?.debug(message),
@@ -223,17 +222,17 @@ export async function handleCreateDomain(
       }
 
       // Unlock
-      await client.unlockDomain({ domainName }, lockHandle);
+      await client.getDomain().unlock({ domainName }, lockHandle);
 
       // Activate if requested
       if (shouldActivate) {
-        await client.activateDomain({ domainName });
+        await client.getDomain().activate({ domainName });
       } else {
         logger?.debug(`Skipping activation for: ${domainName}`);
       }
 
       // Get domain details from create result (createDomain already does verification)
-      const createResult = client.getCreateResult();
+      const createResult = createState.createResult;
       let domainDetails = null;
       if (
         createResult?.data &&

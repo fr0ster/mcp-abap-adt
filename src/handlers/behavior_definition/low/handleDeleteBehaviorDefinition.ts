@@ -1,12 +1,12 @@
 /**
  * DeleteBehaviorDefinition Handler - Delete ABAP Behavior Definition
  *
- * Uses CrudClient.deleteBehaviorDefinition from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.deleteBehaviorDefinition from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { IBehaviorDefinitionConfig } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -43,7 +43,7 @@ interface DeleteBehaviorDefinitionArgs {
 /**
  * Main handler for DeleteBehaviorDefinition MCP tool
  *
- * Uses CrudClient.deleteBehaviorDefinition - low-level single method call
+ * Uses AdtClient.deleteBehaviorDefinition - low-level single method call
  */
 export async function handleDeleteBehaviorDefinition(
   context: HandlerContext,
@@ -58,20 +58,22 @@ export async function handleDeleteBehaviorDefinition(
       return return_error(new Error('name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const bdefName = name.toUpperCase();
 
     logger?.info(`Starting behavior definition deletion: ${bdefName}`);
 
     try {
       // Delete behavior definition - using types from adt-clients
-      const deleteConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> &
-        Partial<Pick<BehaviorDefinitionBuilderConfig, 'transportRequest'>> = {
+      const deleteConfig: Pick<IBehaviorDefinitionConfig, 'name'> &
+        Partial<Pick<IBehaviorDefinitionConfig, 'transportRequest'>> = {
         name: bdefName,
         ...(transport_request && { transportRequest: transport_request }),
       };
-      await client.deleteBehaviorDefinition(deleteConfig);
-      const deleteResult = client.getDeleteResult();
+      const deleteState = await client
+        .getBehaviorDefinition()
+        .delete(deleteConfig);
+      const deleteResult = deleteState.deleteResult;
 
       if (!deleteResult) {
         throw new Error(

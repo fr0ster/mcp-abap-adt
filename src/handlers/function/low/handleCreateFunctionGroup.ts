@@ -1,11 +1,11 @@
 /**
  * CreateFunctionGroup Handler - Create ABAP Function Group
  *
- * Uses CrudClient.createFunctionGroup from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.createFunctionGroup from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -75,7 +75,7 @@ interface CreateFunctionGroupArgs {
 /**
  * Main handler for CreateFunctionGroup MCP tool
  *
- * Uses CrudClient.createFunctionGroup - low-level single method call
+ * Uses AdtClient.createFunctionGroup - low-level single method call
  */
 export async function handleCreateFunctionGroup(
   context: HandlerContext,
@@ -101,7 +101,7 @@ export async function handleCreateFunctionGroup(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -115,13 +115,13 @@ export async function handleCreateFunctionGroup(
 
     try {
       // Create function group
-      await client.createFunctionGroup({
+      const createState = await client.getFunctionGroup().create({
         functionGroupName,
         description,
         packageName: package_name,
         transportRequest: transport_request,
       });
-      const createResult = client.getCreateResult();
+      const createResult = createState.createResult;
 
       if (!createResult) {
         throw new Error(
@@ -154,6 +154,62 @@ export async function handleCreateFunctionGroup(
         `Error creating function group ${functionGroupName}: ${error?.message || error}`,
       );
 
+      const responseData =
+        typeof error.response?.data === 'string'
+          ? error.response.data
+          : error.response?.data
+            ? JSON.stringify(error.response.data)
+            : '';
+      const responseSnippet = responseData
+        ? responseData.slice(0, 1000)
+        : undefined;
+      if (responseSnippet) {
+        logger?.warn(
+          `CreateFunctionGroup returned HTTP ${error.response?.status} for ${functionGroupName}. Response: ${responseSnippet}`,
+        );
+      }
+
+      if (
+        error.response?.status === 400 &&
+        typeof error.response?.data === 'string' &&
+        error.response.data.includes('Interface SAPL') &&
+        error.response.data.includes('has not been created')
+      ) {
+        logger?.warn(
+          `CreateFunctionGroup got interface warning for ${functionGroupName}, attempting read to verify object`,
+        );
+        try {
+          const readState = await client
+            .getFunctionGroup()
+            .read({ functionGroupName }, 'inactive', { withLongPolling: true });
+          if (readState?.readResult) {
+            logger?.warn(
+              `CreateFunctionGroup returned interface error, but ${functionGroupName} is readable; continuing as success`,
+            );
+            return return_response({
+              data: JSON.stringify(
+                {
+                  success: true,
+                  function_group_name: functionGroupName,
+                  description,
+                  package_name: package_name,
+                  transport_request: transport_request || null,
+                  session_id: session_id || null,
+                  session_state: null,
+                  warning:
+                    'Interface SAPL* not created during create (400). Object verified by read.',
+                  message: `Function group ${functionGroupName} created successfully (interface warning ignored).`,
+                },
+                null,
+                2,
+              ),
+            } as AxiosResponse);
+          }
+        } catch (_readError) {
+          // Fall through to standard error handling below.
+        }
+      }
+
       // Parse error message
       let errorMessage = `Failed to create function group: ${error.message || String(error)}`;
 
@@ -179,6 +235,8 @@ export async function handleCreateFunctionGroup(
         } catch (_parseError) {
           // Ignore parse errors
         }
+      } else if (responseSnippet) {
+        errorMessage = `Failed to create function group (HTTP ${error.response?.status}): ${responseSnippet}`;
       }
 
       return return_error(new Error(errorMessage));

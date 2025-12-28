@@ -1,11 +1,11 @@
 /**
  * CreateDataElement Handler - Create ABAP DataElement
  *
- * Uses CrudClient.createDataElement from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.createDataElement from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -105,7 +105,7 @@ interface CreateDataElementArgs {
 /**
  * Main handler for CreateDataElement MCP tool
  *
- * Uses CrudClient.createDataElement - low-level single method call
+ * Uses AdtClient.createDataElement - low-level single method call
  */
 export async function handleCreateDataElement(
   context: HandlerContext,
@@ -136,7 +136,7 @@ export async function handleCreateDataElement(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -188,8 +188,8 @@ export async function handleCreateDataElement(
         transportRequest: transport_request,
       };
 
-      await client.createDataElement(createConfig);
-      const createResult = client.getCreateResult();
+      const createState = await client.getDataElement().create(createConfig);
+      const createResult = createState.createResult;
 
       if (!createResult) {
         logger?.error(

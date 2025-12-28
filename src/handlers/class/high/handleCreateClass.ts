@@ -4,7 +4,7 @@
  * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
 
-import type { ClassBuilderState } from '@mcp-abap-adt/adt-clients';
+import type { IClassState } from '@mcp-abap-adt/adt-clients';
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -128,7 +128,7 @@ export async function handleCreateClass(
     // AdtClass.create() handles cleanup (unlock) in its catch block, so we should let errors propagate
     logger?.info(`Creating class with AdtClass: ${className}`);
 
-    let state: ClassBuilderState;
+    let state: IClassState;
     try {
       state = await adtClass.create(
         {

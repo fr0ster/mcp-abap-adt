@@ -4,7 +4,7 @@
  * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -63,13 +63,13 @@ export async function handleUpdateClass(
   );
 
   try {
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const shouldActivate = args.activate === true;
+    let lockHandle: string | undefined;
 
     // Lock
     logger?.debug(`Locking class: ${className}`);
-    await client.lockClass({ className: className });
-    const lockHandle = client.getLockHandle();
+    lockHandle = await client.getClass().lock({ className: className });
     logger?.debug(
       `Class locked: ${className} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
     );
@@ -81,11 +81,12 @@ export async function handleUpdateClass(
       try {
         await safeCheckOperation(
           () =>
-            client.checkClass(
-              { className: className },
-              'inactive',
-              args.source_code,
-            ),
+            client
+              .getClass()
+              .check(
+                { className: className, sourceCode: args.source_code },
+                'inactive',
+              ),
           className,
           { debug: (message: string) => logger?.debug(message) },
         );
@@ -108,10 +109,12 @@ export async function handleUpdateClass(
       // Update (if check passed)
       if (checkNewCodePassed) {
         logger?.debug(`Updating class source code: ${className}`);
-        await client.updateClass(
-          { className: className, sourceCode: args.source_code },
-          lockHandle,
-        );
+        await client
+          .getClass()
+          .update(
+            { className: className, sourceCode: args.source_code },
+            { lockHandle },
+          );
         logger?.info(`Class source code updated: ${className}`);
       } else {
         logger?.warn(`Skipping update - new code check failed: ${className}`);
@@ -119,14 +122,16 @@ export async function handleUpdateClass(
 
       // Unlock
       logger?.debug(`Unlocking class: ${className}`);
-      await client.unlockClass({ className: className }, lockHandle);
-      logger?.info(`Class unlocked: ${className}`);
+      if (lockHandle) {
+        await client.getClass().unlock({ className: className }, lockHandle);
+        logger?.info(`Class unlocked: ${className}`);
+      }
 
       // Check inactive after unlock
       logger?.debug(`Checking inactive version: ${className}`);
       try {
         await safeCheckOperation(
-          () => client.checkClass({ className: className }, 'inactive'),
+          () => client.getClass().check({ className: className }, 'inactive'),
           className,
           { debug: (message: string) => logger?.debug(message) },
         );
@@ -144,7 +149,7 @@ export async function handleUpdateClass(
       // Activate if requested
       if (shouldActivate) {
         logger?.debug(`Activating class: ${className}`);
-        await client.activateClass({ className: className });
+        await client.getClass().activate({ className: className });
         logger?.info(`Class activated: ${className}`);
       } else {
         logger?.debug(`Skipping activation for: ${className}`);
@@ -167,10 +172,9 @@ export async function handleUpdateClass(
     } catch (workflowError: any) {
       // Try to unlock on error
       try {
-        const lockHandle = client.getLockHandle();
         if (lockHandle) {
           logger?.warn(`Attempting to unlock class after error: ${className}`);
-          await client.unlockClass({ className: className }, lockHandle);
+          await client.getClass().unlock({ className: className }, lockHandle);
           logger?.warn(`Unlocked class after error: ${className}`);
         }
       } catch (unlockError: any) {

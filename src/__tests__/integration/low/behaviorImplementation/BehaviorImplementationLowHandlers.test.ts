@@ -13,7 +13,7 @@
  * Run: npm test -- --testPathPattern=integration/behaviorImplementation
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { handleLockBehaviorImplementation } from '../../../../handlers/behavior_implementation/low/handleLockBehaviorImplementation';
 import { handleValidateBehaviorImplementation } from '../../../../handlers/behavior_implementation/low/handleValidateBehaviorImplementation';
@@ -295,27 +295,16 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
           }
           const implementationCode = testCase.params.implementation_code;
 
-          // Update main source with "FOR BEHAVIOR OF" clause first
-          const client = new CrudClient(connection);
+          const client = new AdtClient(connection);
 
-          // Update main source with "FOR BEHAVIOR OF"
-          await client.updateBehaviorImplementationMainSource(
-            {
-              className: className,
-              behaviorDefinition: behaviorDefinition,
-            },
-            lockHandle,
-          );
-
-          // Update implementations include with local handler class
-          // Use CrudClient method with custom code
-          await client.updateBehaviorImplementation(
+          // Update main source + implementations include in low-level mode
+          await client.getBehaviorImplementation().update(
             {
               className: className,
               behaviorDefinition: behaviorDefinition,
               implementationCode: implementationCode,
             },
-            lockHandle,
+            { lockHandle },
           );
 
           testLogger?.success(

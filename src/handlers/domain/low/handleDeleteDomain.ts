@@ -1,11 +1,11 @@
 /**
  * DeleteDomain Handler - Delete ABAP Domain
  *
- * Uses CrudClient.deleteDomain from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.deleteDomain from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -42,7 +42,7 @@ interface DeleteDomainArgs {
 /**
  * Main handler for DeleteDomain MCP tool
  *
- * Uses CrudClient.deleteDomain - low-level single method call
+ * Uses AdtClient.deleteDomain - low-level single method call
  */
 export async function handleDeleteDomain(
   context: HandlerContext,
@@ -57,18 +57,18 @@ export async function handleDeleteDomain(
       return return_error(new Error('domain_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const domainName = domain_name.toUpperCase();
 
     logger?.info(`Starting domain deletion: ${domainName}`);
 
     try {
       // Delete domain
-      await client.deleteDomain({
+      const deleteState = await client.getDomain().delete({
         domainName: domainName,
         transportRequest: transport_request,
       });
-      const deleteResult = client.getDeleteResult();
+      const deleteResult = deleteState.deleteResult;
 
       if (!deleteResult) {
         throw new Error(

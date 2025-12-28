@@ -1,11 +1,11 @@
 /**
  * ActivateClassTestClasses Handler - Activate ABAP Unit test include for a class
  *
- * Uses CrudClient.activateTestClasses from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.activateTestClasses from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -74,7 +74,7 @@ export async function handleActivateClassTestClasses(
       return return_error(new Error('class_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -89,11 +89,11 @@ export async function handleActivateClassTestClasses(
     logger?.info(`Starting test classes activation for: ${className}`);
 
     try {
-      await client.activateTestClasses({
+      const classClient = client.getClass() as any;
+      const activationResult = await classClient.activateTestClasses({
         className,
         testClassName: testClassName ?? className,
       });
-      const activationResult = client.getTestClassActivateResult();
 
       logger?.info(`✅ ActivateClassTestClasses completed: ${className}`);
 

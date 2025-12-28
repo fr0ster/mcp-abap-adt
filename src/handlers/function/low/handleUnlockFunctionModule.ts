@@ -1,11 +1,11 @@
 /**
  * UnlockFunctionModule Handler - Unlock ABAP Function Module
  *
- * Uses CrudClient.unlockFunctionModule from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.unlockFunctionModule from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -73,7 +73,7 @@ interface UnlockFunctionModuleArgs {
 /**
  * Main handler for UnlockFunctionModule MCP tool
  *
- * Uses CrudClient.unlockFunctionModule - low-level single method call
+ * Uses AdtClient.unlockFunctionModule - low-level single method call
  */
 export async function handleUnlockFunctionModule(
   context: HandlerContext,
@@ -103,7 +103,7 @@ export async function handleUnlockFunctionModule(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -121,7 +121,7 @@ export async function handleUnlockFunctionModule(
     try {
       // Unlock function module
       // Note: unlock() doesn't throw if successful, so if we reach here, unlock succeeded
-      await client.unlockFunctionModule(
+      await client.getFunctionModule().unlock(
         {
           functionModuleName: functionModuleName,
           functionGroupName: functionGroupName,

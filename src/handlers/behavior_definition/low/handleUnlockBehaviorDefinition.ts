@@ -1,12 +1,12 @@
 /**
  * UnlockBehaviorDefinition Handler - Unlock ABAP Behavior Definition
  *
- * Uses CrudClient.unlockBehaviorDefinition from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.unlockBehaviorDefinition from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import type { BehaviorDefinitionBuilderConfig } from '@mcp-abap-adt/adt-clients';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import type { IBehaviorDefinitionConfig } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -64,7 +64,7 @@ interface UnlockBehaviorDefinitionArgs {
 /**
  * Main handler for UnlockBehaviorDefinition MCP tool
  *
- * Uses CrudClient.unlockBehaviorDefinition - low-level single method call
+ * Uses AdtClient.unlockBehaviorDefinition - low-level single method call
  */
 export async function handleUnlockBehaviorDefinition(
   context: HandlerContext,
@@ -82,7 +82,7 @@ export async function handleUnlockBehaviorDefinition(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_state) {
@@ -99,11 +99,13 @@ export async function handleUnlockBehaviorDefinition(
 
     try {
       // Unlock behavior definition - using types from adt-clients
-      const unlockConfig: Pick<BehaviorDefinitionBuilderConfig, 'name'> = {
+      const unlockConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
         name: bdefName,
       };
-      await client.unlockBehaviorDefinition(unlockConfig, lock_handle);
-      const unlockResult = client.getUnlockResult();
+      const unlockState = await client
+        .getBehaviorDefinition()
+        .unlock(unlockConfig, lock_handle);
+      const unlockResult = unlockState.unlockResult;
 
       if (!unlockResult) {
         throw new Error(

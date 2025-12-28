@@ -94,6 +94,15 @@ export async function handleGetLocalDefinitions(
         ),
       } as AxiosResponse);
     } catch (error: any) {
+      const status = error?.response?.status;
+      const url = error?.response?.config?.url;
+      const rawData = error?.response?.data;
+      const responseSnippet =
+        typeof rawData === 'string' ? rawData.slice(0, 800) : rawData;
+      logger?.warn(
+        `GetLocalDefinitions failed (HTTP ${status ?? 'unknown'}) for ${className}${url ? ` at ${url}` : ''}`,
+        responseSnippet ? { response: responseSnippet } : undefined,
+      );
       logger?.error(
         `Error reading local definitions for ${className}: ${error?.message || error}`,
       );
@@ -104,6 +113,13 @@ export async function handleGetLocalDefinitions(
         errorMessage = `Local definitions for ${className} not found.`;
       } else if (error.response?.status === 423) {
         errorMessage = `Class ${className} is locked by another user.`;
+      } else if (error.response?.status === 406) {
+        const status = error?.response?.status;
+        const url = error?.response?.config?.url;
+        const rawData = error?.response?.data;
+        const responseSnippet =
+          typeof rawData === 'string' ? rawData.slice(0, 800) : rawData;
+        errorMessage = `Local definitions read not supported on this system (HTTP ${status}). ${url ? `URL: ${url}. ` : ''}${responseSnippet ? `Response: ${typeof responseSnippet === 'string' ? responseSnippet : JSON.stringify(responseSnippet)}` : ''}`;
       }
 
       return return_error(new Error(errorMessage));

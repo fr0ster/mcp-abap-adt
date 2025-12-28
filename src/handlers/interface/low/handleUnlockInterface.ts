@@ -1,11 +1,11 @@
 /**
  * UnlockInterface Handler - Unlock ABAP Interface
  *
- * Uses CrudClient.unlockInterface from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.unlockInterface from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -63,7 +63,7 @@ interface UnlockInterfaceArgs {
 /**
  * Main handler for UnlockInterface MCP tool
  *
- * Uses CrudClient.unlockInterface - low-level single method call
+ * Uses AdtClient.unlockInterface - low-level single method call
  */
 export async function handleUnlockInterface(
   context: HandlerContext,
@@ -81,7 +81,7 @@ export async function handleUnlockInterface(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_state) {
@@ -96,11 +96,10 @@ export async function handleUnlockInterface(
 
     try {
       // Unlock interface
-      await client.unlockInterface(
-        { interfaceName: interfaceName },
-        lock_handle,
-      );
-      const unlockResult = client.getUnlockResult();
+      const unlockState = await client
+        .getInterface()
+        .unlock({ interfaceName: interfaceName }, lock_handle);
+      const unlockResult = unlockState.unlockResult;
 
       if (!unlockResult) {
         throw new Error(

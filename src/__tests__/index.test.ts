@@ -6,10 +6,10 @@ describe('MCP ABAP ADT Server', () => {
   describe('Module Imports', () => {
     it('should require handler modules without errors', () => {
       expect(() =>
-        require('../handlers/program/readonly/handleGetProgram'),
+        require('../handlers/program/high/handleGetProgram'),
       ).not.toThrow();
       expect(() =>
-        require('../handlers/class/readonly/handleGetClass'),
+        require('../handlers/class/high/handleGetClass'),
       ).not.toThrow();
       expect(() =>
         require('../handlers/function/readonly/handleGetFunction'),

@@ -131,6 +131,15 @@ All tests require:
 2. **Built server**: Run `npm run build` before testing
 3. **SAP system access**: Valid SAP credentials and accessible SAP system
 
+## Cleanup Behavior (Integration Tests)
+
+Integration tests that use `LowTester`/`HighTester` run cleanup automatically in `afterEach`
+(even if the test fails), unless disabled in `test-config.yaml` via `skip_cleanup=true`
+or `cleanup_after=false`.
+
+If a test creates **multiple objects** (e.g., domain + data element + structure),
+add explicit cleanup steps for the additional objects.
+
 ## Environment Setup
 
 Create `.env` file in project root:

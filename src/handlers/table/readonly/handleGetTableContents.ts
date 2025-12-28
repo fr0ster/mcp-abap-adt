@@ -22,9 +22,9 @@ export async function handleGetTableContents(
     throw new McpError(ErrorCode.InvalidParams, 'Table name is required');
   }
 
-  // TODO: Implement using ReadOnlyClient.readTableContents() when method is added
+  // TODO: Implement using AdtClient.readTableContents() when method is added
   throw new McpError(
     ErrorCode.InternalError,
-    'GetTableContents is temporarily unavailable. Method will be added to ReadOnlyClient soon.',
+    'GetTableContents is temporarily unavailable. Method will be added to AdtClient soon.',
   );
 }

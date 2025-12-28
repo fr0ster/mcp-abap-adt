@@ -1,11 +1,11 @@
 /**
  * UpdateFunctionModule Handler - Update ABAP Function Module Source Code
  *
- * Uses CrudClient.updateFunctionModule from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.updateFunctionModule from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -81,7 +81,7 @@ interface UpdateFunctionModuleArgs {
 /**
  * Main handler for UpdateFunctionModule MCP tool
  *
- * Uses CrudClient.updateFunctionModule - low-level single method call
+ * Uses AdtClient.updateFunctionModule - low-level single method call
  */
 export async function handleUpdateFunctionModule(
   context: HandlerContext,
@@ -112,7 +112,7 @@ export async function handleUpdateFunctionModule(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -129,15 +129,15 @@ export async function handleUpdateFunctionModule(
 
     try {
       // Update function module with source code
-      await client.updateFunctionModule(
+      const updateState = await client.getFunctionModule().update(
         {
           functionModuleName: functionModuleName,
           functionGroupName: functionGroupName,
           sourceCode: source_code,
         },
-        lock_handle,
+        { lockHandle: lock_handle },
       );
-      const updateResult = client.getUpdateResult();
+      const updateResult = updateState.updateResult;
 
       if (!updateResult) {
         throw new Error(
@@ -149,16 +149,13 @@ export async function handleUpdateFunctionModule(
 
       logger?.info(`✅ UpdateFunctionModule completed: ${functionModuleName}`);
 
-      // Get lock handle from builder (it should still be there after update)
-      const lockHandleFromBuilder = client.getLockHandle();
-
       return return_response({
         data: JSON.stringify(
           {
             success: true,
             function_module_name: functionModuleName,
             function_group_name: functionGroupName,
-            lock_handle: lockHandleFromBuilder || lock_handle, // Return lock handle for unlock
+            lock_handle: lock_handle,
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
             message: `Function module ${functionModuleName} updated successfully. Remember to unlock using UnlockObject.`,

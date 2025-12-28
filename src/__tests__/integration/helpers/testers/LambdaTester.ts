@@ -286,12 +286,32 @@ export class LambdaTester {
   /**
    * Lifecycle: beforeEach
    * Prepares test case for each test
+   * Performs pre-cleanup if enabled (removes leftover objects from previous failed tests)
    * @param lambda - Lambda to execute before each test
    */
   async beforeEach(lambda: TLambda): Promise<void> {
     if (!this.context) {
       throw new Error('Context not initialized');
     }
+
+    // Pre-cleanup: Remove leftover objects from previous failed tests
+    // This ensures tests start with a clean state even if previous test failed
+    const shouldCleanup = getCleanupAfter(this.testCase);
+    if (shouldCleanup && this.cleanupAfterLambda) {
+      try {
+        this.context.logger?.debug?.(
+          '🧹 Running pre-cleanup (removing leftover objects)...',
+        );
+        await this.cleanupAfterLambda(this.context);
+        this.context.logger?.debug?.('✅ Pre-cleanup completed');
+      } catch (error: any) {
+        // Pre-cleanup errors are non-fatal - object might not exist
+        this.context.logger?.debug?.(
+          `⚠️ Pre-cleanup warning (ignored): ${error?.message || String(error)}`,
+        );
+      }
+    }
+
     await lambda(this.context);
   }
 

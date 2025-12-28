@@ -1,4 +1,4 @@
-import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError } from '../../../lib/utils';
@@ -27,11 +27,10 @@ export async function handleGetFunction(context: HandlerContext, args: any) {
     );
 
     // Create client
-    const client = new ReadOnlyClient(connection);
-    const result = await client.readFunctionModule(
-      args.function_name,
-      args.function_group,
-    );
+    const client = new AdtClient(connection);
+    const result = await client
+      .getFunctionModule()
+      .read(args.function_name, args.function_group);
     logger?.debug(`Successfully read function module ${args.function_name}`);
     return {
       isError: false,

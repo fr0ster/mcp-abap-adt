@@ -1,11 +1,11 @@
 /**
  * UnlockClassTestClasses Handler - Unlock ABAP Unit test include for a class
  *
- * Uses CrudClient.unlockTestClasses from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.unlockTestClasses from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -73,7 +73,7 @@ export async function handleUnlockClassTestClasses(
       return return_error(new Error('class_name and lock_handle are required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -84,7 +84,8 @@ export async function handleUnlockClassTestClasses(
     logger?.info(`Starting test classes unlock for: ${className}`);
 
     try {
-      await client.unlockTestClasses({ className }, lock_handle);
+      const classClient = client.getClass() as any;
+      await classClient.unlockTestClasses({ className }, lock_handle);
 
       logger?.info(`✅ UnlockClassTestClasses completed: ${className}`);
 

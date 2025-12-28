@@ -1,11 +1,11 @@
 /**
  * LockStructure Handler - Lock ABAP Structure
  *
- * Uses CrudClient.lockStructure from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.lockStructure from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -58,7 +58,7 @@ interface LockStructureArgs {
 /**
  * Main handler for LockStructure MCP tool
  *
- * Uses CrudClient.lockStructure - low-level single method call
+ * Uses AdtClient.lockStructure - low-level single method call
  */
 export async function handleLockStructure(
   context: HandlerContext,
@@ -74,7 +74,7 @@ export async function handleLockStructure(
       return return_error(new Error('structure_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -89,8 +89,9 @@ export async function handleLockStructure(
 
     try {
       // Lock structure
-      await client.lockStructure({ structureName: structureName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client
+        .getStructure()
+        .lock({ structureName: structureName });
 
       if (!lockHandle) {
         throw new Error(

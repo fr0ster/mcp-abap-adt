@@ -1,11 +1,11 @@
 /**
  * UnlockProgram Handler - Unlock ABAP Program
  *
- * Uses CrudClient.unlockProgram from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.unlockProgram from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -64,7 +64,7 @@ interface UnlockProgramArgs {
 /**
  * Main handler for UnlockProgram MCP tool
  *
- * Uses CrudClient.unlockProgram - low-level single method call
+ * Uses AdtClient.unlockProgram - low-level single method call
  */
 export async function handleUnlockProgram(
   context: HandlerContext,
@@ -91,7 +91,7 @@ export async function handleUnlockProgram(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_state) {
@@ -106,8 +106,10 @@ export async function handleUnlockProgram(
 
     try {
       // Unlock program
-      await client.unlockProgram({ programName: programName }, lock_handle);
-      const unlockResult = client.getUnlockResult();
+      const unlockState = await client
+        .getProgram()
+        .unlock({ programName: programName }, lock_handle);
+      const unlockResult = unlockState.unlockResult;
 
       if (!unlockResult) {
         throw new Error(

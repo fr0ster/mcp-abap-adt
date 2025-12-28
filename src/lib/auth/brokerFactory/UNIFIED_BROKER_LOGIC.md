@@ -1,166 +1,158 @@
-# Уніфікована логіка створення AuthBroker
+# Unified AuthBroker Creation Logic
 
-## Принципи
+## Principles
 
-1. **Один брокер на один destination** – мапа брокерів за ключем `destination` (або `'default'` для дефолтного).
-2. **Дефолтний брокер** – спеціальний брокер з ключем `'default'`, який використовується коли destination не вказано в headers.
-3. **Токен витягується тільки в MCP‑хендлері** – брокер не викликається у транспорту/серверу до моменту виконання інструмента. MCP‑сервер має лиш передати в хендлер destination/ідентифікатор і доступ до брокера, але не тягнути токен наперед.
+1. **One broker per destination**: brokers are stored in a map keyed by `destination` (or `'default'` for the default broker).
+2. **Default broker**: a special broker with key `'default'` used when destination is not provided in headers.
+3. **Token retrieval happens only in MCP handlers**: the broker is not invoked by transport/server before a tool executes. The MCP server passes destination/broker to handlers; token is fetched only when a tool runs.
 
-## Створення дефолтного брокера (по транспортам)
-
-### Streamable HTTP
-- Стартуємо без обов’язкового дефолтного брокера.
-- Якщо `--mcp=destination` → створюємо брокер з ключем `'default'` (або destination), з serviceKeyStore + sessionStore (safe/file залежно від `--unsafe`), tokenProvider = `BtpTokenProvider`.
-- Якщо `--env=path/to/.env` → створюємо брокер `'default'` без serviceKeyStore, sessionStore з тієї ж директорії, tokenProvider = `BtpTokenProvider`.
-- Якщо немає жодного з вище, брокер не створюється: конект можливий тільки по headers або через destination у запиті (брокер тоді створюється на льоту).
-
-### SSE
-- Аналогічно HTTP, але дефолтний брокер доречний для локальних сценаріїв:
-  - `--mcp=destination` → брокер `'default'` з serviceKeyStore + sessionStore.
-  - `.env` у поточній директорії без `--auth-broker` → брокер `'default'` без serviceKeyStore, sessionStore з поточної директорії.
-  - `--env=path/to/.env` → брокер `'default'` без serviceKeyStore, sessionStore з директорії .env.
-  - Якщо нічого з цього немає, брокер не створюється; з’єднання можливе лише якщо клієнт надасть destination/headers, і тоді брокер може бути створений на льоту для цього destination.
-
-### stdio
-- Вимагає дефолтний брокер на старті, інакше помилка.
-- Варіанти:
-  - `--mcp=destination` → брокер `'default'` з serviceKeyStore + sessionStore.
-  - `.env` у поточній директорії без `--auth-broker` → брокер `'default'` без serviceKeyStore, sessionStore з поточної директорії.
-  - `--env=path/to/.env` → брокер `'default'` без serviceKeyStore, sessionStore з директорії .env.
-- Інші випадки: брокер не створюється → сервер не стартує (stdio без дефолтного джерела недопустимий).
-
-## Використання брокерів (по транспортам)
+## Default Broker Creation (by transport)
 
 ### Streamable HTTP
-- **Ключ у мапі**: `destination` (+ стабільний клієнтський ідентифікатор, якщо треба ізолювати клієнтів; варіантами можуть бути `sessionId` або `clientId:port`).
-- **Поведінка**:
-  1. У PUT/POST обробнику (до створення MCP server) читаємо destination з headers.
-  2. Якщо destination є: шукаємо брокер у мапі, за відсутності створюємо, кладемо в мапу; якщо створення не вдалося – повертаємо помилку.
-  3. Якщо destination немає: беремо дефолтний брокер; якщо його немає – читаємо прямі параметри конекту з headers; якщо і їх немає – повертаємо помилку.
-  4. Далі створюємо MCP server instance для запиту/клієнта, передаємо в хендлери destination/брокер (або параметри headers). **Токен витягується лише в хендлері перед виконанням інструмента.**
+- Start without a mandatory default broker.
+- If `--mcp=destination` → create broker with key `'default'` (or destination), with serviceKeyStore + sessionStore (safe/file depending on `--unsafe`), tokenProvider = `AuthorizationCodeProvider`.
+- If `--env=path/to/.env` → create `'default'` broker without serviceKeyStore, sessionStore from the same directory, tokenProvider = `AuthorizationCodeProvider`.
+- If none of the above, no default broker is created; connection is possible only via headers or destination in request (broker can be created on demand).
 
 ### SSE
-- **Ключ у мапі**: аналогічно Streamable HTTP (destination + за потреби клієнтський ідентифікатор).
-- **Поведінка**:
-  1. У GET обробнику (до створення MCP server для сесії) читаємо destination з headers.
-  2. Якщо destination є: беремо/створюємо брокер, кладемо в мапу; якщо не вдалося – повертаємо помилку.
-  3. Якщо destination немає: пробуємо дефолтний брокер; якщо його немає – читаємо прямі headers; якщо нічого немає – повертаємо помилку.
-  4. Створюємо MCP server для сесії, передаємо в хендлери destination/брокер (або параметри headers). **Токен витягується лише в хендлері.**
+- Same as HTTP, but a default broker is useful for local scenarios:
+  - `--mcp=destination` → `'default'` broker with serviceKeyStore + sessionStore.
+  - `.env` in current directory without `--auth-broker` → `'default'` broker without serviceKeyStore, sessionStore from current directory.
+  - `--env=path/to/.env` → `'default'` broker without serviceKeyStore, sessionStore from .env directory.
+  - If none of the above, no default broker is created; connection works only if the client provides destination/headers and the broker is created on demand.
 
 ### stdio
-- **Ключ у мапі**: єдиний брокер на старті (`default` або destination з `--mcp`).
-- **Поведінка**:
-  1. При старті створюємо брокер за `--mcp` / конфігом / ENV. Якщо нічого немає – помилка і не стартуємо.
-  2. Створюємо MCP server один раз на старті.
-  3. Хендлери отримують destination/брокер і тягнуть токен тільки під час виконання інструмента.
+- Requires a default broker at startup, otherwise error.
+- Variants:
+  - `--mcp=destination` → `'default'` broker with serviceKeyStore + sessionStore.
+  - `.env` in current directory without `--auth-broker` → `'default'` broker without serviceKeyStore, sessionStore from current directory.
+  - `--env=path/to/.env` → `'default'` broker without serviceKeyStore, sessionStore from .env directory.
+- Other cases: no broker → server does not start (stdio without default source is not allowed).
 
-## Структура мапи брокерів
+## Broker Usage (by transport)
+
+### Streamable HTTP
+- **Map key**: `destination` (+ stable client identifier if isolation needed; options: `sessionId` or `clientId:port`).
+- **Behavior**:
+  1. In PUT/POST handler (before MCP server creation), read destination from headers.
+  2. If destination is present: get broker from map, create if missing; if creation fails return error.
+  3. If destination is absent: use default broker; if missing, read direct headers; if also missing, return error.
+  4. Create MCP server instance, pass destination/broker (or direct header params) to handlers. **Token is fetched only in the handler before tool execution.**
+
+### SSE
+- **Map key**: same as Streamable HTTP.
+- **Behavior**:
+  1. In GET handler (before MCP server creation for a session), read destination from headers.
+  2. If destination is present: get/create broker; if fail, return error.
+  3. If destination is absent: try default broker; if missing, read direct headers; if missing, return error.
+  4. Create MCP server for the session, pass destination/broker (or direct header params). **Token is fetched only in the handler.**
+
+### stdio
+- **Map key**: single broker at startup (`default` or destination from `--mcp`).
+- **Behavior**:
+  1. At startup create broker from `--mcp` / config / ENV. If none, error and do not start.
+  2. Create MCP server once.
+  3. Handlers receive destination/broker and fetch token only during tool execution.
+
+## Broker Map Structure
 
 ```typescript
 Map<string, AuthBroker> {
-  'default' => AuthBroker {  // Дефолтний брокер (якщо створено)
-    serviceKeyStore?: IServiceKeyStore,  // Може бути undefined для --env випадку
+  'default' => AuthBroker {
+    serviceKeyStore?: IServiceKeyStore,
     sessionStore: ISessionStore,
-    tokenProvider: BtpTokenProvider
+    tokenProvider: AuthorizationCodeProvider
   },
-  'trial' => AuthBroker {  // Брокер для конкретного destination
+  'trial' => AuthBroker {
     serviceKeyStore: IServiceKeyStore,
-    sessionStore: ISessionStore,  // Спільний з іншими destinations
-    tokenProvider: BtpTokenProvider
+    sessionStore: ISessionStore,
+    tokenProvider: AuthorizationCodeProvider
   },
-  'production' => AuthBroker {  // Інший destination
+  'production' => AuthBroker {
     serviceKeyStore: IServiceKeyStore,
-    sessionStore: ISessionStore,  // Той самий instance що і для 'trial'
-    tokenProvider: BtpTokenProvider
+    sessionStore: ISessionStore,
+    tokenProvider: AuthorizationCodeProvider
   }
 }
 ```
 
-## Спільні stores
+## Shared Stores
 
-- **ServiceKeyStore**: Окремий для кожного destination (бо кожен destination має свій файл service key)
-- **SessionStore**: Спільний для всіх destinations з тим самим каталогом та типом
-  - Ключ для спільного store: `${storeType}::${sessionsDir}::${unsafe}`
-  - Кожен destination має свій файл сесії всередині каталогу: `{destination}.env`
+- **ServiceKeyStore**: separate per destination (each destination has its own service key file).
+- **SessionStore**: shared for all destinations with the same directory and type.
+  - Shared store key: `${storeType}::${sessionsDir}::${unsafe}`
+  - Each destination has its own session file in the directory: `{destination}.env`
 
-## Алгоритм роботи
+## Algorithm
 
-### Ініціалізація (при старті сервера):
-
-```
-1. Перевірити параметри командного рядка:
-   - Якщо --mcp=destination → створити дефолтний брокер з serviceKeyStore для destination
-   - Якщо --env=path → створити дефолтний брокер з sessionStore з path (без serviceKeyStore)
-   - Якщо stdio/sse + .env в поточному фолдері + НЕ --auth-broker → створити дефолтний брокер з sessionStore (без serviceKeyStore)
-
-2. Для stdio:
-   - Якщо дефолтний брокер НЕ створено → помилка, не стартувати
-   - Якщо дефолтний брокер створено → використовувати його для підключення
-
-3. Для SSE/HTTP:
-   - Сервер стартує в будь-якому випадку
-   - Дефолтний брокер використовується тільки якщо destination не вказано в headers
-```
-
-### Обробка запиту (для SSE/HTTP):
+### Initialization (at server startup):
 
 ```
-1. Отримати destination з headers (x-mcp-destination або X-MCP-Destination).
-2. Якщо destination вказано:
-   a. Взяти брокер з мапи (destination [+ clientId/sessionId], якщо використовується).
-   b. Якщо не знайдено – створити, покласти в мапу; якщо не вдалось – повернути помилку.
-3. Якщо destination НЕ вказано:
-   a. Спробувати дефолтний брокер.
-   b. Якщо дефолтного немає – читати прямі headers; якщо і їх немає – повернути помилку.
-4. Створити MCP server для запиту/сесії, передати в хендлери destination/брокер.
-5. Хендлер перед виконанням інструмента викликає broker.getToken(destination) і створює конекшн.
+1. Check CLI parameters:
+   - If --mcp=destination → create default broker with serviceKeyStore for destination
+   - If --env=path → create default broker with sessionStore from path (no serviceKeyStore)
+   - If stdio/sse + .env in current folder + NOT --auth-broker → create default broker with sessionStore (no serviceKeyStore)
+
+2. For stdio:
+   - If default broker is NOT created → error, do not start
+   - If default broker is created → use it for connections
+
+3. For SSE/HTTP:
+   - Server starts regardless
+   - Default broker is used only when destination is not provided in headers
 ```
 
-## Приклади
+### Request handling (SSE/HTTP):
 
-### Приклад 1: stdio з --mcp=trial
+```
+1. Read destination from headers (x-mcp-destination or X-MCP-Destination).
+2. If destination is provided:
+   a. Get broker from map (destination [+ clientId/sessionId], if used).
+   b. If missing, create and store; if creation fails, return error.
+3. If destination is NOT provided:
+   a. Try default broker.
+   b. If no default broker, read direct headers; if missing, return error.
+4. Create MCP server for the request/session, pass destination/broker to handlers.
+5. Handler calls broker.getToken(destination) before tool execution to create connection.
+```
+
+## Examples
+
+### Example 1: stdio with --mcp=trial
 ```bash
 npm run dev -- --mcp=trial
 ```
-- Створюється дефолтний брокер з serviceKeyStore для 'trial'
-- Підключення через дефолтний брокер
+- Creates default broker with serviceKeyStore for 'trial'
+- Connects via default broker
 
-### Приклад 2: stdio з --env=./.env.local
+### Example 2: stdio with --env=./.env.local
 ```bash
 npm run dev -- --env=./.env.local
 ```
-- Створюється дефолтний брокер з sessionStore з ./.env.local (без serviceKeyStore)
-- Підключення через дефолтний брокер
+- Creates default broker with sessionStore from ./.env.local (no serviceKeyStore)
+- Connects via default broker
 
-### Приклад 3: HTTP з --mcp=trial, кліент НЕ передає destination в headers
+### Example 3: HTTP with --mcp=trial, client does NOT pass destination
 ```bash
 npm run dev:http -- --mcp=trial
-# Кліент робить запит БЕЗ x-mcp-destination header
 ```
-- Створюється дефолтний брокер з serviceKeyStore для 'trial'
-- Використовується дефолтний брокер
+- Creates default broker with serviceKeyStore for 'trial'
+- Uses default broker
 
-### Приклад 4: HTTP з --mcp=trial, кліент передає destination=production в headers
+### Example 4: HTTP with --mcp=trial, client passes destination=production
 ```bash
 npm run dev:http -- --mcp=trial
-# Кліент робить запит з x-mcp-destination: production
 ```
-- Створюється дефолтний брокер з serviceKeyStore для 'trial'
-- Створюється окремий брокер для 'production'
-- Використовується брокер для 'production'
+- Creates default broker for 'trial'
+- Creates separate broker for 'production'
+- Uses broker for 'production'
 
-### Приклад 5: HTTP БЕЗ --mcp та БЕЗ .env, кліент передає всі headers
+### Example 5: HTTP without --mcp and without .env, client provides all headers
 ```bash
 npm run dev:http
-# Кліент робить запит з SAP_URL, SAP_JWT_TOKEN, тощо
 ```
-- Дефолтний брокер НЕ створюється
-- Підключення тільки по headers (без брокера)
+- No default broker
+- Connection works only via headers (no broker)
 
-### Приклад 6: stdio БЕЗ параметрів та БЕЗ .env
-```bash
-npm run dev
-```
-- Дефолтний брокер НЕ створюється
-- ❌ Помилка: "stdio transport requires either --mcp parameter or .env file"
-- Сервер не стартує
+### Example 6: stdio without parameters and without .env
+- No default broker → server does not start

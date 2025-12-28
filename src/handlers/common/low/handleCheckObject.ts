@@ -1,9 +1,9 @@
 /**
  * CheckObject Handler - Syntax check for ABAP objects via ADT API.
- * Uses CrudClient check methods per object type.
+ * Uses AdtClient check methods per object type.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -126,7 +126,7 @@ export async function handleCheckObject(
       ? (version.toLowerCase() as 'active' | 'inactive')
       : 'active';
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -139,70 +139,62 @@ export async function handleCheckObject(
     );
 
     try {
+      let checkState: any | undefined;
       switch (objectType) {
         case 'class':
-          await client.checkClass(
-            { className: objectName },
-            undefined,
-            checkVersion,
-          );
+          checkState = await client
+            .getClass()
+            .check({ className: objectName }, checkVersion);
           break;
         case 'program':
-          await client.checkProgram(
-            { programName: objectName },
-            undefined,
-            checkVersion,
-          );
+          checkState = await client
+            .getProgram()
+            .check({ programName: objectName }, checkVersion);
           break;
         case 'interface':
-          await client.checkInterface(
-            { interfaceName: objectName },
-            undefined,
-            checkVersion,
-          );
+          checkState = await client
+            .getInterface()
+            .check({ interfaceName: objectName }, checkVersion);
           break;
         case 'function_group':
-          await client.checkFunctionGroup({ functionGroupName: objectName });
+          checkState = await client
+            .getFunctionGroup()
+            .check({ functionGroupName: objectName });
           break;
         case 'table':
-          await client.checkTable(
-            { tableName: objectName },
-            undefined,
-            checkVersion,
-          );
+          checkState = await client
+            .getTable()
+            .check({ tableName: objectName }, checkVersion);
           break;
         case 'structure':
-          await client.checkStructure(
-            { structureName: objectName },
-            undefined,
-            checkVersion,
-          );
+          checkState = await client
+            .getStructure()
+            .check({ structureName: objectName }, checkVersion);
           break;
         case 'view':
-          await client.checkView(
-            { viewName: objectName },
-            undefined,
-            checkVersion,
-          );
+          checkState = await client
+            .getView()
+            .check({ viewName: objectName }, checkVersion);
           break;
         case 'domain':
-          await client.checkDomain({ domainName: objectName }, checkVersion);
+          checkState = await client
+            .getDomain()
+            .check({ domainName: objectName }, checkVersion);
           break;
         case 'data_element':
-          await client.checkDataElement(
-            { dataElementName: objectName },
-            checkVersion,
-          );
+          checkState = await client
+            .getDataElement()
+            .check({ dataElementName: objectName }, checkVersion);
           break;
         case 'behavior_definition':
-          await client.checkBehaviorDefinition({ name: objectName });
+          checkState = await client
+            .getBehaviorDefinition()
+            .check({ name: objectName });
           break;
         case 'metadata_extension':
-          await client.checkMetadataExtension(
-            { name: objectName },
-            undefined,
-            checkVersion,
-          );
+          checkState = await client
+            .getMetadataExtension()
+            .check({ name: objectName }, checkVersion);
           break;
         default:
           return return_error(
@@ -210,12 +202,12 @@ export async function handleCheckObject(
           );
       }
 
-      const response = client.getCheckResult();
+      const response = checkState?.checkResult;
       if (!response) {
         throw new Error('Check did not return a response');
       }
 
-      const checkResult = parseCheckRunResponse(response);
+      const checkResult = parseCheckRunResponse(response as AxiosResponse);
 
       logger?.info(`✅ CheckObject completed: ${objectName}`);
       logger?.info(`   Status: ${checkResult.status}`);

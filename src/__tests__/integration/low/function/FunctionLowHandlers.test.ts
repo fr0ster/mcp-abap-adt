@@ -98,6 +98,64 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
         const functionModuleName = testCase.params.function_module_name;
         const packageName = resolvePackageName(testCase);
         const transportRequest = resolveTransportRequest(testCase);
+
+        // Pre-cleanup: Remove leftover objects from previous failed tests
+        // This ensures tests start with a clean state even if previous test failed
+        const shouldCleanup = getCleanupAfter(testCase);
+        if (shouldCleanup) {
+          try {
+            testLogger?.debug(
+              '🧹 Running pre-cleanup (removing leftover objects)...',
+            );
+
+            // Try to delete FM first (if exists)
+            try {
+              await handleDeleteFunctionModule(
+                { connection, logger: testLogger },
+                {
+                  function_module_name: functionModuleName,
+                  function_group_name: functionGroupName,
+                  transport_request: transportRequest,
+                },
+              );
+              testLogger?.debug(
+                `✅ Pre-cleanup: deleted leftover FM ${functionModuleName}`,
+              );
+            } catch (error: any) {
+              // FM might not exist - ignore
+              testLogger?.debug(
+                `⚠️ Pre-cleanup: FM ${functionModuleName} not found (ignored)`,
+              );
+            }
+
+            // Try to delete FUGR (if exists)
+            try {
+              await handleDeleteFunctionGroup(
+                { connection, logger: testLogger },
+                {
+                  function_group_name: functionGroupName,
+                  transport_request: transportRequest,
+                },
+              );
+              testLogger?.debug(
+                `✅ Pre-cleanup: deleted leftover FUGR ${functionGroupName}`,
+              );
+            } catch (error: any) {
+              // FUGR might not exist - ignore
+              testLogger?.debug(
+                `⚠️ Pre-cleanup: FUGR ${functionGroupName} not found (ignored)`,
+              );
+            }
+
+            testLogger?.debug('✅ Pre-cleanup completed');
+          } catch (error: any) {
+            // Pre-cleanup errors are non-fatal - objects might not exist
+            testLogger?.debug(
+              `⚠️ Pre-cleanup warning (ignored): ${error?.message || String(error)}`,
+            );
+          }
+        }
+
         const functionGroupDescription =
           testCase.params.function_group_description || functionGroupName;
         const functionModuleDescription =
@@ -136,6 +194,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             { connection, logger: testLogger },
             {
               function_group_name: functionGroupName,
+              package_name: packageName,
               description: functionGroupDescription,
               session_id: session.session_id,
               session_state: session.session_state,

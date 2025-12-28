@@ -5,7 +5,7 @@
  * Connection management handled internally.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -162,7 +162,7 @@ export async function handleValidateObject(
       );
     }
 
-    const validationClient = new CrudClient(connection);
+    const validationClient = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -183,133 +183,144 @@ export async function handleValidateObject(
 
       switch (normalizedType) {
         case 'program': {
-          await validationClient.validateProgram({
+          const validationState = await validationClient.getProgram().validate({
             programName: objectName,
             packageName: package_name || undefined,
             description: description || undefined,
           });
-          const programResponse = validationClient.getValidationResponse();
+          const programResponse = validationState.validationResponse;
           if (!programResponse) {
             throw new Error('Validation did not return a result');
           }
-          result = parseValidationResponse(programResponse);
+          result = parseValidationResponse(programResponse as AxiosResponse);
           break;
         }
         case 'class': {
-          await validationClient.validateClass({
+          const validationState = await validationClient.getClass().validate({
             className: objectName,
             packageName: package_name || undefined,
             description: description || undefined,
           });
-          const classResponse = validationClient.getValidationResponse();
+          const classResponse = validationState.validationResponse;
           if (!classResponse) {
             throw new Error('Validation did not return a result');
           }
-          result = parseValidationResponse(classResponse);
+          result = parseValidationResponse(classResponse as AxiosResponse);
           break;
         }
         case 'interface': {
-          await validationClient.validateInterface({
-            interfaceName: objectName,
-            packageName: package_name || undefined,
-            description: description || undefined,
-          });
-          const interfaceResponse = validationClient.getValidationResponse();
+          const validationState = await validationClient
+            .getInterface()
+            .validate({
+              interfaceName: objectName,
+              packageName: package_name || undefined,
+              description: description || undefined,
+            });
+          const interfaceResponse = validationState.validationResponse;
           if (!interfaceResponse) {
             throw new Error('Validation did not return a result');
           }
-          result = parseValidationResponse(interfaceResponse);
+          result = parseValidationResponse(interfaceResponse as AxiosResponse);
           break;
         }
         case 'function_group': {
-          await validationClient.validateFunctionGroup({
-            functionGroupName: objectName,
-            description: description || undefined,
-          });
-          const functionGroupResponse =
-            validationClient.getValidationResponse();
+          const validationState = await validationClient
+            .getFunctionGroup()
+            .validate({
+              functionGroupName: objectName,
+              description: description || undefined,
+            });
+          const functionGroupResponse = validationState.validationResponse;
           if (!functionGroupResponse) {
             throw new Error('Validation did not return a result');
           }
-          result = parseValidationResponse(functionGroupResponse);
+          result = parseValidationResponse(
+            functionGroupResponse as AxiosResponse,
+          );
           break;
         }
         case 'table': {
-          await validationClient.validateTable({
+          const validationState = await validationClient.getTable().validate({
             tableName: objectName,
             packageName: package_name || undefined,
             description: description || undefined,
           });
-          const tableResponse = validationClient.getValidationResponse();
+          const tableResponse = validationState.validationResponse;
           if (!tableResponse) {
             throw new Error('Validation did not return a result');
           }
-          result = parseValidationResponse(tableResponse);
+          result = parseValidationResponse(tableResponse as AxiosResponse);
           break;
         }
         case 'structure': {
-          await validationClient.validateStructure({
-            structureName: objectName,
-            packageName: package_name || undefined,
-            description: description || undefined,
-          });
-          const structureResponse = validationClient.getValidationResponse();
+          const validationState = await validationClient
+            .getStructure()
+            .validate({
+              structureName: objectName,
+              packageName: package_name || undefined,
+              description: description || undefined,
+            });
+          const structureResponse = validationState.validationResponse;
           if (!structureResponse) {
             throw new Error('Validation did not return a result');
           }
-          result = parseValidationResponse(structureResponse);
+          result = parseValidationResponse(structureResponse as AxiosResponse);
           break;
         }
         case 'view': {
-          await validationClient.validateView({
+          const validationState = await validationClient.getView().validate({
             viewName: objectName,
             packageName: package_name || undefined,
             description: description || undefined,
           });
-          const viewResponse = validationClient.getValidationResponse();
+          const viewResponse = validationState.validationResponse;
           if (!viewResponse) {
             throw new Error('Validation did not return a result');
           }
-          result = parseValidationResponse(viewResponse);
+          result = parseValidationResponse(viewResponse as AxiosResponse);
           break;
         }
         case 'domain': {
-          await validationClient.validateDomain({
+          const validationState = await validationClient.getDomain().validate({
             domainName: objectName,
             packageName: package_name || undefined,
             description: description || undefined,
           });
-          const domainResponse = validationClient.getValidationResponse();
+          const domainResponse = validationState.validationResponse;
           if (!domainResponse) {
             throw new Error('Validation did not return a result');
           }
-          result = parseValidationResponse(domainResponse);
+          result = parseValidationResponse(domainResponse as AxiosResponse);
           break;
         }
         case 'data_element': {
-          await validationClient.validateDataElement({
-            dataElementName: objectName,
-            packageName: package_name || undefined,
-            description: description || undefined,
-          });
-          const dataElementResponse = validationClient.getValidationResponse();
+          const validationState = await validationClient
+            .getDataElement()
+            .validate({
+              dataElementName: objectName,
+              packageName: package_name || undefined,
+              description: description || undefined,
+            });
+          const dataElementResponse = validationState.validationResponse;
           if (!dataElementResponse) {
             throw new Error('Validation did not return a result');
           }
-          result = parseValidationResponse(dataElementResponse);
+          result = parseValidationResponse(
+            dataElementResponse as AxiosResponse,
+          );
           break;
         }
         case 'package': {
-          await validationClient.validatePackage({
+          const validationState = await validationClient.getPackage().validate({
             packageName: objectName,
             superPackage: undefined, // package doesn't have superPackage in args
             description: description || undefined,
           });
-          const packageResponse = validationClient.getValidationResponse();
+          const packageResponse = validationState.validationResponse;
           if (!packageResponse) {
             throw new Error('Validation did not return a result');
           }
-          result = parseValidationResponse(packageResponse);
+          result = parseValidationResponse(packageResponse as AxiosResponse);
           break;
         }
         case 'behavior_definition': {
@@ -343,23 +354,26 @@ export async function handleValidateObject(
               ),
             );
           }
-          await validationClient.validateBehaviorDefinition({
-            name: objectName,
-            packageName: package_name,
-            description: description,
-            rootEntity: root_entity,
-            implementationType: normalizedImplementationType as
-              | 'Managed'
-              | 'Unmanaged'
-              | 'Abstract'
-              | 'Projection',
-          });
-          const behaviorDefinitionResponse =
-            validationClient.getValidationResponse();
+          const validationState = await validationClient
+            .getBehaviorDefinition()
+            .validate({
+              name: objectName,
+              packageName: package_name,
+              description: description,
+              rootEntity: root_entity,
+              implementationType: normalizedImplementationType as
+                | 'Managed'
+                | 'Unmanaged'
+                | 'Abstract'
+                | 'Projection',
+            });
+          const behaviorDefinitionResponse = validationState.validationResponse;
           if (!behaviorDefinitionResponse) {
             throw new Error('Validation did not return a result');
           }
-          result = parseValidationResponse(behaviorDefinitionResponse);
+          result = parseValidationResponse(
+            behaviorDefinitionResponse as AxiosResponse,
+          );
           break;
         }
         case 'behavior_implementation': {
@@ -370,18 +384,22 @@ export async function handleValidateObject(
               ),
             );
           }
-          await validationClient.validateBehaviorImplementation({
-            className: objectName,
-            packageName: package_name,
-            behaviorDefinition: behavior_definition || '',
-            ...(description && { description }),
-          });
+          const validationState = await validationClient
+            .getBehaviorImplementation()
+            .validate({
+              className: objectName,
+              packageName: package_name,
+              behaviorDefinition: behavior_definition || '',
+              ...(description && { description }),
+            });
           const behaviorImplementationResponse =
-            validationClient.getValidationResponse();
+            validationState.validationResponse;
           if (!behaviorImplementationResponse) {
             throw new Error('Validation did not return a result');
           }
-          result = parseValidationResponse(behaviorImplementationResponse);
+          result = parseValidationResponse(
+            behaviorImplementationResponse as AxiosResponse,
+          );
           break;
         }
         case 'metadata_extension':
@@ -393,17 +411,20 @@ export async function handleValidateObject(
               ),
             );
           }
-          await validationClient.validateMetadataExtension({
-            name: objectName,
-            description: description,
-            packageName: package_name,
-          });
-          const metadataExtensionResponse =
-            validationClient.getValidationResponse();
+          const validationState = await validationClient
+            .getMetadataExtension()
+            .validate({
+              name: objectName,
+              description: description,
+              packageName: package_name,
+            });
+          const metadataExtensionResponse = validationState.validationResponse;
           if (!metadataExtensionResponse) {
             throw new Error('Validation did not return a result');
           }
-          result = parseValidationResponse(metadataExtensionResponse);
+          result = parseValidationResponse(
+            metadataExtensionResponse as AxiosResponse,
+          );
           break;
         }
         default:

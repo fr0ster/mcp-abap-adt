@@ -116,18 +116,23 @@ export class HighTester extends LambdaTester {
       connection: this.context.connection,
       logger: this.context.logger,
     });
+    const logger = this.context.logger;
 
     try {
       // Execute create workflow
       if (this.workflowFunctions.create) {
+        logger?.info(`   • create ${this.context.objectName}`);
         const args = this.buildCreateArgs(this.context);
         await this.workflowFunctions.create(handlerContext, args);
+        logger?.info(`   ✅ create completed`);
       }
 
       // Execute update workflow
       if (this.workflowFunctions.update) {
+        logger?.info(`   • update ${this.context.objectName}`);
         const args = this.buildUpdateArgs(this.context);
         await this.workflowFunctions.update(handlerContext, args);
+        logger?.info(`   ✅ update completed`);
       }
     } catch (error: any) {
       // Check if error is a skip condition

@@ -2,7 +2,7 @@
  * CreateMetadataExtension Handler - ABAP Metadata Extension Creation via ADT API
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
@@ -66,11 +66,11 @@ export async function handleCreateMetadataExtension(
   logger?.info(`Starting DDLX creation: ${name}`);
 
   try {
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     const shouldActivate = args.activate !== false;
 
     // Create
-    await client.createMetadataExtension({
+    await client.getMetadataExtension().create({
       name,
       description: args.description || name,
       packageName: args.package_name,
@@ -78,24 +78,23 @@ export async function handleCreateMetadataExtension(
     });
 
     // Lock
-    await client.lockMetadataExtension({ name: name });
-    const lockHandle = client.getLockHandle();
+    const lockHandle = await client.getMetadataExtension().lock({ name: name });
 
     try {
       // Check
-      await client.checkMetadataExtension({ name: name });
+      await client.getMetadataExtension().check({ name: name });
 
       // Unlock
-      await client.unlockMetadataExtension({ name: name }, lockHandle);
+      await client.getMetadataExtension().unlock({ name: name }, lockHandle);
 
       // Activate if requested
       if (shouldActivate) {
-        await client.activateMetadataExtension({ name: name });
+        await client.getMetadataExtension().activate({ name: name });
       }
     } catch (error) {
       // Unlock on error (principle 1: if lock was done, unlock is mandatory)
       try {
-        await client.unlockMetadataExtension({ name: name }, lockHandle);
+        await client.getMetadataExtension().unlock({ name: name }, lockHandle);
       } catch (unlockError) {
         logger?.error(
           `Failed to unlock metadata extension after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,

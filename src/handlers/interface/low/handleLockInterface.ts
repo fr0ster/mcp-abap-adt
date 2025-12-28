@@ -1,11 +1,11 @@
 /**
  * LockInterface Handler - Lock ABAP Interface
  *
- * Uses CrudClient.lockInterface from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.lockInterface from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -58,7 +58,7 @@ interface LockInterfaceArgs {
 /**
  * Main handler for LockInterface MCP tool
  *
- * Uses CrudClient.lockInterface - low-level single method call
+ * Uses AdtClient.lockInterface - low-level single method call
  */
 export async function handleLockInterface(
   context: HandlerContext,
@@ -74,7 +74,7 @@ export async function handleLockInterface(
       return return_error(new Error('interface_name is required'));
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {
@@ -87,8 +87,9 @@ export async function handleLockInterface(
 
     try {
       // Lock interface
-      await client.lockInterface({ interfaceName: interfaceName });
-      const lockHandle = client.getLockHandle();
+      const lockHandle = await client
+        .getInterface()
+        .lock({ interfaceName: interfaceName });
 
       if (!lockHandle) {
         throw new Error(

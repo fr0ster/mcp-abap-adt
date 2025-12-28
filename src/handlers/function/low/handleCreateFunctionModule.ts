@@ -1,11 +1,11 @@
 /**
  * CreateFunctionModule Handler - Create ABAP Function Module
  *
- * Uses CrudClient.createFunctionModule from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.createFunctionModule from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -84,7 +84,7 @@ interface CreateFunctionModuleArgs {
 /**
  * Main handler for CreateFunctionModule MCP tool
  *
- * Uses CrudClient.createFunctionModule - low-level single method call
+ * Uses AdtClient.createFunctionModule - low-level single method call
  */
 export async function handleCreateFunctionModule(
   context: HandlerContext,
@@ -116,7 +116,7 @@ export async function handleCreateFunctionModule(
       );
     }
 
-    const client = new CrudClient(connection);
+    const client = new AdtClient(connection);
     // Restore session state if provided
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
@@ -133,7 +133,7 @@ export async function handleCreateFunctionModule(
 
     try {
       // Create function module
-      await client.createFunctionModule({
+      await client.getFunctionModule().create({
         functionModuleName,
         functionGroupName,
         description,
@@ -141,12 +141,14 @@ export async function handleCreateFunctionModule(
         sourceCode: '',
         transportRequest: transport_request,
       });
-      const createResult = client.getCreateResult();
-
-      if (!createResult) {
-        throw new Error(
-          `Create did not return a response for function module ${functionModuleName}`,
-        );
+      try {
+        await client
+          .getFunctionModule()
+          .read({ functionModuleName, functionGroupName }, 'inactive', {
+            withLongPolling: true,
+          });
+      } catch (_readError: any) {
+        // Read is best-effort; create may still succeed without immediate read.
       }
 
       // Get updated session state after create
@@ -174,6 +176,20 @@ export async function handleCreateFunctionModule(
       logger?.error(
         `Error creating function module ${functionModuleName}: ${error?.message || error}`,
       );
+      const responseData =
+        typeof error.response?.data === 'string'
+          ? error.response.data
+          : error.response?.data
+            ? JSON.stringify(error.response.data)
+            : '';
+      const responseSnippet = responseData
+        ? responseData.slice(0, 1000)
+        : undefined;
+      if (responseSnippet) {
+        logger?.warn(
+          `CreateFunctionModule returned HTTP ${error.response?.status} for ${functionModuleName}. Response: ${responseSnippet}`,
+        );
+      }
 
       // Parse error message
       let errorMessage = `Failed to create function module: ${error.message || String(error)}`;

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/core",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -122,6 +122,7 @@
     "@mcp-abap-adt/auth-providers": "^0.2.10",
     "@mcp-abap-adt/auth-stores": "^0.2.10",
     "@mcp-abap-adt/connection": "^0.2.9",
+    "@mcp-abap-adt/core": "^1.4.1",
     "@mcp-abap-adt/header-validator": "^0.1.8",
     "@mcp-abap-adt/interfaces": "^0.2.15",
     "@mcp-abap-adt/logger": "^0.1.4",

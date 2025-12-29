@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.4.2] - 2025-12-29
+### Fixed
+- **Version path**: Fixed incorrect path to package.json in `--version` command
+
 ## [1.4.1] - 2025-12-29
 ### Changed
 - **Package renamed**: Changed from `@fr0ster/mcp-abap-adt` to `@mcp-abap-adt/core` for npm publishing

@@ -39,13 +39,7 @@ function hasArg(name: string): boolean {
 }
 
 function showVersion(): void {
-  const packageJsonPath = path.join(
-    __dirname,
-    '..',
-    '..',
-    '..',
-    'package.json',
-  );
+  const packageJsonPath = path.join(__dirname, '..', '..', 'package.json');
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
   console.log(packageJson.version);
   process.exit(0);

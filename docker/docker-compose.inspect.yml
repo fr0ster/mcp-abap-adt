@@ -1,0 +1,8 @@
+services:
+  mcp-abap-adt:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.inspect
+    image: mcp-abap-adt:inspect
+    stdin_open: true
+    tty: true

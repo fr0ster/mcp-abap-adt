@@ -2,8 +2,14 @@
 
 ## [Unreleased]
 
-## [1.2.8] - 2025-12-28
+## [1.2.8] - 2025-12-29
+### Added
+- **GetPackageContents** tool: New read-only tool to retrieve objects inside an ABAP package (moved from legacy `GetPackage`).
+
 ### Changed
+- **GetPackage** tool: Migrated to high-level API (`AdtClient.getPackage().read()`). Now returns package metadata and supports `version` parameter (`active`/`inactive`).
+- **GetFunction** tool: Updated to support `version` parameter and migrated to new `adt-clients` signature.
+- **High-level handlers**: Improved parameter handling and consistency with new `adt-clients` versioning requirements.
 - Test cleanup documentation updated to clarify `afterEach` behavior and multi-object cleanup requirements.
 - Test runners (`LowTester`/`HighTester`) now emit step-level flow logs for validate/create/lock/update/unlock/activate.
 - Package cleanup can use a fresh connection with optional `connection_config` for locked session cases.

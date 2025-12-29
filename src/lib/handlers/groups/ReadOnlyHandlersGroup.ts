@@ -23,9 +23,9 @@ import {
   handleGetIncludesList,
 } from '../../../handlers/include/readonly/handleGetIncludesList';
 import {
-  TOOL_DEFINITION as GetPackage_Tool,
-  handleGetPackage,
-} from '../../../handlers/package/readonly/handleGetPackage';
+  TOOL_DEFINITION as GetPackageContents_Tool,
+  handleGetPackageContents,
+} from '../../../handlers/package/readonly/handleGetPackageContents';
 import {
   TOOL_DEFINITION as GetProgFullCode_Tool,
   handleGetProgFullCode,
@@ -73,11 +73,11 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
-          name: GetPackage_Tool.name,
-          description: GetPackage_Tool.description,
-          inputSchema: GetPackage_Tool.inputSchema,
+          name: GetPackageContents_Tool.name,
+          description: GetPackageContents_Tool.description,
+          inputSchema: GetPackageContents_Tool.inputSchema,
         },
-        handler: (args: any) => handleGetPackage(this.context, args),
+        handler: (args: any) => handleGetPackageContents(this.context, args),
       },
       {
         toolDefinition: {

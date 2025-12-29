@@ -9,8 +9,8 @@ This document contains a complete list of all tools (functions) provided by the 
 
 ## 📊 Tool Summary
 
-- Total tools: 234
-- High-level tools: 88
+- Total tools: 235
+- High-level tools: 89
 - Low-level tools: 119
 - Read-only tools: 27
 - Other tools: 0
@@ -160,14 +160,15 @@ The navigation below mirrors the document structure for easier discovery.
     - [ValidateStructureLow](#validatestructurelow-low)
     - [ValidateTableLow](#validatetablelow-low)
     - [ValidateViewLow](#validateviewlow-low)
-- [Packages and Interfaces](#packages-and-interfaces) (21 tools – 5 high-level, 15 low-level, 1 read-only)
+- [Packages and Interfaces](#packages-and-interfaces) (22 tools – 6 high-level, 15 low-level, 1 read-only)
   - [Read-Only Tools](#packages-and-interfaces-read-only)
-    - [GetPackage](#getpackage-readonly)
+    - [GetPackageContents](#getpackagecontents-readonly)
   - [High-Level Tools](#packages-and-interfaces-high-level)
     - [CreateInterface](#createinterface-high)
     - [CreatePackage](#createpackage-high)
     - [DeleteInterface](#deleteinterface-high)
     - [GetInterface](#getinterface-high)
+    - [GetPackage](#getpackage-high)
     - [UpdateInterface](#updateinterface-high)
   - [Low-Level Tools](#packages-and-interfaces-low-level)
     - [ActivateInterfaceLow](#activateinterfacelow-low)
@@ -786,7 +787,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ### Low-Level Tools {#programs,-classes,-functions-low-level}
 
-*Low-level tools perform a single operation (one method call to AdtClient).*
+*Low-level tools perform a single operation (one method call to CrudClient).*
 
 ### ActivateClassLow {#activateclasslow-low}
 **Description:** [low-level] Activate an ABAP class. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
@@ -1416,6 +1417,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 **Parameters:**
 - `inputSchema` (string, optional) - FunctionGroup name to validate (e.g., Z_MY_PROGRAM).
+- `package_name` (string, optional) - Package name for validation (optional but recommended).
 - `description` (string, optional) - Optional description for validation
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1615,6 +1617,7 @@ The navigation below mirrors the document structure for easier discovery.
 **Parameters:**
 - `inputSchema` (string, optional) - Table name (e.g., ZZ_TEST_TABLE_001). Must follow SAP naming conventions.
 - `ddl_code` (string, required) - Complete DDL code for table creation. Example: 
+- `description` (string, optional) - Table description for validation and creation.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 - `activate` (boolean, optional) - Activate table after creation. Default: true. Set to false for batch operations (activate multiple objects later).
@@ -1966,7 +1969,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ### Low-Level Tools {#tables-and-structures-low-level}
 
-*Low-level tools perform a single operation (one method call to AdtClient).*
+*Low-level tools perform a single operation (one method call to CrudClient).*
 
 ### ActivateDataElementLow {#activatedataelementlow-low}
 **Description:** [low-level] Activate an ABAP data element. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
@@ -2687,8 +2690,8 @@ The navigation below mirrors the document structure for easier discovery.
 
 *Read-only tools retrieve information without modifying the system.*
 
-### GetPackage {#getpackage-readonly}
-**Description:** [read-only] Retrieve ABAP package details.
+### GetPackageContents {#getpackagecontents-readonly}
+**Description:** [read-only] Retrieve objects inside an ABAP package.
 
 **Parameters:** None
 
@@ -2766,6 +2769,22 @@ The navigation below mirrors the document structure for easier discovery.
 
 ---
 
+### GetPackage {#getpackage-high}
+**Description:** Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version.
+
+**Parameters:**
+- `inputSchema` (string, optional) - Package name (e.g., Z_MY_PACKAGE).
+- `version` (string, optional (default: "active")) - Version to read: 
+
+**Example:**
+```json
+{
+  "version": "\"example_value\""
+}
+```
+
+---
+
 ### UpdateInterface {#updateinterface-high}
 **Description:** Update source code of an existing ABAP interface. Uses stateful session with proper lock/unlock mechanism. Lock handle and transport number are passed in URL parameters.
 
@@ -2787,7 +2806,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ### Low-Level Tools {#packages-and-interfaces-low-level}
 
-*Low-level tools perform a single operation (one method call to AdtClient).*
+*Low-level tools perform a single operation (one method call to CrudClient).*
 
 ### ActivateInterfaceLow {#activateinterfacelow-low}
 **Description:** [low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
@@ -2904,6 +2923,7 @@ The navigation below mirrors the document structure for easier discovery.
 - `inputSchema` (string, optional) - Package name (e.g., Z_MY_PROGRAM).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
 - `force_new_connection` (boolean, optional) - Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.
+- `connection_config` (object, optional) - Optional SAP connection config to create a fresh connection for deletion. Useful when the existing connection config is unavailable.
 
 **Example:**
 ```json
@@ -3347,7 +3367,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ### Low-Level Tools {#types,-descriptions,-metadata-low-level}
 
-*Low-level tools perform a single operation (one method call to AdtClient).*
+*Low-level tools perform a single operation (one method call to CrudClient).*
 
 ### GetNodeStructureLow {#getnodestructurelow-low}
 **Description:** [low-level] Fetch node structure from ADT repository. Used for object tree navigation and structure discovery. Can use session_id and session_state from GetSession to maintain the same session.
@@ -3520,7 +3540,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ### Low-Level Tools {#search,-sql,-transactions-low-level}
 
-*Low-level tools perform a single operation (one method call to AdtClient).*
+*Low-level tools perform a single operation (one method call to CrudClient).*
 
 ### CreateTransportLow {#createtransportlow-low}
 **Description:** [low-level] Create a new ABAP transport request.
@@ -3635,7 +3655,7 @@ The navigation below mirrors the document structure for easier discovery.
 
 ### Low-Level Tools {#enhancements-low-level}
 
-*Low-level tools perform a single operation (one method call to AdtClient).*
+*Low-level tools perform a single operation (one method call to CrudClient).*
 
 ### ActivateMetadataExtensionLow {#activatemetadataextensionlow-low}
 **Description:** [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
@@ -3811,6 +3831,6 @@ All functions return MCP-compliant responses in the following format:
 
 ---
 
-*Last updated: 2025-12-27*
+*Last updated: 2025-12-29*
 *Document version: 1.0*
 *Generated automatically from TOOL_DEFINITION exports*

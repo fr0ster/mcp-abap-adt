@@ -14,21 +14,21 @@ import { writeResultToFile } from '../../../lib/writeResultToFile';
 // Need infrastructure module with method that returns parsed package contents
 
 export const TOOL_DEFINITION = {
-  name: 'GetPackage',
-  description: '[read-only] Retrieve ABAP package details.',
+  name: 'GetPackageContents',
+  description: '[read-only] Retrieve objects inside an ABAP package.',
   inputSchema: {
     package_name: z.string().describe('Name of the ABAP package'),
   },
 } as const;
 
-interface GetPackageArgs {
+interface GetPackageContentsArgs {
   package_name: string;
   filePath?: string;
 }
 
-export async function handleGetPackage(
+export async function handleGetPackageContents(
   context: HandlerContext,
-  args: GetPackageArgs,
+  args: GetPackageContentsArgs,
 ) {
   const { connection, logger } = context;
   try {

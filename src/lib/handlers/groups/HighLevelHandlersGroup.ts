@@ -213,6 +213,10 @@ import {
   handleCreatePackage,
 } from '../../../handlers/package/high/handleCreatePackage';
 import {
+  TOOL_DEFINITION as GetPackage_Tool,
+  handleGetPackage,
+} from '../../../handlers/package/high/handleGetPackage';
+import {
   TOOL_DEFINITION as CreateProgram_Tool,
   handleCreateProgram,
 } from '../../../handlers/program/high/handleCreateProgram';
@@ -370,6 +374,14 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           inputSchema: CreatePackage_Tool.inputSchema,
         },
         handler: (args: any) => handleCreatePackage(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: GetPackage_Tool.name,
+          description: GetPackage_Tool.description,
+          inputSchema: GetPackage_Tool.inputSchema,
+        },
+        handler: (args: any) => handleGetPackage(this.context, args),
       },
       {
         toolDefinition: {

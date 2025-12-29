@@ -117,6 +117,7 @@ import { handleUnlockInterface } from '../../handlers/interface/low/handleUnlock
 import { handleUpdateInterface as handleUpdateInterfaceLow } from '../../handlers/interface/low/handleUpdateInterface';
 import { handleValidateInterface } from '../../handlers/interface/low/handleValidateInterface';
 import { handleCreatePackage } from '../../handlers/package/high/handleCreatePackage';
+import { handleGetPackage } from '../../handlers/package/high/handleGetPackage';
 import { handleCheckPackage } from '../../handlers/package/low/handleCheckPackage';
 import { handleCreatePackage as handleCreatePackageLow } from '../../handlers/package/low/handleCreatePackage';
 import { handleDeletePackage } from '../../handlers/package/low/handleDeletePackage';
@@ -124,7 +125,7 @@ import { handleLockPackage } from '../../handlers/package/low/handleLockPackage'
 import { handleUnlockPackage } from '../../handlers/package/low/handleUnlockPackage';
 import { handleUpdatePackage } from '../../handlers/package/low/handleUpdatePackage';
 import { handleValidatePackage } from '../../handlers/package/low/handleValidatePackage';
-import { handleGetPackage } from '../../handlers/package/readonly/handleGetPackage';
+import { handleGetPackageContents } from '../../handlers/package/readonly/handleGetPackageContents';
 import { handleCreateProgram } from '../../handlers/program/high/handleCreateProgram';
 // Import handler functions
 // Import handler functions
@@ -321,6 +322,7 @@ import { TOOL_DEFINITION as UnlockInterface_Tool } from '../../handlers/interfac
 import { TOOL_DEFINITION as UpdateInterface_Tool } from '../../handlers/interface/low/handleUpdateInterface';
 import { TOOL_DEFINITION as ValidateInterface_Tool } from '../../handlers/interface/low/handleValidateInterface';
 import { TOOL_DEFINITION as CreatePackage_Tool } from '../../handlers/package/high/handleCreatePackage';
+import { TOOL_DEFINITION as GetPackage_Tool } from '../../handlers/package/high/handleGetPackage';
 import { TOOL_DEFINITION as CheckPackage_Tool } from '../../handlers/package/low/handleCheckPackage';
 import { TOOL_DEFINITION as CreatePackageLow_Tool } from '../../handlers/package/low/handleCreatePackage';
 import { TOOL_DEFINITION as DeletePackage_Tool } from '../../handlers/package/low/handleDeletePackage';
@@ -328,7 +330,7 @@ import { TOOL_DEFINITION as LockPackage_Tool } from '../../handlers/package/low/
 import { TOOL_DEFINITION as UnlockPackage_Tool } from '../../handlers/package/low/handleUnlockPackage';
 import { TOOL_DEFINITION as UpdatePackage_Tool } from '../../handlers/package/low/handleUpdatePackage';
 import { TOOL_DEFINITION as ValidatePackage_Tool } from '../../handlers/package/low/handleValidatePackage';
-import { TOOL_DEFINITION as GetPackage_Tool } from '../../handlers/package/readonly/handleGetPackage';
+import { TOOL_DEFINITION as GetPackageContents_Tool } from '../../handlers/package/readonly/handleGetPackageContents';
 import { TOOL_DEFINITION as CreateProgram_Tool } from '../../handlers/program/high/handleCreateProgram';
 // Import TOOL_DEFINITION from handlers
 import { TOOL_DEFINITION as GetProgram_Tool } from '../../handlers/program/high/handleGetProgram';
@@ -774,6 +776,15 @@ export class McpHandlers {
         GetPackage_Tool.inputSchema as any,
         (args: any) => {
           return handleGetPackage(context, args);
+        },
+      );
+      this.registerToolOnServer(
+        server,
+        GetPackageContents_Tool.name,
+        GetPackageContents_Tool.description,
+        GetPackageContents_Tool.inputSchema as any,
+        (args: any) => {
+          return handleGetPackageContents(context, args);
         },
       );
       this.registerToolOnServer(

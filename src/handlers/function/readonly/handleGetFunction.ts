@@ -8,29 +8,36 @@ export const TOOL_DEFINITION = {
   description: '[read-only] Retrieve ABAP Function Module source code.',
   inputSchema: {
     function_name: z.string().describe('Name of the function module'),
-    function_group: z.string().describe('Name of the function group'),
+    function_group: z
+      .string()
+      .optional()
+      .describe('Name of the function group (optional)'),
+    version: z
+      .enum(['active', 'inactive'])
+      .default('active')
+      .describe('Version to read'),
   },
 } as const;
 
 export async function handleGetFunction(context: HandlerContext, args: any) {
   const { connection, logger } = context;
   try {
-    if (!args?.function_name || !args?.function_group) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'Function name and group are required',
-      );
+    if (!args?.function_name) {
+      throw new McpError(ErrorCode.InvalidParams, 'Function name is required');
     }
 
     logger?.info(
-      `Reading function module ${args.function_name} in group ${args.function_group}`,
+      `Reading function module ${args.function_name}, version: ${args.version || 'active'}`,
     );
 
     // Create client
     const client = new AdtClient(connection);
     const result = await client
       .getFunctionModule()
-      .read(args.function_name, args.function_group);
+      .read(
+        { functionModuleName: args.function_name },
+        args.version || 'active',
+      );
     logger?.debug(`Successfully read function module ${args.function_name}`);
     return {
       isError: false,

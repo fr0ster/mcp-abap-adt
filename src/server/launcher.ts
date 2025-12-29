@@ -50,20 +50,47 @@ function showVersion(): void {
  */
 const V2_HELP_SECTIONS = `
 ENVIRONMENT VARIABLES:
-  DEBUG_AUTH_LOG                   Enable debug logging for auth-broker (true|false)
-                                   Default: false (only info messages shown)
-  DEBUG_AUTH_BROKER                Alias for DEBUG_AUTH_LOG
-  AUTH_BROKER_PATH                 Custom paths for service keys and sessions
+
+  MCP Server Configuration:
+    MCP_TRANSPORT                  Transport type: stdio|http|sse (default: stdio)
+    MCP_HTTP_HOST                  HTTP server host (default: 127.0.0.1)
+    MCP_HTTP_PORT                  HTTP server port (default: 3000)
+    MCP_SSE_HOST                   SSE server host (default: 127.0.0.1)
+    MCP_SSE_PORT                   SSE server port (default: 3001)
+    MCP_ENV_PATH                   Path to .env file
+    MCP_UNSAFE                     Disable connection validation (true|false)
+    MCP_USE_AUTH_BROKER            Force auth-broker usage (true|false)
+    MCP_BROWSER                    Browser for OAuth2 flow (e.g., chrome, firefox)
+
+  Auth-Broker:
+    DEBUG_AUTH_LOG                 Enable debug logging for auth-broker (true|false)
+    DEBUG_AUTH_BROKER              Alias for DEBUG_AUTH_LOG
+    AUTH_BROKER_PATH               Custom paths for service keys and sessions
                                    Unix: colon-separated (e.g., /path1:/path2)
                                    Windows: semicolon-separated (e.g., C:\\\\path1;C:\\\\path2)
 
+  Debug Options:
+    DEBUG_HANDLERS                 Enable handler debug logging (true|false)
+    DEBUG_CONNECTORS               Enable connector debug logging (true|false)
+    DEBUG_CONNECTION_MANAGER       Enable connection manager debug logging (true|false)
+    HANDLER_LOG_SILENT             Disable all handler logs (true|false)
+
 SAP CONNECTION (.env file):
-  SAP_URL                          SAP system URL (required)
-  SAP_CLIENT                       SAP client number (required)
-  SAP_AUTH_TYPE                    Authentication type: basic|jwt (default: basic)
-  SAP_USERNAME                     SAP username (required for basic auth)
-  SAP_PASSWORD                     SAP password (required for basic auth)
-  SAP_JWT_TOKEN                    JWT token (required for jwt auth)
+
+  Basic Authentication:
+    SAP_URL                        SAP system URL (required)
+    SAP_CLIENT                     SAP client number (required)
+    SAP_AUTH_TYPE                  Authentication type: basic|jwt (default: basic)
+    SAP_USERNAME                   SAP username (required for basic auth)
+    SAP_PASSWORD                   SAP password (required for basic auth)
+    SAP_LANGUAGE                   SAP language (optional, e.g., EN, DE)
+
+  JWT/OAuth2 Authentication:
+    SAP_JWT_TOKEN                  JWT token (required for jwt auth)
+    SAP_REFRESH_TOKEN              Refresh token for token renewal
+    SAP_UAA_URL                    UAA URL for OAuth2 (or UAA_URL)
+    SAP_UAA_CLIENT_ID              UAA Client ID (or UAA_CLIENT_ID)
+    SAP_UAA_CLIENT_SECRET          UAA Client Secret (or UAA_CLIENT_SECRET)
 
 GENERATING .ENV FROM SERVICE KEY:
   Install connection package: npm install -g @mcp-abap-adt/connection

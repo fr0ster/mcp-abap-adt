@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [1.4.3] - 2025-12-29
+### Documentation
+- **CLI Help**: Extended `--help` output with comprehensive environment variables documentation
+  - Added MCP Server Configuration section (`MCP_TRANSPORT`, `MCP_HTTP_HOST`, `MCP_HTTP_PORT`, `MCP_SSE_HOST`, `MCP_SSE_PORT`, `MCP_ENV_PATH`, `MCP_UNSAFE`, `MCP_USE_AUTH_BROKER`, `MCP_BROWSER`)
+  - Added Debug Options section (`DEBUG_HANDLERS`, `DEBUG_CONNECTORS`, `DEBUG_CONNECTION_MANAGER`, `HANDLER_LOG_SILENT`)
+  - Extended SAP Connection section with JWT/OAuth2 variables (`SAP_REFRESH_TOKEN`, `SAP_UAA_URL`, `SAP_UAA_CLIENT_ID`, `SAP_UAA_CLIENT_SECRET`, `SAP_LANGUAGE`)
+- **CLI_OPTIONS.md**: Added missing environment variables documentation
+  - Added `MCP_UNSAFE`, `MCP_USE_AUTH_BROKER`, `MCP_BROWSER` to General section
+  - Added JWT/OAuth2 authentication variables to SAP Connection section
+  - New Auth-Broker section with `AUTH_BROKER_PATH` and debug variables
+  - New Debug section with handler and connector logging options
+- **INSTALLATION.md**: Expanded Environment Variables section with full reference and link to CLI_OPTIONS.md
+
 ## [1.4.2] - 2025-12-29
 ### Fixed
 - **Version path**: Fixed incorrect path to package.json in `--version` command

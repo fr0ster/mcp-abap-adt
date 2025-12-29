@@ -432,14 +432,44 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 
 **Environment Variables:**
 
-You can also configure the server using environment variables:
+You can also configure the server using environment variables.
+
+*MCP Server Configuration:*
 - `MCP_ENV_PATH` - Path to .env file
 - `MCP_SKIP_ENV_LOAD` - Skip automatic .env loading (true|false)
-- `MCP_TRANSPORT` - Default transport type
+- `MCP_TRANSPORT` - Default transport type (stdio|http|sse)
 - `MCP_HTTP_PORT` - Default HTTP port
-- `MCP_HTTP_HOST` - Default HTTP host
+- `MCP_HTTP_HOST` - Default HTTP host (default: 127.0.0.1)
 - `MCP_SSE_PORT` - Default SSE port
-- `MCP_SSE_HOST` - Default SSE host
+- `MCP_SSE_HOST` - Default SSE host (default: 127.0.0.1)
+- `MCP_UNSAFE` - Disable connection validation (true|false)
+- `MCP_USE_AUTH_BROKER` - Force auth-broker usage (true|false)
+- `MCP_BROWSER` - Browser for OAuth2 flow (e.g., chrome, firefox)
+
+*Auth-Broker:*
+- `AUTH_BROKER_PATH` - Custom paths for service keys and sessions
+- `DEBUG_AUTH_LOG` - Enable auth-broker debug logging (true|false)
+
+*Debug Options:*
+- `DEBUG_HANDLERS` - Enable handler debug logging (true|false)
+- `DEBUG_CONNECTORS` - Enable connector debug logging (true|false)
+- `DEBUG_CONNECTION_MANAGER` - Enable connection manager debug logging (true|false)
+- `HANDLER_LOG_SILENT` - Disable all handler logs (true|false)
+
+*SAP Connection (in .env file):*
+- `SAP_URL` - SAP system URL (required)
+- `SAP_CLIENT` - SAP client number (required)
+- `SAP_AUTH_TYPE` - Authentication type: basic|jwt (default: basic)
+- `SAP_USERNAME` - SAP username (for basic auth)
+- `SAP_PASSWORD` - SAP password (for basic auth)
+- `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
+- `SAP_JWT_TOKEN` - JWT token (for jwt auth)
+- `SAP_REFRESH_TOKEN` - Refresh token for token renewal
+- `SAP_UAA_URL` - UAA URL for OAuth2
+- `SAP_UAA_CLIENT_ID` - UAA Client ID
+- `SAP_UAA_CLIENT_SECRET` - UAA Client Secret
+
+For complete list see [CLI Options](../user-guide/CLI_OPTIONS.md#environment-variables)
 
 **Examples with Options:**
 

@@ -344,6 +344,9 @@ Alternative to command line arguments. Environment variables can be set in shell
 - `MCP_SKIP_ENV_LOAD` - Skip automatic .env loading (true|false)
 - `MCP_SKIP_AUTO_START` - Skip automatic server start (true|false, for testing)
 - `MCP_TRANSPORT` - Default transport type (stdio|http|sse)
+- `MCP_UNSAFE` - Disable connection validation (true|false)
+- `MCP_USE_AUTH_BROKER` - Force auth-broker usage (true|false)
+- `MCP_BROWSER` - Browser for OAuth2 flow (e.g., chrome, firefox)
 
 ### HTTP Transport
 
@@ -366,12 +369,35 @@ Alternative to command line arguments. Environment variables can be set in shell
 
 These are typically set in `.env` file:
 
+**Basic Authentication:**
 - `SAP_URL` - SAP system URL (required)
 - `SAP_CLIENT` - SAP client number (required)
 - `SAP_AUTH_TYPE` - Authentication type: `basic` or `jwt` (default: basic)
 - `SAP_USERNAME` - SAP username (for basic auth)
 - `SAP_PASSWORD` - SAP password (for basic auth)
-- `SAP_JWT_TOKEN` - JWT token (for jwt auth)
+- `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
+
+**JWT/OAuth2 Authentication:**
+- `SAP_JWT_TOKEN` - JWT token (required for jwt auth)
+- `SAP_REFRESH_TOKEN` - Refresh token for automatic token renewal
+- `SAP_UAA_URL` - UAA URL for OAuth2 (alternative: `UAA_URL`)
+- `SAP_UAA_CLIENT_ID` - UAA Client ID (alternative: `UAA_CLIENT_ID`)
+- `SAP_UAA_CLIENT_SECRET` - UAA Client Secret (alternative: `UAA_CLIENT_SECRET`)
+
+### Auth-Broker
+
+- `AUTH_BROKER_PATH` - Custom paths for service keys and sessions
+  - Unix: colon-separated (e.g., `/path1:/path2`)
+  - Windows: semicolon-separated (e.g., `C:\path1;C:\path2`)
+- `DEBUG_AUTH_LOG` - Enable debug logging for auth-broker (true|false)
+- `DEBUG_AUTH_BROKER` - Alias for `DEBUG_AUTH_LOG`
+
+### Debug
+
+- `DEBUG_HANDLERS` - Enable handler debug logging (true|false)
+- `DEBUG_CONNECTORS` - Enable connector debug logging (true|false)
+- `DEBUG_CONNECTION_MANAGER` - Enable connection manager debug logging (true|false)
+- `HANDLER_LOG_SILENT` - Disable all handler logs (true|false)
 
 ### Example Environment Setup
 

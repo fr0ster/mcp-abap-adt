@@ -125,13 +125,21 @@ export class ServerConfigManager {
   }
 
   /**
-   * Parse transport from command line
+   * Parse transport from command line or environment variable
    */
   private parseTransport(): Transport | undefined {
-    const value = ArgumentsParser.getArgument('--transport');
-    if (value === 'sse') return 'sse';
-    if (value === 'http' || value === 'streamable-http') return 'http';
-    if (value === 'stdio') return 'stdio';
+    // Priority 1: Command line argument --transport
+    const cliValue = ArgumentsParser.getArgument('--transport');
+    if (cliValue === 'sse') return 'sse';
+    if (cliValue === 'http' || cliValue === 'streamable-http') return 'http';
+    if (cliValue === 'stdio') return 'stdio';
+
+    // Priority 2: Environment variable MCP_TRANSPORT
+    const envValue = process.env.MCP_TRANSPORT;
+    if (envValue === 'sse') return 'sse';
+    if (envValue === 'http' || envValue === 'streamable-http') return 'http';
+    if (envValue === 'stdio') return 'stdio';
+
     return undefined;
   }
 

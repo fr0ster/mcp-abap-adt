@@ -2691,7 +2691,7 @@ The navigation below mirrors the document structure for easier discovery.
 *Read-only tools retrieve information without modifying the system.*
 
 ### GetPackageContents {#getpackagecontents-readonly}
-**Description:** [read-only] Retrieve objects inside an ABAP package.
+**Description:** [read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages.
 
 **Parameters:** None
 

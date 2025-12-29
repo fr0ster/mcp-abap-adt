@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [1.3.0] - 2025-12-29
+### Added
+- **glama.json**: Added configuration for compatibility with the Glama platform.
+- **Node.js Debugging**: Added `--inspect` support to Docker container and exposed port 9229.
+- **MCP_TRANSPORT Environment Variable**: Added support for selecting transport mode via environment variable.
+
+### Changed
+- **@mcp-abap-adt/adt-clients Updated**: Upgraded to version 0.3.13, bringing fixes for recursion and 406 Accept errors.
+- **GetPackageTree Optimized**: Simplified implementation by using the library's `getPackageHierarchy` method, ensuring correct recursive traversal of subpackages.
+- **GetPackageContents Enhanced**: Added support for `include_subpackages`, `max_depth`, and `include_descriptions` parameters.
+- **Docker Defaults**: Changed default transport to `stdio` in Docker and updated healthcheck logic.
+
 ## [1.2.9] - 2025-12-29
 ### Changed
 - **v1 McpHandlers Refactoring**: Rewrote `McpHandlers` to use `HandlerExporter` internally. This ensures the legacy embeddable server (v1) stays in sync with all tools available in v2 while reducing code duplication.

@@ -35,7 +35,8 @@ WORKDIR /app
 # Runtime environment
 ENV NODE_ENV=production \
     MCP_HTTP_PORT=3000 \
-    MCP_HTTP_HOST=0.0.0.0
+    MCP_HTTP_HOST=0.0.0.0 \
+    MCP_TRANSPORT=stdio
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
@@ -45,13 +46,13 @@ COPY --from=builder /app/package.json ./
 # Create directories for service keys and sessions
 RUN mkdir -p /app/service-keys /app/sessions
 
-# Expose HTTP port
-EXPOSE 3000
+# Expose HTTP and Debug ports
+EXPOSE 3000 9229
 
-# Healthcheck
+# Healthcheck - only relevant for sse/http transports
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
+  CMD if [ "$MCP_TRANSPORT" = "stdio" ]; then exit 0; else node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1; fi
 
-# Start server with streamable-http transport and destination
-# Use v2 server for proper header-based destination handling
-CMD ["node", "./dist/server/v2/launcher.js", "--transport", "streamable-http"]
+# Start server with v2 launcher
+# Transport will be taken from MCP_TRANSPORT env var (defaults to stdio)
+CMD ["node", "--inspect=0.0.0.0:9229", "./dist/server/v2/launcher.js"]

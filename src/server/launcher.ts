@@ -130,21 +130,41 @@ async function main() {
   await authBrokerFactory.initializeDefaultBroker();
 
   if (config.transport === 'stdio') {
-    if (!config.mcpDestination && !config.envFile) {
-      throw new Error('stdio requires --mcp=<destination> or --env=<path>');
-    }
     // For .env file, use 'default' broker; for --mcp, use specified destination
-    // Priority: --mcp takes precedence over auto-detected .env file
-    const brokerKey =
+    const configuredBrokerKey =
       config.mcpDestination ?? (config.envFile ? 'default' : undefined);
-    if (!brokerKey) {
-      throw new Error('stdio requires --mcp=<destination> or --env=<path>');
+    const configuredBroker = configuredBrokerKey
+      ? await authBrokerFactory.getOrCreateAuthBroker(configuredBrokerKey)
+      : undefined;
+
+    let broker: typeof configuredBroker;
+    let brokerKey: string;
+
+    if (configuredBroker) {
+      broker = configuredBroker;
+      brokerKey = configuredBrokerKey!;
+    } else {
+      // Inspection-only mode: no connection parameters provided
+      const { MockAbapConnection } = await import('./MockAbapConnection.js');
+      const mockConnection = new MockAbapConnection();
+      broker = {
+        getSession: async () => ({
+          connection: mockConnection as any,
+          client: {} as any,
+          config: { url: 'http://mock', authType: 'basic' } as any,
+          getHeaders: () => ({}),
+        }),
+      } as any;
+      brokerKey = 'mock';
+      console.error(
+        '[MCP] Starting in inspection-only mode (no connection parameters).',
+      );
+      console.error(
+        '[MCP] To connect to SAP system, use --mcp=<destination> or --env=<path>',
+      );
     }
-    const broker = await authBrokerFactory.getOrCreateAuthBroker(brokerKey);
-    if (!broker) {
-      throw new Error(`Auth broker not available for ${brokerKey}`);
-    }
-    const server = new StdioServer(handlersRegistry, broker, {
+
+    const server = new StdioServer(handlersRegistry, broker!, {
       logger: loggerForTransport,
     });
     await server.start(brokerKey);

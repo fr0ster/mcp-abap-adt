@@ -19,7 +19,7 @@ mcp-abap-adt --transport=sse           # SSE mode
 ### 2. Handler Exporter (For Embedding)
 Export handlers for integration into existing servers (e.g., SAP CAP/CDS applications):
 ```typescript
-import { HandlerExporter } from '@fr0ster/mcp-abap-adt/handlers';
+import { HandlerExporter } from '@mcp-abap-adt/core/handlers';
 
 const exporter = new HandlerExporter();
 exporter.registerOnServer(mcpServer, () => getConnection());

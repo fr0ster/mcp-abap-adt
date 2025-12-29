@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [1.4.1] - 2025-12-29
+### Changed
+- **Package renamed**: Changed from `@fr0ster/mcp-abap-adt` to `@mcp-abap-adt/core` for npm publishing
+- **Package now public**: Removed `private: true` flag to allow npm publishing
+
+### Added
+- **Inspection-only mode**: Server can now start in stdio mode without connection parameters for tool inspection (used by glama.ai)
+- **MockAbapConnection**: Added mock connection class for inspection-only mode that returns descriptive error when tools are executed
+- **Docker inspection support**: Added `Dockerfile.inspect` and `docker-compose.inspect.yml` for local testing of inspection mode
+- **CLAUDE.md**: Added project documentation for Claude Code assistance
+
 ## [1.3.0] - 2025-12-29
 ### Added
 - **glama.json**: Added configuration for compatibility with the Glama platform.

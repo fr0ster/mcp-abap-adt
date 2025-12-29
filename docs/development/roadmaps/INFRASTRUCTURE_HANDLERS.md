@@ -127,7 +127,7 @@ These handlers currently use `makeAdtRequest`/`makeAdtRequestWithTimeout` direct
   - Status: ✅ Fully implemented with direct endpoint
 
 #### Behavior Definition Operations
-- **`GetBdef`** (`behavior_definition/readonly/handleGetBdef.ts`)
+- **`GetBehaviorDefinition`** (`behavior_definition/readonly/handleGetBehaviorDefinition.ts`)
   - Endpoint: `/sap/bc/adt/bo/behaviordefinitions/{name}/source/main`
   - Method: GET
   - Purpose: Retrieve source code of BDEF (Behavior Definition) for CDS entity

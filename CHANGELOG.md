@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [1.2.9] - 2025-12-29
+### Changed
+- **v1 McpHandlers Refactoring**: Rewrote `McpHandlers` to use `HandlerExporter` internally. This ensures the legacy embeddable server (v1) stays in sync with all tools available in v2 while reducing code duplication.
+- **Shared Schema Utilities**: Replaced duplicated `jsonSchemaToZod` logic in `v1` with a central implementation from `src/lib/handlers/utils/schemaUtils.ts`.
+- **Documentation Generator**: Updated `tools/generate-tools-docs.js` category mapping to support the standardized `GetBehaviorDefinition` naming.
+
+### Removed
+- **GetBdef compatibility adapter**: Removed the manual adapter for `GetBdef` in v1 server. All tools now use standard names (e.g., `GetBehaviorDefinition`).
+
+### Added
+- **tsx** added to `devDependencies` for improved TypeScript execution and testing.
+
 ## [1.2.8] - 2025-12-29
 ### Added
 - **GetPackageContents** tool: New read-only tool to retrieve objects inside an ABAP package (moved from legacy `GetPackage`).

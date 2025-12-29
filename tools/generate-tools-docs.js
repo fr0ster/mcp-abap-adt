@@ -101,7 +101,7 @@ const CATEGORY_MAP = {
   'GetEnhancements': 'Enhancements',
   'GetEnhancementSpot': 'Enhancements',
   'GetEnhancementImpl': 'Enhancements',
-  'GetBdef': 'Enhancements',
+  'GetBehaviorDefinition': 'Enhancements',
 
   // ABAP Parser & Semantic Analysis
   'GetAbapAST': 'ABAP Parser and Semantic Analysis',

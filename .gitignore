@@ -89,4 +89,3 @@ docker/nginx.conf
 *.d.ts.map
 mdd.json
 package.json
-GEMINI.md

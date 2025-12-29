@@ -1,0 +1,8 @@
+{
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "name": "mcp-abap-adt",
+  "description": "Embedded ABAP ADT MCP server tailored for the Cloud LLM Hub stack",
+  "maintainers": [
+    "fr0ster"
+  ]
+}

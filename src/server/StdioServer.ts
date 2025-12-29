@@ -1,8 +1,8 @@
 import type { AuthBroker } from '@mcp-abap-adt/auth-broker';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { noopLogger } from '../../lib/handlerLogger.js';
-import type { IHandlersRegistry } from '../../lib/handlers/interfaces.js';
+import { noopLogger } from '../lib/handlerLogger.js';
+import type { IHandlersRegistry } from '../lib/handlers/interfaces.js';
 import { BaseMcpServer } from './BaseMcpServer.js';
 
 const DEFAULT_VERSION = process.env.npm_package_version ?? '1.0.0';

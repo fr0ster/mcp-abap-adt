@@ -14,15 +14,15 @@
       "import": "./dist/lib/handlers/index.js",
       "require": "./dist/lib/handlers/index.js"
     },
-    "./server/v1": {
-      "types": "./dist/server/v1/index.d.ts",
-      "import": "./dist/server/v1/index.js",
-      "require": "./dist/server/v1/index.js"
-    },
     "./utils": {
       "types": "./dist/lib/utils.d.ts",
       "import": "./dist/lib/utils.js",
       "require": "./dist/lib/utils.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js",
+      "require": "./dist/server/index.js"
     }
   },
   "typesVersions": {
@@ -30,11 +30,11 @@
       "handlers": [
         "dist/lib/handlers/index.d.ts"
       ],
-      "server/v1": [
-        "dist/server/v1/index.d.ts"
-      ],
       "utils": [
         "dist/lib/utils.d.ts"
+      ],
+      "server": [
+        "dist/server/index.d.ts"
       ]
     }
   },
@@ -53,11 +53,9 @@
     "start": "node ./bin/mcp-abap-adt.js",
     "start:http": "node ./bin/mcp-abap-adt.js --transport=http",
     "start:sse": "node ./bin/mcp-abap-adt.js --transport=sse",
-    "start:legacy": "node dist/server/v1/legacy-server.js",
-    "dev": "npm run build && npx @modelcontextprotocol/inspector node ./dist/server/v2/launcher.js --transport=stdio",
+    "dev": "npm run build && npx @modelcontextprotocol/inspector node ./dist/server/launcher.js --transport=stdio",
     "dev:http": "npm run build && node ./tools/dev-http-v2.js",
     "dev:sse": "npm run build && node ./tools/dev-sse-v2.js",
-    "dev:legacy": "npx @modelcontextprotocol/inspector node ./dist/server/v1/legacy-server.js --transport=stdio",
     "kill-ports": "lsof -ti:3000,3001,4000,4001,5000,6274,6277 | xargs -r kill -9 2>/dev/null || true",
     "auth": "npx sap-abap-auth auth",
     "clean": "make clean",

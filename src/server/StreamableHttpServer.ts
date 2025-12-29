@@ -1,9 +1,9 @@
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
-import type { AuthBrokerFactory } from '../../lib/auth/index.js';
-import { noopLogger } from '../../lib/handlerLogger.js';
-import type { IHandlersRegistry } from '../../lib/handlers/interfaces.js';
+import type { AuthBrokerFactory } from '../lib/auth/index.js';
+import { noopLogger } from '../lib/handlerLogger.js';
+import type { IHandlersRegistry } from '../lib/handlers/interfaces.js';
 import { BaseMcpServer } from './BaseMcpServer.js';
 import type {
   IHttpApplication,

@@ -1,16 +1,16 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { AuthBrokerFactory } from '../../lib/auth/index.js';
-import { ServerConfigManager } from '../../lib/config/index.js';
+import { AuthBrokerFactory } from '../lib/auth/index.js';
+import { ServerConfigManager } from '../lib/config/index.js';
 import {
   HighLevelHandlersGroup,
   LowLevelHandlersGroup,
   ReadOnlyHandlersGroup,
   SearchHandlersGroup,
   SystemHandlersGroup,
-} from '../../lib/handlers/groups/index.js';
-import type { HandlerContext } from '../../lib/handlers/interfaces.js';
-import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry.js';
+} from '../lib/handlers/groups/index.js';
+import type { HandlerContext } from '../lib/handlers/interfaces.js';
+import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { AuthBrokerConfig } from './AuthBrokerConfig.js';
 import { SseServer } from './SseServer.js';
 import { StdioServer } from './StdioServer.js';

@@ -12,4 +12,4 @@
 
 // Just require the server entry point directly - this runs the server in the same process
 // with proper stdin/stdout handling for MCP protocol
-require('../dist/server/v2/launcher.js');
+require('../dist/server/launcher.js');

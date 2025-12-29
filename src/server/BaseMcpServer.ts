@@ -5,11 +5,11 @@ import {
 } from '@mcp-abap-adt/connection';
 import { defaultLogger, type Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { HandlerContext } from '../../handlers/interfaces.js';
-import type { IHandlersRegistry } from '../../lib/handlers/interfaces.js';
-import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry.js';
-import { jsonSchemaToZod } from '../../lib/handlers/utils/schemaUtils.js';
-import { registerAuthBroker } from '../../lib/utils.js';
+import type { HandlerContext } from '../handlers/interfaces.js';
+import type { IHandlersRegistry } from '../lib/handlers/interfaces.js';
+import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
+import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
+import { registerAuthBroker } from '../lib/utils.js';
 import type { ConnectionContext } from './ConnectionContext.js';
 
 /**

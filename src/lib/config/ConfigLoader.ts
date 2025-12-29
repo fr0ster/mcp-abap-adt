@@ -4,7 +4,7 @@
  * Used by both old server (mcp_abap_adt_server) and new servers
  */
 
-import type { IServerConfig } from '../../server/v1/IServerConfig.js';
+import type { IServerConfig } from '../../server/IServerConfig.js';
 import type { TransportConfig } from '../utils.js';
 import { ArgumentsParser, type ParsedArguments } from './ArgumentsParser.js';
 import {

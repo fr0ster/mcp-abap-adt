@@ -154,6 +154,13 @@ async function main() {
           config: { url: 'http://mock', authType: 'basic' } as any,
           getHeaders: () => ({}),
         }),
+        getConnectionConfig: async () => ({
+          serviceUrl: 'http://mock',
+          authType: 'basic',
+          username: 'mock',
+          password: 'mock',
+        }),
+        getToken: async () => undefined,
       } as any;
       brokerKey = 'mock';
       console.error(

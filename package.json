@@ -119,7 +119,7 @@
     "yaml": "^2.8.1"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^0.3.10",
+    "@mcp-abap-adt/adt-clients": "^0.3.13",
     "@mcp-abap-adt/auth-broker": "^0.2.14",
     "@mcp-abap-adt/auth-providers": "^0.2.10",
     "@mcp-abap-adt/auth-stores": "^0.2.10",

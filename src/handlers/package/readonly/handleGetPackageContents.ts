@@ -1,28 +1,37 @@
-import convert from 'xml-js';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  ErrorCode,
-  McpError,
-  makeAdtRequestWithTimeout,
-} from '../../../lib/utils';
+import { ErrorCode, McpError } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
-
-// TODO: Migrate to infrastructure module
-// This handler uses getPackageContents() from @mcp-abap-adt/adt-clients/src/core/package/read.ts
-// AdtClient.getPackage().read() doesn't return package contents
-// Need infrastructure module with method that returns parsed package contents
 
 export const TOOL_DEFINITION = {
   name: 'GetPackageContents',
-  description: '[read-only] Retrieve objects inside an ABAP package.',
+  description:
+    '[read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages.',
   inputSchema: {
-    package_name: z.string().describe('Name of the ABAP package'),
+    package_name: z
+      .string()
+      .describe('Name of the ABAP package (e.g., "ZMY_PACKAGE")'),
+    include_subpackages: z
+      .boolean()
+      .optional()
+      .describe('Include contents of subpackages recursively (default: false)'),
+    max_depth: z
+      .number()
+      .optional()
+      .describe('Maximum depth for recursive package traversal (default: 5)'),
+    include_descriptions: z
+      .boolean()
+      .optional()
+      .describe('Include object descriptions in response (default: true)'),
   },
 } as const;
 
 interface GetPackageContentsArgs {
   package_name: string;
+  include_subpackages?: boolean;
+  max_depth?: number;
+  include_descriptions?: boolean;
   filePath?: string;
 }
 
@@ -36,49 +45,33 @@ export async function handleGetPackageContents(
       throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
     }
 
-    const nodeContentsUrl = `/sap/bc/adt/repository/nodestructure`;
-    const nodeContentsParams = {
-      parent_type: 'DEVC/K',
-      parent_name: args.package_name,
-      withShortDescriptions: true,
-    };
+    const client = new AdtClient(connection, logger);
+    const utils = client.getUtils();
 
-    const package_structure_response = await makeAdtRequestWithTimeout(
-      connection,
-      nodeContentsUrl,
-      'POST',
-      'default',
-      undefined,
-      nodeContentsParams,
+    // Use the optimized list method from adt-clients 0.3.13
+    const items = await utils.getPackageContentsList(
+      args.package_name.toUpperCase(),
+      {
+        includeSubpackages: args.include_subpackages,
+        maxDepth: args.max_depth,
+        includeDescriptions: args.include_descriptions,
+      },
     );
-    const result = convert.xml2js(package_structure_response.data, {
-      compact: true,
-    });
-
-    const nodes =
-      result['asx:abap']?.['asx:values']?.DATA?.TREE_CONTENT
-        ?.SEU_ADT_REPOSITORY_OBJ_NODE || [];
-    const extractedData = (Array.isArray(nodes) ? nodes : [nodes])
-      .filter((node) => node.OBJECT_NAME?._text && node.OBJECT_URI?._text)
-      .map((node) => ({
-        OBJECT_TYPE: node.OBJECT_TYPE._text,
-        OBJECT_NAME: node.OBJECT_NAME._text,
-        OBJECT_DESCRIPTION: node.DESCRIPTION?._text,
-        OBJECT_URI: node.OBJECT_URI._text,
-      }));
 
     const finalResult = {
       isError: false,
       content: [
         {
           type: 'text',
-          text: JSON.stringify(extractedData, null, 2),
+          text: JSON.stringify(items, null, 2),
         },
       ],
     };
+
     if (args.filePath) {
       writeResultToFile(JSON.stringify(finalResult, null, 2), args.filePath);
     }
+
     return finalResult;
   } catch (error) {
     return {

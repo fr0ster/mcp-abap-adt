@@ -14,6 +14,7 @@ import type {
   IHandlersRegistry,
 } from './interfaces.js';
 import { CompositeHandlersRegistry } from './registry/CompositeHandlersRegistry.js';
+import { jsonSchemaToZod } from './utils/schemaUtils.js';
 
 /**
  * Options for creating handler exporter
@@ -199,12 +200,22 @@ export class HandlerExporter {
           return { content };
         };
 
+        // Convert JSON Schema to Zod schema for MCP SDK compatibility
+        const inputSchema = entry.toolDefinition.inputSchema;
+        const zodSchema =
+          inputSchema &&
+          typeof inputSchema === 'object' &&
+          inputSchema.type === 'object' &&
+          inputSchema.properties
+            ? jsonSchemaToZod(inputSchema)
+            : inputSchema;
+
         // Register tool on server
         server.registerTool(
           entry.toolDefinition.name,
           {
             description: entry.toolDefinition.description,
-            inputSchema: entry.toolDefinition.inputSchema,
+            inputSchema: zodSchema,
           },
           wrappedHandler,
         );

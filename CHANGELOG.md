@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [2.0.1] - 2025-12-30
+### Documentation
+- Added glama.ai badge with security/license/quality grades
+- Updated README example to use `EmbeddableMcpServer` instead of deprecated `HandlerExporter.registerOnServer()`
+
 ## [2.0.0] - 2025-12-30
 ### Added
 - **EmbeddableMcpServer**: New server class for external integration (e.g., cloud-llm-hub)

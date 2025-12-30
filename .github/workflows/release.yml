@@ -37,16 +37,6 @@ jobs:
         run: npm test
         continue-on-error: true  # Don't fail release if tests fail
 
-      - name: Create package
-        run: npm pack
-
-      - name: Get package filename
-        id: package
-        run: |
-          PACKAGE_FILE=$(ls fr0ster-mcp-abap-adt-*.tgz)
-          echo "filename=$PACKAGE_FILE" >> $GITHUB_OUTPUT
-          echo "Package created: $PACKAGE_FILE"
-
       - name: Extract version from tag
         id: version
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
@@ -54,23 +44,14 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ steps.package.outputs.filename }}
           generate_release_notes: true
           draft: false
           prerelease: false
           body: |
             ## Installation
 
-            Download the `.tgz` package and install:
-
             ```bash
-            # Global installation
-            npm install -g ./${{ steps.package.outputs.filename }}
-
-            # Available commands:
-            mcp-abap-adt          # stdio transport
-            mcp-abap-adt-http     # HTTP server
-            mcp-abap-adt-sse      # SSE server
+            npm install @mcp-abap-adt/core
             ```
 
             See [Installation Guide](https://github.com/${{ github.repository }}/blob/main/doc/installation/INSTALLATION.md) for details.

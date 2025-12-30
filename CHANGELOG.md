@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2.0.2] - 2025-12-30
+### Changed
+- **GetWhereUsed handler**: Now uses `getWhereUsedList()` from adt-clients and returns parsed JSON with structured references instead of raw XML
+
+### Fixed
+- **Release workflow**: Simplified to use npm registry instead of uploading tgz artifacts
+
 ## [2.0.1] - 2025-12-30
 ### Documentation
 - Added glama.ai badge with security/license/quality grades

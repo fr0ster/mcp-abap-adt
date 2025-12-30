@@ -46,7 +46,7 @@ jobs:
       - name: Test package installation (Unix)
         if: runner.os != 'Windows'
         run: |
-          PACKAGE_FILE=$(ls fr0ster-mcp-abap-adt-*.tgz)
+          PACKAGE_FILE=$(ls mcp-abap-adt-core-*.tgz)
           npm install -g "./$PACKAGE_FILE"
           mcp-abap-adt --help || true
 
@@ -54,6 +54,6 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $PACKAGE_FILE = Get-ChildItem -Filter "fr0ster-mcp-abap-adt-*.tgz" | Select-Object -First 1 -ExpandProperty Name
+          $PACKAGE_FILE = Get-ChildItem -Filter "mcp-abap-adt-core-*.tgz" | Select-Object -First 1 -ExpandProperty Name
           npm install -g $PACKAGE_FILE
           mcp-abap-adt --help

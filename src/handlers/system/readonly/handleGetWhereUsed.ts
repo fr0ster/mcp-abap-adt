@@ -1,7 +1,7 @@
 /**
  * WhereUsed handler using AdtClient utilities
  * Endpoint: /sap/bc/adt/repository/informationsystem/usageReferences
- * Uses two-step workflow matching Eclipse ADT behavior
+ * Uses getWhereUsedList for parsed results
  */
 
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
@@ -12,7 +12,7 @@ import { ErrorCode, McpError } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetWhereUsed',
   description:
-    '[read-only] Retrieve where-used references for ABAP objects via ADT usageReferences. Uses Eclipse ADT-compatible two-step workflow with optional scope customization.',
+    '[read-only] Retrieve where-used references for ABAP objects via ADT usageReferences. Returns parsed list of referencing objects with their types and packages.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -44,10 +44,7 @@ interface WhereUsedArgs {
 
 /**
  * Returns where-used references for ABAP objects using AdtClient utilities.
- *
- * Two-step workflow:
- * 1. Fetch scope configuration (if enable_all_types is true)
- * 2. Execute where-used search with scope
+ * Uses getWhereUsedList for parsed structured results.
  */
 export async function handleGetWhereUsed(
   context: HandlerContext,
@@ -73,48 +70,32 @@ export async function handleGetWhereUsed(
     const client = new AdtClient(connection, logger);
     const utils = client.getUtils();
 
-    let scopeXml: string | undefined;
-
-    // Step 1: If enable_all_types is true, fetch and modify scope
-    if (typedArgs.enable_all_types === true) {
-      logger?.info(
-        'Fetching scope with all types enabled (Eclipse "select all" behavior)',
-      );
-
-      const scopeResponse = await utils.getWhereUsedScope({
-        object_name: typedArgs.object_name,
-        object_type: typedArgs.object_type,
-      });
-
-      // Modify scope to enable all types
-      scopeXml = utils.modifyWhereUsedScope(scopeResponse.data, {
-        enableAll: true,
-      });
-    }
-
-    // Step 2: Execute where-used search
-    // If scopeXml is undefined, getWhereUsed will auto-fetch default scope
-    const result = await utils.getWhereUsed({
+    // Use getWhereUsedList for parsed results
+    const result = await utils.getWhereUsedList({
       object_name: typedArgs.object_name,
       object_type: typedArgs.object_type,
-      scopeXml,
+      enableAllTypes: typedArgs.enable_all_types,
     });
 
     logger?.debug(
-      `Where-used search completed for ${typedArgs.object_type}/${typedArgs.object_name}`,
+      `Where-used search completed for ${typedArgs.object_type}/${typedArgs.object_name}: ${result.totalReferences} references`,
     );
 
-    // Parse numberOfResults from XML
-    const numberOfResults =
-      result.data?.match(/numberOfResults="(\d+)"/)?.[1] || '0';
-
-    // Format response
+    // Format response with parsed data
     const formattedResponse = {
-      object_name: typedArgs.object_name,
-      object_type: typedArgs.object_type,
+      object_name: result.objectName,
+      object_type: result.objectType,
       enable_all_types: typedArgs.enable_all_types || false,
-      total_references: parseInt(numberOfResults, 10),
-      raw_xml: result.data,
+      total_references: result.totalReferences,
+      result_description: result.resultDescription,
+      references: result.references.map((ref) => ({
+        name: ref.name,
+        type: ref.type,
+        uri: ref.uri,
+        package_name: ref.packageName,
+        responsible: ref.responsible,
+        usage_information: ref.usageInformation,
+      })),
     };
 
     const mcpResult = {

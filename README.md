@@ -1,5 +1,9 @@
 # mcp-abap-adt: Your Gateway to ABAP Development Tools (ADT)
 
+<a href="https://glama.ai/mcp/servers/@fr0ster/mcp-abap-adt">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@fr0ster/mcp-abap-adt/badge" />
+</a>
+
 > **Acknowledgment**: This project was originally inspired by [mario-andreschak/mcp-abap-adt](https://github.com/mario-andreschak/mcp-abap-adt). We started with the core concept and then evolved it into an independent project with our own architecture and features.
 
 This project provides a server that allows you to interact with SAP ABAP systems using the Model Context Protocol (MCP). Think of it as a bridge that lets tools like [Cline](https://marketplace.visualstudio.com/items?itemName=saoudrizwan.claude-dev) (a VS Code extension) talk to your ABAP system and retrieve information like source code, table structures, and more.
@@ -16,13 +20,17 @@ mcp-abap-adt --transport=http          # HTTP mode
 mcp-abap-adt --transport=sse           # SSE mode
 ```
 
-### 2. Handler Exporter (For Embedding)
-Export handlers for integration into existing servers (e.g., SAP CAP/CDS applications):
+### 2. Embeddable Server (For Integration)
+Embed MCP server into existing applications (e.g., SAP CAP/CDS, Express):
 ```typescript
-import { HandlerExporter } from '@mcp-abap-adt/core/handlers';
+import { EmbeddableMcpServer } from '@mcp-abap-adt/core/server';
 
-const exporter = new HandlerExporter();
-exporter.registerOnServer(mcpServer, () => getConnection());
+const server = new EmbeddableMcpServer({
+  connection,              // Your AbapConnection instance
+  logger,                  // Optional logger
+  exposition: ['readonly', 'high'],  // Handler groups to expose
+});
+await server.connect(transport);
 ```
 
 ## Quick Start

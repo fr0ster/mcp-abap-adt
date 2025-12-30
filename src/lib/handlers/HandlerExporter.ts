@@ -1,7 +1,5 @@
-import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { defaultLogger } from '@mcp-abap-adt/logger';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../handlers/interfaces.js';
 import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
 import { LowLevelHandlersGroup } from './groups/LowLevelHandlersGroup.js';
@@ -14,7 +12,6 @@ import type {
   IHandlersRegistry,
 } from './interfaces.js';
 import { CompositeHandlersRegistry } from './registry/CompositeHandlersRegistry.js';
-import { jsonSchemaToZod } from './utils/schemaUtils.js';
 
 /**
  * Options for creating handler exporter
@@ -58,21 +55,27 @@ export interface HandlerExporterOptions {
 }
 
 /**
- * Handler Exporter - exports MCP handlers for use in external servers
+ * Handler Exporter - factory for creating handlers registry
  *
- * This class provides a simple way to register ABAP ADT handlers on any McpServer instance.
- * It's designed for integration with external servers (like cloud-llm-hub) that manage
- * their own connection lifecycle.
+ * This class provides a way to create handlers registry with configurable
+ * exposition levels. Use with EmbeddableMcpServer for external integration.
  *
  * Usage:
  * ```typescript
- * import { HandlerExporter } from '@fr0ster/mcp-abap-adt';
+ * import { HandlerExporter, EmbeddableMcpServer } from '@mcp-abap-adt/core';
  *
- * // Create exporter
- * const exporter = new HandlerExporter();
+ * // Create exporter with specific handlers
+ * const exporter = new HandlerExporter({
+ *   includeReadOnly: true,
+ *   includeHighLevel: true,
+ *   includeLowLevel: false,
+ * });
  *
- * // Register on your McpServer with connection provider
- * exporter.registerOnServer(mcpServer, () => getConnection());
+ * // Use with EmbeddableMcpServer
+ * const server = new EmbeddableMcpServer({
+ *   connection: myConnection,
+ *   handlersRegistry: exporter.createRegistry(),
+ * });
  * ```
  */
 export class HandlerExporter {
@@ -83,7 +86,7 @@ export class HandlerExporter {
     this.logger = options?.logger ?? defaultLogger;
 
     // Create dummy context for group instantiation
-    // Real context will be provided per-request via registerOnServer
+    // Real context is provided by BaseMcpServer.registerHandlers() via getConnection()
     const dummyContext: HandlerContext = {
       connection: null as any,
       logger: this.logger,
@@ -129,102 +132,10 @@ export class HandlerExporter {
   }
 
   /**
-   * Create handlers registry for use with v2 servers
+   * Create handlers registry for use with EmbeddableMcpServer or BaseMcpServer
    */
   createRegistry(): IHandlersRegistry {
     return new CompositeHandlersRegistry(this.handlerGroups);
-  }
-
-  /**
-   * Register all handlers on an McpServer instance
-   *
-   * @param server - McpServer instance to register handlers on
-   * @param connectionProvider - Function that returns AbapConnection for each request
-   * @param logger - Optional logger (defaults to constructor logger)
-   *
-   * The connectionProvider is called for each handler invocation, allowing
-   * per-request connection management (e.g., different JWT tokens per request)
-   */
-  registerOnServer(
-    server: McpServer,
-    connectionProvider: () => AbapConnection | Promise<AbapConnection>,
-    logger?: Logger,
-  ): void {
-    const log = logger ?? this.logger;
-
-    for (const group of this.handlerGroups) {
-      const handlers = group.getHandlers();
-
-      for (const entry of handlers) {
-        // Wrap handler to inject connection from provider
-        const wrappedHandler = async (args: any) => {
-          const connection = await connectionProvider();
-          const context: HandlerContext = {
-            connection,
-            logger: log,
-          };
-
-          const result = await entry.handler(context, args);
-
-          // Handle errors: if handler returns isError, throw McpError
-          if (result?.isError) {
-            const { ErrorCode, McpError } = await import(
-              '@modelcontextprotocol/sdk/types.js'
-            );
-            const errorText =
-              (result.content || [])
-                .map((item: any) => {
-                  if (item?.type === 'json' && item.json !== undefined) {
-                    return JSON.stringify(item.json);
-                  }
-                  return item?.text || String(item);
-                })
-                .join('\n') || 'Unknown error';
-            throw new McpError(ErrorCode.InternalError, errorText);
-          }
-
-          // Normalize content: SDK expects text/image/audio/resource, convert custom json to text
-          const content = (result?.content || []).map((item: any) => {
-            if (item?.type === 'json' && item.json !== undefined) {
-              return {
-                type: 'text' as const,
-                text: JSON.stringify(item.json),
-              };
-            }
-            return {
-              type: 'text' as const,
-              text: item?.text || String(item || ''),
-            };
-          });
-
-          return { content };
-        };
-
-        // Convert JSON Schema to Zod schema for MCP SDK compatibility
-        const inputSchema = entry.toolDefinition.inputSchema;
-        const zodSchema =
-          inputSchema &&
-          typeof inputSchema === 'object' &&
-          inputSchema.type === 'object' &&
-          inputSchema.properties
-            ? jsonSchemaToZod(inputSchema)
-            : inputSchema;
-
-        // Register tool on server
-        server.registerTool(
-          entry.toolDefinition.name,
-          {
-            description: entry.toolDefinition.description,
-            inputSchema: zodSchema,
-          },
-          wrappedHandler,
-        );
-      }
-    }
-
-    log.info?.(
-      `[HandlerExporter] Registered ${this.getToolNames().length} tools on server`,
-    );
   }
 }
 

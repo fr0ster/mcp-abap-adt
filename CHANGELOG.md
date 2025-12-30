@@ -2,6 +2,42 @@
 
 ## [Unreleased]
 
+## [2.0.0] - 2025-12-30
+### Added
+- **EmbeddableMcpServer**: New server class for external integration (e.g., cloud-llm-hub)
+  - Accepts injected `AbapConnection` from consumer
+  - Extends `BaseMcpServer` with proper handler registration
+  - Configurable exposition levels: `readonly`, `high`, `low`, `system`, `search`
+  - Export via `@mcp-abap-adt/core/server`
+
+### Changed
+- **HandlerExporter**: Now serves only as registry factory
+  - Use `createRegistry()` to get `IHandlersRegistry` for custom scenarios
+  - `getHandlerEntries()` and `getToolNames()` still available for inspection
+
+### Removed
+- **BREAKING**: `HandlerExporter.registerOnServer()` method removed
+  - Had bug with handler signature (passed context twice)
+  - Replace with `EmbeddableMcpServer` for cleaner architecture
+
+### Migration Guide
+```typescript
+// Before (v1.x - broken)
+import { HandlerExporter } from '@mcp-abap-adt/core/handlers';
+const exporter = new HandlerExporter({ includeReadOnly: true, includeHighLevel: true });
+const mcpServer = new McpServer({ name: 'mcp-abap-adt', version: '1.0.0' });
+exporter.registerOnServer(mcpServer, () => connection, logger);
+
+// After (v2.x)
+import { EmbeddableMcpServer } from '@mcp-abap-adt/core/server';
+const server = new EmbeddableMcpServer({
+  connection,
+  logger,
+  exposition: ['readonly', 'high'],
+});
+await server.connect(transport);
+```
+
 ## [1.4.3] - 2025-12-29
 ### Documentation
 - **CLI Help**: Extended `--help` output with comprehensive environment variables documentation

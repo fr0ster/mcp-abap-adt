@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [2.1.0] - 2025-12-31
+### Fixed
+- Updated `@mcp-abap-adt/auth-broker` so installs now pull `0.2.17` instead of the stale `0.2.14` release that was hiding upstream fixes.
+- Removed the accidental `@mcp-abap-adt/core` dependency that caused consumers to download the old `1.4.1` tarball.
+
 ## [2.0.3] - 2025-12-31
 ### Changed
 - **@mcp-abap-adt/auth-broker**: bumped to `0.2.15` so the locked dependency pulls in the latest fixes referenced by the release.

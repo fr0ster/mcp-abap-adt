@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2.0.3] - 2025-12-31
+### Changed
+- **@mcp-abap-adt/auth-broker**: bumped to `0.2.15` so the locked dependency pulls in the latest fixes referenced by the release.
+
+### Fixed
+- **CI workflow package install**: `.github/workflows/ci.yml` now looks for `mcp-abap-adt-core-*.tgz`, matching the actual npm pack output before testing global install.
+
 ## [2.0.2] - 2025-12-30
 ### Changed
 - **GetWhereUsed handler**: Now uses `getWhereUsedList()` from adt-clients and returns parsed JSON with structured references instead of raw XML

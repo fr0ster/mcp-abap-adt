@@ -118,9 +118,9 @@
   },
   "dependencies": {
     "@mcp-abap-adt/adt-clients": "^0.3.13",
-    "@mcp-abap-adt/auth-broker": "^0.2.17",
+    "@mcp-abap-adt/auth-broker": "^0.3.0",
     "@mcp-abap-adt/auth-providers": "^0.2.10",
-    "@mcp-abap-adt/auth-stores": "^0.2.10",
+    "@mcp-abap-adt/auth-stores": "^0.3.0",
     "@mcp-abap-adt/connection": "^0.2.9",
     "@mcp-abap-adt/header-validator": "^0.1.8",
     "@mcp-abap-adt/interfaces": "^0.2.15",

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [2.1.1] - 2025-12-31
+### Changed
+- **@mcp-abap-adt/auth-broker**: bumped to `^0.3.0` - auto-detect service key format, credentials wrapper support, debug logging
+- **@mcp-abap-adt/auth-stores**: bumped to `^0.3.0`
+
 ## [2.1.0] - 2025-12-31
 ### Fixed
 - Updated `@mcp-abap-adt/auth-broker` so installs now pull `0.2.17` instead of the stale `0.2.14` release that was hiding upstream fixes.

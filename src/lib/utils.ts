@@ -42,11 +42,6 @@ export const sessionContext = new AsyncLocalStorage<{
   destination?: string; // Store destination for AuthBroker-based token refresh
 }>();
 
-// Session storage for stateful sessions (persists cookies and CSRF tokens)
-// Only enabled if MCP_ENABLE_SESSION_STORAGE=true or MCP_SESSION_DIR is set
-// Session storage is now handled by @mcp-abap-adt/auth-broker package
-// Connection package no longer supports session storage parameter
-
 // Fixed session ID for server connection (allows session persistence across requests)
 const _SERVER_SESSION_ID = 'mcp-abap-adt-session';
 
@@ -1357,7 +1352,6 @@ DOCUMENTATION:
   https://github.com/fr0ster/mcp-abap-adt
   Installation:    docs/installation/INSTALLATION.md
   Configuration:   docs/user-guide/CLIENT_CONFIGURATION.md
-  Available Tools: docs/user-guide/AVAILABLE_TOOLS.md
 
 AUTHENTICATION:
   For JWT authentication with SAP BTP service keys:

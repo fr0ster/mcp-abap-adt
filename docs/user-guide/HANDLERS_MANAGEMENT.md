@@ -90,13 +90,13 @@ node bin/mcp-abap-adt-v2.js --transport=stdio --env=.env
 npm run docs:tools
 ```
 
-This generates `docs/AVAILABLE_TOOLS.md` with:
+This generates `docs/user-guide/AVAILABLE_TOOLS.md` with:
 - All available handlers
 - Parameters and types
 - Usage examples
 - Category grouping
 
-### Manual Inspection
+## Manual Inspection
 
 List handlers by set:
 

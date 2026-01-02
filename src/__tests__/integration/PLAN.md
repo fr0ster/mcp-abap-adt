@@ -166,7 +166,6 @@ DEBUG_ADT_TESTS=true npm test -- --testPathPattern=integration/class
 
 ## Session & Lock Persistence Roadmap
 
-- [ ] Read config: support `session_config` / `lock_config` (dirs, persist flags) in helpers (via `configHelpers` getters).
 - [ ] Implement persistence helper: new `helpers/persistenceHelpers.ts` with `saveSessionSnapshot`, `saveLockSnapshot` (JSON, base64 for heavy fields), `cleanupSessionSnapshot`.
 - [ ] Wire tests: call persistence helpers from cleanup/finally blocks where `session`/`lock_handle` are available.
 - [ ] Ensure files are written for every test run (last-resort diagnostics).

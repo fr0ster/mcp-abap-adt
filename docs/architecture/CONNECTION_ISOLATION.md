@@ -147,4 +147,3 @@ Client B (SAP System B) - Concurrent:
 
 - [Client Configuration Guide](../user-guide/CLIENT_CONFIGURATION.md)
 - [Stateful Session Guide](./STATEFUL_SESSION_GUIDE.md)
-

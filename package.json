@@ -148,7 +148,6 @@
   ],
   "bin": {
     "mcp-abap-adt": "./bin/mcp-abap-adt.js",
-    "adt-lock-object": "./bin/lock-object.js",
     "mcp-abap-adt-v2": "./bin/mcp-abap-adt-v2.js"
   },
   "jest": {

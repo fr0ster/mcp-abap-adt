@@ -50,6 +50,5 @@
 
 ## Documentation
 Refer to the `docs/` directory for detailed guides:
-*   `docs/user-guide/AVAILABLE_TOOLS.md`: List of all MCP tools provided.
 *   `docs/architecture/`: Deep dive into system design.
 *   `docs/development/`: Guides for contributing and testing.

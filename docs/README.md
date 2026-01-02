@@ -28,7 +28,6 @@ Documentation for server configuration options.
 ### [architecture/](architecture/) - For Developers
 Technical documentation about the system architecture, design decisions, and internal structure.
 
-- `STATEFUL_SESSION_GUIDE.md` - Stateful session management in SAP ADT API
 - `TOOLS_ARCHITECTURE.md` - MCP tools architecture and handler structure
 - `README.md` - Architecture documentation index
 
@@ -50,7 +49,7 @@ Documentation for developers: testing, development guides, and internal document
 - **User Configuration**: [Client Configuration](user-guide/CLIENT_CONFIGURATION.md)
 - **Server Configuration**: [YAML Config](configuration/YAML_CONFIG.md) | [CLI Options](user-guide/CLI_OPTIONS.md)
 - **Available Tools**: [Tools List](user-guide/AVAILABLE_TOOLS.md)
-- **Architecture**: [Stateful Sessions](architecture/STATEFUL_SESSION_GUIDE.md)
+- **Architecture**: [Stateful Sessions](architecture/STATEFUL_SESSION_GUIDE.md) | [Architecture Docs](architecture/README.md)
 - **Development**: [Development Documentation](development/)
 
 ## 📝 Package-Specific Documentation

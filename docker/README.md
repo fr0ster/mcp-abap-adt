@@ -107,14 +107,8 @@ docker-compose ps
    - Read-only volume mount
    - Contains OAuth2 credentials for SAP system
 
-2. **Sessions**: Stored in `./sessions/{destination}.env`
-   - Read-write volume mount
-   - AuthBroker saves JWT tokens and refresh tokens here
-   - Automatically refreshed when expired
-
-3. **Destination**: Specified via `MCP_DESTINATION` environment variable
+2. **Destination**: Specified via `MCP_DESTINATION` environment variable
    - Determines which service key to use
-   - Session file matches the destination name
 
 ### Directory Structure
 
@@ -128,10 +122,6 @@ docker/
 │   ├── trial.json
 │   ├── dev.json
 │   └── prod.json
-└── sessions/              # Session data (not in git)
-    ├── trial.env
-    ├── dev.env
-    └── prod.env
 ```
 
 ## Usage Examples
@@ -187,14 +177,11 @@ docker-compose -f docker-compose.package.yml up -d
 - `MCP_DESTINATION`: Destination name (default: "default")
 - `MCP_HTTP_PORT`: Server port (default: 3000)
 - `MCP_HTTP_HOST`: Server host (default: 0.0.0.0)
-- `MCP_ENABLE_SESSION_STORAGE`: Enable persistent sessions (default: false)
 - `AUTH_BROKER_PATH`: Custom path for service keys (default: /app/service-keys)
 
 ### Volumes
 
 - `./service-keys:/app/service-keys:ro` - Service keys (read-only)
-- `./sessions:/app/sessions` - Session storage (read-write)
-- `./locks:/app/.locks` - Lock files (optional)
 - `./cache:/app/cache` - Cache directory (optional)
 
 ## Troubleshooting

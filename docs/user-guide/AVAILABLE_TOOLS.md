@@ -3320,7 +3320,7 @@ The navigation below mirrors the document structure for easier discovery.
 ---
 
 ### GetWhereUsed {#getwhereused-readonly}
-**Description:** [read-only] Retrieve where-used references for ABAP objects via ADT usageReferences. Uses Eclipse ADT-compatible two-step workflow with optional scope customization.
+**Description:** [read-only] Retrieve where-used references for ABAP objects via ADT usageReferences. Returns parsed list of referencing objects with their types and packages.
 
 **Parameters:**
 - `inputSchema` (string, optional) - Name of the ABAP object
@@ -3831,6 +3831,6 @@ All functions return MCP-compliant responses in the following format:
 
 ---
 
-*Last updated: 2025-12-29*
+*Last updated: 2026-01-02*
 *Document version: 1.0*
 *Generated automatically from TOOL_DEFINITION exports*

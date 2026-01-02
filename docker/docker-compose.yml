@@ -5,7 +5,6 @@ version: '3.8'
 # Architecture:
 # - Uses AuthBroker for authentication management
 # - Service keys stored in volume (./service-keys)
-# - Sessions stored in local temporary directory (./sessions)
 # - HTTP transport on port 3000
 
 services:
@@ -30,9 +29,6 @@ services:
       # Override with: docker-compose run -e MCP_DESTINATION=your-dest mcp-abap-adt
       - MCP_DESTINATION=${MCP_DESTINATION:-default}
 
-      # Optional: Enable session storage for persistent sessions
-      # - MCP_ENABLE_SESSION_STORAGE=true
-
       # Optional: Custom paths for AuthBroker
       # - AUTH_BROKER_PATH=/app/service-keys
 
@@ -41,13 +37,6 @@ services:
       # Service keys directory - put your {destination}.json files here
       # Example: ./service-keys/trial.json, ./service-keys/dev.json
       - ./service-keys:/app/service-keys:ro
-
-      # Sessions directory - AuthBroker stores session data here
-      # Contains .env files with tokens: {destination}.env
-      - ./sessions:/app/sessions
-
-      # Optional: Locks directory for object locking
-      # - ./locks:/app/.locks
 
       # Optional: Cache directory
       # - ./cache:/app/cache

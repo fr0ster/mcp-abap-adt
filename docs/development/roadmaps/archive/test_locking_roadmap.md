@@ -4,14 +4,12 @@
 Persist session/lock diagnostics for integration tests to allow post-failure unlock and session reconstruction. Always capture; optionally clean up sessions when configured.
 
 ## Configuration
-- `session_config`: `persist_session`, `sessions_dir`, `session_id_format`, `cleanup_session_after_test`.
 - `lock_config`: `persist_locks`, `locks_dir`.
 
 ## Implementation Steps
 Progress is tracked by ticking the checkboxes below in _this_ file.
 
 - [x] **Config access**
-  - Extend `configHelpers` with getters for `session_config` and `lock_config`.
 - [x] **Persistence helper**
   - New `src/__tests__/integration/helpers/persistenceHelpers.ts`.
   - Functions: `saveSessionSnapshot`, `saveLockSnapshot` (JSON; base64 for heavy fields), `cleanupSessionSnapshot`.
@@ -45,4 +43,3 @@ Progress is tracked by ticking the checkboxes below in _this_ file.
 - [ ] **Docs/template**
   - Ensure `tests/test-config.yaml.template` documents the settings and file locations/format.
 - [ ] **Verification**
-  - Sanity check on one high-level and one low-level class test; confirm files appear in `.sessions`/`.locks`.

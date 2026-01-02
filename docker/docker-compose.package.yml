@@ -35,9 +35,6 @@ services:
       # Service keys directory - put your {destination}.json files here
       - ./service-keys:/app/service-keys:ro
 
-      # Sessions directory - AuthBroker stores session data here
-      - ./sessions:/app/sessions
-
     # Resource limits
     deploy:
       resources:

@@ -664,5 +664,5 @@ In this case, the server will use configuration from `.env` file.
 ## Related Documentation
 
 - [Installation Guide](../installation/INSTALLATION.md)
-- [Stateful Session Guide](../architecture/STATEFUL_SESSION_GUIDE.md)
 - [Server README](../README.md)
+- [Stateful Session Guide](../architecture/STATEFUL_SESSION_GUIDE.md)

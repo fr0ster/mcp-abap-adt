@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [2.1.3] - 2026-01-02
+### Changed
+- **Documentation**: Restored the stateful ADT flow guide without file-based session persistence references.
+- **Available tools**: Regenerated `docs/user-guide/AVAILABLE_TOOLS.md` and restored links across docs.
+
+### Removed
+- **Lock/session persistence**: Removed filesystem lock registry and session persistence helpers/config from core and tests.
+- **CLI commands**: `adt-lock-object`, `adt-unlock-object`, `adt-manage-locks`, `adt-manage-sessions`, and `adt-unlock-objects` removed from package bins.
+- **User guides**: Removed usage/scenario docs tied to legacy session flows.
+
 ## [2.1.2] - 2026-01-02
 ### Changed
 - **Lock registry types**: `LockState.objectType` now uses `AdtObjectType` with normalization for legacy entries.

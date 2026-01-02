@@ -445,8 +445,7 @@ Instead of command-line arguments, you can use environment variables:
       "env": {
         "MCP_TRANSPORT": "stdio",
         "MCP_ENV_PATH": "/path/to/.env",
-        "MCP_ENABLE_SESSION_STORAGE": "true",
-        "MCP_SESSION_DIR": "/custom/sessions/path"
+        "MCP_HTTP_PORT": "3000"
       },
       "disabled": false
     }
@@ -460,38 +459,8 @@ Instead of command-line arguments, you can use environment variables:
 |----------|-------------|---------|----------------|
 | `MCP_TRANSPORT` | Transport type: stdio, http, sse | `stdio` (if piped) or `http` | All platforms |
 | `MCP_ENV_PATH` | Path to .env file | `./.env` | Use absolute paths |
-| `MCP_ENABLE_SESSION_STORAGE` | Enable persistent sessions | `false` (disabled) | All platforms |
-| `MCP_SESSION_DIR` | Custom session storage directory | OS temp dir | Platform-specific defaults:<br>• Windows: `%TEMP%\mcp-abap-adt-sessions`<br>• Linux: `/tmp/mcp-abap-adt-sessions`<br>• macOS: `/var/folders/.../mcp-abap-adt-sessions` |
 | `MCP_HTTP_PORT` | HTTP server port | `3000` | All platforms |
 | `MCP_SSE_PORT` | SSE server port | `3001` | All platforms |
-
-**Session Storage**:
-
-By default, session storage is **disabled** (stateless mode - each request creates a fresh connection).
-
-**Enable for persistent sessions** (cookies, CSRF tokens survive across requests):
-```json
-{
-  "env": {
-    "MCP_ENABLE_SESSION_STORAGE": "true"
-  }
-}
-```
-
-**Custom session directory**:
-```json
-{
-  "env": {
-    "MCP_SESSION_DIR": "/absolute/path/to/sessions"
-  }
-}
-```
-
-**When to enable session storage**:
-- ✅ Long-running operations requiring multiple requests
-- ✅ Working with locked objects across multiple tool calls
-- ❌ Simple read-only queries (adds overhead)
-- ❌ Multiple parallel clients (each needs unique session dir)
 
 ## Security Notes
 

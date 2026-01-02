@@ -23,7 +23,6 @@ import {
   getEnabledTestCase,
   getOperationDelay,
   getSapConfigFromEnv,
-  getSessionConfig,
   getTimeout,
   isCloudConnection,
   loadTestEnv,

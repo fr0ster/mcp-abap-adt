@@ -300,30 +300,6 @@ export function loadTestConfig(): any {
 }
 
 /**
- * Get session persistence config
- */
-export function getSessionConfig(): {
-  persist_session?: boolean;
-  sessions_dir?: string;
-  session_id_format?: string;
-  cleanup_session_after_test?: boolean;
-} {
-  const config = loadTestConfig();
-  return config.session_config || {};
-}
-
-/**
- * Get lock persistence config
- */
-export function getLockConfig(): {
-  persist_locks?: boolean;
-  locks_dir?: string;
-} {
-  const config = loadTestConfig();
-  return config.lock_config || {};
-}
-
-/**
  * Get enabled test case for a handler
  * @param handlerName - Handler name (e.g., 'create_class_low', 'lock_class_low')
  * @param testCaseName - Optional: specific test case name

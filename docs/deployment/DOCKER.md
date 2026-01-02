@@ -70,13 +70,7 @@ The Docker deployment uses:
    - Contains OAuth2 credentials for SAP system
    - Never committed to git (.gitignore)
 
-2. **Sessions** (`./sessions/{destination}.env`):
-   - Mounted as read-write volume
-   - AuthBroker stores JWT tokens and refresh tokens here
-   - Automatically refreshed when expired
-   - Never committed to git (.gitignore)
-
-3. **Destination**:
+2. **Destination**:
    - Specified via `MCP_DESTINATION` environment variable
    - Determines which service key to use
    - Example: `MCP_DESTINATION=trial` uses `service-keys/trial.json`
@@ -89,8 +83,6 @@ Container: mcp-abap-adt-server
 ├── Transport: streamable-http
 ├── Volumes:
 │   ├── ./service-keys:/app/service-keys (ro)  # Service keys
-│   ├── ./sessions:/app/sessions (rw)          # Session tokens
-│   └── ./locks:/app/.locks (optional)         # Object locks
 └── Environment:
     ├── MCP_DESTINATION (default: default)
     ├── MCP_HTTP_PORT (default: 3000)
@@ -220,15 +212,6 @@ MCP_DESTINATION=dev docker-compose up -d
 ```
 
 ## Advanced Configuration
-
-### Enable Session Persistence
-
-By default, sessions are stateless. Enable persistent sessions:
-
-```bash
-# In .env or docker-compose.yml
-MCP_ENABLE_SESSION_STORAGE=true
-```
 
 ### Custom Port
 

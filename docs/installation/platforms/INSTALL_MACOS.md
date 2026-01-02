@@ -471,7 +471,6 @@ source ~/.bash_profile  # for bash
 
 - [Configure SAP Connection](../../user-guide/CLIENT_CONFIGURATION.md)
 - [Review CLI Options](../../user-guide/CLI_OPTIONS.md)
-- [Available Tools](../../user-guide/AVAILABLE_TOOLS.md)
 
 ## 💡 Tips for macOS
 
@@ -512,3 +511,4 @@ uname -m
 # arm64 = Apple Silicon
 # x86_64 = Intel
 ```
+- [Available Tools](../../user-guide/AVAILABLE_TOOLS.md)

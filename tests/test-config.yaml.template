@@ -40,20 +40,6 @@ test_settings:
     create: 3000
     default: 3000
 
-# Session persistence configuration
-session_config:
-  persist_session: true           # Persist cookies/CSRF tokens between steps
-  sessions_dir: ".sessions"       # Directory (relative to repo) for session files
-  session_id_format: "auto"       # "auto" or custom pattern
-  cleanup_session_after_test: true
-
-# Lock persistence configuration
-lock_config:
-  locks_dir: ".locks"             # Directory (relative to repo) for lock files
-  persist_locks: true             # Track locks across steps for safety
-
-
-
 environment:
   default_package: "<YOUR_PACKAGE_NAME>"  # Test package from GROUP 2
   default_transport: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)

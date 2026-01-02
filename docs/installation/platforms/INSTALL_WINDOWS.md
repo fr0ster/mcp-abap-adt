@@ -451,7 +451,6 @@ New-NetFirewallRule -DisplayName "Node.js" -Direction Outbound -Program "C:\Prog
 
 - [Configure SAP Connection](../../user-guide/CLIENT_CONFIGURATION.md)
 - [Review CLI Options](../../user-guide/CLI_OPTIONS.md)
-- [Available Tools](../../user-guide/AVAILABLE_TOOLS.md)
 
 ## 💡 Tips for Windows
 
@@ -478,3 +477,4 @@ For better performance:
 ```powershell
 winget install Microsoft.PowerShell
 ```
+- [Available Tools](../../user-guide/AVAILABLE_TOOLS.md)

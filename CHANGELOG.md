@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-01-02
+### Changed
+- **Lock registry types**: `LockState.objectType` now uses `AdtObjectType` with normalization for legacy entries.
+- **adt-lock-object**: No longer registers lock handles in `.locks/active-locks.json`; session save only.
+
+### Removed
+- **CLI commands**: `adt-unlock-object`, `adt-manage-locks`, `adt-manage-sessions`, and `adt-unlock-objects` removed from package bins.
+
 ## [2.1.1] - 2025-12-31
 ### Changed
 - **@mcp-abap-adt/auth-broker**: bumped to `^0.3.0` - auto-detect service key format, credentials wrapper support, debug logging

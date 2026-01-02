@@ -5,27 +5,56 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { AdtObjectType } from '@mcp-abap-adt/adt-clients';
+
+const OBJECT_TYPE_NORMALIZATION_MAP: Record<string, AdtObjectType> = {
+  class: 'class',
+  'clas/oc': 'clas/oc',
+  program: 'program',
+  'prog/p': 'prog/p',
+  interface: 'interface',
+  'intf/if': 'intf/if',
+  fm: 'functionmodule',
+  functionmodule: 'functionmodule',
+  fugr: 'functiongroup',
+  'fugr/ff': 'fugr/ff',
+  functiongroup: 'functiongroup',
+  view: 'view',
+  'ddls/df': 'ddls/df',
+  structure: 'structure',
+  'stru/dt': 'stru/dt',
+  table: 'table',
+  'tabl/dt': 'tabl/dt',
+  tabletype: 'tabletype',
+  'ttyp/df': 'ttyp/df',
+  domain: 'domain',
+  'doma/dd': 'doma/dd',
+  dataelement: 'dataelement',
+  dtel: 'dtel',
+  package: 'package',
+  'devc/k': 'devc/k',
+};
+
+export function normalizeLockObjectType(objectType: string): AdtObjectType {
+  const normalized = OBJECT_TYPE_NORMALIZATION_MAP[objectType.toLowerCase()];
+  if (!normalized) {
+    throw new Error(`Unsupported object type for lock registry: ${objectType}`);
+  }
+  return normalized;
+}
 
 export interface LockState {
   sessionId: string;
   lockHandle: string;
-  objectType:
-    | 'class'
-    | 'interface'
-    | 'program'
-    | 'fm'
-    | 'domain'
-    | 'dataElement'
-    | 'view'
-    | 'table'
-    | 'structure'
-    | 'package';
+  objectType: AdtObjectType;
   objectName: string;
   functionGroupName?: string; // Required for FM
   timestamp: number;
   pid: number;
   testFile?: string; // Which test file created this lock
 }
+
+type RawLockState = Omit<LockState, 'objectType'> & { objectType: string };
 
 export interface LockRegistry {
   locks: LockState[];
@@ -53,7 +82,13 @@ export class LockStateManager {
     if (fs.existsSync(this.lockFilePath)) {
       try {
         const data = fs.readFileSync(this.lockFilePath, 'utf-8');
-        return JSON.parse(data);
+        const parsed = JSON.parse(data) as LockRegistry;
+        const locks = Array.isArray(parsed?.locks) ? parsed.locks : [];
+        const normalizedLocks = locks
+          .map((lock) => this.normalizeLock(lock))
+          .filter(Boolean) as LockState[];
+
+        return { locks: normalizedLocks };
       } catch (error) {
         console.warn(`Failed to load lock registry: ${error}`);
         return { locks: [] };
@@ -80,9 +115,11 @@ export class LockStateManager {
   /**
    * Register a new lock
    */
-  registerLock(lock: Omit<LockState, 'timestamp' | 'pid'>): void {
+  registerLock(lock: Omit<RawLockState, 'timestamp' | 'pid'>): void {
+    const normalizedType = normalizeLockObjectType(lock.objectType);
     const lockState: LockState = {
       ...lock,
+      objectType: normalizedType,
       timestamp: Date.now(),
       pid: process.pid,
     };
@@ -91,7 +128,7 @@ export class LockStateManager {
     this.registry.locks = this.registry.locks.filter(
       (l) =>
         !(
-          l.objectType === lock.objectType &&
+          l.objectType === normalizedType &&
           l.objectName === lock.objectName &&
           l.functionGroupName === lock.functionGroupName
         ),
@@ -109,10 +146,11 @@ export class LockStateManager {
     objectName: string,
     functionGroupName?: string,
   ): void {
+    const normalizedType = normalizeLockObjectType(objectType);
     this.registry.locks = this.registry.locks.filter(
       (l) =>
         !(
-          l.objectType === objectType &&
+          l.objectType === normalizedType &&
           l.objectName === objectName &&
           l.functionGroupName === functionGroupName
         ),
@@ -128,9 +166,10 @@ export class LockStateManager {
     objectName: string,
     functionGroupName?: string,
   ): LockState | undefined {
+    const normalizedType = normalizeLockObjectType(objectType);
     return this.registry.locks.find(
       (l) =>
-        l.objectType === objectType &&
+        l.objectType === normalizedType &&
         l.objectName === objectName &&
         l.functionGroupName === functionGroupName,
     );
@@ -187,6 +226,23 @@ export class LockStateManager {
   clearAll(): void {
     this.registry = { locks: [] };
     this.saveRegistry();
+  }
+
+  /**
+   * Normalize a lock loaded from disk to canonical ADT object type
+   */
+  private normalizeLock(lock: RawLockState): LockState | null {
+    try {
+      return {
+        ...lock,
+        objectType: normalizeLockObjectType(lock.objectType),
+      };
+    } catch (error) {
+      console.warn(
+        `Skipping lock with unknown object type "${lock.objectType}": ${error}`,
+      );
+      return null;
+    }
   }
 }
 

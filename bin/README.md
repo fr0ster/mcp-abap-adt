@@ -1,32 +1,17 @@
 # CLI Utilities
 
-This directory contains command-line utilities for managing ADT client sessions and locks.
+This directory contains command-line utilities for managing ADT client sessions.
 
 ## Overview of All Scripts
 
 | Command | Purpose | Use Case |
 |---------|---------|----------|
 | `adt-lock-object` | Lock an object and save session | Start work on object, persist session for later |
-| `adt-unlock-object` | Unlock object using saved session | Resume work and unlock after crash/restart |
-| `adt-manage-locks` | View/clean lock registry | Debug locks, cleanup stale locks |
-| `adt-manage-sessions` | View/clean session files | Debug sessions, cleanup old sessions |
-| `adt-unlock-objects` | Unlock predefined test objects | Cleanup after failed integration tests |
 
 ### Key Differences
 
-**Lock/Unlock Pair (for production use):**
-- `adt-lock-object` + `adt-unlock-object` - Full workflow: lock → save session → restore session → unlock
-- Works with ANY object specified via CLI args
-- Designed for manual/scripted workflows
-
-**Management Tools (for debugging/maintenance):**
-- `adt-manage-locks` - View and manage lock registry only
-- `adt-manage-sessions` - View and manage session files only
-- Read-only inspection + cleanup operations
-
-**Test Cleanup (for testing):**
-- `adt-unlock-objects` - Hardcoded list of test objects from test-config.yaml
-- Used specifically for cleanup after integration test failures
+**Locking (for production use):**
+- `adt-lock-object` - Lock object and persist session; designed for manual/scripted workflows
 
 ## Installation
 
@@ -42,9 +27,6 @@ After global installation, all commands are available in your PATH:
 
 ```bash
 adt-lock-object --help
-adt-unlock-object --help
-adt-manage-locks --help
-adt-manage-sessions --help
 ```
 
 ### Local Installation
@@ -59,7 +41,6 @@ Run commands using npx:
 
 ```bash
 npx adt-lock-object class ZCL_MY_CLASS
-npx adt-manage-locks list
 ```
 
 ### Development Installation
@@ -98,167 +79,17 @@ adt-lock-object program Z_MY_PROGRAM
 **What it does:**
 1. Connects to SAP and locks the object
 2. Saves session (cookies, CSRF token) to `.sessions/<session-id>.env`
-3. Registers lock handle in `.locks/active-locks.json`
-4. Prints unlock command for later use
+3. Prints the lock handle for later use
 
 **Supported types:** class, program, interface, fm, domain, dataelement
 
-### adt-unlock-object
-
-Unlock an SAP object using previously saved session state.
-
-```bash
-# Unlock using saved session
-adt-unlock-object class ZCL_MY_CLASS --session-id my_work
-
-# Unlock function module
-adt-unlock-object fm MY_FUNCTION --function-group Z_MY_FUGR --session-id my_work
-```
-
-**What it does:**
-1. Loads session from `.sessions/<session-id>.env`
-2. Restores session state to new connection
-3. Retrieves lock handle from `.locks/active-locks.json`
-4. Unlocks the object on SAP server
-5. Removes lock from registry
-
-**Note:** Requires `--session-id` used with `adt-lock-object`
-
-### adt-manage-locks
-
-Manage persistent lock registry - view, cleanup, and force unlock.
-
-```bash
-# List all active locks
-adt-manage-locks list
-
-# Clean up stale locks (>30 min or dead processes)
-adt-manage-locks cleanup
-
-# Force unlock specific object on SAP server
-adt-manage-locks unlock class ZCL_TEST
-adt-manage-locks unlock fm MY_FUNCTION Z_MY_FUGR
-
-# Clear all locks from registry
-adt-manage-locks clear
-```
-
-**What it does:**
-- `list` - Shows all locks with session ID, handle, object, timestamp, PID
-- `cleanup` - Removes stale locks (>30min old or dead processes)
-- `unlock` - Connects to SAP and force unlocks object, removes from registry
-- `clear` - Removes ALL locks from registry (doesn't unlock on SAP!)
-
-**Use case:** Debugging lock issues, cleanup after crashes
-
-### adt-manage-sessions
-
-Manage saved session files - view, inspect, and cleanup.
-
-```bash
-# List all sessions
-adt-manage-sessions list
-
-# View session details
-adt-manage-sessions info my_session_id
-
-# Clean up old sessions (>24 hours)
-adt-manage-sessions cleanup
-
-# Clear all sessions
-adt-manage-sessions clear
-```
-
-**What it does:**
-- `list` - Shows all session files with ID, timestamp, age, PID
-- `info` - Displays session details (cookies, CSRF token, metadata)
-- `cleanup` - Removes stale sessions (>24h old or dead processes)
-- `clear` - Deletes ALL session files
-
-**Use case:** Debugging session issues, inspect saved state, cleanup old files
-
-### adt-unlock-objects
-
-Unlock predefined test objects from test-config.yaml.
-
-```bash
-# Unlock all test objects defined in test-config.yaml
-adt-unlock-objects
-
-# Use custom config file
-adt-unlock-objects --config custom-test-config.yaml
-
-# Use custom locks directory
-adt-unlock-objects --locks-dir /custom/path/.locks
-```
-
-**What it does:**
-1. Reads test object list from `test-config.yaml`
-2. For each object: retrieves lock handle from registry
-3. Connects to SAP and unlocks object
-4. Removes lock from registry
-
-**Use case:** Cleanup after integration test failures when objects remain locked
-
-**Note:** Hardcoded to work with test objects only, not for general use
-
 ## Common Options
-
-Most commands support:
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--locks-dir <path>` | Lock registry directory | `.locks` |
 | `--sessions-dir <path>` | Sessions directory | `.sessions` |
 | `--env <path>` | Path to .env file | `.env` |
 | `--help, -h` | Show help message | - |
-
-## Workflow Examples
-
-### Daily Work on a Class
-
-```bash
-# Morning - lock class and start work
-adt-lock-object class ZCL_MY_WORK --session-id daily_work
-# Session ID: daily_work
-
-# ... work all day, make changes via other tools ...
-
-# Evening - unlock when done
-adt-unlock-object class ZCL_MY_WORK --session-id daily_work
-```
-
-### Recovery After Crash
-
-```bash
-# Process crashed while object was locked
-# Check what was locked
-adt-manage-locks list
-
-# Resume and unlock using saved session
-adt-unlock-object class ZCL_MY_CLASS --session-id <session-from-list>
-```
-
-### Integration Test Cleanup
-
-```bash
-# Tests failed and left objects locked
-# Quick cleanup of all test objects
-adt-unlock-objects
-```
-
-### Debug Session Issues
-
-```bash
-# See what sessions are saved
-adt-manage-sessions list
-
-# Inspect specific session
-adt-manage-sessions info my_session_id
-
-# Clean up old sessions
-adt-manage-sessions cleanup
-```
 
 ## File Structure
 
@@ -266,9 +97,6 @@ adt-manage-sessions cleanup
 .sessions/
   ├── my_work_session.env       # Session state (cookies, CSRF)
   └── lock_class_ZCL_TEST_*.env # Auto-generated session
-
-.locks/
-  └── active-locks.json           # Lock registry
 ```
 
 ## Environment Setup
@@ -295,5 +123,3 @@ Ensure these directories are in `.gitignore`:
 - [Stateful Session Guide](../docs/architecture/STATEFUL_SESSION_GUIDE.md)
 - [Tools Architecture](../docs/architecture/TOOLS_ARCHITECTURE.md)
 - [Integration Tests Overview](../src/__tests__/integration/README.md)
-
-

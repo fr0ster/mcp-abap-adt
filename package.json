@@ -149,10 +149,6 @@
   "bin": {
     "mcp-abap-adt": "./bin/mcp-abap-adt.js",
     "adt-lock-object": "./bin/lock-object.js",
-    "adt-unlock-object": "./bin/unlock-object.js",
-    "adt-manage-locks": "./bin/manage-locks.js",
-    "adt-manage-sessions": "./bin/manage-sessions.js",
-    "adt-unlock-objects": "./bin/unlock-test-objects.js",
     "mcp-abap-adt-v2": "./bin/mcp-abap-adt-v2.js"
   },
   "jest": {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Lock Object CLI - Lock an SAP object and save session/lock handle
+ * Lock Object CLI - Lock an SAP object and save session state
  *
  * Usage:
  *   adt-lock-object <type> <name> [options]
@@ -13,7 +13,6 @@
  */
 
 const path = require('path');
-const fs = require('fs');
 
 // Color codes for terminal output
 const colors = {
@@ -28,7 +27,7 @@ const colors = {
 
 function showHelp() {
   console.log(`
-${colors.bright}Lock Object CLI${colors.reset} - Lock an SAP object and save session/lock handle
+${colors.bright}Lock Object CLI${colors.reset} - Lock an SAP object and save session state
 
 ${colors.bright}USAGE:${colors.reset}
   adt-lock-object <type> <name> [options]
@@ -41,7 +40,6 @@ ${colors.bright}OPTIONS:${colors.reset}
   --function-group <name>    Function group name (required for fm type)
   --session-id <id>          Custom session ID (default: auto-generated)
   --sessions-dir <path>      Sessions directory (default: .sessions)
-  --locks-dir <path>         Locks directory (default: .locks)
   --env <path>               Path to .env file (default: .env)
   --help, -h                 Show this help message
 
@@ -55,13 +53,11 @@ ${colors.bright}EXAMPLES:${colors.reset}
   # Lock a function module
   adt-lock-object fm MY_FUNCTION_MODULE --function-group Z_MY_FUGR
 
-  # Lock with custom directories
-  adt-lock-object class ZCL_TEST --sessions-dir /tmp/sessions --locks-dir /tmp/locks
+  # Lock with custom session directory
+  adt-lock-object class ZCL_TEST --sessions-dir /tmp/sessions
 
 ${colors.bright}NOTES:${colors.reset}
   - Session state (cookies, CSRF token) saved to <sessions-dir>/<session-id>.json
-  - Lock handle saved to <locks-dir>/active-locks.json
-  - Use 'adt-unlock-object' with same session-id to unlock later
   - Requires SAP_URL, SAP_USERNAME, SAP_PASSWORD in .env file
 `);
 }
@@ -89,7 +85,6 @@ async function main() {
   let functionGroup;
   let sessionId;
   let sessionsDir = '.sessions';
-  let locksDir = '.locks';
   let envPath = '.env';
 
   for (let i = 2; i < args.length; i++) {
@@ -99,15 +94,13 @@ async function main() {
       sessionId = args[++i];
     } else if (args[i] === '--sessions-dir' && args[i + 1]) {
       sessionsDir = args[++i];
-    } else if (args[i] === '--locks-dir' && args[i + 1]) {
-      locksDir = args[++i];
     } else if (args[i] === '--env' && args[i + 1]) {
       envPath = args[++i];
     }
   }
 
   // Validate function group for FM
-  if (objectType === 'fm' && !functionGroup) {
+  if (['fm', 'functionmodule'].includes(objectType.toLowerCase()) && !functionGroup) {
     console.error(`${colors.red}Error: --function-group is required for function modules${colors.reset}`);
     process.exit(1);
   }
@@ -145,40 +138,31 @@ async function main() {
     // Dynamic imports
     const { createAbapConnection } = require('@mcp-abap-adt/connection');
     const { AbapSessionStore } = require('@mcp-abap-adt/auth-stores');
-    const { LockStateManager } = require('../src/utils/lockStateManager');
 
     // Map object type to lock function
     let lockFunction;
-    let adtObjectType;
 
     switch (objectType.toLowerCase()) {
       case 'class':
         lockFunction = require('@mcp-abap-adt/adt-clients/core/class/lock.js').lockClass;
-        adtObjectType = 'class';
         break;
       case 'program':
         lockFunction = require('@mcp-abap-adt/adt-clients/core/program/lock.js').lockProgram;
-        adtObjectType = 'program';
         break;
       case 'interface':
         lockFunction = require('@mcp-abap-adt/adt-clients/core/interface/lock.js').lockInterface;
-        adtObjectType = 'interface';
         break;
       case 'fugr':
         lockFunction = require('@mcp-abap-adt/adt-clients/core/functionGroup/lock.js').lockFunctionGroup;
-        adtObjectType = 'fugr';
         break;
       case 'fm':
         lockFunction = require('@mcp-abap-adt/adt-clients/core/functionModule/lock.js').lockFunctionModule;
-        adtObjectType = 'fm';
         break;
       case 'domain':
         lockFunction = require('@mcp-abap-adt/adt-clients/core/domain/lock.js').lockDomain;
-        adtObjectType = 'domain';
         break;
       case 'dataelement':
         lockFunction = require('@mcp-abap-adt/adt-clients/core/dataElement/lock.js').lockDataElement;
-        adtObjectType = 'dataElement';
         break;
       default:
         console.error(`${colors.red}Error: Unsupported object type: ${objectType}${colors.reset}`);
@@ -242,23 +226,7 @@ async function main() {
     console.log(`  Session ID: ${colors.bright}${sessionId}${colors.reset}`);
     console.log(`  Session File: ${path.join(sessionsDir, sessionId + '.env')}`);
 
-    // Register lock in lock manager
-    const lockManager = new LockStateManager(locksDir);
-    lockManager.registerLock({
-      sessionId,
-      lockHandle,
-      objectType: adtObjectType,
-      objectName,
-      functionGroupName: functionGroup,
-      testFile: 'CLI',
-    });
-
-    console.log(`${colors.green}✓ Lock registered${colors.reset}`);
-    console.log(`  Lock File: ${path.join(locksDir, 'active-locks.json')}`);
-
     console.log(`\n${colors.bright}${colors.green}SUCCESS!${colors.reset} Object locked and session saved.`);
-    console.log(`\nTo unlock later, run:`);
-    console.log(`  ${colors.cyan}adt-unlock-object ${objectType} ${objectName} --session-id ${sessionId}${functionGroup ? ` --function-group ${functionGroup}` : ''}${colors.reset}`);
 
   } catch (error) {
     console.error(`\n${colors.red}Error: ${error.message}${colors.reset}`);

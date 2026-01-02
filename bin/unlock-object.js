@@ -152,7 +152,8 @@ async function main() {
 
   try {
     // Dynamic imports
-    const { createAbapConnection, FileSessionStorage } = require('@mcp-abap-adt/connection');
+    const { createAbapConnection } = require('@mcp-abap-adt/connection');
+    const { AbapSessionStore } = require('@mcp-abap-adt/auth-stores');
     const { LockStateManager } = require('../src/utils/lockStateManager');
 
     // Map object type to unlock function
@@ -195,17 +196,14 @@ async function main() {
     }
 
     // Load session from file
-    const sessionStorage = new FileSessionStorage({
-      sessionDir: sessionsDir,
-      prettyPrint: true,
-    });
+    const sessionStorage = new AbapSessionStore(sessionsDir);
 
     console.log(`${colors.yellow}📂 Loading session...${colors.reset}`);
     const sessionState = await sessionStorage.load(sessionId);
 
     if (!sessionState) {
       console.error(`${colors.red}Error: Session not found: ${sessionId}${colors.reset}`);
-      console.error(`  Expected file: ${path.join(sessionsDir, sessionId + '.json')}`);
+      console.error(`  Expected file: ${path.join(sessionsDir, sessionId + '.env')}`);
       process.exit(1);
     }
 
@@ -274,8 +272,8 @@ async function main() {
     console.log(`${colors.green}✓ Lock removed from registry${colors.reset}`);
 
     // Optionally cleanup session
-    console.log(`\n${colors.yellow}Session file preserved: ${path.join(sessionsDir, sessionId + '.json')}${colors.reset}`);
-    console.log(`To clean up session, run: rm ${path.join(sessionsDir, sessionId + '.json')}`);
+    console.log(`\n${colors.yellow}Session file preserved: ${path.join(sessionsDir, sessionId + '.env')}${colors.reset}`);
+    console.log(`To clean up session, run: rm ${path.join(sessionsDir, sessionId + '.env')}`);
 
     console.log(`\n${colors.bright}${colors.green}SUCCESS!${colors.reset} Object unlocked.`);
 

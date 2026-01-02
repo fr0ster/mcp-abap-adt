@@ -24,7 +24,7 @@
  */
 
 const path = require('path');
-const { FileSessionStorage } = require('@mcp-abap-adt/connection');
+const fs = require('fs');
 
 // Parse command line arguments
 function parseArgs() {
@@ -87,145 +87,143 @@ EXAMPLES:
   adt-manage-sessions clear
 
 FILES:
-  .sessions/<sessionId>.json    Session state files (cookies, CSRF tokens)
+  .sessions/<sessionId>.env    Session state files (cookies, CSRF tokens)
 
 For more info: https://github.com/fr0ster/mcp-abap-adt-clients
 `);
 }
 
-const options = parseArgs();
 
-// Show help
-if (!options.command || options.command === 'help') {
-  showHelp();
-  process.exit(0);
-}
 
-const sessionStorage = new FileSessionStorage({
-  sessionDir: options.sessionsDir,
-  prettyPrint: true
-});
 
-function formatAge(ms) {
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
 
-  if (hours > 0) {
-    return `${hours}h ${minutes % 60}m`;
-  } else if (minutes > 0) {
-    return `${minutes}m ${seconds % 60}s`;
-  } else {
-    return `${seconds}s`;
-  }
-}
 
-function formatSessionInfo(sessionId, metadata) {
-  const processStatus = (() => {
-    try {
-      process.kill(metadata.pid, 0);
-      return '🟢 Running';
-    } catch {
-      return '🔴 Dead';
-    }
-  })();
-
-  return `
-Session ID: ${sessionId}
-  Created: ${new Date(metadata.timestamp).toISOString()}
-  Age: ${formatAge(metadata.age)}
-  Process: ${metadata.pid} ${processStatus}`;
-}
 
 async function main() {
-  const command = process.argv[2];
-  const arg = process.argv[3];
+  const { sessionsDir, command, commandArgs } = parseArgs();
+  const sessionDir = path.resolve(sessionsDir);
 
-  if (!command || command === 'list') {
-    // List all sessions
-    const sessions = await sessionStorage.listSessions();
+  if (!fs.existsSync(sessionDir)) {
+    console.error(`❌ Session directory not found: ${sessionDir}`);
+    process.exit(1);
+  }
 
-    if (sessions.length === 0) {
+  const listSessions = () => {
+    return fs.readdirSync(sessionDir)
+      .filter(file => file.endsWith('.json'))
+      .map(file => path.join(sessionDir, file));
+  };
+
+  const readSession = (filePath) => {
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      return JSON.parse(content);
+    } catch (e) {
+      console.error(`❌ Error reading session file ${filePath}: ${e.message}`);
+      return null;
+    }
+  };
+
+  const formatAge = (ms) => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+
+    if (hours > 0) {
+      return `${hours}h ${minutes % 60}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds % 60}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  }
+
+  if (command === 'list') {
+    const sessionFiles = listSessions();
+
+    if (sessionFiles.length === 0) {
       console.log('✅ No active sessions found');
       return;
     }
 
-    console.log(`\n📋 Active Sessions (${sessions.length}):\n`);
+    console.log(`\n📋 Active Sessions (${sessionFiles.length}):\n`);
 
-    for (const sessionId of sessions) {
-      const metadata = await sessionStorage.getSessionMetadata(sessionId);
-      if (metadata) {
-        console.log(formatSessionInfo(sessionId, metadata));
+    for (const file of sessionFiles) {
+      const session = readSession(file);
+      if (session) {
+        const stats = fs.statSync(file);
+        const age = Date.now() - stats.mtimeMs;
+        const sessionId = path.basename(file, '.json');
+        console.log(`
+Session ID: ${sessionId}
+  Modified: ${stats.mtime.toISOString()}
+  Age: ${formatAge(age)}`);
       }
     }
     console.log();
 
   } else if (command === 'info') {
-    // Show session details
-    if (!arg) {
+    const sessionId = commandArgs[0];
+    if (!sessionId) {
       console.error('❌ Usage: manage-sessions info <sessionId>');
       process.exit(1);
     }
 
-    const state = await sessionStorage.load(arg);
-    const metadata = await sessionStorage.getSessionMetadata(arg);
-
-    if (!state || !metadata) {
-      console.error(`❌ Session not found: ${arg}`);
+    const sessionFile = path.join(sessionDir, `${sessionId}.json`);
+    if (!fs.existsSync(sessionFile)) {
+      console.error(`❌ Session not found: ${sessionId}`);
       process.exit(1);
     }
 
-    console.log(formatSessionInfo(arg, metadata));
-    console.log('\nSession State:');
-    console.log(`  Has Cookies: ${!!state.cookies}`);
-    console.log(`  Has CSRF Token: ${!!state.csrfToken}`);
-    console.log(`  Cookie Store: ${Object.keys(state.cookieStore).length} entries`);
-
-    if (state.cookies) {
-      console.log(`\nCookies:\n  ${state.cookies}`);
-    }
-
-    if (state.csrfToken) {
-      console.log(`\nCSRF Token:\n  ${state.csrfToken}`);
-    }
-
-    if (Object.keys(state.cookieStore).length > 0) {
-      console.log('\nCookie Store:');
-      for (const [key, value] of Object.entries(state.cookieStore)) {
-        console.log(`  ${key}: ${value}`);
-      }
+    const session = readSession(sessionFile);
+    if (session) {
+      const stats = fs.statSync(sessionFile);
+      const age = Date.now() - stats.mtimeMs;
+      console.log(`
+Session ID: ${sessionId}
+  Modified: ${stats.mtime.toISOString()}
+  Age: ${formatAge(age)}
+  Content:`);
+      console.log(JSON.stringify(session, null, 2));
     }
 
   } else if (command === 'cleanup') {
-    // Clean up stale sessions
     console.log('🧹 Cleaning up stale sessions...\n');
+    const sessionFiles = listSessions();
+    let cleanedCount = 0;
+    const now = Date.now();
+    const staleTime = 30 * 60 * 1000; // 30 minutes
 
-    const stale = await sessionStorage.cleanupStaleSessions();
-    const dead = await sessionStorage.cleanupDeadProcessSessions();
+    for (const file of sessionFiles) {
+      const stats = fs.statSync(file);
+      const age = now - stats.mtimeMs;
+      if (age > staleTime) {
+        fs.unlinkSync(file);
+        console.log(`  - Removed stale session: ${path.basename(file, '.json')}`);
+        cleanedCount++;
+      }
+    }
 
-    const allCleaned = [...new Set([...stale, ...dead])];
-
-    if (allCleaned.length === 0) {
+    if (cleanedCount === 0) {
       console.log('✅ No stale sessions to cleanup');
     } else {
-      console.log(`🧹 Cleaned up ${allCleaned.length} session(s):`);
-      allCleaned.forEach(id => console.log(`  - ${id}`));
+      console.log(`\n🧹 Cleaned up ${cleanedCount} session(s)`);
     }
 
   } else if (command === 'clear') {
-    // Clear all sessions
-    const sessions = await sessionStorage.listSessions();
-    await sessionStorage.clearAll();
-    console.log(`🧹 Cleared ${sessions.length} session(s)`);
+    const sessionFiles = listSessions();
+    if (sessionFiles.length === 0) {
+        console.log('✅ No active sessions found');
+        return;
+    }
+    console.log(`🧹 Clearing ${sessionFiles.length} session(s)...`);
+    for (const file of sessionFiles) {
+      fs.unlinkSync(file);
+    }
+    console.log('✅ All sessions cleared');
 
   } else {
-    console.error(`❌ Unknown command: ${command}`);
-    console.error('Usage:');
-    console.error('  manage-sessions list              - Show all active sessions');
-    console.error('  manage-sessions info <sessionId>  - Show session details');
-    console.error('  manage-sessions cleanup           - Remove stale sessions');
-    console.error('  manage-sessions clear             - Clear all sessions');
-    process.exit(1);
+    showHelp();
   }
 }
 

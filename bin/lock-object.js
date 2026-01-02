@@ -143,7 +143,8 @@ async function main() {
 
   try {
     // Dynamic imports
-    const { createAbapConnection, FileSessionStorage } = require('@mcp-abap-adt/connection');
+    const { createAbapConnection } = require('@mcp-abap-adt/connection');
+    const { AbapSessionStore } = require('@mcp-abap-adt/auth-stores');
     const { LockStateManager } = require('../src/utils/lockStateManager');
 
     // Map object type to lock function
@@ -214,10 +215,7 @@ async function main() {
     const connection = createAbapConnection(config, logger);
 
     // Setup session storage
-    const sessionStorage = new FileSessionStorage({
-      sessionDir: sessionsDir,
-      prettyPrint: true
-    });
+    const sessionStorage = new AbapSessionStore(sessionsDir);
 
     // Enable stateful session on connection
     await connection.enableStatefulSession(sessionId, sessionStorage);
@@ -242,7 +240,7 @@ async function main() {
     // after each request in stateful mode
     console.log(`${colors.green}✓ Session saved${colors.reset}`);
     console.log(`  Session ID: ${colors.bright}${sessionId}${colors.reset}`);
-    console.log(`  Session File: ${path.join(sessionsDir, sessionId + '.json')}`);
+    console.log(`  Session File: ${path.join(sessionsDir, sessionId + '.env')}`);
 
     // Register lock in lock manager
     const lockManager = new LockStateManager(locksDir);

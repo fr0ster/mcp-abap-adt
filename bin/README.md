@@ -97,7 +97,7 @@ adt-lock-object program Z_MY_PROGRAM
 
 **What it does:**
 1. Connects to SAP and locks the object
-2. Saves session (cookies, CSRF token) to `.sessions/<session-id>.json`
+2. Saves session (cookies, CSRF token) to `.sessions/<session-id>.env`
 3. Registers lock handle in `.locks/active-locks.json`
 4. Prints unlock command for later use
 
@@ -116,7 +116,7 @@ adt-unlock-object fm MY_FUNCTION --function-group Z_MY_FUGR --session-id my_work
 ```
 
 **What it does:**
-1. Loads session from `.sessions/<session-id>.json`
+1. Loads session from `.sessions/<session-id>.env`
 2. Restores session state to new connection
 3. Retrieves lock handle from `.locks/active-locks.json`
 4. Unlocks the object on SAP server
@@ -264,8 +264,8 @@ adt-manage-sessions cleanup
 
 ```
 .sessions/
-  ├── my_work_session.json       # Session state (cookies, CSRF)
-  └── lock_class_ZCL_TEST_*.json # Auto-generated session
+  ├── my_work_session.env       # Session state (cookies, CSRF)
+  └── lock_class_ZCL_TEST_*.env # Auto-generated session
 
 .locks/
   └── active-locks.json           # Lock registry
@@ -297,72 +297,3 @@ Ensure these directories are in `.gitignore`:
 - [Integration Tests Overview](../src/__tests__/integration/README.md)
 
 
-# Clear all locks from registry
-adt-manage-locks clear
-```
-
-### adt-manage-sessions
-
-Manage HTTP session state (cookies, CSRF tokens).
-
-```bash
-# List all active sessions
-adt-manage-sessions list
-
-# Show session details
-adt-manage-sessions info <sessionId>
-
-# Clean up stale sessions (>30 min or dead processes)
-adt-manage-sessions cleanup
-
-# Clear all sessions
-adt-manage-sessions clear
-```
-
-### adt-unlock-objects
-
-Unlock predefined test objects (used after failed tests).
-
-```bash
-adt-unlock-objects
-```
-
-## With npx
-
-You can also run these commands without installing:
-
-```bash
-npx @mcp-abap-adt/adt-clients adt-manage-locks list
-npx @mcp-abap-adt/adt-clients adt-manage-sessions list
-```
-
-## Configuration
-
-Commands require `.env` file in the project root with SAP connection details:
-
-```env
-SAP_URL=https://your-sap-system.com:443
-SAP_CLIENT=100
-SAP_USERNAME=your-username
-SAP_PASSWORD=your-password
-SAP_AUTH_TYPE=basic
-```
-
-For JWT authentication:
-```env
-SAP_AUTH_TYPE=jwt
-SAP_JWT_TOKEN=your-jwt-token
-```
-
-## Data Storage
-
-- **Locks**: `.locks/active-locks.json`
-- **Sessions**: `.sessions/<sessionId>.json`
-
-Both directories are in `.gitignore` and should not be committed.
-
-## Documentation
-
-For detailed information, see:
-- [Stateful Session Guide](../docs/architecture/STATEFUL_SESSION_GUIDE.md#lock-mechanism)
-- [Tools Architecture](../docs/architecture/TOOLS_ARCHITECTURE.md)

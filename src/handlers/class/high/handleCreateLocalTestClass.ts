@@ -141,7 +141,12 @@ export async function handleCreateLocalTestClass(
         errorMessage = `Bad request. Check test class code syntax.`;
       }
 
-      return return_error(new Error(errorMessage));
+      //return return_error(new Error(errorMessage));
+      const resultingError = return_error(error);
+      if (errorMessage) {
+        resultingError.content.unshift({ type: 'text', text: errorMessage });
+      }
+      return resultingError;
     }
   } catch (error: any) {
     return return_error(error);

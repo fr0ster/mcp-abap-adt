@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [2.1.4] - 2026-01-21
+### Fixed
+- **CreateLocalTestClass**: Return full SAP error details on failure (including the original response payload).
+
 ## [2.1.3] - 2026-01-02
 ### Changed
 - **Documentation**: Restored the stateful ADT flow guide without file-based session persistence references.

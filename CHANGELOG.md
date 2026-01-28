@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2.1.5] - 2026-01-28
+### Added
+- **Startup diagnostics**: Display SAP connection configuration at server startup when using `--env` parameter
+  - Shows source file, SAP URL, client, auth type, and UAA URL
+  - Tokens and secrets are safely masked (first/last 4 chars for long values, full mask for short)
+  - Helps diagnose auth issues by showing which config is actually used
+
 ## [2.1.4] - 2026-01-21
 ### Fixed
 - **CreateLocalTestClass**: Return full SAP error details on failure (including the original response payload).

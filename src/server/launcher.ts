@@ -11,6 +11,10 @@ import {
 } from '../lib/handlers/groups/index.js';
 import type { HandlerContext } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
+import {
+  formatAuthConfigForDisplay,
+  type AuthDisplayConfig,
+} from '../lib/utils.js';
 import { AuthBrokerConfig } from './AuthBrokerConfig.js';
 import { SseServer } from './SseServer.js';
 import { StdioServer } from './StdioServer.js';
@@ -149,6 +153,63 @@ async function main() {
 
   // Initialize default broker (important for .env file support)
   await authBrokerFactory.initializeDefaultBroker();
+
+  // Display auth configuration at startup (always show for transparency)
+  const defaultBroker = authBrokerFactory.getDefaultBroker();
+  if (defaultBroker) {
+    try {
+      // Get connection config from broker to display
+      const connConfig = await defaultBroker.getConnectionConfig(
+        config.mcpDestination || 'default',
+      );
+
+      if (connConfig) {
+        const displayConfig: AuthDisplayConfig = {
+          serviceUrl: connConfig.serviceUrl,
+          sapClient: connConfig.sapClient,
+          authType: connConfig.authType,
+          username: connConfig.username,
+          password: connConfig.password,
+          jwtToken: connConfig.authorizationToken,
+        };
+
+        // Try to get auth config for UAA details
+        try {
+          const authConfig = await (defaultBroker as any).sessionStore?.getAuthorizationConfig?.(
+            config.mcpDestination || 'default',
+          );
+          if (authConfig) {
+            displayConfig.uaaUrl = authConfig.uaaUrl;
+            displayConfig.uaaClientId = authConfig.uaaClientId;
+            displayConfig.uaaClientSecret = authConfig.uaaClientSecret;
+            displayConfig.refreshToken = authConfig.refreshToken;
+          }
+        } catch {
+          // Ignore - auth config is optional
+        }
+
+        // Determine source
+        let source = 'unknown';
+        if (config.envFile) {
+          source = config.envFile;
+        } else if (config.mcpDestination) {
+          source = `service-key: ${config.mcpDestination}`;
+        }
+
+        console.error(formatAuthConfigForDisplay(displayConfig, source));
+      }
+    } catch (error) {
+      // Don't fail startup if we can't display config
+      console.error(
+        `[MCP] Warning: Could not display auth config: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  } else if (config.envFile || config.mcpDestination) {
+    // Broker not created but config was expected
+    console.error(
+      `[MCP] Warning: Auth broker not initialized. Config source: ${config.envFile || config.mcpDestination}`,
+    );
+  }
 
   if (config.transport === 'stdio') {
     // For .env file, use 'default' broker; for --mcp, use specified destination

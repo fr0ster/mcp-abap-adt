@@ -31,11 +31,11 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   ErrorCode,
-  fetchNodeStructure,
   McpError,
   return_response,
 } from '../../../lib/utils';
@@ -161,12 +161,14 @@ export async function handleGetObjectsByType(
         : true;
     const outputFormat = format || 'parsed'; // 'raw' or 'parsed'
 
+    // Create AdtClient and get utilities
+    const client = new AdtClient(connection, logger);
+    const utils = client.getUtils();
+
     // Get specific node structure
-    const response = await fetchNodeStructure(
-      connection,
-      parent_name.toUpperCase(),
-      parent_tech_name.toUpperCase(),
+    const response = await utils.fetchNodeStructure(
       parent_type,
+      parent_name.toUpperCase(),
       node_id,
       withDescriptions,
     );

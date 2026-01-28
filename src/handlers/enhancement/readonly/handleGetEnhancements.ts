@@ -1,9 +1,9 @@
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   ErrorCode,
   encodeSapObjectName,
-  fetchNodeStructure,
   logger,
   McpError,
   makeAdtRequestWithTimeout,
@@ -397,26 +397,24 @@ async function getIncludesListInternal(
     }
 
     // For includes, we need to determine the parent program
-    const parentName = objectName;
-    const parentTechName = objectName;
+    const parentName = objectName.toUpperCase();
     const parentType = 'PROG/P';
 
     if (objectType === 'include') {
-      // For includes, we assume they belong to a program with similar name
-      // This is a simplification - in real scenarios, you might need additional logic
-      // to determine the actual parent program
       logger?.warn(
         `Include processing: assuming parent program for include ${objectName}`,
       );
     }
 
+    // Create AdtClient and get utilities
+    const client = new AdtClient(connection, logger);
+    const utils = client.getUtils();
+
     // Step 1: Get root node structure to find includes node (with timeout)
     const rootResponse = await Promise.race([
-      fetchNodeStructure(
-        connection,
-        parentName.toUpperCase(),
-        parentTechName.toUpperCase(),
+      utils.fetchNodeStructure(
         parentType,
+        parentName,
         '000000', // Root node
         true, // with descriptions
       ),
@@ -444,11 +442,9 @@ async function getIncludesListInternal(
 
     // Step 3: Get includes list using the found node ID (with timeout)
     const includesResponse = await Promise.race([
-      fetchNodeStructure(
-        connection,
-        parentName.toUpperCase(),
-        parentTechName.toUpperCase(),
+      utils.fetchNodeStructure(
         parentType,
+        parentName,
         includesNode.node_id,
         true, // with descriptions
       ),

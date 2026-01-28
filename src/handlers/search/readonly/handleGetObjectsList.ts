@@ -1,4 +1,4 @@
-import type { AbapConnection } from '@mcp-abap-adt/connection';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 
 export const TOOL_DEFINITION = {
   name: 'GetObjectsList',
@@ -32,7 +32,7 @@ export const TOOL_DEFINITION = {
 
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, fetchNodeStructure, McpError } from '../../../lib/utils';
+import { ErrorCode, McpError } from '../../../lib/utils';
 
 /**
  * Parses every SEU_ADT_REPOSITORY_OBJ_NODE element from the XML and returns objects with the required fields
@@ -93,9 +93,8 @@ function parseNodeIds(xmlData: string): string[] {
  * Recursively walks the ADT node structure and returns only valid objects
  */
 async function collectValidObjectsStrict(
-  connection: AbapConnection,
+  utils: ReturnType<AdtClient['getUtils']>,
   parent_name: string,
-  parent_tech_name: string,
   parent_type: string,
   node_id: string,
   with_short_descriptions: boolean,
@@ -104,11 +103,9 @@ async function collectValidObjectsStrict(
   if (visited.has(node_id)) return [];
   visited.add(node_id);
 
-  const response = await fetchNodeStructure(
-    connection,
-    parent_name,
-    parent_tech_name,
+  const response = await utils.fetchNodeStructure(
     parent_type,
+    parent_name,
     node_id,
     with_short_descriptions,
   );
@@ -121,9 +118,8 @@ async function collectValidObjectsStrict(
   const nodeIds = parseNodeIds(xml);
   for (const childNodeId of nodeIds) {
     const childObjects = await collectValidObjectsStrict(
-      connection,
+      utils,
       parent_name,
-      parent_tech_name,
       parent_type,
       childNodeId,
       with_short_descriptions,
@@ -185,11 +181,14 @@ export async function handleGetObjectsList(context: HandlerContext, args: any) {
         ? Boolean(with_short_descriptions)
         : true;
 
+    // Create AdtClient and get utilities
+    const client = new AdtClient(connection, logger);
+    const utils = client.getUtils();
+
     // Begin traversal from node_id '000000' (the root node)
     const objects = await collectValidObjectsStrict(
-      connection,
+      utils,
       parent_name.toUpperCase(),
-      parent_tech_name.toUpperCase(),
       parent_type,
       '000000',
       withDescriptions,

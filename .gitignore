@@ -90,3 +90,5 @@ docker/nginx.conf
 mdd.json
 package.json
 .npm-cache/**
+SAP_ADT.json
+desktop.ini

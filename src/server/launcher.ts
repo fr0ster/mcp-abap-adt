@@ -12,8 +12,8 @@ import {
 import type { HandlerContext } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import {
-  formatAuthConfigForDisplay,
   type AuthDisplayConfig,
+  formatAuthConfigForDisplay,
 } from '../lib/utils.js';
 import { AuthBrokerConfig } from './AuthBrokerConfig.js';
 import { SseServer } from './SseServer.js';
@@ -175,7 +175,9 @@ async function main() {
 
         // Try to get auth config for UAA details
         try {
-          const authConfig = await (defaultBroker as any).sessionStore?.getAuthorizationConfig?.(
+          const authConfig = await (
+            defaultBroker as any
+          ).sessionStore?.getAuthorizationConfig?.(
             config.mcpDestination || 'default',
           );
           if (authConfig) {

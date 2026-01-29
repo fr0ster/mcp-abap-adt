@@ -2,10 +2,7 @@ import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import convert from 'xml-js';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  ErrorCode,
-  McpError,
-} from '../../../lib/utils';
+import { ErrorCode, McpError } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 export const TOOL_DEFINITION = {
   name: 'GetObjectInfo',

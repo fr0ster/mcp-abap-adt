@@ -1959,18 +1959,25 @@ export function formatAuthConfigForDisplay(
 ): string {
   const lines: string[] = [];
 
-  lines.push('╔══════════════════════════════════════════════════════════════╗');
-  lines.push('║                   SAP Connection Config                      ║');
-  lines.push('╠══════════════════════════════════════════════════════════════╣');
+  lines.push(
+    '╔══════════════════════════════════════════════════════════════╗',
+  );
+  lines.push(
+    '║                   SAP Connection Config                      ║',
+  );
+  lines.push(
+    '╠══════════════════════════════════════════════════════════════╣',
+  );
 
   if (source) {
     lines.push(`║  Source:        ${source.padEnd(45)}║`);
   }
 
   if (config.serviceUrl) {
-    const url = config.serviceUrl.length > 45
-      ? config.serviceUrl.substring(0, 42) + '...'
-      : config.serviceUrl;
+    const url =
+      config.serviceUrl.length > 45
+        ? config.serviceUrl.substring(0, 42) + '...'
+        : config.serviceUrl;
     lines.push(`║  SAP URL:       ${url.padEnd(45)}║`);
   }
 
@@ -1987,32 +1994,45 @@ export function formatAuthConfigForDisplay(
       lines.push(`║  Username:      ${config.username.padEnd(45)}║`);
     }
     if (config.password) {
-      lines.push(`║  Password:      ${maskSensitiveValue(config.password).padEnd(45)}║`);
+      lines.push(
+        `║  Password:      ${maskSensitiveValue(config.password).padEnd(45)}║`,
+      );
     }
   }
 
   if (config.authType === 'jwt') {
     if (config.jwtToken) {
-      lines.push(`║  JWT Token:     ${maskSensitiveValue(config.jwtToken).padEnd(45)}║`);
+      lines.push(
+        `║  JWT Token:     ${maskSensitiveValue(config.jwtToken).padEnd(45)}║`,
+      );
     }
     if (config.refreshToken) {
-      lines.push(`║  Refresh Token: ${maskSensitiveValue(config.refreshToken).padEnd(45)}║`);
+      lines.push(
+        `║  Refresh Token: ${maskSensitiveValue(config.refreshToken).padEnd(45)}║`,
+      );
     }
     if (config.uaaUrl) {
-      const uaaUrl = config.uaaUrl.length > 45
-        ? config.uaaUrl.substring(0, 42) + '...'
-        : config.uaaUrl;
+      const uaaUrl =
+        config.uaaUrl.length > 45
+          ? config.uaaUrl.substring(0, 42) + '...'
+          : config.uaaUrl;
       lines.push(`║  UAA URL:       ${uaaUrl.padEnd(45)}║`);
     }
     if (config.uaaClientId) {
-      lines.push(`║  UAA Client ID: ${maskSensitiveValue(config.uaaClientId).padEnd(45)}║`);
+      lines.push(
+        `║  UAA Client ID: ${maskSensitiveValue(config.uaaClientId).padEnd(45)}║`,
+      );
     }
     if (config.uaaClientSecret) {
-      lines.push(`║  UAA Secret:    ${maskSensitiveValue(config.uaaClientSecret).padEnd(45)}║`);
+      lines.push(
+        `║  UAA Secret:    ${maskSensitiveValue(config.uaaClientSecret).padEnd(45)}║`,
+      );
     }
   }
 
-  lines.push('╚══════════════════════════════════════════════════════════════╝');
+  lines.push(
+    '╚══════════════════════════════════════════════════════════════╝',
+  );
 
   return lines.join('\n');
 }

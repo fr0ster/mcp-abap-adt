@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [2.1.7] - 2026-01-29
+### Fixed
+- **UpdateLocalTestClass**: Added detailed SAP error information for 409 conflict errors to improve troubleshooting (#6)
+
 ## [2.1.6] - 2026-01-29
 ### Fixed
 - **GetIncludesList, GetObjectsList, GetObjectsByType, GetEnhancements, GetObjectInfo**: Migrate from deprecated `fetchNodeStructure` stub to `AdtClient.getUtils().fetchNodeStructure()` - fixes "not implemented" errors

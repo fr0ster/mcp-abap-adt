@@ -72,7 +72,6 @@ export class LowTester extends LambdaTester {
         const { connection, objectName, transportRequest, logger } = context;
         if (!objectName) return;
 
-        logger?.info?.(`   • cleanup: delete ${objectName}`);
         try {
           await delay(2000); // Ensure object is ready for deletion
           const handlerContext = createHandlerContext({
@@ -88,13 +87,13 @@ export class LowTester extends LambdaTester {
           if (deleteResponse?.isError) {
             const errorMsg =
               deleteResponse.content?.[0]?.text || 'Unknown error';
-            logger?.warn?.(`Delete failed (ignored in cleanup): ${errorMsg}`);
+            logger?.warn?.(`⚠️ Delete failed (ignored): ${errorMsg}`);
           } else {
-            logger?.success?.(`✅ cleanup: deleted ${objectName} successfully`);
+            logger?.info?.(`🗑️ Deleted ${objectName}`);
           }
         } catch (error: any) {
           logger?.warn?.(
-            `Cleanup delete error (ignored): ${error?.message || String(error)}`,
+            `⚠️ Cleanup error (ignored): ${error?.message || String(error)}`,
           );
         }
       };
@@ -131,21 +130,18 @@ export class LowTester extends LambdaTester {
     try {
       // Execute workflow in order: validate -> create -> lock -> update -> unlock -> activate
       if (this.workflowFunctions.validate) {
-        logger?.info(`   • validate ${this.context.objectName}`);
         const args = this.buildValidateArgs(this.context);
         await this.workflowFunctions.validate(handlerContext, args);
-        logger?.info(`   ✅ validate completed`);
+        logger?.info(`✅ Validated ${this.context.objectName}`);
       }
 
       if (this.workflowFunctions.create) {
-        logger?.info(`   • create ${this.context.objectName}`);
         const args = this.buildCreateArgs(this.context);
         await this.workflowFunctions.create(handlerContext, args);
-        logger?.info(`   ✅ create completed`);
+        logger?.info(`✅ Created ${this.context.objectName}`);
       }
 
       if (this.workflowFunctions.lock) {
-        logger?.info(`   • lock ${this.context.objectName}`);
         const args = this.buildLockArgs(this.context);
         const lockResponse = await this.workflowFunctions.lock(
           handlerContext,
@@ -159,28 +155,25 @@ export class LowTester extends LambdaTester {
             this.context.lockHandle = lockHandle;
           }
         }
-        logger?.info(`   ✅ lock completed`);
+        logger?.info(`🔒 Locked ${this.context.objectName}`);
       }
 
       if (this.workflowFunctions.update) {
-        logger?.info(`   • update ${this.context.objectName}`);
         const args = this.buildUpdateArgs(this.context);
         await this.workflowFunctions.update(handlerContext, args);
-        logger?.info(`   ✅ update completed`);
+        logger?.info(`📝 Updated ${this.context.objectName}`);
       }
 
       if (this.workflowFunctions.unlock) {
-        logger?.info(`   • unlock ${this.context.objectName}`);
         const args = this.buildUnlockArgs(this.context);
         await this.workflowFunctions.unlock(handlerContext, args);
-        logger?.info(`   ✅ unlock completed`);
+        logger?.info(`🔓 Unlocked ${this.context.objectName}`);
       }
 
       if (this.workflowFunctions.activate) {
-        logger?.info(`   • activate ${this.context.objectName}`);
         const args = this.buildActivateArgs(this.context);
         await this.workflowFunctions.activate(handlerContext, args);
-        logger?.info(`   ✅ activate completed`);
+        logger?.info(`⚡ Activated ${this.context.objectName}`);
       }
     } catch (error: any) {
       // Check if error is a skip condition

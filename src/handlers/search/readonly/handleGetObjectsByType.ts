@@ -34,11 +34,7 @@ export const TOOL_DEFINITION = {
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  ErrorCode,
-  McpError,
-  return_response,
-} from '../../../lib/utils';
+import { ErrorCode, McpError, return_response } from '../../../lib/utils';
 
 /**
  * Parses XML response to extract object names from node structure

@@ -1898,6 +1898,125 @@ export function getConfig(): SapConfig {
   return config;
 }
 
+/**
+ * Mask sensitive values (tokens, secrets) for safe logging
+ *
+ * Rules:
+ * - Long values (>20 chars): show first 4 and last 4 chars with *** in between
+ * - Short values (<=20 chars): fully mask with asterisks
+ * - Empty/undefined: return placeholder
+ *
+ * @param value - The sensitive value to mask
+ * @param placeholder - Placeholder for empty values (default: '(not set)')
+ * @returns Masked string safe for logging
+ */
+export function maskSensitiveValue(
+  value: string | undefined | null,
+  placeholder = '(not set)',
+): string {
+  if (!value || value.trim() === '') {
+    return placeholder;
+  }
+
+  const trimmed = value.trim();
+
+  // Long values: show first 4 and last 4 chars
+  if (trimmed.length > 20) {
+    return `${trimmed.substring(0, 4)}***${trimmed.substring(trimmed.length - 4)}`;
+  }
+
+  // Short values: fully mask
+  return '*'.repeat(trimmed.length);
+}
+
+/**
+ * Format auth configuration for display at server startup
+ * Shows connection details with masked sensitive values
+ */
+export interface AuthDisplayConfig {
+  envFile?: string;
+  serviceUrl?: string;
+  sapClient?: string;
+  authType?: string;
+  username?: string;
+  password?: string;
+  jwtToken?: string;
+  refreshToken?: string;
+  uaaUrl?: string;
+  uaaClientId?: string;
+  uaaClientSecret?: string;
+}
+
+/**
+ * Format auth configuration for console output
+ * @param config - Auth configuration to display
+ * @param source - Source of the config (e.g., 'e19.env', 'service-key')
+ * @returns Formatted string for console output
+ */
+export function formatAuthConfigForDisplay(
+  config: AuthDisplayConfig,
+  source?: string,
+): string {
+  const lines: string[] = [];
+
+  lines.push('╔══════════════════════════════════════════════════════════════╗');
+  lines.push('║                   SAP Connection Config                      ║');
+  lines.push('╠══════════════════════════════════════════════════════════════╣');
+
+  if (source) {
+    lines.push(`║  Source:        ${source.padEnd(45)}║`);
+  }
+
+  if (config.serviceUrl) {
+    const url = config.serviceUrl.length > 45
+      ? config.serviceUrl.substring(0, 42) + '...'
+      : config.serviceUrl;
+    lines.push(`║  SAP URL:       ${url.padEnd(45)}║`);
+  }
+
+  if (config.sapClient) {
+    lines.push(`║  SAP Client:    ${config.sapClient.padEnd(45)}║`);
+  }
+
+  if (config.authType) {
+    lines.push(`║  Auth Type:     ${config.authType.padEnd(45)}║`);
+  }
+
+  if (config.authType === 'basic') {
+    if (config.username) {
+      lines.push(`║  Username:      ${config.username.padEnd(45)}║`);
+    }
+    if (config.password) {
+      lines.push(`║  Password:      ${maskSensitiveValue(config.password).padEnd(45)}║`);
+    }
+  }
+
+  if (config.authType === 'jwt') {
+    if (config.jwtToken) {
+      lines.push(`║  JWT Token:     ${maskSensitiveValue(config.jwtToken).padEnd(45)}║`);
+    }
+    if (config.refreshToken) {
+      lines.push(`║  Refresh Token: ${maskSensitiveValue(config.refreshToken).padEnd(45)}║`);
+    }
+    if (config.uaaUrl) {
+      const uaaUrl = config.uaaUrl.length > 45
+        ? config.uaaUrl.substring(0, 42) + '...'
+        : config.uaaUrl;
+      lines.push(`║  UAA URL:       ${uaaUrl.padEnd(45)}║`);
+    }
+    if (config.uaaClientId) {
+      lines.push(`║  UAA Client ID: ${maskSensitiveValue(config.uaaClientId).padEnd(45)}║`);
+    }
+    if (config.uaaClientSecret) {
+      lines.push(`║  UAA Secret:    ${maskSensitiveValue(config.uaaClientSecret).padEnd(45)}║`);
+    }
+  }
+
+  lines.push('╚══════════════════════════════════════════════════════════════╝');
+
+  return lines.join('\n');
+}
+
 export function parseActivationResponse(responseData: any) {
   const { XMLParser } = require('fast-xml-parser');
   const parser = new XMLParser({

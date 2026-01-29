@@ -1,16 +1,10 @@
-/**
- * @TODO Migrate to infrastructure module
- * Endpoint: /sap/bc/adt/repository/nodestructure
- * This handler uses makeAdtRequestWithTimeout directly and should be moved to adt-clients infrastructure module
- */
-import type { AbapConnection } from '@mcp-abap-adt/connection';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import convert from 'xml-js';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   ErrorCode,
   McpError,
-  makeAdtRequestWithTimeout,
 } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 export const TOOL_DEFINITION = {
@@ -53,27 +47,22 @@ function getDefaultDepth(parent_type: string): number {
 }
 
 async function fetchNodeStructureRaw(
-  connection: AbapConnection,
+  context: HandlerContext,
   parent_type: string,
   parent_name: string,
   node_id?: string,
 ) {
-  // Pass only the endpoint path; the connection prepends baseUrl internally.
-  const url = `/sap/bc/adt/repository/nodestructure`;
-  const params: any = {
+  const { connection, logger } = context;
+  const client = new AdtClient(connection, logger);
+  const utils = client.getUtils();
+
+  const response = await utils.fetchNodeStructure(
     parent_type,
     parent_name,
-    withShortDescriptions: true,
-  };
-  if (node_id) params.node_id = node_id;
-  const response = await makeAdtRequestWithTimeout(
-    connection,
-    url,
-    'POST',
-    'default',
-    undefined,
-    params,
+    node_id || '0000',
+    true, // withShortDescriptions
   );
+
   const result = convert.xml2js(response.data, { compact: true });
   let nodes =
     result['asx:abap']?.['asx:values']?.DATA?.TREE_CONTENT
@@ -172,7 +161,6 @@ async function buildTree(
   enrich: boolean,
   node_id: string = '',
 ): Promise<any> {
-  const { connection, logger } = context;
   // 1. Enrich root node
   let enrichment: any = {
     packageName: undefined,
@@ -191,7 +179,7 @@ async function buildTree(
   if (depth < maxDepth) {
     // Use node_id "0000" for the root; for others keep the actual NODE_ID
     const nodes = await fetchNodeStructureRaw(
-      connection,
+      context,
       objectType,
       objectName,
       depth === 0 ? '0000' : node_id,
@@ -266,7 +254,7 @@ export async function handleGetObjectInfo(
     enrich?: boolean;
   },
 ) {
-  const { connection, logger } = context;
+  const { logger } = context;
   try {
     if (!args?.parent_type || !args?.parent_name) {
       throw new McpError(

@@ -1,10 +1,6 @@
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  ErrorCode,
-  fetchNodeStructure,
-  McpError,
-  return_error,
-} from '../../../lib/utils';
+import { ErrorCode, McpError, return_error } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetIncludesList',
@@ -164,21 +160,22 @@ export async function handleGetIncludesList(
     const isDetailed = detailed === true;
 
     // Pass object_type straight through as parentType
-    const parentName = object_name;
-    const parentTechName = object_name;
+    const parentName = object_name.toUpperCase();
     const parentType = object_type;
 
     logger?.info(
-      `Starting includes discovery for ${parentName.toUpperCase()} (${parentType}), detailed=${isDetailed}`,
+      `Starting includes discovery for ${parentName} (${parentType}), detailed=${isDetailed}`,
     );
+
+    // Create AdtClient and get utilities
+    const client = new AdtClient(connection, logger);
+    const utils = client.getUtils();
 
     // Step 1: Get root node structure to find includes node (with timeout)
     const rootResponse = await Promise.race([
-      fetchNodeStructure(
-        connection,
-        parentName.toUpperCase(),
-        parentTechName.toUpperCase(),
+      utils.fetchNodeStructure(
         parentType,
+        parentName,
         '000000', // Root node
         true, // with descriptions
       ),
@@ -215,11 +212,9 @@ export async function handleGetIncludesList(
 
     // Step 3: Get includes list using the found node ID (with timeout)
     const includesResponse = await Promise.race([
-      fetchNodeStructure(
-        connection,
-        parentName.toUpperCase(),
-        parentTechName.toUpperCase(),
+      utils.fetchNodeStructure(
         parentType,
+        parentName,
         includesNode.node_id,
         true, // with descriptions
       ),

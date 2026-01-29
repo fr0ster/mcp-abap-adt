@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2.1.6] - 2026-01-29
+### Fixed
+- **GetIncludesList, GetObjectsList, GetObjectsByType, GetEnhancements, GetObjectInfo**: Migrate from deprecated `fetchNodeStructure` stub to `AdtClient.getUtils().fetchNodeStructure()` - fixes "not implemented" errors
+
+### Changed
+- **LowTester logging**: Unified to compact format with emojis, matching LambdaTester output style
+
 ## [2.1.5] - 2026-01-28
 ### Added
 - **Startup diagnostics**: Display SAP connection configuration at server startup when using `--env` parameter

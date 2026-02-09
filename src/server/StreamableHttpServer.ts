@@ -134,14 +134,19 @@ export class StreamableHttpServer extends BaseMcpServer {
         // Priority 3: Use default destination
         else if (this.defaultDestination) {
           destination = this.defaultDestination;
-          broker =
-            await this.authBrokerFactory.getOrCreateAuthBroker(destination);
+          // Use default broker for --mcp/--env startup config
+          broker = await this.authBrokerFactory.getOrCreateAuthBroker();
         }
         // Priority 4: No auth params at all
         // Allow request to proceed - metadata methods (tools/list, etc.) will work
         // tools/call will fail with appropriate error in handler
 
-        // Set connection context only if we have destination or broker
+        if (destination && !broker) {
+          throw new Error(
+            `Auth broker not initialized for destination: ${destination}`,
+          );
+        }
+
         if (destination && broker) {
           await server.setConnectionContextPublic(destination, broker);
         }

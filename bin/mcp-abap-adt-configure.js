@@ -166,8 +166,8 @@ for (const client of options.clients) {
       );
       break;
     case "codex":
-      if (options.transport !== "stdio") {
-        fail("Codex supports only stdio transport.");
+      if (options.transport === "sse") {
+        fail("Codex does not support SSE transport.");
       }
       writeCodexConfig(getCodexPath(platform, home, userProfile), options.name, serverArgs);
       break;
@@ -314,6 +314,7 @@ function writeJsonConfig(filePath, serverName, argsArray, clientType) {
     data.mcpServers[serverName] = {
       command: options.command,
       args: argsArray,
+      timeout: options.timeout,
       disabled:
         options.disabled ||
         (getDefaultDisabled(clientType) ? true : undefined),
@@ -373,6 +374,7 @@ function writeClaudeConfig(filePath, serverName, argsArray) {
       type: "stdio",
       command: options.command,
       args: argsArray,
+      timeout: options.timeout,
       env: {},
     };
   } else {
@@ -426,11 +428,24 @@ function writeCodexConfig(filePath, serverName, argsArray) {
     );
   }
 
-  data.mcp_servers[serverName] = {
-    command: options.command,
-    args: argsArray,
-    enabled: options.disabled ? false : defaultEnabled,
-  };
+  if (options.transport === "stdio") {
+    data.mcp_servers[serverName] = {
+      command: options.command,
+      args: argsArray,
+      startup_timeout_sec: options.timeout,
+      enabled: options.disabled ? false : defaultEnabled,
+    };
+  } else {
+    const entry = {
+      url: options.url,
+      startup_timeout_sec: options.timeout,
+      enabled: options.disabled ? false : defaultEnabled,
+    };
+    if (Object.keys(options.headers).length > 0) {
+      entry.http_headers = options.headers;
+    }
+    data.mcp_servers[serverName] = entry;
+  }
 
   writeFile(filePath, toml.stringify(data));
 }
@@ -474,7 +489,7 @@ function writeGooseConfig(filePath, serverName, argsArray) {
       args: argsArray,
       type: "stdio",
       enabled,
-      timeout: 300,
+      timeout: options.timeout,
     };
   } else {
     const gooseType =

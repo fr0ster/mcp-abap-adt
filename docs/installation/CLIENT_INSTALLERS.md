@@ -18,6 +18,8 @@ mcp-abap-adt-configure --client claude --mcp TRIAL --name abap --project /home/u
 mcp-abap-adt-configure --client codex --name abap --remove
 mcp-abap-adt-configure --client cline --name direct-jwt-test-001 --transport http --url http://localhost:4004/mcp/stream/http --header x-sap-url=https://... --header x-sap-client=210 --header x-sap-auth-type=jwt --header x-sap-jwt-token=...
 mcp-abap-adt-configure --client cline --name local-mcp-sse --transport sse --url http://localhost:3001/sse
+mcp-abap-adt-configure --client codex --name abap-http --transport http --url http://localhost:3000/mcp/stream/http
+mcp-abap-adt-configure --client codex --name abap-http --transport http --url http://localhost:3000/mcp/stream/http --header x-mcp-destination=trial
 ```
 
 ## Common Tasks
@@ -59,7 +61,7 @@ Options:
 - `--config <path>`: override client config path (optional for Claude on Linux; default: `~/.claude.json`)
 - `--url <http(s)://...>`: required for `sse` and `http`
 - `--header key=value`: add request header (repeatable)
-- `--timeout <seconds>`: request timeout for http/sse (default: 60)
+- `--timeout <seconds>`: timeout value for client entries (default: 60)
 - `--disable`: disable server entry (Codex: `enabled = false`, Cline: `disabled = true`)
 - `--enable`: enable server entry (Codex: `enabled = true`, Cline: `disabled = false`)
 - `--remove`: remove server entry from client config
@@ -70,7 +72,9 @@ Notes:
 - Cursor ignores enable/disable via `mcp.json`; use `--remove` instead.
 - New entries for Cline, Codex, Windsurf, and Goose are added **disabled by default**. Use `--enable` to turn them on.
 - `--enable`/`--disable` only work if the server entry already exists. Use add commands with `--env` or `--mcp` first.
-- Non-stdio transports are supported for Cline/Cursor/Windsurf/Claude/Goose. Codex is stdio-only.
+- Non-stdio transports are supported for Cline/Cursor/Windsurf/Claude/Goose. Codex supports `http` (streamable HTTP) but not `sse`.
+- Codex writes custom headers under `http_headers` in `~/.codex/config.toml`.
+- Codex HTTP entries include `startup_timeout_sec` (default: 60).
 - `--dry-run`: print changes without writing files
 - `--force`: overwrite existing server entry if it exists
 

@@ -71,6 +71,7 @@ Notes:
 - `--env`/`--mcp` are only valid for `stdio` transport. For `sse/http`, use `--url` and optional `--header`.
 - Cursor ignores enable/disable via `mcp.json`; use `--remove` instead.
 - New entries for Cline, Codex, Windsurf, and Goose are added **disabled by default**. Use `--enable` to turn them on.
+- Windsurf follows `disabled` like Cline. The configurator sets `disabled = true` for default-disabled entries.
 - `--enable`/`--disable` only work if the server entry already exists. Use add commands with `--env` or `--mcp` first.
 - Non-stdio transports are supported for Cline/Cursor/Windsurf/Claude/Goose. Codex supports `http` (streamable HTTP) but not `sse`.
 - Codex writes custom headers under `http_headers` in `~/.codex/config.toml`.

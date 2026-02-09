@@ -292,8 +292,8 @@ function writeJsonConfig(filePath, serverName, argsArray, clientType) {
     }
     data.mcpServers[serverName] = {
       ...data.mcpServers[serverName],
-      disabled: options.disabled || undefined,
     };
+    data.mcpServers[serverName].disabled = options.disabled ? true : false;
     writeFile(filePath, JSON.stringify(data, null, 2));
     return;
   }
@@ -315,10 +315,9 @@ function writeJsonConfig(filePath, serverName, argsArray, clientType) {
       command: options.command,
       args: argsArray,
       timeout: options.timeout,
-      disabled:
-        options.disabled ||
-        (getDefaultDisabled(clientType) ? true : undefined),
     };
+    data.mcpServers[serverName].disabled =
+      options.disabled || getDefaultDisabled(clientType) ? true : false;
   } else {
     const entry = {
       type: options.transport,
@@ -329,9 +328,7 @@ function writeJsonConfig(filePath, serverName, argsArray, clientType) {
       entry.headers = options.headers;
     }
     const defaultDisabled = getDefaultDisabled(clientType);
-    if (options.disabled || defaultDisabled) {
-      entry.disabled = true;
-    }
+    entry.disabled = options.disabled || defaultDisabled ? true : false;
     data.mcpServers[serverName] = entry;
   }
   writeFile(filePath, JSON.stringify(data, null, 2));

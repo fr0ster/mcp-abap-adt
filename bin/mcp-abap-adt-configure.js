@@ -276,7 +276,7 @@ function getWindsurfPath(platformValue, homeDir, userProfileDir) {
 }
 
 function getDefaultDisabled(clientType) {
-  return ["cline", "codex", "windsurf", "goose"].includes(clientType);
+  return ["cline", "codex", "windsurf", "goose", "claude"].includes(clientType);
 }
 
 function writeJsonConfig(filePath, serverName, argsArray, clientType) {
@@ -337,53 +337,179 @@ function writeJsonConfig(filePath, serverName, argsArray, clientType) {
 function writeClaudeConfig(filePath, serverName, argsArray) {
   ensureDir(filePath);
   const data = readJson(filePath);
+  const isDesktopConfig =
+    filePath.endsWith(".claude.json") ||
+    filePath.endsWith("claude_desktop_config.json");
   if (!options.project) {
     options.project = process.cwd();
   }
-  data.projects = data.projects || {};
-  if (!data.projects[options.project]) {
-    data.projects[options.project] = {
-      allowedTools: [],
-      mcpContextUris: [],
-      mcpServers: {},
-    };
-  }
-  data.projects[options.project].mcpServers =
-    data.projects[options.project].mcpServers || {};
-  if (options.toggle) {
-    fail("Claude does not support enable/disable. Use --remove instead.");
-  }
-  if (options.remove) {
-    if (!data.projects[options.project].mcpServers[serverName]) {
-      fail(`Server "${serverName}" not found for ${options.project}.`);
+  const resolveProjectKey = () => {
+    const desired = options.project;
+    if (!data.projects || data.projects[desired]) {
+      return desired;
     }
-    delete data.projects[options.project].mcpServers[serverName];
+    let desiredReal;
+    try {
+      desiredReal = fs.realpathSync(desired);
+    } catch {
+      return desired;
+    }
+    const keys = Object.keys(data.projects || {});
+    for (const key of keys) {
+      try {
+        if (fs.realpathSync(key) === desiredReal) {
+          return key;
+        }
+      } catch {
+        // ignore invalid paths
+      }
+    }
+    return desired;
+  };
+  const updateClaudeMcpLists = (projectNode) => {
+    projectNode.enabledMcpServers = projectNode.enabledMcpServers || [];
+    projectNode.disabledMcpServers = projectNode.disabledMcpServers || [];
+    // Migrate legacy keys if present
+    if (projectNode.enabledMcpjsonServers?.length) {
+      for (const name of projectNode.enabledMcpjsonServers) {
+        if (!projectNode.enabledMcpServers.includes(name)) {
+          projectNode.enabledMcpServers.push(name);
+        }
+      }
+    }
+    if (projectNode.disabledMcpjsonServers?.length) {
+      for (const name of projectNode.disabledMcpjsonServers) {
+        if (!projectNode.disabledMcpServers.includes(name)) {
+          projectNode.disabledMcpServers.push(name);
+        }
+      }
+    }
+    const enabled = projectNode.enabledMcpServers;
+    const disabled = projectNode.disabledMcpServers;
+    const shouldDisable = options.toggle
+      ? options.disabled
+      : options.disabled || getDefaultDisabled("claude");
+    const removeFrom = (list) => {
+      const idx = list.indexOf(serverName);
+      if (idx >= 0) {
+        list.splice(idx, 1);
+      }
+    };
+    if (shouldDisable) {
+      removeFrom(enabled);
+      if (!disabled.includes(serverName)) {
+        disabled.push(serverName);
+      }
+    } else {
+      removeFrom(disabled);
+      if (!enabled.includes(serverName)) {
+        enabled.push(serverName);
+      }
+    }
+  };
+  if (options.remove) {
+    if (isDesktopConfig) {
+      if (!data.projects?.[options.project]?.mcpServers?.[serverName]) {
+        fail(`Server "${serverName}" not found for ${options.project}.`);
+      }
+      delete data.projects[options.project].mcpServers[serverName];
+      const projectNode = data.projects[options.project];
+      projectNode.enabledMcpjsonServers =
+        projectNode.enabledMcpjsonServers?.filter(
+          (name) => name !== serverName
+        ) || [];
+      projectNode.disabledMcpjsonServers =
+        projectNode.disabledMcpjsonServers?.filter(
+          (name) => name !== serverName
+        ) || [];
+    } else {
+      data.mcpServers = data.mcpServers || {};
+      if (!data.mcpServers[serverName]) {
+        fail(`Server "${serverName}" not found in ${filePath}.`);
+      }
+      delete data.mcpServers[serverName];
+    }
     writeFile(filePath, JSON.stringify(data, null, 2));
     return;
   }
-  if (data.projects[options.project].mcpServers[serverName] && !options.force) {
-    fail(
-      `Server "${serverName}" already exists for ${options.project}. Use --force to overwrite.`
-    );
+  if (options.toggle && !isDesktopConfig) {
+    fail("Claude enable/disable requires the main Claude config file.");
   }
-  if (options.transport === "stdio") {
-    data.projects[options.project].mcpServers[serverName] = {
-      type: "stdio",
-      command: options.command,
-      args: argsArray,
-      timeout: options.timeout,
-      env: {},
-    };
-  } else {
-    const entry = {
-      type: options.transport,
-      url: options.url,
-      timeout: options.timeout,
-    };
-    if (Object.keys(options.headers).length > 0) {
-      entry.headers = options.headers;
+  if (isDesktopConfig) {
+    data.projects = data.projects || {};
+    const projectKey = resolveProjectKey();
+    if (!data.projects[projectKey]) {
+      data.projects[projectKey] = {
+        allowedTools: [],
+        mcpContextUris: [],
+        mcpServers: {},
+        enabledMcpServers: [],
+        disabledMcpServers: [],
+      };
     }
-    data.projects[options.project].mcpServers[serverName] = entry;
+    data.projects[projectKey].enabledMcpServers =
+      data.projects[projectKey].enabledMcpServers || [];
+    data.projects[projectKey].disabledMcpServers =
+      data.projects[projectKey].disabledMcpServers || [];
+    data.projects[projectKey].mcpServers =
+      data.projects[projectKey].mcpServers || {};
+    if (options.toggle) {
+      if (!data.projects[projectKey].mcpServers[serverName]) {
+        fail(`Server "${serverName}" not found for ${projectKey}.`);
+      }
+      updateClaudeMcpLists(data.projects[projectKey]);
+      writeFile(filePath, JSON.stringify(data, null, 2));
+      return;
+    }
+    if (data.projects[projectKey].mcpServers[serverName] && !options.force) {
+      fail(
+        `Server "${serverName}" already exists for ${projectKey}. Use --force to overwrite.`
+      );
+    }
+    if (options.transport === "stdio") {
+      data.projects[projectKey].mcpServers[serverName] = {
+        type: "stdio",
+        command: options.command,
+        args: argsArray,
+        timeout: options.timeout,
+        env: {},
+      };
+    } else {
+      const entry = {
+        type: options.transport === "streamableHttp" ? "http" : options.transport,
+        url: options.url,
+        timeout: options.timeout,
+      };
+      if (Object.keys(options.headers).length > 0) {
+        entry.headers = options.headers;
+      }
+      data.projects[projectKey].mcpServers[serverName] = entry;
+    }
+    updateClaudeMcpLists(data.projects[projectKey]);
+  } else {
+    data.mcpServers = data.mcpServers || {};
+    if (data.mcpServers[serverName] && !options.force) {
+      fail(
+        `Server "${serverName}" already exists in ${filePath}. Use --force to overwrite.`
+      );
+    }
+    if (options.transport === "stdio") {
+      data.mcpServers[serverName] = {
+        command: options.command,
+        args: argsArray,
+        timeout: options.timeout,
+      };
+    } else {
+      const entry = {
+        type: options.transport,
+        url: options.url,
+        timeout: options.timeout,
+      };
+      if (Object.keys(options.headers).length > 0) {
+        entry.headers = options.headers;
+      }
+      data.mcpServers[serverName] = entry;
+    }
   }
   writeFile(filePath, JSON.stringify(data, null, 2));
 }

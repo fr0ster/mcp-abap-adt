@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "abap": {
+      "command": "mcp-abap-adt",
+      "args": [
+        "--transport=stdio",
+        "--mcp=trial"
+      ],
+      "timeout": 60
+    }
+  }
+}

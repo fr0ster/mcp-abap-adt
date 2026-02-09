@@ -57,20 +57,21 @@ Options:
 - `--name <serverName>`: MCP server name (required)
 - `--transport <type>`: `stdio`, `sse`, or `http` (`http` maps to `streamableHttp`)
 - `--command <bin>`: command to run (default: `mcp-abap-adt`)
-- `--project <path>`: project path for Claude Desktop (defaults to current directory)
-- `--config <path>`: override client config path (optional for Claude on Linux; default: `~/.claude.json`)
+- `--project <path>`: project path for Claude (defaults to current directory). If the path is a symlink, the configurator matches existing Claude project entries by real path.
+- `--config <path>`: override client config path (Claude Desktop or custom; default: `~/.claude.json` on Linux)
 - `--url <http(s)://...>`: required for `sse` and `http`
 - `--header key=value`: add request header (repeatable)
 - `--timeout <seconds>`: timeout value for client entries (default: 60)
-- `--disable`: disable server entry (Codex: `enabled = false`, Cline: `disabled = true`)
-- `--enable`: enable server entry (Codex: `enabled = true`, Cline: `disabled = false`)
+- `--disable`: disable server entry (Codex: `enabled = false`, Cline/Windsurf: `disabled = true`, Claude: moves name to `disabledMcpjsonServers`)
+- `--enable`: enable server entry (Codex: `enabled = true`, Cline/Windsurf: `disabled = false`, Claude: moves name to `enabledMcpjsonServers`)
 - `--remove`: remove server entry from client config
 
 Notes:
 - `--disable` and `--remove` do not require `--env` or `--mcp`.
 - `--env`/`--mcp` are only valid for `stdio` transport. For `sse/http`, use `--url` and optional `--header`.
 - Cursor ignores enable/disable via `mcp.json`; use `--remove` instead.
-- New entries for Cline, Codex, Windsurf, and Goose are added **disabled by default**. Use `--enable` to turn them on.
+- Claude stores enable/disable state under `enabledMcpServers` and `disabledMcpServers` for each project.
+- New entries for Cline, Codex, Windsurf, Goose, and Claude are added **disabled by default**. Use `--enable` to turn them on.
 - Windsurf follows `disabled` like Cline. The configurator sets `disabled = true` for default-disabled entries.
 - `--enable`/`--disable` only work if the server entry already exists. Use add commands with `--env` or `--mcp` first.
 - Non-stdio transports are supported for Cline/Cursor/Windsurf/Claude/Goose. Codex supports `http` (streamable HTTP) but not `sse`.
@@ -89,6 +90,9 @@ Paths are client-specific and OS-dependent. The installer writes config files in
 - **Codex**:
   - Linux/macOS: `~/.codex/config.toml`
   - Windows: `%USERPROFILE%\.codex\config.toml`
+- **Claude Code (CLI)**:
+  - Linux default: `~/.claude.json` (per-project entries under `projects.<path>.mcpServers`)
+  - Use `--config` to target a specific file (e.g. `.mcp.json`)
 - **Claude Desktop**:
   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`

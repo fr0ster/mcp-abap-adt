@@ -127,6 +127,7 @@
     "@mcp-abap-adt/interfaces": "^0.2.15",
     "@mcp-abap-adt/logger": "^0.1.4",
     "@modelcontextprotocol/sdk": "^1.26.0",
+    "@iarna/toml": "^2.2.5",
     "axios": "^1.13.5",
     "fast-xml-parser": "^5.3.5",
     "js-yaml": "^4.1.1",
@@ -149,7 +150,8 @@
   ],
   "bin": {
     "mcp-abap-adt": "./bin/mcp-abap-adt.js",
-    "mcp-abap-adt-v2": "./bin/mcp-abap-adt-v2.js"
+    "mcp-abap-adt-v2": "./bin/mcp-abap-adt-v2.js",
+    "mcp-abap-adt-configure": "./bin/mcp-abap-adt-configure.js"
   },
   "jest": {
     "preset": "ts-jest",

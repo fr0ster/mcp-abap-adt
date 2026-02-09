@@ -49,6 +49,7 @@ Documentation for developers: testing, development guides, and internal document
 - **User Configuration**: [Client Configuration](user-guide/CLIENT_CONFIGURATION.md)
 - **Server Configuration**: [YAML Config](configuration/YAML_CONFIG.md) | [CLI Options](user-guide/CLI_OPTIONS.md)
 - **Deployment**: [MCP Registry](deployment/MCP_REGISTRY.md) | [Docker](deployment/DOCKER.md)
+- **Client Configuration**: [Auto-Configure](installation/CLIENT_INSTALLERS.md)
 - **Available Tools**: [Tools List](user-guide/AVAILABLE_TOOLS.md)
 - **Architecture**: [Stateful Sessions](architecture/STATEFUL_SESSION_GUIDE.md) | [Architecture Docs](architecture/README.md)
 - **Development**: [Development Documentation](development/)

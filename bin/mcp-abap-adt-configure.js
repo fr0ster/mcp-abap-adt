@@ -179,9 +179,6 @@ for (const client of options.clients) {
       );
       break;
     case "goose":
-      if (options.transport !== "stdio") {
-        fail("Goose supports only stdio transport.");
-      }
       writeGooseConfig(
         getGoosePath(platform, home, appData),
         options.name,
@@ -469,14 +466,36 @@ function writeGooseConfig(filePath, serverName, argsArray) {
       `Server "${serverName}" already exists in ${filePath}. Use --force to overwrite.`
     );
   }
-  data.extensions[serverName] = {
-    name: "MCP ABAP ADT",
-    cmd: options.command,
-    args: argsArray,
-    type: "stdio",
-    enabled: options.disabled ? false : !getDefaultDisabled("goose"),
-    timeout: 300,
-  };
+  const enabled = options.disabled ? false : !getDefaultDisabled("goose");
+  if (options.transport === "stdio") {
+    data.extensions[serverName] = {
+      name: "MCP ABAP ADT",
+      cmd: options.command,
+      args: argsArray,
+      type: "stdio",
+      enabled,
+      timeout: 300,
+    };
+  } else {
+    const gooseType =
+      options.transport === "sse" ? "sse" : "streamable_http";
+    const entry = {
+      name: serverName,
+      description: "Abap ADT MCP",
+      type: gooseType,
+      uri: options.url,
+      enabled,
+      timeout: options.timeout,
+      envs: {},
+      env_keys: [],
+      available_tools: [],
+      bundled: null,
+    };
+    if (Object.keys(options.headers).length > 0) {
+      entry.headers = options.headers;
+    }
+    data.extensions[serverName] = entry;
+  }
   writeFile(filePath, yaml.stringify(data));
 }
 

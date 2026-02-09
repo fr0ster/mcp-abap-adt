@@ -70,7 +70,7 @@ Notes:
 - Cursor ignores enable/disable via `mcp.json`; use `--remove` instead.
 - New entries for Cline, Codex, Windsurf, and Goose are added **disabled by default**. Use `--enable` to turn them on.
 - `--enable`/`--disable` only work if the server entry already exists. Use add commands with `--env` or `--mcp` first.
- - Non-stdio transports are supported for Cline/Cursor/Windsurf/Claude. Codex/Goose are stdio-only.
+- Non-stdio transports are supported for Cline/Cursor/Windsurf/Claude/Goose. Codex is stdio-only.
 - `--dry-run`: print changes without writing files
 - `--force`: overwrite existing server entry if it exists
 

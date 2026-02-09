@@ -14,7 +14,7 @@ npm install -g @mcp-abap-adt/core
 mcp-abap-adt-configure --client cline --env /path/to/.env --name abap
 mcp-abap-adt-configure --client cline --mcp TRIAL --name abap
 mcp-abap-adt-configure --client cline --env /path/to/.env --name abap --transport stdio
-mcp-abap-adt-configure --client claude --mcp TRIAL --name abap --project /home/user/prj/myproj
+mcp-abap-adt-configure --client claude --mcp TRIAL --name abap
 mcp-abap-adt-configure --client codex --name abap --remove
 mcp-abap-adt-configure --client cline --name direct-jwt-test-001 --transport http --url http://localhost:4004/mcp/stream/http --header x-sap-url=https://... --header x-sap-client=210 --header x-sap-auth-type=jwt --header x-sap-jwt-token=...
 mcp-abap-adt-configure --client cline --name local-mcp-sse --transport sse --url http://localhost:3001/sse
@@ -29,7 +29,7 @@ Add MCP:
 ```bash
 mcp-abap-adt-configure --client codex --mcp TRIAL --name abap
 mcp-abap-adt-configure --client cline --env /path/to/.env --name abap
-mcp-abap-adt-configure --client claude --mcp TRIAL --name abap --project /home/user/prj/myproj
+mcp-abap-adt-configure --client claude --mcp TRIAL --name abap
 ```
 
 Disable MCP:
@@ -48,29 +48,27 @@ Remove MCP:
 ```bash
 mcp-abap-adt-configure --client codex --name abap --remove
 mcp-abap-adt-configure --client cline --name abap --remove
-mcp-abap-adt-configure --client claude --name abap --project /home/user/prj/myproj --remove
+mcp-abap-adt-configure --client claude --name abap --remove
 ```
 
 Options:
-- `--client <name>` (repeatable): `cline`, `codex`, `claude`, `goose`, `cursor`, `windsurf`, `opencode`
+- `--client <name>` (repeatable): `cline`, `codex`, `claude`, `goose`, `cursor`, `windsurf`, `opencode`, `copilot`
 - `--env <path>`: use a specific `.env` file
 - `--mcp <destination>`: use service key destination
 - `--name <serverName>`: MCP server name (required)
 - `--transport <type>`: `stdio`, `sse`, or `http` (`http` maps to `streamableHttp`)
 - `--command <bin>`: command to run (default: `mcp-abap-adt`)
-- `--project <path>`: project path for Claude/OpenCode (defaults to current directory). If the path is a symlink, the configurator matches existing Claude project entries by real path.
-- `--config <path>`: override client config path (Claude Desktop or custom; OpenCode uses it as `opencode.json` path)
 - `--url <http(s)://...>`: required for `sse` and `http`
 - `--header key=value`: add request header (repeatable)
 - `--timeout <seconds>`: timeout value for client entries (default: 60)
-- `--disable`: disable server entry (Codex/OpenCode: `enabled = false`, Cline/Windsurf: `disabled = true`, Claude: moves name to `disabledMcpServers`)
-- `--enable`: enable server entry (Codex/OpenCode: `enabled = true`, Cline/Windsurf: `disabled = false`, Claude: moves name to `enabledMcpServers`)
+- `--disable`: disable server entry (Codex/OpenCode: `enabled = false`, Cline/Windsurf: `disabled = true`, Claude: moves name to `disabledMcpServers`; not Cursor/Copilot)
+- `--enable`: enable server entry (Codex/OpenCode: `enabled = true`, Cline/Windsurf: `disabled = false`, Claude: moves name to `enabledMcpServers`; not Cursor/Copilot)
 - `--remove`: remove server entry from client config
 
 Notes:
 - `--disable` and `--remove` do not require `--env` or `--mcp`.
 - `--env`/`--mcp` are only valid for `stdio` transport. For `sse/http`, use `--url` and optional `--header`.
-- Cursor ignores enable/disable via `mcp.json`; use `--remove` instead.
+- Cursor/Copilot enable/disable are not implemented yet.
 - Claude stores enable/disable state under `enabledMcpServers` and `disabledMcpServers` for each project.
 - New entries for Cline, Codex, Windsurf, Goose, Claude, and OpenCode are added **disabled by default**. Use `--enable` to turn them on.
 - Windsurf follows `disabled` like Cline. The configurator sets `disabled = true` for default-disabled entries.
@@ -92,8 +90,7 @@ Paths are client-specific and OS-dependent. The installer writes config files in
   - Linux/macOS: `~/.codex/config.toml`
   - Windows: `%USERPROFILE%\.codex\config.toml`
 - **Claude Code (CLI)**:
-  - Linux default: `~/.claude.json` (per-project entries under `projects.<path>.mcpServers`)
-  - Use `--config` to target a specific file (e.g. `.mcp.json`)
+  - Linux default: `~/.claude.json` (per-project entries under `projects.<cwd>.mcpServers`)
 - **Claude Desktop**:
   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
@@ -108,3 +105,5 @@ Paths are client-specific and OS-dependent. The installer writes config files in
   - Windows: `%USERPROFILE%\.codeium\windsurf\mcp_config.json`
 - **OpenCode**:
   - Project: `./opencode.json` (uses `mcp.<name>` entries with `enabled: true|false`)
+- **GitHub Copilot**:
+  - Project: `./.vscode/mcp.json` (uses `servers.<name>` entries)

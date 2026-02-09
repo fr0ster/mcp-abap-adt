@@ -31,14 +31,12 @@ const options = {
   command: "mcp-abap-adt",
   dryRun: false,
   force: false,
-  project: null,
   disabled: false,
   toggle: false,
   remove: false,
   url: null,
   headers: {},
   timeout: 60,
-  configPath: null,
 };
 
 if (args.includes("--help") || args.includes("-h")) {
@@ -78,12 +76,6 @@ for (let i = 0; i < args.length; i += 1) {
     i += 1;
   } else if (arg === "--timeout") {
     options.timeout = Number(args[i + 1]);
-    i += 1;
-  } else if (arg === "--project") {
-    options.project = args[i + 1];
-    i += 1;
-  } else if (arg === "--config") {
-    options.configPath = args[i + 1];
     i += 1;
   } else if (arg === "--disable") {
     options.disabled = true;
@@ -173,7 +165,7 @@ for (const client of options.clients) {
       break;
     case "claude":
       writeClaudeConfig(
-        getClaudePath(platform, home, appData, options.configPath),
+        getClaudePath(platform, home, appData),
         options.name,
         serverArgs
       );
@@ -186,12 +178,10 @@ for (const client of options.clients) {
       );
       break;
     case "opencode":
-      writeJsonConfig(
-        getOpenCodePath(options.configPath, options.project),
-        options.name,
-        serverArgs,
-        "opencode"
-      );
+      writeJsonConfig(getOpenCodePath(), options.name, serverArgs, "opencode");
+      break;
+    case "copilot":
+      writeJsonConfig(getCopilotPath(), options.name, serverArgs, "copilot");
       break;
     case "cursor":
       writeJsonConfig(
@@ -245,10 +235,7 @@ function getCodexPath(platformValue, homeDir, userProfileDir) {
   return path.join(homeDir, ".codex", "config.toml");
 }
 
-function getClaudePath(platformValue, homeDir, appDataDir, overridePath) {
-  if (overridePath) {
-    return overridePath;
-  }
+function getClaudePath(platformValue, homeDir, appDataDir) {
   if (platformValue === "darwin") {
     return path.join(
       homeDir,
@@ -276,12 +263,12 @@ function getCursorPath(_platformValue, homeDir, userProfileDir) {
   return path.join(base, ".cursor", "mcp.json");
 }
 
-function getOpenCodePath(overridePath, projectPath) {
-  if (overridePath) {
-    return overridePath;
-  }
-  const baseDir = projectPath || process.cwd();
-  return path.join(baseDir, "opencode.json");
+function getCopilotPath() {
+  return path.join(process.cwd(), ".vscode", "mcp.json");
+}
+
+function getOpenCodePath() {
+  return path.join(process.cwd(), "opencode.json");
 }
 
 function getWindsurfPath(platformValue, homeDir, userProfileDir) {
@@ -300,14 +287,24 @@ function writeJsonConfig(filePath, serverName, argsArray, clientType) {
   const data = readJson(filePath);
   if (clientType === "opencode") {
     data.mcp = data.mcp || {};
+  } else if (clientType === "copilot") {
+    data.servers = data.servers || {};
+    data.inputs = data.inputs || [];
   } else {
     data.mcpServers = data.mcpServers || {};
   }
-  if (options.toggle && clientType === "cursor") {
-    fail("Cursor does not support enable/disable. Use --remove instead.");
-  }
   if (options.toggle) {
-    const store = clientType === "opencode" ? data.mcp : data.mcpServers;
+    if (clientType === "cursor" || clientType === "copilot") {
+      fail(
+        `${clientType === "cursor" ? "Cursor" : "GitHub Copilot"} enable/disable is not implemented yet.`
+      );
+    }
+    const store =
+      clientType === "opencode"
+        ? data.mcp
+        : clientType === "copilot"
+          ? data.servers
+          : data.mcpServers;
     if (!store[serverName]) {
       fail(`Server "${serverName}" not found in ${filePath}.`);
     }
@@ -323,7 +320,12 @@ function writeJsonConfig(filePath, serverName, argsArray, clientType) {
     return;
   }
   if (options.remove) {
-    const store = clientType === "opencode" ? data.mcp : data.mcpServers;
+    const store =
+      clientType === "opencode"
+        ? data.mcp
+        : clientType === "copilot"
+          ? data.servers
+          : data.mcpServers;
     if (!store[serverName]) {
       fail(`Server "${serverName}" not found in ${filePath}.`);
     }
@@ -331,7 +333,12 @@ function writeJsonConfig(filePath, serverName, argsArray, clientType) {
     writeFile(filePath, JSON.stringify(data, null, 2));
     return;
   }
-  const store = clientType === "opencode" ? data.mcp : data.mcpServers;
+  const store =
+    clientType === "opencode"
+      ? data.mcp
+      : clientType === "copilot"
+        ? data.servers
+        : data.mcpServers;
   if (store[serverName] && !options.force) {
     fail(
       `Server "${serverName}" already exists in ${filePath}. Use --force to overwrite.`
@@ -352,6 +359,26 @@ function writeJsonConfig(filePath, serverName, argsArray, clientType) {
         url: options.url,
         enabled,
       };
+    }
+    writeFile(filePath, JSON.stringify(data, null, 2));
+    return;
+  }
+  if (clientType === "copilot") {
+    if (options.transport === "stdio") {
+      store[serverName] = {
+        type: "stdio",
+        command: options.command,
+        args: argsArray,
+      };
+    } else {
+      const entry = {
+        type: options.transport === "streamableHttp" ? "http" : options.transport,
+        url: options.url,
+      };
+      if (Object.keys(options.headers).length > 0) {
+        entry.headers = options.headers;
+      }
+      store[serverName] = entry;
     }
     writeFile(filePath, JSON.stringify(data, null, 2));
     return;
@@ -386,11 +413,9 @@ function writeClaudeConfig(filePath, serverName, argsArray) {
   const isDesktopConfig =
     filePath.endsWith(".claude.json") ||
     filePath.endsWith("claude_desktop_config.json");
-  if (!options.project) {
-    options.project = process.cwd();
-  }
+  const projectPath = process.cwd();
   const resolveProjectKey = () => {
-    const desired = options.project;
+    const desired = projectPath;
     if (!data.projects || data.projects[desired]) {
       return desired;
     }
@@ -760,25 +785,23 @@ Usage:
   mcp-abap-adt-configure --client <name> --name <serverName> [--env <path> | --mcp <dest>] [options]
 
 Options:
-  --client <name>       cline | codex | claude | goose | cursor | windsurf | opencode (repeatable)
+  --client <name>       cline | codex | claude | goose | cursor | windsurf | opencode | copilot (repeatable)
   --name <serverName>   required MCP server name key
   --env <path>          .env path (add/update only)
   --mcp <dest>          destination name (add/update only)
   --transport <type>    stdio | sse | http (http => streamableHttp)
   --command <bin>       command to run (default: mcp-abap-adt)
-  --project <path>      Claude project path (defaults to cwd)
-  --config <path>       override client config path (Claude Linux)
   --url <http(s)://...> required for sse/http
   --header key=value    add request header (repeatable)
-  --timeout <seconds>   http/sse timeout (default: 60)
-  --disable             disable entry (Codex/Cline/Windsurf/Goose only)
-  --enable              enable entry (Codex/Cline/Windsurf/Goose only)
+  --timeout <seconds>   entry timeout (default: 60)
+  --disable             disable entry (Codex/OpenCode/Cline/Windsurf/Goose/Claude; not Cursor/Copilot)
+  --enable              enable entry (Codex/OpenCode/Cline/Windsurf/Goose/Claude; not Cursor/Copilot)
   --remove              remove entry
   --force               overwrite existing entry (add/update)
   --dry-run             print changes without writing files
   -h, --help            show this help
 
 Notes:
-  New entries for Cline/Codex/Windsurf/Goose are added disabled by default.
+  New entries for Cline/Codex/Windsurf/Goose/Claude/OpenCode are added disabled by default.
 `);
 }

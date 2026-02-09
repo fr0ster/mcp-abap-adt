@@ -39,6 +39,50 @@ await server.connect(transport);
 2. **Configure**: See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md)
 3. **Use**: See [Available Tools](docs/user-guide/AVAILABLE_TOOLS.md)
 
+## Smithery (Local stdio)
+
+This project ships a `smithery.yaml` that runs the server locally via `npx -y @mcp-abap-adt/core` (stdio transport).
+
+Smithery requires exactly one of these config fields:
+- `envPath` → maps to `--env=<path>` (use a specific `.env` file)
+- `mcpDestination` → maps to `--mcp=<destination>` (use service keys/auth-broker)
+
+Minimal parameter docs:
+- `--env` is documented in [CLI Options](docs/user-guide/CLI_OPTIONS.md#environment-file-configuration)
+- `--mcp` (auth-broker destination) is documented in [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication)
+
+### Smithery CLI examples
+
+**Codex:**
+```bash
+npx -y @smithery/cli install mcp-abap-adt --client codex
+```
+
+**Cline:**
+```bash
+npx -y @smithery/cli install mcp-abap-adt --client cline
+```
+
+**Claude:**
+```bash
+npx -y @smithery/cli install mcp-abap-adt --client claude
+```
+
+**Crush:**
+```bash
+npx -y @smithery/cli install mcp-abap-adt --client crush
+```
+
+**Goose:**
+```bash
+npx -y @smithery/cli install mcp-abap-adt --client goose
+```
+
+If a client name is not accepted by your CLI version, run:
+```bash
+npx -y @smithery/cli install --help
+```
+
 ## Features
 
 - **🏗️ Domain Management**: `GetDomain`, `CreateDomain`, `UpdateDomain` - Create, retrieve, and update ABAP domains

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [2.1.8] - 2026-02-09
+### Added
+- **MCP Registry metadata**: Added `server.json` and `mcpName` for registry publishing.
+- **Smithery sandbox entry**: Added `src/smithery-entry.ts` for capability scanning without real credentials.
+
+### Changed
+- **Default logger loading**: Lazy-load logger to avoid bundler issues with optional transports.
+- **Smithery config**: Updated `smithery.yaml` to support `--env` or `--mcp` via `npx` stdio command.
+
 ## [2.1.7] - 2026-01-29
 ### Fixed
 - **UpdateLocalTestClass**: Added detailed SAP error information for 409 conflict errors to improve troubleshooting (#6)

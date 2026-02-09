@@ -1,5 +1,5 @@
+import { createRequire } from 'node:module';
 import type { Logger } from '@mcp-abap-adt/logger';
-import { defaultLogger } from '@mcp-abap-adt/logger';
 
 /**
  * Create a prefixed logger for handlers.
@@ -8,20 +8,21 @@ import { defaultLogger } from '@mcp-abap-adt/logger';
  */
 export function getHandlerLogger(
   category: string,
-  baseLogger: Logger = defaultLogger,
+  baseLogger?: Logger,
 ): Logger {
   if (process.env.HANDLER_LOG_SILENT === 'true') {
     return noopLogger;
   }
+  const resolvedLogger = baseLogger ?? getDefaultLogger();
   const prefix = `[${category}]`;
   const wrap = (fn: (msg: string) => void) => (msg: string) =>
     fn(`${prefix} ${msg}`);
 
   return {
-    info: wrap(baseLogger?.info.bind(baseLogger)),
-    debug: wrap(baseLogger?.debug.bind(baseLogger)),
-    warn: wrap(baseLogger?.warn.bind(baseLogger)),
-    error: wrap(baseLogger?.error.bind(baseLogger)),
+    info: wrap(resolvedLogger?.info.bind(resolvedLogger)),
+    debug: wrap(resolvedLogger?.debug.bind(resolvedLogger)),
+    warn: wrap(resolvedLogger?.warn.bind(resolvedLogger)),
+    error: wrap(resolvedLogger?.error.bind(resolvedLogger)),
   };
 }
 
@@ -32,3 +33,9 @@ export const noopLogger: Logger = {
   warn: noopFn,
   error: noopFn,
 };
+
+function getDefaultLogger(): Logger {
+  const require = createRequire(__filename);
+  const mod = require('@mcp-abap-adt/logger');
+  return mod.defaultLogger ?? new mod.DefaultLogger();
+}

@@ -1,9 +1,10 @@
+import { createRequire } from 'node:module';
 import type { AuthBroker } from '@mcp-abap-adt/auth-broker';
 import {
   type AbapConnection,
   createAbapConnection,
 } from '@mcp-abap-adt/connection';
-import { defaultLogger, type Logger } from '@mcp-abap-adt/logger';
+import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
 import type { IHandlersRegistry } from '../lib/handlers/interfaces.js';
@@ -39,7 +40,7 @@ export abstract class BaseMcpServer extends McpServer {
 
   constructor(options: { name: string; version?: string; logger?: Logger }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
-    this.logger = options.logger ?? defaultLogger;
+    this.logger = options.logger ?? getDefaultLogger();
   }
 
   /**
@@ -124,12 +125,19 @@ export abstract class BaseMcpServer extends McpServer {
    * Sets connection context from HTTP headers (direct SAP connection, no broker)
    * Used when x-sap-url + auth headers are provided
    */
-  protected setConnectionContextFromHeaders(headers: any): void {
-    const url = headers['x-sap-url'] || headers['X-SAP-URL'];
-    const jwtToken = headers['x-sap-jwt-token'] || headers['X-SAP-JWT-Token'];
-    const username = headers['x-sap-login'] || headers['X-SAP-Login'];
-    const password = headers['x-sap-password'] || headers['X-SAP-Password'];
-    const client = headers['x-sap-client'] || headers['X-SAP-Client'] || '';
+  protected setConnectionContextFromHeaders(
+    headers: Record<string, string | string[] | undefined>,
+  ): void {
+    const getHeader = (name: string): string | undefined => {
+      const value = headers[name] ?? headers[name.toUpperCase()];
+      return Array.isArray(value) ? value[0] : value;
+    };
+
+    const url = getHeader('x-sap-url');
+    const jwtToken = getHeader('x-sap-jwt-token');
+    const username = getHeader('x-sap-login');
+    const password = getHeader('x-sap-password');
+    const client = getHeader('x-sap-client') || '';
 
     if (!url) {
       throw new Error('x-sap-url header is required for direct SAP connection');
@@ -233,7 +241,13 @@ export abstract class BaseMcpServer extends McpServer {
         for (const entry of handlers) {
           // Wrap handler to inject connection from context
           // Original handler: (context: HandlerContext, args: any) => Promise<any>
-          const wrappedHandler = async (args: any) => {
+          type HandlerFnWithContext = (
+            context: HandlerContext,
+            args: unknown,
+          ) => Promise<unknown>;
+          type HandlerFnArgsOnly = (args: unknown) => Promise<unknown>;
+
+          const wrappedHandler = async (args: unknown) => {
             // Get connection from context (this.connectionContext)
             // Token will be automatically refreshed via AuthBroker if needed
             const context: HandlerContext = {
@@ -244,43 +258,64 @@ export abstract class BaseMcpServer extends McpServer {
             // If handler expects context+args (preferred), pass both.
             // Otherwise, update group context and call with args only for backward compatibility.
             // NOTE: Always await the handler result to ensure we get the resolved value for normalization
-            let handlerPromise: Promise<any>;
-            if ((entry.handler as any).length >= 2) {
-              handlerPromise = (entry.handler as any)(context, args);
+            let handlerPromise: Promise<unknown>;
+            if ((entry.handler as HandlerFnWithContext).length >= 2) {
+              handlerPromise = (entry.handler as HandlerFnWithContext)(
+                context,
+                args,
+              );
             } else {
               try {
-                if (typeof (group as any).setContext === 'function') {
-                  (group as any).setContext(context);
+                const contextAwareGroup = group as Partial<{
+                  setContext: (ctx: HandlerContext) => void;
+                  context: HandlerContext;
+                }>;
+                if (typeof contextAwareGroup.setContext === 'function') {
+                  contextAwareGroup.setContext(context);
                 } else {
-                  (group as any).context = context;
+                  contextAwareGroup.context = context;
                 }
               } catch {
                 // ignore if group doesn't expose context setter
               }
-              handlerPromise = (entry.handler as any)(args);
+              handlerPromise = (entry.handler as HandlerFnArgsOnly)(args);
             }
 
             const result = await handlerPromise;
 
             // Handle errors: if handler returns isError, throw McpError
-            if (result?.isError) {
+            type ContentItem = {
+              type?: string;
+              json?: unknown;
+              text?: unknown;
+            };
+            type ToolResult = {
+              isError?: boolean;
+              content?: ContentItem[];
+            };
+
+            if ((result as ToolResult | undefined)?.isError) {
               const { ErrorCode, McpError } = await import(
                 '@modelcontextprotocol/sdk/types.js'
               );
               const errorText =
-                (result.content || [])
-                  .map((item: any) => {
+                ((result as ToolResult | undefined)?.content || [])
+                  .map((item) => {
                     if (item?.type === 'json' && item.json !== undefined) {
                       return JSON.stringify(item.json);
                     }
-                    return item?.text || String(item);
+                    return item?.text !== undefined
+                      ? String(item.text)
+                      : String(item);
                   })
                   .join('\n') || 'Unknown error';
               throw new McpError(ErrorCode.InternalError, errorText);
             }
 
             // Normalize content: SDK expects text/image/audio/resource, convert custom json to text
-            const content = (result?.content || []).map((item: any) => {
+            const content = (
+              (result as ToolResult | undefined)?.content || []
+            ).map((item) => {
               if (item?.type === 'json' && item.json !== undefined) {
                 return {
                   type: 'text' as const,
@@ -290,7 +325,10 @@ export abstract class BaseMcpServer extends McpServer {
               // Ensure all items have proper text type structure
               return {
                 type: 'text' as const,
-                text: item?.text || String(item || ''),
+                text:
+                  item?.text !== undefined
+                    ? String(item.text)
+                    : String(item || ''),
               };
             });
 
@@ -324,4 +362,10 @@ export abstract class BaseMcpServer extends McpServer {
       handlersRegistry.registerAllTools(this);
     }
   }
+}
+
+function getDefaultLogger(): Logger {
+  const require = createRequire(__filename);
+  const mod = require('@mcp-abap-adt/logger');
+  return mod.defaultLogger ?? new mod.DefaultLogger();
 }

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.fr0ster/mcp-abap-adt",
+  "description": "Embedded ABAP ADT MCP server tailored for the Cloud LLM Hub stack",
+  "repository": {
+    "url": "https://github.com/fr0ster/mcp-abap-adt",
+    "source": "github"
+  },
+  "version": "2.1.8",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@mcp-abap-adt/core",
+      "version": "2.1.8",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

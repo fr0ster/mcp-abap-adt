@@ -5,25 +5,25 @@ startCommand:
   configSchema:
     # JSON Schema defining the configuration options for the MCP.
     type: object
-    required:
-      - sapUrl
-      - sapUsername
-      - sapPassword
-      - sapClient
     properties:
-      sapUrl:
+      envPath:
         type: string
-        description: The URL of the SAP system.
-      sapUsername:
+        description: Path to a .env file with SAP_* variables (on-prem or BTP).
+      mcpDestination:
         type: string
-        description: The username for the SAP system.
-      sapPassword:
-        type: string
-        description: The password for the SAP system.
-      sapClient:
-        type: string
-        description: The SAP client number.
+        description: MCP destination name for service key auth (uses ~/.config/mcp-abap-adt/service-keys/{destination}.json).
+    oneOf:
+      - required: [envPath]
+      - required: [mcpDestination]
   commandFunction:
     # A function that produces the CLI command to start the MCP on stdio.
     |-
-    (config) => ({command:'node', args:['./dist/index.js'], env:{SAP_URL:config.sapUrl, SAP_USERNAME:config.sapUsername, SAP_PASSWORD:config.sapPassword, SAP_CLIENT:config.sapClient}})
+    (config) => {
+      const args = ['-y', '@mcp-abap-adt/core', '--transport=stdio'];
+      if (config.envPath) args.push(`--env=${config.envPath}`);
+      if (config.mcpDestination) args.push(`--mcp=${config.mcpDestination}`);
+      return {command:'npx', args};
+    }
+assets:
+  - source: node_modules/pino/lib/worker.js
+    destination: lib/worker.js

@@ -11,6 +11,11 @@ This directory contains documentation for deploying and releasing MCP ABAP ADT S
   - Multi-stage builds
   - Production best practices
 
+- **[MCP_REGISTRY.md](./MCP_REGISTRY.md)** - MCP Registry publishing
+  - `server.json` and `mcpName` metadata
+  - Publish with `mcp-publisher`
+  - Verification steps
+
 - **[RELEASE.md](./RELEASE.md)** - Release process documentation
   - Automated releases via GitHub Actions
   - Manual release process

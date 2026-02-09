@@ -83,6 +83,10 @@ If a client name is not accepted by your CLI version, run:
 npx -y @smithery/cli install --help
 ```
 
+## MCP Registry
+
+Published in the official MCP Registry. See `docs/deployment/MCP_REGISTRY.md` for full details.
+
 ## Features
 
 - **🏗️ Domain Management**: `GetDomain`, `CreateDomain`, `UpdateDomain` - Create, retrieve, and update ABAP domains

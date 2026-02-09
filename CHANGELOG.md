@@ -2,14 +2,16 @@
 
 ## [Unreleased]
 
-## [2.1.8] - 2026-02-09
+## [2.2.0] - 2026-02-09
 ### Added
 - **MCP Registry metadata**: Added `server.json` and `mcpName` for registry publishing.
-- **Smithery sandbox entry**: Added `src/smithery-entry.ts` for capability scanning without real credentials.
+- **Client configurator**: Added `mcp-abap-adt-configure` to add/enable/disable/remove MCP entries across clients.
+- **Auto-config docs**: Added `docs/installation/CLIENT_INSTALLERS.md` with usage and common tasks.
 
 ### Changed
 - **Default logger loading**: Lazy-load logger to avoid bundler issues with optional transports.
-- **Smithery config**: Updated `smithery.yaml` to support `--env` or `--mcp` via `npx` stdio command.
+- **Claude config**: Write MCP settings under `projects.<full_path>.mcpServers` for Claude CLI on Linux.
+- **Config defaults**: New entries for Cline/Codex/Windsurf/Goose are disabled by default; enable explicitly.
 
 ## [2.1.7] - 2026-01-29
 ### Fixed

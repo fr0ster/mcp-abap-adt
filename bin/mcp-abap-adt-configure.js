@@ -132,7 +132,8 @@ for (const client of options.clients) {
       writeJsonConfig(
         getClinePath(platform, home, appData),
         options.name,
-        serverArgs
+        serverArgs,
+        "cline"
       );
       break;
     case "codex":
@@ -156,14 +157,16 @@ for (const client of options.clients) {
       writeJsonConfig(
         getCursorPath(platform, home, userProfile),
         options.name,
-        serverArgs
+        serverArgs,
+        "cursor"
       );
       break;
     case "windsurf":
       writeJsonConfig(
         getWindsurfPath(platform, home, userProfile),
         options.name,
-        serverArgs
+        serverArgs,
+        "windsurf"
       );
       break;
     default:
@@ -240,10 +243,17 @@ function getWindsurfPath(platformValue, homeDir, userProfileDir) {
   return path.join(homeDir, ".codeium", "windsurf", "mcp_config.json");
 }
 
-function writeJsonConfig(filePath, serverName, argsArray) {
+function getDefaultDisabled(clientType) {
+  return ["cline", "codex", "windsurf", "goose"].includes(clientType);
+}
+
+function writeJsonConfig(filePath, serverName, argsArray, clientType) {
   ensureDir(filePath);
   const data = readJson(filePath);
   data.mcpServers = data.mcpServers || {};
+  if (options.toggle && clientType === "cursor") {
+    fail("Cursor does not support enable/disable. Use --remove instead.");
+  }
   if (options.toggle) {
     if (!data.mcpServers[serverName]) {
       fail(`Server "${serverName}" not found in ${filePath}.`);
@@ -271,7 +281,8 @@ function writeJsonConfig(filePath, serverName, argsArray) {
   data.mcpServers[serverName] = {
     command: options.command,
     args: argsArray,
-    disabled: options.disabled || undefined,
+    disabled:
+      options.disabled || (getDefaultDisabled(clientType) ? true : undefined),
   };
   writeFile(filePath, JSON.stringify(data, null, 2));
 }
@@ -325,6 +336,7 @@ function writeCodexConfig(filePath, serverName, argsArray) {
 
   const data = readToml(filePath);
   data.mcp_servers = data.mcp_servers || {};
+  const defaultEnabled = !getDefaultDisabled("codex");
 
   if (options.remove) {
     if (!data.mcp_servers[serverName]) {
@@ -356,7 +368,7 @@ function writeCodexConfig(filePath, serverName, argsArray) {
   data.mcp_servers[serverName] = {
     command: options.command,
     args: argsArray,
-    enabled: !options.disabled,
+    enabled: options.disabled ? false : defaultEnabled,
   };
 
   writeFile(filePath, toml.stringify(data));
@@ -398,7 +410,7 @@ function writeGooseConfig(filePath, serverName, argsArray) {
     cmd: options.command,
     args: argsArray,
     type: "stdio",
-    enabled: !options.disabled,
+    enabled: options.disabled ? false : !getDefaultDisabled("goose"),
     timeout: 300,
   };
   writeFile(filePath, yaml.stringify(data));
@@ -489,11 +501,14 @@ Options:
   --command <bin>       command to run (default: mcp-abap-adt)
   --project <path>      Claude project path (defaults to cwd)
   --config <path>       override client config path (Claude Linux)
-  --disable             disable entry (Codex/Cline/Goose only)
-  --enable              enable entry (Codex/Cline/Goose only)
+  --disable             disable entry (Codex/Cline/Windsurf/Goose only)
+  --enable              enable entry (Codex/Cline/Windsurf/Goose only)
   --remove              remove entry
   --force               overwrite existing entry (add/update)
   --dry-run             print changes without writing files
   -h, --help            show this help
+
+Notes:
+  New entries for Cline/Codex/Windsurf/Goose are added disabled by default.
 `);
 }

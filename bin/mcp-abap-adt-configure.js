@@ -35,6 +35,9 @@ const options = {
   disabled: false,
   toggle: false,
   remove: false,
+  url: null,
+  headers: {},
+  timeout: 60,
   configPath: null,
 };
 
@@ -62,6 +65,19 @@ for (let i = 0; i < args.length; i += 1) {
     i += 1;
   } else if (arg === "--command") {
     options.command = args[i + 1];
+    i += 1;
+  } else if (arg === "--url") {
+    options.url = args[i + 1];
+    i += 1;
+  } else if (arg === "--header") {
+    const [key, ...rest] = (args[i + 1] || "").split("=");
+    if (!key || rest.length === 0) {
+      fail("Header must be in key=value format.");
+    }
+    options.headers[key] = rest.join("=");
+    i += 1;
+  } else if (arg === "--timeout") {
+    options.timeout = Number(args[i + 1]);
     i += 1;
   } else if (arg === "--project") {
     options.project = args[i + 1];
@@ -92,13 +108,13 @@ if (!options.name) {
   fail("Provide --name <serverName> (required).");
 }
 
-if (options.transport !== "stdio") {
-  fail("Only --transport stdio is supported by this installer.");
-}
+const transportNormalized =
+  options.transport === "http" ? "streamableHttp" : options.transport;
+options.transport = transportNormalized;
 
 const requiresConnectionParams = !options.remove && !options.toggle;
 
-if (requiresConnectionParams) {
+if (requiresConnectionParams && options.transport === "stdio") {
   if (!options.envPath && !options.mcpDestination) {
     fail("Provide either --env <path> or --mcp <destination>.");
   }
@@ -108,22 +124,35 @@ if (requiresConnectionParams) {
   }
 }
 
+if (
+  requiresConnectionParams &&
+  options.transport !== "stdio" &&
+  !options.url
+) {
+  fail("Provide --url for non-stdio transports.");
+}
+
+if (options.transport !== "stdio" && (options.envPath || options.mcpDestination)) {
+  fail("--env/--mcp are only valid for stdio transport.");
+}
+
 const platform = process.platform;
 const home = os.homedir();
 const appData =
   process.env.APPDATA || path.join(home, "AppData", "Roaming");
 const userProfile = process.env.USERPROFILE || home;
 
-const serverArgsRaw = options.remove || options.toggle
-  ? []
-  : [
-      `--transport=${options.transport}`,
-      options.envPath
-        ? `--env=${options.envPath}`
-        : options.mcpDestination
-          ? `--mcp=${options.mcpDestination.toLowerCase()}`
-          : undefined,
-    ];
+const serverArgsRaw =
+  options.remove || options.toggle || options.transport !== "stdio"
+    ? []
+    : [
+        `--transport=${options.transport}`,
+        options.envPath
+          ? `--env=${options.envPath}`
+          : options.mcpDestination
+            ? `--mcp=${options.mcpDestination.toLowerCase()}`
+            : undefined,
+      ];
 const serverArgs = serverArgsRaw.filter(Boolean);
 
 for (const client of options.clients) {
@@ -137,6 +166,9 @@ for (const client of options.clients) {
       );
       break;
     case "codex":
+      if (options.transport !== "stdio") {
+        fail("Codex supports only stdio transport.");
+      }
       writeCodexConfig(getCodexPath(platform, home, userProfile), options.name, serverArgs);
       break;
     case "claude":
@@ -147,6 +179,9 @@ for (const client of options.clients) {
       );
       break;
     case "goose":
+      if (options.transport !== "stdio") {
+        fail("Goose supports only stdio transport.");
+      }
       writeGooseConfig(
         getGoosePath(platform, home, appData),
         options.name,
@@ -278,12 +313,29 @@ function writeJsonConfig(filePath, serverName, argsArray, clientType) {
       `Server "${serverName}" already exists in ${filePath}. Use --force to overwrite.`
     );
   }
-  data.mcpServers[serverName] = {
-    command: options.command,
-    args: argsArray,
-    disabled:
-      options.disabled || (getDefaultDisabled(clientType) ? true : undefined),
-  };
+  if (options.transport === "stdio") {
+    data.mcpServers[serverName] = {
+      command: options.command,
+      args: argsArray,
+      disabled:
+        options.disabled ||
+        (getDefaultDisabled(clientType) ? true : undefined),
+    };
+  } else {
+    const entry = {
+      type: options.transport,
+      url: options.url,
+      timeout: options.timeout,
+    };
+    if (Object.keys(options.headers).length > 0) {
+      entry.headers = options.headers;
+    }
+    const defaultDisabled = getDefaultDisabled(clientType);
+    if (options.disabled || defaultDisabled) {
+      entry.disabled = true;
+    }
+    data.mcpServers[serverName] = entry;
+  }
   writeFile(filePath, JSON.stringify(data, null, 2));
 }
 
@@ -319,12 +371,24 @@ function writeClaudeConfig(filePath, serverName, argsArray) {
       `Server "${serverName}" already exists for ${options.project}. Use --force to overwrite.`
     );
   }
-  data.projects[options.project].mcpServers[serverName] = {
-    type: "stdio",
-    command: options.command,
-    args: argsArray,
-    env: {},
-  };
+  if (options.transport === "stdio") {
+    data.projects[options.project].mcpServers[serverName] = {
+      type: "stdio",
+      command: options.command,
+      args: argsArray,
+      env: {},
+    };
+  } else {
+    const entry = {
+      type: options.transport,
+      url: options.url,
+      timeout: options.timeout,
+    };
+    if (Object.keys(options.headers).length > 0) {
+      entry.headers = options.headers;
+    }
+    data.projects[options.project].mcpServers[serverName] = entry;
+  }
   writeFile(filePath, JSON.stringify(data, null, 2));
 }
 
@@ -497,10 +561,13 @@ Options:
   --name <serverName>   required MCP server name key
   --env <path>          .env path (add/update only)
   --mcp <dest>          destination name (add/update only)
-  --transport <type>    only stdio supported
+  --transport <type>    stdio | sse | http (http => streamableHttp)
   --command <bin>       command to run (default: mcp-abap-adt)
   --project <path>      Claude project path (defaults to cwd)
   --config <path>       override client config path (Claude Linux)
+  --url <http(s)://...> required for sse/http
+  --header key=value    add request header (repeatable)
+  --timeout <seconds>   http/sse timeout (default: 60)
   --disable             disable entry (Codex/Cline/Windsurf/Goose only)
   --enable              enable entry (Codex/Cline/Windsurf/Goose only)
   --remove              remove entry

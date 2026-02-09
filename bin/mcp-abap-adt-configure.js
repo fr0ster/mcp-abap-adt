@@ -35,6 +35,7 @@ const options = {
   disabled: false,
   toggle: false,
   remove: false,
+  configPath: null,
 };
 
 for (let i = 0; i < args.length; i += 1) {
@@ -59,6 +60,9 @@ for (let i = 0; i < args.length; i += 1) {
     i += 1;
   } else if (arg === "--project") {
     options.project = args[i + 1];
+    i += 1;
+  } else if (arg === "--config") {
+    options.configPath = args[i + 1];
     i += 1;
   } else if (arg === "--disable") {
     options.disabled = true;
@@ -131,7 +135,7 @@ for (const client of options.clients) {
       break;
     case "claude":
       writeClaudeConfig(
-        getClaudePath(platform, home, appData),
+        getClaudePath(platform, home, appData, options.configPath),
         options.name,
         serverArgs
       );
@@ -193,7 +197,10 @@ function getCodexPath(platformValue, homeDir, userProfileDir) {
   return path.join(homeDir, ".codex", "config.toml");
 }
 
-function getClaudePath(platformValue, homeDir, appDataDir) {
+function getClaudePath(platformValue, homeDir, appDataDir, overridePath) {
+  if (overridePath) {
+    return overridePath;
+  }
   if (platformValue === "darwin") {
     return path.join(
       homeDir,
@@ -206,8 +213,7 @@ function getClaudePath(platformValue, homeDir, appDataDir) {
   if (platformValue === "win32") {
     return path.join(appDataDir, "Claude", "claude_desktop_config.json");
   }
-  fail("Claude Desktop config path is only defined for macOS and Windows.");
-  return "";
+  return path.join(homeDir, ".claude.json");
 }
 
 function getGoosePath(platformValue, homeDir, appDataDir) {
@@ -271,44 +277,37 @@ function writeClaudeConfig(filePath, serverName, argsArray) {
   if (!options.project) {
     options.project = process.cwd();
   }
-  if (!data[options.project]) {
-    data[options.project] = {
+  data.projects = data.projects || {};
+  if (!data.projects[options.project]) {
+    data.projects[options.project] = {
       allowedTools: [],
       mcpContextUris: [],
       mcpServers: {},
     };
   }
-  data[options.project].mcpServers = data[options.project].mcpServers || {};
+  data.projects[options.project].mcpServers =
+    data.projects[options.project].mcpServers || {};
   if (options.toggle) {
-    if (!data[options.project].mcpServers[serverName]) {
-      fail(`Server "${serverName}" not found for ${options.project}.`);
-    }
-    data[options.project].mcpServers[serverName] = {
-      ...data[options.project].mcpServers[serverName],
-      disabled: options.disabled || undefined,
-    };
-    writeFile(filePath, JSON.stringify(data, null, 2));
-    return;
+    fail("Claude does not support enable/disable. Use --remove instead.");
   }
   if (options.remove) {
-    if (!data[options.project].mcpServers[serverName]) {
+    if (!data.projects[options.project].mcpServers[serverName]) {
       fail(`Server "${serverName}" not found for ${options.project}.`);
     }
-    delete data[options.project].mcpServers[serverName];
+    delete data.projects[options.project].mcpServers[serverName];
     writeFile(filePath, JSON.stringify(data, null, 2));
     return;
   }
-  if (data[options.project].mcpServers[serverName] && !options.force) {
+  if (data.projects[options.project].mcpServers[serverName] && !options.force) {
     fail(
       `Server "${serverName}" already exists for ${options.project}. Use --force to overwrite.`
     );
   }
-  data[options.project].mcpServers[serverName] = {
+  data.projects[options.project].mcpServers[serverName] = {
     type: "stdio",
     command: options.command,
     args: argsArray,
     env: {},
-    disabled: options.disabled || undefined,
   };
   writeFile(filePath, JSON.stringify(data, null, 2));
 }

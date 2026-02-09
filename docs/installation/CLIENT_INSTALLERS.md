@@ -31,14 +31,12 @@ Disable MCP:
 ```bash
 mcp-abap-adt-configure --client codex --name abap --disable
 mcp-abap-adt-configure --client cline --name abap --disable
-mcp-abap-adt-configure --client claude --name abap --project /home/user/prj/myproj --disable
 ```
 
 Enable MCP:
 ```bash
 mcp-abap-adt-configure --client codex --name abap --enable
 mcp-abap-adt-configure --client cline --name abap --enable
-mcp-abap-adt-configure --client claude --name abap --project /home/user/prj/myproj --enable
 ```
 
 Remove MCP:
@@ -56,6 +54,7 @@ Options:
 - `--transport <type>`: transport type (only `stdio` supported)
 - `--command <bin>`: command to run (default: `mcp-abap-adt`)
 - `--project <path>`: project path for Claude Desktop (defaults to current directory)
+- `--config <path>`: override client config path (optional for Claude on Linux; default: `~/.claude.json`)
 - `--disable`: disable server entry (Codex: `enabled = false`, Cline: `disabled = true`)
 - `--enable`: enable server entry (Codex: `enabled = true`, Cline: `disabled = false`)
 - `--remove`: remove server entry from client config

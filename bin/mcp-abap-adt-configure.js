@@ -604,7 +604,7 @@ function writeGooseConfig(filePath, serverName, argsArray) {
       `Server "${serverName}" already exists in ${filePath}. Use --force to overwrite.`
     );
   }
-  const enabled = options.disabled ? false : !getDefaultDisabled("goose");
+  const enabled = options.disabled ? false : false;
   if (options.transport === "stdio") {
     data.extensions[serverName] = {
       name: "MCP ABAP ADT",

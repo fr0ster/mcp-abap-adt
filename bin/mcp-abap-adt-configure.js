@@ -185,6 +185,14 @@ for (const client of options.clients) {
         serverArgs
       );
       break;
+    case "opencode":
+      writeJsonConfig(
+        getOpenCodePath(options.configPath, options.project),
+        options.name,
+        serverArgs,
+        "opencode"
+      );
+      break;
     case "cursor":
       writeJsonConfig(
         getCursorPath(platform, home, userProfile),
@@ -268,6 +276,14 @@ function getCursorPath(_platformValue, homeDir, userProfileDir) {
   return path.join(base, ".cursor", "mcp.json");
 }
 
+function getOpenCodePath(overridePath, projectPath) {
+  if (overridePath) {
+    return overridePath;
+  }
+  const baseDir = projectPath || process.cwd();
+  return path.join(baseDir, "opencode.json");
+}
+
 function getWindsurfPath(platformValue, homeDir, userProfileDir) {
   if (platformValue === "win32") {
     return path.join(userProfileDir, ".codeium", "windsurf", "mcp_config.json");
@@ -276,39 +292,69 @@ function getWindsurfPath(platformValue, homeDir, userProfileDir) {
 }
 
 function getDefaultDisabled(clientType) {
-  return ["cline", "codex", "windsurf", "goose", "claude"].includes(clientType);
+  return ["cline", "codex", "windsurf", "goose", "claude", "opencode"].includes(clientType);
 }
 
 function writeJsonConfig(filePath, serverName, argsArray, clientType) {
   ensureDir(filePath);
   const data = readJson(filePath);
-  data.mcpServers = data.mcpServers || {};
+  if (clientType === "opencode") {
+    data.mcp = data.mcp || {};
+  } else {
+    data.mcpServers = data.mcpServers || {};
+  }
   if (options.toggle && clientType === "cursor") {
     fail("Cursor does not support enable/disable. Use --remove instead.");
   }
   if (options.toggle) {
-    if (!data.mcpServers[serverName]) {
+    const store = clientType === "opencode" ? data.mcp : data.mcpServers;
+    if (!store[serverName]) {
       fail(`Server "${serverName}" not found in ${filePath}.`);
     }
-    data.mcpServers[serverName] = {
-      ...data.mcpServers[serverName],
+    store[serverName] = {
+      ...store[serverName],
     };
-    data.mcpServers[serverName].disabled = options.disabled ? true : false;
+    if (clientType === "opencode") {
+      store[serverName].enabled = options.disabled ? false : true;
+    } else {
+      store[serverName].disabled = options.disabled ? true : false;
+    }
     writeFile(filePath, JSON.stringify(data, null, 2));
     return;
   }
   if (options.remove) {
-    if (!data.mcpServers[serverName]) {
+    const store = clientType === "opencode" ? data.mcp : data.mcpServers;
+    if (!store[serverName]) {
       fail(`Server "${serverName}" not found in ${filePath}.`);
     }
-    delete data.mcpServers[serverName];
+    delete store[serverName];
     writeFile(filePath, JSON.stringify(data, null, 2));
     return;
   }
-  if (data.mcpServers[serverName] && !options.force) {
+  const store = clientType === "opencode" ? data.mcp : data.mcpServers;
+  if (store[serverName] && !options.force) {
     fail(
       `Server "${serverName}" already exists in ${filePath}. Use --force to overwrite.`
     );
+  }
+  if (clientType === "opencode") {
+    const enabled = options.disabled ? false : !getDefaultDisabled("opencode");
+    if (options.transport === "stdio") {
+      store[serverName] = {
+        type: "local",
+        command: options.command,
+        args: argsArray,
+        enabled,
+      };
+    } else {
+      store[serverName] = {
+        type: "remote",
+        url: options.url,
+        enabled,
+      };
+    }
+    writeFile(filePath, JSON.stringify(data, null, 2));
+    return;
   }
   if (options.transport === "stdio") {
     data.mcpServers[serverName] = {
@@ -714,7 +760,7 @@ Usage:
   mcp-abap-adt-configure --client <name> --name <serverName> [--env <path> | --mcp <dest>] [options]
 
 Options:
-  --client <name>       cline | codex | claude | goose | cursor | windsurf (repeatable)
+  --client <name>       cline | codex | claude | goose | cursor | windsurf | opencode (repeatable)
   --name <serverName>   required MCP server name key
   --env <path>          .env path (add/update only)
   --mcp <dest>          destination name (add/update only)

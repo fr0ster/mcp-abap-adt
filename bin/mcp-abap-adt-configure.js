@@ -38,6 +38,11 @@ const options = {
   configPath: null,
 };
 
+if (args.includes("--help") || args.includes("-h")) {
+  printHelp();
+  process.exit(0);
+}
+
 for (let i = 0; i < args.length; i += 1) {
   const arg = args[i];
   if (arg === "--client") {
@@ -467,4 +472,28 @@ function escapeRegex(value) {
 function fail(message) {
   process.stderr.write(`${message}\n`);
   process.exit(1);
+}
+
+function printHelp() {
+  process.stdout.write(`mcp-abap-adt-configure
+
+Usage:
+  mcp-abap-adt-configure --client <name> --name <serverName> [--env <path> | --mcp <dest>] [options]
+
+Options:
+  --client <name>       cline | codex | claude | goose | cursor | windsurf (repeatable)
+  --name <serverName>   required MCP server name key
+  --env <path>          .env path (add/update only)
+  --mcp <dest>          destination name (add/update only)
+  --transport <type>    only stdio supported
+  --command <bin>       command to run (default: mcp-abap-adt)
+  --project <path>      Claude project path (defaults to cwd)
+  --config <path>       override client config path (Claude Linux)
+  --disable             disable entry (Codex/Cline/Goose only)
+  --enable              enable entry (Codex/Cline/Goose only)
+  --remove              remove entry
+  --force               overwrite existing entry (add/update)
+  --dry-run             print changes without writing files
+  -h, --help            show this help
+`);
 }

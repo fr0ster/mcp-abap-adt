@@ -69,6 +69,7 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly defaultDestination?: string;
   private readonly path: string;
   private readonly externalApp?: IHttpApplication;
+  private readonly version: string;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -80,6 +81,7 @@ export class StreamableHttpServer extends BaseMcpServer {
       version: opts?.version ?? DEFAULT_VERSION,
       logger: opts?.logger ?? noopLogger,
     });
+    this.version = opts?.version ?? DEFAULT_VERSION;
     this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3000;
     this.enableJsonResponse = opts?.enableJsonResponse ?? true;
@@ -105,8 +107,11 @@ export class StreamableHttpServer extends BaseMcpServer {
       );
 
       try {
+        const server = this.createPerRequestServer();
         let destination: string | undefined;
-        let broker: any;
+        let broker: Awaited<
+          ReturnType<AuthBrokerFactory['getOrCreateAuthBroker']>
+        >;
 
         // Priority 1: Check x-mcp-destination header
         const destinationHeader =
@@ -124,7 +129,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           // No destination, no broker - create connection directly from headers
           destination = undefined;
           broker = undefined;
-          this.setConnectionContextFromHeaders(req.headers);
+          server.setConnectionContextFromHeadersPublic(req.headers);
         }
         // Priority 3: Use default destination
         else if (this.defaultDestination) {
@@ -138,7 +143,7 @@ export class StreamableHttpServer extends BaseMcpServer {
 
         // Set connection context only if we have destination or broker
         if (destination && broker) {
-          await this.setConnectionContext(destination, broker);
+          await server.setConnectionContextPublic(destination, broker);
         }
 
         const transport = new StreamableHTTPServerTransport({
@@ -150,7 +155,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           void transport.close();
         });
 
-        await this.connect(transport);
+        await server.connect(transport);
         await transport.handleRequest(req, res, req.body);
       } catch (err) {
         console.error('[StreamableHttpServer] Error handling request:', err);
@@ -175,12 +180,12 @@ export class StreamableHttpServer extends BaseMcpServer {
     const handler = this.createRequestHandler();
 
     // Only handle POST requests - GET SSE streams cause abort errors on disconnect
-    app.post(this.path, handler as any);
+    app.post(this.path, handler);
 
     // Return 405 for other methods to avoid SSE stream issues
-    app.all(this.path, ((_req: Request, res: Response) => {
+    app.all(this.path, (_req: Request, res: Response) => {
       res.status(405).send('Method Not Allowed');
-    }) as any);
+    });
 
     console.error(
       `[StreamableHttpServer] Routes registered on external app at ${this.path}`,
@@ -239,7 +244,9 @@ export class StreamableHttpServer extends BaseMcpServer {
   /**
    * Check if request has SAP connection headers
    */
-  private hasSapConnectionHeaders(headers: any): boolean {
+  private hasSapConnectionHeaders(
+    headers: Record<string, string | string[] | undefined>,
+  ): boolean {
     const hasUrl = headers['x-sap-url'] || headers['X-SAP-URL'];
     const hasJwtAuth = headers['x-sap-jwt-token'] || headers['X-SAP-JWT-Token'];
     const hasBasicAuth =
@@ -247,5 +254,48 @@ export class StreamableHttpServer extends BaseMcpServer {
       (headers['x-sap-password'] || headers['X-SAP-Password']);
 
     return !!(hasUrl && (hasJwtAuth || hasBasicAuth));
+  }
+
+  private createPerRequestServer(): {
+    connect: BaseMcpServer['connect'];
+    setConnectionContextPublic: (
+      destination: string,
+      broker: Awaited<ReturnType<AuthBrokerFactory['getOrCreateAuthBroker']>>,
+    ) => Promise<void>;
+    setConnectionContextFromHeadersPublic: (
+      headers: Record<string, string | string[] | undefined>,
+    ) => void;
+  } {
+    class PerRequestServer extends BaseMcpServer {
+      constructor(
+        private readonly registry: IHandlersRegistry,
+        version: string,
+        logger: Logger,
+      ) {
+        super({ name: 'mcp-abap-adt', version, logger });
+        this.registerHandlers(this.registry);
+      }
+
+      public setConnectionContextPublic(
+        destination: string,
+        broker: Awaited<ReturnType<AuthBrokerFactory['getOrCreateAuthBroker']>>,
+      ): Promise<void> {
+        if (!broker) {
+          return Promise.resolve();
+        }
+        return this.setConnectionContext(destination, broker);
+      }
+
+      public setConnectionContextFromHeadersPublic(
+        headers: Record<string, string | string[] | undefined>,
+      ): void {
+        this.setConnectionContextFromHeaders(headers);
+      }
+    }
+    return new PerRequestServer(
+      this.handlersRegistry,
+      this.version,
+      this.logger,
+    );
   }
 }

@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [2.2.2] - 2026-02-10
+## [2.2.3] - 2026-02-10
 ### Added
 - **Docs**: Added dedicated Terminology and Authentication guides, with links from README.
 
@@ -11,9 +11,20 @@
 - **Docs structure**: Moved GitHub configuration README into deployment docs and fixed internal links.
 - **Client configuration docs**: Linked to the configurator repo and usage guide.
 
-## [2.2.1] - 2026-02-10
+## [2.2.2] - 2026-02-10
+### Added
+- **Client support**: Added OpenCode and Copilot configuration support.
+- **Claude config**: Added `.mcp.json` project configuration and docs.
+- **Configurator options**: Added URL, headers, and timeout options in `mcp-abap-adt-configure`.
+
 ### Changed
 - **Configurator split**: Removed `mcp-abap-adt-configure` from core. Use `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`) with `mcp-conf` instead.
+- **Codex/Goose handling**: Improved transport handling and timeout defaults for non-stdio transports.
+- **Default-disabled entries**: Updated JSON config handling and docs to keep new entries disabled by default.
+- **Streamable HTTP**: Refactored server handling for per-request connections.
+
+### Fixed
+- **Goose config**: Corrected enabled state handling in `writeGooseConfig`.
 
 ## [2.2.0] - 2026-02-09
 ### Added

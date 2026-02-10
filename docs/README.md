@@ -59,6 +59,7 @@ Documentation for developers: testing, development guides, and internal document
 - **User Configuration**: [Client Configuration](user-guide/CLIENT_CONFIGURATION.md)
 - **Authentication**: [Destinations & Auth](user-guide/AUTHENTICATION.md)
 - **Terminology**: [Project Terms](user-guide/TERMINOLOGY.md)
+- **Handlers Management**: [Handler Groups](user-guide/HANDLERS_MANAGEMENT.md)
 - **Server Configuration**: [YAML Config](configuration/YAML_CONFIG.md) | [CLI Options](user-guide/CLI_OPTIONS.md)
 - **Deployment**: [MCP Registry](deployment/MCP_REGISTRY.md) | [Docker](deployment/DOCKER.md)
 - **Available Tools**: [Tools List](user-guide/AVAILABLE_TOOLS.md)

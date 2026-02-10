@@ -128,6 +128,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Installation Guide](docs/installation/README.md)** - Installation overview and platform guides
 - **[User Guide](docs/user-guide/README.md)** - End-user docs (auth, config, tools)
 - **[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md)** - Destination-based auth and service keys
+- **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups
 - **Configurator**: `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`) provides the `mcp-conf` CLI to auto-configure clients
 - **[Available Tools](docs/user-guide/AVAILABLE_TOOLS.md)** - Complete list of available MCP tools
 

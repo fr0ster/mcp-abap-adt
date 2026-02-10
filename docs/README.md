@@ -17,6 +17,7 @@ Complete installation instructions for different platforms and environments.
 Documentation for end users: configuration, usage, and available tools.
 
 - `CLIENT_CONFIGURATION.md` - How to configure MCP clients to connect to the server
+- Configurator (auto-config): `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`)
 - `AVAILABLE_TOOLS.md` - Complete list of available MCP tools and their descriptions
 - `CLI_OPTIONS.md` - Complete command-line options reference
 
@@ -49,7 +50,6 @@ Documentation for developers: testing, development guides, and internal document
 - **User Configuration**: [Client Configuration](user-guide/CLIENT_CONFIGURATION.md)
 - **Server Configuration**: [YAML Config](configuration/YAML_CONFIG.md) | [CLI Options](user-guide/CLI_OPTIONS.md)
 - **Deployment**: [MCP Registry](deployment/MCP_REGISTRY.md) | [Docker](deployment/DOCKER.md)
-- **Client Configuration**: [Auto-Configure](installation/CLIENT_INSTALLERS.md)
 - **Available Tools**: [Tools List](user-guide/AVAILABLE_TOOLS.md)
 - **Architecture**: [Stateful Sessions](architecture/STATEFUL_SESSION_GUIDE.md) | [Architecture Docs](architecture/README.md)
 - **Development**: [Development Documentation](development/)

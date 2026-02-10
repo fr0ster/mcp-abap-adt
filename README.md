@@ -8,6 +8,22 @@
 
 This project provides a server that allows you to interact with SAP ABAP systems using the Model Context Protocol (MCP). Think of it as a bridge that lets tools like [Cline](https://marketplace.visualstudio.com/items?itemName=saoudrizwan.claude-dev) (a VS Code extension) talk to your ABAP system and retrieve information like source code, table structures, and more.
 
+## Configure Clients Fast (Recommended)
+
+Use the configurator to generate client config files instead of hand‑editing JSON/TOML:
+
+```bash
+npm install -g @mcp-abap-adt/configurator
+
+# stdio (destination)
+mcp-conf --client cline --name abap --mcp TRIAL
+
+# HTTP (streamable HTTP)
+mcp-conf --client copilot --name abap --transport http --url http://localhost:3000/mcp/stream/http --header x-mcp-destination=trial
+```
+
+Full usage: `docs/CLIENT_INSTALLERS.md` in the `mcp-abap-adt-conf` repo.
+
 ## Architecture
 
 The project provides two main usage patterns:
@@ -35,9 +51,10 @@ await server.connect(transport);
 
 ## Quick Start
 
-1. **Install**: See [Installation Guide](docs/installation/INSTALLATION.md)
-2. **Configure**: See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md)
-3. **Use**: See [Available Tools](docs/user-guide/AVAILABLE_TOOLS.md)
+1. **Install server**: See [Installation Guide](docs/installation/INSTALLATION.md)
+2. **Configure client (auto)**: Use `mcp-conf` from `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`)
+3. **Configure client (manual)**: See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md)
+4. **Use**: See [Available Tools](docs/user-guide/AVAILABLE_TOOLS.md)
 
 ## MCP Registry
 
@@ -70,6 +87,7 @@ Published in the official MCP Registry. See `docs/deployment/MCP_REGISTRY.md` fo
 ### For Users
 - **[Installation Guide](docs/installation/INSTALLATION.md)** - Installation instructions for all platforms
 - **[Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md)** - How to configure MCP clients
+- **Configurator**: `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`) provides the `mcp-conf` CLI to auto-configure clients.
 - **[Available Tools](docs/user-guide/AVAILABLE_TOOLS.md)** - Complete list of available MCP tools
 
 ### For Administrators

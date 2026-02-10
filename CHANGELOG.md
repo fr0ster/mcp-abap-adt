@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-02-10
+### Changed
+- **Configurator split**: Removed `mcp-abap-adt-configure` from core. Use `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`) with `mcp-conf` instead.
+
 ## [2.2.0] - 2026-02-09
 ### Added
 - **MCP Registry metadata**: Added `server.json` and `mcpName` for registry publishing.

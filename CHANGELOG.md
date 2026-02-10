@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [2.2.2] - 2026-02-10
+### Added
+- **Docs**: Added dedicated Terminology and Authentication guides, with links from README.
+
+### Changed
+- **README**: Reworked first-screen content and links to emphasize configurator usage and destinations.
+- **Docs structure**: Moved GitHub configuration README into deployment docs and fixed internal links.
+- **Client configuration docs**: Linked to the configurator repo and usage guide.
+
 ## [2.2.1] - 2026-02-10
 ### Changed
 - **Configurator split**: Removed `mcp-abap-adt-configure` from core. Use `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`) with `mcp-conf` instead.

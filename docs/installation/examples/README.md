@@ -82,7 +82,7 @@ Use `cline-http-service-key-npx-config.json` for destination-based authenticatio
    **Note**: 
    - The `--auth-broker` flag forces use of auth-broker (service keys), ignoring any `.env` file
    - By default (without `--env` or `--auth-broker`), the server uses `.env` from current directory if it exists, otherwise uses auth-broker
-   - Auth-broker is only available for HTTP/streamable-http transport (not for stdio/SSE)
+   - Auth-broker is available for stdio/SSE via `--mcp=<destination>` and for HTTP via destination headers
 
 3. **Use config** with destination header:
    ```json

@@ -2,6 +2,9 @@
 
 This guide explains how to configure MCP clients to connect to the `mcp-abap-adt` server.
 
+If you prefer not to edit JSON/TOML by hand, use the configurator CLI:
+`@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`, docs: https://github.com/fr0ster/mcp-abap-adt-conf/tree/main/docs/CLIENT_INSTALLERS.md).
+
 ## Overview
 
 The `mcp-abap-adt` server supports multiple transport modes:

@@ -1,6 +1,12 @@
 # mcp-abap-adt: Your Gateway to ABAP Development Tools (ADT)
 
-This project provides a server that allows you to interact with SAP ABAP systems using the Model Context Protocol (MCP). Think of it as a bridge that lets tools like [Cline](https://marketplace.visualstudio.com/items?itemName=saoudrizwan.claude-dev) (a VS Code extension) talk to your ABAP system and retrieve information like source code, table structures, and more.
+This project provides a server that allows you to interact with SAP ABAP systems using the Model Context Protocol (MCP). It connects AI clients to real ADT capabilities: read, analyze, and modify ABAP artifacts with a consistent, secure interface.
+
+**Why teams use it:**
+- Works with **on‑prem** and **BTP** ABAP systems
+- **Destination‑based auth** (service keys) so you stop pasting tokens everywhere
+- Multiple transports: **stdio**, **HTTP**, **SSE**
+- Rich tool surface for ABAP objects, metadata, transports, and search
 
 **Authorization & Destinations (Important):** A *destination* is the filename of a service key stored locally. You place service keys in the service-keys directory, and use `--mcp=<destination>` to select which one to use. This is the primary auth model for on‑prem and BTP systems. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 

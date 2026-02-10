@@ -88,7 +88,7 @@ mcp-auth auth -k path/to/service-key.json
 **Run the server:**
 ```bash
 # Default HTTP mode (uses auth-broker by default, even if .env exists)
-# Note: auth-broker is only available for HTTP/streamable-http transport
+# Note: auth-broker is available for stdio/SSE via `--mcp=<destination>` and for HTTP via destination headers
 mcp-abap-adt
 
 # Force use of auth-broker (service keys), ignore .env file

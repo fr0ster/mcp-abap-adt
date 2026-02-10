@@ -1,18 +1,31 @@
 # mcp-abap-adt: Your Gateway to ABAP Development Tools (ADT)
 
-<a href="https://glama.ai/mcp/servers/@fr0ster/mcp-abap-adt">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@fr0ster/mcp-abap-adt/badge" />
-</a>
-
 > **Acknowledgment**: This project was originally inspired by [mario-andreschak/mcp-abap-adt](https://github.com/mario-andreschak/mcp-abap-adt). We started with the core concept and then evolved it into an independent project with our own architecture and features.
 
 This project provides a server that allows you to interact with SAP ABAP systems using the Model Context Protocol (MCP). Think of it as a bridge that lets tools like [Cline](https://marketplace.visualstudio.com/items?itemName=saoudrizwan.claude-dev) (a VS Code extension) talk to your ABAP system and retrieve information like source code, table structures, and more.
 
-## Configure Clients Fast (Recommended)
+**Authorization & Destinations (Important):** A *destination* is the filename of a service key stored locally. You place service keys in the service-keys directory, and use `--mcp=<destination>` to select which one to use. This is the primary auth model for on‑prem and BTP systems. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 
-Use the configurator to generate client config files instead of hand‑editing JSON/TOML:
+You can configure MCP clients either manually (JSON/TOML) or via the configurator CLI (`@mcp-abap-adt/configurator`, repo: `mcp-abap-adt-conf`).
+
+## Table of Contents
+
+1. [Getting Started](#getting-started)
+2. [Architecture](#architecture)
+3. [Quick Start](#quick-start)
+4. [Authorization & Destinations](#authorization--destinations)
+5. [Registries](#registries)
+6. [Features](#features)
+7. [Documentation](#documentation)
+8. [Dependencies](#dependencies)
+9. [Running the Server](#running-the-server)
+
+## Getting Started
+
+Install the server and configure your client using the configurator:
 
 ```bash
+npm install -g @mcp-abap-adt/core
 npm install -g @mcp-abap-adt/configurator
 
 # stdio (destination)
@@ -22,7 +35,17 @@ mcp-conf --client cline --name abap --mcp TRIAL
 mcp-conf --client copilot --name abap --transport http --url http://localhost:3000/mcp/stream/http --header x-mcp-destination=trial
 ```
 
-Full usage: `docs/CLIENT_INSTALLERS.md` in the `mcp-abap-adt-conf` repo.
+Full configurator usage: `docs/CLIENT_INSTALLERS.md` in the `mcp-abap-adt-conf` repo.
+
+## Authorization & Destinations
+
+Destination-based auth is the default. Drop service keys into the service-keys folder and use the filename as your destination:
+
+```bash
+mcp-abap-adt --transport=stdio --mcp=TRIAL
+```
+
+For full details (paths, `.env`, direct headers), see [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 
 ## Architecture
 
@@ -56,9 +79,15 @@ await server.connect(transport);
 3. **Configure client (manual)**: See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md)
 4. **Use**: See [Available Tools](docs/user-guide/AVAILABLE_TOOLS.md)
 
-## MCP Registry
+## Registries
 
-Published in the official MCP Registry. See `docs/deployment/MCP_REGISTRY.md` for full details.
+Published in the official MCP Registry and listed on Glama.ai.
+
+- MCP Registry: see `docs/deployment/MCP_REGISTRY.md`
+- Glama.ai:
+  <a href="https://glama.ai/mcp/servers/@fr0ster/mcp-abap-adt">
+    <img width="380" height="200" src="https://glama.ai/mcp/servers/@fr0ster/mcp-abap-adt/badge" />
+  </a>
 
 ## Features
 
@@ -85,17 +114,20 @@ Published in the official MCP Registry. See `docs/deployment/MCP_REGISTRY.md` fo
 ## Documentation
 
 ### For Users
-- **[Installation Guide](docs/installation/INSTALLATION.md)** - Installation instructions for all platforms
-- **[Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md)** - How to configure MCP clients
-- **Configurator**: `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`) provides the `mcp-conf` CLI to auto-configure clients.
+- **[Docs Index](docs/README.md)** - Full documentation index
+- **[Installation Guide](docs/installation/README.md)** - Installation overview and platform guides
+- **[User Guide](docs/user-guide/README.md)** - End-user docs (auth, config, tools)
+- **[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md)** - Destination-based auth and service keys
+- **Configurator**: `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`) provides the `mcp-conf` CLI to auto-configure clients
 - **[Available Tools](docs/user-guide/AVAILABLE_TOOLS.md)** - Complete list of available MCP tools
 
 ### For Administrators
-- **[Installation Guide](docs/installation/INSTALLATION.md)** - Platform-specific installation guides
+- **[Deployment Docs](docs/deployment/README.md)** - MCP Registry, Docker, release notes
+- **[Server Configuration](docs/configuration/YAML_CONFIG.md)** - YAML config reference
 
 ### For Developers
-- **[Architecture Documentation](docs/architecture/)** - System architecture and design decisions
-- **[Development Documentation](docs/development/)** - Testing guides and development resources
+- **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
+- **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
 
 ## Dependencies

@@ -5,11 +5,20 @@ This directory contains documentation for developers: testing guides, developmen
 ## Files
 
 - **[ASSISTANT_GUIDELINES.md](ASSISTANT_GUIDELINES.md)** - Guidelines for AI assistants working on this project
+- **[ISSUE_ROADMAP_SYSTEM.md](ISSUE_ROADMAP_SYSTEM.md)** - Roadmap organization and issue tracking workflow
+- **[TEST_CONFIG_YAML_GUIDE.md](TEST_CONFIG_YAML_GUIDE.md)** - Test configuration reference
 - **[TEST_SYSTEM_SETUP.md](TEST_SYSTEM_SETUP.md)** - Guide for setting up test systems
-- **[SYNC_OPTIONAL_PARAMS.md](SYNC_OPTIONAL_PARAMS.md)** - Tool to sync optional parameters from adt-clients TypeScript interfaces
-- **[DetectObjectTypeListTools.md](DetectObjectTypeListTools.md)** - Documentation for object type detection tools
-- **[HANDLERS_COVERAGE.md](HANDLERS_COVERAGE.md)** - Analysis of low-level handlers coverage and implementation status
-- **[TEST_LOGGING_ROADMAP.md](roadmaps/TEST_LOGGING_ROADMAP.md)** - Test logging storage and rotation policy
+
+## Roadmaps
+
+- `roadmaps/HANDLER_BUILD_ERRORS_ROADMAP.md`
+- `roadmaps/INFRASTRUCTURE_HANDLERS.md`
+- `roadmaps/MCP_SERVER_REFACTORING_ROADMAP.md`
+- `roadmaps/TEST_LOGGING_ROADMAP.md`
+- `roadmaps/TEST_REFACTORING_ROADMAP.md`
+- `roadmaps/TODO_ROADMAP.md`
+- `roadmaps/USAGE_DOCUMENTATION_ROADMAP.md`
+- `roadmaps/parameter_passing_unit_tests_roadmap.md`
 
 ## Test Documentation
 

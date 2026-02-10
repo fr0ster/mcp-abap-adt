@@ -17,6 +17,7 @@ Complete installation instructions for different platforms and environments.
 Documentation for end users: configuration, usage, and available tools.
 
 - `CLIENT_CONFIGURATION.md` - How to configure MCP clients to connect to the server
+- `AUTHENTICATION.md` - Destination-based auth, service key locations, and header-based auth
 - Configurator (auto-config): `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`)
 - `AVAILABLE_TOOLS.md` - Complete list of available MCP tools and their descriptions
 - `CLI_OPTIONS.md` - Complete command-line options reference
@@ -25,6 +26,14 @@ Documentation for end users: configuration, usage, and available tools.
 Documentation for server configuration options.
 
 - `YAML_CONFIG.md` - YAML configuration file guide (alternative to command-line arguments)
+
+### [deployment/](deployment/) - Deployment & Releases
+Documentation for deployment, Docker, and release flow.
+
+- `README.md` - Deployment docs index
+- `MCP_REGISTRY.md` - MCP Registry publishing
+- `DOCKER.md` - Docker deployment guide
+- `RELEASE.md` - Release process
 
 ### [architecture/](architecture/) - For Developers
 Technical documentation about the system architecture, design decisions, and internal structure.
@@ -48,11 +57,17 @@ Documentation for developers: testing, development guides, and internal document
 
 - **Getting Started**: [Installation Guide](installation/INSTALLATION.md)
 - **User Configuration**: [Client Configuration](user-guide/CLIENT_CONFIGURATION.md)
+- **Authentication**: [Destinations & Auth](user-guide/AUTHENTICATION.md)
 - **Server Configuration**: [YAML Config](configuration/YAML_CONFIG.md) | [CLI Options](user-guide/CLI_OPTIONS.md)
 - **Deployment**: [MCP Registry](deployment/MCP_REGISTRY.md) | [Docker](deployment/DOCKER.md)
 - **Available Tools**: [Tools List](user-guide/AVAILABLE_TOOLS.md)
 - **Architecture**: [Stateful Sessions](architecture/STATEFUL_SESSION_GUIDE.md) | [Architecture Docs](architecture/README.md)
 - **Development**: [Development Documentation](development/)
+
+## 📦 Artifacts
+
+- `adt-discovery.xml` - ADT discovery snapshot
+- `discovery.json` - ADT discovery JSON snapshot
 
 ## 📝 Package-Specific Documentation
 

@@ -52,5 +52,5 @@ See [RELEASE.md](./RELEASE.md) for detailed instructions.
 ## Related Documentation
 
 - [Installation Guide](../installation/INSTALLATION.md) - Installation for development
-- [CI/CD Configuration](../../.github/README.md) - GitHub Actions workflows
+- [CI/CD Configuration](GITHUB_ACTIONS.md) - GitHub Actions workflows
 - [User Guide](../user-guide/README.md) - Using the server

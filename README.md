@@ -10,7 +10,7 @@ This project provides a server that allows you to interact with SAP ABAP systems
 
 **Authorization & Destinations (Important):** A *destination* is the filename of a service key stored locally. You place service keys in the service-keys directory, and use `--mcp=<destination>` to select which one to use. This is the primary auth model for on‑prem and BTP systems. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 
-You can configure MCP clients either manually (JSON/TOML) or via the configurator CLI (`@mcp-abap-adt/configurator`, repo: `mcp-abap-adt-conf`).
+You can configure MCP clients either manually (JSON/TOML) or via the configurator CLI (`@mcp-abap-adt/configurator`, repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf)).
 
 ## Table of Contents
 
@@ -40,12 +40,7 @@ mcp-conf --client cline --name abap --mcp TRIAL
 mcp-conf --client copilot --name abap --transport http --url http://localhost:3000/mcp/stream/http --header x-mcp-destination=trial
 ```
 
-Full configurator usage (separate repo): `docs/CLIENT_INSTALLERS.md` in `mcp-abap-adt-conf`.
-
-Repo:
-```text
-https://github.com/fr0ster/mcp-abap-adt-conf
-```
+Full configurator usage (separate repo): [CLIENT_INSTALLERS.md](https://github.com/fr0ster/mcp-abap-adt-conf/tree/main/docs/CLIENT_INSTALLERS.md).
 
 ## Terminology
 
@@ -135,7 +130,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[User Guide](docs/user-guide/README.md)** - End-user docs (auth, config, tools)
 - **[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md)** - Destination-based auth and service keys
 - **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups
-- **Configurator**: `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`) provides the `mcp-conf` CLI to auto-configure clients
+- **Configurator**: `@mcp-abap-adt/configurator` (repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf)) provides the `mcp-conf` CLI to auto-configure clients
 - **[Available Tools](docs/user-guide/AVAILABLE_TOOLS.md)** - Complete list of available MCP tools
 
 ### For Administrators

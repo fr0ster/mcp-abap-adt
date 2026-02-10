@@ -80,7 +80,7 @@ The server processes the following HTTP headers (as checked in `applyAuthHeaders
 - For **JWT authentication**: `x-sap-url`, `x-sap-auth-type`, and `x-sap-jwt-token` are required. `x-sap-refresh-token` is optional for automatic token refresh.
 - For **basic authentication**: `x-sap-url`, `x-sap-auth-type`, `x-sap-login`, and `x-sap-password` are required.
 - For **destination-based authentication**: Use `x-sap-destination` or `x-mcp-destination` header. URL is automatically derived from the service key, so `x-sap-url` is not required (and will be ignored if provided). Service keys must be stored in platform-specific locations (see [Destination-Based Authentication](#destination-based-authentication) section).
-- For automatic token refresh, you only need `x-sap-refresh-token`. Client ID and Client Secret are **not needed** for refresh - they are only required for initial token generation via `sap-abap-auth` CLI tool (part of `@mcp-abap-adt/connection` package) or service keys.
+- For automatic token refresh, you only need `x-sap-refresh-token`. Client ID and Client Secret are **not needed** for refresh - they are only required for initial token generation via `mcp-auth` CLI tool (part of `@mcp-abap-adt/connection` package) or service keys.
 
 
 ## Basic Authentication
@@ -572,7 +572,7 @@ The server supports automatic token refresh when `x-sap-refresh-token` is provid
 
 The connection will automatically refresh expired tokens when a 401/403 error is detected. The refresh happens transparently without requiring manual intervention.
 
-**Note:** For automatic token refresh, you only need the refresh token. Client ID and Client Secret are **not needed** for refresh - they are only required for initial token generation via `sap-abap-auth` CLI tool (part of `@mcp-abap-adt/connection` package).
+**Note:** For automatic token refresh, you only need the refresh token. Client ID and Client Secret are **not needed** for refresh - they are only required for initial token generation via `mcp-auth` CLI tool (part of `@mcp-abap-adt/connection` package).
 
 ## Examples
 

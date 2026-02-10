@@ -1,7 +1,5 @@
 # mcp-abap-adt: Your Gateway to ABAP Development Tools (ADT)
 
-> **Acknowledgment**: This project was originally inspired by [mario-andreschak/mcp-abap-adt](https://github.com/mario-andreschak/mcp-abap-adt). We started with the core concept and then evolved it into an independent project with our own architecture and features.
-
 This project provides a server that allows you to interact with SAP ABAP systems using the Model Context Protocol (MCP). Think of it as a bridge that lets tools like [Cline](https://marketplace.visualstudio.com/items?itemName=saoudrizwan.claude-dev) (a VS Code extension) talk to your ABAP system and retrieve information like source code, table structures, and more.
 
 **Authorization & Destinations (Important):** A *destination* is the filename of a service key stored locally. You place service keys in the service-keys directory, and use `--mcp=<destination>` to select which one to use. This is the primary auth model for on‑prem and BTP systems. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
@@ -13,12 +11,13 @@ You can configure MCP clients either manually (JSON/TOML) or via the configurato
 1. [Getting Started](#getting-started)
 2. [Architecture](#architecture)
 3. [Quick Start](#quick-start)
-4. [Authorization & Destinations](#authorization--destinations)
-5. [Registries](#registries)
-6. [Features](#features)
-7. [Documentation](#documentation)
-8. [Dependencies](#dependencies)
-9. [Running the Server](#running-the-server)
+4. [Terminology](#terminology)
+5. [Authorization & Destinations](#authorization--destinations)
+6. [Registries](#registries)
+7. [Features](#features)
+8. [Documentation](#documentation)
+9. [Dependencies](#dependencies)
+10. [Running the Server](#running-the-server)
 
 ## Getting Started
 
@@ -35,7 +34,18 @@ mcp-conf --client cline --name abap --mcp TRIAL
 mcp-conf --client copilot --name abap --transport http --url http://localhost:3000/mcp/stream/http --header x-mcp-destination=trial
 ```
 
-Full configurator usage: `docs/CLIENT_INSTALLERS.md` in the `mcp-abap-adt-conf` repo.
+Full configurator usage (separate repo): `docs/CLIENT_INSTALLERS.md` in `mcp-abap-adt-conf`.
+
+Repo:
+```text
+https://github.com/fr0ster/mcp-abap-adt-conf
+```
+
+## Terminology
+
+**Destination**: a local service key filename. You store service keys in the service-keys directory, and pass the filename (without extension) via `--mcp=<destination>` to select which system to use.
+
+See [docs/user-guide/TERMINOLOGY.md](docs/user-guide/TERMINOLOGY.md) for the full list.
 
 ## Authorization & Destinations
 
@@ -75,7 +85,7 @@ await server.connect(transport);
 ## Quick Start
 
 1. **Install server**: See [Installation Guide](docs/installation/INSTALLATION.md)
-2. **Configure client (auto)**: Use `mcp-conf` from `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`)
+2. **Configure client (auto)**: Use `mcp-conf` from `@mcp-abap-adt/configurator` (repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf), docs: [CLIENT_INSTALLERS.md](https://github.com/fr0ster/mcp-abap-adt-conf/tree/main/docs/CLIENT_INSTALLERS.md))
 3. **Configure client (manual)**: See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md)
 4. **Use**: See [Available Tools](docs/user-guide/AVAILABLE_TOOLS.md)
 
@@ -83,7 +93,7 @@ await server.connect(transport);
 
 Published in the official MCP Registry and listed on Glama.ai.
 
-- MCP Registry: see `docs/deployment/MCP_REGISTRY.md`
+- MCP Registry: [docs/deployment/MCP_REGISTRY.md](docs/deployment/MCP_REGISTRY.md)
 - Glama.ai:
   <a href="https://glama.ai/mcp/servers/@fr0ster/mcp-abap-adt">
     <img width="380" height="200" src="https://glama.ai/mcp/servers/@fr0ster/mcp-abap-adt/badge" />
@@ -138,6 +148,9 @@ This project uses two npm packages:
 - **[@mcp-abap-adt/adt-clients](https://www.npmjs.com/package/@mcp-abap-adt/adt-clients)** – Builder-first ADT clients
 
 These packages are automatically installed via `npm install` and are published to npm.
+
+---
+
 
 ## Running the Server
 
@@ -216,10 +229,12 @@ SAP_JWT_TOKEN=your-jwt-token
 npm install -g @mcp-abap-adt/connection
 
 # Generate .env file from service key JSON
-sap-abap-auth auth -k path/to/service-key.json
+mcp-auth auth -k path/to/service-key.json
 ```
 
 This will automatically create/update `.env` file with JWT tokens and connection details.
+
+**Claude recommendation:** place the service key in the service-keys directory and use `--mcp=<destination>` (avoid manual JWT tokens).
 
 ### Command-Line Options
 
@@ -278,3 +293,7 @@ npm run docs:tools
 ## Contributors
 
 Thank you to all contributors! See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the complete list.
+
+---
+
+**Acknowledgment**: This project was originally inspired by [mario-andreschak/mcp-abap-adt](https://github.com/mario-andreschak/mcp-abap-adt). We started with the core concept and then evolved it into an independent project with our own architecture and features.

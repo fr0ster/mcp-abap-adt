@@ -58,6 +58,7 @@ See [Installation Guide](../installation/INSTALLATION.md) for full instructions.
 - **[CLIENT_CONFIGURATION.md](CLIENT_CONFIGURATION.md)** - Guide for configuring MCP clients to connect to the server, including HTTP header configuration for dynamic SAP connection setup
 - **[AVAILABLE_TOOLS.md](AVAILABLE_TOOLS.md)** - Complete list of all available MCP tools with descriptions and usage examples (auto-generated from handler definitions)
 - **[AUTHENTICATION.md](AUTHENTICATION.md)** - Destination-based auth, service key locations, and header-based auth
+- **[TERMINOLOGY.md](TERMINOLOGY.md)** - Project-specific terminology
 
 ## Getting Started
 

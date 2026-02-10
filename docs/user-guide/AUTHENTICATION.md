@@ -34,6 +34,17 @@ You can also provide credentials via `.env`:
 
 This is useful for quick local testing or when you do not want to store service keys.
 
+### Generate .env from Service Key
+
+```bash
+npm install -g @mcp-abap-adt/connection
+mcp-auth auth -k path/to/service-key.json
+```
+
+This writes JWT details to `.env`.
+
+**Claude recommendation:** for Claude, prefer service keys in `service-keys` and use `--mcp=<destination>` instead of manual tokens.
+
 ## HTTP/SSE Headers
 
 For HTTP/SSE transports, you can supply auth per request using headers:

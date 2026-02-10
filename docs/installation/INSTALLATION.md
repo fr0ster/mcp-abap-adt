@@ -51,7 +51,7 @@ After installation, you'll have access to:
 **For JWT authentication with service keys**, install the connection package separately:
 ```bash
 npm install -g @mcp-abap-adt/connection
-sap-abap-auth auth -k path/to/service-key.json
+mcp-auth auth -k path/to/service-key.json
 ```
 
 **Get help on available options:**
@@ -80,7 +80,7 @@ For JWT authentication (SAP BTP) with service key:
 npm install -g @mcp-abap-adt/connection
 
 # Generate .env file from service key JSON
-sap-abap-auth auth -k path/to/service-key.json
+mcp-auth auth -k path/to/service-key.json
 
 # This automatically creates/updates .env file with JWT tokens
 ```
@@ -282,7 +282,7 @@ mcp-abap-adt --transport=sse --sse-port=3001
 **For JWT authentication with service keys**, install separately:
 ```bash
 npm install -g @mcp-abap-adt/connection
-sap-abap-auth auth -k path/to/service-key.json
+mcp-auth auth -k path/to/service-key.json
 ```
 
 #### Local Installation (Project-specific)

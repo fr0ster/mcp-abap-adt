@@ -252,22 +252,6 @@ docker-compose restart
 
 ## Production Deployment
 
-### With HTTPS Proxy (nginx)
-
-```yaml
-# docker-compose.prod.yml
-services:
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - mcp-abap-adt
-```
-
 ### With Secrets Management
 
 ```bash

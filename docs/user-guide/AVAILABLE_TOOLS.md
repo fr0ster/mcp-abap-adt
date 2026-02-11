@@ -300,10 +300,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="read-only-group"></a>
 ## Read-Only Group
 
+<a id="read-only-enhancement"></a>
 ### Read-Only / Enhancement
 
+<a id="getenhancementimpl-read-only-enhancement"></a>
 #### GetEnhancementImpl (Read-Only / Enhancement)
 **Description:** [read-only] Retrieve source code of a specific enhancement implementation by its name and enhancement spot.
 
@@ -315,6 +318,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getenhancements-read-only-enhancement"></a>
 #### GetEnhancements (Read-Only / Enhancement)
 **Description:** [read-only] Retrieve a list of enhancements for a given ABAP object.
 
@@ -326,6 +330,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getenhancementspot-read-only-enhancement"></a>
 #### GetEnhancementSpot (Read-Only / Enhancement)
 **Description:** [read-only] Retrieve metadata and list of implementations for a specific enhancement spot.
 
@@ -336,8 +341,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="read-only-function"></a>
 ### Read-Only / Function
 
+<a id="getfunction-read-only-function"></a>
 #### GetFunction (Read-Only / Function)
 **Description:** [read-only] Retrieve ABAP Function Module source code.
 
@@ -348,8 +355,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="read-only-include"></a>
 ### Read-Only / Include
 
+<a id="getinclude-read-only-include"></a>
 #### GetInclude (Read-Only / Include)
 **Description:** [read-only] Retrieve source code of a specific ABAP include file.
 
@@ -360,6 +369,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getincludeslist-read-only-include"></a>
 #### GetIncludesList (Read-Only / Include)
 **Description:** [read-only] Recursively discover and list ALL include files within an ABAP program or include.
 
@@ -373,8 +383,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="read-only-package"></a>
 ### Read-Only / Package
 
+<a id="getpackagecontents-read-only-package"></a>
 #### GetPackageContents (Read-Only / Package)
 **Description:** [read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages.
 
@@ -385,8 +397,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="read-only-program"></a>
 ### Read-Only / Program
 
+<a id="getprogfullcode-read-only-program"></a>
 #### GetProgFullCode (Read-Only / Program)
 **Description:** [read-only] Returns the full code for a program or function group, including all includes, in tree traversal order.
 
@@ -398,8 +412,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="read-only-search"></a>
 ### Read-Only / Search
 
+<a id="getobjectsbytype-read-only-search"></a>
 #### GetObjectsByType (Read-Only / Search)
 **Description:** [read-only] Retrieves all ABAP objects of a specific type under a given node.
 
@@ -414,6 +430,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getobjectslist-read-only-search"></a>
 #### GetObjectsList (Read-Only / Search)
 **Description:** [read-only] Recursively retrieves all valid ABAP repository objects for a given parent (program, function group, etc.) including nested includes.
 
@@ -427,6 +444,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="searchobject-read-only-search"></a>
 #### SearchObject (Read-Only / Search)
 **Description:** [read-only] Search for ABAP objects by name pattern. Parameters: object_name (with or without mask), object_type (optional), maxResults (optional). If object_type is specified, results are filtered by type.
 
@@ -439,8 +457,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="read-only-system"></a>
 ### Read-Only / System
 
+<a id="describebylist-read-only-system"></a>
 #### DescribeByList (Read-Only / System)
 **Description:** [read-only] Batch description for a list of ABAP objects. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE, STRUCTURE, etc.
 
@@ -452,6 +472,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getabapast-read-only-system"></a>
 #### GetAbapAST (Read-Only / System)
 **Description:** [read-only] Parse ABAP code and return AST (Abstract Syntax Tree) in JSON format.
 
@@ -463,6 +484,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getabapsemanticanalysis-read-only-system"></a>
 #### GetAbapSemanticAnalysis (Read-Only / System)
 **Description:** [read-only] Perform semantic analysis on ABAP code and return symbols, types, scopes, and dependencies.
 
@@ -474,6 +496,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getabapsystemsymbols-read-only-system"></a>
 #### GetAbapSystemSymbols (Read-Only / System)
 **Description:** [read-only] Resolve ABAP symbols from semantic analysis with SAP system information including types, scopes, descriptions, and packages.
 
@@ -485,6 +508,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getadttypes-read-only-system"></a>
 #### GetAdtTypes (Read-Only / System)
 **Description:** [read-only] Retrieve all valid ADT object types.
 
@@ -495,6 +519,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getinactiveobjects-read-only-system"></a>
 #### GetInactiveObjects (Read-Only / System)
 **Description:** [read-only] Get a list of inactive ABAP objects (objects that have been modified but not activated).
 
@@ -505,6 +530,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getobjectinfo-read-only-system"></a>
 #### GetObjectInfo (Read-Only / System)
 **Description:** [read-only] Return ABAP object tree: root, group nodes, and terminal leaves up to maxDepth. Enrich each node via SearchObject if enrich=true. Group nodes are included for hierarchy. Each node has node_type: root, point, end.
 
@@ -518,6 +544,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getobjectnodefromcache-read-only-system"></a>
 #### GetObjectNodeFromCache (Read-Only / System)
 **Description:** [read-only] Returns a node from the in-memory objects list cache by OBJECT_TYPE, OBJECT_NAME, TECH_NAME, and expands OBJECT_URI if present.
 
@@ -528,6 +555,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getobjectstructure-read-only-system"></a>
 #### GetObjectStructure (Read-Only / System)
 **Description:** [read-only] Retrieve ADT object structure as a compact JSON tree.
 
@@ -539,6 +567,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getsession-read-only-system"></a>
 #### GetSession (Read-Only / System)
 **Description:** [read-only] Get a new session ID and current session state (cookies, CSRF token) for reuse across multiple ADT operations. Use this to maintain the same session and lock handle across multiple requests.
 
@@ -549,6 +578,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getsqlquery-read-only-system"></a>
 #### GetSqlQuery (Read-Only / System)
 **Description:** [read-only] Execute freestyle SQL queries via SAP ADT Data Preview API.
 
@@ -560,6 +590,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="gettransaction-read-only-system"></a>
 #### GetTransaction (Read-Only / System)
 **Description:** [read-only] Retrieve ABAP transaction details.
 
@@ -570,6 +601,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="gettypeinfo-read-only-system"></a>
 #### GetTypeInfo (Read-Only / System)
 **Description:** [read-only] Retrieve ABAP type information.
 
@@ -580,6 +612,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getwhereused-read-only-system"></a>
 #### GetWhereUsed (Read-Only / System)
 **Description:** [read-only] Retrieve where-used references for ABAP objects via ADT usageReferences. Returns parsed list of referencing objects with their types and packages.
 
@@ -592,8 +625,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="read-only-table"></a>
 ### Read-Only / Table
 
+<a id="gettablecontents-read-only-table"></a>
 #### GetTableContents (Read-Only / Table)
 **Description:** [read-only] Retrieve contents of an ABAP table.
 
@@ -604,8 +639,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="read-only-transport"></a>
 ### Read-Only / Transport
 
+<a id="gettransport-read-only-transport"></a>
 #### GetTransport (Read-Only / Transport)
 **Description:** [read-only] Retrieve ABAP transport request information including metadata, included objects, and status from SAP system.
 
@@ -618,10 +655,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-group"></a>
 ## High-Level Group
 
+<a id="high-level-behavior-definition"></a>
 ### High-Level / Behavior Definition
 
+<a id="createbehaviordefinition-high-level-behavior-definition"></a>
 #### CreateBehaviorDefinition (High-Level / Behavior Definition)
 **Description:** Create a new ABAP Behavior Definition (BDEF) in SAP system.
 
@@ -638,6 +678,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletebehaviordefinition-high-level-behavior-definition"></a>
 #### DeleteBehaviorDefinition (High-Level / Behavior Definition)
 **Description:** Delete an ABAP behavior definition from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
@@ -649,6 +690,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getbehaviordefinition-high-level-behavior-definition"></a>
 #### GetBehaviorDefinition (High-Level / Behavior Definition)
 **Description:** Retrieve ABAP behavior definition definition. Supports reading active or inactive version.
 
@@ -660,6 +702,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatebehaviordefinition-high-level-behavior-definition"></a>
 #### UpdateBehaviorDefinition (High-Level / Behavior Definition)
 **Description:** Update source code of an ABAP Behavior Definition.
 
@@ -673,8 +716,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-behavior-implementation"></a>
 ### High-Level / Behavior Implementation
 
+<a id="createbehaviorimplementation-high-level-behavior-implementation"></a>
 #### CreateBehaviorImplementation (High-Level / Behavior Implementation)
 **Description:** Create a new ABAP behavior implementation class for a behavior definition. Behavior implementations contain the business logic for RAP entities. Uses stateful session for proper lock management.
 
@@ -691,6 +736,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletebehaviorimplementation-high-level-behavior-implementation"></a>
 #### DeleteBehaviorImplementation (High-Level / Behavior Implementation)
 **Description:** Delete an ABAP behavior implementation from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
@@ -702,6 +748,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getbehaviorimplementation-high-level-behavior-implementation"></a>
 #### GetBehaviorImplementation (High-Level / Behavior Implementation)
 **Description:** Retrieve ABAP behavior implementation definition. Supports reading active or inactive version.
 
@@ -713,6 +760,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatebehaviorimplementation-high-level-behavior-implementation"></a>
 #### UpdateBehaviorImplementation (High-Level / Behavior Implementation)
 **Description:** Update source code of an existing ABAP behavior implementation class. Updates both main source (with FOR BEHAVIOR OF clause) and implementations include. Uses stateful session with proper lock/unlock mechanism.
 
@@ -727,8 +775,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-class"></a>
 ### High-Level / Class
 
+<a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
 **Description:** Create a new ABAP class with optional activation. Manages validation, lock, check, update, unlock, and optional activation.
 
@@ -747,6 +797,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createlocaldefinitions-high-level-class"></a>
 #### CreateLocalDefinitions (High-Level / Class)
 **Description:** Create local definitions in an ABAP class (definitions include). Manages lock, check, update, unlock, and optional activation.
 
@@ -760,6 +811,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createlocalmacros-high-level-class"></a>
 #### CreateLocalMacros (High-Level / Class)
 **Description:** Create local macros in an ABAP class (macros include). Manages lock, check, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.
 
@@ -773,6 +825,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createlocaltestclass-high-level-class"></a>
 #### CreateLocalTestClass (High-Level / Class)
 **Description:** Create a local test class in an ABAP class. Manages lock, check, update, unlock, and optional activation of parent class.
 
@@ -787,6 +840,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createlocaltypes-high-level-class"></a>
 #### CreateLocalTypes (High-Level / Class)
 **Description:** Create local types in an ABAP class (implementations include). Manages lock, check, update, unlock, and optional activation.
 
@@ -800,6 +854,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deleteclass-high-level-class"></a>
 #### DeleteClass (High-Level / Class)
 **Description:** Delete an ABAP class from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
@@ -811,6 +866,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletelocaldefinitions-high-level-class"></a>
 #### DeleteLocalDefinitions (High-Level / Class)
 **Description:** Delete local definitions from an ABAP class by clearing the definitions include. Manages lock, update, unlock, and optional activation.
 
@@ -823,6 +879,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletelocalmacros-high-level-class"></a>
 #### DeleteLocalMacros (High-Level / Class)
 **Description:** Delete local macros from an ABAP class by clearing the macros include. Manages lock, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.
 
@@ -835,6 +892,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletelocaltestclass-high-level-class"></a>
 #### DeleteLocalTestClass (High-Level / Class)
 **Description:** Delete a local test class from an ABAP class by clearing the testclasses include. Manages lock, update, unlock, and optional activation of parent class.
 
@@ -847,6 +905,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletelocaltypes-high-level-class"></a>
 #### DeleteLocalTypes (High-Level / Class)
 **Description:** Delete local types from an ABAP class by clearing the implementations include. Manages lock, update, unlock, and optional activation.
 
@@ -859,6 +918,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getclass-high-level-class"></a>
 #### GetClass (High-Level / Class)
 **Description:** Retrieve ABAP class source code. Supports reading active or inactive version.
 
@@ -870,6 +930,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getlocaldefinitions-high-level-class"></a>
 #### GetLocalDefinitions (High-Level / Class)
 **Description:** Retrieve local definitions source code from a class (definitions include). Supports reading active or inactive version.
 
@@ -881,6 +942,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getlocalmacros-high-level-class"></a>
 #### GetLocalMacros (High-Level / Class)
 **Description:** Retrieve local macros source code from a class (macros include). Supports reading active or inactive version. Note: Macros are supported in older ABAP versions but not in newer ones.
 
@@ -892,6 +954,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getlocaltestclass-high-level-class"></a>
 #### GetLocalTestClass (High-Level / Class)
 **Description:** Retrieve local test class source code from a class. Supports reading active or inactive version.
 
@@ -903,6 +966,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getlocaltypes-high-level-class"></a>
 #### GetLocalTypes (High-Level / Class)
 **Description:** Retrieve local types source code from a class (implementations include). Supports reading active or inactive version.
 
@@ -914,6 +978,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updateclass-high-level-class"></a>
 #### UpdateClass (High-Level / Class)
 **Description:** Update source code of an existing ABAP class. Locks, checks, updates, unlocks, and optionally activates.
 
@@ -926,6 +991,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatelocaldefinitions-high-level-class"></a>
 #### UpdateLocalDefinitions (High-Level / Class)
 **Description:** Update local definitions in an ABAP class (definitions include). Manages lock, check, update, unlock, and optional activation.
 
@@ -939,6 +1005,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatelocalmacros-high-level-class"></a>
 #### UpdateLocalMacros (High-Level / Class)
 **Description:** Update local macros in an ABAP class (macros include). Manages lock, check, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.
 
@@ -952,6 +1019,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatelocaltestclass-high-level-class"></a>
 #### UpdateLocalTestClass (High-Level / Class)
 **Description:** Update a local test class in an ABAP class. Manages lock, check, update, unlock, and optional activation of parent class.
 
@@ -965,6 +1033,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatelocaltypes-high-level-class"></a>
 #### UpdateLocalTypes (High-Level / Class)
 **Description:** Update local types in an ABAP class (implementations include). Manages lock, check, update, unlock, and optional activation.
 
@@ -978,8 +1047,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-data-element"></a>
 ### High-Level / Data Element
 
+<a id="createdataelement-high-level-data-element"></a>
 #### CreateDataElement (High-Level / Data Element)
 **Description:** Create a new ABAP data element in SAP system with all required steps: create, activate, and verify.
 
@@ -1005,6 +1076,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletedataelement-high-level-data-element"></a>
 #### DeleteDataElement (High-Level / Data Element)
 **Description:** Delete an ABAP data element from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
@@ -1016,6 +1088,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getdataelement-high-level-data-element"></a>
 #### GetDataElement (High-Level / Data Element)
 **Description:** Retrieve ABAP data element definition. Supports reading active or inactive version.
 
@@ -1027,6 +1100,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatedataelement-high-level-data-element"></a>
 #### UpdateDataElement (High-Level / Data Element)
 **Description:** Data element name to update (e.g., ZZ_TEST_DTEL_01)
 
@@ -1053,8 +1127,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-ddlx"></a>
 ### High-Level / Ddlx
 
+<a id="createmetadataextension-high-level-ddlx"></a>
 #### CreateMetadataExtension (High-Level / Ddlx)
 **Description:** Create a new ABAP Metadata Extension (DDLX) in SAP system.
 
@@ -1069,6 +1145,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatemetadataextension-high-level-ddlx"></a>
 #### UpdateMetadataExtension (High-Level / Ddlx)
 **Description:** Update source code of an ABAP Metadata Extension.
 
@@ -1082,8 +1159,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-domain"></a>
 ### High-Level / Domain
 
+<a id="createdomain-high-level-domain"></a>
 #### CreateDomain (High-Level / Domain)
 **Description:** Create a new ABAP domain in SAP system with all required steps: lock, create, check, unlock, activate, and verify.
 
@@ -1107,6 +1186,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletedomain-high-level-domain"></a>
 #### DeleteDomain (High-Level / Domain)
 **Description:** Delete an ABAP domain from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
@@ -1118,6 +1198,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getdomain-high-level-domain"></a>
 #### GetDomain (High-Level / Domain)
 **Description:** Retrieve ABAP domain definition. Supports reading active or inactive version.
 
@@ -1129,6 +1210,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatedomain-high-level-domain"></a>
 #### UpdateDomain (High-Level / Domain)
 **Description:** Domain name to update (e.g., ZZ_TEST_0001)
 
@@ -1152,8 +1234,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-function"></a>
 ### High-Level / Function
 
+<a id="createfunctiongroup-high-level-function"></a>
 #### CreateFunctionGroup (High-Level / Function)
 **Description:** Create a new ABAP function group in SAP system. Function groups serve as containers for function modules. Uses stateful session for proper lock management.
 
@@ -1168,6 +1252,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createfunctionmodule-high-level-function"></a>
 #### CreateFunctionModule (High-Level / Function)
 **Description:** Create a new ABAP function module within an existing function group. Uses stateful session with LOCK/UNLOCK workflow for source code upload.
 
@@ -1183,6 +1268,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatefunctiongroup-high-level-function"></a>
 #### UpdateFunctionGroup (High-Level / Function)
 **Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don
 
@@ -1195,6 +1281,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatefunctionmodule-high-level-function"></a>
 #### UpdateFunctionModule (High-Level / Function)
 **Description:** Update source code of an existing ABAP function module. Locks the function module, uploads new source code, and unlocks. Optionally activates after update. Use this to modify existing function modules without re-creating metadata.
 
@@ -1209,8 +1296,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-function-group"></a>
 ### High-Level / Function Group
 
+<a id="deletefunctiongroup-high-level-function-group"></a>
 #### DeleteFunctionGroup (High-Level / Function Group)
 **Description:** Delete an ABAP function group from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
@@ -1222,6 +1311,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getfunctiongroup-high-level-function-group"></a>
 #### GetFunctionGroup (High-Level / Function Group)
 **Description:** Retrieve ABAP function group definition. Supports reading active or inactive version.
 
@@ -1233,8 +1323,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-function-module"></a>
 ### High-Level / Function Module
 
+<a id="deletefunctionmodule-high-level-function-module"></a>
 #### DeleteFunctionModule (High-Level / Function Module)
 **Description:** Delete an ABAP function module from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
@@ -1246,6 +1338,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getfunctionmodule-high-level-function-module"></a>
 #### GetFunctionModule (High-Level / Function Module)
 **Description:** Retrieve ABAP function module definition. Supports reading active or inactive version.
 
@@ -1257,8 +1350,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-interface"></a>
 ### High-Level / Interface
 
+<a id="createinterface-high-level-interface"></a>
 #### CreateInterface (High-Level / Interface)
 **Description:** Create a new ABAP interface in SAP system with source code. Interfaces define method signatures, events, and types for implementation by classes. Uses stateful session for proper lock management.
 
@@ -1274,6 +1369,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deleteinterface-high-level-interface"></a>
 #### DeleteInterface (High-Level / Interface)
 **Description:** Delete an ABAP interface from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
@@ -1285,6 +1381,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getinterface-high-level-interface"></a>
 #### GetInterface (High-Level / Interface)
 **Description:** Retrieve ABAP interface definition. Supports reading active or inactive version.
 
@@ -1296,6 +1393,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updateinterface-high-level-interface"></a>
 #### UpdateInterface (High-Level / Interface)
 **Description:** Update source code of an existing ABAP interface. Uses stateful session with proper lock/unlock mechanism. Lock handle and transport number are passed in URL parameters.
 
@@ -1309,8 +1407,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-metadata-extension"></a>
 ### High-Level / Metadata Extension
 
+<a id="deletemetadataextension-high-level-metadata-extension"></a>
 #### DeleteMetadataExtension (High-Level / Metadata Extension)
 **Description:** Delete an ABAP metadata extension from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
@@ -1322,6 +1422,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getmetadataextension-high-level-metadata-extension"></a>
 #### GetMetadataExtension (High-Level / Metadata Extension)
 **Description:** Retrieve ABAP metadata extension definition. Supports reading active or inactive version.
 
@@ -1333,8 +1434,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-package"></a>
 ### High-Level / Package
 
+<a id="createpackage-high-level-package"></a>
 #### CreatePackage (High-Level / Package)
 **Description:** Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.
 
@@ -1345,6 +1448,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
 **Description:** Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version.
 
@@ -1356,8 +1460,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-program"></a>
 ### High-Level / Program
 
+<a id="createprogram-high-level-program"></a>
 #### CreateProgram (High-Level / Program)
 **Description:** Create a new ABAP program (report) in SAP system with source code. Supports executable programs, includes, module pools. Uses stateful session for proper lock management.
 
@@ -1375,6 +1481,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deleteprogram-high-level-program"></a>
 #### DeleteProgram (High-Level / Program)
 **Description:** Delete an ABAP program from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
@@ -1386,6 +1493,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getprogram-high-level-program"></a>
 #### GetProgram (High-Level / Program)
 **Description:** Retrieve ABAP program definition. Supports reading active or inactive version.
 
@@ -1397,6 +1505,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updateprogram-high-level-program"></a>
 #### UpdateProgram (High-Level / Program)
 **Description:** Update source code of an existing ABAP program. Locks the program, checks new code, uploads new source code, and unlocks. Optionally activates after update. Use this to modify existing programs without re-creating metadata.
 
@@ -1409,8 +1518,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-service-definition"></a>
 ### High-Level / Service Definition
 
+<a id="createservicedefinition-high-level-service-definition"></a>
 #### CreateServiceDefinition (High-Level / Service Definition)
 **Description:** Create a new ABAP service definition for OData services. Service definitions define the structure and behavior of OData services. Uses stateful session for proper lock management.
 
@@ -1426,6 +1537,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deleteservicedefinition-high-level-service-definition"></a>
 #### DeleteServiceDefinition (High-Level / Service Definition)
 **Description:** Delete an ABAP service definition from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
@@ -1437,6 +1549,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getservicedefinition-high-level-service-definition"></a>
 #### GetServiceDefinition (High-Level / Service Definition)
 **Description:** Retrieve ABAP service definition definition. Supports reading active or inactive version.
 
@@ -1448,6 +1561,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updateservicedefinition-high-level-service-definition"></a>
 #### UpdateServiceDefinition (High-Level / Service Definition)
 **Description:** Update source code of an existing ABAP service definition. Uses stateful session with proper lock/unlock mechanism.
 
@@ -1461,8 +1575,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-structure"></a>
 ### High-Level / Structure
 
+<a id="createstructure-high-level-structure"></a>
 #### CreateStructure (High-Level / Structure)
 **Description:** Create a new ABAP structure in SAP system with fields and type references. Includes create, activate, and verify steps.
 
@@ -1484,6 +1600,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletestructure-high-level-structure"></a>
 #### DeleteStructure (High-Level / Structure)
 **Description:** Delete an ABAP structure from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
@@ -1495,6 +1612,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getstructure-high-level-structure"></a>
 #### GetStructure (High-Level / Structure)
 **Description:** Retrieve ABAP structure definition. Supports reading active or inactive version.
 
@@ -1506,6 +1624,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatestructure-high-level-structure"></a>
 #### UpdateStructure (High-Level / Structure)
 **Description:** Update DDL source code of an existing ABAP structure. Locks the structure, uploads new DDL source, and unlocks. Optionally activates after update. Use this to modify existing structures without re-creating metadata.
 
@@ -1519,8 +1638,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-system"></a>
 ### High-Level / System
 
+<a id="getpackagetree-high-level-system"></a>
 #### GetPackageTree (High-Level / System)
 **Description:** [high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions.
 
@@ -1535,8 +1656,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-table"></a>
 ### High-Level / Table
 
+<a id="createtable-high-level-table"></a>
 #### CreateTable (High-Level / Table)
 **Description:** Create a new ABAP table via the ADT API using provided DDL. Mirrors Eclipse ADT behaviour with status/check runs, lock handling, activation and verification.
 
@@ -1552,6 +1675,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletetable-high-level-table"></a>
 #### DeleteTable (High-Level / Table)
 **Description:** Delete an ABAP table from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
@@ -1563,6 +1687,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="gettable-high-level-table"></a>
 #### GetTable (High-Level / Table)
 **Description:** Retrieve ABAP table definition. Supports reading active or inactive version.
 
@@ -1574,6 +1699,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatetable-high-level-table"></a>
 #### UpdateTable (High-Level / Table)
 **Description:** Update DDL source code of an existing ABAP table. Locks the table, uploads new DDL source, and unlocks. Optionally activates after update. Use this to modify existing tables without re-creating metadata.
 
@@ -1587,8 +1713,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-transport"></a>
 ### High-Level / Transport
 
+<a id="createtransport-high-level-transport"></a>
 #### CreateTransport (High-Level / Transport)
 **Description:** Create a new ABAP transport request in SAP system for development objects.
 
@@ -1602,8 +1730,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-unit-test"></a>
 ### High-Level / Unit Test
 
+<a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
 **Description:** Create a CDS unit test class with CDS validation, class template, and local test class source.
 
@@ -1620,6 +1750,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createunittest-high-level-unit-test"></a>
 #### CreateUnitTest (High-Level / Unit Test)
 **Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
 
@@ -1631,6 +1762,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletecdsunittest-high-level-unit-test"></a>
 #### DeleteCdsUnitTest (High-Level / Unit Test)
 **Description:** Delete a CDS unit test class (global class).
 
@@ -1642,6 +1774,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deleteunittest-high-level-unit-test"></a>
 #### DeleteUnitTest (High-Level / Unit Test)
 **Description:** Delete an ABAP Unit test run. Note: ADT does not support deleting unit test runs and will return an error.
 
@@ -1652,6 +1785,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getcdsunittest-high-level-unit-test"></a>
 #### GetCdsUnitTest (High-Level / Unit Test)
 **Description:** Retrieve CDS unit test run status and result for a previously started run_id.
 
@@ -1662,6 +1796,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getcdsunittestresult-high-level-unit-test"></a>
 #### GetCdsUnitTestResult (High-Level / Unit Test)
 **Description:** Retrieve CDS unit test run result for a run_id.
 
@@ -1674,6 +1809,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getcdsunitteststatus-high-level-unit-test"></a>
 #### GetCdsUnitTestStatus (High-Level / Unit Test)
 **Description:** Retrieve CDS unit test run status for a run_id.
 
@@ -1685,6 +1821,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getunittest-high-level-unit-test"></a>
 #### GetUnitTest (High-Level / Unit Test)
 **Description:** Retrieve ABAP Unit test run status and result for a previously started run_id.
 
@@ -1695,6 +1832,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
 **Description:** Retrieve ABAP Unit test run result for a run_id.
 
@@ -1707,6 +1845,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getunitteststatus-high-level-unit-test"></a>
 #### GetUnitTestStatus (High-Level / Unit Test)
 **Description:** Retrieve ABAP Unit test run status for a run_id.
 
@@ -1718,6 +1857,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
 **Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
 
@@ -1729,6 +1869,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatecdsunittest-high-level-unit-test"></a>
 #### UpdateCdsUnitTest (High-Level / Unit Test)
 **Description:** Update a CDS unit test class local test class source code.
 
@@ -1741,6 +1882,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updateunittest-high-level-unit-test"></a>
 #### UpdateUnitTest (High-Level / Unit Test)
 **Description:** Update an ABAP Unit test run. Note: ADT does not support updating unit test runs and will return an error.
 
@@ -1751,8 +1893,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-view"></a>
 ### High-Level / View
 
+<a id="createview-high-level-view"></a>
 #### CreateView (High-Level / View)
 **Description:** Create CDS View or Classic View in SAP using DDL syntax. Both types use the same API workflow, differing only in DDL content (CDS has @AbapCatalog.sqlViewName and other annotations).
 
@@ -1767,6 +1911,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deleteview-high-level-view"></a>
 #### DeleteView (High-Level / View)
 **Description:** Delete an ABAP view from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
@@ -1778,6 +1923,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getview-high-level-view"></a>
 #### GetView (High-Level / View)
 **Description:** Retrieve ABAP view definition. Supports reading active or inactive version.
 
@@ -1789,6 +1935,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updateview-high-level-view"></a>
 #### UpdateView (High-Level / View)
 **Description:** Update DDL source code of an existing CDS View or Classic View. Locks the view, checks new code, uploads new DDL source, unlocks, and optionally activates.
 
@@ -1800,10 +1947,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-group"></a>
 ## Low-Level Group
 
+<a id="low-level-behavior-definition"></a>
 ### Low-Level / Behavior Definition
 
+<a id="activatebehaviordefinitionlow-low-level-behavior-definition"></a>
 #### ActivateBehaviorDefinitionLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Activate an ABAP behavior definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -1816,6 +1966,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="checkbdeflow-low-level-behavior-definition"></a>
 #### CheckBdefLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Perform syntax check on an ABAP behavior definition. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -1828,6 +1979,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createbehaviordefinitionlow-low-level-behavior-definition"></a>
 #### CreateBehaviorDefinitionLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Create a new ABAP Behavior Definition. - use CreateBehaviorDefinition (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
@@ -1845,6 +1997,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletebehaviordefinitionlow-low-level-behavior-definition"></a>
 #### DeleteBehaviorDefinitionLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
@@ -1856,6 +2009,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="lockbehaviordefinitionlow-low-level-behavior-definition"></a>
 #### LockBehaviorDefinitionLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Lock an ABAP behavior definition for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
@@ -1868,6 +2022,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="unlockbehaviordefinitionlow-low-level-behavior-definition"></a>
 #### UnlockBehaviorDefinitionLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Unlock an ABAP behavior definition after modification. Must use the same session_id and lock_handle from LockBehaviorDefinition operation.
 
@@ -1881,6 +2036,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatebehaviordefinitionlow-low-level-behavior-definition"></a>
 #### UpdateBehaviorDefinitionLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Update source code of an existing ABAP behavior definition. Requires lock handle from LockObject. - use UpdateBehaviorDefinition (high-level) for full workflow with lock/unlock/activate.
 
@@ -1895,6 +2051,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="validatebehaviordefinitionlow-low-level-behavior-definition"></a>
 #### ValidateBehaviorDefinitionLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Validate an ABAP behavior definition name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -1911,8 +2068,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-behavior-implementation"></a>
 ### Low-Level / Behavior Implementation
 
+<a id="createbehaviorimplementationlow-low-level-behavior-implementation"></a>
 #### CreateBehaviorImplementationLow (Low-Level / Behavior Implementation)
 **Description:** [low-level] Create a new ABAP behavior implementation class with full workflow (create, lock, update main source, update implementations, unlock, activate). - use CreateBehaviorImplementation (high-level) for additional validation.
 
@@ -1930,6 +2089,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="lockbehaviorimplementationlow-low-level-behavior-implementation"></a>
 #### LockBehaviorImplementationLow (Low-Level / Behavior Implementation)
 **Description:** [low-level] Lock an ABAP behavior implementation class for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
@@ -1942,6 +2102,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="validatebehaviorimplementationlow-low-level-behavior-implementation"></a>
 #### ValidateBehaviorImplementationLow (Low-Level / Behavior Implementation)
 **Description:** [low-level] Validate an ABAP behavior implementation class name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -1957,8 +2118,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-class"></a>
 ### Low-Level / Class
 
+<a id="activateclasslow-low-level-class"></a>
 #### ActivateClassLow (Low-Level / Class)
 **Description:** [low-level] Activate an ABAP class. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -1971,6 +2134,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="activateclasstestclasseslow-low-level-class"></a>
 #### ActivateClassTestClassesLow (Low-Level / Class)
 **Description:** [low-level] Activate ABAP Unit test classes include for an existing class. Should be executed after updating and unlocking test classes.
 
@@ -1984,6 +2148,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="checkclasslow-low-level-class"></a>
 #### CheckClassLow (Low-Level / Class)
 **Description:** [low-level] Perform syntax check on an ABAP class. Can check existing class (active/inactive) or hypothetical source code. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -1998,6 +2163,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createclasslow-low-level-class"></a>
 #### CreateClassLow (Low-Level / Class)
 **Description:** [low-level] Create a new ABAP class. - use CreateClass (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
@@ -2017,6 +2183,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deleteclasslow-low-level-class"></a>
 #### DeleteClassLow (Low-Level / Class)
 **Description:** [low-level] Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
@@ -2028,6 +2195,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getclassunittestresultlow-low-level-class"></a>
 #### GetClassUnitTestResultLow (Low-Level / Class)
 **Description:** [low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id.
 
@@ -2042,6 +2210,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getclassunitteststatuslow-low-level-class"></a>
 #### GetClassUnitTestStatusLow (Low-Level / Class)
 **Description:** [low-level] Retrieve ABAP Unit run status XML for a previously started run_id.
 
@@ -2055,6 +2224,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="lockclasslow-low-level-class"></a>
 #### LockClassLow (Low-Level / Class)
 **Description:** [low-level] Lock an ABAP class for modification. Uses session from HandlerContext. Returns lock handle that must be used in subsequent update/unlock operations.
 
@@ -2065,6 +2235,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="lockclasstestclasseslow-low-level-class"></a>
 #### LockClassTestClassesLow (Low-Level / Class)
 **Description:** [low-level] Lock ABAP Unit test classes include (CLAS/OC testclasses) for the specified class. Returns a test_classes_lock_handle for subsequent update/unlock operations using the same session.
 
@@ -2077,6 +2248,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="runclassunittestslow-low-level-class"></a>
 #### RunClassUnitTestsLow (Low-Level / Class)
 **Description:** [low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers.
 
@@ -2088,6 +2260,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="unlockclasslow-low-level-class"></a>
 #### UnlockClassLow (Low-Level / Class)
 **Description:** [low-level] Unlock an ABAP class after modification. Uses session from HandlerContext. Must use the same lock_handle from LockClass operation.
 
@@ -2099,6 +2272,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="unlockclasstestclasseslow-low-level-class"></a>
 #### UnlockClassTestClassesLow (Low-Level / Class)
 **Description:** [low-level] Unlock ABAP Unit test classes include for a class using the test_classes_lock_handle obtained from LockClassTestClassesLow.
 
@@ -2112,6 +2286,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updateclasslow-low-level-class"></a>
 #### UpdateClassLow (Low-Level / Class)
 **Description:** [low-level] Update source code of an existing ABAP class. Uses session from HandlerContext. Requires lock handle from LockClass operation. - use UpdateClass (high-level) for full workflow with lock/unlock/activate.
 
@@ -2124,6 +2299,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updateclasstestclasseslow-low-level-class"></a>
 #### UpdateClassTestClassesLow (Low-Level / Class)
 **Description:** [low-level] Upload ABAP Unit test include source code for an existing class. Requires test_classes_lock_handle from LockClassTestClassesLow.
 
@@ -2138,6 +2314,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="validateclasslow-low-level-class"></a>
 #### ValidateClassLow (Low-Level / Class)
 **Description:** [low-level] Validate an ABAP class name before creation. Checks if the name is valid, available, and validates package, description, and superclass if provided. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2153,8 +2330,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-common"></a>
 ### Low-Level / Common
 
+<a id="activateobjectlow-low-level-common"></a>
 #### ActivateObjectLow (Low-Level / Common)
 **Description:** [low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type.
 
@@ -2165,6 +2344,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="checkobjectlow-low-level-common"></a>
 #### CheckObjectLow (Low-Level / Common)
 **Description:** [low-level] Perform syntax check on an ABAP object without activation. Returns syntax errors, warnings, and messages.
 
@@ -2179,6 +2359,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deleteobjectlow-low-level-common"></a>
 #### DeleteObjectLow (Low-Level / Common)
 **Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects.
 
@@ -2192,6 +2373,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="lockobjectlow-low-level-common"></a>
 #### LockObjectLow (Low-Level / Common)
 **Description:** [low-level] Lock an ABAP object for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
@@ -2206,6 +2388,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="unlockobjectlow-low-level-common"></a>
 #### UnlockObjectLow (Low-Level / Common)
 **Description:** [low-level] Unlock an ABAP object after modification. Must use the same session_id and lock_handle from the LockObject operation.
 
@@ -2220,6 +2403,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="validateobjectlow-low-level-common"></a>
 #### ValidateObjectLow (Low-Level / Common)
 **Description:** [low-level] Validate an ABAP object name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2238,8 +2422,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-data-element"></a>
 ### Low-Level / Data Element
 
+<a id="activatedataelementlow-low-level-data-element"></a>
 #### ActivateDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Activate an ABAP data element. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2252,6 +2438,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="checkdataelementlow-low-level-data-element"></a>
 #### CheckDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Perform syntax check on an ABAP data element. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2264,6 +2451,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createdataelementlow-low-level-data-element"></a>
 #### CreateDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Create a new ABAP data element. - use CreateDataElement (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
@@ -2284,6 +2472,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletedataelementlow-low-level-data-element"></a>
 #### DeleteDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
@@ -2295,6 +2484,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="lockdataelementlow-low-level-data-element"></a>
 #### LockDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Lock an ABAP data element for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
@@ -2307,6 +2497,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="unlockdataelementlow-low-level-data-element"></a>
 #### UnlockDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Unlock an ABAP data element after modification. Must use the same session_id and lock_handle from LockDataElement operation.
 
@@ -2320,6 +2511,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatedataelementlow-low-level-data-element"></a>
 #### UpdateDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Update properties of an existing ABAP data element. Requires lock handle from LockObject. - use UpdateDataElement (high-level) for full workflow with lock/unlock/activate.
 
@@ -2334,6 +2526,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="validatedataelementlow-low-level-data-element"></a>
 #### ValidateDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Validate an ABAP data element name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2348,8 +2541,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-ddlx"></a>
 ### Low-Level / Ddlx
 
+<a id="activatemetadataextensionlow-low-level-ddlx"></a>
 #### ActivateMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2362,6 +2557,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="checkmetadataextensionlow-low-level-ddlx"></a>
 #### CheckMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Perform syntax check on an ABAP metadata extension. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2374,6 +2570,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createmetadataextensionlow-low-level-ddlx"></a>
 #### CreateMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Create a new ABAP Metadata Extension. - use CreateMetadataExtension (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
@@ -2390,6 +2587,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletemetadataextensionlow-low-level-ddlx"></a>
 #### DeleteMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Delete an ABAP metadata extension from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
@@ -2401,6 +2599,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="lockmetadataextensionlow-low-level-ddlx"></a>
 #### LockMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Lock an ABAP metadata extension for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
@@ -2413,6 +2612,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="unlockmetadataextensionlow-low-level-ddlx"></a>
 #### UnlockMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Unlock an ABAP metadata extension after modification. Must use the same session_id and lock_handle from LockMetadataExtension operation.
 
@@ -2426,6 +2626,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatemetadataextensionlow-low-level-ddlx"></a>
 #### UpdateMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Update source code of an existing ABAP metadata extension. Requires lock handle from LockObject. - use UpdateMetadataExtension (high-level) for full workflow with lock/unlock/activate.
 
@@ -2440,6 +2641,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="validatemetadataextensionlow-low-level-ddlx"></a>
 #### ValidateMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Validate an ABAP metadata extension name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2452,8 +2654,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-domain"></a>
 ### Low-Level / Domain
 
+<a id="activatedomainlow-low-level-domain"></a>
 #### ActivateDomainLow (Low-Level / Domain)
 **Description:** [low-level] Activate an ABAP domain. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2466,6 +2670,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="checkdomainlow-low-level-domain"></a>
 #### CheckDomainLow (Low-Level / Domain)
 **Description:** [low-level] Perform syntax check on an ABAP domain. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2478,6 +2683,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createdomainlow-low-level-domain"></a>
 #### CreateDomainLow (Low-Level / Domain)
 **Description:** [low-level] Create a new ABAP domain. - use CreateDomain (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
@@ -2493,6 +2699,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletedomainlow-low-level-domain"></a>
 #### DeleteDomainLow (Low-Level / Domain)
 **Description:** [low-level] Delete an ABAP domain from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
@@ -2504,6 +2711,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="lockdomainlow-low-level-domain"></a>
 #### LockDomainLow (Low-Level / Domain)
 **Description:** [low-level] Lock an ABAP domain for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
@@ -2516,6 +2724,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="unlockdomainlow-low-level-domain"></a>
 #### UnlockDomainLow (Low-Level / Domain)
 **Description:** [low-level] Unlock an ABAP domain after modification. Must use the same session_id and lock_handle from LockDomain operation.
 
@@ -2529,6 +2738,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatedomainlow-low-level-domain"></a>
 #### UpdateDomainLow (Low-Level / Domain)
 **Description:** [low-level] Update properties of an existing ABAP domain. Requires lock handle from LockObject. - use UpdateDomain (high-level) for full workflow with lock/unlock/activate.
 
@@ -2543,6 +2753,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="validatedomainlow-low-level-domain"></a>
 #### ValidateDomainLow (Low-Level / Domain)
 **Description:** [low-level] Validate an ABAP domain name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2557,8 +2768,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-function"></a>
 ### Low-Level / Function
 
+<a id="activatefunctiongrouplow-low-level-function"></a>
 #### ActivateFunctionGroupLow (Low-Level / Function)
 **Description:** [low-level] Activate an ABAP function group. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2571,6 +2784,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="activatefunctionmodulelow-low-level-function"></a>
 #### ActivateFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Activate an ABAP function module. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2584,6 +2798,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="checkfunctiongrouplow-low-level-function"></a>
 #### CheckFunctionGroupLow (Low-Level / Function)
 **Description:** [low-level] Perform syntax check on an ABAP function group. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2596,6 +2811,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="checkfunctionmodulelow-low-level-function"></a>
 #### CheckFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Perform syntax check on an ABAP function module. Returns syntax errors, warnings, and messages. Requires function group name. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2610,6 +2826,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createfunctiongrouplow-low-level-function"></a>
 #### CreateFunctionGroupLow (Low-Level / Function)
 **Description:** [low-level] Create a new ABAP function group. - use CreateFunctionGroup (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
@@ -2625,6 +2842,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createfunctionmodulelow-low-level-function"></a>
 #### CreateFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Create a new ABAP function module. - use CreateFunctionModule (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
@@ -2641,6 +2859,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletefunctiongrouplow-low-level-function"></a>
 #### DeleteFunctionGroupLow (Low-Level / Function)
 **Description:** [low-level] Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
@@ -2652,6 +2871,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletefunctionmodulelow-low-level-function"></a>
 #### DeleteFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
@@ -2664,6 +2884,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="lockfunctiongrouplow-low-level-function"></a>
 #### LockFunctionGroupLow (Low-Level / Function)
 **Description:** [low-level] Lock an ABAP function group for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
@@ -2676,6 +2897,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="lockfunctionmodulelow-low-level-function"></a>
 #### LockFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Lock an ABAP function module for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
@@ -2689,6 +2911,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="unlockfunctiongrouplow-low-level-function"></a>
 #### UnlockFunctionGroupLow (Low-Level / Function)
 **Description:** [low-level] Unlock an ABAP function group after modification. Must use the same session_id and lock_handle from LockFunctionGroup operation.
 
@@ -2702,6 +2925,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="unlockfunctionmodulelow-low-level-function"></a>
 #### UnlockFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Unlock an ABAP function module after modification. Must use the same session_id and lock_handle from LockFunctionModule operation.
 
@@ -2716,6 +2940,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatefunctionmodulelow-low-level-function"></a>
 #### UpdateFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Update source code of an existing ABAP function module. Requires lock handle from LockObject and function group name. - use UpdateFunctionModule (high-level) for full workflow with lock/unlock/activate.
 
@@ -2731,6 +2956,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="validatefunctiongrouplow-low-level-function"></a>
 #### ValidateFunctionGroupLow (Low-Level / Function)
 **Description:** [low-level] Validate an ABAP function group name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2745,6 +2971,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="validatefunctionmodulelow-low-level-function"></a>
 #### ValidateFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Validate an ABAP function module name before creation. Checks if the name is valid and available. Requires function group name. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2759,8 +2986,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-interface"></a>
 ### Low-Level / Interface
 
+<a id="activateinterfacelow-low-level-interface"></a>
 #### ActivateInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2773,6 +3002,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="checkinterfacelow-low-level-interface"></a>
 #### CheckInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Perform syntax check on an ABAP interface. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2785,6 +3015,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createinterfacelow-low-level-interface"></a>
 #### CreateInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Create a new ABAP interface. - use CreateInterface (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
@@ -2800,6 +3031,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deleteinterfacelow-low-level-interface"></a>
 #### DeleteInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
@@ -2811,6 +3043,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="lockinterfacelow-low-level-interface"></a>
 #### LockInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Lock an ABAP interface for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
@@ -2823,6 +3056,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="unlockinterfacelow-low-level-interface"></a>
 #### UnlockInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Unlock an ABAP interface after modification. Must use the same session_id and lock_handle from LockInterface operation.
 
@@ -2836,6 +3070,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updateinterfacelow-low-level-interface"></a>
 #### UpdateInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Update source code of an existing ABAP interface. Requires lock handle from LockObject. - use UpdateInterface (high-level) for full workflow with lock/unlock/activate.
 
@@ -2850,6 +3085,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="validateinterfacelow-low-level-interface"></a>
 #### ValidateInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Validate an ABAP interface name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2864,8 +3100,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-package"></a>
 ### Low-Level / Package
 
+<a id="checkpackagelow-low-level-package"></a>
 #### CheckPackageLow (Low-Level / Package)
 **Description:** [low-level] Perform syntax check on an ABAP package. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2879,6 +3117,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createpackagelow-low-level-package"></a>
 #### CreatePackageLow (Low-Level / Package)
 **Description:** [low-level] Create a new ABAP package. - use CreatePackage (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
@@ -2898,6 +3137,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletepackagelow-low-level-package"></a>
 #### DeletePackageLow (Low-Level / Package)
 **Description:** [low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
@@ -2911,6 +3151,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="lockpackagelow-low-level-package"></a>
 #### LockPackageLow (Low-Level / Package)
 **Description:** [low-level] Lock an ABAP package for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. Requires super_package.
 
@@ -2924,6 +3165,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="unlockpackagelow-low-level-package"></a>
 #### UnlockPackageLow (Low-Level / Package)
 **Description:** [low-level] Unlock an ABAP package after modification. Requires lock handle from LockObject and superPackage. - must use the same session_id and lock_handle from LockObject.
 
@@ -2938,6 +3180,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatepackagelow-low-level-package"></a>
 #### UpdatePackageLow (Low-Level / Package)
 **Description:** [low-level] Update description of an existing ABAP package. Requires lock handle from LockObject and superPackage. - use UpdatePackageSource for full workflow with lock/unlock.
 
@@ -2953,6 +3196,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="validatepackagelow-low-level-package"></a>
 #### ValidatePackageLow (Low-Level / Package)
 **Description:** [low-level] Validate an ABAP package name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2965,8 +3209,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-program"></a>
 ### Low-Level / Program
 
+<a id="activateprogramlow-low-level-program"></a>
 #### ActivateProgramLow (Low-Level / Program)
 **Description:** [low-level] Activate an ABAP program. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2979,6 +3225,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="checkprogramlow-low-level-program"></a>
 #### CheckProgramLow (Low-Level / Program)
 **Description:** [low-level] Perform syntax check on an ABAP program. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -2991,6 +3238,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createprogramlow-low-level-program"></a>
 #### CreateProgramLow (Low-Level / Program)
 **Description:** [low-level] Create a new ABAP program. - use CreateProgram (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
@@ -3008,6 +3256,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deleteprogramlow-low-level-program"></a>
 #### DeleteProgramLow (Low-Level / Program)
 **Description:** [low-level] Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
@@ -3019,6 +3268,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="lockprogramlow-low-level-program"></a>
 #### LockProgramLow (Low-Level / Program)
 **Description:** [low-level] Lock an ABAP program for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
@@ -3031,6 +3281,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="unlockprogramlow-low-level-program"></a>
 #### UnlockProgramLow (Low-Level / Program)
 **Description:** [low-level] Unlock an ABAP program after modification. Must use the same session_id and lock_handle from LockProgram operation.
 
@@ -3044,6 +3295,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updateprogramlow-low-level-program"></a>
 #### UpdateProgramLow (Low-Level / Program)
 **Description:** [low-level] Update source code of an existing ABAP program. Requires lock handle from LockObject. - use UpdateProgram (high-level) for full workflow with lock/unlock/activate.
 
@@ -3058,6 +3310,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="validateprogramlow-low-level-program"></a>
 #### ValidateProgramLow (Low-Level / Program)
 **Description:** [low-level] Validate an ABAP program name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -3072,8 +3325,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-structure"></a>
 ### Low-Level / Structure
 
+<a id="activatestructurelow-low-level-structure"></a>
 #### ActivateStructureLow (Low-Level / Structure)
 **Description:** [low-level] Activate an ABAP structure. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -3086,6 +3341,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="checkstructurelow-low-level-structure"></a>
 #### CheckStructureLow (Low-Level / Structure)
 **Description:** [low-level] Perform syntax check on an ABAP structure. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_code is provided, validates new/unsaved code (will be base64 encoded in request).
 
@@ -3100,6 +3356,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createstructurelow-low-level-structure"></a>
 #### CreateStructureLow (Low-Level / Structure)
 **Description:** [low-level] Create a new ABAP structure. - use CreateStructure (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
@@ -3117,6 +3374,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletestructurelow-low-level-structure"></a>
 #### DeleteStructureLow (Low-Level / Structure)
 **Description:** [low-level] Delete an ABAP structure from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
@@ -3128,6 +3386,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="lockstructurelow-low-level-structure"></a>
 #### LockStructureLow (Low-Level / Structure)
 **Description:** [low-level] Lock an ABAP structure for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
@@ -3140,6 +3399,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="unlockstructurelow-low-level-structure"></a>
 #### UnlockStructureLow (Low-Level / Structure)
 **Description:** [low-level] Unlock an ABAP structure after modification. Must use the same session_id and lock_handle from LockStructure operation.
 
@@ -3153,6 +3413,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatestructurelow-low-level-structure"></a>
 #### UpdateStructureLow (Low-Level / Structure)
 **Description:** [low-level] Update DDL source code of an existing ABAP structure. Requires lock handle from LockObject. - use UpdateStructureSource for full workflow with lock/unlock.
 
@@ -3167,6 +3428,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="validatestructurelow-low-level-structure"></a>
 #### ValidateStructureLow (Low-Level / Structure)
 **Description:** [low-level] Validate an ABAP structure name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -3181,8 +3443,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-system"></a>
 ### Low-Level / System
 
+<a id="getnodestructurelow-low-level-system"></a>
 #### GetNodeStructureLow (Low-Level / System)
 **Description:** [low-level] Fetch node structure from ADT repository. Used for object tree navigation and structure discovery. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -3198,6 +3462,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getobjectstructurelow-low-level-system"></a>
 #### GetObjectStructureLow (Low-Level / System)
 **Description:** [low-level] Retrieve ADT object structure as compact JSON tree. Returns XML response with object structure tree. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -3211,6 +3476,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getvirtualfolderslow-low-level-system"></a>
 #### GetVirtualFoldersLow (Low-Level / System)
 **Description:** [low-level] Retrieve hierarchical virtual folder contents from ADT information system. Used for browsing ABAP objects by package, group, type, etc.
 
@@ -3223,8 +3489,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-table"></a>
 ### Low-Level / Table
 
+<a id="activatetablelow-low-level-table"></a>
 #### ActivateTableLow (Low-Level / Table)
 **Description:** [low-level] Activate an ABAP table. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -3237,6 +3505,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="checktablelow-low-level-table"></a>
 #### CheckTableLow (Low-Level / Table)
 **Description:** [low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Requires session_id for stateful operations. Can use session_id and session_state from GetSession to maintain the same session. If ddl_code is provided, validates new/unsaved code (will be base64 encoded in request).
 
@@ -3252,6 +3521,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createtablelow-low-level-table"></a>
 #### CreateTableLow (Low-Level / Table)
 **Description:** [low-level] Create a new ABAP table. - use CreateTable (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
@@ -3266,6 +3536,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletetablelow-low-level-table"></a>
 #### DeleteTableLow (Low-Level / Table)
 **Description:** [low-level] Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
@@ -3277,6 +3548,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="locktablelow-low-level-table"></a>
 #### LockTableLow (Low-Level / Table)
 **Description:** [low-level] Lock an ABAP table for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
@@ -3289,6 +3561,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="unlocktablelow-low-level-table"></a>
 #### UnlockTableLow (Low-Level / Table)
 **Description:** [low-level] Unlock an ABAP table after modification. Must use the same session_id and lock_handle from LockTable operation.
 
@@ -3302,6 +3575,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updatetablelow-low-level-table"></a>
 #### UpdateTableLow (Low-Level / Table)
 **Description:** [low-level] Update DDL source code of an existing ABAP table. Requires lock handle from LockObject. - use CreateTable for full workflow with lock/unlock.
 
@@ -3317,6 +3591,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="validatetablelow-low-level-table"></a>
 #### ValidateTableLow (Low-Level / Table)
 **Description:** [low-level] Validate an ABAP table name before creation. Checks if the name is valid and available. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -3331,8 +3606,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-transport"></a>
 ### Low-Level / Transport
 
+<a id="createtransportlow-low-level-transport"></a>
 #### CreateTransportLow (Low-Level / Transport)
 **Description:** [low-level] Create a new ABAP transport request.
 
@@ -3344,8 +3621,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-view"></a>
 ### Low-Level / View
 
+<a id="activateviewlow-low-level-view"></a>
 #### ActivateViewLow (Low-Level / View)
 **Description:** [low-level] Activate an ABAP view (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
@@ -3358,6 +3637,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="checkviewlow-low-level-view"></a>
 #### CheckViewLow (Low-Level / View)
 **Description:** [low-level] Perform syntax check on an ABAP view. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).
 
@@ -3372,6 +3652,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="createviewlow-low-level-view"></a>
 #### CreateViewLow (Low-Level / View)
 **Description:** [low-level] Create a new ABAP view. - use CreateView (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
@@ -3389,6 +3670,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deleteviewlow-low-level-view"></a>
 #### DeleteViewLow (Low-Level / View)
 **Description:** [low-level] Delete an ABAP view from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
@@ -3400,6 +3682,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="lockviewlow-low-level-view"></a>
 #### LockViewLow (Low-Level / View)
 **Description:** [low-level] Lock an ABAP view for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
@@ -3412,6 +3695,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="unlockviewlow-low-level-view"></a>
 #### UnlockViewLow (Low-Level / View)
 **Description:** [low-level] Unlock an ABAP view after modification. Must use the same session_id and lock_handle from LockView operation.
 
@@ -3425,6 +3709,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="updateviewlow-low-level-view"></a>
 #### UpdateViewLow (Low-Level / View)
 **Description:** [low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockObject. - use UpdateView (high-level) for full workflow with lock/unlock/activate.
 
@@ -3439,6 +3724,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="validateviewlow-low-level-view"></a>
 #### ValidateViewLow (Low-Level / View)
 **Description:** [low-level] Validate an ABAP view name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 

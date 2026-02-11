@@ -315,14 +315,20 @@ function generateMarkdown(tools) {
     if (objects.length === 0) continue;
 
     const levelHeading = `${levelTitle(level)} Group`;
+    const levelAnchor = anchorFromHeading(levelHeading);
+    md += `<a id="${levelAnchor}"></a>\n`;
     md += `## ${levelHeading}\n\n`;
 
     for (const obj of objects) {
       const objectHeading = `${levelTitle(level)} / ${obj.objectTitle}`;
+      const objectAnchor = anchorFromHeading(objectHeading);
+      md += `<a id="${objectAnchor}"></a>\n`;
       md += `### ${objectHeading}\n\n`;
 
       for (const tool of obj.tools) {
         const toolHeading = `${tool.name} (${levelTitle(level)} / ${obj.objectTitle})`;
+        const toolAnchor = anchorFromHeading(toolHeading);
+        md += `<a id="${toolAnchor}"></a>\n`;
         md += `#### ${toolHeading}\n`;
         md += `**Description:** ${tool.description || 'No description'}\n\n`;
         md += `**Source:** \`${tool.filePath}\`\n\n`;

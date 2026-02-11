@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.fr0ster/mcp-abap-adt",
-  "description": "SAP ABAP ADT MCP server with full CRUD for on-prem and ABAP Cloud (BTP), plus JWT/XSUAA and service-key destination auth",
+  "description": "SAP ABAP ADT MCP: full CRUD, on-prem + ABAP Cloud (BTP), JWT/XSUAA, service-key auth",
   "repository": {
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"

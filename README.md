@@ -89,7 +89,10 @@ await server.connect(transport);
 1. **Install server**: See [Installation Guide](docs/installation/INSTALLATION.md)
 2. **Configure client (auto)**: Use `mcp-conf` from `@mcp-abap-adt/configurator` (repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf), docs: [CLIENT_INSTALLERS.md](https://github.com/fr0ster/mcp-abap-adt-conf/tree/main/docs/CLIENT_INSTALLERS.md))
 3. **Configure client (manual)**: See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md)
-4. **Use**: See [Available Tools](docs/user-guide/AVAILABLE_TOOLS.md)
+4. **Use**:
+   - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
+   - [High-Level Tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md)
+   - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
 
 ## Registries
 
@@ -132,7 +135,10 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md)** - Destination-based auth and service keys
 - **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups
 - **Configurator**: `@mcp-abap-adt/configurator` (repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf)) provides the `mcp-conf` CLI to auto-configure clients
-- **[Available Tools](docs/user-guide/AVAILABLE_TOOLS.md)** - Complete list of available MCP tools
+- **Tools by level**
+  - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
+  - [High-Level Tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md)
+  - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
 
 ### For Administrators
 - **[Deployment Docs](docs/deployment/README.md)** - MCP Registry, Docker, release notes

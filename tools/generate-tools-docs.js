@@ -12,7 +12,12 @@ const fs = require('fs');
 const path = require('path');
 
 const HANDLERS_ROOT = path.join(__dirname, '../src/handlers');
-const OUTPUT_PATH = path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS.md');
+const OUTPUT_PATHS = {
+  all: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS.md'),
+  readonly: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_READONLY.md'),
+  high: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_HIGH.md'),
+  low: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_LOW.md'),
+};
 const LEVELS = ['readonly', 'high', 'low'];
 
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
@@ -21,6 +26,9 @@ Usage: node tools/generate-tools-docs.js
 
 Scans src/handlers/**/(readonly|high|low)/*.ts and generates:
   docs/user-guide/AVAILABLE_TOOLS.md
+  docs/user-guide/AVAILABLE_TOOLS_READONLY.md
+  docs/user-guide/AVAILABLE_TOOLS_HIGH.md
+  docs/user-guide/AVAILABLE_TOOLS_LOW.md
 
 Output hierarchy:
   1) Group (level)
@@ -343,6 +351,53 @@ function generateMarkdown(tools) {
   return md;
 }
 
+function generateLevelMarkdown(tools, level) {
+  const levelTools = tools.filter(t => t.level === level);
+  const grouped = groupByLevelAndObject(levelTools);
+  const objects = Object.values(grouped[level]).sort((a, b) => a.objectTitle.localeCompare(b.objectTitle));
+
+  let md = `# ${levelTitle(level)} Tools - MCP ABAP ADT Server\n\n`;
+  md += `Generated from code in \`src/handlers/**\` (not from docs).\n\n`;
+  md += `- Level: ${levelTitle(level)}\n`;
+  md += `- Total tools: ${levelTools.length}\n\n`;
+
+  md += `## Navigation\n\n`;
+  const levelHeading = `${levelTitle(level)} Group`;
+  md += `- [${levelHeading}](#${anchorFromHeading(levelHeading)})\n`;
+  for (const obj of objects) {
+    const objectHeading = `${levelTitle(level)} / ${obj.objectTitle}`;
+    md += `  - [${obj.objectTitle}](#${anchorFromHeading(objectHeading)})\n`;
+    for (const tool of obj.tools) {
+      const toolHeading = `${tool.name} (${levelTitle(level)} / ${obj.objectTitle})`;
+      md += `    - [${tool.name}](#${anchorFromHeading(toolHeading)})\n`;
+    }
+  }
+
+  md += `\n---\n\n`;
+  md += `<a id="${anchorFromHeading(levelHeading)}"></a>\n`;
+  md += `## ${levelHeading}\n\n`;
+
+  for (const obj of objects) {
+    const objectHeading = `${levelTitle(level)} / ${obj.objectTitle}`;
+    md += `<a id="${anchorFromHeading(objectHeading)}"></a>\n`;
+    md += `### ${objectHeading}\n\n`;
+
+    for (const tool of obj.tools) {
+      const toolHeading = `${tool.name} (${levelTitle(level)} / ${obj.objectTitle})`;
+      md += `<a id="${anchorFromHeading(toolHeading)}"></a>\n`;
+      md += `#### ${toolHeading}\n`;
+      md += `**Description:** ${tool.description || 'No description'}\n\n`;
+      md += `**Source:** \`${tool.filePath}\`\n\n`;
+      md += `**Parameters:**\n`;
+      md += renderParams(tool);
+      md += `\n---\n\n`;
+    }
+  }
+
+  md += `*Last updated: ${new Date().toISOString().slice(0, 10)}*\n`;
+  return md;
+}
+
 function main() {
   console.log('🔍 Scanning handler code in src/handlers...');
   const tools = loadToolsFromHandlers();
@@ -353,9 +408,27 @@ function main() {
   }
 
   console.log(`✅ Found ${tools.length} tools`);
-  const markdown = generateMarkdown(tools);
-  fs.writeFileSync(OUTPUT_PATH, markdown, 'utf8');
-  console.log(`✅ Documentation generated: ${OUTPUT_PATH}`);
+  const markdownAll = generateMarkdown(tools);
+  fs.writeFileSync(OUTPUT_PATHS.all, markdownAll, 'utf8');
+  fs.writeFileSync(
+    OUTPUT_PATHS.readonly,
+    generateLevelMarkdown(tools, 'readonly'),
+    'utf8',
+  );
+  fs.writeFileSync(
+    OUTPUT_PATHS.high,
+    generateLevelMarkdown(tools, 'high'),
+    'utf8',
+  );
+  fs.writeFileSync(
+    OUTPUT_PATHS.low,
+    generateLevelMarkdown(tools, 'low'),
+    'utf8',
+  );
+  console.log(`✅ Documentation generated: ${OUTPUT_PATHS.all}`);
+  console.log(`✅ Documentation generated: ${OUTPUT_PATHS.readonly}`);
+  console.log(`✅ Documentation generated: ${OUTPUT_PATHS.high}`);
+  console.log(`✅ Documentation generated: ${OUTPUT_PATHS.low}`);
 }
 
 if (require.main === module) {
@@ -366,4 +439,5 @@ module.exports = {
   extractToolDefinition,
   loadToolsFromHandlers,
   generateMarkdown,
+  generateLevelMarkdown,
 };

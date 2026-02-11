@@ -56,7 +56,10 @@ See [Installation Guide](../installation/INSTALLATION.md) for full instructions.
 ## Documentation Files
 
 - **[CLIENT_CONFIGURATION.md](CLIENT_CONFIGURATION.md)** - Guide for configuring MCP clients to connect to the server, including HTTP header configuration for dynamic SAP connection setup
-- **[AVAILABLE_TOOLS.md](AVAILABLE_TOOLS.md)** - Complete list of all available MCP tools with descriptions and usage examples (auto-generated from handler definitions)
+- **[AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md)** - Read-only tools (auto-generated)
+- **[AVAILABLE_TOOLS_HIGH.md](AVAILABLE_TOOLS_HIGH.md)** - High-level tools (auto-generated)
+- **[AVAILABLE_TOOLS_LOW.md](AVAILABLE_TOOLS_LOW.md)** - Low-level tools (auto-generated)
+- **[AVAILABLE_TOOLS.md](AVAILABLE_TOOLS.md)** - Full combined tools reference (auto-generated)
 - **[AUTHENTICATION.md](AUTHENTICATION.md)** - Destination-based auth, service key locations, and header-based auth
 - **[TERMINOLOGY.md](TERMINOLOGY.md)** - Project-specific terminology
 - **[HANDLERS_MANAGEMENT.md](HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups and exposure
@@ -67,7 +70,10 @@ See [Installation Guide](../installation/INSTALLATION.md) for full instructions.
 2. **Configure your client**:
    - **Auto (recommended)**: Use the configurator (`@mcp-abap-adt/configurator`, repo: `mcp-abap-adt-conf`)
    - **Manual**: See [CLIENT_CONFIGURATION.md](CLIENT_CONFIGURATION.md) for JSON/TOML examples
-3. **Explore available tools**: See [AVAILABLE_TOOLS.md](AVAILABLE_TOOLS.md) for a complete list of tools you can use
+3. **Explore available tools**:
+   - [Read-only tools](AVAILABLE_TOOLS_READONLY.md)
+   - [High-level tools](AVAILABLE_TOOLS_HIGH.md)
+   - [Low-level tools](AVAILABLE_TOOLS_LOW.md)
 
 ## Package Tree Output
 

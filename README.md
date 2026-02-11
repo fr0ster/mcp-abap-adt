@@ -1,10 +1,11 @@
 # mcp-abap-adt: Your Gateway to ABAP Development Tools (ADT)
 
-This project provides a server that allows you to interact with SAP ABAP systems using the Model Context Protocol (MCP). It connects AI clients to real ADT capabilities: read, analyze, and modify ABAP artifacts with a consistent, secure interface.
+This project provides an MCP server for SAP ABAP ADT with full CRUD support across On-Premise and SAP BTP ABAP Cloud systems. It supports JWT/XSUAA authentication and service key (destination-based) authorization from the start.
 
 **Why teams use it:**
-- Works with **on‑prem** and **BTP** ABAP systems
-- **Destination‑based auth** (service keys) so you stop pasting tokens everywhere
+- **Full CRUD** (not read-only): create, read, update, and delete ABAP artifacts
+- Works with **On-Premise** and **ABAP Cloud (BTP)** systems
+- **JWT/XSUAA** and **service key** (destination-based) authorization
 - Multiple transports: **stdio**, **HTTP**, **SSE**
 - Rich tool surface for ABAP objects, metadata, transports, and search
 

@@ -87,10 +87,17 @@
     "sap",
     "adt",
     "mcp",
-    "model-context-protocol"
+    "model-context-protocol",
+    "mcp-server",
+    "abap-cloud",
+    "sap-btp",
+    "xsuaa",
+    "jwt-auth",
+    "service-key",
+    "crud"
   ],
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
-  "description": "Embedded ABAP ADT MCP server tailored for the Cloud LLM Hub stack",
+  "description": "SAP ABAP ADT MCP server with full CRUD for on-prem and ABAP Cloud (BTP), plus JWT/XSUAA and service-key destination auth",
   "license": "MIT",
   "repository": {
     "type": "git",

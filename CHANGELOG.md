@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2.2.5] - 2026-02-11
+### Changed
+- **Tools docs generator**: Reworked `tools/generate-tools-docs.js` to scan only handler code in `src/handlers/**`.
+- **Tools docs structure**: Updated `docs/user-guide/AVAILABLE_TOOLS.md` hierarchy to `Group (level) → Object (folder) → Tools`.
+- **Coverage fix**: Ensured BDEF and other handler folders are included consistently in generated tools documentation.
+
 ## [2.2.4] - 2026-02-11
 ### Changed
 - **Discoverability metadata**: Updated npm keywords and package metadata to improve MCP search relevance for ABAP, ABAP Cloud, JWT/XSUAA, and service-key flows.

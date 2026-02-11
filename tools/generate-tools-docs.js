@@ -1,760 +1,352 @@
 #!/usr/bin/env node
 
 /**
- * Generate AVAILABLE_TOOLS.md documentation from TOOL_DEFINITION exports
+ * Generate AVAILABLE_TOOLS.md from TOOL_DEFINITION in src/handlers/**
  *
- * This script automatically generates documentation for all MCP ABAP ADT tools
- * by reading TOOL_DEFINITION from handler files.
- *
- * Usage:
- *   node tools/generate-tools-docs.js [--help]
- *   npm run docs:tools
- *
- * Options:
- *   --help, -h    Show this help message
- *
- * What it does:
- *   1. Scans all handler files in src/handlers/
- *   2. Extracts TOOL_DEFINITION from each handler
- *   3. Groups tools by category
- *   4. Generates markdown documentation with descriptions, parameters, and examples
- *   5. Writes to doc/user-guide/AVAILABLE_TOOLS.md
- *
- * Example:
- *   $ npm run docs:tools
- *   🔍 Loading tools from handlers...
- *   ✅ Found 31 tools
- *   📝 Generating documentation...
- *   ✅ Documentation generated: doc/user-guide/AVAILABLE_TOOLS.md
+ * Rules:
+ * - Scan code folders only (src/handlers)
+ * - Hierarchy in output: Group(level) -> Object(folder) -> Tools
  */
 
 const fs = require('fs');
 const path = require('path');
 
-// Show help if requested
+const HANDLERS_ROOT = path.join(__dirname, '../src/handlers');
+const OUTPUT_PATH = path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS.md');
+const LEVELS = ['readonly', 'high', 'low'];
+
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log(`
-Usage: node tools/generate-tools-docs.js [options]
+Usage: node tools/generate-tools-docs.js
 
-Generate AVAILABLE_TOOLS.md documentation from TOOL_DEFINITION exports
+Scans src/handlers/**/(readonly|high|low)/*.ts and generates:
+  docs/user-guide/AVAILABLE_TOOLS.md
 
-Options:
-  --help, -h    Show this help message
-
-What it does:
-  • Scans all handler files in src/handlers/
-  • Extracts TOOL_DEFINITION from each handler
-  • Groups tools by category (Programs, Tables, Enhancements, etc.)
-  • Generates markdown documentation with:
-    - Tool descriptions
-    - Parameter lists with types and descriptions
-    - Example JSON for each tool
-    - Special notes (e.g., ABAP Cloud limitations)
-  • Writes to doc/user-guide/AVAILABLE_TOOLS.md
-
-Examples:
-  $ npm run docs:tools
-  $ node tools/generate-tools-docs.js
-
-See also:
-  • tools/update-handlers-with-tool-definitions.js - Add TOOL_DEFINITION to new handlers
-  • doc/user-guide/AVAILABLE_TOOLS.md - Generated documentation
-  • TOOLS_ARCHITECTURE.md - Architecture documentation
+Output hierarchy:
+  1) Group (level)
+  2) Object (folder under src/handlers)
+  3) Tools (TOOL_DEFINITION.name)
 `);
   process.exit(0);
 }
 
-// Tool category mappings
-const CATEGORY_MAP = {
-  // Programs, classes, functions
-  'GetProgram': 'Programs, Classes, Functions',
-  'GetClass': 'Programs, Classes, Functions',
-  'GetFunction': 'Programs, Classes, Functions',
-  'GetFunctionGroup': 'Programs, Classes, Functions',
+function titleCaseFolder(folder) {
+  return folder
+    .split('_')
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
 
-  // Tables, structures
-  'GetTable': 'Tables and Structures',
-  'GetStructure': 'Tables and Structures',
-  'GetTableContents': 'Tables and Structures',
+function slug(value) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-');
+}
 
-  // Packages, interfaces
-  'GetPackage': 'Packages and Interfaces',
-  'GetInterface': 'Packages and Interfaces',
+function walk(dir, acc) {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walk(full, acc);
+      continue;
+    }
+    if (entry.isFile() && entry.name.endsWith('.ts')) {
+      acc.push(full);
+    }
+  }
+}
 
-  // Includes, hierarchies
-  'GetInclude': 'Includes and Hierarchies',
-  'GetIncludesList': 'Includes and Hierarchies',
-  'GetObjectStructure': 'Includes and Hierarchies',
+function findToolDefinitionBlock(content) {
+  const marker = 'export const TOOL_DEFINITION';
+  const start = content.indexOf(marker);
+  if (start === -1) return null;
 
-  // Types, descriptions, metadata
-  'GetTypeInfo': 'Types, Descriptions, Metadata',
-  'GetAdtTypes': 'Types, Descriptions, Metadata',
-  'GetObjectInfo': 'Types, Descriptions, Metadata',
+  const firstBrace = content.indexOf('{', start);
+  if (firstBrace === -1) return null;
 
-  // Search, SQL, transactions
-  'SearchObject': 'Search, SQL, Transactions',
-  'GetSqlQuery': 'Search, SQL, Transactions',
-  'GetTransaction': 'Search, SQL, Transactions',
-  'GetWhereUsed': 'Search, SQL, Transactions',
+  let depth = 0;
+  let inSingle = false;
+  let inDouble = false;
+  let inTemplate = false;
+  let escape = false;
 
-  // Enhancement
-  'GetEnhancements': 'Enhancements',
-  'GetEnhancementSpot': 'Enhancements',
-  'GetEnhancementImpl': 'Enhancements',
-  'GetBehaviorDefinition': 'Enhancements',
+  for (let i = firstBrace; i < content.length; i++) {
+    const ch = content[i];
 
-  // ABAP Parser & Semantic Analysis
-  'GetAbapAST': 'ABAP Parser and Semantic Analysis',
-  'GetAbapSemanticAnalysis': 'ABAP Parser and Semantic Analysis',
-  'GetAbapSystemSymbols': 'ABAP Parser and Semantic Analysis',
+    if (escape) {
+      escape = false;
+      continue;
+    }
 
-  // Batch operations
-  'GetObjectsByType': 'Batch Operations',
-  'GetObjectsList': 'Batch Operations',
-  'GetProgFullCode': 'Batch Operations',
-  'GetObjectNodeFromCache': 'Batch Operations',
-  'DescribeByList': 'Batch Operations',
-};
+    if (ch === '\\') {
+      escape = true;
+      continue;
+    }
 
-// Category order for output
-const CATEGORY_ORDER = [
-  'Programs, Classes, Functions',
-  'Tables and Structures',
-  'Packages and Interfaces',
-  'Includes and Hierarchies',
-  'Types, Descriptions, Metadata',
-  'Search, SQL, Transactions',
-  'Enhancements',
-  'ABAP Parser and Semantic Analysis',
-  'Batch Operations',
-];
+    if (!inDouble && !inTemplate && ch === "'") {
+      inSingle = !inSingle;
+      continue;
+    }
+    if (!inSingle && !inTemplate && ch === '"') {
+      inDouble = !inDouble;
+      continue;
+    }
+    if (!inSingle && !inDouble && ch === '`') {
+      inTemplate = !inTemplate;
+      continue;
+    }
 
-// Special notes for certain tools
-const TOOL_NOTES = {
-  'GetTableContents': '> **⚠️ ABAP Cloud Limitation:** Direct access to table data through ADT Data Preview is blocked by SAP BTP backend policies. When authenticating via JWT/XSUAA, the server will return a descriptive error. This function works only for on-premise systems.',
-  'GetSqlQuery': '> **⚠️ ABAP Cloud Limitation:** Direct execution of SQL queries through ADT Data Preview is blocked by SAP BTP backend policies. When authenticating via JWT/XSUAA, the server will return a descriptive error. This function works only for on-premise systems.',
-};
+    if (inSingle || inDouble || inTemplate) continue;
 
-// Special handling for batch detection tools
-const BATCH_DETECTION_TOOLS = ['DetectObjectTypeListArray', 'DetectObjectTypeListJson'];
+    if (ch === '{') depth++;
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        return content.slice(firstBrace, i + 1);
+      }
+    }
+  }
 
-/**
- * Parse TypeScript file to extract TOOL_DEFINITION
- */
+  return null;
+}
+
+function extractInputSchemaBlock(toolBlock) {
+  const key = 'inputSchema';
+  const keyPos = toolBlock.indexOf(key);
+  if (keyPos === -1) return null;
+
+  const firstBrace = toolBlock.indexOf('{', keyPos);
+  if (firstBrace === -1) return null;
+
+  let depth = 0;
+  for (let i = firstBrace; i < toolBlock.length; i++) {
+    const ch = toolBlock[i];
+    if (ch === '{') depth++;
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        return toolBlock.slice(firstBrace, i + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
 function extractToolDefinition(filePath) {
-  try {
-    const content = fs.readFileSync(filePath, 'utf8');
+  const content = fs.readFileSync(filePath, 'utf8');
+  const block = findToolDefinitionBlock(content);
+  if (!block) return null;
 
-    // Find TOOL_DEFINITION export - handle multiline, with or without "as const"
-    let toolDefMatch = content.match(/export const TOOL_DEFINITION\s*=\s*\{[\s\S]*?\}\s*as\s*const;/);
-    if (!toolDefMatch) {
-      // Try without "as const"
-      toolDefMatch = content.match(/export const TOOL_DEFINITION\s*=\s*\{[\s\S]*?\}\s*;/);
-      if (!toolDefMatch) {
-        return null;
-      }
+  const nameMatch = block.match(/name\s*:\s*['"]([^'"]+)['"]/);
+  if (!nameMatch) return null;
+
+  const descMatch = block.match(/description\s*:\s*['"]([^'"]+)['"]/);
+  const inputSchemaBlock = extractInputSchemaBlock(block);
+
+  const inputSchema = {
+    properties: {},
+    required: [],
+  };
+
+  if (inputSchemaBlock) {
+    const requiredMatch = inputSchemaBlock.match(/required\s*:\s*\[([\s\S]*?)\]/m);
+    if (requiredMatch) {
+      inputSchema.required = requiredMatch[1]
+        .split(',')
+        .map(s => s.trim().replace(/['"]/g, ''))
+        .filter(Boolean);
     }
 
-    const toolDefStr = toolDefMatch[0];
+    const propertiesMatch = inputSchemaBlock.match(/properties\s*:\s*\{([\s\S]*?)\}\s*,\s*required/m);
+    const propertiesBlock = propertiesMatch
+      ? propertiesMatch[1]
+      : (inputSchemaBlock.match(/properties\s*:\s*\{([\s\S]*?)\}/m)?.[1] || '');
 
-    // Extract name - handle both "name" and 'name', with or without quotes around key
-    let nameMatch = toolDefStr.match(/["']?name["']?\s*:\s*["']([^"']+)["']/);
-    if (!nameMatch) {
-      // Try with single quotes
-      nameMatch = toolDefStr.match(/["']?name["']?\s*:\s*[']([^']+)[']/);
-      if (!nameMatch) return null;
-    }
-    const name = nameMatch[1];
+    const propPattern = /([a-zA-Z0-9_]+)\s*:\s*\{([\s\S]*?)\n\s*\}/g;
+    let m;
+    while ((m = propPattern.exec(propertiesBlock)) !== null) {
+      const propName = m[1];
+      const body = m[2];
+      const type = body.match(/type\s*:\s*['"]([^'"]+)['"]/)?.[1] || 'any';
+      const description = body.match(/description\s*:\s*['"]([^'"]+)['"]/)?.[1] || '';
+      const defaultRaw = body.match(/default\s*:\s*([^,\n]+)/)?.[1]?.trim();
 
-    // Extract description - handle multiline descriptions, with or without quotes around key
-    let descMatch = toolDefStr.match(/["']?description["']?\s*:\s*["']([^"']+)["']/);
-    if (!descMatch) {
-      descMatch = toolDefStr.match(/["']?description["']?\s*:\s*[']([^']+)[']/);
-    }
-    const description = descMatch ? descMatch[1] : '';
-
-    // Extract inputSchema
-    const schemaStart = toolDefStr.indexOf('inputSchema:');
-    if (schemaStart === -1) {
-      return { name, description, inputSchema: null };
-    }
-
-    // Find the matching brace for inputSchema
-    let braceCount = 0;
-    let inSchema = false;
-    let schemaEnd = schemaStart;
-    for (let i = schemaStart; i < toolDefStr.length; i++) {
-      if (toolDefStr[i] === '{') {
-        braceCount++;
-        inSchema = true;
-      } else if (toolDefStr[i] === '}') {
-        braceCount--;
-        if (inSchema && braceCount === 0) {
-          schemaEnd = i + 1;
-          break;
-        }
-      }
-    }
-
-    const schemaStr = toolDefStr.substring(schemaStart, schemaEnd);
-
-    // Extract properties - more robust parsing
-    const properties = {};
-
-    // Find all property definitions
-    const propPattern = /["']?(\w+)["']?\s*:\s*\{([^}]*type:\s*["'](\w+)["'][^}]*description:\s*["']([^"']+)["'][^}]*)\}/g;
-    let propMatch;
-    while ((propMatch = propPattern.exec(schemaStr)) !== null) {
-      const propName = propMatch[1];
-      const propType = propMatch[3];
-      const propDesc = propMatch[4];
-
-      // Check for default value
-      const defaultMatch = propMatch[2].match(/default:\s*([^,}\n]+)/);
-
-      properties[propName] = {
-        type: propType,
-        description: propDesc,
-        ...(defaultMatch && { default: defaultMatch[1].trim().replace(/["']/g, '') })
+      inputSchema.properties[propName] = {
+        type,
+        description,
+        default: defaultRaw ? defaultRaw.replace(/^['"]|['"]$/g, '') : undefined,
       };
     }
-
-    // Extract required fields
-    const requiredMatch = schemaStr.match(/required:\s*\[([^\]]*)\]/s);
-    const required = requiredMatch
-      ? requiredMatch[1]
-          .split(',')
-          .map(s => s.trim().replace(/["']/g, ''))
-          .filter(Boolean)
-      : [];
-
-    return {
-      name,
-      description,
-      inputSchema: {
-        type: 'object',
-        properties,
-        required
-      }
-    };
-  } catch (error) {
-    console.error(`Error parsing ${filePath}:`, error.message);
-    return null;
   }
-}
 
-/**
- * Map category folder to display category
- */
-function getCategoryFromFolder(folder) {
-  const categoryMap = {
-    'class': 'Programs, Classes, Functions',
-    'program': 'Programs, Classes, Functions',
-    'function': 'Programs, Classes, Functions',
-    'table': 'Tables and Structures',
-    'structure': 'Tables and Structures',
-    'package': 'Packages and Interfaces',
-    'interface': 'Packages and Interfaces',
-    'include': 'Includes and Hierarchies',
-    'system': 'Types, Descriptions, Metadata',
-    'enhancement': 'Enhancements',
-    'bdef': 'Enhancements',
-    'ddlx': 'Enhancements',
-    'domain': 'Tables and Structures',
-    'data_element': 'Tables and Structures',
-    'view': 'Tables and Structures',
-    'service_definition': 'Tables and Structures',
-    'search': 'Search, SQL, Transactions',
-    'transport': 'Search, SQL, Transactions',
-    'common': 'Other'
+  return {
+    name: nameMatch[1],
+    description: descMatch ? descMatch[1] : '',
+    inputSchema,
   };
-  return categoryMap[folder] || 'Other';
 }
 
-/**
- * Load all tools from handler groups (used by v2 server)
- */
-function loadAllTools() {
-  const groupsDir = path.join(__dirname, '../src/lib/handlers/groups');
+function loadToolsFromHandlers() {
+  const files = [];
+  walk(HANDLERS_ROOT, files);
+
   const tools = [];
-  const processedHandlers = new Set();
 
-  // Read all handler group files
-  const groupFiles = fs.readdirSync(groupsDir)
-    .filter(f => f.endsWith('.ts') && f !== 'index.ts');
+  for (const filePath of files) {
+    const rel = path.relative(HANDLERS_ROOT, filePath).replace(/\\/g, '/');
+    const parts = rel.split('/');
+    if (parts.length < 3) continue;
 
-  for (const groupFile of groupFiles) {
-    const groupPath = path.join(groupsDir, groupFile);
-    const content = fs.readFileSync(groupPath, 'utf8');
+    const objectFolder = parts[0];
+    const level = parts[1];
+    if (!LEVELS.includes(level)) continue;
 
-    // Extract all TOOL_DEFINITION imports from handler groups
-    // Pattern: import { TOOL_DEFINITION as XXX_Tool } from '../../../handlers/category/level/handlerFile';
-    // Supports both single-line and multi-line imports
-    const importMatches = content.matchAll(/import \{[\s\S]*?TOOL_DEFINITION as (\w+)_Tool[\s\S]*?\} from ['"]\.\.\/\.\.\/\.\.\/handlers\/(.+?)['"];/g);
+    const toolDef = extractToolDefinition(filePath);
+    if (!toolDef) continue;
 
-    for (const match of importMatches) {
-      const handlerRelativePath = match[2]; // e.g., "program/readonly/handleGetProgram"
-      const handlerPath = path.join(__dirname, `../src/handlers/${handlerRelativePath}.ts`);
-
-      if (processedHandlers.has(handlerPath)) {
-        continue;
-      }
-
-      if (fs.existsSync(handlerPath)) {
-        const toolDef = extractToolDefinition(handlerPath);
-        if (toolDef) {
-          processedHandlers.add(handlerPath);
-          // Determine level based on path
-          const isReadOnly = handlerRelativePath.includes('/readonly/');
-          const isLow = handlerRelativePath.includes('/low/');
-          const isHigh = handlerRelativePath.includes('/high/');
-          toolDef.level = isReadOnly ? 'readonly' : (isLow ? 'low' : (isHigh ? 'high' : 'unknown'));
-          // Extract category folder from path (e.g., "program/readonly/handleGetProgram" -> "program")
-          const categoryMatch = handlerRelativePath.match(/^([^\/]+)/);
-          const categoryFolder = categoryMatch ? categoryMatch[1] : 'other';
-          // Map to display category
-          toolDef.category = getCategoryFromFolder(categoryFolder);
-          toolDef.categoryFolder = categoryFolder;
-          tools.push(toolDef);
-        }
-      }
-    }
+    tools.push({
+      ...toolDef,
+      objectFolder,
+      objectTitle: titleCaseFolder(objectFolder),
+      level,
+      filePath: `src/handlers/${rel}`,
+    });
   }
+
+  tools.sort((a, b) => {
+    if (a.level !== b.level) return LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level);
+    if (a.objectTitle !== b.objectTitle) return a.objectTitle.localeCompare(b.objectTitle);
+    return a.name.localeCompare(b.name);
+  });
 
   return tools;
 }
 
-function computeLevelTotals(tools) {
-  const totals = { high: 0, low: 0, readonly: 0, other: 0, total: tools.length };
-  for (const tool of tools) {
-    if (tool.level === 'high') totals.high++;
-    else if (tool.level === 'low') totals.low++;
-    else if (tool.level === 'readonly') totals.readonly++;
-    else totals.other++;
-  }
-  return totals;
+function levelTitle(level) {
+  if (level === 'readonly') return 'Read-Only';
+  if (level === 'high') return 'High-Level';
+  if (level === 'low') return 'Low-Level';
+  return level;
 }
 
-/**
- * Format parameter documentation
- */
-function formatParameter(propName, propDef) {
-  const type = propDef.type || 'any';
-  const desc = propDef.description || '';
-  const isRequired = false; // Will be determined from required array
-  const optional = propDef.default !== undefined ? ' (optional, default: ' + JSON.stringify(propDef.default) + ')' : '';
-
-  return `- \`${propName}\` (${type}, ${isRequired ? 'required' : 'optional'}${optional}) - ${desc}`;
-}
-
-/**
- * Generate example JSON for a tool
- */
-function generateExample(tool) {
-  const example = {};
-
-  if (!tool.inputSchema || !tool.inputSchema.properties) {
-    return '{}';
-  }
-
-  for (const [propName, propDef] of Object.entries(tool.inputSchema.properties)) {
-    const isRequired = tool.inputSchema.required?.includes(propName) || false;
-
-    if (isRequired || propDef.default !== undefined) {
-      // Generate example value based on type
-      switch (propDef.type) {
-        case 'string':
-          example[propName] = propName.includes('name') ? `"ZMY_${propName.toUpperCase().replace('_', '_')}"`
-            : propName.includes('type') ? `"PROG/P"`
-            : `"example_value"`;
-          break;
-        case 'number':
-          example[propName] = propDef.default || 100;
-          break;
-        case 'boolean':
-          example[propName] = propDef.default || true;
-          break;
-        case 'array':
-          example[propName] = [];
-          break;
-        case 'object':
-          example[propName] = {};
-          break;
-        default:
-          example[propName] = `"example"`;
-      }
-    }
-  }
-
-  return JSON.stringify(example, null, 2);
-}
-
-/**
- * Generate markdown documentation
- */
-function generateMarkdown(tools, levelTotals) {
-  // Group tools by category and level
-  const categories = {};
+function groupByLevelAndObject(tools) {
+  const grouped = {};
+  for (const level of LEVELS) grouped[level] = {};
 
   for (const tool of tools) {
-    // Use category from tool (determined from folder path) or fallback to CATEGORY_MAP
-    const category = tool.category || CATEGORY_MAP[tool.name] || 'Other';
-    if (!categories[category]) {
-      categories[category] = { low: [], high: [], readonly: [], other: [] };
+    if (!grouped[tool.level][tool.objectFolder]) {
+      grouped[tool.level][tool.objectFolder] = {
+        objectTitle: tool.objectTitle,
+        tools: [],
+      };
     }
-    const level = tool.level || 'other';
-    if (level === 'low' || level === 'high' || level === 'readonly') {
-      categories[category][level].push(tool);
-    } else {
-      categories[category].other.push(tool);
-    }
+    grouped[tool.level][tool.objectFolder].tools.push(tool);
   }
 
-  // Sort tools within categories by name
-  for (const category of Object.keys(categories)) {
-    categories[category].low.sort((a, b) => a.name.localeCompare(b.name));
-    categories[category].high.sort((a, b) => a.name.localeCompare(b.name));
-    categories[category].readonly.sort((a, b) => a.name.localeCompare(b.name));
-    categories[category].other.sort((a, b) => a.name.localeCompare(b.name));
-  }
-
-  let markdown = `# Available Tools Reference - MCP ABAP ADT Server
-
-This document contains a complete list of all tools (functions) provided by the MCP ABAP ADT server, with descriptions of their purpose and parameters.
-
-> **Note:** This document is automatically generated from \`TOOL_DEFINITION\` exports in handler modules. To regenerate, run:
-> \`\`\`bash
-> npm run docs:tools
-> \`\`\`
-
-## 📊 Tool Summary
-
-- Total tools: ${levelTotals.total}
-- High-level tools: ${levelTotals.high}
-- Low-level tools: ${levelTotals.low}
-- Read-only tools: ${levelTotals.readonly}
-- Other tools: ${levelTotals.other}
-
-## 📋 Navigation
-
-The navigation below mirrors the document structure for easier discovery.
-
-`;
-
-  // Generate detailed navigation matching the document hierarchy
-  for (const category of CATEGORY_ORDER) {
-    if (!categories[category]) continue;
-
-    const anchor = category.toLowerCase().replace(/\s+/g, '-');
-    const lowCount = categories[category].low.length;
-    const highCount = categories[category].high.length;
-    const readonlyCount = categories[category].readonly.length;
-    const otherCount = categories[category].other.length;
-    const total = lowCount + highCount + readonlyCount + otherCount;
-    markdown += `- [${category}](#${anchor}) (${total} tools`;
-    const breakdown = [];
-    if (highCount) breakdown.push(`${highCount} high-level`);
-    if (lowCount) breakdown.push(`${lowCount} low-level`);
-    if (readonlyCount) breakdown.push(`${readonlyCount} read-only`);
-    if (otherCount) breakdown.push(`${otherCount} other`);
-    if (breakdown.length) {
-      markdown += ` – ${breakdown.join(', ')}`;
-    }
-    markdown += `)\n`;
-
-    if (categories[category].readonly.length > 0) {
-      const readonlyAnchor = `${anchor}-read-only`;
-      markdown += `  - [Read-Only Tools](#${readonlyAnchor})\n`;
-      for (const tool of categories[category].readonly) {
-        const toolAnchor = `${tool.name.toLowerCase().replace(/\s+/g, '-')}-readonly`;
-        markdown += `    - [${tool.name}](#${toolAnchor})\n`;
-      }
-    }
-
-    if (categories[category].high.length > 0) {
-      const highAnchor = `${anchor}-high-level`;
-      markdown += `  - [High-Level Tools](#${highAnchor})\n`;
-      for (const tool of categories[category].high) {
-        const toolAnchor = `${tool.name.toLowerCase().replace(/\s+/g, '-')}-high`;
-        markdown += `    - [${tool.name}](#${toolAnchor})\n`;
-      }
-    }
-
-    if (categories[category].low.length > 0) {
-      const lowAnchor = `${anchor}-low-level`;
-      markdown += `  - [Low-Level Tools](#${lowAnchor})\n`;
-      for (const tool of categories[category].low) {
-        const toolAnchor = `${tool.name.toLowerCase().replace(/\s+/g, '-')}-low`;
-        markdown += `    - [${tool.name}](#${toolAnchor})\n`;
-      }
-    }
-
-    if (categories[category].other.length > 0) {
-      const otherAnchor = `${anchor}-other`;
-      markdown += `  - [Other Tools](#${otherAnchor})\n`;
-      for (const tool of categories[category].other) {
-        const toolAnchor = tool.name.toLowerCase().replace(/\s+/g, '-');
-        markdown += `    - [${tool.name}](#${toolAnchor})\n`;
-      }
-    }
-  }
-
-  markdown += '\n---\n\n';
-
-  // Generate documentation for each category
-  for (const category of CATEGORY_ORDER) {
-    if (!categories[category]) continue;
-
-    const anchor = category.toLowerCase().replace(/\s+/g, '-');
-    markdown += `## ${category}\n\n`;
-
-    // Read-only tools first
-    if (categories[category].readonly.length > 0) {
-      markdown += `### Read-Only Tools {#${anchor}-read-only}\n\n`;
-      markdown += `*Read-only tools retrieve information without modifying the system.*\n\n`;
-
-      for (const tool of categories[category].readonly) {
-        const baseAnchor = tool.name.toLowerCase().replace(/\s+/g, '-');
-        const toolAnchor = `${baseAnchor}-readonly`;
-        markdown += `### ${tool.name} {#${toolAnchor}}\n`;
-        markdown += `**Description:** ${tool.description}\n\n`;
-
-        // Add special notes if any
-        if (TOOL_NOTES[tool.name]) {
-          markdown += `${TOOL_NOTES[tool.name]}\n\n`;
-        }
-
-        // Parameters
-        if (tool.inputSchema && tool.inputSchema.properties && Object.keys(tool.inputSchema.properties).length > 0) {
-          markdown += `**Parameters:**\n`;
-          for (const [propName, propDef] of Object.entries(tool.inputSchema.properties)) {
-            const isRequired = tool.inputSchema.required?.includes(propName) || false;
-            const optional = propDef.default !== undefined ? ` (default: ${JSON.stringify(propDef.default)})` : '';
-            markdown += `- \`${propName}\` (${propDef.type || 'any'}, ${isRequired ? 'required' : 'optional'}${optional}) - ${propDef.description || ''}\n`;
-          }
-          markdown += '\n';
-        } else {
-          markdown += `**Parameters:** None\n\n`;
-        }
-
-        // Example
-        markdown += `**Example:**\n`;
-        markdown += `\`\`\`json\n`;
-        markdown += generateExample(tool);
-        markdown += `\n\`\`\`\n\n`;
-
-        markdown += '---\n\n';
-      }
-      markdown += '\n';
-    }
-
-    // High-level tools
-    if (categories[category].high.length > 0) {
-      markdown += `### High-Level Tools {#${anchor}-high-level}\n\n`;
-      markdown += `*High-level tools perform a chain of operations (e.g., validate → lock → update → check → unlock → activate).*\n\n`;
-
-      for (const tool of categories[category].high) {
-        const baseAnchor = tool.name.toLowerCase().replace(/\s+/g, '-');
-        const toolAnchor = `${baseAnchor}-high`;
-        markdown += `### ${tool.name} {#${toolAnchor}}\n`;
-        markdown += `**Description:** ${tool.description}\n\n`;
-
-        // Add special notes if any
-        if (TOOL_NOTES[tool.name]) {
-          markdown += `${TOOL_NOTES[tool.name]}\n\n`;
-        }
-
-        // Parameters
-        if (tool.inputSchema && tool.inputSchema.properties && Object.keys(tool.inputSchema.properties).length > 0) {
-          markdown += `**Parameters:**\n`;
-          for (const [propName, propDef] of Object.entries(tool.inputSchema.properties)) {
-            const isRequired = tool.inputSchema.required?.includes(propName) || false;
-            const optional = propDef.default !== undefined ? ` (default: ${JSON.stringify(propDef.default)})` : '';
-            markdown += `- \`${propName}\` (${propDef.type || 'any'}, ${isRequired ? 'required' : 'optional'}${optional}) - ${propDef.description || ''}\n`;
-          }
-          markdown += '\n';
-        } else {
-          markdown += `**Parameters:** None\n\n`;
-        }
-
-        // Example
-        markdown += `**Example:**\n`;
-        markdown += `\`\`\`json\n`;
-        markdown += generateExample(tool);
-        markdown += `\n\`\`\`\n\n`;
-
-        markdown += '---\n\n';
-      }
-      markdown += '\n';
-    }
-
-    // Low-level tools
-    if (categories[category].low.length > 0) {
-      markdown += `### Low-Level Tools {#${anchor}-low-level}\n\n`;
-      markdown += `*Low-level tools perform a single operation (one method call to CrudClient).*\n\n`;
-
-      for (const tool of categories[category].low) {
-        const baseAnchor = tool.name.toLowerCase().replace(/\s+/g, '-');
-        const toolAnchor = `${baseAnchor}-low`;
-        markdown += `### ${tool.name} {#${toolAnchor}}\n`;
-        markdown += `**Description:** ${tool.description}\n\n`;
-
-        // Add special notes if any
-        if (TOOL_NOTES[tool.name]) {
-          markdown += `${TOOL_NOTES[tool.name]}\n\n`;
-        }
-
-        // Parameters
-        if (tool.inputSchema && tool.inputSchema.properties && Object.keys(tool.inputSchema.properties).length > 0) {
-          markdown += `**Parameters:**\n`;
-          for (const [propName, propDef] of Object.entries(tool.inputSchema.properties)) {
-            const isRequired = tool.inputSchema.required?.includes(propName) || false;
-            const optional = propDef.default !== undefined ? ` (default: ${JSON.stringify(propDef.default)})` : '';
-            markdown += `- \`${propName}\` (${propDef.type || 'any'}, ${isRequired ? 'required' : 'optional'}${optional}) - ${propDef.description || ''}\n`;
-          }
-          markdown += '\n';
-        } else {
-          markdown += `**Parameters:** None\n\n`;
-        }
-
-        // Example
-        markdown += `**Example:**\n`;
-        markdown += `\`\`\`json\n`;
-        markdown += generateExample(tool);
-        markdown += `\n\`\`\`\n\n`;
-
-        markdown += '---\n\n';
-      }
-      markdown += '\n';
-    }
-
-    // Other tools (without level classification)
-    if (categories[category].other.length > 0) {
-      markdown += `### Other Tools {#${anchor}-other}\n\n`;
-
-      for (const tool of categories[category].other) {
-        const toolAnchor = tool.name.toLowerCase().replace(/\s+/g, '-');
-        markdown += `### ${tool.name} {#${toolAnchor}}\n`;
-        markdown += `**Description:** ${tool.description}\n\n`;
-
-        // Add special notes if any
-        if (TOOL_NOTES[tool.name]) {
-          markdown += `${TOOL_NOTES[tool.name]}\n\n`;
-        }
-
-        // Parameters
-        if (tool.inputSchema && tool.inputSchema.properties && Object.keys(tool.inputSchema.properties).length > 0) {
-          markdown += `**Parameters:**\n`;
-          for (const [propName, propDef] of Object.entries(tool.inputSchema.properties)) {
-            const isRequired = tool.inputSchema.required?.includes(propName) || false;
-            const optional = propDef.default !== undefined ? ` (default: ${JSON.stringify(propDef.default)})` : '';
-            markdown += `- \`${propName}\` (${propDef.type || 'any'}, ${isRequired ? 'required' : 'optional'}${optional}) - ${propDef.description || ''}\n`;
-          }
-          markdown += '\n';
-        } else {
-          markdown += `**Parameters:** None\n\n`;
-        }
-
-        // Example
-        markdown += `**Example:**\n`;
-        markdown += `\`\`\`json\n`;
-        markdown += generateExample(tool);
-        markdown += `\n\`\`\`\n\n`;
-
-        markdown += '---\n\n';
-      }
-      markdown += '\n';
-    }
-  }
-
-  // Add batch detection tools section if needed
-  const batchTools = tools.filter(t => BATCH_DETECTION_TOOLS.includes(t.name));
-  if (batchTools.length > 0) {
-    markdown += `## Batch Detection Tools\n\n`;
-    for (const tool of batchTools) {
-      markdown += `### ${tool.name}\n`;
-      markdown += `**Description:** ${tool.description}\n\n`;
-      markdown += `For more details, see: [doc/DetectObjectTypeListTools.md](DetectObjectTypeListTools.md)\n\n`;
-      markdown += '---\n\n';
-    }
-  }
-
-  // Add notes section
-  markdown += `## Notes
-
-### ABAP Cloud Limitations
-
-Some functions have limitations when working with ABAP Cloud on SAP BTP:
-
-- **GetTableContents** - Direct access to table data is blocked
-- **GetSqlQuery** - Direct execution of SQL queries is blocked
-
-These functions work only for on-premise systems.
-
-### Caching
-
-All handler modules use a centralized in-memory cache (\`objectsListCache\`) to improve performance and consistency.
-
-### Response Format
-
-All functions return MCP-compliant responses in the following format:
-\`\`\`typescript
-{
-  isError: boolean;
-  content: Array<{
-    type: "text";
-    text: string;
-  }>;
-}
-\`\`\`
-
----
-
-## Additional Information
-
-- [Tools Architecture](../TOOLS_ARCHITECTURE.md) - Technical documentation about the tools architecture
-- [Installation Guide](INSTALLATION_GUIDE_UA.md) - Setup and configuration instructions
-- [README](../README.md) - Main project documentation
-
----
-
-*Last updated: ${new Date().toISOString().split('T')[0]}*
-*Document version: 1.0*
-*Generated automatically from TOOL_DEFINITION exports*
-`;
-
-  return markdown;
+  return grouped;
 }
 
-/**
- * Main function
- */
+function renderParams(tool) {
+  const props = tool.inputSchema?.properties || {};
+  const keys = Object.keys(props);
+  if (keys.length === 0) return '- None\n';
+
+  const required = new Set(tool.inputSchema?.required || []);
+  let out = '';
+  for (const key of keys.sort((a, b) => a.localeCompare(b))) {
+    const p = props[key];
+    const req = required.has(key) ? 'required' : 'optional';
+    const def = p.default !== undefined ? ` (default: ${p.default})` : '';
+    out += `- \`${key}\` (${p.type}, ${req}${def}) - ${p.description}\n`;
+  }
+  return out;
+}
+
+function generateMarkdown(tools) {
+  const grouped = groupByLevelAndObject(tools);
+  const summary = {
+    total: tools.length,
+    readonly: tools.filter(t => t.level === 'readonly').length,
+    high: tools.filter(t => t.level === 'high').length,
+    low: tools.filter(t => t.level === 'low').length,
+  };
+
+  let md = `# Available Tools Reference - MCP ABAP ADT Server\n\n`;
+  md += `Generated from code in \`src/handlers/**\` (not from docs).\n\n`;
+  md += `## Summary\n\n`;
+  md += `- Total tools: ${summary.total}\n`;
+  md += `- Read-only tools: ${summary.readonly}\n`;
+  md += `- High-level tools: ${summary.high}\n`;
+  md += `- Low-level tools: ${summary.low}\n\n`;
+
+  md += `## Navigation\n\n`;
+  for (const level of LEVELS) {
+    const objects = Object.values(grouped[level]).sort((a, b) => a.objectTitle.localeCompare(b.objectTitle));
+    if (objects.length === 0) continue;
+
+    const levelAnchor = slug(`${levelTitle(level)} Group`);
+    md += `- [${levelTitle(level)} Group](#${levelAnchor})\n`;
+    for (const obj of objects) {
+      const objAnchor = slug(`${levelTitle(level)} ${obj.objectTitle}`);
+      md += `  - [${obj.objectTitle}](#${objAnchor})\n`;
+      for (const tool of obj.tools) {
+        const toolAnchor = slug(`${tool.name}-${level}`);
+        md += `    - [${tool.name}](#${toolAnchor})\n`;
+      }
+    }
+  }
+
+  md += `\n---\n\n`;
+
+  for (const level of LEVELS) {
+    const objects = Object.values(grouped[level]).sort((a, b) => a.objectTitle.localeCompare(b.objectTitle));
+    if (objects.length === 0) continue;
+
+    md += `## ${levelTitle(level)} Group {#${slug(`${levelTitle(level)} Group`)}}\n\n`;
+
+    for (const obj of objects) {
+      md += `### ${obj.objectTitle} {#${slug(`${levelTitle(level)} ${obj.objectTitle}`)}}\n\n`;
+
+      for (const tool of obj.tools) {
+        md += `#### ${tool.name} {#${slug(`${tool.name}-${level}`)}}\n`;
+        md += `**Description:** ${tool.description || 'No description'}\n\n`;
+        md += `**Source:** \`${tool.filePath}\`\n\n`;
+        md += `**Parameters:**\n`;
+        md += renderParams(tool);
+        md += `\n---\n\n`;
+      }
+    }
+  }
+
+  md += `*Last updated: ${new Date().toISOString().slice(0, 10)}*\n`;
+  return md;
+}
+
 function main() {
-  console.log('🔍 Loading tools from handlers...');
-  const tools = loadAllTools();
+  console.log('🔍 Scanning handler code in src/handlers...');
+  const tools = loadToolsFromHandlers();
 
   if (tools.length === 0) {
-    console.error('❌ No tools found!');
+    console.error('❌ No TOOL_DEFINITION found in src/handlers');
     process.exit(1);
   }
 
   console.log(`✅ Found ${tools.length} tools`);
-  const levelTotals = computeLevelTotals(tools);
-  console.log(`📊 Tool levels -> High: ${levelTotals.high}, Low: ${levelTotals.low}, Read-only: ${levelTotals.readonly}, Other: ${levelTotals.other}`);
-  console.log('📝 Generating documentation...');
-
-  const markdown = generateMarkdown(tools, levelTotals);
-
-  const outputPath = path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS.md');
-  fs.writeFileSync(outputPath, markdown, 'utf8');
-
-  console.log(`✅ Documentation generated: ${outputPath}`);
-  console.log(`📊 Documented ${tools.length} tools`);
+  const markdown = generateMarkdown(tools);
+  fs.writeFileSync(OUTPUT_PATH, markdown, 'utf8');
+  console.log(`✅ Documentation generated: ${OUTPUT_PATH}`);
 }
 
 if (require.main === module) {
   main();
 }
 
-module.exports = { loadAllTools, generateMarkdown };
-
+module.exports = {
+  extractToolDefinition,
+  loadToolsFromHandlers,
+  generateMarkdown,
+};

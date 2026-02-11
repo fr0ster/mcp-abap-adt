@@ -13,298 +13,298 @@ Generated from code in `src/handlers/**` (not from docs).
 
 - [Read-Only Group](#read-only-group)
   - [Enhancement](#read-only-enhancement)
-    - [GetEnhancementImpl](#getenhancementimpl-readonly)
-    - [GetEnhancements](#getenhancements-readonly)
-    - [GetEnhancementSpot](#getenhancementspot-readonly)
+    - [GetEnhancementImpl](#getenhancementimpl-read-only-enhancement)
+    - [GetEnhancements](#getenhancements-read-only-enhancement)
+    - [GetEnhancementSpot](#getenhancementspot-read-only-enhancement)
   - [Function](#read-only-function)
-    - [GetFunction](#getfunction-readonly)
+    - [GetFunction](#getfunction-read-only-function)
   - [Include](#read-only-include)
-    - [GetInclude](#getinclude-readonly)
-    - [GetIncludesList](#getincludeslist-readonly)
+    - [GetInclude](#getinclude-read-only-include)
+    - [GetIncludesList](#getincludeslist-read-only-include)
   - [Package](#read-only-package)
-    - [GetPackageContents](#getpackagecontents-readonly)
+    - [GetPackageContents](#getpackagecontents-read-only-package)
   - [Program](#read-only-program)
-    - [GetProgFullCode](#getprogfullcode-readonly)
+    - [GetProgFullCode](#getprogfullcode-read-only-program)
   - [Search](#read-only-search)
-    - [GetObjectsByType](#getobjectsbytype-readonly)
-    - [GetObjectsList](#getobjectslist-readonly)
-    - [SearchObject](#searchobject-readonly)
+    - [GetObjectsByType](#getobjectsbytype-read-only-search)
+    - [GetObjectsList](#getobjectslist-read-only-search)
+    - [SearchObject](#searchobject-read-only-search)
   - [System](#read-only-system)
-    - [DescribeByList](#describebylist-readonly)
-    - [GetAbapAST](#getabapast-readonly)
-    - [GetAbapSemanticAnalysis](#getabapsemanticanalysis-readonly)
-    - [GetAbapSystemSymbols](#getabapsystemsymbols-readonly)
-    - [GetAdtTypes](#getadttypes-readonly)
-    - [GetInactiveObjects](#getinactiveobjects-readonly)
-    - [GetObjectInfo](#getobjectinfo-readonly)
-    - [GetObjectNodeFromCache](#getobjectnodefromcache-readonly)
-    - [GetObjectStructure](#getobjectstructure-readonly)
-    - [GetSession](#getsession-readonly)
-    - [GetSqlQuery](#getsqlquery-readonly)
-    - [GetTransaction](#gettransaction-readonly)
-    - [GetTypeInfo](#gettypeinfo-readonly)
-    - [GetWhereUsed](#getwhereused-readonly)
+    - [DescribeByList](#describebylist-read-only-system)
+    - [GetAbapAST](#getabapast-read-only-system)
+    - [GetAbapSemanticAnalysis](#getabapsemanticanalysis-read-only-system)
+    - [GetAbapSystemSymbols](#getabapsystemsymbols-read-only-system)
+    - [GetAdtTypes](#getadttypes-read-only-system)
+    - [GetInactiveObjects](#getinactiveobjects-read-only-system)
+    - [GetObjectInfo](#getobjectinfo-read-only-system)
+    - [GetObjectNodeFromCache](#getobjectnodefromcache-read-only-system)
+    - [GetObjectStructure](#getobjectstructure-read-only-system)
+    - [GetSession](#getsession-read-only-system)
+    - [GetSqlQuery](#getsqlquery-read-only-system)
+    - [GetTransaction](#gettransaction-read-only-system)
+    - [GetTypeInfo](#gettypeinfo-read-only-system)
+    - [GetWhereUsed](#getwhereused-read-only-system)
   - [Table](#read-only-table)
-    - [GetTableContents](#gettablecontents-readonly)
+    - [GetTableContents](#gettablecontents-read-only-table)
   - [Transport](#read-only-transport)
-    - [GetTransport](#gettransport-readonly)
+    - [GetTransport](#gettransport-read-only-transport)
 - [High-Level Group](#high-level-group)
   - [Behavior Definition](#high-level-behavior-definition)
-    - [CreateBehaviorDefinition](#createbehaviordefinition-high)
-    - [DeleteBehaviorDefinition](#deletebehaviordefinition-high)
-    - [GetBehaviorDefinition](#getbehaviordefinition-high)
-    - [UpdateBehaviorDefinition](#updatebehaviordefinition-high)
+    - [CreateBehaviorDefinition](#createbehaviordefinition-high-level-behavior-definition)
+    - [DeleteBehaviorDefinition](#deletebehaviordefinition-high-level-behavior-definition)
+    - [GetBehaviorDefinition](#getbehaviordefinition-high-level-behavior-definition)
+    - [UpdateBehaviorDefinition](#updatebehaviordefinition-high-level-behavior-definition)
   - [Behavior Implementation](#high-level-behavior-implementation)
-    - [CreateBehaviorImplementation](#createbehaviorimplementation-high)
-    - [DeleteBehaviorImplementation](#deletebehaviorimplementation-high)
-    - [GetBehaviorImplementation](#getbehaviorimplementation-high)
-    - [UpdateBehaviorImplementation](#updatebehaviorimplementation-high)
+    - [CreateBehaviorImplementation](#createbehaviorimplementation-high-level-behavior-implementation)
+    - [DeleteBehaviorImplementation](#deletebehaviorimplementation-high-level-behavior-implementation)
+    - [GetBehaviorImplementation](#getbehaviorimplementation-high-level-behavior-implementation)
+    - [UpdateBehaviorImplementation](#updatebehaviorimplementation-high-level-behavior-implementation)
   - [Class](#high-level-class)
-    - [CreateClass](#createclass-high)
-    - [CreateLocalDefinitions](#createlocaldefinitions-high)
-    - [CreateLocalMacros](#createlocalmacros-high)
-    - [CreateLocalTestClass](#createlocaltestclass-high)
-    - [CreateLocalTypes](#createlocaltypes-high)
-    - [DeleteClass](#deleteclass-high)
-    - [DeleteLocalDefinitions](#deletelocaldefinitions-high)
-    - [DeleteLocalMacros](#deletelocalmacros-high)
-    - [DeleteLocalTestClass](#deletelocaltestclass-high)
-    - [DeleteLocalTypes](#deletelocaltypes-high)
-    - [GetClass](#getclass-high)
-    - [GetLocalDefinitions](#getlocaldefinitions-high)
-    - [GetLocalMacros](#getlocalmacros-high)
-    - [GetLocalTestClass](#getlocaltestclass-high)
-    - [GetLocalTypes](#getlocaltypes-high)
-    - [UpdateClass](#updateclass-high)
-    - [UpdateLocalDefinitions](#updatelocaldefinitions-high)
-    - [UpdateLocalMacros](#updatelocalmacros-high)
-    - [UpdateLocalTestClass](#updatelocaltestclass-high)
-    - [UpdateLocalTypes](#updatelocaltypes-high)
+    - [CreateClass](#createclass-high-level-class)
+    - [CreateLocalDefinitions](#createlocaldefinitions-high-level-class)
+    - [CreateLocalMacros](#createlocalmacros-high-level-class)
+    - [CreateLocalTestClass](#createlocaltestclass-high-level-class)
+    - [CreateLocalTypes](#createlocaltypes-high-level-class)
+    - [DeleteClass](#deleteclass-high-level-class)
+    - [DeleteLocalDefinitions](#deletelocaldefinitions-high-level-class)
+    - [DeleteLocalMacros](#deletelocalmacros-high-level-class)
+    - [DeleteLocalTestClass](#deletelocaltestclass-high-level-class)
+    - [DeleteLocalTypes](#deletelocaltypes-high-level-class)
+    - [GetClass](#getclass-high-level-class)
+    - [GetLocalDefinitions](#getlocaldefinitions-high-level-class)
+    - [GetLocalMacros](#getlocalmacros-high-level-class)
+    - [GetLocalTestClass](#getlocaltestclass-high-level-class)
+    - [GetLocalTypes](#getlocaltypes-high-level-class)
+    - [UpdateClass](#updateclass-high-level-class)
+    - [UpdateLocalDefinitions](#updatelocaldefinitions-high-level-class)
+    - [UpdateLocalMacros](#updatelocalmacros-high-level-class)
+    - [UpdateLocalTestClass](#updatelocaltestclass-high-level-class)
+    - [UpdateLocalTypes](#updatelocaltypes-high-level-class)
   - [Data Element](#high-level-data-element)
-    - [CreateDataElement](#createdataelement-high)
-    - [DeleteDataElement](#deletedataelement-high)
-    - [GetDataElement](#getdataelement-high)
-    - [UpdateDataElement](#updatedataelement-high)
+    - [CreateDataElement](#createdataelement-high-level-data-element)
+    - [DeleteDataElement](#deletedataelement-high-level-data-element)
+    - [GetDataElement](#getdataelement-high-level-data-element)
+    - [UpdateDataElement](#updatedataelement-high-level-data-element)
   - [Ddlx](#high-level-ddlx)
-    - [CreateMetadataExtension](#createmetadataextension-high)
-    - [UpdateMetadataExtension](#updatemetadataextension-high)
+    - [CreateMetadataExtension](#createmetadataextension-high-level-ddlx)
+    - [UpdateMetadataExtension](#updatemetadataextension-high-level-ddlx)
   - [Domain](#high-level-domain)
-    - [CreateDomain](#createdomain-high)
-    - [DeleteDomain](#deletedomain-high)
-    - [GetDomain](#getdomain-high)
-    - [UpdateDomain](#updatedomain-high)
+    - [CreateDomain](#createdomain-high-level-domain)
+    - [DeleteDomain](#deletedomain-high-level-domain)
+    - [GetDomain](#getdomain-high-level-domain)
+    - [UpdateDomain](#updatedomain-high-level-domain)
   - [Function](#high-level-function)
-    - [CreateFunctionGroup](#createfunctiongroup-high)
-    - [CreateFunctionModule](#createfunctionmodule-high)
-    - [UpdateFunctionGroup](#updatefunctiongroup-high)
-    - [UpdateFunctionModule](#updatefunctionmodule-high)
+    - [CreateFunctionGroup](#createfunctiongroup-high-level-function)
+    - [CreateFunctionModule](#createfunctionmodule-high-level-function)
+    - [UpdateFunctionGroup](#updatefunctiongroup-high-level-function)
+    - [UpdateFunctionModule](#updatefunctionmodule-high-level-function)
   - [Function Group](#high-level-function-group)
-    - [DeleteFunctionGroup](#deletefunctiongroup-high)
-    - [GetFunctionGroup](#getfunctiongroup-high)
+    - [DeleteFunctionGroup](#deletefunctiongroup-high-level-function-group)
+    - [GetFunctionGroup](#getfunctiongroup-high-level-function-group)
   - [Function Module](#high-level-function-module)
-    - [DeleteFunctionModule](#deletefunctionmodule-high)
-    - [GetFunctionModule](#getfunctionmodule-high)
+    - [DeleteFunctionModule](#deletefunctionmodule-high-level-function-module)
+    - [GetFunctionModule](#getfunctionmodule-high-level-function-module)
   - [Interface](#high-level-interface)
-    - [CreateInterface](#createinterface-high)
-    - [DeleteInterface](#deleteinterface-high)
-    - [GetInterface](#getinterface-high)
-    - [UpdateInterface](#updateinterface-high)
+    - [CreateInterface](#createinterface-high-level-interface)
+    - [DeleteInterface](#deleteinterface-high-level-interface)
+    - [GetInterface](#getinterface-high-level-interface)
+    - [UpdateInterface](#updateinterface-high-level-interface)
   - [Metadata Extension](#high-level-metadata-extension)
-    - [DeleteMetadataExtension](#deletemetadataextension-high)
-    - [GetMetadataExtension](#getmetadataextension-high)
+    - [DeleteMetadataExtension](#deletemetadataextension-high-level-metadata-extension)
+    - [GetMetadataExtension](#getmetadataextension-high-level-metadata-extension)
   - [Package](#high-level-package)
-    - [CreatePackage](#createpackage-high)
-    - [GetPackage](#getpackage-high)
+    - [CreatePackage](#createpackage-high-level-package)
+    - [GetPackage](#getpackage-high-level-package)
   - [Program](#high-level-program)
-    - [CreateProgram](#createprogram-high)
-    - [DeleteProgram](#deleteprogram-high)
-    - [GetProgram](#getprogram-high)
-    - [UpdateProgram](#updateprogram-high)
+    - [CreateProgram](#createprogram-high-level-program)
+    - [DeleteProgram](#deleteprogram-high-level-program)
+    - [GetProgram](#getprogram-high-level-program)
+    - [UpdateProgram](#updateprogram-high-level-program)
   - [Service Definition](#high-level-service-definition)
-    - [CreateServiceDefinition](#createservicedefinition-high)
-    - [DeleteServiceDefinition](#deleteservicedefinition-high)
-    - [GetServiceDefinition](#getservicedefinition-high)
-    - [UpdateServiceDefinition](#updateservicedefinition-high)
+    - [CreateServiceDefinition](#createservicedefinition-high-level-service-definition)
+    - [DeleteServiceDefinition](#deleteservicedefinition-high-level-service-definition)
+    - [GetServiceDefinition](#getservicedefinition-high-level-service-definition)
+    - [UpdateServiceDefinition](#updateservicedefinition-high-level-service-definition)
   - [Structure](#high-level-structure)
-    - [CreateStructure](#createstructure-high)
-    - [DeleteStructure](#deletestructure-high)
-    - [GetStructure](#getstructure-high)
-    - [UpdateStructure](#updatestructure-high)
+    - [CreateStructure](#createstructure-high-level-structure)
+    - [DeleteStructure](#deletestructure-high-level-structure)
+    - [GetStructure](#getstructure-high-level-structure)
+    - [UpdateStructure](#updatestructure-high-level-structure)
   - [System](#high-level-system)
-    - [GetPackageTree](#getpackagetree-high)
+    - [GetPackageTree](#getpackagetree-high-level-system)
   - [Table](#high-level-table)
-    - [CreateTable](#createtable-high)
-    - [DeleteTable](#deletetable-high)
-    - [GetTable](#gettable-high)
-    - [UpdateTable](#updatetable-high)
+    - [CreateTable](#createtable-high-level-table)
+    - [DeleteTable](#deletetable-high-level-table)
+    - [GetTable](#gettable-high-level-table)
+    - [UpdateTable](#updatetable-high-level-table)
   - [Transport](#high-level-transport)
-    - [CreateTransport](#createtransport-high)
+    - [CreateTransport](#createtransport-high-level-transport)
   - [Unit Test](#high-level-unit-test)
-    - [CreateCdsUnitTest](#createcdsunittest-high)
-    - [CreateUnitTest](#createunittest-high)
-    - [DeleteCdsUnitTest](#deletecdsunittest-high)
-    - [DeleteUnitTest](#deleteunittest-high)
-    - [GetCdsUnitTest](#getcdsunittest-high)
-    - [GetCdsUnitTestResult](#getcdsunittestresult-high)
-    - [GetCdsUnitTestStatus](#getcdsunitteststatus-high)
-    - [GetUnitTest](#getunittest-high)
-    - [GetUnitTestResult](#getunittestresult-high)
-    - [GetUnitTestStatus](#getunitteststatus-high)
-    - [RunUnitTest](#rununittest-high)
-    - [UpdateCdsUnitTest](#updatecdsunittest-high)
-    - [UpdateUnitTest](#updateunittest-high)
+    - [CreateCdsUnitTest](#createcdsunittest-high-level-unit-test)
+    - [CreateUnitTest](#createunittest-high-level-unit-test)
+    - [DeleteCdsUnitTest](#deletecdsunittest-high-level-unit-test)
+    - [DeleteUnitTest](#deleteunittest-high-level-unit-test)
+    - [GetCdsUnitTest](#getcdsunittest-high-level-unit-test)
+    - [GetCdsUnitTestResult](#getcdsunittestresult-high-level-unit-test)
+    - [GetCdsUnitTestStatus](#getcdsunitteststatus-high-level-unit-test)
+    - [GetUnitTest](#getunittest-high-level-unit-test)
+    - [GetUnitTestResult](#getunittestresult-high-level-unit-test)
+    - [GetUnitTestStatus](#getunitteststatus-high-level-unit-test)
+    - [RunUnitTest](#rununittest-high-level-unit-test)
+    - [UpdateCdsUnitTest](#updatecdsunittest-high-level-unit-test)
+    - [UpdateUnitTest](#updateunittest-high-level-unit-test)
   - [View](#high-level-view)
-    - [CreateView](#createview-high)
-    - [DeleteView](#deleteview-high)
-    - [GetView](#getview-high)
-    - [UpdateView](#updateview-high)
+    - [CreateView](#createview-high-level-view)
+    - [DeleteView](#deleteview-high-level-view)
+    - [GetView](#getview-high-level-view)
+    - [UpdateView](#updateview-high-level-view)
 - [Low-Level Group](#low-level-group)
   - [Behavior Definition](#low-level-behavior-definition)
-    - [ActivateBehaviorDefinitionLow](#activatebehaviordefinitionlow-low)
-    - [CheckBdefLow](#checkbdeflow-low)
-    - [CreateBehaviorDefinitionLow](#createbehaviordefinitionlow-low)
-    - [DeleteBehaviorDefinitionLow](#deletebehaviordefinitionlow-low)
-    - [LockBehaviorDefinitionLow](#lockbehaviordefinitionlow-low)
-    - [UnlockBehaviorDefinitionLow](#unlockbehaviordefinitionlow-low)
-    - [UpdateBehaviorDefinitionLow](#updatebehaviordefinitionlow-low)
-    - [ValidateBehaviorDefinitionLow](#validatebehaviordefinitionlow-low)
+    - [ActivateBehaviorDefinitionLow](#activatebehaviordefinitionlow-low-level-behavior-definition)
+    - [CheckBdefLow](#checkbdeflow-low-level-behavior-definition)
+    - [CreateBehaviorDefinitionLow](#createbehaviordefinitionlow-low-level-behavior-definition)
+    - [DeleteBehaviorDefinitionLow](#deletebehaviordefinitionlow-low-level-behavior-definition)
+    - [LockBehaviorDefinitionLow](#lockbehaviordefinitionlow-low-level-behavior-definition)
+    - [UnlockBehaviorDefinitionLow](#unlockbehaviordefinitionlow-low-level-behavior-definition)
+    - [UpdateBehaviorDefinitionLow](#updatebehaviordefinitionlow-low-level-behavior-definition)
+    - [ValidateBehaviorDefinitionLow](#validatebehaviordefinitionlow-low-level-behavior-definition)
   - [Behavior Implementation](#low-level-behavior-implementation)
-    - [CreateBehaviorImplementationLow](#createbehaviorimplementationlow-low)
-    - [LockBehaviorImplementationLow](#lockbehaviorimplementationlow-low)
-    - [ValidateBehaviorImplementationLow](#validatebehaviorimplementationlow-low)
+    - [CreateBehaviorImplementationLow](#createbehaviorimplementationlow-low-level-behavior-implementation)
+    - [LockBehaviorImplementationLow](#lockbehaviorimplementationlow-low-level-behavior-implementation)
+    - [ValidateBehaviorImplementationLow](#validatebehaviorimplementationlow-low-level-behavior-implementation)
   - [Class](#low-level-class)
-    - [ActivateClassLow](#activateclasslow-low)
-    - [ActivateClassTestClassesLow](#activateclasstestclasseslow-low)
-    - [CheckClassLow](#checkclasslow-low)
-    - [CreateClassLow](#createclasslow-low)
-    - [DeleteClassLow](#deleteclasslow-low)
-    - [GetClassUnitTestResultLow](#getclassunittestresultlow-low)
-    - [GetClassUnitTestStatusLow](#getclassunitteststatuslow-low)
-    - [LockClassLow](#lockclasslow-low)
-    - [LockClassTestClassesLow](#lockclasstestclasseslow-low)
-    - [RunClassUnitTestsLow](#runclassunittestslow-low)
-    - [UnlockClassLow](#unlockclasslow-low)
-    - [UnlockClassTestClassesLow](#unlockclasstestclasseslow-low)
-    - [UpdateClassLow](#updateclasslow-low)
-    - [UpdateClassTestClassesLow](#updateclasstestclasseslow-low)
-    - [ValidateClassLow](#validateclasslow-low)
+    - [ActivateClassLow](#activateclasslow-low-level-class)
+    - [ActivateClassTestClassesLow](#activateclasstestclasseslow-low-level-class)
+    - [CheckClassLow](#checkclasslow-low-level-class)
+    - [CreateClassLow](#createclasslow-low-level-class)
+    - [DeleteClassLow](#deleteclasslow-low-level-class)
+    - [GetClassUnitTestResultLow](#getclassunittestresultlow-low-level-class)
+    - [GetClassUnitTestStatusLow](#getclassunitteststatuslow-low-level-class)
+    - [LockClassLow](#lockclasslow-low-level-class)
+    - [LockClassTestClassesLow](#lockclasstestclasseslow-low-level-class)
+    - [RunClassUnitTestsLow](#runclassunittestslow-low-level-class)
+    - [UnlockClassLow](#unlockclasslow-low-level-class)
+    - [UnlockClassTestClassesLow](#unlockclasstestclasseslow-low-level-class)
+    - [UpdateClassLow](#updateclasslow-low-level-class)
+    - [UpdateClassTestClassesLow](#updateclasstestclasseslow-low-level-class)
+    - [ValidateClassLow](#validateclasslow-low-level-class)
   - [Common](#low-level-common)
-    - [ActivateObjectLow](#activateobjectlow-low)
-    - [CheckObjectLow](#checkobjectlow-low)
-    - [DeleteObjectLow](#deleteobjectlow-low)
-    - [LockObjectLow](#lockobjectlow-low)
-    - [UnlockObjectLow](#unlockobjectlow-low)
-    - [ValidateObjectLow](#validateobjectlow-low)
+    - [ActivateObjectLow](#activateobjectlow-low-level-common)
+    - [CheckObjectLow](#checkobjectlow-low-level-common)
+    - [DeleteObjectLow](#deleteobjectlow-low-level-common)
+    - [LockObjectLow](#lockobjectlow-low-level-common)
+    - [UnlockObjectLow](#unlockobjectlow-low-level-common)
+    - [ValidateObjectLow](#validateobjectlow-low-level-common)
   - [Data Element](#low-level-data-element)
-    - [ActivateDataElementLow](#activatedataelementlow-low)
-    - [CheckDataElementLow](#checkdataelementlow-low)
-    - [CreateDataElementLow](#createdataelementlow-low)
-    - [DeleteDataElementLow](#deletedataelementlow-low)
-    - [LockDataElementLow](#lockdataelementlow-low)
-    - [UnlockDataElementLow](#unlockdataelementlow-low)
-    - [UpdateDataElementLow](#updatedataelementlow-low)
-    - [ValidateDataElementLow](#validatedataelementlow-low)
+    - [ActivateDataElementLow](#activatedataelementlow-low-level-data-element)
+    - [CheckDataElementLow](#checkdataelementlow-low-level-data-element)
+    - [CreateDataElementLow](#createdataelementlow-low-level-data-element)
+    - [DeleteDataElementLow](#deletedataelementlow-low-level-data-element)
+    - [LockDataElementLow](#lockdataelementlow-low-level-data-element)
+    - [UnlockDataElementLow](#unlockdataelementlow-low-level-data-element)
+    - [UpdateDataElementLow](#updatedataelementlow-low-level-data-element)
+    - [ValidateDataElementLow](#validatedataelementlow-low-level-data-element)
   - [Ddlx](#low-level-ddlx)
-    - [ActivateMetadataExtensionLow](#activatemetadataextensionlow-low)
-    - [CheckMetadataExtensionLow](#checkmetadataextensionlow-low)
-    - [CreateMetadataExtensionLow](#createmetadataextensionlow-low)
-    - [DeleteMetadataExtensionLow](#deletemetadataextensionlow-low)
-    - [LockMetadataExtensionLow](#lockmetadataextensionlow-low)
-    - [UnlockMetadataExtensionLow](#unlockmetadataextensionlow-low)
-    - [UpdateMetadataExtensionLow](#updatemetadataextensionlow-low)
-    - [ValidateMetadataExtensionLow](#validatemetadataextensionlow-low)
+    - [ActivateMetadataExtensionLow](#activatemetadataextensionlow-low-level-ddlx)
+    - [CheckMetadataExtensionLow](#checkmetadataextensionlow-low-level-ddlx)
+    - [CreateMetadataExtensionLow](#createmetadataextensionlow-low-level-ddlx)
+    - [DeleteMetadataExtensionLow](#deletemetadataextensionlow-low-level-ddlx)
+    - [LockMetadataExtensionLow](#lockmetadataextensionlow-low-level-ddlx)
+    - [UnlockMetadataExtensionLow](#unlockmetadataextensionlow-low-level-ddlx)
+    - [UpdateMetadataExtensionLow](#updatemetadataextensionlow-low-level-ddlx)
+    - [ValidateMetadataExtensionLow](#validatemetadataextensionlow-low-level-ddlx)
   - [Domain](#low-level-domain)
-    - [ActivateDomainLow](#activatedomainlow-low)
-    - [CheckDomainLow](#checkdomainlow-low)
-    - [CreateDomainLow](#createdomainlow-low)
-    - [DeleteDomainLow](#deletedomainlow-low)
-    - [LockDomainLow](#lockdomainlow-low)
-    - [UnlockDomainLow](#unlockdomainlow-low)
-    - [UpdateDomainLow](#updatedomainlow-low)
-    - [ValidateDomainLow](#validatedomainlow-low)
+    - [ActivateDomainLow](#activatedomainlow-low-level-domain)
+    - [CheckDomainLow](#checkdomainlow-low-level-domain)
+    - [CreateDomainLow](#createdomainlow-low-level-domain)
+    - [DeleteDomainLow](#deletedomainlow-low-level-domain)
+    - [LockDomainLow](#lockdomainlow-low-level-domain)
+    - [UnlockDomainLow](#unlockdomainlow-low-level-domain)
+    - [UpdateDomainLow](#updatedomainlow-low-level-domain)
+    - [ValidateDomainLow](#validatedomainlow-low-level-domain)
   - [Function](#low-level-function)
-    - [ActivateFunctionGroupLow](#activatefunctiongrouplow-low)
-    - [ActivateFunctionModuleLow](#activatefunctionmodulelow-low)
-    - [CheckFunctionGroupLow](#checkfunctiongrouplow-low)
-    - [CheckFunctionModuleLow](#checkfunctionmodulelow-low)
-    - [CreateFunctionGroupLow](#createfunctiongrouplow-low)
-    - [CreateFunctionModuleLow](#createfunctionmodulelow-low)
-    - [DeleteFunctionGroupLow](#deletefunctiongrouplow-low)
-    - [DeleteFunctionModuleLow](#deletefunctionmodulelow-low)
-    - [LockFunctionGroupLow](#lockfunctiongrouplow-low)
-    - [LockFunctionModuleLow](#lockfunctionmodulelow-low)
-    - [UnlockFunctionGroupLow](#unlockfunctiongrouplow-low)
-    - [UnlockFunctionModuleLow](#unlockfunctionmodulelow-low)
-    - [UpdateFunctionModuleLow](#updatefunctionmodulelow-low)
-    - [ValidateFunctionGroupLow](#validatefunctiongrouplow-low)
-    - [ValidateFunctionModuleLow](#validatefunctionmodulelow-low)
+    - [ActivateFunctionGroupLow](#activatefunctiongrouplow-low-level-function)
+    - [ActivateFunctionModuleLow](#activatefunctionmodulelow-low-level-function)
+    - [CheckFunctionGroupLow](#checkfunctiongrouplow-low-level-function)
+    - [CheckFunctionModuleLow](#checkfunctionmodulelow-low-level-function)
+    - [CreateFunctionGroupLow](#createfunctiongrouplow-low-level-function)
+    - [CreateFunctionModuleLow](#createfunctionmodulelow-low-level-function)
+    - [DeleteFunctionGroupLow](#deletefunctiongrouplow-low-level-function)
+    - [DeleteFunctionModuleLow](#deletefunctionmodulelow-low-level-function)
+    - [LockFunctionGroupLow](#lockfunctiongrouplow-low-level-function)
+    - [LockFunctionModuleLow](#lockfunctionmodulelow-low-level-function)
+    - [UnlockFunctionGroupLow](#unlockfunctiongrouplow-low-level-function)
+    - [UnlockFunctionModuleLow](#unlockfunctionmodulelow-low-level-function)
+    - [UpdateFunctionModuleLow](#updatefunctionmodulelow-low-level-function)
+    - [ValidateFunctionGroupLow](#validatefunctiongrouplow-low-level-function)
+    - [ValidateFunctionModuleLow](#validatefunctionmodulelow-low-level-function)
   - [Interface](#low-level-interface)
-    - [ActivateInterfaceLow](#activateinterfacelow-low)
-    - [CheckInterfaceLow](#checkinterfacelow-low)
-    - [CreateInterfaceLow](#createinterfacelow-low)
-    - [DeleteInterfaceLow](#deleteinterfacelow-low)
-    - [LockInterfaceLow](#lockinterfacelow-low)
-    - [UnlockInterfaceLow](#unlockinterfacelow-low)
-    - [UpdateInterfaceLow](#updateinterfacelow-low)
-    - [ValidateInterfaceLow](#validateinterfacelow-low)
+    - [ActivateInterfaceLow](#activateinterfacelow-low-level-interface)
+    - [CheckInterfaceLow](#checkinterfacelow-low-level-interface)
+    - [CreateInterfaceLow](#createinterfacelow-low-level-interface)
+    - [DeleteInterfaceLow](#deleteinterfacelow-low-level-interface)
+    - [LockInterfaceLow](#lockinterfacelow-low-level-interface)
+    - [UnlockInterfaceLow](#unlockinterfacelow-low-level-interface)
+    - [UpdateInterfaceLow](#updateinterfacelow-low-level-interface)
+    - [ValidateInterfaceLow](#validateinterfacelow-low-level-interface)
   - [Package](#low-level-package)
-    - [CheckPackageLow](#checkpackagelow-low)
-    - [CreatePackageLow](#createpackagelow-low)
-    - [DeletePackageLow](#deletepackagelow-low)
-    - [LockPackageLow](#lockpackagelow-low)
-    - [UnlockPackageLow](#unlockpackagelow-low)
-    - [UpdatePackageLow](#updatepackagelow-low)
-    - [ValidatePackageLow](#validatepackagelow-low)
+    - [CheckPackageLow](#checkpackagelow-low-level-package)
+    - [CreatePackageLow](#createpackagelow-low-level-package)
+    - [DeletePackageLow](#deletepackagelow-low-level-package)
+    - [LockPackageLow](#lockpackagelow-low-level-package)
+    - [UnlockPackageLow](#unlockpackagelow-low-level-package)
+    - [UpdatePackageLow](#updatepackagelow-low-level-package)
+    - [ValidatePackageLow](#validatepackagelow-low-level-package)
   - [Program](#low-level-program)
-    - [ActivateProgramLow](#activateprogramlow-low)
-    - [CheckProgramLow](#checkprogramlow-low)
-    - [CreateProgramLow](#createprogramlow-low)
-    - [DeleteProgramLow](#deleteprogramlow-low)
-    - [LockProgramLow](#lockprogramlow-low)
-    - [UnlockProgramLow](#unlockprogramlow-low)
-    - [UpdateProgramLow](#updateprogramlow-low)
-    - [ValidateProgramLow](#validateprogramlow-low)
+    - [ActivateProgramLow](#activateprogramlow-low-level-program)
+    - [CheckProgramLow](#checkprogramlow-low-level-program)
+    - [CreateProgramLow](#createprogramlow-low-level-program)
+    - [DeleteProgramLow](#deleteprogramlow-low-level-program)
+    - [LockProgramLow](#lockprogramlow-low-level-program)
+    - [UnlockProgramLow](#unlockprogramlow-low-level-program)
+    - [UpdateProgramLow](#updateprogramlow-low-level-program)
+    - [ValidateProgramLow](#validateprogramlow-low-level-program)
   - [Structure](#low-level-structure)
-    - [ActivateStructureLow](#activatestructurelow-low)
-    - [CheckStructureLow](#checkstructurelow-low)
-    - [CreateStructureLow](#createstructurelow-low)
-    - [DeleteStructureLow](#deletestructurelow-low)
-    - [LockStructureLow](#lockstructurelow-low)
-    - [UnlockStructureLow](#unlockstructurelow-low)
-    - [UpdateStructureLow](#updatestructurelow-low)
-    - [ValidateStructureLow](#validatestructurelow-low)
+    - [ActivateStructureLow](#activatestructurelow-low-level-structure)
+    - [CheckStructureLow](#checkstructurelow-low-level-structure)
+    - [CreateStructureLow](#createstructurelow-low-level-structure)
+    - [DeleteStructureLow](#deletestructurelow-low-level-structure)
+    - [LockStructureLow](#lockstructurelow-low-level-structure)
+    - [UnlockStructureLow](#unlockstructurelow-low-level-structure)
+    - [UpdateStructureLow](#updatestructurelow-low-level-structure)
+    - [ValidateStructureLow](#validatestructurelow-low-level-structure)
   - [System](#low-level-system)
-    - [GetNodeStructureLow](#getnodestructurelow-low)
-    - [GetObjectStructureLow](#getobjectstructurelow-low)
-    - [GetVirtualFoldersLow](#getvirtualfolderslow-low)
+    - [GetNodeStructureLow](#getnodestructurelow-low-level-system)
+    - [GetObjectStructureLow](#getobjectstructurelow-low-level-system)
+    - [GetVirtualFoldersLow](#getvirtualfolderslow-low-level-system)
   - [Table](#low-level-table)
-    - [ActivateTableLow](#activatetablelow-low)
-    - [CheckTableLow](#checktablelow-low)
-    - [CreateTableLow](#createtablelow-low)
-    - [DeleteTableLow](#deletetablelow-low)
-    - [LockTableLow](#locktablelow-low)
-    - [UnlockTableLow](#unlocktablelow-low)
-    - [UpdateTableLow](#updatetablelow-low)
-    - [ValidateTableLow](#validatetablelow-low)
+    - [ActivateTableLow](#activatetablelow-low-level-table)
+    - [CheckTableLow](#checktablelow-low-level-table)
+    - [CreateTableLow](#createtablelow-low-level-table)
+    - [DeleteTableLow](#deletetablelow-low-level-table)
+    - [LockTableLow](#locktablelow-low-level-table)
+    - [UnlockTableLow](#unlocktablelow-low-level-table)
+    - [UpdateTableLow](#updatetablelow-low-level-table)
+    - [ValidateTableLow](#validatetablelow-low-level-table)
   - [Transport](#low-level-transport)
-    - [CreateTransportLow](#createtransportlow-low)
+    - [CreateTransportLow](#createtransportlow-low-level-transport)
   - [View](#low-level-view)
-    - [ActivateViewLow](#activateviewlow-low)
-    - [CheckViewLow](#checkviewlow-low)
-    - [CreateViewLow](#createviewlow-low)
-    - [DeleteViewLow](#deleteviewlow-low)
-    - [LockViewLow](#lockviewlow-low)
-    - [UnlockViewLow](#unlockviewlow-low)
-    - [UpdateViewLow](#updateviewlow-low)
-    - [ValidateViewLow](#validateviewlow-low)
+    - [ActivateViewLow](#activateviewlow-low-level-view)
+    - [CheckViewLow](#checkviewlow-low-level-view)
+    - [CreateViewLow](#createviewlow-low-level-view)
+    - [DeleteViewLow](#deleteviewlow-low-level-view)
+    - [LockViewLow](#lockviewlow-low-level-view)
+    - [UnlockViewLow](#unlockviewlow-low-level-view)
+    - [UpdateViewLow](#updateviewlow-low-level-view)
+    - [ValidateViewLow](#validateviewlow-low-level-view)
 
 ---
 
-## Read-Only Group {#read-only-group}
+## Read-Only Group
 
-### Enhancement {#read-only-enhancement}
+### Read-Only / Enhancement
 
-#### GetEnhancementImpl {#getenhancementimpl-readonly}
+#### GetEnhancementImpl (Read-Only / Enhancement)
 **Description:** [read-only] Retrieve source code of a specific enhancement implementation by its name and enhancement spot.
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancementImpl.ts`
@@ -315,7 +315,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetEnhancements {#getenhancements-readonly}
+#### GetEnhancements (Read-Only / Enhancement)
 **Description:** [read-only] Retrieve a list of enhancements for a given ABAP object.
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancements.ts`
@@ -326,7 +326,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetEnhancementSpot {#getenhancementspot-readonly}
+#### GetEnhancementSpot (Read-Only / Enhancement)
 **Description:** [read-only] Retrieve metadata and list of implementations for a specific enhancement spot.
 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancementSpot.ts`
@@ -336,9 +336,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Function {#read-only-function}
+### Read-Only / Function
 
-#### GetFunction {#getfunction-readonly}
+#### GetFunction (Read-Only / Function)
 **Description:** [read-only] Retrieve ABAP Function Module source code.
 
 **Source:** `src/handlers/function/readonly/handleGetFunction.ts`
@@ -348,9 +348,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Include {#read-only-include}
+### Read-Only / Include
 
-#### GetInclude {#getinclude-readonly}
+#### GetInclude (Read-Only / Include)
 **Description:** [read-only] Retrieve source code of a specific ABAP include file.
 
 **Source:** `src/handlers/include/readonly/handleGetInclude.ts`
@@ -360,7 +360,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetIncludesList {#getincludeslist-readonly}
+#### GetIncludesList (Read-Only / Include)
 **Description:** [read-only] Recursively discover and list ALL include files within an ABAP program or include.
 
 **Source:** `src/handlers/include/readonly/handleGetIncludesList.ts`
@@ -373,9 +373,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Package {#read-only-package}
+### Read-Only / Package
 
-#### GetPackageContents {#getpackagecontents-readonly}
+#### GetPackageContents (Read-Only / Package)
 **Description:** [read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages.
 
 **Source:** `src/handlers/package/readonly/handleGetPackageContents.ts`
@@ -385,9 +385,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Program {#read-only-program}
+### Read-Only / Program
 
-#### GetProgFullCode {#getprogfullcode-readonly}
+#### GetProgFullCode (Read-Only / Program)
 **Description:** [read-only] Returns the full code for a program or function group, including all includes, in tree traversal order.
 
 **Source:** `src/handlers/program/readonly/handleGetProgFullCode.ts`
@@ -398,9 +398,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Search {#read-only-search}
+### Read-Only / Search
 
-#### GetObjectsByType {#getobjectsbytype-readonly}
+#### GetObjectsByType (Read-Only / Search)
 **Description:** [read-only] Retrieves all ABAP objects of a specific type under a given node.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsByType.ts`
@@ -414,7 +414,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetObjectsList {#getobjectslist-readonly}
+#### GetObjectsList (Read-Only / Search)
 **Description:** [read-only] Recursively retrieves all valid ABAP repository objects for a given parent (program, function group, etc.) including nested includes.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsList.ts`
@@ -427,7 +427,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### SearchObject {#searchobject-readonly}
+#### SearchObject (Read-Only / Search)
 **Description:** [read-only] Search for ABAP objects by name pattern. Parameters: object_name (with or without mask), object_type (optional), maxResults (optional). If object_type is specified, results are filtered by type.
 
 **Source:** `src/handlers/search/readonly/handleSearchObject.ts`
@@ -439,9 +439,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### System {#read-only-system}
+### Read-Only / System
 
-#### DescribeByList {#describebylist-readonly}
+#### DescribeByList (Read-Only / System)
 **Description:** [read-only] Batch description for a list of ABAP objects. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE, STRUCTURE, etc.
 
 **Source:** `src/handlers/system/readonly/handleDescribeByList.ts`
@@ -452,7 +452,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetAbapAST {#getabapast-readonly}
+#### GetAbapAST (Read-Only / System)
 **Description:** [read-only] Parse ABAP code and return AST (Abstract Syntax Tree) in JSON format.
 
 **Source:** `src/handlers/system/readonly/handleGetAbapAST.ts`
@@ -463,7 +463,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetAbapSemanticAnalysis {#getabapsemanticanalysis-readonly}
+#### GetAbapSemanticAnalysis (Read-Only / System)
 **Description:** [read-only] Perform semantic analysis on ABAP code and return symbols, types, scopes, and dependencies.
 
 **Source:** `src/handlers/system/readonly/handleGetAbapSemanticAnalysis.ts`
@@ -474,7 +474,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetAbapSystemSymbols {#getabapsystemsymbols-readonly}
+#### GetAbapSystemSymbols (Read-Only / System)
 **Description:** [read-only] Resolve ABAP symbols from semantic analysis with SAP system information including types, scopes, descriptions, and packages.
 
 **Source:** `src/handlers/system/readonly/handleGetAbapSystemSymbols.ts`
@@ -485,7 +485,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetAdtTypes {#getadttypes-readonly}
+#### GetAdtTypes (Read-Only / System)
 **Description:** [read-only] Retrieve all valid ADT object types.
 
 **Source:** `src/handlers/system/readonly/handleGetAllTypes.ts`
@@ -495,7 +495,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetInactiveObjects {#getinactiveobjects-readonly}
+#### GetInactiveObjects (Read-Only / System)
 **Description:** [read-only] Get a list of inactive ABAP objects (objects that have been modified but not activated).
 
 **Source:** `src/handlers/system/readonly/handleGetInactiveObjects.ts`
@@ -505,7 +505,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetObjectInfo {#getobjectinfo-readonly}
+#### GetObjectInfo (Read-Only / System)
 **Description:** [read-only] Return ABAP object tree: root, group nodes, and terminal leaves up to maxDepth. Enrich each node via SearchObject if enrich=true. Group nodes are included for hierarchy. Each node has node_type: root, point, end.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectInfo.ts`
@@ -518,7 +518,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetObjectNodeFromCache {#getobjectnodefromcache-readonly}
+#### GetObjectNodeFromCache (Read-Only / System)
 **Description:** [read-only] Returns a node from the in-memory objects list cache by OBJECT_TYPE, OBJECT_NAME, TECH_NAME, and expands OBJECT_URI if present.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectNodeFromCache.ts`
@@ -528,7 +528,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetObjectStructure {#getobjectstructure-readonly}
+#### GetObjectStructure (Read-Only / System)
 **Description:** [read-only] Retrieve ADT object structure as a compact JSON tree.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectStructure.ts`
@@ -539,7 +539,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetSession {#getsession-readonly}
+#### GetSession (Read-Only / System)
 **Description:** [read-only] Get a new session ID and current session state (cookies, CSRF token) for reuse across multiple ADT operations. Use this to maintain the same session and lock handle across multiple requests.
 
 **Source:** `src/handlers/system/readonly/handleGetSession.ts`
@@ -549,7 +549,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetSqlQuery {#getsqlquery-readonly}
+#### GetSqlQuery (Read-Only / System)
 **Description:** [read-only] Execute freestyle SQL queries via SAP ADT Data Preview API.
 
 **Source:** `src/handlers/system/readonly/handleGetSqlQuery.ts`
@@ -560,7 +560,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetTransaction {#gettransaction-readonly}
+#### GetTransaction (Read-Only / System)
 **Description:** [read-only] Retrieve ABAP transaction details.
 
 **Source:** `src/handlers/system/readonly/handleGetTransaction.ts`
@@ -570,7 +570,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetTypeInfo {#gettypeinfo-readonly}
+#### GetTypeInfo (Read-Only / System)
 **Description:** [read-only] Retrieve ABAP type information.
 
 **Source:** `src/handlers/system/readonly/handleGetTypeInfo.ts`
@@ -580,7 +580,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetWhereUsed {#getwhereused-readonly}
+#### GetWhereUsed (Read-Only / System)
 **Description:** [read-only] Retrieve where-used references for ABAP objects via ADT usageReferences. Returns parsed list of referencing objects with their types and packages.
 
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
@@ -592,9 +592,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Table {#read-only-table}
+### Read-Only / Table
 
-#### GetTableContents {#gettablecontents-readonly}
+#### GetTableContents (Read-Only / Table)
 **Description:** [read-only] Retrieve contents of an ABAP table.
 
 **Source:** `src/handlers/table/readonly/handleGetTableContents.ts`
@@ -604,9 +604,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Transport {#read-only-transport}
+### Read-Only / Transport
 
-#### GetTransport {#gettransport-readonly}
+#### GetTransport (Read-Only / Transport)
 **Description:** [read-only] Retrieve ABAP transport request information including metadata, included objects, and status from SAP system.
 
 **Source:** `src/handlers/transport/readonly/handleGetTransport.ts`
@@ -618,11 +618,11 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-## High-Level Group {#high-level-group}
+## High-Level Group
 
-### Behavior Definition {#high-level-behavior-definition}
+### High-Level / Behavior Definition
 
-#### CreateBehaviorDefinition {#createbehaviordefinition-high}
+#### CreateBehaviorDefinition (High-Level / Behavior Definition)
 **Description:** Create a new ABAP Behavior Definition (BDEF) in SAP system.
 
 **Source:** `src/handlers/behavior_definition/high/handleCreateBehaviorDefinition.ts`
@@ -638,7 +638,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteBehaviorDefinition {#deletebehaviordefinition-high}
+#### DeleteBehaviorDefinition (High-Level / Behavior Definition)
 **Description:** Delete an ABAP behavior definition from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/behavior_definition/high/handleDeleteBehaviorDefinition.ts`
@@ -649,7 +649,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetBehaviorDefinition {#getbehaviordefinition-high}
+#### GetBehaviorDefinition (High-Level / Behavior Definition)
 **Description:** Retrieve ABAP behavior definition definition. Supports reading active or inactive version.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
@@ -660,7 +660,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateBehaviorDefinition {#updatebehaviordefinition-high}
+#### UpdateBehaviorDefinition (High-Level / Behavior Definition)
 **Description:** Update source code of an ABAP Behavior Definition.
 
 **Source:** `src/handlers/behavior_definition/high/handleUpdateBehaviorDefinition.ts`
@@ -673,9 +673,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Behavior Implementation {#high-level-behavior-implementation}
+### High-Level / Behavior Implementation
 
-#### CreateBehaviorImplementation {#createbehaviorimplementation-high}
+#### CreateBehaviorImplementation (High-Level / Behavior Implementation)
 **Description:** Create a new ABAP behavior implementation class for a behavior definition. Behavior implementations contain the business logic for RAP entities. Uses stateful session for proper lock management.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
@@ -691,7 +691,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteBehaviorImplementation {#deletebehaviorimplementation-high}
+#### DeleteBehaviorImplementation (High-Level / Behavior Implementation)
 **Description:** Delete an ABAP behavior implementation from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/behavior_implementation/high/handleDeleteBehaviorImplementation.ts`
@@ -702,7 +702,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetBehaviorImplementation {#getbehaviorimplementation-high}
+#### GetBehaviorImplementation (High-Level / Behavior Implementation)
 **Description:** Retrieve ABAP behavior implementation definition. Supports reading active or inactive version.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
@@ -713,7 +713,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateBehaviorImplementation {#updatebehaviorimplementation-high}
+#### UpdateBehaviorImplementation (High-Level / Behavior Implementation)
 **Description:** Update source code of an existing ABAP behavior implementation class. Updates both main source (with FOR BEHAVIOR OF clause) and implementations include. Uses stateful session with proper lock/unlock mechanism.
 
 **Source:** `src/handlers/behavior_implementation/high/handleUpdateBehaviorImplementation.ts`
@@ -727,9 +727,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Class {#high-level-class}
+### High-Level / Class
 
-#### CreateClass {#createclass-high}
+#### CreateClass (High-Level / Class)
 **Description:** Create a new ABAP class with optional activation. Manages validation, lock, check, update, unlock, and optional activation.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
@@ -747,7 +747,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateLocalDefinitions {#createlocaldefinitions-high}
+#### CreateLocalDefinitions (High-Level / Class)
 **Description:** Create local definitions in an ABAP class (definitions include). Manages lock, check, update, unlock, and optional activation.
 
 **Source:** `src/handlers/class/high/handleCreateLocalDefinitions.ts`
@@ -760,7 +760,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateLocalMacros {#createlocalmacros-high}
+#### CreateLocalMacros (High-Level / Class)
 **Description:** Create local macros in an ABAP class (macros include). Manages lock, check, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.
 
 **Source:** `src/handlers/class/high/handleCreateLocalMacros.ts`
@@ -773,7 +773,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateLocalTestClass {#createlocaltestclass-high}
+#### CreateLocalTestClass (High-Level / Class)
 **Description:** Create a local test class in an ABAP class. Manages lock, check, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleCreateLocalTestClass.ts`
@@ -787,7 +787,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateLocalTypes {#createlocaltypes-high}
+#### CreateLocalTypes (High-Level / Class)
 **Description:** Create local types in an ABAP class (implementations include). Manages lock, check, update, unlock, and optional activation.
 
 **Source:** `src/handlers/class/high/handleCreateLocalTypes.ts`
@@ -800,7 +800,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteClass {#deleteclass-high}
+#### DeleteClass (High-Level / Class)
 **Description:** Delete an ABAP class from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/class/high/handleDeleteClass.ts`
@@ -811,7 +811,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteLocalDefinitions {#deletelocaldefinitions-high}
+#### DeleteLocalDefinitions (High-Level / Class)
 **Description:** Delete local definitions from an ABAP class by clearing the definitions include. Manages lock, update, unlock, and optional activation.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalDefinitions.ts`
@@ -823,7 +823,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteLocalMacros {#deletelocalmacros-high}
+#### DeleteLocalMacros (High-Level / Class)
 **Description:** Delete local macros from an ABAP class by clearing the macros include. Manages lock, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalMacros.ts`
@@ -835,7 +835,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteLocalTestClass {#deletelocaltestclass-high}
+#### DeleteLocalTestClass (High-Level / Class)
 **Description:** Delete a local test class from an ABAP class by clearing the testclasses include. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTestClass.ts`
@@ -847,7 +847,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteLocalTypes {#deletelocaltypes-high}
+#### DeleteLocalTypes (High-Level / Class)
 **Description:** Delete local types from an ABAP class by clearing the implementations include. Manages lock, update, unlock, and optional activation.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTypes.ts`
@@ -859,7 +859,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetClass {#getclass-high}
+#### GetClass (High-Level / Class)
 **Description:** Retrieve ABAP class source code. Supports reading active or inactive version.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
@@ -870,7 +870,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetLocalDefinitions {#getlocaldefinitions-high}
+#### GetLocalDefinitions (High-Level / Class)
 **Description:** Retrieve local definitions source code from a class (definitions include). Supports reading active or inactive version.
 
 **Source:** `src/handlers/class/high/handleGetLocalDefinitions.ts`
@@ -881,7 +881,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetLocalMacros {#getlocalmacros-high}
+#### GetLocalMacros (High-Level / Class)
 **Description:** Retrieve local macros source code from a class (macros include). Supports reading active or inactive version. Note: Macros are supported in older ABAP versions but not in newer ones.
 
 **Source:** `src/handlers/class/high/handleGetLocalMacros.ts`
@@ -892,7 +892,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetLocalTestClass {#getlocaltestclass-high}
+#### GetLocalTestClass (High-Level / Class)
 **Description:** Retrieve local test class source code from a class. Supports reading active or inactive version.
 
 **Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
@@ -903,7 +903,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetLocalTypes {#getlocaltypes-high}
+#### GetLocalTypes (High-Level / Class)
 **Description:** Retrieve local types source code from a class (implementations include). Supports reading active or inactive version.
 
 **Source:** `src/handlers/class/high/handleGetLocalTypes.ts`
@@ -914,7 +914,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateClass {#updateclass-high}
+#### UpdateClass (High-Level / Class)
 **Description:** Update source code of an existing ABAP class. Locks, checks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/class/high/handleUpdateClass.ts`
@@ -926,7 +926,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateLocalDefinitions {#updatelocaldefinitions-high}
+#### UpdateLocalDefinitions (High-Level / Class)
 **Description:** Update local definitions in an ABAP class (definitions include). Manages lock, check, update, unlock, and optional activation.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalDefinitions.ts`
@@ -939,7 +939,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateLocalMacros {#updatelocalmacros-high}
+#### UpdateLocalMacros (High-Level / Class)
 **Description:** Update local macros in an ABAP class (macros include). Manages lock, check, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalMacros.ts`
@@ -952,7 +952,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateLocalTestClass {#updatelocaltestclass-high}
+#### UpdateLocalTestClass (High-Level / Class)
 **Description:** Update a local test class in an ABAP class. Manages lock, check, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTestClass.ts`
@@ -965,7 +965,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateLocalTypes {#updatelocaltypes-high}
+#### UpdateLocalTypes (High-Level / Class)
 **Description:** Update local types in an ABAP class (implementations include). Manages lock, check, update, unlock, and optional activation.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTypes.ts`
@@ -978,9 +978,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Data Element {#high-level-data-element}
+### High-Level / Data Element
 
-#### CreateDataElement {#createdataelement-high}
+#### CreateDataElement (High-Level / Data Element)
 **Description:** Create a new ABAP data element in SAP system with all required steps: create, activate, and verify.
 
 **Source:** `src/handlers/data_element/high/handleCreateDataElement.ts`
@@ -1005,7 +1005,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteDataElement {#deletedataelement-high}
+#### DeleteDataElement (High-Level / Data Element)
 **Description:** Delete an ABAP data element from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/data_element/high/handleDeleteDataElement.ts`
@@ -1016,7 +1016,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetDataElement {#getdataelement-high}
+#### GetDataElement (High-Level / Data Element)
 **Description:** Retrieve ABAP data element definition. Supports reading active or inactive version.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
@@ -1027,7 +1027,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateDataElement {#updatedataelement-high}
+#### UpdateDataElement (High-Level / Data Element)
 **Description:** Data element name to update (e.g., ZZ_TEST_DTEL_01)
 
 **Source:** `src/handlers/data_element/high/handleUpdateDataElement.ts`
@@ -1053,9 +1053,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Ddlx {#high-level-ddlx}
+### High-Level / Ddlx
 
-#### CreateMetadataExtension {#createmetadataextension-high}
+#### CreateMetadataExtension (High-Level / Ddlx)
 **Description:** Create a new ABAP Metadata Extension (DDLX) in SAP system.
 
 **Source:** `src/handlers/ddlx/high/handleCreateMetadataExtension.ts`
@@ -1069,7 +1069,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateMetadataExtension {#updatemetadataextension-high}
+#### UpdateMetadataExtension (High-Level / Ddlx)
 **Description:** Update source code of an ABAP Metadata Extension.
 
 **Source:** `src/handlers/ddlx/high/handleUpdateMetadataExtension.ts`
@@ -1082,9 +1082,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Domain {#high-level-domain}
+### High-Level / Domain
 
-#### CreateDomain {#createdomain-high}
+#### CreateDomain (High-Level / Domain)
 **Description:** Create a new ABAP domain in SAP system with all required steps: lock, create, check, unlock, activate, and verify.
 
 **Source:** `src/handlers/domain/high/handleCreateDomain.ts`
@@ -1107,7 +1107,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteDomain {#deletedomain-high}
+#### DeleteDomain (High-Level / Domain)
 **Description:** Delete an ABAP domain from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/domain/high/handleDeleteDomain.ts`
@@ -1118,7 +1118,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetDomain {#getdomain-high}
+#### GetDomain (High-Level / Domain)
 **Description:** Retrieve ABAP domain definition. Supports reading active or inactive version.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
@@ -1129,7 +1129,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateDomain {#updatedomain-high}
+#### UpdateDomain (High-Level / Domain)
 **Description:** Domain name to update (e.g., ZZ_TEST_0001)
 
 **Source:** `src/handlers/domain/high/handleUpdateDomain.ts`
@@ -1152,9 +1152,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Function {#high-level-function}
+### High-Level / Function
 
-#### CreateFunctionGroup {#createfunctiongroup-high}
+#### CreateFunctionGroup (High-Level / Function)
 **Description:** Create a new ABAP function group in SAP system. Function groups serve as containers for function modules. Uses stateful session for proper lock management.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionGroup.ts`
@@ -1168,7 +1168,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateFunctionModule {#createfunctionmodule-high}
+#### CreateFunctionModule (High-Level / Function)
 **Description:** Create a new ABAP function module within an existing function group. Uses stateful session with LOCK/UNLOCK workflow for source code upload.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionModule.ts`
@@ -1183,7 +1183,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateFunctionGroup {#updatefunctiongroup-high}
+#### UpdateFunctionGroup (High-Level / Function)
 **Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionGroup.ts`
@@ -1195,7 +1195,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateFunctionModule {#updatefunctionmodule-high}
+#### UpdateFunctionModule (High-Level / Function)
 **Description:** Update source code of an existing ABAP function module. Locks the function module, uploads new source code, and unlocks. Optionally activates after update. Use this to modify existing function modules without re-creating metadata.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionModule.ts`
@@ -1209,9 +1209,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Function Group {#high-level-function-group}
+### High-Level / Function Group
 
-#### DeleteFunctionGroup {#deletefunctiongroup-high}
+#### DeleteFunctionGroup (High-Level / Function Group)
 **Description:** Delete an ABAP function group from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/function_group/high/handleDeleteFunctionGroup.ts`
@@ -1222,7 +1222,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetFunctionGroup {#getfunctiongroup-high}
+#### GetFunctionGroup (High-Level / Function Group)
 **Description:** Retrieve ABAP function group definition. Supports reading active or inactive version.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
@@ -1233,9 +1233,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Function Module {#high-level-function-module}
+### High-Level / Function Module
 
-#### DeleteFunctionModule {#deletefunctionmodule-high}
+#### DeleteFunctionModule (High-Level / Function Module)
 **Description:** Delete an ABAP function module from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/function_module/high/handleDeleteFunctionModule.ts`
@@ -1246,7 +1246,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetFunctionModule {#getfunctionmodule-high}
+#### GetFunctionModule (High-Level / Function Module)
 **Description:** Retrieve ABAP function module definition. Supports reading active or inactive version.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
@@ -1257,9 +1257,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Interface {#high-level-interface}
+### High-Level / Interface
 
-#### CreateInterface {#createinterface-high}
+#### CreateInterface (High-Level / Interface)
 **Description:** Create a new ABAP interface in SAP system with source code. Interfaces define method signatures, events, and types for implementation by classes. Uses stateful session for proper lock management.
 
 **Source:** `src/handlers/interface/high/handleCreateInterface.ts`
@@ -1274,7 +1274,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteInterface {#deleteinterface-high}
+#### DeleteInterface (High-Level / Interface)
 **Description:** Delete an ABAP interface from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/interface/high/handleDeleteInterface.ts`
@@ -1285,7 +1285,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetInterface {#getinterface-high}
+#### GetInterface (High-Level / Interface)
 **Description:** Retrieve ABAP interface definition. Supports reading active or inactive version.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
@@ -1296,7 +1296,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateInterface {#updateinterface-high}
+#### UpdateInterface (High-Level / Interface)
 **Description:** Update source code of an existing ABAP interface. Uses stateful session with proper lock/unlock mechanism. Lock handle and transport number are passed in URL parameters.
 
 **Source:** `src/handlers/interface/high/handleUpdateInterface.ts`
@@ -1309,9 +1309,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Metadata Extension {#high-level-metadata-extension}
+### High-Level / Metadata Extension
 
-#### DeleteMetadataExtension {#deletemetadataextension-high}
+#### DeleteMetadataExtension (High-Level / Metadata Extension)
 **Description:** Delete an ABAP metadata extension from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/metadata_extension/high/handleDeleteMetadataExtension.ts`
@@ -1322,7 +1322,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetMetadataExtension {#getmetadataextension-high}
+#### GetMetadataExtension (High-Level / Metadata Extension)
 **Description:** Retrieve ABAP metadata extension definition. Supports reading active or inactive version.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
@@ -1333,9 +1333,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Package {#high-level-package}
+### High-Level / Package
 
-#### CreatePackage {#createpackage-high}
+#### CreatePackage (High-Level / Package)
 **Description:** Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.
 
 **Source:** `src/handlers/package/high/handleCreatePackage.ts`
@@ -1345,7 +1345,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetPackage {#getpackage-high}
+#### GetPackage (High-Level / Package)
 **Description:** Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
@@ -1356,9 +1356,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Program {#high-level-program}
+### High-Level / Program
 
-#### CreateProgram {#createprogram-high}
+#### CreateProgram (High-Level / Program)
 **Description:** Create a new ABAP program (report) in SAP system with source code. Supports executable programs, includes, module pools. Uses stateful session for proper lock management.
 
 **Source:** `src/handlers/program/high/handleCreateProgram.ts`
@@ -1375,7 +1375,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteProgram {#deleteprogram-high}
+#### DeleteProgram (High-Level / Program)
 **Description:** Delete an ABAP program from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/program/high/handleDeleteProgram.ts`
@@ -1386,7 +1386,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetProgram {#getprogram-high}
+#### GetProgram (High-Level / Program)
 **Description:** Retrieve ABAP program definition. Supports reading active or inactive version.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
@@ -1397,7 +1397,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateProgram {#updateprogram-high}
+#### UpdateProgram (High-Level / Program)
 **Description:** Update source code of an existing ABAP program. Locks the program, checks new code, uploads new source code, and unlocks. Optionally activates after update. Use this to modify existing programs without re-creating metadata.
 
 **Source:** `src/handlers/program/high/handleUpdateProgram.ts`
@@ -1409,9 +1409,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Service Definition {#high-level-service-definition}
+### High-Level / Service Definition
 
-#### CreateServiceDefinition {#createservicedefinition-high}
+#### CreateServiceDefinition (High-Level / Service Definition)
 **Description:** Create a new ABAP service definition for OData services. Service definitions define the structure and behavior of OData services. Uses stateful session for proper lock management.
 
 **Source:** `src/handlers/service_definition/high/handleCreateServiceDefinition.ts`
@@ -1426,7 +1426,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteServiceDefinition {#deleteservicedefinition-high}
+#### DeleteServiceDefinition (High-Level / Service Definition)
 **Description:** Delete an ABAP service definition from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/service_definition/high/handleDeleteServiceDefinition.ts`
@@ -1437,7 +1437,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetServiceDefinition {#getservicedefinition-high}
+#### GetServiceDefinition (High-Level / Service Definition)
 **Description:** Retrieve ABAP service definition definition. Supports reading active or inactive version.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
@@ -1448,7 +1448,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateServiceDefinition {#updateservicedefinition-high}
+#### UpdateServiceDefinition (High-Level / Service Definition)
 **Description:** Update source code of an existing ABAP service definition. Uses stateful session with proper lock/unlock mechanism.
 
 **Source:** `src/handlers/service_definition/high/handleUpdateServiceDefinition.ts`
@@ -1461,9 +1461,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Structure {#high-level-structure}
+### High-Level / Structure
 
-#### CreateStructure {#createstructure-high}
+#### CreateStructure (High-Level / Structure)
 **Description:** Create a new ABAP structure in SAP system with fields and type references. Includes create, activate, and verify steps.
 
 **Source:** `src/handlers/structure/high/handleCreateStructure.ts`
@@ -1484,7 +1484,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteStructure {#deletestructure-high}
+#### DeleteStructure (High-Level / Structure)
 **Description:** Delete an ABAP structure from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/structure/high/handleDeleteStructure.ts`
@@ -1495,7 +1495,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetStructure {#getstructure-high}
+#### GetStructure (High-Level / Structure)
 **Description:** Retrieve ABAP structure definition. Supports reading active or inactive version.
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
@@ -1506,7 +1506,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateStructure {#updatestructure-high}
+#### UpdateStructure (High-Level / Structure)
 **Description:** Update DDL source code of an existing ABAP structure. Locks the structure, uploads new DDL source, and unlocks. Optionally activates after update. Use this to modify existing structures without re-creating metadata.
 
 **Source:** `src/handlers/structure/high/handleUpdateStructure.ts`
@@ -1519,9 +1519,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### System {#high-level-system}
+### High-Level / System
 
-#### GetPackageTree {#getpackagetree-high}
+#### GetPackageTree (High-Level / System)
 **Description:** [high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions.
 
 **Source:** `src/handlers/system/high/handleGetPackageTree.ts`
@@ -1535,9 +1535,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Table {#high-level-table}
+### High-Level / Table
 
-#### CreateTable {#createtable-high}
+#### CreateTable (High-Level / Table)
 **Description:** Create a new ABAP table via the ADT API using provided DDL. Mirrors Eclipse ADT behaviour with status/check runs, lock handling, activation and verification.
 
 **Source:** `src/handlers/table/high/handleCreateTable.ts`
@@ -1552,7 +1552,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteTable {#deletetable-high}
+#### DeleteTable (High-Level / Table)
 **Description:** Delete an ABAP table from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/table/high/handleDeleteTable.ts`
@@ -1563,7 +1563,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetTable {#gettable-high}
+#### GetTable (High-Level / Table)
 **Description:** Retrieve ABAP table definition. Supports reading active or inactive version.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
@@ -1574,7 +1574,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateTable {#updatetable-high}
+#### UpdateTable (High-Level / Table)
 **Description:** Update DDL source code of an existing ABAP table. Locks the table, uploads new DDL source, and unlocks. Optionally activates after update. Use this to modify existing tables without re-creating metadata.
 
 **Source:** `src/handlers/table/high/handleUpdateTable.ts`
@@ -1587,9 +1587,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Transport {#high-level-transport}
+### High-Level / Transport
 
-#### CreateTransport {#createtransport-high}
+#### CreateTransport (High-Level / Transport)
 **Description:** Create a new ABAP transport request in SAP system for development objects.
 
 **Source:** `src/handlers/transport/high/handleCreateTransport.ts`
@@ -1602,9 +1602,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Unit Test {#high-level-unit-test}
+### High-Level / Unit Test
 
-#### CreateCdsUnitTest {#createcdsunittest-high}
+#### CreateCdsUnitTest (High-Level / Unit Test)
 **Description:** Create a CDS unit test class with CDS validation, class template, and local test class source.
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
@@ -1620,7 +1620,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateUnitTest {#createunittest-high}
+#### CreateUnitTest (High-Level / Unit Test)
 **Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
 
 **Source:** `src/handlers/unit_test/high/handleCreateUnitTest.ts`
@@ -1631,7 +1631,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteCdsUnitTest {#deletecdsunittest-high}
+#### DeleteCdsUnitTest (High-Level / Unit Test)
 **Description:** Delete a CDS unit test class (global class).
 
 **Source:** `src/handlers/unit_test/high/handleDeleteCdsUnitTest.ts`
@@ -1642,7 +1642,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteUnitTest {#deleteunittest-high}
+#### DeleteUnitTest (High-Level / Unit Test)
 **Description:** Delete an ABAP Unit test run. Note: ADT does not support deleting unit test runs and will return an error.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteUnitTest.ts`
@@ -1652,7 +1652,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetCdsUnitTest {#getcdsunittest-high}
+#### GetCdsUnitTest (High-Level / Unit Test)
 **Description:** Retrieve CDS unit test run status and result for a previously started run_id.
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTest.ts`
@@ -1662,7 +1662,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetCdsUnitTestResult {#getcdsunittestresult-high}
+#### GetCdsUnitTestResult (High-Level / Unit Test)
 **Description:** Retrieve CDS unit test run result for a run_id.
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestResult.ts`
@@ -1674,7 +1674,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetCdsUnitTestStatus {#getcdsunitteststatus-high}
+#### GetCdsUnitTestStatus (High-Level / Unit Test)
 **Description:** Retrieve CDS unit test run status for a run_id.
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestStatus.ts`
@@ -1685,7 +1685,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetUnitTest {#getunittest-high}
+#### GetUnitTest (High-Level / Unit Test)
 **Description:** Retrieve ABAP Unit test run status and result for a previously started run_id.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTest.ts`
@@ -1695,7 +1695,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetUnitTestResult {#getunittestresult-high}
+#### GetUnitTestResult (High-Level / Unit Test)
 **Description:** Retrieve ABAP Unit test run result for a run_id.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
@@ -1707,7 +1707,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetUnitTestStatus {#getunitteststatus-high}
+#### GetUnitTestStatus (High-Level / Unit Test)
 **Description:** Retrieve ABAP Unit test run status for a run_id.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestStatus.ts`
@@ -1718,7 +1718,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### RunUnitTest {#rununittest-high}
+#### RunUnitTest (High-Level / Unit Test)
 **Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
@@ -1729,7 +1729,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateCdsUnitTest {#updatecdsunittest-high}
+#### UpdateCdsUnitTest (High-Level / Unit Test)
 **Description:** Update a CDS unit test class local test class source code.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
@@ -1741,7 +1741,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateUnitTest {#updateunittest-high}
+#### UpdateUnitTest (High-Level / Unit Test)
 **Description:** Update an ABAP Unit test run. Note: ADT does not support updating unit test runs and will return an error.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateUnitTest.ts`
@@ -1751,9 +1751,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### View {#high-level-view}
+### High-Level / View
 
-#### CreateView {#createview-high}
+#### CreateView (High-Level / View)
 **Description:** Create CDS View or Classic View in SAP using DDL syntax. Both types use the same API workflow, differing only in DDL content (CDS has @AbapCatalog.sqlViewName and other annotations).
 
 **Source:** `src/handlers/view/high/handleCreateView.ts`
@@ -1767,7 +1767,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteView {#deleteview-high}
+#### DeleteView (High-Level / View)
 **Description:** Delete an ABAP view from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/view/high/handleDeleteView.ts`
@@ -1778,7 +1778,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetView {#getview-high}
+#### GetView (High-Level / View)
 **Description:** Retrieve ABAP view definition. Supports reading active or inactive version.
 
 **Source:** `src/handlers/view/high/handleGetView.ts`
@@ -1789,7 +1789,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateView {#updateview-high}
+#### UpdateView (High-Level / View)
 **Description:** Update DDL source code of an existing CDS View or Classic View. Locks the view, checks new code, uploads new DDL source, unlocks, and optionally activates.
 
 **Source:** `src/handlers/view/high/handleUpdateView.ts`
@@ -1800,11 +1800,11 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-## Low-Level Group {#low-level-group}
+## Low-Level Group
 
-### Behavior Definition {#low-level-behavior-definition}
+### Low-Level / Behavior Definition
 
-#### ActivateBehaviorDefinitionLow {#activatebehaviordefinitionlow-low}
+#### ActivateBehaviorDefinitionLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Activate an ABAP behavior definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/behavior_definition/low/handleActivateBehaviorDefinition.ts`
@@ -1816,7 +1816,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CheckBdefLow {#checkbdeflow-low}
+#### CheckBdefLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Perform syntax check on an ABAP behavior definition. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/behavior_definition/low/handleCheckBehaviorDefinition.ts`
@@ -1828,7 +1828,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateBehaviorDefinitionLow {#createbehaviordefinitionlow-low}
+#### CreateBehaviorDefinitionLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Create a new ABAP Behavior Definition. - use CreateBehaviorDefinition (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Source:** `src/handlers/behavior_definition/low/handleCreateBehaviorDefinition.ts`
@@ -1845,7 +1845,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteBehaviorDefinitionLow {#deletebehaviordefinitionlow-low}
+#### DeleteBehaviorDefinitionLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/behavior_definition/low/handleDeleteBehaviorDefinition.ts`
@@ -1856,7 +1856,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockBehaviorDefinitionLow {#lockbehaviordefinitionlow-low}
+#### LockBehaviorDefinitionLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Lock an ABAP behavior definition for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/behavior_definition/low/handleLockBehaviorDefinition.ts`
@@ -1868,7 +1868,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UnlockBehaviorDefinitionLow {#unlockbehaviordefinitionlow-low}
+#### UnlockBehaviorDefinitionLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Unlock an ABAP behavior definition after modification. Must use the same session_id and lock_handle from LockBehaviorDefinition operation.
 
 **Source:** `src/handlers/behavior_definition/low/handleUnlockBehaviorDefinition.ts`
@@ -1881,7 +1881,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateBehaviorDefinitionLow {#updatebehaviordefinitionlow-low}
+#### UpdateBehaviorDefinitionLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Update source code of an existing ABAP behavior definition. Requires lock handle from LockObject. - use UpdateBehaviorDefinition (high-level) for full workflow with lock/unlock/activate.
 
 **Source:** `src/handlers/behavior_definition/low/handleUpdateBehaviorDefinition.ts`
@@ -1895,7 +1895,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ValidateBehaviorDefinitionLow {#validatebehaviordefinitionlow-low}
+#### ValidateBehaviorDefinitionLow (Low-Level / Behavior Definition)
 **Description:** [low-level] Validate an ABAP behavior definition name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/behavior_definition/low/handleValidateBehaviorDefinition.ts`
@@ -1911,9 +1911,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Behavior Implementation {#low-level-behavior-implementation}
+### Low-Level / Behavior Implementation
 
-#### CreateBehaviorImplementationLow {#createbehaviorimplementationlow-low}
+#### CreateBehaviorImplementationLow (Low-Level / Behavior Implementation)
 **Description:** [low-level] Create a new ABAP behavior implementation class with full workflow (create, lock, update main source, update implementations, unlock, activate). - use CreateBehaviorImplementation (high-level) for additional validation.
 
 **Source:** `src/handlers/behavior_implementation/low/handleCreateBehaviorImplementation.ts`
@@ -1930,7 +1930,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockBehaviorImplementationLow {#lockbehaviorimplementationlow-low}
+#### LockBehaviorImplementationLow (Low-Level / Behavior Implementation)
 **Description:** [low-level] Lock an ABAP behavior implementation class for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/behavior_implementation/low/handleLockBehaviorImplementation.ts`
@@ -1942,7 +1942,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ValidateBehaviorImplementationLow {#validatebehaviorimplementationlow-low}
+#### ValidateBehaviorImplementationLow (Low-Level / Behavior Implementation)
 **Description:** [low-level] Validate an ABAP behavior implementation class name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/behavior_implementation/low/handleValidateBehaviorImplementation.ts`
@@ -1957,9 +1957,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Class {#low-level-class}
+### Low-Level / Class
 
-#### ActivateClassLow {#activateclasslow-low}
+#### ActivateClassLow (Low-Level / Class)
 **Description:** [low-level] Activate an ABAP class. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/class/low/handleActivateClass.ts`
@@ -1971,7 +1971,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ActivateClassTestClassesLow {#activateclasstestclasseslow-low}
+#### ActivateClassTestClassesLow (Low-Level / Class)
 **Description:** [low-level] Activate ABAP Unit test classes include for an existing class. Should be executed after updating and unlocking test classes.
 
 **Source:** `src/handlers/class/low/handleActivateClassTestClasses.ts`
@@ -1984,7 +1984,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CheckClassLow {#checkclasslow-low}
+#### CheckClassLow (Low-Level / Class)
 **Description:** [low-level] Perform syntax check on an ABAP class. Can check existing class (active/inactive) or hypothetical source code. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/class/low/handleCheckClass.ts`
@@ -1998,7 +1998,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateClassLow {#createclasslow-low}
+#### CreateClassLow (Low-Level / Class)
 **Description:** [low-level] Create a new ABAP class. - use CreateClass (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Source:** `src/handlers/class/low/handleCreateClass.ts`
@@ -2017,7 +2017,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteClassLow {#deleteclasslow-low}
+#### DeleteClassLow (Low-Level / Class)
 **Description:** [low-level] Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/class/low/handleDeleteClass.ts`
@@ -2028,7 +2028,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetClassUnitTestResultLow {#getclassunittestresultlow-low}
+#### GetClassUnitTestResultLow (Low-Level / Class)
 **Description:** [low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id.
 
 **Source:** `src/handlers/class/low/handleGetClassUnitTestResult.ts`
@@ -2042,7 +2042,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetClassUnitTestStatusLow {#getclassunitteststatuslow-low}
+#### GetClassUnitTestStatusLow (Low-Level / Class)
 **Description:** [low-level] Retrieve ABAP Unit run status XML for a previously started run_id.
 
 **Source:** `src/handlers/class/low/handleGetClassUnitTestStatus.ts`
@@ -2055,7 +2055,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockClassLow {#lockclasslow-low}
+#### LockClassLow (Low-Level / Class)
 **Description:** [low-level] Lock an ABAP class for modification. Uses session from HandlerContext. Returns lock handle that must be used in subsequent update/unlock operations.
 
 **Source:** `src/handlers/class/low/handleLockClass.ts`
@@ -2065,7 +2065,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockClassTestClassesLow {#lockclasstestclasseslow-low}
+#### LockClassTestClassesLow (Low-Level / Class)
 **Description:** [low-level] Lock ABAP Unit test classes include (CLAS/OC testclasses) for the specified class. Returns a test_classes_lock_handle for subsequent update/unlock operations using the same session.
 
 **Source:** `src/handlers/class/low/handleLockClassTestClasses.ts`
@@ -2077,7 +2077,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### RunClassUnitTestsLow {#runclassunittestslow-low}
+#### RunClassUnitTestsLow (Low-Level / Class)
 **Description:** [low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers.
 
 **Source:** `src/handlers/class/low/handleRunClassUnitTests.ts`
@@ -2088,7 +2088,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UnlockClassLow {#unlockclasslow-low}
+#### UnlockClassLow (Low-Level / Class)
 **Description:** [low-level] Unlock an ABAP class after modification. Uses session from HandlerContext. Must use the same lock_handle from LockClass operation.
 
 **Source:** `src/handlers/class/low/handleUnlockClass.ts`
@@ -2099,7 +2099,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UnlockClassTestClassesLow {#unlockclasstestclasseslow-low}
+#### UnlockClassTestClassesLow (Low-Level / Class)
 **Description:** [low-level] Unlock ABAP Unit test classes include for a class using the test_classes_lock_handle obtained from LockClassTestClassesLow.
 
 **Source:** `src/handlers/class/low/handleUnlockClassTestClasses.ts`
@@ -2112,7 +2112,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateClassLow {#updateclasslow-low}
+#### UpdateClassLow (Low-Level / Class)
 **Description:** [low-level] Update source code of an existing ABAP class. Uses session from HandlerContext. Requires lock handle from LockClass operation. - use UpdateClass (high-level) for full workflow with lock/unlock/activate.
 
 **Source:** `src/handlers/class/low/handleUpdateClass.ts`
@@ -2124,7 +2124,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateClassTestClassesLow {#updateclasstestclasseslow-low}
+#### UpdateClassTestClassesLow (Low-Level / Class)
 **Description:** [low-level] Upload ABAP Unit test include source code for an existing class. Requires test_classes_lock_handle from LockClassTestClassesLow.
 
 **Source:** `src/handlers/class/low/handleUpdateClassTestClasses.ts`
@@ -2138,7 +2138,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ValidateClassLow {#validateclasslow-low}
+#### ValidateClassLow (Low-Level / Class)
 **Description:** [low-level] Validate an ABAP class name before creation. Checks if the name is valid, available, and validates package, description, and superclass if provided. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/class/low/handleValidateClass.ts`
@@ -2153,9 +2153,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Common {#low-level-common}
+### Low-Level / Common
 
-#### ActivateObjectLow {#activateobjectlow-low}
+#### ActivateObjectLow (Low-Level / Common)
 **Description:** [low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type.
 
 **Source:** `src/handlers/common/low/handleActivateObject.ts`
@@ -2165,7 +2165,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CheckObjectLow {#checkobjectlow-low}
+#### CheckObjectLow (Low-Level / Common)
 **Description:** [low-level] Perform syntax check on an ABAP object without activation. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/common/low/handleCheckObject.ts`
@@ -2179,7 +2179,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteObjectLow {#deleteobjectlow-low}
+#### DeleteObjectLow (Low-Level / Common)
 **Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/common/low/handleDeleteObject.ts`
@@ -2192,7 +2192,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockObjectLow {#lockobjectlow-low}
+#### LockObjectLow (Low-Level / Common)
 **Description:** [low-level] Lock an ABAP object for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/common/low/handleLockObject.ts`
@@ -2206,7 +2206,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UnlockObjectLow {#unlockobjectlow-low}
+#### UnlockObjectLow (Low-Level / Common)
 **Description:** [low-level] Unlock an ABAP object after modification. Must use the same session_id and lock_handle from the LockObject operation.
 
 **Source:** `src/handlers/common/low/handleUnlockObject.ts`
@@ -2220,7 +2220,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ValidateObjectLow {#validateobjectlow-low}
+#### ValidateObjectLow (Low-Level / Common)
 **Description:** [low-level] Validate an ABAP object name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/common/low/handleValidateObject.ts`
@@ -2238,9 +2238,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Data Element {#low-level-data-element}
+### Low-Level / Data Element
 
-#### ActivateDataElementLow {#activatedataelementlow-low}
+#### ActivateDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Activate an ABAP data element. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/data_element/low/handleActivateDataElement.ts`
@@ -2252,7 +2252,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CheckDataElementLow {#checkdataelementlow-low}
+#### CheckDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Perform syntax check on an ABAP data element. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/data_element/low/handleCheckDataElement.ts`
@@ -2264,7 +2264,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateDataElementLow {#createdataelementlow-low}
+#### CreateDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Create a new ABAP data element. - use CreateDataElement (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Source:** `src/handlers/data_element/low/handleCreateDataElement.ts`
@@ -2284,7 +2284,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteDataElementLow {#deletedataelementlow-low}
+#### DeleteDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/data_element/low/handleDeleteDataElement.ts`
@@ -2295,7 +2295,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockDataElementLow {#lockdataelementlow-low}
+#### LockDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Lock an ABAP data element for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/data_element/low/handleLockDataElement.ts`
@@ -2307,7 +2307,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UnlockDataElementLow {#unlockdataelementlow-low}
+#### UnlockDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Unlock an ABAP data element after modification. Must use the same session_id and lock_handle from LockDataElement operation.
 
 **Source:** `src/handlers/data_element/low/handleUnlockDataElement.ts`
@@ -2320,7 +2320,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateDataElementLow {#updatedataelementlow-low}
+#### UpdateDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Update properties of an existing ABAP data element. Requires lock handle from LockObject. - use UpdateDataElement (high-level) for full workflow with lock/unlock/activate.
 
 **Source:** `src/handlers/data_element/low/handleUpdateDataElement.ts`
@@ -2334,7 +2334,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ValidateDataElementLow {#validatedataelementlow-low}
+#### ValidateDataElementLow (Low-Level / Data Element)
 **Description:** [low-level] Validate an ABAP data element name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/data_element/low/handleValidateDataElement.ts`
@@ -2348,9 +2348,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Ddlx {#low-level-ddlx}
+### Low-Level / Ddlx
 
-#### ActivateMetadataExtensionLow {#activatemetadataextensionlow-low}
+#### ActivateMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/ddlx/low/handleActivateMetadataExtension.ts`
@@ -2362,7 +2362,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CheckMetadataExtensionLow {#checkmetadataextensionlow-low}
+#### CheckMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Perform syntax check on an ABAP metadata extension. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/ddlx/low/handleCheckMetadataExtension.ts`
@@ -2374,7 +2374,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateMetadataExtensionLow {#createmetadataextensionlow-low}
+#### CreateMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Create a new ABAP Metadata Extension. - use CreateMetadataExtension (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Source:** `src/handlers/ddlx/low/handleCreateMetadataExtension.ts`
@@ -2390,7 +2390,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteMetadataExtensionLow {#deletemetadataextensionlow-low}
+#### DeleteMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Delete an ABAP metadata extension from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/ddlx/low/handleDeleteMetadataExtension.ts`
@@ -2401,7 +2401,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockMetadataExtensionLow {#lockmetadataextensionlow-low}
+#### LockMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Lock an ABAP metadata extension for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/ddlx/low/handleLockMetadataExtension.ts`
@@ -2413,7 +2413,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UnlockMetadataExtensionLow {#unlockmetadataextensionlow-low}
+#### UnlockMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Unlock an ABAP metadata extension after modification. Must use the same session_id and lock_handle from LockMetadataExtension operation.
 
 **Source:** `src/handlers/ddlx/low/handleUnlockMetadataExtension.ts`
@@ -2426,7 +2426,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateMetadataExtensionLow {#updatemetadataextensionlow-low}
+#### UpdateMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Update source code of an existing ABAP metadata extension. Requires lock handle from LockObject. - use UpdateMetadataExtension (high-level) for full workflow with lock/unlock/activate.
 
 **Source:** `src/handlers/ddlx/low/handleUpdateMetadataExtension.ts`
@@ -2440,7 +2440,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ValidateMetadataExtensionLow {#validatemetadataextensionlow-low}
+#### ValidateMetadataExtensionLow (Low-Level / Ddlx)
 **Description:** [low-level] Validate an ABAP metadata extension name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/ddlx/low/handleValidateMetadataExtension.ts`
@@ -2452,9 +2452,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Domain {#low-level-domain}
+### Low-Level / Domain
 
-#### ActivateDomainLow {#activatedomainlow-low}
+#### ActivateDomainLow (Low-Level / Domain)
 **Description:** [low-level] Activate an ABAP domain. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/domain/low/handleActivateDomain.ts`
@@ -2466,7 +2466,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CheckDomainLow {#checkdomainlow-low}
+#### CheckDomainLow (Low-Level / Domain)
 **Description:** [low-level] Perform syntax check on an ABAP domain. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/domain/low/handleCheckDomain.ts`
@@ -2478,7 +2478,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateDomainLow {#createdomainlow-low}
+#### CreateDomainLow (Low-Level / Domain)
 **Description:** [low-level] Create a new ABAP domain. - use CreateDomain (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Source:** `src/handlers/domain/low/handleCreateDomain.ts`
@@ -2493,7 +2493,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteDomainLow {#deletedomainlow-low}
+#### DeleteDomainLow (Low-Level / Domain)
 **Description:** [low-level] Delete an ABAP domain from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/domain/low/handleDeleteDomain.ts`
@@ -2504,7 +2504,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockDomainLow {#lockdomainlow-low}
+#### LockDomainLow (Low-Level / Domain)
 **Description:** [low-level] Lock an ABAP domain for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/domain/low/handleLockDomain.ts`
@@ -2516,7 +2516,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UnlockDomainLow {#unlockdomainlow-low}
+#### UnlockDomainLow (Low-Level / Domain)
 **Description:** [low-level] Unlock an ABAP domain after modification. Must use the same session_id and lock_handle from LockDomain operation.
 
 **Source:** `src/handlers/domain/low/handleUnlockDomain.ts`
@@ -2529,7 +2529,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateDomainLow {#updatedomainlow-low}
+#### UpdateDomainLow (Low-Level / Domain)
 **Description:** [low-level] Update properties of an existing ABAP domain. Requires lock handle from LockObject. - use UpdateDomain (high-level) for full workflow with lock/unlock/activate.
 
 **Source:** `src/handlers/domain/low/handleUpdateDomain.ts`
@@ -2543,7 +2543,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ValidateDomainLow {#validatedomainlow-low}
+#### ValidateDomainLow (Low-Level / Domain)
 **Description:** [low-level] Validate an ABAP domain name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/domain/low/handleValidateDomain.ts`
@@ -2557,9 +2557,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Function {#low-level-function}
+### Low-Level / Function
 
-#### ActivateFunctionGroupLow {#activatefunctiongrouplow-low}
+#### ActivateFunctionGroupLow (Low-Level / Function)
 **Description:** [low-level] Activate an ABAP function group. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionGroup.ts`
@@ -2571,7 +2571,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ActivateFunctionModuleLow {#activatefunctionmodulelow-low}
+#### ActivateFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Activate an ABAP function module. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionModule.ts`
@@ -2584,7 +2584,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CheckFunctionGroupLow {#checkfunctiongrouplow-low}
+#### CheckFunctionGroupLow (Low-Level / Function)
 **Description:** [low-level] Perform syntax check on an ABAP function group. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/function/low/handleCheckFunctionGroup.ts`
@@ -2596,7 +2596,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CheckFunctionModuleLow {#checkfunctionmodulelow-low}
+#### CheckFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Perform syntax check on an ABAP function module. Returns syntax errors, warnings, and messages. Requires function group name. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/function/low/handleCheckFunctionModule.ts`
@@ -2610,7 +2610,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateFunctionGroupLow {#createfunctiongrouplow-low}
+#### CreateFunctionGroupLow (Low-Level / Function)
 **Description:** [low-level] Create a new ABAP function group. - use CreateFunctionGroup (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Source:** `src/handlers/function/low/handleCreateFunctionGroup.ts`
@@ -2625,7 +2625,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateFunctionModuleLow {#createfunctionmodulelow-low}
+#### CreateFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Create a new ABAP function module. - use CreateFunctionModule (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Source:** `src/handlers/function/low/handleCreateFunctionModule.ts`
@@ -2641,7 +2641,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteFunctionGroupLow {#deletefunctiongrouplow-low}
+#### DeleteFunctionGroupLow (Low-Level / Function)
 **Description:** [low-level] Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/function/low/handleDeleteFunctionGroup.ts`
@@ -2652,7 +2652,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteFunctionModuleLow {#deletefunctionmodulelow-low}
+#### DeleteFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/function/low/handleDeleteFunctionModule.ts`
@@ -2664,7 +2664,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockFunctionGroupLow {#lockfunctiongrouplow-low}
+#### LockFunctionGroupLow (Low-Level / Function)
 **Description:** [low-level] Lock an ABAP function group for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/function/low/handleLockFunctionGroup.ts`
@@ -2676,7 +2676,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockFunctionModuleLow {#lockfunctionmodulelow-low}
+#### LockFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Lock an ABAP function module for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/function/low/handleLockFunctionModule.ts`
@@ -2689,7 +2689,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UnlockFunctionGroupLow {#unlockfunctiongrouplow-low}
+#### UnlockFunctionGroupLow (Low-Level / Function)
 **Description:** [low-level] Unlock an ABAP function group after modification. Must use the same session_id and lock_handle from LockFunctionGroup operation.
 
 **Source:** `src/handlers/function/low/handleUnlockFunctionGroup.ts`
@@ -2702,7 +2702,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UnlockFunctionModuleLow {#unlockfunctionmodulelow-low}
+#### UnlockFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Unlock an ABAP function module after modification. Must use the same session_id and lock_handle from LockFunctionModule operation.
 
 **Source:** `src/handlers/function/low/handleUnlockFunctionModule.ts`
@@ -2716,7 +2716,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateFunctionModuleLow {#updatefunctionmodulelow-low}
+#### UpdateFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Update source code of an existing ABAP function module. Requires lock handle from LockObject and function group name. - use UpdateFunctionModule (high-level) for full workflow with lock/unlock/activate.
 
 **Source:** `src/handlers/function/low/handleUpdateFunctionModule.ts`
@@ -2731,7 +2731,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ValidateFunctionGroupLow {#validatefunctiongrouplow-low}
+#### ValidateFunctionGroupLow (Low-Level / Function)
 **Description:** [low-level] Validate an ABAP function group name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/function/low/handleValidateFunctionGroup.ts`
@@ -2745,7 +2745,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ValidateFunctionModuleLow {#validatefunctionmodulelow-low}
+#### ValidateFunctionModuleLow (Low-Level / Function)
 **Description:** [low-level] Validate an ABAP function module name before creation. Checks if the name is valid and available. Requires function group name. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/function/low/handleValidateFunctionModule.ts`
@@ -2759,9 +2759,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Interface {#low-level-interface}
+### Low-Level / Interface
 
-#### ActivateInterfaceLow {#activateinterfacelow-low}
+#### ActivateInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/interface/low/handleActivateInterface.ts`
@@ -2773,7 +2773,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CheckInterfaceLow {#checkinterfacelow-low}
+#### CheckInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Perform syntax check on an ABAP interface. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/interface/low/handleCheckInterface.ts`
@@ -2785,7 +2785,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateInterfaceLow {#createinterfacelow-low}
+#### CreateInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Create a new ABAP interface. - use CreateInterface (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Source:** `src/handlers/interface/low/handleCreateInterface.ts`
@@ -2800,7 +2800,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteInterfaceLow {#deleteinterfacelow-low}
+#### DeleteInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/interface/low/handleDeleteInterface.ts`
@@ -2811,7 +2811,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockInterfaceLow {#lockinterfacelow-low}
+#### LockInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Lock an ABAP interface for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/interface/low/handleLockInterface.ts`
@@ -2823,7 +2823,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UnlockInterfaceLow {#unlockinterfacelow-low}
+#### UnlockInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Unlock an ABAP interface after modification. Must use the same session_id and lock_handle from LockInterface operation.
 
 **Source:** `src/handlers/interface/low/handleUnlockInterface.ts`
@@ -2836,7 +2836,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateInterfaceLow {#updateinterfacelow-low}
+#### UpdateInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Update source code of an existing ABAP interface. Requires lock handle from LockObject. - use UpdateInterface (high-level) for full workflow with lock/unlock/activate.
 
 **Source:** `src/handlers/interface/low/handleUpdateInterface.ts`
@@ -2850,7 +2850,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ValidateInterfaceLow {#validateinterfacelow-low}
+#### ValidateInterfaceLow (Low-Level / Interface)
 **Description:** [low-level] Validate an ABAP interface name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/interface/low/handleValidateInterface.ts`
@@ -2864,9 +2864,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Package {#low-level-package}
+### Low-Level / Package
 
-#### CheckPackageLow {#checkpackagelow-low}
+#### CheckPackageLow (Low-Level / Package)
 **Description:** [low-level] Perform syntax check on an ABAP package. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/package/low/handleCheckPackage.ts`
@@ -2879,7 +2879,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreatePackageLow {#createpackagelow-low}
+#### CreatePackageLow (Low-Level / Package)
 **Description:** [low-level] Create a new ABAP package. - use CreatePackage (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Source:** `src/handlers/package/low/handleCreatePackage.ts`
@@ -2898,7 +2898,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeletePackageLow {#deletepackagelow-low}
+#### DeletePackageLow (Low-Level / Package)
 **Description:** [low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/package/low/handleDeletePackage.ts`
@@ -2911,7 +2911,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockPackageLow {#lockpackagelow-low}
+#### LockPackageLow (Low-Level / Package)
 **Description:** [low-level] Lock an ABAP package for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. Requires super_package.
 
 **Source:** `src/handlers/package/low/handleLockPackage.ts`
@@ -2924,7 +2924,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UnlockPackageLow {#unlockpackagelow-low}
+#### UnlockPackageLow (Low-Level / Package)
 **Description:** [low-level] Unlock an ABAP package after modification. Requires lock handle from LockObject and superPackage. - must use the same session_id and lock_handle from LockObject.
 
 **Source:** `src/handlers/package/low/handleUnlockPackage.ts`
@@ -2938,7 +2938,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdatePackageLow {#updatepackagelow-low}
+#### UpdatePackageLow (Low-Level / Package)
 **Description:** [low-level] Update description of an existing ABAP package. Requires lock handle from LockObject and superPackage. - use UpdatePackageSource for full workflow with lock/unlock.
 
 **Source:** `src/handlers/package/low/handleUpdatePackage.ts`
@@ -2953,7 +2953,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ValidatePackageLow {#validatepackagelow-low}
+#### ValidatePackageLow (Low-Level / Package)
 **Description:** [low-level] Validate an ABAP package name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/package/low/handleValidatePackage.ts`
@@ -2965,9 +2965,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Program {#low-level-program}
+### Low-Level / Program
 
-#### ActivateProgramLow {#activateprogramlow-low}
+#### ActivateProgramLow (Low-Level / Program)
 **Description:** [low-level] Activate an ABAP program. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/program/low/handleActivateProgram.ts`
@@ -2979,7 +2979,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CheckProgramLow {#checkprogramlow-low}
+#### CheckProgramLow (Low-Level / Program)
 **Description:** [low-level] Perform syntax check on an ABAP program. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/program/low/handleCheckProgram.ts`
@@ -2991,7 +2991,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateProgramLow {#createprogramlow-low}
+#### CreateProgramLow (Low-Level / Program)
 **Description:** [low-level] Create a new ABAP program. - use CreateProgram (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Source:** `src/handlers/program/low/handleCreateProgram.ts`
@@ -3008,7 +3008,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteProgramLow {#deleteprogramlow-low}
+#### DeleteProgramLow (Low-Level / Program)
 **Description:** [low-level] Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/program/low/handleDeleteProgram.ts`
@@ -3019,7 +3019,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockProgramLow {#lockprogramlow-low}
+#### LockProgramLow (Low-Level / Program)
 **Description:** [low-level] Lock an ABAP program for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/program/low/handleLockProgram.ts`
@@ -3031,7 +3031,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UnlockProgramLow {#unlockprogramlow-low}
+#### UnlockProgramLow (Low-Level / Program)
 **Description:** [low-level] Unlock an ABAP program after modification. Must use the same session_id and lock_handle from LockProgram operation.
 
 **Source:** `src/handlers/program/low/handleUnlockProgram.ts`
@@ -3044,7 +3044,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateProgramLow {#updateprogramlow-low}
+#### UpdateProgramLow (Low-Level / Program)
 **Description:** [low-level] Update source code of an existing ABAP program. Requires lock handle from LockObject. - use UpdateProgram (high-level) for full workflow with lock/unlock/activate.
 
 **Source:** `src/handlers/program/low/handleUpdateProgram.ts`
@@ -3058,7 +3058,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ValidateProgramLow {#validateprogramlow-low}
+#### ValidateProgramLow (Low-Level / Program)
 **Description:** [low-level] Validate an ABAP program name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/program/low/handleValidateProgram.ts`
@@ -3072,9 +3072,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Structure {#low-level-structure}
+### Low-Level / Structure
 
-#### ActivateStructureLow {#activatestructurelow-low}
+#### ActivateStructureLow (Low-Level / Structure)
 **Description:** [low-level] Activate an ABAP structure. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/structure/low/handleActivateStructure.ts`
@@ -3086,7 +3086,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CheckStructureLow {#checkstructurelow-low}
+#### CheckStructureLow (Low-Level / Structure)
 **Description:** [low-level] Perform syntax check on an ABAP structure. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_code is provided, validates new/unsaved code (will be base64 encoded in request).
 
 **Source:** `src/handlers/structure/low/handleCheckStructure.ts`
@@ -3100,7 +3100,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateStructureLow {#createstructurelow-low}
+#### CreateStructureLow (Low-Level / Structure)
 **Description:** [low-level] Create a new ABAP structure. - use CreateStructure (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Source:** `src/handlers/structure/low/handleCreateStructure.ts`
@@ -3117,7 +3117,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteStructureLow {#deletestructurelow-low}
+#### DeleteStructureLow (Low-Level / Structure)
 **Description:** [low-level] Delete an ABAP structure from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/structure/low/handleDeleteStructure.ts`
@@ -3128,7 +3128,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockStructureLow {#lockstructurelow-low}
+#### LockStructureLow (Low-Level / Structure)
 **Description:** [low-level] Lock an ABAP structure for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/structure/low/handleLockStructure.ts`
@@ -3140,7 +3140,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UnlockStructureLow {#unlockstructurelow-low}
+#### UnlockStructureLow (Low-Level / Structure)
 **Description:** [low-level] Unlock an ABAP structure after modification. Must use the same session_id and lock_handle from LockStructure operation.
 
 **Source:** `src/handlers/structure/low/handleUnlockStructure.ts`
@@ -3153,7 +3153,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateStructureLow {#updatestructurelow-low}
+#### UpdateStructureLow (Low-Level / Structure)
 **Description:** [low-level] Update DDL source code of an existing ABAP structure. Requires lock handle from LockObject. - use UpdateStructureSource for full workflow with lock/unlock.
 
 **Source:** `src/handlers/structure/low/handleUpdateStructure.ts`
@@ -3167,7 +3167,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ValidateStructureLow {#validatestructurelow-low}
+#### ValidateStructureLow (Low-Level / Structure)
 **Description:** [low-level] Validate an ABAP structure name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/structure/low/handleValidateStructure.ts`
@@ -3181,9 +3181,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### System {#low-level-system}
+### Low-Level / System
 
-#### GetNodeStructureLow {#getnodestructurelow-low}
+#### GetNodeStructureLow (Low-Level / System)
 **Description:** [low-level] Fetch node structure from ADT repository. Used for object tree navigation and structure discovery. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/system/low/handleGetNodeStructure.ts`
@@ -3198,7 +3198,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetObjectStructureLow {#getobjectstructurelow-low}
+#### GetObjectStructureLow (Low-Level / System)
 **Description:** [low-level] Retrieve ADT object structure as compact JSON tree. Returns XML response with object structure tree. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/system/low/handleGetObjectStructure.ts`
@@ -3211,7 +3211,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### GetVirtualFoldersLow {#getvirtualfolderslow-low}
+#### GetVirtualFoldersLow (Low-Level / System)
 **Description:** [low-level] Retrieve hierarchical virtual folder contents from ADT information system. Used for browsing ABAP objects by package, group, type, etc.
 
 **Source:** `src/handlers/system/low/handleGetVirtualFolders.ts`
@@ -3223,9 +3223,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Table {#low-level-table}
+### Low-Level / Table
 
-#### ActivateTableLow {#activatetablelow-low}
+#### ActivateTableLow (Low-Level / Table)
 **Description:** [low-level] Activate an ABAP table. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/table/low/handleActivateTable.ts`
@@ -3237,7 +3237,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CheckTableLow {#checktablelow-low}
+#### CheckTableLow (Low-Level / Table)
 **Description:** [low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Requires session_id for stateful operations. Can use session_id and session_state from GetSession to maintain the same session. If ddl_code is provided, validates new/unsaved code (will be base64 encoded in request).
 
 **Source:** `src/handlers/table/low/handleCheckTable.ts`
@@ -3252,7 +3252,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateTableLow {#createtablelow-low}
+#### CreateTableLow (Low-Level / Table)
 **Description:** [low-level] Create a new ABAP table. - use CreateTable (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Source:** `src/handlers/table/low/handleCreateTable.ts`
@@ -3266,7 +3266,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteTableLow {#deletetablelow-low}
+#### DeleteTableLow (Low-Level / Table)
 **Description:** [low-level] Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/table/low/handleDeleteTable.ts`
@@ -3277,7 +3277,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockTableLow {#locktablelow-low}
+#### LockTableLow (Low-Level / Table)
 **Description:** [low-level] Lock an ABAP table for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/table/low/handleLockTable.ts`
@@ -3289,7 +3289,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UnlockTableLow {#unlocktablelow-low}
+#### UnlockTableLow (Low-Level / Table)
 **Description:** [low-level] Unlock an ABAP table after modification. Must use the same session_id and lock_handle from LockTable operation.
 
 **Source:** `src/handlers/table/low/handleUnlockTable.ts`
@@ -3302,7 +3302,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateTableLow {#updatetablelow-low}
+#### UpdateTableLow (Low-Level / Table)
 **Description:** [low-level] Update DDL source code of an existing ABAP table. Requires lock handle from LockObject. - use CreateTable for full workflow with lock/unlock.
 
 **Source:** `src/handlers/table/low/handleUpdateTable.ts`
@@ -3317,7 +3317,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ValidateTableLow {#validatetablelow-low}
+#### ValidateTableLow (Low-Level / Table)
 **Description:** [low-level] Validate an ABAP table name before creation. Checks if the name is valid and available. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/table/low/handleValidateTable.ts`
@@ -3331,9 +3331,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### Transport {#low-level-transport}
+### Low-Level / Transport
 
-#### CreateTransportLow {#createtransportlow-low}
+#### CreateTransportLow (Low-Level / Transport)
 **Description:** [low-level] Create a new ABAP transport request.
 
 **Source:** `src/handlers/transport/low/handleCreateTransport.ts`
@@ -3344,9 +3344,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-### View {#low-level-view}
+### Low-Level / View
 
-#### ActivateViewLow {#activateviewlow-low}
+#### ActivateViewLow (Low-Level / View)
 **Description:** [low-level] Activate an ABAP view (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/view/low/handleActivateView.ts`
@@ -3358,7 +3358,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CheckViewLow {#checkviewlow-low}
+#### CheckViewLow (Low-Level / View)
 **Description:** [low-level] Perform syntax check on an ABAP view. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).
 
 **Source:** `src/handlers/view/low/handleCheckView.ts`
@@ -3372,7 +3372,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### CreateViewLow {#createviewlow-low}
+#### CreateViewLow (Low-Level / View)
 **Description:** [low-level] Create a new ABAP view. - use CreateView (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
 
 **Source:** `src/handlers/view/low/handleCreateView.ts`
@@ -3389,7 +3389,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### DeleteViewLow {#deleteviewlow-low}
+#### DeleteViewLow (Low-Level / View)
 **Description:** [low-level] Delete an ABAP view from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/view/low/handleDeleteView.ts`
@@ -3400,7 +3400,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### LockViewLow {#lockviewlow-low}
+#### LockViewLow (Low-Level / View)
 **Description:** [low-level] Lock an ABAP view for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/view/low/handleLockView.ts`
@@ -3412,7 +3412,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UnlockViewLow {#unlockviewlow-low}
+#### UnlockViewLow (Low-Level / View)
 **Description:** [low-level] Unlock an ABAP view after modification. Must use the same session_id and lock_handle from LockView operation.
 
 **Source:** `src/handlers/view/low/handleUnlockView.ts`
@@ -3425,7 +3425,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### UpdateViewLow {#updateviewlow-low}
+#### UpdateViewLow (Low-Level / View)
 **Description:** [low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockObject. - use UpdateView (high-level) for full workflow with lock/unlock/activate.
 
 **Source:** `src/handlers/view/low/handleUpdateView.ts`
@@ -3439,7 +3439,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-#### ValidateViewLow {#validateviewlow-low}
+#### ValidateViewLow (Low-Level / View)
 **Description:** [low-level] Validate an ABAP view name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/view/low/handleValidateView.ts`

@@ -45,6 +45,11 @@ function slug(value) {
     .replace(/\s+/g, '-');
 }
 
+function anchorFromHeading(heading) {
+  // GitHub-style links are derived from heading text.
+  return slug(heading);
+}
+
 function walk(dir, acc) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
@@ -288,13 +293,16 @@ function generateMarkdown(tools) {
     const objects = Object.values(grouped[level]).sort((a, b) => a.objectTitle.localeCompare(b.objectTitle));
     if (objects.length === 0) continue;
 
-    const levelAnchor = slug(`${levelTitle(level)} Group`);
+    const levelHeading = `${levelTitle(level)} Group`;
+    const levelAnchor = anchorFromHeading(levelHeading);
     md += `- [${levelTitle(level)} Group](#${levelAnchor})\n`;
     for (const obj of objects) {
-      const objAnchor = slug(`${levelTitle(level)} ${obj.objectTitle}`);
+      const objectHeading = `${levelTitle(level)} / ${obj.objectTitle}`;
+      const objAnchor = anchorFromHeading(objectHeading);
       md += `  - [${obj.objectTitle}](#${objAnchor})\n`;
       for (const tool of obj.tools) {
-        const toolAnchor = slug(`${tool.name}-${level}`);
+        const toolHeading = `${tool.name} (${levelTitle(level)} / ${obj.objectTitle})`;
+        const toolAnchor = anchorFromHeading(toolHeading);
         md += `    - [${tool.name}](#${toolAnchor})\n`;
       }
     }
@@ -306,13 +314,16 @@ function generateMarkdown(tools) {
     const objects = Object.values(grouped[level]).sort((a, b) => a.objectTitle.localeCompare(b.objectTitle));
     if (objects.length === 0) continue;
 
-    md += `## ${levelTitle(level)} Group {#${slug(`${levelTitle(level)} Group`)}}\n\n`;
+    const levelHeading = `${levelTitle(level)} Group`;
+    md += `## ${levelHeading}\n\n`;
 
     for (const obj of objects) {
-      md += `### ${obj.objectTitle} {#${slug(`${levelTitle(level)} ${obj.objectTitle}`)}}\n\n`;
+      const objectHeading = `${levelTitle(level)} / ${obj.objectTitle}`;
+      md += `### ${objectHeading}\n\n`;
 
       for (const tool of obj.tools) {
-        md += `#### ${tool.name} {#${slug(`${tool.name}-${level}`)}}\n`;
+        const toolHeading = `${tool.name} (${levelTitle(level)} / ${obj.objectTitle})`;
+        md += `#### ${toolHeading}\n`;
         md += `**Description:** ${tool.description || 'No description'}\n\n`;
         md += `**Source:** \`${tool.filePath}\`\n\n`;
         md += `**Parameters:**\n`;

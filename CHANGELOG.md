@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2.2.4] - 2026-02-11
+### Changed
+- **Discoverability metadata**: Updated npm keywords and package metadata to improve MCP search relevance for ABAP, ABAP Cloud, JWT/XSUAA, and service-key flows.
+- **Registry description**: Shortened `server.json` description to meet the MCP publisher 100-character constraint.
+- **README positioning**: Clarified first-screen value proposition around full CRUD, On-Premise + ABAP Cloud support, and auth options.
+
 ## [2.2.3] - 2026-02-10
 ### Added
 - **Docs**: Added dedicated Terminology and Authentication guides, with links from README.

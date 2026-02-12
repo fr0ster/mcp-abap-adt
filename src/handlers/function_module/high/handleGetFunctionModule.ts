@@ -62,8 +62,7 @@ export async function handleGetFunctionModule(
       function_module_name,
       function_group_name,
       version = 'active',
-    } =
-      args as GetFunctionModuleArgs;
+    } = args as GetFunctionModuleArgs;
 
     // Validation
     if (!function_module_name || !function_group_name) {

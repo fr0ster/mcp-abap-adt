@@ -51,4 +51,3 @@ export function resolveEnvFilePath(options: {
   const sessionsDir = firstPlatformSessionsDir(options.authBrokerPath);
   return path.join(sessionsDir, fileName);
 }
-

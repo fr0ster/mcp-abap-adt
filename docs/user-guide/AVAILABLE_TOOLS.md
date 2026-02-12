@@ -1333,6 +1333,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function_module/high/handleDeleteFunctionModule.ts`
 
 **Parameters:**
+- `function_group_name` (string, required) - FunctionGroup name containing the function module (e.g., Z_MY_FUNCTIONGROUP).
 - `function_module_name` (string, required) - FunctionModule name (e.g., Z_MY_FUNCTIONMODULE).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
 
@@ -1345,6 +1346,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
 **Parameters:**
+- `function_group_name` (string, required) - FunctionGroup name containing the function module (e.g., Z_MY_FUNCTIONGROUP).
 - `function_module_name` (string, required) - FunctionModule name (e.g., Z_MY_FUNCTIONMODULE).
 - `version` (string, optional (default: active)) - Version to read: 
 
@@ -2949,10 +2951,11 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `function_group_name` (string, required) - Function group name containing the function module (e.g., Z_TEST_FG).
 - `function_module_name` (string, required) - Function module name (e.g., Z_TEST_FM). Function module must already exist.
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
+- `lock_handle` (string, required) - Lock handle from LockFunctionModule. Required for update operation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, required) - Complete ABAP function module source code.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects locked in a request.
 
 ---
 
@@ -3739,4 +3742,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-02-11*
+*Last updated: 2026-02-12*

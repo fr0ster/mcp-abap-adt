@@ -91,19 +91,19 @@ After installing from package, these commands are available:
 
 ### `mcp-abap-adt` - Default HTTP transport
 ```bash
-mcp-abap-adt [--env /path/to/.env]
+mcp-abap-adt [--env <destination>] [--env-path /path/to/.env]
 ```
 Use with MCP clients like Claude Desktop, VSCode extensions.
 
 ### `mcp-abap-adt --transport=http` - HTTP server
 ```bash
-mcp-abap-adt --transport=http [--port 3000] [--host localhost] [--env /path/to/.env]
+mcp-abap-adt --transport=http [--port 3000] [--host localhost] [--env <destination>] [--env-path /path/to/.env]
 ```
 Starts HTTP server with StreamableHTTP transport.
 
 ### `mcp-abap-adt --transport=sse` - SSE server
 ```bash
-mcp-abap-adt --transport=sse [--port 3000] [--host localhost] [--env /path/to/.env]
+mcp-abap-adt --transport=sse [--port 3000] [--host localhost] [--env <destination>] [--env-path /path/to/.env]
 ```
 Starts HTTP server with Server-Sent Events transport.
 
@@ -121,5 +121,5 @@ mcp-abap-adt --transport=sse --host 0.0.0.0 --port 3000
 
 ### Example 3: Custom Environment File
 ```bash
-mcp-abap-adt --transport=http --env /opt/config/.env.production --port 8080
+mcp-abap-adt --transport=http --env-path /opt/config/.env.production --port 8080
 ```

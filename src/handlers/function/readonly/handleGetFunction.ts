@@ -8,10 +8,7 @@ export const TOOL_DEFINITION = {
   description: '[read-only] Retrieve ABAP Function Module source code.',
   inputSchema: {
     function_name: z.string().describe('Name of the function module'),
-    function_group: z
-      .string()
-      .optional()
-      .describe('Name of the function group (optional)'),
+    function_group: z.string().describe('Name of the function group'),
     version: z
       .enum(['active', 'inactive'])
       .default('active')
@@ -25,9 +22,15 @@ export async function handleGetFunction(context: HandlerContext, args: any) {
     if (!args?.function_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Function name is required');
     }
+    if (!args?.function_group) {
+      throw new McpError(ErrorCode.InvalidParams, 'Function group is required');
+    }
+
+    const functionModuleName = String(args.function_name).toUpperCase();
+    const functionGroupName = String(args.function_group).toUpperCase();
 
     logger?.info(
-      `Reading function module ${args.function_name}, version: ${args.version || 'active'}`,
+      `Reading function module ${functionModuleName} in ${functionGroupName}, version: ${args.version || 'active'}`,
     );
 
     // Create client
@@ -35,10 +38,10 @@ export async function handleGetFunction(context: HandlerContext, args: any) {
     const result = await client
       .getFunctionModule()
       .read(
-        { functionModuleName: args.function_name },
+        { functionModuleName, functionGroupName },
         args.version || 'active',
       );
-    logger?.debug(`Successfully read function module ${args.function_name}`);
+    logger?.debug(`Successfully read function module ${functionModuleName}`);
     return {
       isError: false,
       content: [{ type: 'json', json: result }],

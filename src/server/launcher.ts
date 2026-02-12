@@ -61,7 +61,7 @@ ENVIRONMENT VARIABLES:
     MCP_HTTP_PORT                  HTTP server port (default: 3000)
     MCP_SSE_HOST                   SSE server host (default: 127.0.0.1)
     MCP_SSE_PORT                   SSE server port (default: 3001)
-    MCP_ENV_PATH                   Path to .env file
+    MCP_ENV_PATH                   Explicit .env file path (same as --env-path)
     MCP_UNSAFE                     Disable connection validation (true|false)
     MCP_USE_AUTH_BROKER            Force auth-broker usage (true|false)
     MCP_BROWSER                    Browser for OAuth2 flow (e.g., chrome, firefox)

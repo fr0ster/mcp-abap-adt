@@ -182,8 +182,11 @@ mcp-abap-adt --transport=stdio
 # Use stdio mode with auth-broker (--mcp parameter)
 mcp-abap-adt --transport=stdio --mcp=TRIAL
 
-# Use custom .env file
-mcp-abap-adt --env=/path/to/my.env
+# Use env destination from platform sessions store
+mcp-abap-adt --env=trial
+
+# Use explicit .env file path
+mcp-abap-adt --env-path=/path/to/my.env
 
 # SSE mode (requires .env file or --mcp parameter)
 mcp-abap-adt --transport=sse --sse-port=3001
@@ -210,10 +213,12 @@ npm run start:legacy
 
 ### Environment Configuration
 
-The server automatically looks for `.env` file in this order:
-1. Path specified via `--env` argument
-2. `.env` in current working directory (where you run the command)
-3. `.env` in package installation directory
+Env resolution:
+1. `--env-path=<path|file>` (or `MCP_ENV_PATH`) for explicit `.env` file.
+2. `--env=<destination>` for destination file in sessions store:
+   - Unix: `~/.config/mcp-abap-adt/sessions/<destination>.env`
+   - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\<destination>.env`
+3. Fallback to `.env` in current working directory.
 
 **Example .env file:**
 ```bash

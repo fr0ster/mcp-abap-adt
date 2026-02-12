@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [2.2.6] - 2026-02-12
+### Changed
+- **Function Module handlers**: Fixed parameter propagation for function module operations:
+  - `GetFunctionModule` and `DeleteFunctionModule` now require and pass `function_group_name`.
+  - `GetFunction` (read-only) now requires and passes `function_group`.
+  - `UpdateFunctionModule` (high/low) now forwards `transport_request` to ADT update calls.
+- **CLI env resolution**: Updated env argument behavior:
+  - `--env=<name>` now resolves to platform sessions path: `{sessions}/<name>.env`.
+  - Added `--env-path=<path|file>` for explicit `.env` file usage.
+  - `MCP_ENV_PATH` now maps to explicit env file path behavior (same as `--env-path`).
+- **Errors**: Improved function module update error messages for transport-related `400` responses and XML SAP errors.
+
 ## [2.2.5] - 2026-02-11
 ### Changed
 - **Tools docs generator**: Reworked `tools/generate-tools-docs.js` to scan only handler code in `src/handlers/**`.

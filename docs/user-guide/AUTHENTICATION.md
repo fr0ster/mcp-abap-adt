@@ -8,7 +8,7 @@ A **destination** is simply the **filename** of a service key stored in the serv
 
 - Put service keys here:
   - Linux/macOS: `~/.config/mcp-abap-adt/service-keys`
-  - Windows: `%APPDATA%\mcp-abap-adt\service-keys`
+  - Windows: `%USERPROFILE%\Documents\mcp-abap-adt\service-keys`
 - The filename (without extension) becomes the destination name.
 
 Example:
@@ -30,7 +30,8 @@ The server will load the matching service key and manage tokens automatically.
 You can also provide credentials via `.env`:
 
 - In the current directory: `.env`
-- Or explicitly: `--env /path/to/.env`
+- By destination: `--env <destination>` (resolved to sessions `<destination>.env`)
+- Or explicitly: `--env-path /path/to/.env`
 
 This is useful for quick local testing or when you do not want to store service keys.
 

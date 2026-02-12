@@ -1,27 +1,38 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { resolveEnvFilePath } from './envResolver';
 
 export function parseEnvArg(): string | undefined {
   const args = process.argv;
+  let envDestination: string | undefined;
+  let envPath: string | undefined;
+
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg.startsWith('--env=')) {
-      const envPath = arg.slice('--env='.length);
-      if (envPath.length === 0) continue;
-      if (envPath.startsWith('.\\') || envPath.startsWith('./')) {
-        return path.resolve(process.cwd(), envPath);
-      }
-      return envPath;
+    if (arg.startsWith('--env-path=')) {
+      const value = arg.slice('--env-path='.length);
+      if (value.length === 0) continue;
+      envPath = value;
+    } else if (arg === '--env-path' && i + 1 < args.length) {
+      const value = args[i + 1];
+      if (!value || value.startsWith('-')) continue;
+      envPath = value;
+    } else if (arg.startsWith('--env=')) {
+      const value = arg.slice('--env='.length);
+      if (value.length === 0) continue;
+      envDestination = value;
     } else if (arg === '--env' && i + 1 < args.length) {
-      const envPath = args[i + 1];
-      if (!envPath || envPath.startsWith('-')) continue;
-      if (envPath.startsWith('.\\') || envPath.startsWith('./')) {
-        return path.resolve(process.cwd(), envPath);
-      }
-      return envPath;
+      const value = args[i + 1];
+      if (!value || value.startsWith('-')) continue;
+      envDestination = value;
     }
   }
-  return undefined;
+
+  return resolveEnvFilePath({
+    envDestination,
+    envPath: envPath || process.env.MCP_ENV_PATH,
+    authBrokerPath: parseAuthBrokerPathArg(),
+  });
 }
 
 export function parseAuthBrokerPathArg(): string | undefined {

@@ -236,7 +236,9 @@ TRANSPORT SELECTION:
   --post-path=<path>               SSE message post path (default: /messages)
 
 AUTHENTICATION:
-  --env=<path>                     Path to .env file (uses .env instead of auth-broker)
+  --env=<name>                     Env destination name (resolved to sessions/<name>.env)
+                                   Uses platform default sessions directory
+  --env-path=<path|file>           Explicit .env file path (or relative file name)
   --mcp=<destination>              Default MCP destination name (for auth-broker mode)
                                    Example: --mcp=TRIAL
   --auth-broker-path=<path>        Custom path for auth-broker storage
@@ -254,8 +256,11 @@ EXAMPLES:
   # Stdio with auth-broker (for MCP clients)
   mcp-abap-adt --mcp=TRIAL
 
-  # Stdio with .env file
-  mcp-abap-adt --env=.env
+  # Stdio with env destination from sessions store
+  mcp-abap-adt --env=trial
+
+  # Stdio with explicit env file
+  mcp-abap-adt --env-path=.env
 
   # Limit to readonly operations only
   mcp-abap-adt --mcp=TRIAL --exposition=readonly

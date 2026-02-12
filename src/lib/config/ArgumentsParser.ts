@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { resolveEnvFilePath } from './envResolver';
 
 export interface ParsedArguments {
   /** Default MCP destination from --mcp parameter */
@@ -130,29 +131,31 @@ export class ArgumentsParser {
     // Parse --mcp
     result.mcp = getArgValue('--mcp');
 
-    // Parse --env
-    const envArg = getArgValue('--env');
-    if (envArg) {
-      if (envArg.startsWith('.\\') || envArg.startsWith('./')) {
-        result.env = path.resolve(process.cwd(), envArg);
-      } else {
-        result.env = envArg;
-      }
-    } else {
-      const envPath = process.env.MCP_ENV_PATH;
-      if (envPath) {
-        result.env = envPath;
-      } else {
-        // Check for .env in current directory
-        const cwdEnvPath = path.resolve(process.cwd(), '.env');
-        if (fs.existsSync(cwdEnvPath)) {
-          result.env = cwdEnvPath;
-        }
-      }
-    }
-
     // Parse --auth-broker-path
     result.authBrokerPath = getArgValue('--auth-broker-path');
+
+    // Parse --env and --env-path
+    // --env: destination name (resolved to sessions/<name>.env in platform path)
+    // --env-path: explicit file path or file name (resolved against cwd if relative)
+    const envDestination = getArgValue('--env');
+    const envPathArg = getArgValue('--env-path');
+    const envPathFromEnv = process.env.MCP_ENV_PATH;
+
+    const resolvedEnv = resolveEnvFilePath({
+      envDestination,
+      envPath: envPathArg || envPathFromEnv,
+      authBrokerPath: result.authBrokerPath,
+    });
+
+    if (resolvedEnv) {
+      result.env = resolvedEnv;
+    } else {
+      // Backward-compatible fallback: .env in current directory
+      const cwdEnvPath = path.resolve(process.cwd(), '.env');
+      if (fs.existsSync(cwdEnvPath)) {
+        result.env = cwdEnvPath;
+      }
+    }
 
     // Parse --unsafe
     result.unsafe = hasFlag('--unsafe') || process.env.MCP_UNSAFE === 'true';

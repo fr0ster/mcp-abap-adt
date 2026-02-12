@@ -1170,8 +1170,9 @@ YAML CONFIGURATION:
   See docs/configuration/YAML_CONFIG.md for detailed documentation.
 
 ENVIRONMENT FILE:
-  --env=<path>                     Path to .env file (uses .env instead of auth-broker)
-  --env <path>                     Alternative syntax for --env
+  --env=<name>                     Env destination name (resolved to sessions/<name>.env)
+  --env <name>                     Alternative syntax for --env
+  --env-path=<path|file>           Explicit .env file path (or relative file name)
   --auth-broker                    Force use of auth-broker (service keys) instead of .env file
                                    Ignores .env file even if present in current directory
                                    By default, .env in current directory is used automatically (if exists)
@@ -1216,7 +1217,7 @@ SSE (SERVER-SENT EVENTS) OPTIONS:
   --sse-enable-dns-protection     Enable DNS rebinding protection
 
 ENVIRONMENT VARIABLES:
-  MCP_ENV_PATH                     Path to .env file
+  MCP_ENV_PATH                     Explicit .env file path (same as --env-path)
   MCP_SKIP_ENV_LOAD                Skip automatic .env loading (true|false)
   MCP_SKIP_AUTO_START              Skip automatic server start (true|false)
   MCP_TRANSPORT                    Transport type (stdio|http|sse)
@@ -1315,8 +1316,11 @@ EXAMPLES:
   # Use SSE transport with --mcp parameter (allows auth-broker with SSE transport)
   mcp-abap-adt --transport=sse --mcp=TRIAL
 
-  # Use .env file from custom path
-  mcp-abap-adt --env=/path/to/my.env
+  # Use env destination from sessions store
+  mcp-abap-adt --env=trial
+
+  # Use explicit .env file from custom path
+  mcp-abap-adt --env-path=/path/to/my.env
 
   # Start HTTP server with CORS enabled
   mcp-abap-adt --transport=http --http-port=3000 \\
@@ -1430,7 +1434,7 @@ SERVICE KEYS (Destination-Based Authentication):
           "mcp-abap-adt-stdio": {
             "type": "stdio",
             "command": "mcp-abap-adt",
-            "args": ["--env=/path/to/.env"],
+            "args": ["--env-path=/path/to/.env"],
             "timeout": 60
           }
         }

@@ -114,6 +114,8 @@ export async function handleLockFunctionModule(
       }
 
       // Get updated session state after lock
+      const actualSessionId = connection.getSessionId() || session_id || null;
+      const actualSessionState = session_state || null;
 
       logger?.info(`✅ LockFunctionModule completed: ${functionModuleName}`);
       logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
@@ -124,9 +126,9 @@ export async function handleLockFunctionModule(
             success: true,
             function_module_name: functionModuleName,
             function_group_name: functionGroupName,
-            session_id: session_id || null,
+            session_id: actualSessionId,
             lock_handle: lockHandle,
-            session_state: null, // Session state management is now handled by auth-broker,
+            session_state: actualSessionState,
             message: `Function module ${functionModuleName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`,
           },
           null,

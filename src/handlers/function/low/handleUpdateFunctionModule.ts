@@ -35,10 +35,15 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Complete ABAP function module source code.',
       },
+      transport_request: {
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable objects locked in a request.',
+      },
       lock_handle: {
         type: 'string',
         description:
-          'Lock handle from LockObject. Required for update operation.',
+          'Lock handle from LockFunctionModule. Required for update operation.',
       },
       session_id: {
         type: 'string',
@@ -69,6 +74,7 @@ interface UpdateFunctionModuleArgs {
   function_module_name: string;
   function_group_name: string;
   source_code: string;
+  transport_request?: string;
   lock_handle: string;
   session_id?: string;
   session_state?: {
@@ -93,6 +99,7 @@ export async function handleUpdateFunctionModule(
       function_module_name,
       function_group_name,
       source_code,
+      transport_request,
       lock_handle,
       session_id,
       session_state,
@@ -134,6 +141,7 @@ export async function handleUpdateFunctionModule(
           functionModuleName: functionModuleName,
           functionGroupName: functionGroupName,
           sourceCode: source_code,
+          transportRequest: transport_request,
         },
         { lockHandle: lock_handle },
       );
@@ -155,10 +163,11 @@ export async function handleUpdateFunctionModule(
             success: true,
             function_module_name: functionModuleName,
             function_group_name: functionGroupName,
+            transport_request: transport_request || null,
             lock_handle: lock_handle,
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
-            message: `Function module ${functionModuleName} updated successfully. Remember to unlock using UnlockObject.`,
+            message: `Function module ${functionModuleName} updated successfully. Remember to unlock using UnlockFunctionModule.`,
           },
           null,
           2,
@@ -174,6 +183,8 @@ export async function handleUpdateFunctionModule(
 
       if (error.response?.status === 404) {
         errorMessage = `Function module ${functionModuleName} not found.`;
+      } else if (error.response?.status === 400 && !transport_request) {
+        errorMessage = `Update failed for ${functionModuleName}. The object may be assigned to a transport request. Pass transport_request explicitly.`;
       } else if (error.response?.status === 423) {
         errorMessage = `Function module ${functionModuleName} is locked by another user or lock handle is invalid.`;
       } else if (

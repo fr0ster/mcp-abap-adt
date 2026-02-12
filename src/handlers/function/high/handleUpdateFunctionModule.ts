@@ -112,6 +112,7 @@ export async function handleUpdateFunctionModule(
             functionModuleName,
             functionGroupName,
             sourceCode: args.source_code,
+            transportRequest: args.transport_request,
           },
           { lockHandle },
         );
@@ -150,6 +151,7 @@ export async function handleUpdateFunctionModule(
         success: true,
         function_module_name: functionModuleName,
         function_group_name: functionGroupName,
+        transport_request: args.transport_request || null,
         activated: shouldActivate,
         message: `Function module ${functionModuleName} source code updated successfully${shouldActivate ? ' and activated' : ''}`,
       };
@@ -166,11 +168,39 @@ export async function handleUpdateFunctionModule(
         `Error updating function module source ${functionModuleName}: ${error?.message || error}`,
       );
 
-      const errorMessage = error.response?.data
+      let errorMessage = error.response?.data
         ? typeof error.response.data === 'string'
           ? error.response.data
           : JSON.stringify(error.response.data)
         : error.message || String(error);
+
+      if (error.response?.status === 404) {
+        errorMessage = `Function module ${functionModuleName} not found in group ${functionGroupName}.`;
+      } else if (error.response?.status === 423) {
+        errorMessage = `Function module ${functionModuleName} is locked by another user or lock handle is invalid.`;
+      } else if (error.response?.status === 400 && !args.transport_request) {
+        errorMessage = `Update failed for ${functionModuleName}. The object may be assigned to a transport request. Pass transport_request explicitly.`;
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
+        try {
+          const { XMLParser } = require('fast-xml-parser');
+          const parser = new XMLParser({
+            ignoreAttributes: false,
+            attributeNamePrefix: '@_',
+          });
+          const errorData = parser.parse(error.response.data);
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
+          if (errorMsg) {
+            errorMessage = `SAP Error: ${errorMsg}`;
+          }
+        } catch (_parseError) {
+          // Keep original error message if XML parsing fails
+        }
+      }
 
       return return_error(
         new Error(`Failed to update function module source: ${errorMessage}`),

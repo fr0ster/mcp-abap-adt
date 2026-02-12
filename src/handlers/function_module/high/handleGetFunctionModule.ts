@@ -24,6 +24,11 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'FunctionModule name (e.g., Z_MY_FUNCTIONMODULE).',
       },
+      function_group_name: {
+        type: 'string',
+        description:
+          'FunctionGroup name containing the function module (e.g., Z_MY_FUNCTIONGROUP).',
+      },
       version: {
         type: 'string',
         enum: ['active', 'inactive'],
@@ -32,12 +37,13 @@ export const TOOL_DEFINITION = {
         default: 'active',
       },
     },
-    required: ['function_module_name'],
+    required: ['function_module_name', 'function_group_name'],
   },
 } as const;
 
 interface GetFunctionModuleArgs {
   function_module_name: string;
+  function_group_name: string;
   version?: 'active' | 'inactive';
 }
 
@@ -52,26 +58,33 @@ export async function handleGetFunctionModule(
 ) {
   const { connection, logger } = context;
   try {
-    const { function_module_name, version = 'active' } =
+    const {
+      function_module_name,
+      function_group_name,
+      version = 'active',
+    } =
       args as GetFunctionModuleArgs;
 
     // Validation
-    if (!function_module_name) {
-      return return_error(new Error('function_module_name is required'));
+    if (!function_module_name || !function_group_name) {
+      return return_error(
+        new Error('function_module_name and function_group_name are required'),
+      );
     }
 
     const client = new AdtClient(connection, logger);
     const functionModuleName = function_module_name.toUpperCase();
+    const functionGroupName = function_group_name.toUpperCase();
 
     logger?.info(
-      `Reading function module ${functionModuleName}, version: ${version}`,
+      `Reading function module ${functionModuleName} in ${functionGroupName}, version: ${version}`,
     );
 
     try {
       // Read function module using AdtClient
       const functionModuleObject = client.getFunctionModule();
       const readResult = await functionModuleObject.read(
-        { functionModuleName },
+        { functionModuleName, functionGroupName },
         version as 'active' | 'inactive',
       );
 
@@ -94,6 +107,7 @@ export async function handleGetFunctionModule(
           {
             success: true,
             function_module_name: functionModuleName,
+            function_group_name: functionGroupName,
             version,
             function_module_data: functionModuleData,
             status: readResult.readResult.status,

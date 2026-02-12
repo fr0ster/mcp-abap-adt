@@ -24,18 +24,24 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'FunctionModule name (e.g., Z_MY_FUNCTIONMODULE).',
       },
+      function_group_name: {
+        type: 'string',
+        description:
+          'FunctionGroup name containing the function module (e.g., Z_MY_FUNCTIONGROUP).',
+      },
       transport_request: {
         type: 'string',
         description:
           'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
       },
     },
-    required: ['function_module_name'],
+    required: ['function_module_name', 'function_group_name'],
   },
 } as const;
 
 interface DeleteFunctionModuleArgs {
   function_module_name: string;
+  function_group_name: string;
   transport_request?: string;
 }
 
@@ -50,24 +56,30 @@ export async function handleDeleteFunctionModule(
 ) {
   const { connection, logger } = context;
   try {
-    const { function_module_name, transport_request } =
+    const { function_module_name, function_group_name, transport_request } =
       args as DeleteFunctionModuleArgs;
 
     // Validation
-    if (!function_module_name) {
-      return return_error(new Error('function_module_name is required'));
+    if (!function_module_name || !function_group_name) {
+      return return_error(
+        new Error('function_module_name and function_group_name are required'),
+      );
     }
 
     const client = new AdtClient(connection, logger);
     const functionModuleName = function_module_name.toUpperCase();
+    const functionGroupName = function_group_name.toUpperCase();
 
-    logger?.info(`Starting function module deletion: ${functionModuleName}`);
+    logger?.info(
+      `Starting function module deletion: ${functionModuleName} in ${functionGroupName}`,
+    );
 
     try {
       // Delete function module using AdtClient (includes deletion check)
       const functionModuleObject = client.getFunctionModule();
       const deleteResult = await functionModuleObject.delete({
         functionModuleName,
+        functionGroupName,
         transportRequest: transport_request,
       });
 
@@ -86,6 +98,7 @@ export async function handleDeleteFunctionModule(
           {
             success: true,
             function_module_name: functionModuleName,
+            function_group_name: functionGroupName,
             transport_request: transport_request || null,
             message: `FunctionModule ${functionModuleName} deleted successfully.`,
           },

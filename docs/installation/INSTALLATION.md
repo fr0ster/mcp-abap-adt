@@ -100,18 +100,23 @@ mcp-abap-adt --auth-broker
 # Example: mcp-abap-adt --transport=stdio --mcp=TRIAL
 mcp-abap-adt --transport=stdio
 
-# Or specify custom .env location (uses .env instead of auth-broker)
-mcp-abap-adt --env=/path/to/my.env
-mcp-abap-adt --env ~/configs/sap-dev.env
+# Or specify env destination from sessions store
+mcp-abap-adt --env=trial
+
+# Or explicit .env location (uses .env instead of auth-broker)
+mcp-abap-adt --env-path=/path/to/my.env
+mcp-abap-adt --env-path ~/configs/sap-dev.env
 
 # Start HTTP server on custom port
 mcp-abap-adt --transport=http --http-port=8080
 ```
 
 **Environment File Priority:**
-1. Path specified via `--env` or `--env=` argument  
-2. `.env` in current working directory (where you run the command)
-3. `.env` in package installation directory
+1. Path specified via `--env-path` (or `MCP_ENV_PATH`)  
+2. Destination file via `--env=<destination>`:
+   - Unix: `~/.config/mcp-abap-adt/sessions/<destination>.env`
+   - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\<destination>.env`
+3. `.env` in current working directory (where you run the command)
 
 This means you can have different `.env` files for different projects and the server will automatically use the one in your current directory.
 
@@ -270,7 +275,7 @@ mcp-abap-adt --auth-broker
 mcp-abap-adt --transport=stdio
 
 # Use .env file instead of auth-broker
-mcp-abap-adt --env=/path/to/.env
+mcp-abap-adt --env-path=/path/to/.env
 
 # HTTP server transport
 mcp-abap-adt --transport=http --http-port=3000
@@ -365,7 +370,7 @@ EOF
 Or use a custom environment file:
 
 ```bash
-mcp-abap-adt --transport=http --env /path/to/custom/.env --port 3000
+mcp-abap-adt --transport=http --env-path /path/to/custom/.env --port 3000
 ```
 
 #### Usage Examples
@@ -387,7 +392,7 @@ mcp-abap-adt --transport=http --host 0.0.0.0 --port 3000
 
 **Example 4: Use custom environment file**
 ```bash
-mcp-abap-adt --transport=http --env /opt/config/.env.production --port 8080
+mcp-abap-adt --transport=http --env-path /opt/config/.env.production --port 8080
 ```
 
 **Example 5: Start SSE server**
@@ -407,8 +412,8 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
   - Directories are created automatically if they don't exist
   - Example: `--auth-broker-path=~/prj/tmp/` uses `~/prj/tmp/service-keys/` and `~/prj/tmp/sessions/`
   - Can be used together with `--auth-broker` flag
-- `--env=<path>` - Path to .env file (uses .env instead of auth-broker)
-- `--env <path>` - Alternative syntax for specifying .env path
+- `--env=<destination>` - Destination env file from sessions store (`<destination>.env`)
+- `--env-path=<path|file>` - Explicit path to `.env` file (uses .env instead of auth-broker)
 
 **Note:** By default (when no flags are specified), the server checks for `.env` in the current directory first. If `.env` exists, it is used automatically. If not, auth-broker is used. Use `--auth-broker` to force auth-broker even when `.env` exists.
 
@@ -435,7 +440,7 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 You can also configure the server using environment variables.
 
 *MCP Server Configuration:*
-- `MCP_ENV_PATH` - Path to .env file
+- `MCP_ENV_PATH` - Explicit path to `.env` file (same as `--env-path`)
 - `MCP_SKIP_ENV_LOAD` - Skip automatic .env loading (true|false)
 - `MCP_TRANSPORT` - Default transport type (stdio|http|sse)
 - `MCP_HTTP_PORT` - Default HTTP port

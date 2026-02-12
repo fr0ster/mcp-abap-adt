@@ -46,27 +46,33 @@ Command-line arguments always override YAML values, allowing you to use YAML as 
 
 ### Environment File Configuration
 
-**--env=\<path\>** or **--env \<path\>**
+**--env=\<destination\>** or **--env \<destination\>**
 
-Specify path to .env file containing SAP connection details.
+Use destination-style env lookup from platform sessions store.
+
+**--env-path=\<path|file\>**
+
+Use an explicit `.env` file path (or relative file name).
 
 ```bash
-# Absolute path
-mcp-abap-adt --env=/opt/config/sap-prod.env
+# Destination name -> sessions/<destination>.env
+mcp-abap-adt --env=trial
 
-# Relative path (resolved from current directory)
-mcp-abap-adt --env=../configs/dev.env
+# Explicit path
+mcp-abap-adt --env-path=/opt/config/sap-prod.env
 
-# Space-separated syntax
-mcp-abap-adt --env ~/sap-configs/production.env
+# Relative file name/path (resolved from current directory)
+mcp-abap-adt --env-path=../configs/dev.env
 ```
 
 **Environment File Priority:**
 
-The server looks for .env file in this order:
-1. Path specified via `--env` argument
-2. `.env` in current working directory (`process.cwd()`)
-3. `.env` in package installation directory
+The server resolves env file in this order:
+1. `--env-path=<path|file>` (or `MCP_ENV_PATH`)
+2. `--env=<destination>` -> platform sessions path:
+   - Unix: `~/.config/mcp-abap-adt/sessions/<destination>.env`
+   - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\<destination>.env`
+3. `.env` in current working directory (`process.cwd()`)
 
 This allows you to:
 - Have different .env files per project
@@ -92,7 +98,7 @@ EOF
 mcp-abap-adt  # Uses ~/projects/abap-prod/.env
 
 # Override for testing
-mcp-abap-adt --env=/tmp/test.env
+mcp-abap-adt --env-path=/tmp/test.env
 ```
 
 ## Transport Selection
@@ -255,7 +261,7 @@ mcp-abap-adt --transport=http \
   --http-host=0.0.0.0 \
   --http-allowed-origins=http://localhost:3000,https://myapp.com \
   --http-enable-dns-protection \
-  --env=~/configs/sap-prod.env
+  --env-path=~/configs/sap-prod.env
 ```
 
 ## SSE Server Options
@@ -331,7 +337,7 @@ mcp-abap-adt --transport=sse \
   --sse-host=0.0.0.0 \
   --sse-allowed-origins=http://localhost:3000 \
   --sse-enable-dns-protection \
-  --env=~/configs/sap-dev.env
+  --env-path=~/configs/sap-dev.env
 ```
 
 ## Environment Variables
@@ -340,7 +346,7 @@ Alternative to command line arguments. Environment variables can be set in shell
 
 ### General
 
-- `MCP_ENV_PATH` - Path to .env file
+- `MCP_ENV_PATH` - Explicit path to `.env` file (same as `--env-path`)
 - `MCP_SKIP_ENV_LOAD` - Skip automatic .env loading (true|false)
 - `MCP_SKIP_AUTO_START` - Skip automatic server start (true|false, for testing)
 - `MCP_TRANSPORT` - Default transport type (stdio|http|sse)
@@ -415,7 +421,7 @@ MCP_HTTP_PORT=8080
 MCP_HTTP_ALLOWED_ORIGINS=http://localhost:3000,https://myapp.com
 
 # Use it
-mcp-abap-adt --transport=http --env ~/.mcp-abap-adt.env
+mcp-abap-adt --transport=http --env-path ~/.mcp-abap-adt.env
 ```
 
 ## Priority Order
@@ -466,7 +472,7 @@ EOF
 
 # Run with explicit config
 mcp-abap-adt --transport=http \
-  --env=/etc/mcp-abap-adt/prod.env \
+  --env-path=/etc/mcp-abap-adt/prod.env \
   --http-port=8080 \
   --http-enable-dns-protection
 ```
@@ -481,9 +487,9 @@ mcp-abap-adt --transport=http \
 └── prod.env
 
 # Quick switch
-alias mcp-dev='mcp-abap-adt --env=~/sap-configs/dev.env'
-alias mcp-test='mcp-abap-adt --env=~/sap-configs/test.env'
-alias mcp-prod='mcp-abap-adt --transport=http --env=~/sap-configs/prod.env --http-port=8080'
+alias mcp-dev='mcp-abap-adt --env-path=~/sap-configs/dev.env'
+alias mcp-test='mcp-abap-adt --env-path=~/sap-configs/test.env'
+alias mcp-prod='mcp-abap-adt --transport=http --env-path=~/sap-configs/prod.env --http-port=8080'
 
 # Use
 mcp-dev
@@ -539,7 +545,7 @@ Check which .env is being used:
 [MCP-ENV] ✓ Successfully loaded: /home/user/project/.env
 
 # Or use explicit path
-mcp-abap-adt --env=/correct/path/.env
+mcp-abap-adt --env-path=/correct/path/.env
 ```
 
 ## See Also

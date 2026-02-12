@@ -126,17 +126,19 @@ The server supports destination-based authentication using service keys stored l
 
 The server uses auth-broker (service keys) in the following cases:
 
-1. **By default** (when `--env` is not specified AND no `.env` file exists in current directory): Auth-broker is used automatically
+1. **By default** (when no explicit env file/destination is provided and no `.env` exists in current directory): Auth-broker is used automatically
 2. **When `--auth-broker` flag is specified**: Forces use of auth-broker, ignoring any `.env` file (even if it exists in current directory)
 3. **When `--mcp` parameter is specified**: Uses auth-broker with the specified destination, `.env` file is not loaded automatically
-4. **When `--env` is specified**: Uses the specified `.env` file instead of auth-broker
+4. **When `--env=<destination>` is specified**: Uses destination env file from sessions store
+5. **When `--env-path=<path|file>` is specified**: Uses explicit `.env` file instead of auth-broker
 
 **Priority:**
-1. `--env=<path>` - explicit .env file (highest priority)
-2. `--mcp=<destination>` - uses auth-broker, skips .env file loading
-3. `.env` in current directory - used automatically if exists (default behavior)
-4. `--auth-broker` - force auth-broker, ignore .env
-5. Auth-broker - used if no .env found (fallback)
+1. `--env-path=<path|file>` (or `MCP_ENV_PATH`) - explicit `.env` file (highest priority)
+2. `--env=<destination>` - destination env from sessions store
+3. `--mcp=<destination>` - uses auth-broker, skips automatic `.env` loading
+4. `.env` in current directory - used automatically if exists (default behavior)
+5. `--auth-broker` - force auth-broker, ignore `.env`
+6. Auth-broker - used if no `.env` found (fallback)
 
 **Examples:**
 ```bash
@@ -149,8 +151,11 @@ mcp-abap-adt --auth-broker
 # Uses auth-broker with --mcp parameter (skips .env file)
 mcp-abap-adt --transport=stdio --mcp=TRIAL
 
-# Uses .env file from custom path
-mcp-abap-adt --env=/path/to/.env
+# Uses destination env from sessions store
+mcp-abap-adt --env=trial
+
+# Uses explicit .env file from custom path
+mcp-abap-adt --env-path=/path/to/.env
 ```
 
 ### How It Works
@@ -427,13 +432,13 @@ mcp-abap-adt --auth-broker
 # Forces use of auth-broker with custom path (creates service-keys and sessions subdirectories)
 mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
 
-# Uses .env file from current directory (must be explicitly specified)
-mcp-abap-adt --env=.env
-mcp-abap-adt --env .env
+# Uses destination env from sessions store
+mcp-abap-adt --env=trial
+mcp-abap-adt --env trial
 
-# Uses .env file from custom path
-mcp-abap-adt --env=/path/to/.env
-mcp-abap-adt --env /path/to/.env
+# Uses explicit .env file from custom path
+mcp-abap-adt --env-path=/path/to/.env
+mcp-abap-adt --env-path /path/to/.env
 ```
 
 **Behavior:**
@@ -449,7 +454,10 @@ mcp-abap-adt --env /path/to/.env
   - With `--unsafe`, session tokens are saved to `.env` files in the sessions directory
   - Can be set via environment variable: `MCP_UNSAFE=true`
   - Use only if you need session persistence across server restarts
-- **`--env=<path>` or `--env <path>`**: Uses specified `.env` file, auth-broker is not used
+- **`--env=<destination>` or `--env <destination>`**: Uses destination env file from sessions store
+  - Unix: `~/.config/mcp-abap-adt/sessions/<destination>.env`
+  - Windows: `%USERPROFILE%\Documents\mcp-abap-adt\sessions\<destination>.env`
+- **`--env-path=<path|file>`**: Uses specified `.env` file directly, auth-broker is not used
   - Relative paths are resolved from current working directory
   - Absolute paths are used as-is
 

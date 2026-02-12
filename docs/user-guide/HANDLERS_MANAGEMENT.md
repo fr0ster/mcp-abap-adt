@@ -49,16 +49,16 @@ V2 server supports flexible handler set configuration through the `--exposition`
 
 ```bash
 # Default: readonly + high (+ search + system always included)
-node bin/mcp-abap-adt-v2.js --transport=stdio --env=.env
+node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env
 
 # Only read-only operations (safest)
-node bin/mcp-abap-adt-v2.js --transport=stdio --env=.env --exposition=readonly
+node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=readonly
 
 # Read-only + high-level writes (recommended)
-node bin/mcp-abap-adt-v2.js --transport=stdio --env=.env --exposition=readonly,high
+node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=readonly,high
 
 # All operations (dangerous, for development only)
-node bin/mcp-abap-adt-v2.js --transport=stdio --env=.env --exposition=readonly,high,low
+node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=readonly,high,low
 ```
 
 ### Config File
@@ -79,7 +79,7 @@ Set `MCP_EXPOSITION`:
 
 ```bash
 export MCP_EXPOSITION=readonly,high
-node bin/mcp-abap-adt-v2.js --transport=stdio --env=.env
+node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env
 ```
 
 ## Generating Handler Documentation

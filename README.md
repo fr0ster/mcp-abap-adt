@@ -45,17 +45,21 @@ Full configurator usage (separate repo): [CLIENT_INSTALLERS.md](https://github.c
 
 ## Terminology
 
-**Destination**: a local service key filename. You store service keys in the service-keys directory, and pass the filename (without extension) via `--mcp=<destination>` to select which system to use.
+**Destination**: a local service key filename. You store service keys in the standard `service-keys` directory, and pass the filename (without extension) via `--mcp=<destination>` to select which system to use.
 
 See [docs/user-guide/TERMINOLOGY.md](docs/user-guide/TERMINOLOGY.md) for the full list.
 
 ## Authorization & Destinations
 
-Destination-based auth is the default. Drop service keys into the service-keys folder and use the filename as your destination:
+Destination-based auth is the default. Drop service keys into the standard platform folder and use the filename as your destination:
 
 ```bash
 mcp-abap-adt --transport=stdio --mcp=TRIAL
 ```
+
+Standard service key paths:
+- Unix (Linux/macOS): `~/.config/mcp-abap-adt/service-keys/<destination>.json`
+- Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\<destination>.json`
 
 For full details (paths, `.env`, direct headers), see [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 
@@ -215,7 +219,9 @@ npm run start:legacy
 
 Env resolution:
 1. `--env-path=<path|file>` (or `MCP_ENV_PATH`) for explicit `.env` file.
-2. `--env=<destination>` for destination file in sessions store:
+   - Absolute path: used as-is.
+   - Relative path or file name only (e.g. `my.env`): resolved from current working directory.
+2. `--env=<destination>` for destination file in standard sessions store:
    - Unix: `~/.config/mcp-abap-adt/sessions/<destination>.env`
    - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\<destination>.env`
 3. Fallback to `.env` in current working directory.

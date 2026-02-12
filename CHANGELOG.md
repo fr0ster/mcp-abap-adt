@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [2.2.7] - 2026-02-12
+### Fixed
+- **CI (Biome)**: Applied formatting fixes required by `npx biome check src --diagnostic-level=error`.
+  - `src/handlers/function_module/high/handleGetFunctionModule.ts`
+  - `src/lib/config/envResolver.ts`
+
 ## [2.2.6] - 2026-02-12
 ### Changed
 - **Function Module handlers**: Fixed parameter propagation for function module operations:

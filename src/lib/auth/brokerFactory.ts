@@ -725,13 +725,9 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       const key = trimmed.substring(0, eqIndex).trim();
       let value = trimmed.substring(eqIndex + 1);
 
-      // Remove inline comments
-      const commentIndex = value.indexOf('#');
-      if (commentIndex !== -1) {
-        value = value.substring(0, commentIndex).trim();
-      } else {
-        value = value.trim();
-      }
+      // Inline comments are intentionally not supported.
+      // A '#' is treated as comment only when it starts the line.
+      value = value.trim();
 
       // Remove quotes
       value = value.replace(/^["']+|["']+$/g, '').trim();

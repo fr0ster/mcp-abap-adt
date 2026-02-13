@@ -1,6 +1,16 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- **.env parsing policy**:
+  - Inline comments are no longer parsed from values.
+  - `#` is treated as a comment only when it starts the line.
+  - This avoids accidental truncation of secrets containing `#` (for example passwords/tokens).
+
+### Documentation
+- Updated `.env` comments guidance in:
+  - `README.md`
+  - `docs/user-guide/AUTHENTICATION.md`
 
 ## [2.2.7] - 2026-02-12
 ### Fixed

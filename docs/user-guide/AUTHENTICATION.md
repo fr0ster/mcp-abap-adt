@@ -35,6 +35,9 @@ You can also provide credentials via `.env`:
 
 This is useful for quick local testing or when you do not want to store service keys.
 
+**.env comments rule:** only full-line comments are supported (lines that start with `#`).  
+Inline comments are not parsed, so keep comments on separate lines.
+
 ### Generate .env from Service Key
 
 ```bash

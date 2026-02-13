@@ -288,6 +288,9 @@ mcp-auth auth -k path/to/service-key.json
 
 This will automatically create/update `.env` file with JWT tokens and connection details.
 
+**.env comments rule:** only full-line comments are supported (lines that start with `#`).  
+Inline comments are not parsed, so keep comments on separate lines.
+
 **Claude recommendation:** place the service key in the service-keys directory and use `--mcp=<destination>` (avoid manual JWT tokens).
 
 ### Command-Line Options

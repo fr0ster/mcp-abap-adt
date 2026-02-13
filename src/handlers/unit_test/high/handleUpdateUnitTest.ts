@@ -75,9 +75,7 @@ export async function handleUpdateUnitTest(
         error,
         `Failed to update unit test run ${run_id}`,
       );
-      logger?.error(
-        `Error updating unit test run ${run_id}: ${detailedError}`,
-      );
+      logger?.error(`Error updating unit test run ${run_id}: ${detailedError}`);
       return return_error(new Error(detailedError));
     }
   } catch (error: any) {

@@ -9,6 +9,10 @@
 - **Update tool error handling**:
   - Added unified ADT/SAP error extraction for update handlers to improve `409` conflict diagnostics.
   - XML exception payloads (`exc:exception`) are now surfaced as detailed user-facing errors in previously generic update flows.
+- **GetTypeInfo structure fallback**:
+  - Added optional structure lookup fallback (`include_structure_fallback`, default: `true`).
+  - Fallback is executed only when type lookups return `404` or empty result.
+  - Non-`404` errors no longer silently fall through to unrelated lookups.
 
 ### Documentation
 - Updated `.env` comments guidance in:

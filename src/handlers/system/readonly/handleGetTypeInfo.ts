@@ -28,6 +28,12 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Name of the ABAP type',
       },
+      include_structure_fallback: {
+        type: 'boolean',
+        description:
+          'When true (default), tries DDIC structure lookup only if type lookup returns 404/empty.',
+        default: true,
+      },
     },
     required: ['type_name'],
   },
@@ -80,8 +86,82 @@ function parseTypeInfoXml(xml: string) {
   return { raw: result };
 }
 
+function parseStructureInfoXml(xml: string) {
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '',
+    parseAttributeValue: true,
+    trimValues: true,
+  });
+  const result = parser.parse(xml);
+  const wb = result['blue:wbobj'] || {};
+
+  return {
+    name: wb['adtcore:name'] || null,
+    objectType: 'structure',
+    description: wb['adtcore:description'] || null,
+    package: wb['adtcore:packageRef']?.['adtcore:name'] || null,
+    resolved_as: 'structure_fallback',
+    raw: result,
+  };
+}
+
+function hasUsableResult(value: any): boolean {
+  if (value == null) {
+    return false;
+  }
+  if (typeof value === 'string') {
+    return value.trim().length > 0;
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+  if (typeof value === 'object') {
+    if ('raw' in value) {
+      const raw = (value as any).raw;
+      return !!raw && typeof raw === 'object' && Object.keys(raw).length > 0;
+    }
+    return Object.keys(value).length > 0;
+  }
+  return true;
+}
+
+function isNotFoundError(error: any): boolean {
+  return error?.response?.status === 404;
+}
+
+type LookupResult =
+  | { status: 'ok'; payload: any }
+  | { status: 'not_found_or_empty' };
+
+async function tryLookup(
+  connection: any,
+  url: string,
+  parseFn: (xml: string) => any,
+): Promise<LookupResult> {
+  try {
+    const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
+    if (!hasUsableResult(response?.data)) {
+      return { status: 'not_found_or_empty' };
+    }
+
+    const payload = parseFn(response.data);
+    if (!hasUsableResult(payload)) {
+      return { status: 'not_found_or_empty' };
+    }
+
+    return { status: 'ok', payload };
+  } catch (error: any) {
+    if (isNotFoundError(error)) {
+      return { status: 'not_found_or_empty' };
+    }
+    throw error;
+  }
+}
+
 export async function handleGetTypeInfo(context: HandlerContext, args: any) {
   const { connection, logger } = context;
+  const includeStructureFallback = args?.include_structure_fallback !== false;
   try {
     if (!args?.type_name) {
       throw new McpError(ErrorCode.InvalidParams, 'Type name is required');
@@ -101,117 +181,88 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
   }
 
   try {
-    logger?.info(`Fetching domain info for type ${args.type_name}`);
-    const url = `/sap/bc/adt/ddic/domains/${encodeSapObjectName(args.type_name)}/source/main`;
-    const response = await makeAdtRequestWithTimeout(
-      connection,
-      url,
-      'GET',
-      'default',
-    );
-    const result = {
-      isError: false,
+    const typeName = args.type_name;
+    const encodedTypeName = encodeSapObjectName(typeName);
+    const uri = encodeURIComponent(`/sap/bc/adt/ddic/domains/${typeName.toLowerCase()}`);
+
+    const lookups: Array<{
+      label: string;
+      url: string;
+      parseFn: (xml: string) => any;
+    }> = [
+      {
+        label: 'domain',
+        url: `/sap/bc/adt/ddic/domains/${encodedTypeName}/source/main`,
+        parseFn: parseTypeInfoXml,
+      },
+      {
+        label: 'data element',
+        url: `/sap/bc/adt/ddic/dataelements/${encodedTypeName}`,
+        parseFn: parseTypeInfoXml,
+      },
+      {
+        label: 'table type',
+        url: `/sap/bc/adt/ddic/tabletypes/${encodedTypeName}`,
+        parseFn: parseTypeInfoXml,
+      },
+      {
+        label: 'repository information system',
+        url: `/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${uri}`,
+        parseFn: parseTypeInfoXml,
+      },
+    ];
+
+    for (const lookup of lookups) {
+      logger?.debug(`Trying ${lookup.label} lookup for ${typeName}`);
+      const result = await tryLookup(connection, lookup.url, lookup.parseFn);
+      if (result.status === 'ok') {
+        const mcpResult = {
+          isError: false,
+          content: [{ type: 'json', json: result.payload }],
+        };
+        objectsListCache.setCache(mcpResult);
+        return mcpResult;
+      }
+    }
+
+    if (includeStructureFallback) {
+      logger?.debug(
+        `Type lookups returned 404/empty for ${typeName}, trying structure fallback`,
+      );
+      const structureResult = await tryLookup(
+        connection,
+        `/sap/bc/adt/ddic/structures/${encodedTypeName}`,
+        parseStructureInfoXml,
+      );
+      if (structureResult.status === 'ok') {
+        const mcpResult = {
+          isError: false,
+          content: [{ type: 'json', json: structureResult.payload }],
+        };
+        objectsListCache.setCache(mcpResult);
+        return mcpResult;
+      }
+    }
+
+    return {
+      isError: true,
       content: [
         {
-          type: 'json',
-          json: parseTypeInfoXml(response.data),
+          type: 'text',
+          text: `Type ${typeName} was not found as domain, data element, table type, or structure.`,
         },
       ],
     };
-    objectsListCache.setCache(result);
-    return result;
-  } catch (_error) {
-    // no domain found, try data element
-    try {
-      logger?.debug(
-        `Domain lookup failed for ${args.type_name}, trying data element`,
-      );
-      const url = `/sap/bc/adt/ddic/dataelements/${encodeSapObjectName(args.type_name)}`;
-      const response = await makeAdtRequestWithTimeout(
-        connection,
-        url,
-        'GET',
-        'default',
-      );
-      const result = {
-        isError: false,
-        content: [
-          {
-            type: 'json',
-            json: parseTypeInfoXml(response.data),
-          },
-        ],
-      };
-      objectsListCache.setCache(result);
-      return result;
-    } catch (_error) {
-      // no data element found, try table type
-      try {
-        logger?.debug(
-          `Data element lookup failed for ${args.type_name}, trying table type`,
-        );
-        const url = `/sap/bc/adt/ddic/tabletypes/${encodeSapObjectName(args.type_name)}`;
-        const response = await makeAdtRequestWithTimeout(
-          connection,
-          url,
-          'GET',
-          'default',
-        );
-        const result = {
-          isError: false,
-          content: [
-            {
-              type: 'json',
-              json: parseTypeInfoXml(response.data),
-            },
-          ],
-        };
-        objectsListCache.setCache(result);
-        return result;
-      } catch (_error) {
-        // fallback: try repository informationsystem for domain
-        try {
-          logger?.debug(
-            `Table type lookup failed for ${args.type_name}, trying repository information system`,
-          );
-          const uri = encodeURIComponent(
-            `/sap/bc/adt/ddic/domains/${args.type_name.toLowerCase()}`,
-          );
-          const url = `/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${uri}`;
-          const response = await makeAdtRequestWithTimeout(
-            connection,
-            url,
-            'GET',
-            'default',
-          );
-          const result = {
-            isError: false,
-            content: [
-              {
-                type: 'json',
-                json: parseTypeInfoXml(response.data),
-              },
-            ],
-          };
-          objectsListCache.setCache(result);
-          return result;
-        } catch (error) {
-          logger?.error(
-            `Failed to resolve type info for ${args.type_name}`,
-            error as any,
-          );
-          // MCP-compliant error response: always return content[] with type "text"
-          return {
-            isError: true,
-            content: [
-              {
-                type: 'text',
-                text: `ADT error: ${String(error)}`,
-              },
-            ],
-          };
-        }
-      }
-    }
+  } catch (error) {
+    logger?.error(`Failed to resolve type info for ${args.type_name}`, error as any);
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: `ADT error: ${String(error)}`,
+        },
+      ],
+    };
   }
 }

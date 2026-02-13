@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [2.3.0] - 2026-02-13
 ### Changed
 - **.env parsing policy**:
   - Inline comments are no longer parsed from values.

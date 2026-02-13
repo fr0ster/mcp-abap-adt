@@ -8,6 +8,7 @@ import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
+  extractAdtErrorMessage,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -97,10 +98,14 @@ export async function handleUpdateCdsUnitTest(
         ),
       } as AxiosResponse);
     } catch (error: any) {
-      logger?.error(
-        `Error updating CDS unit test class ${className}: ${error?.message || error}`,
+      const detailedError = extractAdtErrorMessage(
+        error,
+        `Failed to update CDS unit test class ${className}`,
       );
-      return return_error(new Error(error?.message || String(error)));
+      logger?.error(
+        `Error updating CDS unit test class ${className}: ${detailedError}`,
+      );
+      return return_error(new Error(detailedError));
     }
   } catch (error: any) {
     return return_error(error);

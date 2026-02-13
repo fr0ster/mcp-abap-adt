@@ -6,6 +6,7 @@ import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
+  extractAdtErrorMessage,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -105,7 +106,11 @@ export async function handleUpdateLocalTypes(
         `Error updating local types for ${className}: ${error?.message || error}`,
       );
 
-      let errorMessage = `Failed to update local types: ${error.message || String(error)}`;
+      const detailedError = extractAdtErrorMessage(
+        error,
+        `Failed to update local types in ${className}`,
+      );
+      let errorMessage = `Failed to update local types: ${detailedError}`;
 
       if (error.response?.status === 404) {
         errorMessage = `Local types for ${className} not found.`;

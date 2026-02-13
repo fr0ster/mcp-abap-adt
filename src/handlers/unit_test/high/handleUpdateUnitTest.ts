@@ -9,6 +9,7 @@ import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
+  extractAdtErrorMessage,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -70,10 +71,14 @@ export async function handleUpdateUnitTest(
         ),
       } as AxiosResponse);
     } catch (error: any) {
-      logger?.error(
-        `Error updating unit test run ${run_id}: ${error?.message || error}`,
+      const detailedError = extractAdtErrorMessage(
+        error,
+        `Failed to update unit test run ${run_id}`,
       );
-      return return_error(new Error(error?.message || String(error)));
+      logger?.error(
+        `Error updating unit test run ${run_id}: ${detailedError}`,
+      );
+      return return_error(new Error(detailedError));
     }
   } catch (error: any) {
     return return_error(error);

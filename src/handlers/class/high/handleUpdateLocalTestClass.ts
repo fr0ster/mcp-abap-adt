@@ -9,6 +9,7 @@ import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
+  extractAdtErrorMessage,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -122,23 +123,21 @@ export async function handleUpdateLocalTestClass(
         `Error updating local test class for ${className}: ${error?.message || error}`,
       );
 
-      // Parse error message
-      let errorMessage = `Failed to update local test class: ${error.message || String(error)}`;
+      const detailedError = extractAdtErrorMessage(
+        error,
+        `Failed to update local test class in ${className}`,
+      );
+      let errorMessage = `Failed to update local test class: ${detailedError}`;
 
       if (error.response?.status === 404) {
         errorMessage = `Local test class for ${className} not found.`;
       } else if (error.response?.status === 423) {
         errorMessage = `Class ${className} is locked by another user.`;
       } else if (error.response?.status === 400) {
-        errorMessage = `Bad request. Check test class code syntax.`;
+        errorMessage = `Bad request. ${detailedError}`;
       }
 
-      //return return_error(new Error(errorMessage));
-      const resultingError = return_error(error);
-      if (errorMessage) {
-        resultingError.content.unshift({ type: 'text', text: errorMessage });
-      }
-      return resultingError;
+      return return_error(new Error(errorMessage));
     }
   } catch (error: any) {
     return return_error(error);

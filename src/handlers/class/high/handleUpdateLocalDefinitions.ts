@@ -6,6 +6,7 @@ import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
+  extractAdtErrorMessage,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -107,7 +108,11 @@ export async function handleUpdateLocalDefinitions(
         `Error updating local definitions for ${className}: ${error?.message || error}`,
       );
 
-      let errorMessage = `Failed to update local definitions: ${error.message || String(error)}`;
+      const detailedError = extractAdtErrorMessage(
+        error,
+        `Failed to update local definitions in ${className}`,
+      );
+      let errorMessage = `Failed to update local definitions: ${detailedError}`;
 
       if (error.response?.status === 404) {
         errorMessage = `Local definitions for ${className} not found.`;

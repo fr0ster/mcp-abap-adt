@@ -199,6 +199,71 @@ export function logErrorSafely(
   logger?.error(errorMessage, errorDetails);
 }
 
+/**
+ * Extracts a user-facing ADT/SAP error message from Axios/ADT errors.
+ * Prioritizes XML exception payloads (<exc:exception>) for detailed messages.
+ */
+export function extractAdtErrorMessage(
+  error: any,
+  fallback = 'Operation failed',
+): string {
+  if (!error) {
+    return fallback;
+  }
+
+  const response = error?.response;
+  const responseData = response?.data;
+
+  if (typeof responseData === 'string') {
+    const raw = responseData.trim();
+
+    // Try to parse ADT XML exception payloads first.
+    if (raw.includes('<exc:exception') || raw.includes('<message')) {
+      try {
+        const { XMLParser } = require('fast-xml-parser');
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@_',
+        });
+        const parsed = parser.parse(raw);
+        const xmlMessage =
+          parsed?.['exc:exception']?.message?.['#text'] ||
+          parsed?.['exc:exception']?.localizedMessage?.['#text'] ||
+          parsed?.['exc:exception']?.message ||
+          parsed?.['exc:exception']?.localizedMessage;
+
+        if (xmlMessage && String(xmlMessage).trim().length > 0) {
+          return `SAP Error: ${String(xmlMessage).trim()}`;
+        }
+      } catch {
+        // Fall through to plain text.
+      }
+    }
+
+    if (raw.length > 0) {
+      return raw.slice(0, 2000);
+    }
+  } else if (responseData && typeof responseData === 'object') {
+    const dataMessage =
+      (responseData as any).message ||
+      (responseData as any).error?.message ||
+      (responseData as any).error_description;
+    if (typeof dataMessage === 'string' && dataMessage.trim().length > 0) {
+      return dataMessage.trim();
+    }
+  }
+
+  if (typeof error?.message === 'string' && error.message.trim().length > 0) {
+    return error.message.trim();
+  }
+
+  if (response?.status) {
+    return `HTTP ${response.status}: ${response.statusText || 'Error'}`;
+  }
+
+  return fallback;
+}
+
 export function return_error(error: any) {
   // Safely extract error message to avoid circular reference issues
   // Always extract only safe properties, never serialize the entire error object

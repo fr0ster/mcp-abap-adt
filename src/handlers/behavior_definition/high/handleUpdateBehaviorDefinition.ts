@@ -5,7 +5,11 @@
 import type { IBehaviorDefinitionConfig } from '@mcp-abap-adt/adt-clients';
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import {
+  extractAdtErrorMessage,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'UpdateBehaviorDefinition',
   description: 'Update source code of an ABAP Behavior Definition.',
@@ -112,7 +116,11 @@ export async function handleUpdateBehaviorDefinition(
       config: {} as any,
     });
   } catch (error: any) {
-    logger?.error(`Error updating BDEF ${name}: ${error?.message || error}`);
-    return return_error(error);
+    const detailedError = extractAdtErrorMessage(
+      error,
+      `Failed to update behavior definition ${name}`,
+    );
+    logger?.error(`Error updating BDEF ${name}: ${detailedError}`);
+    return return_error(new Error(detailedError));
   }
 }

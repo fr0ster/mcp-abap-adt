@@ -9,6 +9,7 @@ import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
+  extractAdtErrorMessage,
   restoreSessionInConnection,
   return_error,
   return_response,
@@ -124,15 +125,19 @@ export async function handleUpdateClassTestClasses(
         ),
       } as AxiosResponse);
     } catch (error: any) {
+      const detailedError = extractAdtErrorMessage(
+        error,
+        `Failed to update test classes for ${className}`,
+      );
       logger?.error(
-        `Error updating test classes for ${className}: ${error?.message || error}`,
+        `Error updating test classes for ${className}: ${detailedError}`,
       );
       const reason =
         error?.response?.status === 404
           ? `Class ${className} not found.`
           : error?.response?.status === 423
             ? `Test classes for ${className} are locked by another user or lock handle is invalid.`
-            : error?.message || String(error);
+            : detailedError;
       return return_error(new Error(reason));
     }
   } catch (error: any) {

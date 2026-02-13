@@ -4,7 +4,11 @@
 
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import {
+  extractAdtErrorMessage,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'UpdateMetadataExtension',
   description: 'Update source code of an ABAP Metadata Extension.',
@@ -97,7 +101,11 @@ export async function handleUpdateMetadataExtension(
       config: {} as any,
     });
   } catch (error: any) {
-    logger?.error(`Error updating DDLX ${name}: ${error?.message || error}`);
-    return return_error(error);
+    const detailedError = extractAdtErrorMessage(
+      error,
+      `Failed to update metadata extension ${name}`,
+    );
+    logger?.error(`Error updating DDLX ${name}: ${detailedError}`);
+    return return_error(new Error(detailedError));
   }
 }

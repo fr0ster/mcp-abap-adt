@@ -6,6 +6,7 @@ import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
+  extractAdtErrorMessage,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -103,7 +104,11 @@ export async function handleUpdateLocalMacros(
         `Error updating local macros for ${className}: ${error?.message || error}`,
       );
 
-      let errorMessage = `Failed to update local macros: ${error.message || String(error)}`;
+      const detailedError = extractAdtErrorMessage(
+        error,
+        `Failed to update local macros in ${className}`,
+      );
+      let errorMessage = `Failed to update local macros: ${detailedError}`;
 
       if (error.response?.status === 404) {
         errorMessage = `Local macros for ${className} not found.`;

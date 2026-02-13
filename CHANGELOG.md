@@ -6,6 +6,9 @@
   - Inline comments are no longer parsed from values.
   - `#` is treated as a comment only when it starts the line.
   - This avoids accidental truncation of secrets containing `#` (for example passwords/tokens).
+- **Update tool error handling**:
+  - Added unified ADT/SAP error extraction for update handlers to improve `409` conflict diagnostics.
+  - XML exception payloads (`exc:exception`) are now surfaced as detailed user-facing errors in previously generic update flows.
 
 ### Documentation
 - Updated `.env` comments guidance in:

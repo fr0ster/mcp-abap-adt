@@ -1,4 +1,4 @@
-# mcp-abap-adt: Your Gateway to ABAP Development Tools (ADT)
+# <img src="logo.png" alt="mcp-abap-adt logo" width="36" align="absmiddle" /> mcp-abap-adt: Your Gateway to ABAP Development Tools (ADT)
 
 `mcp-abap-adt` is an MCP server for ABAP ADT in SAP ECC/S/4HANA (on-premise) and SAP BTP ABAP Cloud systems. It gives agents controlled access to real ABAP repositories through ADT, so analysis and changes are grounded in system data instead of assumptions.
 

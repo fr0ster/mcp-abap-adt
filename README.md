@@ -1,6 +1,10 @@
 # mcp-abap-adt: Your Gateway to ABAP Development Tools (ADT)
 
-This project is an MCP server for SAP BTP ABAP Cloud, SAP ECC/S/4HANA, and On-Premise ABAP systems with full CRUD support. It supports JWT/XSUAA authentication and service key (destination-based) authorization from the start.
+`mcp-abap-adt` is an MCP server for ABAP ADT in SAP ECC/S/4HANA (on-premise) and SAP BTP ABAP Cloud systems. It gives agents controlled access to real ABAP repositories through ADT, so analysis and changes are grounded in system data instead of assumptions.
+
+**Primary workflows:**
+- **Deep ABAP analysis**: where-used, object metadata, repository navigation, object structure, semantic analysis, dependency and impact exploration.
+- **High-level ABAP development**: rapid CRUD and iterative updates for RAP and classic ABAP artifacts (classes, interfaces, function groups/modules, programs, DDIC, CDS/view/service artifacts), validated through ADT flows.
 
 **Why teams use it:**
 - **Full CRUD** (not read-only): create, read, update, and delete ABAP artifacts
@@ -18,13 +22,16 @@ You can configure MCP clients either manually (JSON/TOML) or via the configurato
 1. [Getting Started](#getting-started)
 2. [Architecture](#architecture)
 3. [Quick Start](#quick-start)
-4. [Terminology](#terminology)
-5. [Authorization & Destinations](#authorization--destinations)
-6. [Registries](#registries)
-7. [Features](#features)
-8. [Documentation](#documentation)
-9. [Dependencies](#dependencies)
-10. [Running the Server](#running-the-server)
+4. [Use Cases](#use-cases)
+5. [Target Users](#target-users)
+6. [Capabilities (High-Level Focus)](#capabilities-high-level-focus)
+7. [Terminology](#terminology)
+8. [Authorization & Destinations](#authorization--destinations)
+9. [Registries](#registries)
+10. [Features](#features)
+11. [Documentation](#documentation)
+12. [Dependencies](#dependencies)
+13. [Running the Server](#running-the-server)
 
 ## Getting Started
 
@@ -97,6 +104,33 @@ await server.connect(transport);
    - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
    - [High-Level Tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md)
    - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
+
+## Use Cases
+
+- **Impact analysis / where-used before changes**: map object usage and probable blast radius.
+- **Dependency audit**: inspect links across classes, interfaces, DDIC, CDS/views, and RAP artifacts.
+- **Migration and cleanup prep**: extract repository facts to plan refactoring or cloud-readiness work.
+- **RAP and ABAP iterative development**: create/update artifacts quickly with ADT-backed operations.
+- **Automated documentation and RAG ingestion**: pull structured facts from ABAP systems for downstream tooling.
+
+## Target Users
+
+- ABAP developers and ABAP architects
+- RAP developers
+- Team leads and tech leads who need fast repository visibility
+- Teams building RAG/agent workflows for SAP landscapes
+
+## Capabilities (High-Level Focus)
+
+Key examples of high-value workflows and tools:
+
+- **Repository and impact analysis**: `GetWhereUsed`, `DescribeByList`, `GetObjectStructure`, `GetObjectInfo`, `SearchObject`, `GetPackageTree`, `GetPackageContents`
+- **Code and semantic introspection**: `GetAbapAST`, `GetAbapSemanticAnalysis`, `GetIncludesList`, `GetProgFullCode`
+- **RAP development**: `CreateBehaviorDefinition`, `UpdateBehaviorDefinition`, `CreateBehaviorImplementation`, `UpdateBehaviorImplementation`, `CreateServiceDefinition`, `UpdateServiceDefinition`, `CreateMetadataExtension`, `UpdateMetadataExtension`
+- **CDS/View development**: `CreateView`, `UpdateView`, `GetView`, `DeleteView`
+- **ABAP OO CRUD**: `CreateClass`, `UpdateClass`, `GetClass`, `DeleteClass`, `CreateInterface`, `UpdateInterface`, `GetInterface`, `DeleteInterface`
+- **Function module/group CRUD**: `CreateFunctionGroup`, `UpdateFunctionGroup`, `GetFunctionGroup`, `DeleteFunctionGroup`, `CreateFunctionModule`, `UpdateFunctionModule`, `GetFunctionModule`, `DeleteFunctionModule`
+- **Transport and activation support**: `CreateTransport`, `GetTransport`, `ActivateObject`
 
 ## Registries
 

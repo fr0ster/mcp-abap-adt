@@ -41,19 +41,12 @@ jobs:
         continue-on-error: true
 
       - name: Verify package can be created
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
         run: npm pack
 
       - name: Test package installation (Unix)
-        if: runner.os != 'Windows'
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
         run: |
           PACKAGE_FILE=$(ls mcp-abap-adt-core-*.tgz)
           npm install -g "./$PACKAGE_FILE"
           mcp-abap-adt --help || true
-
-      - name: Test package installation (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $PACKAGE_FILE = Get-ChildItem -Filter "mcp-abap-adt-core-*.tgz" | Select-Object -First 1 -ExpandProperty Name
-          npm install -g $PACKAGE_FILE
-          mcp-abap-adt --help

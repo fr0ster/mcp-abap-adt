@@ -140,7 +140,12 @@ async function tryLookup(
   parseFn: (xml: string) => any,
 ): Promise<LookupResult> {
   try {
-    const response = await makeAdtRequestWithTimeout(connection, url, 'GET', 'default');
+    const response = await makeAdtRequestWithTimeout(
+      connection,
+      url,
+      'GET',
+      'default',
+    );
     if (!hasUsableResult(response?.data)) {
       return { status: 'not_found_or_empty' };
     }
@@ -183,7 +188,9 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
   try {
     const typeName = args.type_name;
     const encodedTypeName = encodeSapObjectName(typeName);
-    const uri = encodeURIComponent(`/sap/bc/adt/ddic/domains/${typeName.toLowerCase()}`);
+    const uri = encodeURIComponent(
+      `/sap/bc/adt/ddic/domains/${typeName.toLowerCase()}`,
+    );
 
     const lookups: Array<{
       label: string;
@@ -254,7 +261,10 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
       ],
     };
   } catch (error) {
-    logger?.error(`Failed to resolve type info for ${args.type_name}`, error as any);
+    logger?.error(
+      `Failed to resolve type info for ${args.type_name}`,
+      error as any,
+    );
     return {
       isError: true,
       content: [

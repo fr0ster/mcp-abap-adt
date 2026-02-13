@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [2.3.1] - 2026-02-13
 ### Fixed
 - **YAML config flag compatibility**:
   - Added `--conf` support as an alias for `--config` in argument parsing.

@@ -164,8 +164,8 @@ export class ArgumentsParser {
     result.useAuthBroker =
       hasFlag('--auth-broker') || process.env.MCP_USE_AUTH_BROKER === 'true';
 
-    // Parse --config
-    result.config = getArgValue('--config');
+    // Parse --conf / --config
+    result.config = getArgValue('--conf') || getArgValue('--config');
 
     // Parse transport
     result.transport = getArgValue('--transport') || process.env.MCP_TRANSPORT;

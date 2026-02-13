@@ -1,6 +1,16 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- **YAML config flag compatibility**:
+  - Added `--conf` support as an alias for `--config` in argument parsing.
+  - Fixed YAML template flow: when config file is missing, template generation now exits cleanly instead of continuing into inspection-only mode.
+- **YAML env config clarity**:
+  - Added `env-path` YAML option to map directly to `--env-path`.
+  - Clarified `env` as destination name and removed duplicate `allowed-origins` entry in template.
+- **HTTP/SSE connection context resolution**:
+  - Enforced priority: `x-mcp-destination` header -> server default destination (`--mcp` / `--env-path`) -> `400` error.
+  - HTTP default-destination broker initialization now uses the resolved destination key.
 
 ## [2.3.0] - 2026-02-13
 ### Changed

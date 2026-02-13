@@ -1215,15 +1215,16 @@ TRANSPORT MODES:
 
 OPTIONS:
   --help                           Show this help message
-  --config=<path>                  Path to YAML configuration file
+  --conf=<path>                    Path to YAML configuration file
+  --config=<path>                  Alias for --conf
                                    If file doesn't exist, generates a template and exits
                                    Command-line arguments override YAML values
-                                   Example: --config=config.yaml
+                                   Example: --conf=config.yaml
 
 YAML CONFIGURATION:
   Instead of passing many command-line arguments, you can use a YAML config file:
 
-    mcp-abap-adt --config=config.yaml
+    mcp-abap-adt --conf=config.yaml
 
   If the file doesn't exist, a template will be generated automatically and the command will exit.
   Edit the template to configure your server settings, then run the command again.
@@ -1364,7 +1365,7 @@ EXAMPLES:
   mcp-abap-adt --transport=http --http-host=0.0.0.0 --http-port=8080
 
   # Use YAML configuration file
-  mcp-abap-adt --config=config.yaml
+  mcp-abap-adt --conf=config.yaml
 
   # Use stdio mode with --mcp parameter (uses auth-broker, skips .env file)
   mcp-abap-adt --mcp=TRIAL

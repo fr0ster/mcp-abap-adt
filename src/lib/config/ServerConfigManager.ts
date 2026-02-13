@@ -78,7 +78,12 @@ export class ServerConfigManager {
 
     // Generate template if needed (from yamlConfig)
     const templateGenerated = generateConfigTemplateIfNeeded(configPath);
-    if (templateGenerated) return;
+    if (templateGenerated) {
+      process.stderr.write(
+        '[MCP-CONFIG] Template generated. Edit it and rerun with --conf.\n',
+      );
+      process.exit(0);
+    }
 
     // Load YAML config and apply to process.argv
     const yamlConfig = loadYamlConfig(configPath);

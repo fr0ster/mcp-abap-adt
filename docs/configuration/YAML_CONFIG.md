@@ -6,7 +6,7 @@ The MCP ABAP ADT server supports YAML configuration files to simplify server set
 
 1. **Generate a template:**
    ```bash
-   mcp-abap-adt --config=config.yaml
+   mcp-abap-adt --conf=config.yaml
    ```
    If the file doesn't exist, a template will be automatically generated.
 
@@ -15,7 +15,7 @@ The MCP ABAP ADT server supports YAML configuration files to simplify server set
 
 3. **Run with config:**
    ```bash
-   mcp-abap-adt --config=config.yaml
+   mcp-abap-adt --conf=config.yaml
    ```
 
 ## Command-Line Override
@@ -28,7 +28,7 @@ Command-line arguments **always override** YAML values. This allows you to:
 Example:
 ```bash
 # Use config.yaml but override the port
-mcp-abap-adt --config=config.yaml --http-port=8080
+mcp-abap-adt --conf=config.yaml --http-port=8080
 ```
 
 ## Configuration File Structure
@@ -41,8 +41,11 @@ transport: stdio
 # Default MCP destination (uses auth-broker)
 mcp: TRIAL
 
-# Path to .env file (alternative to mcp destination)
-env: .env
+# Env destination name in sessions store (e.g. trial -> trial.env)
+env: trial
+
+# Explicit path to .env file (recommended for file-based config)
+env-path: .env
 
 # Use unsafe mode (file-based session store)
 unsafe: false
@@ -83,7 +86,8 @@ sse:
 |--------|------|---------|-------------|
 | `transport` | string | `stdio` | Transport type: `stdio` (default, for MCP clients), `http`, `streamable-http`, or `sse` |
 | `mcp` | string | - | Default MCP destination name (uses auth-broker) |
-| `env` | string | - | Path to `.env` file (alternative to `mcp` destination) |
+| `env` | string | - | Destination name resolved from sessions store (`sessions/<name>.env`) |
+| `env-path` | string | - | Explicit path to `.env` file |
 | `unsafe` | boolean | `false` | Use file-based session store (persists to disk) |
 | `auth-broker` | boolean | `false` | Force use of auth-broker (service keys) instead of `.env` |
 | `auth-broker-path` | string | - | Custom path for auth-broker storage |
@@ -120,7 +124,7 @@ mcp: TRIAL
 
 Usage:
 ```bash
-mcp-abap-adt --config=config.yaml
+mcp-abap-adt --conf=config.yaml
 ```
 
 ### Example 2: HTTP Mode with Custom Port
@@ -134,7 +138,7 @@ http:
 
 Usage:
 ```bash
-mcp-abap-adt --config=config.yaml
+mcp-abap-adt --conf=config.yaml
 ```
 
 ### Example 3: SSE Mode with CORS
@@ -150,19 +154,19 @@ sse:
 
 Usage:
 ```bash
-mcp-abap-adt --config=config.yaml
+mcp-abap-adt --conf=config.yaml
 ```
 
 ### Example 4: stdio Mode with .env File
 
 ```yaml
 transport: stdio
-env: .env
+env-path: .env
 ```
 
 Usage:
 ```bash
-mcp-abap-adt --config=config.yaml
+mcp-abap-adt --conf=config.yaml
 ```
 
 ### Example 5: HTTP Mode with Auth-Broker
@@ -178,7 +182,7 @@ http:
 
 Usage:
 ```bash
-mcp-abap-adt --config=config.yaml
+mcp-abap-adt --conf=config.yaml
 ```
 
 ## Testing Scenarios
@@ -194,7 +198,7 @@ mcp: TRIAL
 ### Test Config 2: stdio-env.yaml
 ```yaml
 transport: stdio
-env: .env
+env-path: .env
 ```
 
 ### Test Config 3: http-default.yaml
@@ -215,10 +219,10 @@ sse:
 
 Run tests with different configs:
 ```bash
-mcp-abap-adt --config=stdio-stdio.yaml
-mcp-abap-adt --config=stdio-env.yaml
-mcp-abap-adt --config=http-default.yaml
-mcp-abap-adt --config=sse-cors.yaml
+mcp-abap-adt --conf=stdio-stdio.yaml
+mcp-abap-adt --conf=stdio-env.yaml
+mcp-abap-adt --conf=http-default.yaml
+mcp-abap-adt --conf=sse-cors.yaml
 ```
 
 ## Benefits
@@ -231,7 +235,7 @@ mcp-abap-adt --config=sse-cors.yaml
 
 ## Template Generation
 
-When you specify `--config=<path>` and the file doesn't exist, a template is automatically generated with:
+When you specify `--conf=<path>` (or `--config=<path>`) and the file doesn't exist, a template is automatically generated with:
 - All available options
 - Default values
 - Comments explaining each option
@@ -248,13 +252,13 @@ Edit the template to customize your configuration.
 Examples:
 ```bash
 # Relative path (resolved from current directory)
-mcp-abap-adt --config=config.yaml
+mcp-abap-adt --conf=config.yaml
 
 # Absolute path
-mcp-abap-adt --config=/path/to/config.yaml
+mcp-abap-adt --conf=/path/to/config.yaml
 
 # Home directory
-mcp-abap-adt --config=~/config.yaml
+mcp-abap-adt --conf=~/config.yaml
 ```
 
 ## Error Handling
@@ -269,4 +273,3 @@ If the YAML file has syntax errors or invalid values:
 - [CLI Options](user-guide/CLI_OPTIONS.md) - Complete list of command-line options
 - [Client Configuration](user-guide/CLIENT_CONFIGURATION.md) - How to configure MCP clients
 - [Installation Guide](installation/INSTALLATION.md) - Server installation instructions
-

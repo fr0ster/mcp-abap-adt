@@ -134,12 +134,19 @@ export class StreamableHttpServer extends BaseMcpServer {
         // Priority 3: Use default destination
         else if (this.defaultDestination) {
           destination = this.defaultDestination;
-          // Use default broker for --mcp/--env startup config
-          broker = await this.authBrokerFactory.getOrCreateAuthBroker();
+          // Initialize broker for the selected default destination
+          broker =
+            await this.authBrokerFactory.getOrCreateAuthBroker(destination);
         }
-        // Priority 4: No auth params at all
-        // Allow request to proceed - metadata methods (tools/list, etc.) will work
-        // tools/call will fail with appropriate error in handler
+        // Priority 4: No auth params at all -> reject request
+        else {
+          res
+            .status(400)
+            .send(
+              'Missing SAP connection context. Provide x-mcp-destination header, configure default destination (--mcp/--env-path), or pass x-sap-* headers.',
+            );
+          return;
+        }
 
         if (destination && !broker) {
           throw new Error(

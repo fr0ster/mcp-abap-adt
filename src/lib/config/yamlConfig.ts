@@ -11,6 +11,7 @@ export interface YamlConfig {
   transport?: string;
   mcp?: string;
   env?: string;
+  'env-path'?: string;
   unsafe?: boolean;
   'auth-broker'?: boolean;
   'auth-broker-path'?: string;
@@ -33,13 +34,17 @@ export interface YamlConfig {
 }
 
 /**
- * Parse --config argument from command line
+ * Parse --conf / --config argument from command line
  */
 export function parseConfigArg(): string | undefined {
   const args = process.argv;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg.startsWith('--config=')) {
+    if (arg.startsWith('--conf=')) {
+      return arg.slice('--conf='.length);
+    } else if (arg === '--conf' && i + 1 < args.length) {
+      return args[i + 1];
+    } else if (arg.startsWith('--config=')) {
       return arg.slice('--config='.length);
     } else if (arg === '--config' && i + 1 < args.length) {
       return args[i + 1];
@@ -194,9 +199,12 @@ transport: stdio
 # If not specified, will use .env file if available
 mcp:
 
-# Path to .env file (alternative to mcp destination)
-# If not specified, will look for .env in current directory
+# Env destination name (resolved in sessions store, e.g. "trial" -> trial.env)
 env:
+
+# Explicit path to .env file (recommended when using file-based config)
+# Example: env-path: .env
+env-path:
 
 # Use unsafe mode (file-based session store instead of in-memory)
 # Default: false
@@ -234,8 +242,6 @@ http:
   json-response: false
 
   # Allowed CORS origins (comma-separated or array)
-  allowed-origins: []
-
   # Allowed hosts (comma-separated or array)
   allowed-hosts: []
 
@@ -338,9 +344,14 @@ export function applyYamlConfigToArgs(config: YamlConfig): void {
     addArg('--mcp', config.mcp);
   }
 
-  // Apply env path
+  // Apply env destination
   if (config.env && !hasArg('--env')) {
     addArg('--env', config.env);
+  }
+
+  // Apply explicit env file path
+  if (config['env-path'] && !hasArg('--env-path')) {
+    addArg('--env-path', config['env-path']);
   }
 
   // Apply unsafe flag

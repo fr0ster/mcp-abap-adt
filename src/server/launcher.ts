@@ -251,7 +251,7 @@ async function main() {
         '[MCP] Starting in inspection-only mode (no connection parameters).',
       );
       console.error(
-        '[MCP] To connect to SAP system, use --mcp=<destination> or --env=<path>',
+        '[MCP] To connect to SAP system, use --mcp=<destination> or --env-path=<path>',
       );
     }
 

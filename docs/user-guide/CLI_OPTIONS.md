@@ -20,16 +20,16 @@ The help message shows all available options for all transport modes.
 
 ### YAML Configuration File
 
-**--config=\<path\>** or **--config \<path\>**
+**--conf=\<path\>** or **--conf \<path\>** (alias: `--config`)
 
 Load server configuration from a YAML file instead of command-line arguments. If the file doesn't exist, a template will be automatically generated.
 
 ```bash
 # Use YAML config file
-mcp-abap-adt --config=config.yaml
+mcp-abap-adt --conf=config.yaml
 
 # Override YAML values with command-line arguments
-mcp-abap-adt --config=config.yaml --http-port=8080
+mcp-abap-adt --conf=config.yaml --http-port=8080
 ```
 
 **Benefits:**
@@ -132,7 +132,7 @@ mcp-abap-adt --transport=sse
 
 **--mcp=\<destination\>**
 
-Default MCP destination name. When specified, this destination will be used when `x-mcp-destination` header is not provided in the request. This allows using auth-broker (service keys) with stdio and SSE transports.
+Default MCP destination name. When specified, this destination is used when `x-mcp-destination` header is not provided.
 
 ```bash
 # Use stdio with auth-broker (--mcp parameter)
@@ -141,7 +141,7 @@ mcp-abap-adt --transport=stdio --mcp=TRIAL
 # Use SSE with auth-broker (--mcp parameter)
 mcp-abap-adt --transport=sse --mcp=TRIAL
 
-# Use HTTP with default destination (overrides x-mcp-destination header if not provided)
+# Use HTTP with default destination (fallback when x-mcp-destination is not provided)
 mcp-abap-adt --transport=http --mcp=TRIAL
 ```
 
@@ -149,6 +149,7 @@ mcp-abap-adt --transport=http --mcp=TRIAL
 - For **stdio transport**: The server initializes auth-broker with the specified destination at startup
 - For **SSE transport**: The server uses the specified destination when `x-mcp-destination` header is not provided
 - For **HTTP transport**: The server uses the specified destination as a fallback when `x-mcp-destination` header is not provided
+- If neither header nor default destination is provided, HTTP/SSE requests are rejected with `400` (missing SAP connection context)
 - **`.env` file is not loaded automatically** when `--mcp` is specified (even if it exists in current directory)
 - **`.env` file is not considered mandatory** for stdio and SSE transports when `--mcp` is specified
 

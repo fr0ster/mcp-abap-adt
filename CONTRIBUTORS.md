@@ -8,14 +8,13 @@ We welcome contributions! Please see the project documentation for details on ho
 
 ## Contributors
 
-<!-- Contributors are listed alphabetically by last name -->
+<!-- Contributors are listed by number of commits (descending) -->
 
-### Core Contributors
-
-- **Frank Fiegel** ([@punkpeye](https://github.com/punkpeye)) - Original contributor
-- **Henry Mao** ([@calclavia](https://github.com/calclavia)) - Contributor
-- **mario-andreschak** ([@mario-andreschak](https://github.com/mario-andreschak)) - Original project maintainer
-- **Oleksii Kyslytsia** - Contributor and maintainer
+- **Oleksii Kyslytsia** ([@fr0ster](https://github.com/fr0ster)) - Main maintainer and contributor (539 commits)
+- **mario-andreschak** ([@mario-andreschak](https://github.com/mario-andreschak)) - Original project maintainer (30 commits)
+- **Henry Mao** ([@calclavia](https://github.com/calclavia)) - Contributor (3 commits)
+- **Aleksandr Razinkin** ([@raaleksandr-epam](https://github.com/raaleksandr-epam)) - Contributor (2 commits)
+- **Frank Fiegel** ([@punkpeye](https://github.com/punkpeye)) - Original contributor (1 commit)
 
 ---
 
@@ -33,4 +32,3 @@ Every contribution helps make mcp-abap-adt better for everyone!
 ---
 
 **Note:** This list is automatically generated from git history. If you've contributed but don't see your name here, please open an issue or submit a PR to update this file.
-

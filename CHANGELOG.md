@@ -1,15 +1,21 @@
 # Changelog
 
 ## [Unreleased]
+
+## [2.4.0] - 2026-02-15
 ### Added
 - **Runtime diagnostics tools**:
   - Added runtime profiling tools: `RuntimeCreateProfilerTraceParameters`, `RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`.
   - Added runtime dump tools: `RuntimeListDumps`, `RuntimeGetDumpById`.
+- **Architecture documentation**:
+  - Added comprehensive architecture document: `docs/architecture/ARCHITECTURE.md`.
 
 ### Changed
 - **Runtime payload format**:
   - Runtime profiling and dump handlers now return parsed JSON payloads (instead of raw XML strings in `payload`).
   - Runtime dump read uses `dump_id` input (`RuntimeGetDumpById`) instead of URI-based input.
+- **Dependencies**:
+  - Updated `@mcp-abap-adt/adt-clients` to `^0.3.16`.
 
 ### Documentation
 - Regenerated tools docs (`docs/user-guide/AVAILABLE_TOOLS*.md`) with runtime diagnostics tools.

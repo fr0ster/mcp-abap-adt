@@ -12,7 +12,8 @@ export const TOOL_DEFINITION = {
     properties: {
       dump_id: {
         type: 'string',
-        description: 'Runtime dump ID (for example: 694AB694097211F1929806D06D234D38).',
+        description:
+          'Runtime dump ID (for example: 694AB694097211F1929806D06D234D38).',
       },
     },
     required: ['dump_id'],

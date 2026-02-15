@@ -25,4 +25,3 @@ export function parseRuntimePayloadToJson(payload: unknown): unknown {
     return payload;
   }
 }
-

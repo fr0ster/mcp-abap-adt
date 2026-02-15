@@ -38,6 +38,7 @@ Handlers are organized into logical groups for flexible composition:
 
 ## Files
 
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Comprehensive architecture overview: server boot flow, transport/auth model, handler sets, runtime diagnostics tools, and extension points
 - **[STATEFUL_SESSION_GUIDE.md](STATEFUL_SESSION_GUIDE.md)** - Stateful ADT request flow for lock/update/unlock operations
 - **[TOOLS_ARCHITECTURE.md](TOOLS_ARCHITECTURE.md)** - MCP tools architecture and handler structure, explaining how tools are organized and how `TOOL_DEFINITION` works
 - **[CONNECTION_ISOLATION.md](CONNECTION_ISOLATION.md)** - Connection isolation architecture, explaining how per-session connection isolation prevents data mixing between clients (version 1.1.10+)

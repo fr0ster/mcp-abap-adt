@@ -119,7 +119,8 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         const { connection } = context;
         const handlerContext = createHandlerContext({ connection, logger });
 
-        const result = await handleRuntimeListProfilerTraceFiles(handlerContext);
+        const result =
+          await handleRuntimeListProfilerTraceFiles(handlerContext);
         expect(result.isError).toBe(false);
 
         const data = parseTextPayload(result);
@@ -144,7 +145,9 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           params?.trace_id_or_uri ||
           undefined;
         if (!traceIdOrUri) {
-          throw new Error('SKIP: no trace_id_or_uri available from feed/config');
+          throw new Error(
+            'SKIP: no trace_id_or_uri available from feed/config',
+          );
         }
 
         const result = await handleRuntimeGetProfilerTraceData(handlerContext, {

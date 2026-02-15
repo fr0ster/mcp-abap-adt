@@ -1526,6 +1526,22 @@ whereused_readonly:
         test_class: "CL_ABAP_CHAR_UTILITIES"  # Standard SAP class for testing
         test_table: "SCARR"                    # Standard SAP table (Flight: Airlines)
 
+# Runtime Read-Only Handlers (Profiling + Dumps)
+runtime_readonly_handlers:
+  test_cases:
+    - name: "test_runtime_readonly"
+      enabled: true
+      description: "Runtime profiling and dumps handlers integration tests"
+      params:
+        # ⚠️ UPDATE: Replace with class that supports ADT classrun execution in your system
+        profiled_class_name: "<YOUR_CLASSRUN_CLASS_NAME>"
+        # Optional fallback trace id/uri when trace list feed does not provide one
+        trace_id_or_uri: ""
+        # Optional user filter for dumps list; empty means all users
+        dumps_user: ""
+        # Optional fallback dump ID when dumps feed does not provide one
+        dump_id: ""
+
 # ============================================================================
 # SYSTEM LOW-LEVEL HANDLERS
 # ============================================================================

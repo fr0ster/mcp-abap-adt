@@ -66,6 +66,26 @@ import {
   TOOL_DEFINITION as GetWhereUsed_Tool,
   handleGetWhereUsed,
 } from '../../../handlers/system/readonly/handleGetWhereUsed';
+import {
+  handleRuntimeCreateProfilerTraceParameters,
+  TOOL_DEFINITION as RuntimeCreateProfilerTraceParameters_Tool,
+} from '../../../handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters';
+import {
+  handleRuntimeGetDumpById,
+  TOOL_DEFINITION as RuntimeGetDumpById_Tool,
+} from '../../../handlers/system/readonly/handleRuntimeGetDumpById';
+import {
+  handleRuntimeGetProfilerTraceData,
+  TOOL_DEFINITION as RuntimeGetProfilerTraceData_Tool,
+} from '../../../handlers/system/readonly/handleRuntimeGetProfilerTraceData';
+import {
+  handleRuntimeListDumps,
+  TOOL_DEFINITION as RuntimeListDumps_Tool,
+} from '../../../handlers/system/readonly/handleRuntimeListDumps';
+import {
+  handleRuntimeListProfilerTraceFiles,
+  TOOL_DEFINITION as RuntimeListProfilerTraceFiles_Tool,
+} from '../../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';
 
@@ -96,6 +116,48 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           inputSchema: GetTransaction_Tool.inputSchema,
         },
         handler: (args: any) => handleGetTransaction(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: RuntimeCreateProfilerTraceParameters_Tool.name,
+          description: RuntimeCreateProfilerTraceParameters_Tool.description,
+          inputSchema: RuntimeCreateProfilerTraceParameters_Tool.inputSchema,
+        },
+        handler: (args: any) =>
+          handleRuntimeCreateProfilerTraceParameters(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: RuntimeListProfilerTraceFiles_Tool.name,
+          description: RuntimeListProfilerTraceFiles_Tool.description,
+          inputSchema: RuntimeListProfilerTraceFiles_Tool.inputSchema,
+        },
+        handler: () => handleRuntimeListProfilerTraceFiles(this.context),
+      },
+      {
+        toolDefinition: {
+          name: RuntimeGetProfilerTraceData_Tool.name,
+          description: RuntimeGetProfilerTraceData_Tool.description,
+          inputSchema: RuntimeGetProfilerTraceData_Tool.inputSchema,
+        },
+        handler: (args: any) =>
+          handleRuntimeGetProfilerTraceData(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: RuntimeListDumps_Tool.name,
+          description: RuntimeListDumps_Tool.description,
+          inputSchema: RuntimeListDumps_Tool.inputSchema,
+        },
+        handler: (args: any) => handleRuntimeListDumps(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: RuntimeGetDumpById_Tool.name,
+          description: RuntimeGetDumpById_Tool.description,
+          inputSchema: RuntimeGetDumpById_Tool.inputSchema,
+        },
+        handler: (args: any) => handleRuntimeGetDumpById(this.context, args),
       },
       {
         toolDefinition: {

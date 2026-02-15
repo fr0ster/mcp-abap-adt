@@ -1,6 +1,19 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- **Runtime diagnostics tools**:
+  - Added runtime profiling tools: `RuntimeCreateProfilerTraceParameters`, `RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`.
+  - Added runtime dump tools: `RuntimeListDumps`, `RuntimeGetDumpById`.
+
+### Changed
+- **Runtime payload format**:
+  - Runtime profiling and dump handlers now return parsed JSON payloads (instead of raw XML strings in `payload`).
+  - Runtime dump read uses `dump_id` input (`RuntimeGetDumpById`) instead of URI-based input.
+
+### Documentation
+- Regenerated tools docs (`docs/user-guide/AVAILABLE_TOOLS*.md`) with runtime diagnostics tools.
+- Updated `README.md` feature list with runtime diagnostics capabilities.
 
 ## [2.3.1] - 2026-02-13
 ### Fixed

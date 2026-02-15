@@ -83,5 +83,6 @@ mdd.json
 package.json
 .npm-cache/**
 SAP_ADT.json
+dev.json
 desktop.ini
 .vscode/mcp.json

@@ -1942,4 +1942,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-02-12*
+*Last updated: 2026-02-15*

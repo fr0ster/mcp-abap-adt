@@ -4,8 +4,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 238
-- Read-only tools: 27
+- Total tools: 243
+- Read-only tools: 32
 - High-level tools: 89
 - Low-level tools: 122
 
@@ -44,6 +44,11 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetTransaction](#gettransaction-read-only-system)
     - [GetTypeInfo](#gettypeinfo-read-only-system)
     - [GetWhereUsed](#getwhereused-read-only-system)
+    - [RuntimeCreateProfilerTraceParameters](#runtimecreateprofilertraceparameters-read-only-system)
+    - [RuntimeGetDumpById](#runtimegetdumpbyid-read-only-system)
+    - [RuntimeGetProfilerTraceData](#runtimegetprofilertracedata-read-only-system)
+    - [RuntimeListDumps](#runtimelistdumps-read-only-system)
+    - [RuntimeListProfilerTraceFiles](#runtimelistprofilertracefiles-read-only-system)
   - [Table](#read-only-table)
     - [GetTableContents](#gettablecontents-read-only-table)
   - [Transport](#read-only-transport)
@@ -608,6 +613,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/readonly/handleGetTypeInfo.ts`
 
 **Parameters:**
+- `include_structure_fallback` (boolean, optional (default: true)) - When true (default), tries DDIC structure lookup only if type lookup returns 404/empty.
 - `type_name` (string, required) - Name of the ABAP type
 
 ---
@@ -622,6 +628,70 @@ Generated from code in `src/handlers/**` (not from docs).
 - `enable_all_types` (boolean, optional (default: false)) - If true, searches in all available object types (Eclipse 
 - `object_name` (string, required) - Name of the ABAP object
 - `object_type` (string, required) - Type of the ABAP object (class, interface, program, table, etc.)
+
+---
+
+<a id="runtimecreateprofilertraceparameters-read-only-system"></a>
+#### RuntimeCreateProfilerTraceParameters (Read-Only / System)
+**Description:** [runtime] Create ABAP profiler trace parameters and return profilerId (URI) for profiled execution.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.ts`
+
+**Parameters:**
+- `description` (string, required) - Human-readable trace description.
+
+---
+
+<a id="runtimegetdumpbyid-read-only-system"></a>
+#### RuntimeGetDumpById (Read-Only / System)
+**Description:** [runtime] Read a specific ABAP runtime dump by dump ID. Returns parsed JSON payload.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeGetDumpById.ts`
+
+**Parameters:**
+- `dump_id` (string, required) - Runtime dump ID (for example: 694AB694097211F1929806D06D234D38).
+
+---
+
+<a id="runtimegetprofilertracedata-read-only-system"></a>
+#### RuntimeGetProfilerTraceData (Read-Only / System)
+**Description:** [runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts`
+
+**Parameters:**
+- `auto_drill_down_threshold` (number, optional) - Auto drill-down threshold (for statements view).
+- `id` (number, optional) - Statement node ID (for statements view).
+- `trace_id_or_uri` (string, required) - Profiler trace ID or full ADT trace URI.
+- `view` (string, required) - Trace view to retrieve.
+- `with_details` (boolean, optional) - Include statement details (for statements view).
+- `with_system_events` (boolean, optional) - Include system events.
+
+---
+
+<a id="runtimelistdumps-read-only-system"></a>
+#### RuntimeListDumps (Read-Only / System)
+**Description:** [runtime] List ABAP runtime dumps with optional user filter and paging. Returns parsed JSON payload.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeListDumps.ts`
+
+**Parameters:**
+- `inlinecount` (string, optional) - Include total count metadata.
+- `orderby` (string, optional) - ADT order by expression.
+- `skip` (number, optional) - Number of records to skip.
+- `top` (number, optional) - Maximum number of records to return.
+- `user` (string, optional) - Optional username filter. If omitted, dumps for all users are returned.
+
+---
+
+<a id="runtimelistprofilertracefiles-read-only-system"></a>
+#### RuntimeListProfilerTraceFiles (Read-Only / System)
+**Description:** [runtime] List ABAP profiler trace files available in ADT runtime. Returns parsed JSON payload.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts`
+
+**Parameters:**
+- None
 
 ---
 
@@ -3742,4 +3812,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-02-12*
+*Last updated: 2026-02-15*

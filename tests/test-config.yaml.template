@@ -1537,8 +1537,16 @@ runtime_readonly_handlers:
         profiled_class_name: "<YOUR_CLASSRUN_CLASS_NAME>"
         # Optional fallback trace id/uri when trace list feed does not provide one
         trace_id_or_uri: ""
+        # Retries for trace files feed lookup (trace can appear with delay)
+        trace_feed_retries: 6
+        trace_feed_retry_delay_ms: 1000
+        # Retries for reading profiler trace data (trace can become available with delay)
+        trace_read_retries: 6
+        trace_read_retry_delay_ms: 1500
         # Optional user filter for dumps list; empty means all users
         dumps_user: ""
+        # Number of dumps to read from feed in RuntimeGetDumpById integration test
+        dumps_read_limit: 5
         # Optional fallback dump ID when dumps feed does not provide one
         dump_id: ""
 

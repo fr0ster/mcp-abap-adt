@@ -13,6 +13,8 @@ This directory contains utility scripts for development and maintenance of the M
 - Add/update local ABAP Unit test include
 - Run baseline test execution (without debugger)
 - Explore debugger runtime operations step-by-step
+- Show probe source with line numbers
+- Set/remove debugger breakpoints by explicit source line and re-sync breakpoints
 
 **Usage:**
 ```bash

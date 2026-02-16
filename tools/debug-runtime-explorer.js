@@ -380,6 +380,159 @@ function compact(data, max = 1200) {
   return `${raw.slice(0, max)}\n... [truncated ${raw.length - max} chars]`;
 }
 
+function buildProbeSourceUri(className) {
+  return `/sap/bc/adt/oo/classes/${String(className || '').toLowerCase()}/source/main`;
+}
+
+async function fetchProbeSource(runtimeContext, probe) {
+  const classApi = runtimeContext.adt.getClass();
+  const readState = await classApi.read(
+    { className: probe.className },
+    'active',
+    { withLongPolling: true },
+  );
+  const source = readState?.readResult?.data;
+  if (typeof source !== 'string' || !source.trim()) {
+    throw new Error(`Failed to read active source for class ${probe.className}`);
+  }
+  return source;
+}
+
+function printNumberedSource(sourceText) {
+  const lines = String(sourceText || '').split('\n');
+  const width = String(lines.length).length;
+  for (let idx = 0; idx < lines.length; idx += 1) {
+    const lineNo = String(idx + 1).padStart(width, ' ');
+    console.log(`${lineNo} | ${lines[idx]}`);
+  }
+}
+
+async function setBreakpointByLine(runtimeContext, probe, lineNo) {
+  const uri = buildProbeSourceUri(probe.className);
+  const anchor = `${uri}#start=${lineNo},0`;
+  const strategies = [
+    {
+      label: 'debugger/breakpoints relation=insert (uri,line)',
+      req: {
+        url: '/sap/bc/adt/debugger/breakpoints',
+        method: 'GET',
+        params: { uri, line: lineNo },
+        headers: {
+          Accept: 'application/xml',
+          'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/insert',
+        },
+      },
+    },
+    {
+      label: 'debugger/actions action=insertBreakpoint value=<uri#start>',
+      req: {
+        url: '/sap/bc/adt/debugger/actions',
+        method: 'GET',
+        params: { action: 'insertBreakpoint', value: anchor },
+        headers: {
+          Accept: 'application/xml',
+          'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/action',
+        },
+      },
+    },
+    {
+      label: 'debugger/actions action=toggleBreakpoint value=<uri#start>',
+      req: {
+        url: '/sap/bc/adt/debugger/actions',
+        method: 'GET',
+        params: { action: 'toggleBreakpoint', value: anchor },
+        headers: {
+          Accept: 'application/xml',
+          'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/action',
+        },
+      },
+    },
+  ];
+
+  let lastError;
+  for (const strategy of strategies) {
+    try {
+      const resp = await runtimeContext.connection.makeAdtRequest(strategy.req);
+      console.log(
+        `[ok] set breakpoint line ${lineNo} via ${strategy.label} -> HTTP ${resp?.status || 'n/a'}`,
+      );
+      return resp;
+    } catch (error) {
+      lastError = error;
+      const msg = parseAdtException(error)?.message || error?.message || String(error);
+      const status = error?.response?.status;
+      console.warn(
+        `[warn] set breakpoint via ${strategy.label} failed: ${msg}${status ? ` [HTTP ${status}]` : ''}`,
+      );
+    }
+  }
+
+  throw lastError || new Error('Failed to set breakpoint by line');
+}
+
+async function removeBreakpointByLine(runtimeContext, probe, lineNo) {
+  const uri = buildProbeSourceUri(probe.className);
+  const anchor = `${uri}#start=${lineNo},0`;
+  const strategies = [
+    {
+      label: 'debugger/breakpoints relation=delete (uri,line)',
+      req: {
+        url: '/sap/bc/adt/debugger/breakpoints',
+        method: 'GET',
+        params: { uri, line: lineNo },
+        headers: {
+          Accept: 'application/xml',
+          'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/delete',
+        },
+      },
+    },
+    {
+      label: 'debugger/actions action=deleteBreakpoint value=<uri#start>',
+      req: {
+        url: '/sap/bc/adt/debugger/actions',
+        method: 'GET',
+        params: { action: 'deleteBreakpoint', value: anchor },
+        headers: {
+          Accept: 'application/xml',
+          'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/action',
+        },
+      },
+    },
+    {
+      label: 'debugger/actions action=toggleBreakpoint value=<uri#start>',
+      req: {
+        url: '/sap/bc/adt/debugger/actions',
+        method: 'GET',
+        params: { action: 'toggleBreakpoint', value: anchor },
+        headers: {
+          Accept: 'application/xml',
+          'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/action',
+        },
+      },
+    },
+  ];
+
+  let lastError;
+  for (const strategy of strategies) {
+    try {
+      const resp = await runtimeContext.connection.makeAdtRequest(strategy.req);
+      console.log(
+        `[ok] remove breakpoint line ${lineNo} via ${strategy.label} -> HTTP ${resp?.status || 'n/a'}`,
+      );
+      return resp;
+    } catch (error) {
+      lastError = error;
+      const msg = parseAdtException(error)?.message || error?.message || String(error);
+      const status = error?.response?.status;
+      console.warn(
+        `[warn] remove breakpoint via ${strategy.label} failed: ${msg}${status ? ` [HTTP ${status}]` : ''}`,
+      );
+    }
+  }
+
+  throw lastError || new Error('Failed to remove breakpoint by line');
+}
+
 function parseAdtException(error) {
   const raw = error?.response?.data;
   if (typeof raw !== 'string') return null;
@@ -667,6 +820,9 @@ function printMenu() {
   console.log('10) Start AMDP debugger');
   console.log('11) List cross traces');
   console.log('12) Get ST05 trace state');
+  console.log('13) Show probe source (line numbers)');
+  console.log('14) Set breakpoint by line');
+  console.log('15) Remove breakpoint by line');
   console.log('q) Quit');
 }
 
@@ -792,6 +948,50 @@ async function main() {
       if (choice === '12') {
         await callRuntime(runtimeContext, 'getSt05TraceState', () =>
           runtimeContext.runtime.getSt05TraceState(),
+        );
+        continue;
+      }
+      if (choice === '13') {
+        const source = await fetchProbeSource(runtimeContext, probe);
+        printNumberedSource(source);
+        continue;
+      }
+      if (choice === '14') {
+        const source = await fetchProbeSource(runtimeContext, probe);
+        printNumberedSource(source);
+        const lineRaw = (await rl.question('Breakpoint line number: ')).trim();
+        const lineNo = Number.parseInt(lineRaw, 10);
+        if (!Number.isInteger(lineNo) || lineNo <= 0) {
+          console.error('[fail] Invalid line number');
+          continue;
+        }
+        await callRuntime(runtimeContext, `setBreakpoint(line=${lineNo})`, () =>
+          setBreakpointByLine(runtimeContext, probe, lineNo),
+        );
+        await callRuntime(runtimeContext, 'synchronizeBreakpoints', () =>
+          runtimeContext.runtime.synchronizeBreakpoints(true),
+        );
+        console.log(
+          '[hint] Check Eclipse ADT breakpoint view/editor to verify the breakpoint marker on this line.',
+        );
+        continue;
+      }
+      if (choice === '15') {
+        const lineRaw = (await rl.question(
+          'Breakpoint line number to remove: ',
+        )).trim();
+        const lineNo = Number.parseInt(lineRaw, 10);
+        if (!Number.isInteger(lineNo) || lineNo <= 0) {
+          console.error('[fail] Invalid line number');
+          continue;
+        }
+        await callRuntime(
+          runtimeContext,
+          `removeBreakpoint(line=${lineNo})`,
+          () => removeBreakpointByLine(runtimeContext, probe, lineNo),
+        );
+        await callRuntime(runtimeContext, 'synchronizeBreakpoints', () =>
+          runtimeContext.runtime.synchronizeBreakpoints(true),
         );
         continue;
       }

@@ -38,6 +38,9 @@ const loggerForTransport =
 
 type Transport = 'stdio' | 'sse' | 'http';
 
+// Keep strong reference to running server instance to avoid premature GC/exit
+let activeServer: StdioServer | SseServer | StreamableHttpServer | undefined;
+
 function hasArg(name: string): boolean {
   return process.argv.includes(name);
 }
@@ -258,6 +261,7 @@ async function main() {
     const server = new StdioServer(handlersRegistry, broker!, {
       logger: loggerForTransport,
     });
+    activeServer = server;
     await server.start(brokerKey);
     return;
   }
@@ -272,6 +276,7 @@ async function main() {
         config.mcpDestination ?? (config.envFile ? 'default' : undefined),
       logger: loggerForTransport,
     });
+    activeServer = server;
     await server.start();
     return;
   }
@@ -286,6 +291,7 @@ async function main() {
       config.mcpDestination ?? (config.envFile ? 'default' : undefined),
     logger: loggerForTransport,
   });
+  activeServer = server;
   await server.start();
 }
 

@@ -1,3 +1,4 @@
+import type { Server as HttpServer } from 'node:http';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
@@ -75,6 +76,7 @@ export class SseServer {
   private readonly logger: Logger;
   private readonly version: string;
   private readonly externalApp?: IHttpApplication;
+  private standaloneServer?: HttpServer;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -155,20 +157,22 @@ export class SseServer {
     this.registerRoutes(app as unknown as IHttpApplication);
 
     await new Promise<void>((resolve, reject) => {
-      const _srv = app
-        .listen(this.port, this.host, () => {
-          console.error(
-            `[SseServer] Server started on ${this.host}:${this.port}`,
-          );
-          console.error(
-            `[SseServer] SSE endpoint: http://${this.host}:${this.port}${this.ssePath}`,
-          );
-          console.error(
-            `[SseServer] POST endpoint: http://${this.host}:${this.port}${this.postPath}`,
-          );
-          resolve();
-        })
-        .on('error', reject);
+      const server = app.listen(this.port, this.host);
+      this.standaloneServer = server;
+
+      server.once('listening', () => {
+        console.error(
+          `[SseServer] Server started on ${this.host}:${this.port}`,
+        );
+        console.error(
+          `[SseServer] SSE endpoint: http://${this.host}:${this.port}${this.ssePath}`,
+        );
+        console.error(
+          `[SseServer] POST endpoint: http://${this.host}:${this.port}${this.postPath}`,
+        );
+        resolve();
+      });
+      server.once('error', reject);
     });
   }
 

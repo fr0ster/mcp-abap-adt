@@ -24,7 +24,7 @@ function parsePort(cliArgs) {
 
 function ensureDistExists(entryPath) {
   if (!fs.existsSync(entryPath)) {
-    process.stderr.write('[dev-http-v2] dist/server/v2/launcher.js not found. Run "npm run build" first.\n');
+    process.stderr.write('[dev-http-v2] dist/server/launcher.js not found. Run "npm run build" first.\n');
     process.exit(1);
   }
 }
@@ -36,7 +36,7 @@ function registerChild(child) {
 }
 
 function spawnServer(entryPath, cliArgs) {
-  const serverArgs = [entryPath, '--transport', 'streamable-http', ...cliArgs];
+  const serverArgs = [entryPath, '--transport', 'http', ...cliArgs];
   const serverEnv = { ...process.env };
   const child = spawn(process.execPath, serverArgs, {
     stdio: 'inherit',
@@ -74,7 +74,7 @@ function spawnInspector(port) {
 }
 
 (function main() {
-  const entryPath = path.resolve(__dirname, '../dist/server/v2/launcher.js');
+  const entryPath = path.resolve(__dirname, '../dist/server/launcher.js');
   ensureDistExists(entryPath);
 
   const port = parsePort(args);
@@ -97,4 +97,3 @@ function spawnInspector(port) {
     });
   }
 })();
-

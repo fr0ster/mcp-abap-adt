@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-02-17
+### Fixed
+- **Dev HTTP/SSE launch scripts**:
+  - Fixed dist entry path to `dist/server/launcher.js` in `tools/dev-http-v2.js` and `tools/dev-sse-v2.js`.
+  - Fixed `dev:http` transport argument to `--transport=http`.
+- **HTTP/SSE server startup reliability**:
+  - Updated standalone server startup flow to listen on `listening`/`error` events, preventing false "started" logs followed by silent exits.
+  - Kept strong server references in launcher to avoid premature process shutdown.
+
+### Changed
+- **Runtime profiling + dumps explorer**:
+  - Refocused tool workflow to class-based profiling run flow.
+  - Improved ABAP user resolution/validation and diagnostics for dumps/traces filtering.
+  - Improved object validation/update flow and trace feed handling in interactive tool.
+- **Tools documentation**:
+  - Updated `tools/README.md` to reflect class-focused profiling flow and ABAP user resolution behavior.
+
 ## [2.4.0] - 2026-02-15
 ### Added
 - **Runtime diagnostics tools**:

@@ -48,12 +48,12 @@ node tools/debug-runtime-explorer.js
   - `--mcp=<destination>` (AuthBroker)
   - `--env=<name>` (loads `~/.config/mcp-abap-adt/sessions/<name>.env`)
   - `--env-path=<path>` (explicit env file path)
-- Create or update executable ABAP objects for profiling (`class`/`fm`/`report`)
-- Run executable object with profiling
+- Create or update executable ABAP class for profiling
+- Run executable object with profiling (`class` via `AdtExecutor`)
 - List profiler trace files and optionally read trace data (`hitlist`/`statements`/`dbaccesses`)
 - List dumps (ABAP user filter is required) and optionally read selected dump details
 
-**Note:** Class profiling run is fully aligned with `AdtExecutor`. FM/report profiling run uses ADT run-endpoint probing (system-dependent) and is intended for endpoint discovery.
+**Note:** This tool is class-focused for profiling run. No direct run-endpoint calls are used.
 
 **Usage:**
 ```bash
@@ -77,8 +77,8 @@ node tools/runtime-profiling-dumps-explorer.js --env-path=/path/to/.env
 
 **ABAP user resolution for filters:**
 1. `--abap-user` (highest priority)
-2. ADT system info endpoint (`/sap/bc/adt/core/http/systeminformation`, field `userName`)
-3. Connection fallback (basic username / JWT claim)
+2. `mcp-abap-adt-clients` system info helper (`getSystemInformation`, field `userName`)
+3. Connection fallback (basic username)
 
 ---
 

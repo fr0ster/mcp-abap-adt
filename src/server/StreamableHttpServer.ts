@@ -1,3 +1,4 @@
+import type { Server as HttpServer } from 'node:http';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
@@ -70,6 +71,7 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly path: string;
   private readonly externalApp?: IHttpApplication;
   private readonly version: string;
+  private standaloneServer?: HttpServer;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -239,17 +241,19 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.registerRoutes(app as unknown as IHttpApplication);
 
     await new Promise<void>((resolve, reject) => {
-      const _srv = app
-        .listen(this.port, this.host, () => {
-          console.error(
-            `[StreamableHttpServer] Server started on ${this.host}:${this.port}`,
-          );
-          console.error(
-            `[StreamableHttpServer] Endpoint: http://${this.host}:${this.port}${this.path}`,
-          );
-          resolve();
-        })
-        .on('error', reject);
+      const server = app.listen(this.port, this.host);
+      this.standaloneServer = server;
+
+      server.once('listening', () => {
+        console.error(
+          `[StreamableHttpServer] Server started on ${this.host}:${this.port}`,
+        );
+        console.error(
+          `[StreamableHttpServer] Endpoint: http://${this.host}:${this.port}${this.path}`,
+        );
+        resolve();
+      });
+      server.once('error', reject);
     });
   }
 

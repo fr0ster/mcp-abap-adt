@@ -103,6 +103,30 @@ function isAlreadyExistsError(error) {
   );
 }
 
+function isNotFoundError(error) {
+  const status = error?.response?.status;
+  const payload = String(error?.response?.data || error?.message || '');
+  return (
+    status === 404 ||
+    payload.includes('ExceptionResourceNotFound') ||
+    payload.includes('does not exist')
+  );
+}
+
+async function validateAllowAlreadyExists(validateFn, objectLabel) {
+  try {
+    await validateFn();
+  } catch (error) {
+    if (isAlreadyExistsError(error)) {
+      console.warn(
+        `[warn] Validation reported existing object for ${objectLabel}; continuing with create/update flow`,
+      );
+      return;
+    }
+    throw error;
+  }
+}
+
 function loadEnvFromArgs(logger) {
   const envPathArg = getArgValue('--env-path');
   const envArg = getArgValue('--env');
@@ -149,62 +173,96 @@ function loadEnvFromArgs(logger) {
   return undefined;
 }
 
-function decodeJwtPayload(token) {
-  if (!token || typeof token !== 'string') return null;
-  const chunks = token.split('.');
-  if (chunks.length < 2) return null;
+function normalizeAbapUser(value, fieldName = 'abapUser') {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (!normalized) {
+    return '';
+  }
+  if (normalized.includes('@')) {
+    throw new Error(
+      `${fieldName}="${value}" looks like email. Use ABAP logon user (e.g. CB9980000423).`,
+    );
+  }
+  if (!/^[A-Z0-9_.$-]+$/.test(normalized)) {
+    throw new Error(
+      `${fieldName}="${value}" has invalid characters for ABAP user.`,
+    );
+  }
+  return normalized;
+}
+
+function resolveAdtClientsSystemInfoModule() {
   try {
-    const payload = chunks[1].replace(/-/g, '+').replace(/_/g, '/');
-    const normalized = payload.padEnd(Math.ceil(payload.length / 4) * 4, '=');
-    return JSON.parse(Buffer.from(normalized, 'base64').toString('utf8'));
+    const adtClientsMainPath = require.resolve('@mcp-abap-adt/adt-clients');
+    const modulePath = path.join(
+      path.dirname(adtClientsMainPath),
+      'dist',
+      'utils',
+      'systemInfo.js',
+    );
+    // eslint-disable-next-line global-require, import/no-dynamic-require
+    return require(modulePath);
   } catch {
-    return null;
+    try {
+      const modulePath = path.resolve(
+        process.cwd(),
+        'node_modules',
+        '@mcp-abap-adt',
+        'adt-clients',
+        'dist',
+        'utils',
+        'systemInfo.js',
+      );
+      if (fs.existsSync(modulePath)) {
+        // eslint-disable-next-line global-require, import/no-dynamic-require
+        return require(modulePath);
+      }
+    } catch {
+      // ignore
+    }
+    return undefined;
   }
 }
 
 function extractDefaultDumpUser(connectionMeta) {
-  const fromArg = (getArgValue('--abap-user') || '').trim();
+  const fromArg = (
+    getArgValue('--abap-user') ||
+    getArgValue('--user') ||
+    getArgValue('-user') ||
+    ''
+  ).trim();
   if (fromArg) {
-    return fromArg.toUpperCase();
+    return normalizeAbapUser(fromArg, 'abapUser');
   }
 
   if (connectionMeta?.authType === 'basic' && connectionMeta?.username) {
-    return String(connectionMeta.username).toUpperCase();
+    return normalizeAbapUser(connectionMeta.username, 'SAP_USERNAME');
   }
-  const claims = decodeJwtPayload(connectionMeta?.jwtToken);
-  return (
-    claims?.user_name ||
-    claims?.['user_name'] ||
-    claims?.['sap.user'] ||
-    claims?.['sap_user'] ||
-    undefined
-  );
+  return undefined;
 }
 
 async function resolveAbapUserFromSystem(connection, logger) {
   try {
-    const response = await connection.makeAdtRequest({
-      url: '/sap/bc/adt/core/http/systeminformation',
-      method: 'GET',
-      headers: {
-        Accept: 'application/vnd.sap.adt.core.http.systeminformation.v1+json',
-      },
-      params: { _: Date.now() },
-    });
-    const data =
-      typeof response?.data === 'string'
-        ? JSON.parse(response.data)
-        : response?.data;
-    const userName = String(data?.userName || '').trim().toUpperCase();
+    const systemInfoModule = resolveAdtClientsSystemInfoModule();
+    const getSystemInformationFn = systemInfoModule?.getSystemInformation;
+    if (typeof getSystemInformationFn !== 'function') {
+      logger?.debug?.(
+        'getSystemInformation helper is not available from adt-clients package internals',
+      );
+      return '';
+    }
+    const systemInfo = await getSystemInformationFn(connection);
+    const userName = normalizeAbapUser(systemInfo?.userName || '', 'systemInfo.userName');
     if (userName) {
+      logger?.info?.(`ABAP user resolved from system info: ${userName}`);
       return userName;
     }
   } catch (error) {
     logger?.debug?.(
-      `Failed to resolve ABAP user via systeminformation: ${error?.message || String(error)}`,
+      `Failed to resolve ABAP user from getSystemInformation: ${error?.message || String(error)}`,
     );
   }
-  return undefined;
+  return '';
 }
 
 function buildConnectionConfigFromEnv() {
@@ -322,6 +380,10 @@ function compact(data, max = 2500) {
   return `${raw.slice(0, max)}\n... [truncated ${raw.length - max} chars]`;
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function buildClassSource(className) {
   return `CLASS ${className} DEFINITION
   PUBLIC
@@ -371,6 +433,34 @@ CLASS ${className} IMPLEMENTATION.
     rv_score = iv_n + recursive_score( iv_n - 1 ).
   ENDMETHOD.
 ENDCLASS.`;
+}
+
+function hasRunnableClassMain(source) {
+  const raw = String(source || '').toUpperCase();
+  return (
+    raw.includes('INTERFACES IF_OO_ADT_CLASSRUN') &&
+    raw.includes('METHOD IF_OO_ADT_CLASSRUN~MAIN')
+  );
+}
+
+function hasProfilingReportSource(source) {
+  const raw = String(source || '').toUpperCase();
+  return (
+    raw.includes('START-OF-SELECTION') &&
+    raw.includes('FORM COMPUTE_BRANCH') &&
+    raw.includes('FORM RECURSE_SCORE') &&
+    raw.includes('DO ')
+  );
+}
+
+function hasProfilingFunctionModuleSource(source) {
+  const raw = String(source || '').toUpperCase();
+  return (
+    raw.includes('FORM COMPUTE_BRANCH') &&
+    raw.includes('FORM RECURSE_SCORE') &&
+    raw.includes('ENDFUNCTION') &&
+    raw.includes('DO ')
+  );
 }
 
 function buildReportSource(programName) {
@@ -522,6 +612,22 @@ function extractTraceEntriesFromFeed(feedPayload) {
     .filter(Boolean);
 }
 
+function getTraceIdSetFromFeed(feedPayload, abapUser) {
+  const user = String(abapUser || '').trim().toUpperCase();
+  const entries = extractTraceEntriesFromFeed(feedPayload);
+  const ids = new Set();
+  for (const entry of entries) {
+    const raw = String(entry.raw || '').toUpperCase();
+    if (user && !raw.includes(user)) {
+      continue;
+    }
+    if (entry.traceId) {
+      ids.add(entry.traceId);
+    }
+  }
+  return ids;
+}
+
 async function askWithDefault(rl, prompt, defaultValue) {
   const suffix = defaultValue ? ` [${defaultValue}]` : '';
   const value = (await rl.question(`${prompt}${suffix}: `)).trim();
@@ -533,13 +639,16 @@ async function askRequiredValue(rl, prompt, defaultValue, fieldName) {
   if (!value) {
     throw new Error(`${fieldName} is required`);
   }
+  if (fieldName === 'abapUser') {
+    return normalizeAbapUser(value, fieldName);
+  }
   return value;
 }
 
 function printMenu() {
   console.log('\n=== Runtime Profiling + Dumps Explorer ===');
-  console.log('1) Create or update class/fm/report for profiling');
-  console.log('2) Run class/fm/report with profiling');
+  console.log('1) Create or update class for profiling');
+  console.log('2) Run class with profiling');
   console.log('3) List profiling traces (+ optional trace data view)');
   console.log('4) List dumps (+ optional read selected dump)');
   console.log('q) Quit');
@@ -567,238 +676,137 @@ function printUsage() {
 }
 
 async function upsertExecutableObject(ctx, rl) {
-  const kind = (
-    await askWithDefault(rl, 'Object type (class/fm/report)', 'class')
-  ).toLowerCase();
   const adt = ctx.adt;
-
-  if (kind === 'class') {
-    const className = toUpperOrThrow(
-      await askWithDefault(
-        rl,
-        'Class name',
-        ctx.state.lastTarget?.kind === 'class'
-          ? ctx.state.lastTarget.className
-          : 'ZADT_MCP_PROFILE_PROBE',
-      ),
-      'className',
-    );
-    const packageHint =
-      ctx.state.defaultPackage || process.env.DEBUG_PROBE_PACKAGE || '';
-    const packageName = toUpperOrThrow(
-      await askRequiredValue(rl, 'Package', packageHint, 'packageName'),
-      'packageName',
-    );
-    const transportRequest = (
-      await askWithDefault(rl, 'Transport request (optional)', '')
-    ).toUpperCase();
-    const sourceCode = buildClassSource(className);
-    const payload = {
-      className,
-      packageName,
-      description: `Profiling probe ${className}`,
-      sourceCode,
-      transportRequest: transportRequest || undefined,
-    };
-    try {
-      const existing = await adt.getClass().read({ className }, 'active');
-      if (existing) {
-        await adt.getClass().update(payload, { activateOnUpdate: true });
-        console.log(`[ok] Class ${className} updated`);
-      } else {
-        await adt.getClass().create(payload, { activateOnCreate: true });
-        console.log(`[ok] Class ${className} created`);
-      }
-    } catch (error) {
-      if (isAlreadyExistsError(error)) {
-        await adt.getClass().update(payload, { activateOnUpdate: true });
-        console.log(`[ok] Class ${className} updated`);
-      } else if (error?.response?.status === 403) {
-        console.warn(
-          `[warn] No change authorization for class ${className}. Using existing class without modifications.`,
-        );
-      } else {
-        throw error;
-      }
-    }
-    ctx.state.lastTarget = { kind: 'class', className };
-    return;
-  }
-
-  if (kind === 'report') {
-    const programName = toUpperOrThrow(
-      await askWithDefault(
-        rl,
-        'Program name',
-        ctx.state.lastTarget?.kind === 'report'
-          ? ctx.state.lastTarget.programName
-          : 'ZADT_MCP_PROFILE_REP',
-      ),
-      'programName',
-    );
-    const packageHint =
-      ctx.state.defaultPackage || process.env.DEBUG_PROBE_PACKAGE || '';
-    const packageName = toUpperOrThrow(
-      await askRequiredValue(rl, 'Package', packageHint, 'packageName'),
-      'packageName',
-    );
-    const transportRequest = (
-      await askWithDefault(rl, 'Transport request (optional)', '')
-    ).toUpperCase();
-    const sourceCode = buildReportSource(programName);
-    const payload = {
-      programName,
-      packageName,
-      description: `Profiling probe ${programName}`,
-      sourceCode,
-      transportRequest: transportRequest || undefined,
-    };
-    try {
-      const existing = await adt.getProgram().read({ programName }, 'active');
-      if (existing) {
-        await adt.getProgram().update(payload, { activateOnUpdate: true });
-        console.log(`[ok] Program ${programName} updated`);
-      } else {
-        await adt.getProgram().create(payload, { activateOnCreate: true });
-        console.log(`[ok] Program ${programName} created`);
-      }
-    } catch (error) {
-      if (isAlreadyExistsError(error)) {
-        await adt.getProgram().update(payload, { activateOnUpdate: true });
-        console.log(`[ok] Program ${programName} updated`);
-      } else if (error?.response?.status === 403) {
-        console.warn(
-          `[warn] No change authorization for report ${programName}. Using existing report without modifications.`,
-        );
-      } else {
-        throw error;
-      }
-    }
-    ctx.state.lastTarget = { kind: 'report', programName };
-    return;
-  }
-
-  if (kind === 'fm') {
-    const functionGroupName = toUpperOrThrow(
-      await askWithDefault(
-        rl,
-        'Function group name',
-        ctx.state.lastTarget?.kind === 'fm'
-          ? ctx.state.lastTarget.functionGroupName
-          : '',
-      ),
-      'functionGroupName',
-    );
-    const functionModuleName = toUpperOrThrow(
-      await askWithDefault(
-        rl,
-        'Function module name',
-        ctx.state.lastTarget?.kind === 'fm'
-          ? ctx.state.lastTarget.functionModuleName
-          : 'ZADT_MCP_PROFILE_FM',
-      ),
-      'functionModuleName',
-    );
-    const transportRequest = (
-      await askWithDefault(rl, 'Transport request (optional)', '')
-    ).toUpperCase();
-    const sourceCode = buildFunctionModuleSource(functionModuleName);
-    const payload = {
-      functionGroupName,
-      functionModuleName,
-      description: `Profiling probe ${functionModuleName}`,
-      sourceCode,
-      transportRequest: transportRequest || undefined,
-    };
-    try {
-      const existing = await adt.getFunctionModule().read(
-        { functionGroupName, functionModuleName },
-        'active',
-      );
-      if (existing) {
-        await adt
-          .getFunctionModule()
-          .update(payload, { activateOnUpdate: true });
-        console.log(`[ok] Function module ${functionModuleName} updated`);
-      } else {
-        await adt
-          .getFunctionModule()
-          .create(payload, { activateOnCreate: true });
-        console.log(`[ok] Function module ${functionModuleName} created`);
-      }
-    } catch (error) {
-      if (isAlreadyExistsError(error)) {
-        await adt
-          .getFunctionModule()
-          .update(payload, { activateOnUpdate: true });
-        console.log(`[ok] Function module ${functionModuleName} updated`);
-      } else if (error?.response?.status === 403) {
-        console.warn(
-          `[warn] No change authorization for function module ${functionModuleName}. Using existing FM without modifications.`,
-        );
-      } else {
-        throw error;
-      }
-    }
-    ctx.state.lastTarget = { kind: 'fm', functionGroupName, functionModuleName };
-    return;
-  }
-
-  throw new Error(`Unsupported object type: ${kind}`);
-}
-
-async function tryRunRequestCandidates(connection, candidates, logger) {
-  let lastError;
-  for (const candidate of candidates) {
-    try {
-      const response = await connection.makeAdtRequest({
-        method: 'POST',
-        url: candidate.url,
-        headers: candidate.headers || { Accept: 'text/plain' },
-      });
-      logger.info(`Run endpoint accepted: ${candidate.url}`);
-      return { response, matchedUrl: candidate.url, requestUri: candidate.requestUri };
-    } catch (error) {
-      lastError = error;
-      const adtException = parseAdtException(error);
-      logger.warn(
-        `Run endpoint failed: ${candidate.url} -> ${adtException?.message || error?.message || String(error)}`,
-      );
-    }
-  }
-  throw lastError || new Error('No run endpoint accepted request');
-}
-
-async function resolveTraceId(runtime, uriCandidates, logger) {
-  for (const uri of uriCandidates) {
-    if (!uri) continue;
-    try {
-      const response = await runtime.getProfilerTraceRequestsByUri(uri);
-      const traceId = extractTraceId(response?.data);
-      if (traceId) return { traceId, source: `traceRequestsByUri(${uri})` };
-    } catch (error) {
-      logger.debug(
-        `Trace lookup by URI failed for ${uri}: ${error?.message || String(error)}`,
-      );
-    }
-  }
+  const className = toUpperOrThrow(
+    await askWithDefault(
+      rl,
+      'Class name',
+      ctx.state.lastTarget?.kind === 'class'
+        ? ctx.state.lastTarget.className
+        : 'ZADT_MCP_PROFILE_PROBE',
+    ),
+    'className',
+  );
+  const packageHint =
+    ctx.state.defaultPackage || process.env.DEBUG_PROBE_PACKAGE || '';
+  const packageName = toUpperOrThrow(
+    await askRequiredValue(rl, 'Package', packageHint, 'packageName'),
+    'packageName',
+  );
+  const transportRequest = (
+    await askWithDefault(rl, 'Transport request (optional)', '')
+  ).toUpperCase();
+  const sourceCode = buildClassSource(className);
+  const payload = {
+    className,
+    packageName,
+    description: `Profiling probe ${className}`,
+    sourceCode,
+    transportRequest: transportRequest || undefined,
+  };
+  await validateAllowAlreadyExists(
+    () =>
+      adt.getClass().validate({
+        className,
+        packageName,
+        transportRequest: transportRequest || undefined,
+        description: `Profiling probe ${className}`,
+      }),
+    `class ${className}`,
+  );
 
   try {
-    const response = await runtime.listProfilerTraceRequests();
-    const traceId = extractTraceId(response?.data);
-    if (traceId) return { traceId, source: 'listProfilerTraceRequests' };
+    await adt.getClass().create(payload, { activateOnCreate: true });
+    console.log(`[ok] Class ${className} created`);
   } catch (error) {
-    logger.debug(
-      `Fallback listProfilerTraceRequests failed: ${error?.message || String(error)}`,
-    );
+    if (isAlreadyExistsError(error)) {
+      await adt.getClass().update(payload, { activateOnUpdate: true });
+      console.log(`[ok] Class ${className} updated`);
+    } else if (isNotFoundError(error)) {
+      throw new Error(
+        `Class ${className} was not found for update path. Re-check package/transport and naming.`,
+      );
+    } else if (error?.response?.status === 403) {
+      console.warn(
+        `[warn] No change authorization for class ${className}. Using existing class without modifications.`,
+      );
+    } else {
+      throw error;
+    }
   }
 
-  const filesResponse = await runtime.listProfilerTraceFiles();
-  const traceId = extractTraceId(filesResponse?.data);
-  if (!traceId) {
-    throw new Error('Failed to resolve trace ID from profiler feeds');
+  // Always enforce profiling template after create/update to avoid empty skeleton classes.
+  await adt.getClass().update(payload, { activateOnUpdate: true });
+  const activeState = await adt.getClass().read({ className }, 'active');
+  if (!hasRunnableClassMain(activeState?.sourceCode)) {
+    throw new Error(
+      `Class ${className} does not contain IF_OO_ADT_CLASSRUN~MAIN after template update`,
+    );
   }
-  return { traceId, source: 'listProfilerTraceFiles' };
+  console.log(
+    `[ok] Class ${className} profiling template enforced (runnable)`,
+  );
+  ctx.state.lastTarget = { kind: 'class', className };
+  return;
+}
+
+async function resolveTraceIdFromTraceFiles(runtime, options = {}) {
+  const {
+    logger,
+    description,
+    abapUser,
+    baselineTraceIds,
+    attempts = 10,
+    delayMs = 1500,
+  } = options;
+  const marker = String(description || '').trim().toUpperCase();
+  const user = String(abapUser || '').trim().toUpperCase();
+  const baseline = baselineTraceIds || new Set();
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const response = await runtime.listProfilerTraceFiles();
+    const entries = extractTraceEntriesFromFeed(response?.data);
+
+    // First priority: a new trace ID not present before run.
+    const newEntry = entries.find((entry) => {
+      if (!entry?.traceId) return false;
+      const raw = String(entry.raw || '').toUpperCase();
+      const matchesUser = user ? raw.includes(user) : true;
+      return matchesUser && !baseline.has(entry.traceId);
+    });
+    if (newEntry?.traceId) {
+      return {
+        traceId: newEntry.traceId,
+        source: 'listProfilerTraceFiles(new-id)',
+      };
+    }
+
+    // Fallback by explicit marker.
+    const matchedByMarker = entries.find((entry) => {
+      if (!entry?.traceId) return false;
+      const raw = String(entry.raw || '').toUpperCase();
+      const matchesDescription = marker ? raw.includes(marker) : false;
+      const matchesUser = user ? raw.includes(user) : true;
+      return matchesDescription && matchesUser;
+    });
+    if (matchedByMarker?.traceId) {
+      return {
+        traceId: matchedByMarker.traceId,
+        source: 'listProfilerTraceFiles(description)',
+      };
+    }
+
+    logger?.debug?.(
+      `Trace ID not yet available in feed (attempt ${attempt}/${attempts})`,
+    );
+    if (attempt < attempts) {
+      await delay(delayMs);
+    }
+  }
+
+  throw new Error(
+    `Trace ID not found in profiler trace files after ${attempts} attempts (description="${description || ''}", user="${abapUser || ''}")`,
+  );
 }
 
 function buildProfilerParameters(description) {
@@ -816,168 +824,60 @@ function buildProfilerParameters(description) {
 }
 
 async function runWithProfiling(ctx, rl) {
-  const kind = (
+  const runtime = ctx.runtime;
+  const className = toUpperOrThrow(
     await askWithDefault(
       rl,
-      'Object type to run (class/fm/report)',
-      ctx.state.lastTarget?.kind || 'class',
-    )
-  ).toLowerCase();
-
-  if (kind === 'class') {
-    const className = toUpperOrThrow(
-      await askWithDefault(
-        rl,
-        'Class name',
-        ctx.state.lastTarget?.kind === 'class'
-          ? ctx.state.lastTarget.className
-          : 'ZADT_MCP_PROFILE_PROBE',
-      ),
-      'className',
-    );
-    const description = await askWithDefault(
-      rl,
-      'Trace description',
-      `MCP_CLASS_PROFILE_${Date.now()}`,
-    );
-    const result = await ctx.executor.getClassExecutor().runWithProfiling(
-      { className },
-      { profilerParameters: buildProfilerParameters(description) },
-    );
-    console.log(`[ok] Class run finished: HTTP ${result.response?.status || 'n/a'}`);
-    console.log(`[ok] Trace ID: ${result.traceId}`);
-    console.log(compact(result.response?.data));
-    ctx.state.lastTarget = { kind: 'class', className };
-    ctx.state.lastRun = {
-      kind,
-      traceId: result.traceId,
-      profilerId: result.profilerId,
-      output: result.response?.data,
-    };
-    return;
-  }
-
-  const runtime = ctx.runtime;
-  const description = await askWithDefault(
-    rl,
-    'Trace description',
-    `MCP_${kind.toUpperCase()}_PROFILE_${Date.now()}`,
+      'Class name',
+      ctx.state.lastTarget?.kind === 'class'
+        ? ctx.state.lastTarget.className
+        : 'ZADT_MCP_PROFILE_PROBE',
+    ),
+    'className',
+  );
+  const description = await askWithDefault(rl, 'Trace description', className);
+  const baselineResponse = await runtime.listProfilerTraceFiles();
+  const baselineTraceIds = getTraceIdSetFromFeed(
+    baselineResponse?.data,
+    ctx.state.defaultDumpUser,
+  );
+  ctx.logger?.info?.(
+    `Profiler baseline traces for ${ctx.state.defaultDumpUser}: ${baselineTraceIds.size}`,
+  );
+  const profilerParameters = buildProfilerParameters(description);
+  ctx.logger?.info?.(
+    `Profiler parameters: ${JSON.stringify(profilerParameters)}`,
   );
   const profilerResponse = await runtime.createProfilerTraceParameters(
-    buildProfilerParameters(description),
+    profilerParameters,
   );
   const profilerId = runtime.extractProfilerIdFromResponse(profilerResponse);
   if (!profilerId) {
     throw new Error('Failed to extract profilerId from createProfilerTraceParameters');
   }
+  ctx.logger?.info?.(`Profiler ID: ${profilerId}`);
+  const runResponse = await ctx.executor.getClassExecutor().runWithProfiler(
+    { className },
+    { profilerId },
+  );
+  const traceLookup = await resolveTraceIdFromTraceFiles(runtime, {
+    logger: ctx.logger,
+    description,
+    abapUser: ctx.state.defaultDumpUser,
+    baselineTraceIds,
+  });
 
-  if (kind === 'report') {
-    const programName = toUpperOrThrow(
-      await askWithDefault(
-        rl,
-        'Program name',
-        ctx.state.lastTarget?.kind === 'report'
-          ? ctx.state.lastTarget.programName
-          : 'ZADT_MCP_PROFILE_REP',
-      ),
-      'programName',
-    );
-    const encodedProfilerId = encodeURIComponent(profilerId);
-    const prog = encodeURIComponent(programName.toLowerCase());
-    const candidates = [
-      {
-        url: `/sap/bc/adt/programs/programs/${prog}/run?profilerId=${encodedProfilerId}`,
-        requestUri: `/sap/bc/adt/programs/programs/${prog}/run`,
-      },
-      {
-        url: `/sap/bc/adt/programs/programs/${prog}?profilerId=${encodedProfilerId}`,
-        requestUri: `/sap/bc/adt/programs/programs/${prog}`,
-      },
-    ];
-    const runResult = await tryRunRequestCandidates(
-      ctx.connection,
-      candidates,
-      ctx.logger,
-    );
-    const traceLookup = await resolveTraceId(
-      runtime,
-      [runResult.requestUri, `/sap/bc/adt/programs/programs/${prog}`],
-      ctx.logger,
-    );
-    console.log(`[ok] Report run finished: HTTP ${runResult.response?.status || 'n/a'}`);
-    console.log(`[ok] Trace ID: ${traceLookup.traceId} (${traceLookup.source})`);
-    console.log(compact(runResult.response?.data));
-    ctx.state.lastTarget = { kind: 'report', programName };
-    ctx.state.lastRun = {
-      kind,
-      traceId: traceLookup.traceId,
-      profilerId,
-      output: runResult.response?.data,
-    };
-    return;
-  }
-
-  if (kind === 'fm') {
-    const functionGroupName = toUpperOrThrow(
-      await askWithDefault(
-        rl,
-        'Function group name',
-        ctx.state.lastTarget?.kind === 'fm'
-          ? ctx.state.lastTarget.functionGroupName
-          : '',
-      ),
-      'functionGroupName',
-    );
-    const functionModuleName = toUpperOrThrow(
-      await askWithDefault(
-        rl,
-        'Function module name',
-        ctx.state.lastTarget?.kind === 'fm'
-          ? ctx.state.lastTarget.functionModuleName
-          : 'ZADT_MCP_PROFILE_FM',
-      ),
-      'functionModuleName',
-    );
-    const encodedProfilerId = encodeURIComponent(profilerId);
-    const fugr = encodeURIComponent(functionGroupName.toLowerCase());
-    const fm = encodeURIComponent(functionModuleName.toLowerCase());
-    const candidates = [
-      {
-        url: `/sap/bc/adt/functions/groups/${fugr}/fmodules/${fm}/run?profilerId=${encodedProfilerId}`,
-        requestUri: `/sap/bc/adt/functions/groups/${fugr}/fmodules/${fm}/run`,
-      },
-      {
-        url: `/sap/bc/adt/functions/groups/${fugr}/fmodules/${fm}?profilerId=${encodedProfilerId}`,
-        requestUri: `/sap/bc/adt/functions/groups/${fugr}/fmodules/${fm}`,
-      },
-    ];
-    const runResult = await tryRunRequestCandidates(
-      ctx.connection,
-      candidates,
-      ctx.logger,
-    );
-    const traceLookup = await resolveTraceId(
-      runtime,
-      [
-        runResult.requestUri,
-        `/sap/bc/adt/functions/groups/${fugr}/fmodules/${fm}`,
-      ],
-      ctx.logger,
-    );
-    console.log(`[ok] FM run finished: HTTP ${runResult.response?.status || 'n/a'}`);
-    console.log(`[ok] Trace ID: ${traceLookup.traceId} (${traceLookup.source})`);
-    console.log(compact(runResult.response?.data));
-    ctx.state.lastTarget = { kind: 'fm', functionGroupName, functionModuleName };
-    ctx.state.lastRun = {
-      kind,
-      traceId: traceLookup.traceId,
-      profilerId,
-      output: runResult.response?.data,
-    };
-    return;
-  }
-
-  throw new Error(`Unsupported object type: ${kind}`);
+  console.log(`[ok] Class run finished: HTTP ${runResponse?.status || 'n/a'}`);
+  console.log(`[ok] Trace ID: ${traceLookup.traceId} (${traceLookup.source})`);
+  console.log(compact(runResponse?.data));
+  ctx.state.lastTarget = { kind: 'class', className };
+  ctx.state.lastRun = {
+    kind: 'class',
+    traceId: traceLookup.traceId,
+    profilerId,
+    output: runResponse?.data,
+  };
+  return;
 }
 
 async function listTraces(ctx, rl) {

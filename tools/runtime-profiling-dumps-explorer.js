@@ -528,6 +528,14 @@ async function askWithDefault(rl, prompt, defaultValue) {
   return value || defaultValue || '';
 }
 
+async function askRequiredValue(rl, prompt, defaultValue, fieldName) {
+  const value = (await askWithDefault(rl, prompt, defaultValue)).trim();
+  if (!value) {
+    throw new Error(`${fieldName} is required`);
+  }
+  return value;
+}
+
 function printMenu() {
   console.log('\n=== Runtime Profiling + Dumps Explorer ===');
   console.log('1) Create or update class/fm/report for profiling');
@@ -551,6 +559,7 @@ function printUsage() {
   console.log('');
   console.log('Optional:');
   console.log('  --abap-user=CB9980000423');
+  console.log('  --package=ZMY_PACKAGE');
   console.log('  --auth-broker-path=/path');
   console.log('  --browser-auth-port=3101');
   console.log('  --browser=system');
@@ -574,8 +583,10 @@ async function upsertExecutableObject(ctx, rl) {
       ),
       'className',
     );
+    const packageHint =
+      ctx.state.defaultPackage || process.env.DEBUG_PROBE_PACKAGE || '';
     const packageName = toUpperOrThrow(
-      await askWithDefault(rl, 'Package', process.env.DEBUG_PROBE_PACKAGE || '$TMP'),
+      await askRequiredValue(rl, 'Package', packageHint, 'packageName'),
       'packageName',
     );
     const transportRequest = (
@@ -625,8 +636,10 @@ async function upsertExecutableObject(ctx, rl) {
       ),
       'programName',
     );
+    const packageHint =
+      ctx.state.defaultPackage || process.env.DEBUG_PROBE_PACKAGE || '';
     const packageName = toUpperOrThrow(
-      await askWithDefault(rl, 'Package', process.env.DEBUG_PROBE_PACKAGE || '$TMP'),
+      await askRequiredValue(rl, 'Package', packageHint, 'packageName'),
       'packageName',
     );
     const transportRequest = (
@@ -969,26 +982,22 @@ async function runWithProfiling(ctx, rl) {
 
 async function listTraces(ctx, rl) {
   const defaultUser = ctx.state.defaultDumpUser || '';
-  const traceUserInput = await askWithDefault(
+  const traceUserInput = await askRequiredValue(
     rl,
-    'ABAP user filter for traces (ENTER=default, *=all users)',
+    'ABAP user filter for traces',
     defaultUser,
+    'abapUser',
   );
-  const traceUser =
-    traceUserInput.trim() === '*'
-      ? ''
-      : traceUserInput.trim().toUpperCase();
+  const traceUser = traceUserInput.trim().toUpperCase();
 
   const response = await ctx.runtime.listProfilerTraceFiles();
   const allEntries = extractTraceEntriesFromFeed(response?.data);
-  const entries = traceUser
-    ? allEntries.filter((entry) =>
-        String(entry.raw || '').toUpperCase().includes(traceUser),
-      )
-    : allEntries;
+  const entries = allEntries.filter((entry) =>
+    String(entry.raw || '').toUpperCase().includes(traceUser),
+  );
   console.log(`[ok] listProfilerTraceFiles -> HTTP ${response?.status || 'n/a'}`);
   if (!entries.length) {
-    console.log('[info] No profiler traces found');
+    console.log(`[info] No profiler traces found for ABAP user ${traceUser}`);
     return;
   }
 
@@ -1042,23 +1051,17 @@ async function listTraces(ctx, rl) {
 
 async function listDumps(ctx, rl) {
   const defaultUser = ctx.state.defaultDumpUser || '';
-  const userInputRaw = await askWithDefault(
+  const userInputRaw = await askRequiredValue(
     rl,
-    'ABAP dump user (ENTER=default, *=all users)',
+    'ABAP dump user',
     defaultUser,
+    'abapUser',
   );
-  const userInput = userInputRaw.trim();
-  const userFilter = userInput === '*' ? '' : userInput.toUpperCase();
-
-  const response = userFilter
-    ? await ctx.runtime.listRuntimeDumpsByUser(userFilter, {
-        inlinecount: 'allpages',
-        top: 50,
-      })
-    : await ctx.runtime.listRuntimeDumps({
-        inlinecount: 'allpages',
-        top: 50,
-      });
+  const userFilter = userInputRaw.trim().toUpperCase();
+  const response = await ctx.runtime.listRuntimeDumpsByUser(userFilter, {
+    inlinecount: 'allpages',
+    top: 50,
+  });
 
   const parsedPayload = parsePayload(response?.data);
   const dumpIds = extractDumpIds(parsedPayload);
@@ -1099,6 +1102,7 @@ async function main() {
     getArgValue('--verbose') !== undefined || process.env.DEBUG_PROBE_VERBOSE === 'true';
   const logger = makeLogger(verbose);
   const mcpDestination = getArgValue('--mcp');
+  const packageFromArg = (getArgValue('--package') || '').trim().toUpperCase();
   loadEnvFromArgs(logger);
 
   const connectionConfig = mcpDestination
@@ -1108,6 +1112,11 @@ async function main() {
   const userFromSystem = await resolveAbapUserFromSystem(connection, logger);
   const defaultAbapUser =
     userFromSystem || extractDefaultDumpUser(connectionConfig);
+  if (!defaultAbapUser) {
+    throw new Error(
+      'ABAP user is required for dumps/traces filters. Pass --abap-user=CB9980000423.',
+    );
+  }
   const ctx = {
     logger,
     connection,
@@ -1118,6 +1127,7 @@ async function main() {
       lastTarget: undefined,
       lastRun: undefined,
       defaultDumpUser: defaultAbapUser,
+      defaultPackage: packageFromArg || process.env.DEBUG_PROBE_PACKAGE || '',
     },
   };
 

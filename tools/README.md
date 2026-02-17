@@ -39,6 +39,48 @@ node tools/debug-runtime-explorer.js
 
 ---
 
+### 0.5 Runtime Profiling + Dumps Explorer
+
+**`runtime-profiling-dumps-explorer.js`** - Interactive script for profiling and dump analysis via `AdtClient`/`AdtRuntimeClient`/`AdtExecutor`.
+
+**Purpose:**
+- Initialize connection via:
+  - `--mcp=<destination>` (AuthBroker)
+  - `--env=<name|file.env>` (loads env file)
+  - `--env-path=<path>` (explicit env file path)
+- Create or update executable ABAP objects for profiling (`class`/`fm`/`report`)
+- Run executable object with profiling
+- List profiler trace files and optionally read trace data (`hitlist`/`statements`/`dbaccesses`)
+- List dumps (optional user filter) and optionally read selected dump details
+
+**Note:** Class profiling run is fully aligned with `AdtExecutor`. FM/report profiling run uses ADT run-endpoint probing (system-dependent) and is intended for endpoint discovery.
+
+**Usage:**
+```bash
+# AuthBroker destination mode
+node tools/runtime-profiling-dumps-explorer.js --mcp=TRIAL
+
+# Session env by name (loads ~/.config/mcp-abap-adt/sessions/trial.env)
+node tools/runtime-profiling-dumps-explorer.js --env=trial
+
+# Explicit env path
+node tools/runtime-profiling-dumps-explorer.js --env-path=/path/to/.env
+```
+
+**Optional args:**
+- `--abap-user=CB9980000423` (default ABAP user filter for dumps/traces menu)
+- `--auth-broker-path=/path/to/storage`
+- `--browser-auth-port=3101`
+- `--browser=system`
+- `--verbose`
+
+**ABAP user resolution for filters:**
+1. `--abap-user` (highest priority)
+2. ADT system info endpoint (`/sap/bc/adt/core/http/systeminformation`, field `userName`)
+3. Connection fallback (basic username / JWT claim)
+
+---
+
 ### 1. Documentation Generator
 
 **`generate-tools-docs.js`** - Automatically generates tool documentation from handler files.

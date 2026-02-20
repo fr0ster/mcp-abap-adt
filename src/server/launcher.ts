@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { AuthBrokerFactory } from '../lib/auth/index.js';
 import { ServerConfigManager } from '../lib/config/index.js';
 import {
+  CompactHandlersGroup,
   HighLevelHandlersGroup,
   LowLevelHandlersGroup,
   ReadOnlyHandlersGroup,
@@ -138,6 +139,9 @@ async function main() {
   }
   if (exposition.includes('high')) {
     handlerGroups.push(new HighLevelHandlersGroup(baseContext));
+  }
+  if (exposition.includes('compact')) {
+    handlerGroups.push(new CompactHandlersGroup(baseContext));
   }
   if (exposition.includes('low')) {
     handlerGroups.push(new LowLevelHandlersGroup(baseContext));

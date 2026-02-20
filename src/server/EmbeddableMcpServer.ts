@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import { CompactHandlersGroup } from '../lib/handlers/groups/CompactHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../lib/handlers/groups/HighLevelHandlersGroup.js';
 import { LowLevelHandlersGroup } from '../lib/handlers/groups/LowLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from '../lib/handlers/groups/ReadOnlyHandlersGroup.js';
@@ -42,7 +43,14 @@ export interface EmbeddableMcpServerOptions {
    * Exposition levels to include when creating default registry
    * @default ['readonly', 'high']
    */
-  exposition?: ('readonly' | 'high' | 'low' | 'system' | 'search')[];
+  exposition?: (
+    | 'readonly'
+    | 'high'
+    | 'low'
+    | 'compact'
+    | 'system'
+    | 'search'
+  )[];
 
   /**
    * Server version
@@ -110,7 +118,14 @@ export class EmbeddableMcpServer extends BaseMcpServer {
    * Creates default handlers registry based on exposition levels
    */
   private createDefaultRegistry(
-    exposition: ('readonly' | 'high' | 'low' | 'system' | 'search')[],
+    exposition: (
+      | 'readonly'
+      | 'high'
+      | 'low'
+      | 'compact'
+      | 'system'
+      | 'search'
+    )[],
     logger?: Logger,
   ): IHandlersRegistry {
     // Dummy context - not actually used because BaseMcpServer.registerHandlers()
@@ -127,6 +142,9 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     }
     if (exposition.includes('high')) {
       groups.push(new HighLevelHandlersGroup(dummyContext));
+    }
+    if (exposition.includes('compact')) {
+      groups.push(new CompactHandlersGroup(dummyContext));
     }
     if (exposition.includes('low')) {
       groups.push(new LowLevelHandlersGroup(dummyContext));

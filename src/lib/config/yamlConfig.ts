@@ -15,7 +15,7 @@ export interface YamlConfig {
   unsafe?: boolean;
   'auth-broker'?: boolean;
   'auth-broker-path'?: string;
-  exposition?: string | string[]; // Handler sets: readonly, high, low
+  exposition?: string | string[]; // Handler sets: readonly, high, low, compact
   http?: {
     port?: number;
     host?: string;
@@ -218,7 +218,7 @@ auth-broker: false
 # If not specified, uses platform-specific default paths
 auth-broker-path:
 
-# Handler sets to expose: readonly, high, low
+# Handler sets to expose: readonly, high, low, compact
 # Default: readonly,high
 # Use comma-separated list or YAML array
 exposition: readonly,high

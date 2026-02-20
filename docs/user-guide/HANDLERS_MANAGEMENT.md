@@ -26,11 +26,19 @@ V2 server supports flexible handler set configuration through the `--exposition`
    - System modifications
    - Database operations
 
-4. **search** - Always included automatically
+4. **compact** - Compact facade operations
+   - `HandlerAction`
+   - `HandlerCreate`
+   - `HandlerGet`
+   - `HandlerUpdate`
+   - `HandlerDelete`
+   - Routes by `object_type` (and `action` for non-CRUD) to high-level handlers
+
+5. **search** - Always included automatically
    - Object search
    - Code search
 
-5. **system** - Always included automatically  
+6. **system** - Always included automatically  
    - Where-used analysis (GetWhereUsed)
    - Type information (GetTypeInfo)
    - Object info (GetObjectInfo)
@@ -57,8 +65,11 @@ node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=reado
 # Read-only + high-level writes (recommended)
 node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=readonly,high
 
+# Compact facade only
+node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=compact
+
 # All operations (dangerous, for development only)
-node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=readonly,high,low
+node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=readonly,high,low,compact
 ```
 
 ### Config File
@@ -71,6 +82,7 @@ envFile: .env
 exposition:
   - readonly
   - high
+  - compact
 ```
 
 ### Environment Variable
@@ -164,6 +176,9 @@ if (config.exposition.includes('readonly')) {
 }
 if (config.exposition.includes('high')) {
   handlerGroups.push(new HighLevelHandlersGroup(baseContext));
+}
+if (config.exposition.includes('compact')) {
+  handlerGroups.push(new CompactHandlersGroup(baseContext));
 }
 if (config.exposition.includes('low')) {
   handlerGroups.push(new LowLevelHandlersGroup(baseContext));

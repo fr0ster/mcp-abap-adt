@@ -1,3 +1,4 @@
+import { COMPACT_ACTIONS } from './compactActions';
 import { COMPACT_OBJECT_TYPES } from './compactObjectTypes';
 
 const versionSchema = {
@@ -9,8 +10,7 @@ const versionSchema = {
 const commonObjectTypeSchema = {
   type: 'string',
   enum: COMPACT_OBJECT_TYPES,
-  description:
-    'ABAP object type for routed operation. Current set: CLASS, PROGRAM, DOMAIN, FUNCTION_MODULE.',
+  description: 'ABAP object type for routed compact operation.',
 } as const;
 
 export const compactCreateSchema = {
@@ -49,29 +49,6 @@ export const compactCreateSchema = {
     },
   },
   required: ['object_type'],
-  oneOf: [
-    {
-      properties: { object_type: { const: 'CLASS' } },
-      required: ['object_type', 'class_name', 'package_name'],
-    },
-    {
-      properties: { object_type: { const: 'PROGRAM' } },
-      required: ['object_type', 'program_name', 'package_name'],
-    },
-    {
-      properties: { object_type: { const: 'DOMAIN' } },
-      required: ['object_type', 'domain_name', 'package_name'],
-    },
-    {
-      properties: { object_type: { const: 'FUNCTION_MODULE' } },
-      required: [
-        'object_type',
-        'function_module_name',
-        'function_group_name',
-        'source_code',
-      ],
-    },
-  ],
 } as const;
 
 export const compactGetSchema = {
@@ -86,24 +63,6 @@ export const compactGetSchema = {
     version: versionSchema,
   },
   required: ['object_type'],
-  oneOf: [
-    {
-      properties: { object_type: { const: 'CLASS' } },
-      required: ['object_type', 'class_name'],
-    },
-    {
-      properties: { object_type: { const: 'PROGRAM' } },
-      required: ['object_type', 'program_name'],
-    },
-    {
-      properties: { object_type: { const: 'DOMAIN' } },
-      required: ['object_type', 'domain_name'],
-    },
-    {
-      properties: { object_type: { const: 'FUNCTION_MODULE' } },
-      required: ['object_type', 'function_module_name', 'function_group_name'],
-    },
-  ],
 } as const;
 
 export const compactUpdateSchema = {
@@ -140,29 +99,6 @@ export const compactUpdateSchema = {
     },
   },
   required: ['object_type'],
-  oneOf: [
-    {
-      properties: { object_type: { const: 'CLASS' } },
-      required: ['object_type', 'class_name', 'source_code'],
-    },
-    {
-      properties: { object_type: { const: 'PROGRAM' } },
-      required: ['object_type', 'program_name', 'source_code'],
-    },
-    {
-      properties: { object_type: { const: 'DOMAIN' } },
-      required: ['object_type', 'domain_name', 'package_name'],
-    },
-    {
-      properties: { object_type: { const: 'FUNCTION_MODULE' } },
-      required: [
-        'object_type',
-        'function_module_name',
-        'function_group_name',
-        'source_code',
-      ],
-    },
-  ],
 } as const;
 
 export const compactDeleteSchema = {
@@ -177,22 +113,77 @@ export const compactDeleteSchema = {
     transport_request: { type: 'string' },
   },
   required: ['object_type'],
-  oneOf: [
-    {
-      properties: { object_type: { const: 'CLASS' } },
-      required: ['object_type', 'class_name'],
+} as const;
+
+export const compactActionSchema = {
+  type: 'object',
+  properties: {
+    object_type: commonObjectTypeSchema,
+    action: {
+      type: 'string',
+      enum: COMPACT_ACTIONS,
+      description:
+        'Action route to run for selected object_type (run/status/result/validate/list_types/create_transport).',
     },
-    {
-      properties: { object_type: { const: 'PROGRAM' } },
-      required: ['object_type', 'program_name'],
+    tests: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          container_class: { type: 'string' },
+          test_class: { type: 'string' },
+        },
+        required: ['container_class', 'test_class'],
+      },
     },
-    {
-      properties: { object_type: { const: 'DOMAIN' } },
-      required: ['object_type', 'domain_name'],
+    run_id: { type: 'string' },
+    with_long_polling: { type: 'boolean' },
+    with_navigation_uris: { type: 'boolean' },
+    format: {
+      type: 'string',
+      enum: ['abapunit', 'junit'],
     },
-    {
-      properties: { object_type: { const: 'FUNCTION_MODULE' } },
-      required: ['object_type', 'function_module_name', 'function_group_name'],
+    response_format: {
+      type: 'string',
+      enum: ['xml', 'json', 'plain'],
     },
-  ],
+    service_binding_name: { type: 'string' },
+    service_definition_name: { type: 'string' },
+    service_binding_version: { type: 'string' },
+    package_name: { type: 'string' },
+    description: { type: 'string' },
+    transport_type: {
+      type: 'string',
+      enum: ['workbench', 'customizing'],
+    },
+    target_system: { type: 'string' },
+    owner: { type: 'string' },
+    title: { type: 'string' },
+    context: { type: 'string' },
+    scope: {
+      type: 'object',
+      properties: {
+        own_tests: { type: 'boolean' },
+        foreign_tests: { type: 'boolean' },
+        add_foreign_tests_as_preview: { type: 'boolean' },
+      },
+    },
+    risk_level: {
+      type: 'object',
+      properties: {
+        harmless: { type: 'boolean' },
+        dangerous: { type: 'boolean' },
+        critical: { type: 'boolean' },
+      },
+    },
+    duration: {
+      type: 'object',
+      properties: {
+        short: { type: 'boolean' },
+        medium: { type: 'boolean' },
+        long: { type: 'boolean' },
+      },
+    },
+  },
+  required: ['object_type', 'action'],
 } as const;

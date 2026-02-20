@@ -158,7 +158,7 @@ export class ServerConfigManager {
 
   /**
    * Parse handler exposition from command line
-   * Format: --exposition=readonly,high,low
+   * Format: --exposition=readonly,high,low,compact
    */
   private parseExposition(): HandlerSet[] {
     const value = ArgumentsParser.getArgument('--exposition');
@@ -168,7 +168,8 @@ export class ServerConfigManager {
       .split(',')
       .map((s) => s.trim())
       .filter(
-        (s): s is HandlerSet => s === 'readonly' || s === 'high' || s === 'low',
+        (s): s is HandlerSet =>
+          s === 'readonly' || s === 'high' || s === 'low' || s === 'compact',
       );
   }
 
@@ -183,7 +184,7 @@ export class ServerConfigManager {
     return `
 HANDLER EXPOSITION:
   --exposition=<sets>              Comma-separated handler sets to expose
-                                   Options: readonly, high, low
+                                   Options: readonly, high, low, compact
                                    Default: readonly,high
 
                                    Handler Sets:
@@ -194,6 +195,9 @@ HANDLER EXPOSITION:
                                                (safe create/update via ADT)
                                    - low:      Update*Low, Delete*, Activate*
                                                (direct/dangerous operations)
+                                   - compact:  HandlerCreate, HandlerGet,
+                                               HandlerUpdate, HandlerDelete
+                                               (object_type-routed facade)
                                    - search:   SearchObject (included with readonly)
                                    - system:   GetWhereUsed, GetTypeInfo, GetObjectInfo,
                                                GetAbapAST, GetSession, etc.
@@ -203,6 +207,7 @@ HANDLER EXPOSITION:
                                    --exposition=readonly       (readonly + search + system)
                                    --exposition=readonly,high  (readonly + high + search + system)
                                    --exposition=high           (high only, NO search/system)
+                                   --exposition=compact        (compact facade only)
                                    --exposition=readonly,high,low (all handlers)
 
                                    For details: docs/user-guide/HANDLERS_MANAGEMENT.md

@@ -9,7 +9,7 @@ import type { TransportConfig } from '../utils.js';
 export type Transport = 'stdio' | 'sse' | 'http';
 
 /** Handler set for exposition control */
-export type HandlerSet = 'readonly' | 'high' | 'low';
+export type HandlerSet = 'readonly' | 'high' | 'low' | 'compact';
 
 export interface IServerConfig {
   // ============================================================================

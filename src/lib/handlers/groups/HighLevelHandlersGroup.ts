@@ -111,6 +111,22 @@ import {
   TOOL_DEFINITION as UpdateLocalTypes_Tool,
 } from '../../../handlers/class/high/handleUpdateLocalTypes';
 import {
+  TOOL_DEFINITION as CompactCreate_Tool,
+  handleCompactCreate,
+} from '../../../handlers/compact/high/handleCompactCreate';
+import {
+  TOOL_DEFINITION as CompactDelete_Tool,
+  handleCompactDelete,
+} from '../../../handlers/compact/high/handleCompactDelete';
+import {
+  TOOL_DEFINITION as CompactGet_Tool,
+  handleCompactGet,
+} from '../../../handlers/compact/high/handleCompactGet';
+import {
+  TOOL_DEFINITION as CompactUpdate_Tool,
+  handleCompactUpdate,
+} from '../../../handlers/compact/high/handleCompactUpdate';
+import {
   TOOL_DEFINITION as CreateDataElement_Tool,
   handleCreateDataElement,
 } from '../../../handlers/data_element/high/handleCreateDataElement';
@@ -397,6 +413,38 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
     };
 
     return [
+      {
+        toolDefinition: {
+          name: CompactCreate_Tool.name,
+          description: CompactCreate_Tool.description,
+          inputSchema: CompactCreate_Tool.inputSchema,
+        },
+        handler: withContext(handleCompactCreate),
+      },
+      {
+        toolDefinition: {
+          name: CompactGet_Tool.name,
+          description: CompactGet_Tool.description,
+          inputSchema: CompactGet_Tool.inputSchema,
+        },
+        handler: withContext(handleCompactGet),
+      },
+      {
+        toolDefinition: {
+          name: CompactUpdate_Tool.name,
+          description: CompactUpdate_Tool.description,
+          inputSchema: CompactUpdate_Tool.inputSchema,
+        },
+        handler: withContext(handleCompactUpdate),
+      },
+      {
+        toolDefinition: {
+          name: CompactDelete_Tool.name,
+          description: CompactDelete_Tool.description,
+          inputSchema: CompactDelete_Tool.inputSchema,
+        },
+        handler: withContext(handleCompactDelete),
+      },
       {
         toolDefinition: {
           name: CreatePackage_Tool.name,

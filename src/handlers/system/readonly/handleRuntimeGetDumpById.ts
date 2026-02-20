@@ -1,9 +1,6 @@
+import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
-import {
-  type RuntimeDumpView,
-  readRuntimeDumpByIdCompat,
-} from './runtimeDumpReadCompat';
 import { parseRuntimePayloadToJson } from './runtimePayloadParser';
 
 export const TOOL_DEFINITION = {
@@ -32,7 +29,7 @@ export const TOOL_DEFINITION = {
 
 interface RuntimeGetDumpByIdArgs {
   dump_id: string;
-  view?: RuntimeDumpView;
+  view?: 'default' | 'summary' | 'formatted';
 }
 
 export async function handleRuntimeGetDumpById(
@@ -47,12 +44,10 @@ export async function handleRuntimeGetDumpById(
     }
 
     const view = args.view ?? 'default';
-    const response = await readRuntimeDumpByIdCompat(
-      connection,
-      logger,
-      args.dump_id,
+    const runtimeClient = new AdtRuntimeClient(connection, logger);
+    const response = await runtimeClient.getRuntimeDumpById(args.dump_id, {
       view,
-    );
+    });
 
     return return_response({
       data: JSON.stringify(

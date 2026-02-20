@@ -192,6 +192,42 @@ get_abap_semantic_analysis:
           lv_count = 42.
           lv_name = 'Test'.
 
+# Runtime Read-Only Handlers (Profiling + Dumps)
+runtime_readonly_handlers:
+  test_cases:
+    - name: "test_runtime_readonly"
+      enabled: false
+      description: "Runtime profiling and dumps handlers integration tests"
+      params:
+        # Required: class that supports ADT classrun in your system
+        profiled_class_name: "<YOUR_CLASSRUN_CLASS_NAME>"
+        # Prefix for temporary class created by profiling test
+        profiled_class_prefix: "ZADT_RTCLS"
+        # Optional: on-prem only. Skipped on ABAP Cloud.
+        profiled_program_name: "<YOUR_EXECUTABLE_PROGRAM_NAME>"
+        # Prefix for temporary program created by profiling test (on-prem only)
+        profiled_program_prefix: "ZADT_RTPRG"
+        # Optional fallback trace id/uri
+        trace_id_or_uri: ""
+        trace_feed_retries: 6
+        trace_feed_retry_delay_ms: 1000
+        trace_read_retries: 6
+        trace_read_retry_delay_ms: 1500
+        # Optional user filter for dumps; empty = all users
+        dumps_user: ""
+        dumps_read_limit: 5
+        # Prefix for temporary class that forces runtime dump (division by zero)
+        dump_class_prefix: "ZADT_RTDMP"
+        # Retries for dump feed lookup after forced failure
+        dump_feed_retries: 8
+        dump_feed_retry_delay_ms: 1500
+        # How many recent dumps to request per poll when looking for generated dump
+        dump_feed_top: 50
+        # Dump read view for RuntimeGetDumpById/RuntimeAnalyzeDump: default|summary|formatted
+        dump_view: "default"
+        # Recommended fallback dump ID to avoid skip when feed is empty
+        dump_id: ""
+
 # Environment Configuration
 # These values can be overridden by environment variables
 environment:

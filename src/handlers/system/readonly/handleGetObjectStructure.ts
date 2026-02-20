@@ -76,17 +76,28 @@ function serializeTree(
 
 export async function handleGetObjectStructure(
   context: HandlerContext,
-  args: { objecttype: string; objectname: string },
+  args: {
+    objecttype?: string;
+    objectname?: string;
+    object_type?: string;
+    object_name?: string;
+  },
 ) {
   const { connection, logger } = context;
   try {
+    const objectType = args.objecttype ?? args.object_type;
+    const objectName = args.objectname ?? args.object_name;
+    if (!objectType || !objectName) {
+      throw new Error(
+        'objecttype/objectname (or object_type/object_name) are required',
+      );
+    }
+
     const client = new AdtClient(connection, logger);
     const response = await client
       .getUtils()
-      .getObjectStructure(args.objecttype, args.objectname);
-    logger?.info(
-      `Fetched object structure for ${args.objecttype}/${args.objectname}`,
-    );
+      .getObjectStructure(objectType, objectName);
+    logger?.info(`Fetched object structure for ${objectType}/${objectName}`);
 
     // Parse XML response
     const parser = new XMLParser({
@@ -130,7 +141,7 @@ export async function handleGetObjectStructure(
     };
   } catch (error) {
     logger?.error(
-      `Failed to fetch object structure for ${args?.objecttype}/${args?.objectname}`,
+      `Failed to fetch object structure for ${args?.objecttype ?? args?.object_type}/${args?.objectname ?? args?.object_name}`,
       error,
     );
     return {

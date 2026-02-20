@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [2.4.2] - 2026-02-20
+### Added
+- **Service Binding high-level tools**:
+  - Added `CreateServiceBinding`, `GetServiceBinding`, `UpdateServiceBinding`, `DeleteServiceBinding`, `ListServiceBindingTypes`, `ValidateServiceBinding`.
+  - Added `serviceBindingPayloadUtils` for response parsing/format normalization.
+- **Runtime profiling tools**:
+  - Added `RuntimeAnalyzeProfilerTrace`, `RuntimeRunClassWithProfiling`, `RuntimeRunProgramWithProfiling`.
+
+### Changed
+- **System read-only handlers**:
+  - Migrated `GetAllTypes`, `GetObjectStructure`, and `GetSqlQuery` to `AdtClient` flow.
+- **Lint/type hygiene**:
+  - Removed explicit `any` usage in new service binding/runtime handlers and high-level handler registrations.
+
 ## [2.4.1] - 2026-02-17
 ### Fixed
 - **Dev HTTP/SSE launch scripts**:

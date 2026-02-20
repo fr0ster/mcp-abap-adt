@@ -390,6 +390,12 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
    * Gets all high-level handler entries
    */
   getHandlers(): HandlerEntry[] {
+    const withContext = <TArgs, TResult>(
+      handler: (context: typeof this.context, args: TArgs) => TResult,
+    ) => {
+      return (args: unknown) => handler(this.context, args as TArgs);
+    };
+
     return [
       {
         toolDefinition: {
@@ -397,7 +403,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreatePackage_Tool.description,
           inputSchema: CreatePackage_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleCreatePackage(this.context, args),
+        handler: withContext(handleCreatePackage),
       },
       {
         toolDefinition: {
@@ -405,7 +411,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetPackage_Tool.description,
           inputSchema: GetPackage_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetPackage(this.context, args),
+        handler: withContext(handleGetPackage),
       },
       {
         toolDefinition: {
@@ -413,7 +419,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateDomain_Tool.description,
           inputSchema: CreateDomain_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleCreateDomain(this.context, args),
+        handler: withContext(handleCreateDomain),
       },
       {
         toolDefinition: {
@@ -421,7 +427,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetDomain_Tool.description,
           inputSchema: GetDomain_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetDomain(this.context, args),
+        handler: withContext(handleGetDomain),
       },
       {
         toolDefinition: {
@@ -429,7 +435,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateDomainHigh_Tool.description,
           inputSchema: UpdateDomainHigh_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleUpdateDomainHigh(this.context, args),
+        handler: withContext(handleUpdateDomainHigh),
       },
       {
         toolDefinition: {
@@ -437,7 +443,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteDomain_Tool.description,
           inputSchema: DeleteDomain_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleDeleteDomain(this.context, args),
+        handler: withContext(handleDeleteDomain),
       },
       {
         toolDefinition: {
@@ -445,7 +451,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateDataElement_Tool.description,
           inputSchema: CreateDataElement_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleCreateDataElement(this.context, args),
+        handler: withContext(handleCreateDataElement),
       },
       {
         toolDefinition: {
@@ -453,7 +459,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetDataElement_Tool.description,
           inputSchema: GetDataElement_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetDataElement(this.context, args),
+        handler: withContext(handleGetDataElement),
       },
       {
         toolDefinition: {
@@ -461,8 +467,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateDataElementHigh_Tool.description,
           inputSchema: UpdateDataElementHigh_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleUpdateDataElementHigh(this.context, args),
+        handler: withContext(handleUpdateDataElementHigh),
       },
       {
         toolDefinition: {
@@ -470,7 +475,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteDataElement_Tool.description,
           inputSchema: DeleteDataElement_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleDeleteDataElement(this.context, args),
+        handler: withContext(handleDeleteDataElement),
       },
       {
         toolDefinition: {
@@ -478,7 +483,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateTransport_Tool.description,
           inputSchema: CreateTransport_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleCreateTransport(this.context, args),
+        handler: withContext(handleCreateTransport),
       },
       {
         toolDefinition: {
@@ -486,7 +491,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateTable_Tool.description,
           inputSchema: CreateTable_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleCreateTable(this.context, args),
+        handler: withContext(handleCreateTable),
       },
       {
         toolDefinition: {
@@ -494,7 +499,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetTable_Tool.description,
           inputSchema: GetTable_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetTable(this.context, args),
+        handler: withContext(handleGetTable),
       },
       {
         toolDefinition: {
@@ -502,7 +507,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateTableHigh_Tool.description,
           inputSchema: UpdateTableHigh_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleUpdateTableHigh(this.context, args),
+        handler: withContext(handleUpdateTableHigh),
       },
       {
         toolDefinition: {
@@ -510,7 +515,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteTable_Tool.description,
           inputSchema: DeleteTable_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleDeleteTable(this.context, args),
+        handler: withContext(handleDeleteTable),
       },
       {
         toolDefinition: {
@@ -518,7 +523,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateStructure_Tool.description,
           inputSchema: CreateStructure_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleCreateStructure(this.context, args),
+        handler: withContext(handleCreateStructure),
       },
       {
         toolDefinition: {
@@ -526,7 +531,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetStructure_Tool.description,
           inputSchema: GetStructure_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetStructure(this.context, args),
+        handler: withContext(handleGetStructure),
       },
       {
         toolDefinition: {
@@ -534,8 +539,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateStructureHigh_Tool.description,
           inputSchema: UpdateStructureHigh_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleUpdateStructureHigh(this.context, args),
+        handler: withContext(handleUpdateStructureHigh),
       },
       {
         toolDefinition: {
@@ -543,7 +547,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteStructure_Tool.description,
           inputSchema: DeleteStructure_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleDeleteStructure(this.context, args),
+        handler: withContext(handleDeleteStructure),
       },
       {
         toolDefinition: {
@@ -551,7 +555,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateView_Tool.description,
           inputSchema: CreateView_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleCreateView(this.context, args),
+        handler: withContext(handleCreateView),
       },
       {
         toolDefinition: {
@@ -559,7 +563,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetView_Tool.description,
           inputSchema: GetView_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetView(this.context, args),
+        handler: withContext(handleGetView),
       },
       {
         toolDefinition: {
@@ -567,7 +571,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateViewHigh_Tool.description,
           inputSchema: UpdateViewHigh_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleUpdateViewHigh(this.context, args),
+        handler: withContext(handleUpdateViewHigh),
       },
       {
         toolDefinition: {
@@ -575,7 +579,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteView_Tool.description,
           inputSchema: DeleteView_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleDeleteView(this.context, args),
+        handler: withContext(handleDeleteView),
       },
       {
         toolDefinition: {
@@ -583,8 +587,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateServiceDefinition_Tool.description,
           inputSchema: CreateServiceDefinition_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleCreateServiceDefinition(this.context, args),
+        handler: withContext(handleCreateServiceDefinition),
       },
       {
         toolDefinition: {
@@ -592,8 +595,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetServiceDefinition_Tool.description,
           inputSchema: GetServiceDefinition_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleGetServiceDefinition(this.context, args),
+        handler: withContext(handleGetServiceDefinition),
       },
       {
         toolDefinition: {
@@ -601,8 +603,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateServiceDefinition_Tool.description,
           inputSchema: UpdateServiceDefinition_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleUpdateServiceDefinition(this.context, args),
+        handler: withContext(handleUpdateServiceDefinition),
       },
       {
         toolDefinition: {
@@ -610,8 +611,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteServiceDefinition_Tool.description,
           inputSchema: DeleteServiceDefinition_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleDeleteServiceDefinition(this.context, args),
+        handler: withContext(handleDeleteServiceDefinition),
       },
       {
         toolDefinition: {
@@ -619,8 +619,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateServiceBinding_Tool.description,
           inputSchema: CreateServiceBinding_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleCreateServiceBinding(this.context, args),
+        handler: withContext(handleCreateServiceBinding),
       },
       {
         toolDefinition: {
@@ -628,8 +627,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: ListServiceBindingTypes_Tool.description,
           inputSchema: ListServiceBindingTypes_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleListServiceBindingTypes(this.context, args),
+        handler: withContext(handleListServiceBindingTypes),
       },
       {
         toolDefinition: {
@@ -637,7 +635,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetServiceBinding_Tool.description,
           inputSchema: GetServiceBinding_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetServiceBinding(this.context, args),
+        handler: withContext(handleGetServiceBinding),
       },
       {
         toolDefinition: {
@@ -645,8 +643,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateServiceBinding_Tool.description,
           inputSchema: UpdateServiceBinding_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleUpdateServiceBinding(this.context, args),
+        handler: withContext(handleUpdateServiceBinding),
       },
       {
         toolDefinition: {
@@ -654,8 +651,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: ValidateServiceBinding_Tool.description,
           inputSchema: ValidateServiceBinding_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleValidateServiceBinding(this.context, args),
+        handler: withContext(handleValidateServiceBinding),
       },
       {
         toolDefinition: {
@@ -663,8 +659,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteServiceBinding_Tool.description,
           inputSchema: DeleteServiceBinding_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleDeleteServiceBinding(this.context, args),
+        handler: withContext(handleDeleteServiceBinding),
       },
       {
         toolDefinition: {
@@ -672,7 +667,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetClass_Tool.description,
           inputSchema: GetClass_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetClass(this.context, args),
+        handler: withContext(handleGetClass),
       },
       {
         toolDefinition: {
@@ -680,7 +675,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateClass_Tool.description,
           inputSchema: CreateClass_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleCreateClass(this.context, args),
+        handler: withContext(handleCreateClass),
       },
       {
         toolDefinition: {
@@ -688,7 +683,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateClassHigh_Tool.description,
           inputSchema: UpdateClassHigh_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleUpdateClassHigh(this.context, args),
+        handler: withContext(handleUpdateClassHigh),
       },
       {
         toolDefinition: {
@@ -696,7 +691,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteClass_Tool.description,
           inputSchema: DeleteClass_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleDeleteClass(this.context, args),
+        handler: withContext(handleDeleteClass),
       },
       {
         toolDefinition: {
@@ -704,7 +699,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateUnitTest_Tool.description,
           inputSchema: CreateUnitTest_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleCreateUnitTest(this.context, args),
+        handler: withContext(handleCreateUnitTest),
       },
       {
         toolDefinition: {
@@ -712,7 +707,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: RunUnitTest_Tool.description,
           inputSchema: RunUnitTest_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleRunUnitTest(this.context, args),
+        handler: withContext(handleRunUnitTest),
       },
       {
         toolDefinition: {
@@ -720,7 +715,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetUnitTest_Tool.description,
           inputSchema: GetUnitTest_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetUnitTest(this.context, args),
+        handler: withContext(handleGetUnitTest),
       },
       {
         toolDefinition: {
@@ -728,7 +723,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetUnitTestStatus_Tool.description,
           inputSchema: GetUnitTestStatus_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetUnitTestStatus(this.context, args),
+        handler: withContext(handleGetUnitTestStatus),
       },
       {
         toolDefinition: {
@@ -736,7 +731,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetUnitTestResult_Tool.description,
           inputSchema: GetUnitTestResult_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetUnitTestResult(this.context, args),
+        handler: withContext(handleGetUnitTestResult),
       },
       {
         toolDefinition: {
@@ -744,7 +739,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateUnitTest_Tool.description,
           inputSchema: UpdateUnitTest_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleUpdateUnitTest(this.context, args),
+        handler: withContext(handleUpdateUnitTest),
       },
       {
         toolDefinition: {
@@ -752,7 +747,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteUnitTest_Tool.description,
           inputSchema: DeleteUnitTest_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleDeleteUnitTest(this.context, args),
+        handler: withContext(handleDeleteUnitTest),
       },
       {
         toolDefinition: {
@@ -760,7 +755,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateCdsUnitTest_Tool.description,
           inputSchema: CreateCdsUnitTest_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleCreateCdsUnitTest(this.context, args),
+        handler: withContext(handleCreateCdsUnitTest),
       },
       {
         toolDefinition: {
@@ -768,7 +763,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetCdsUnitTest_Tool.description,
           inputSchema: GetCdsUnitTest_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetCdsUnitTest(this.context, args),
+        handler: withContext(handleGetCdsUnitTest),
       },
       {
         toolDefinition: {
@@ -776,8 +771,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetCdsUnitTestStatus_Tool.description,
           inputSchema: GetCdsUnitTestStatus_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleGetCdsUnitTestStatus(this.context, args),
+        handler: withContext(handleGetCdsUnitTestStatus),
       },
       {
         toolDefinition: {
@@ -785,8 +779,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetCdsUnitTestResult_Tool.description,
           inputSchema: GetCdsUnitTestResult_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleGetCdsUnitTestResult(this.context, args),
+        handler: withContext(handleGetCdsUnitTestResult),
       },
       {
         toolDefinition: {
@@ -794,7 +787,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateCdsUnitTest_Tool.description,
           inputSchema: UpdateCdsUnitTest_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleUpdateCdsUnitTest(this.context, args),
+        handler: withContext(handleUpdateCdsUnitTest),
       },
       {
         toolDefinition: {
@@ -802,7 +795,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteCdsUnitTest_Tool.description,
           inputSchema: DeleteCdsUnitTest_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleDeleteCdsUnitTest(this.context, args),
+        handler: withContext(handleDeleteCdsUnitTest),
       },
       {
         toolDefinition: {
@@ -810,7 +803,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetLocalTestClass_Tool.description,
           inputSchema: GetLocalTestClass_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetLocalTestClass(this.context, args),
+        handler: withContext(handleGetLocalTestClass),
       },
       {
         toolDefinition: {
@@ -818,8 +811,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateLocalTestClass_Tool.description,
           inputSchema: CreateLocalTestClass_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleCreateLocalTestClass(this.context, args),
+        handler: withContext(handleCreateLocalTestClass),
       },
       {
         toolDefinition: {
@@ -827,8 +819,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateLocalTestClass_Tool.description,
           inputSchema: UpdateLocalTestClass_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleUpdateLocalTestClass(this.context, args),
+        handler: withContext(handleUpdateLocalTestClass),
       },
       {
         toolDefinition: {
@@ -836,8 +827,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteLocalTestClass_Tool.description,
           inputSchema: DeleteLocalTestClass_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleDeleteLocalTestClass(this.context, args),
+        handler: withContext(handleDeleteLocalTestClass),
       },
       {
         toolDefinition: {
@@ -845,7 +835,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetLocalTypes_Tool.description,
           inputSchema: GetLocalTypes_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetLocalTypes(this.context, args),
+        handler: withContext(handleGetLocalTypes),
       },
       {
         toolDefinition: {
@@ -853,7 +843,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateLocalTypes_Tool.description,
           inputSchema: CreateLocalTypes_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleCreateLocalTypes(this.context, args),
+        handler: withContext(handleCreateLocalTypes),
       },
       {
         toolDefinition: {
@@ -861,7 +851,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateLocalTypes_Tool.description,
           inputSchema: UpdateLocalTypes_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleUpdateLocalTypes(this.context, args),
+        handler: withContext(handleUpdateLocalTypes),
       },
       {
         toolDefinition: {
@@ -869,7 +859,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteLocalTypes_Tool.description,
           inputSchema: DeleteLocalTypes_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleDeleteLocalTypes(this.context, args),
+        handler: withContext(handleDeleteLocalTypes),
       },
       {
         toolDefinition: {
@@ -877,8 +867,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetLocalDefinitions_Tool.description,
           inputSchema: GetLocalDefinitions_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleGetLocalDefinitions(this.context, args),
+        handler: withContext(handleGetLocalDefinitions),
       },
       {
         toolDefinition: {
@@ -886,8 +875,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateLocalDefinitions_Tool.description,
           inputSchema: CreateLocalDefinitions_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleCreateLocalDefinitions(this.context, args),
+        handler: withContext(handleCreateLocalDefinitions),
       },
       {
         toolDefinition: {
@@ -895,8 +883,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateLocalDefinitions_Tool.description,
           inputSchema: UpdateLocalDefinitions_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleUpdateLocalDefinitions(this.context, args),
+        handler: withContext(handleUpdateLocalDefinitions),
       },
       {
         toolDefinition: {
@@ -904,8 +891,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteLocalDefinitions_Tool.description,
           inputSchema: DeleteLocalDefinitions_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleDeleteLocalDefinitions(this.context, args),
+        handler: withContext(handleDeleteLocalDefinitions),
       },
       {
         toolDefinition: {
@@ -913,7 +899,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetLocalMacros_Tool.description,
           inputSchema: GetLocalMacros_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetLocalMacros(this.context, args),
+        handler: withContext(handleGetLocalMacros),
       },
       {
         toolDefinition: {
@@ -921,7 +907,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateLocalMacros_Tool.description,
           inputSchema: CreateLocalMacros_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleCreateLocalMacros(this.context, args),
+        handler: withContext(handleCreateLocalMacros),
       },
       {
         toolDefinition: {
@@ -929,7 +915,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateLocalMacros_Tool.description,
           inputSchema: UpdateLocalMacros_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleUpdateLocalMacros(this.context, args),
+        handler: withContext(handleUpdateLocalMacros),
       },
       {
         toolDefinition: {
@@ -937,7 +923,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteLocalMacros_Tool.description,
           inputSchema: DeleteLocalMacros_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleDeleteLocalMacros(this.context, args),
+        handler: withContext(handleDeleteLocalMacros),
       },
       {
         toolDefinition: {
@@ -945,7 +931,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateProgram_Tool.description,
           inputSchema: CreateProgram_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleCreateProgram(this.context, args),
+        handler: withContext(handleCreateProgram),
       },
       {
         toolDefinition: {
@@ -953,7 +939,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetProgram_Tool.description,
           inputSchema: GetProgram_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetProgram(this.context, args),
+        handler: withContext(handleGetProgram),
       },
       {
         toolDefinition: {
@@ -961,7 +947,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateProgramHigh_Tool.description,
           inputSchema: UpdateProgramHigh_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleUpdateProgramHigh(this.context, args),
+        handler: withContext(handleUpdateProgramHigh),
       },
       {
         toolDefinition: {
@@ -969,7 +955,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteProgram_Tool.description,
           inputSchema: DeleteProgram_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleDeleteProgram(this.context, args),
+        handler: withContext(handleDeleteProgram),
       },
       {
         toolDefinition: {
@@ -977,7 +963,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateInterface_Tool.description,
           inputSchema: CreateInterface_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleCreateInterface(this.context, args),
+        handler: withContext(handleCreateInterface),
       },
       {
         toolDefinition: {
@@ -985,7 +971,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetInterface_Tool.description,
           inputSchema: GetInterface_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetInterface(this.context, args),
+        handler: withContext(handleGetInterface),
       },
       {
         toolDefinition: {
@@ -993,8 +979,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateInterfaceHigh_Tool.description,
           inputSchema: UpdateInterfaceHigh_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleUpdateInterfaceHigh(this.context, args),
+        handler: withContext(handleUpdateInterfaceHigh),
       },
       {
         toolDefinition: {
@@ -1002,7 +987,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteInterface_Tool.description,
           inputSchema: DeleteInterface_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleDeleteInterface(this.context, args),
+        handler: withContext(handleDeleteInterface),
       },
       {
         toolDefinition: {
@@ -1010,8 +995,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateFunctionGroup_Tool.description,
           inputSchema: CreateFunctionGroup_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleCreateFunctionGroup(this.context, args),
+        handler: withContext(handleCreateFunctionGroup),
       },
       {
         toolDefinition: {
@@ -1019,7 +1003,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetFunctionGroup_Tool.description,
           inputSchema: GetFunctionGroup_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetFunctionGroup(this.context, args),
+        handler: withContext(handleGetFunctionGroup),
       },
       {
         toolDefinition: {
@@ -1027,8 +1011,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateFunctionGroup_Tool.description,
           inputSchema: UpdateFunctionGroup_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleUpdateFunctionGroup(this.context, args),
+        handler: withContext(handleUpdateFunctionGroup),
       },
       {
         toolDefinition: {
@@ -1036,8 +1019,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteFunctionGroup_Tool.description,
           inputSchema: DeleteFunctionGroup_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleDeleteFunctionGroup(this.context, args),
+        handler: withContext(handleDeleteFunctionGroup),
       },
       {
         toolDefinition: {
@@ -1045,8 +1027,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateFunctionModule_Tool.description,
           inputSchema: CreateFunctionModule_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleCreateFunctionModule(this.context, args),
+        handler: withContext(handleCreateFunctionModule),
       },
       {
         toolDefinition: {
@@ -1054,7 +1035,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetFunctionModule_Tool.description,
           inputSchema: GetFunctionModule_Tool.inputSchema,
         },
-        handler: (args: unknown) => handleGetFunctionModule(this.context, args),
+        handler: withContext(handleGetFunctionModule),
       },
       {
         toolDefinition: {
@@ -1062,8 +1043,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateFunctionModuleHigh_Tool.description,
           inputSchema: UpdateFunctionModuleHigh_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleUpdateFunctionModuleHigh(this.context, args),
+        handler: withContext(handleUpdateFunctionModuleHigh),
       },
       {
         toolDefinition: {
@@ -1071,8 +1051,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteFunctionModule_Tool.description,
           inputSchema: DeleteFunctionModule_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleDeleteFunctionModule(this.context, args),
+        handler: withContext(handleDeleteFunctionModule),
       },
       {
         toolDefinition: {
@@ -1080,8 +1059,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateBdef_Tool.description,
           inputSchema: CreateBdef_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleCreateBehaviorDefinition(this.context, args),
+        handler: withContext(handleCreateBehaviorDefinition),
       },
       {
         toolDefinition: {
@@ -1089,8 +1067,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetBehaviorDefinition_Tool.description,
           inputSchema: GetBehaviorDefinition_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleGetBehaviorDefinition(this.context, args),
+        handler: withContext(handleGetBehaviorDefinition),
       },
       {
         toolDefinition: {
@@ -1098,8 +1075,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateBdef_Tool.description,
           inputSchema: UpdateBdef_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleUpdateBehaviorDefinitionHigh(this.context, args),
+        handler: withContext(handleUpdateBehaviorDefinitionHigh),
       },
       {
         toolDefinition: {
@@ -1107,8 +1083,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteBehaviorDefinition_Tool.description,
           inputSchema: DeleteBehaviorDefinition_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleDeleteBehaviorDefinition(this.context, args),
+        handler: withContext(handleDeleteBehaviorDefinition),
       },
       {
         toolDefinition: {
@@ -1116,8 +1091,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateBehaviorImplementation_Tool.description,
           inputSchema: CreateBehaviorImplementation_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleCreateBehaviorImplementation(this.context, args),
+        handler: withContext(handleCreateBehaviorImplementation),
       },
       {
         toolDefinition: {
@@ -1125,8 +1099,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetBehaviorImplementation_Tool.description,
           inputSchema: GetBehaviorImplementation_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleGetBehaviorImplementation(this.context, args),
+        handler: withContext(handleGetBehaviorImplementation),
       },
       {
         toolDefinition: {
@@ -1134,8 +1107,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateBehaviorImplementation_Tool.description,
           inputSchema: UpdateBehaviorImplementation_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleUpdateBehaviorImplementation(this.context, args),
+        handler: withContext(handleUpdateBehaviorImplementation),
       },
       {
         toolDefinition: {
@@ -1143,8 +1115,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteBehaviorImplementation_Tool.description,
           inputSchema: DeleteBehaviorImplementation_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleDeleteBehaviorImplementation(this.context, args),
+        handler: withContext(handleDeleteBehaviorImplementation),
       },
       {
         toolDefinition: {
@@ -1152,8 +1123,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: CreateDdlx_Tool.description,
           inputSchema: CreateDdlx_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleCreateMetadataExtension(this.context, args),
+        handler: withContext(handleCreateMetadataExtension),
       },
       {
         toolDefinition: {
@@ -1161,8 +1131,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: GetMetadataExtension_Tool.description,
           inputSchema: GetMetadataExtension_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleGetMetadataExtension(this.context, args),
+        handler: withContext(handleGetMetadataExtension),
       },
       {
         toolDefinition: {
@@ -1170,8 +1139,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: UpdateDdlx_Tool.description,
           inputSchema: UpdateDdlx_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleUpdateMetadataExtensionHigh(this.context, args),
+        handler: withContext(handleUpdateMetadataExtensionHigh),
       },
       {
         toolDefinition: {
@@ -1179,8 +1147,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           description: DeleteMetadataExtension_Tool.description,
           inputSchema: DeleteMetadataExtension_Tool.inputSchema,
         },
-        handler: (args: unknown) =>
-          handleDeleteMetadataExtension(this.context, args),
+        handler: withContext(handleDeleteMetadataExtension),
       },
     ];
   }

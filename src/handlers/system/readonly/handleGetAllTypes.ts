@@ -1,14 +1,10 @@
 /**
- * Handler for retrieving all valid ADT object types and validating a type
- *
- * @TODO Migrate to infrastructure module
- * Endpoint: /sap/bc/adt/repository/informationsystem/objecttypes
- * This handler uses makeAdtRequestWithTimeout directly and should be moved to adt-clients infrastructure module
+ * Handler for retrieving all valid ADT object types and validating a type.
  */
 
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { makeAdtRequestWithTimeout } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetAdtTypes',
   description: '[read-only] Retrieve all valid ADT object types.',
@@ -81,13 +77,10 @@ function extractNamedItems(xml: string) {
 export async function handleGetAdtTypes(context: HandlerContext, _args: any) {
   const { connection, logger } = context;
   try {
-    const url = `/sap/bc/adt/repository/informationsystem/objecttypes?maxItemCount=999&name=*&data=usedByProvider`;
-    const response = await makeAdtRequestWithTimeout(
-      connection,
-      url,
-      'GET',
-      'default',
-    );
+    const client = new AdtClient(connection, logger);
+    const response = await client
+      .getUtils()
+      .getAllTypes(999, '*', 'usedByProvider');
     logger?.info('Fetched ADT object types list');
     const items = extractNamedItems(response.data);
     return {

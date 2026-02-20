@@ -17,6 +17,9 @@ export interface LambdaTesterContext {
   connection: AbapConnection;
   session: SessionInfo;
   logger: LoggerWithExtras;
+  authType?: string;
+  connectionSource?: 'auth_broker' | 'env' | 'unknown';
+  isCloudSystem: boolean;
   objectName?: string | null;
   params: any;
   packageName: string;

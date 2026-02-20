@@ -77,6 +77,9 @@ export class LambdaTester {
     let objectName: string | null = null;
     let packageName = '';
     let transportRequest: string | undefined;
+    let authType: string | undefined;
+    let connectionSource: 'auth_broker' | 'env' | 'unknown' = 'unknown';
+    let isCloudSystem = false;
 
     try {
       // Load environment variables
@@ -119,6 +122,11 @@ export class LambdaTester {
       const connectionResult = await createTestConnectionAndSession();
       connection = connectionResult.connection;
       session = connectionResult.session;
+      authType =
+        connectionResult.authType ||
+        ((connection as any)?.getConfig?.()?.authType as string | undefined);
+      connectionSource = connectionResult.connectionSource || 'unknown';
+      isCloudSystem = authType === 'jwt';
 
       // Resolve object name from params
       objectName =
@@ -159,6 +167,9 @@ export class LambdaTester {
         connection,
         session,
         logger,
+        authType,
+        connectionSource,
+        isCloudSystem,
         objectName,
         params: testParams,
         packageName,
@@ -188,6 +199,9 @@ export class LambdaTester {
         connection: connection || ({} as AbapConnection),
         session: session || ({} as SessionInfo),
         logger: errorLogger,
+        authType: undefined,
+        connectionSource: 'unknown',
+        isCloudSystem: false,
         objectName: null,
         params: {},
         packageName: '',

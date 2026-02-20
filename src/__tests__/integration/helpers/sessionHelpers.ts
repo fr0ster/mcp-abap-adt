@@ -228,6 +228,8 @@ async function createConnectionViaBroker(
 export async function createTestConnectionAndSession(): Promise<{
   connection: AbapConnection;
   session: SessionInfo;
+  authType?: string;
+  connectionSource?: 'auth_broker' | 'env' | 'unknown';
 }> {
   // Ensure environment and tokens are loaded (supports auth-broker fallback)
   try {
@@ -262,8 +264,12 @@ export async function createTestConnectionAndSession(): Promise<{
 
     // Try to create connection via AuthBroker first (same approach as index.ts)
     let connection: AbapConnection | null = null;
+    let connectionSource: 'auth_broker' | 'env' | 'unknown' = 'unknown';
     try {
       connection = await createConnectionViaBroker(undefined, envFilePath);
+      if (connection) {
+        connectionSource = 'auth_broker';
+      }
     } catch (brokerError: any) {
       sessionLogger?.debug(
         `[createTestConnectionAndSession] AuthBroker failed: ${brokerError?.message || String(brokerError)}`,
@@ -288,6 +294,7 @@ export async function createTestConnectionAndSession(): Promise<{
 
       // Create connection directly (fallback when AuthBroker is not available)
       connection = createAbapConnection(config, connectionLoggerWithCsrf);
+      connectionSource = 'env';
     }
 
     // Log token info from connection (what's actually used in session)
@@ -378,9 +385,18 @@ export async function createTestConnectionAndSession(): Promise<{
       },
     };
 
+    let authType: string | undefined;
+    try {
+      authType = (connection as any)?.getConfig?.()?.authType;
+    } catch {
+      authType = undefined;
+    }
+
     return {
       connection,
       session,
+      authType,
+      connectionSource,
     };
   } catch (error: any) {
     sessionLogger?.error(

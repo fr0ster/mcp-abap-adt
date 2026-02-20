@@ -572,6 +572,10 @@ export async function preCheckTestParameters(
   superPackage?: string,
   testLabel: string = 'test',
 ): Promise<{ success: boolean; reason?: string }> {
+  const extractStatus = (checkState: any): number | undefined => {
+    return checkState?.checkResult?.status ?? checkState?.status;
+  };
+
   // Pre-check: Verify super package exists (if specified - for package tests)
   if (superPackage && client) {
     try {
@@ -582,8 +586,13 @@ export async function preCheckTestParameters(
         packageName: superPackage,
         superPackage: undefined,
       });
-      if (superPackageCheck?.status !== 200) {
-        const reason = `Super package (parent) ${superPackage} check returned status ${superPackageCheck?.status}. Parent package must exist before creating child package.`;
+      const superPackageStatus = extractStatus(superPackageCheck);
+      if (
+        superPackageStatus !== undefined &&
+        superPackageStatus !== null &&
+        superPackageStatus !== 200
+      ) {
+        const reason = `Super package (parent) ${superPackage} check returned status ${superPackageStatus}. Parent package must exist before creating child package.`;
         configLogger?.error(`❌ ${reason}`);
         return { success: false, reason };
       } else {
@@ -621,8 +630,13 @@ export async function preCheckTestParameters(
         packageName,
         superPackage: undefined,
       });
-      if (packageCheck?.status !== 200) {
-        const reason = `Package ${packageName} check returned status ${packageCheck?.status}. Test may fail.`;
+      const packageStatus = extractStatus(packageCheck);
+      if (
+        packageStatus !== undefined &&
+        packageStatus !== null &&
+        packageStatus !== 200
+      ) {
+        const reason = `Package ${packageName} check returned status ${packageStatus}. Test may fail.`;
         configLogger?.warn(`⚠️  ${reason}`);
         return { success: false, reason };
       } else {

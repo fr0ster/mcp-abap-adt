@@ -24,7 +24,6 @@ import {
   getOperationDelay,
   getSapConfigFromEnv,
   getTimeout,
-  isCloudConnection,
   loadTestEnv,
   preCheckTestParameters,
   resolvePackageName,
@@ -131,7 +130,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
           await connectionAny.connect();
         }
         client = new AdtClient(connection);
-        isCloud = isCloudConnection(); // Uses getManagedConnection internally, but we have separate connection
+        isCloud = config.authType === 'jwt';
 
         // Persist session snapshot for diagnostics
         const sessionState = (connection as any).getSessionState?.();
@@ -232,6 +231,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         client,
         packageName,
         transportRequest,
+        undefined,
         'AdtClient direct test',
       );
       if (!preCheckResult.success) {

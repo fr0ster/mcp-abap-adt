@@ -1,16 +1,7 @@
-/**
- * @TODO Migrate to infrastructure module
- * Endpoint: /sap/bc/adt/datapreview/freestyle
- * This handler uses makeAdtRequestWithTimeout directly and should be moved to adt-clients infrastructure module
- */
-
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  ErrorCode,
-  McpError,
-  makeAdtRequestWithTimeout,
-} from '../../../lib/utils';
+import { ErrorCode, McpError } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetSqlQuery',
@@ -192,19 +183,10 @@ export async function handleGetSqlQuery(context: HandlerContext, args: any) {
 
     logger?.info(`Executing SQL query (rows=${rowNumber})`);
 
-    // Build URL for freestyle data preview with rowNumber parameter
-    const url = `/sap/bc/adt/datapreview/freestyle?rowNumber=${rowNumber}`;
-
-    logger?.debug(`Making SQL query request to: ${url}`);
-
-    // Execute POST request with SQL query in body
-    const response = await makeAdtRequestWithTimeout(
-      connection,
-      url,
-      'POST',
-      'long',
-      sqlQuery,
-    );
+    const client = new AdtClient(connection, logger);
+    const response = await client
+      .getUtils()
+      .getSqlQuery({ sql_query: sqlQuery, row_number: rowNumber });
 
     if (response.status === 200 && response.data) {
       logger?.info('SQL query request completed successfully');

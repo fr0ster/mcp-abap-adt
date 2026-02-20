@@ -67,6 +67,14 @@ import {
   handleGetWhereUsed,
 } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import {
+  handleRuntimeAnalyzeDump,
+  TOOL_DEFINITION as RuntimeAnalyzeDump_Tool,
+} from '../../../handlers/system/readonly/handleRuntimeAnalyzeDump';
+import {
+  handleRuntimeAnalyzeProfilerTrace,
+  TOOL_DEFINITION as RuntimeAnalyzeProfilerTrace_Tool,
+} from '../../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace';
+import {
   handleRuntimeCreateProfilerTraceParameters,
   TOOL_DEFINITION as RuntimeCreateProfilerTraceParameters_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters';
@@ -86,6 +94,14 @@ import {
   handleRuntimeListProfilerTraceFiles,
   TOOL_DEFINITION as RuntimeListProfilerTraceFiles_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles';
+import {
+  handleRuntimeRunClassWithProfiling,
+  TOOL_DEFINITION as RuntimeRunClassWithProfiling_Tool,
+} from '../../../handlers/system/readonly/handleRuntimeRunClassWithProfiling';
+import {
+  handleRuntimeRunProgramWithProfiling,
+  TOOL_DEFINITION as RuntimeRunProgramWithProfiling_Tool,
+} from '../../../handlers/system/readonly/handleRuntimeRunProgramWithProfiling';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';
 
@@ -158,6 +174,41 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
           inputSchema: RuntimeGetDumpById_Tool.inputSchema,
         },
         handler: (args: any) => handleRuntimeGetDumpById(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: RuntimeRunClassWithProfiling_Tool.name,
+          description: RuntimeRunClassWithProfiling_Tool.description,
+          inputSchema: RuntimeRunClassWithProfiling_Tool.inputSchema,
+        },
+        handler: (args: any) =>
+          handleRuntimeRunClassWithProfiling(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: RuntimeRunProgramWithProfiling_Tool.name,
+          description: RuntimeRunProgramWithProfiling_Tool.description,
+          inputSchema: RuntimeRunProgramWithProfiling_Tool.inputSchema,
+        },
+        handler: (args: any) =>
+          handleRuntimeRunProgramWithProfiling(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: RuntimeAnalyzeProfilerTrace_Tool.name,
+          description: RuntimeAnalyzeProfilerTrace_Tool.description,
+          inputSchema: RuntimeAnalyzeProfilerTrace_Tool.inputSchema,
+        },
+        handler: (args: any) =>
+          handleRuntimeAnalyzeProfilerTrace(this.context, args),
+      },
+      {
+        toolDefinition: {
+          name: RuntimeAnalyzeDump_Tool.name,
+          description: RuntimeAnalyzeDump_Tool.description,
+          inputSchema: RuntimeAnalyzeDump_Tool.inputSchema,
+        },
+        handler: (args: any) => handleRuntimeAnalyzeDump(this.context, args),
       },
       {
         toolDefinition: {

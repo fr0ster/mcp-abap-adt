@@ -1,14 +1,10 @@
 /**
- * Handler for retrieving ADT object structure and returning compact JSON tree
- *
- * @TODO Migrate to infrastructure module
- * Endpoint: /sap/bc/adt/repository/objectstructure
- * This handler uses makeAdtRequestWithTimeout directly and should be moved to adt-clients infrastructure module
+ * Handler for retrieving ADT object structure and returning compact JSON tree.
  */
 
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { makeAdtRequestWithTimeout } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetObjectStructure',
   description:
@@ -30,8 +26,21 @@ export const TOOL_DEFINITION = {
 } as const;
 
 // Build nested tree from flat node list (nodeid/parentid)
-function buildNestedTree(flatNodes: any[]) {
-  const nodeMap: Record<string, any> = {};
+interface FlatObjectStructureNode {
+  nodeid: string;
+  parentid?: string;
+  objecttype: string;
+  objectname: string;
+}
+
+interface ObjectStructureTreeNode {
+  objecttype: string;
+  objectname: string;
+  children: ObjectStructureTreeNode[];
+}
+
+function buildNestedTree(flatNodes: FlatObjectStructureNode[]) {
+  const nodeMap: Record<string, ObjectStructureTreeNode> = {};
   flatNodes.forEach((node) => {
     nodeMap[node.nodeid] = {
       objecttype: node.objecttype,
@@ -39,7 +48,7 @@ function buildNestedTree(flatNodes: any[]) {
       children: [],
     };
   });
-  const roots: any[] = [];
+  const roots: ObjectStructureTreeNode[] = [];
   flatNodes.forEach((node) => {
     if (node.parentid && nodeMap[node.parentid]) {
       nodeMap[node.parentid].children.push(nodeMap[node.nodeid]);
@@ -51,7 +60,10 @@ function buildNestedTree(flatNodes: any[]) {
 }
 
 // Serialize tree to MCP-compatible text format ("tree:")
-function serializeTree(tree: any[], indent: string = ''): string {
+function serializeTree(
+  tree: ObjectStructureTreeNode[],
+  indent: string = '',
+): string {
   let result = '';
   for (const node of tree) {
     result += `${indent}- ${node.objecttype}: ${node.objectname}\n`;
@@ -64,17 +76,14 @@ function serializeTree(tree: any[], indent: string = ''): string {
 
 export async function handleGetObjectStructure(
   context: HandlerContext,
-  args: any,
+  args: { objecttype: string; objectname: string },
 ) {
   const { connection, logger } = context;
   try {
-    const url = `/sap/bc/adt/repository/objectstructure?objecttype=${encodeURIComponent(args.objecttype)}&objectname=${encodeURIComponent(args.objectname)}`;
-    const response = await makeAdtRequestWithTimeout(
-      connection,
-      url,
-      'GET',
-      'default',
-    );
+    const client = new AdtClient(connection, logger);
+    const response = await client
+      .getUtils()
+      .getObjectStructure(args.objecttype, args.objectname);
     logger?.info(
       `Fetched object structure for ${args.objecttype}/${args.objectname}`,
     );
@@ -87,8 +96,9 @@ export async function handleGetObjectStructure(
     const parsed = parser.parse(response.data);
 
     // Get flat node list
-    let nodes =
-      parsed['projectexplorer:objectstructure']?.['projectexplorer:node'];
+    let nodes = parsed['projectexplorer:objectstructure']?.[
+      'projectexplorer:node'
+    ] as FlatObjectStructureNode | FlatObjectStructureNode[] | undefined;
     if (!nodes) {
       return {
         isError: true,
@@ -121,7 +131,7 @@ export async function handleGetObjectStructure(
   } catch (error) {
     logger?.error(
       `Failed to fetch object structure for ${args?.objecttype}/${args?.objectname}`,
-      error as any,
+      error,
     );
     return {
       isError: true,

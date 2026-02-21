@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-02-21
+### Changed
+- **Compact handler descriptions**:
+  - Reworked compact handler descriptions to be explicit and deterministic for tool routing.
+  - Added per-`object_type` required parameter mapping directly in handler descriptions (`TYPE(param*)` format).
+  - Clarified read vs validate intent to avoid `HandlerGet` / `HandlerValidate` confusion.
+- **Compact schemas metadata**:
+  - Added missing parameter descriptions in compact schemas to remove `No description` in generated tool docs.
+
+### Documentation
+- Regenerated tools documentation:
+  - `docs/user-guide/AVAILABLE_TOOLS.md`
+  - `docs/user-guide/AVAILABLE_TOOLS_HIGH.md`
+  - `docs/user-guide/AVAILABLE_TOOLS_COMPACT.md`
+
+## [2.5.0] - 2026-02-21
+### Added
+- **Compact facade CRUD routing**:
+  - Added compact facade CRUD operations routed by `object_type`.
+  - Added compact router/matrix coverage for supported object/action combinations.
+- **Compact lifecycle and test handlers**:
+  - Added compact handlers for validation, unlock, and unit test workflows.
+
+### Changed
+- **Compact routing architecture**:
+  - Removed legacy `HandlerAction` path and standardized on dedicated compact handlers.
+
 ## [2.4.2] - 2026-02-20
 ### Added
 - **Service Binding high-level tools**:

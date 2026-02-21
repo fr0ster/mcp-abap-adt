@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: Read-Only
-- Total tools: 32
+- Total tools: 36
 
 ## Navigation
 
@@ -40,11 +40,15 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetTransaction](#gettransaction-read-only-system)
     - [GetTypeInfo](#gettypeinfo-read-only-system)
     - [GetWhereUsed](#getwhereused-read-only-system)
+    - [RuntimeAnalyzeDump](#runtimeanalyzedump-read-only-system)
+    - [RuntimeAnalyzeProfilerTrace](#runtimeanalyzeprofilertrace-read-only-system)
     - [RuntimeCreateProfilerTraceParameters](#runtimecreateprofilertraceparameters-read-only-system)
     - [RuntimeGetDumpById](#runtimegetdumpbyid-read-only-system)
     - [RuntimeGetProfilerTraceData](#runtimegetprofilertracedata-read-only-system)
     - [RuntimeListDumps](#runtimelistdumps-read-only-system)
     - [RuntimeListProfilerTraceFiles](#runtimelistprofilertracefiles-read-only-system)
+    - [RuntimeRunClassWithProfiling](#runtimerunclasswithprofiling-read-only-system)
+    - [RuntimeRunProgramWithProfiling](#runtimerunprogramwithprofiling-read-only-system)
   - [Table](#read-only-table)
     - [GetTableContents](#gettablecontents-read-only-table)
   - [Transport](#read-only-transport)
@@ -174,6 +178,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/search/readonly/handleGetObjectsByType.ts`
 
 **Parameters:**
+- `format` (string, optional) - [read-only] Output format: 
 - `node_id` (string, required) - [read-only] Node ID
 - `parent_name` (string, required) - [read-only] Parent object name
 - `parent_tech_name` (string, required) - [read-only] Parent technical name
@@ -220,7 +225,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `objects` (array, required) - [read-only] Object name (required, must be valid ABAP object name or mask)
-- `type` (string, optional) - [read-only] Optional type (e.g. PROG/P, CLAS/OC, etc.)
 
 ---
 
@@ -303,7 +307,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/readonly/handleGetObjectNodeFromCache.ts`
 
 **Parameters:**
-- None
+- `object_name` (string, required) - [read-only] Object name
+- `object_type` (string, required) - [read-only] Object type
+- `tech_name` (string, required) - [read-only] Technical name
 
 ---
 
@@ -378,6 +384,33 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="runtimeanalyzedump-read-only-system"></a>
+#### RuntimeAnalyzeDump (Read-Only / System)
+**Description:** [runtime] Read runtime dump by ID and return compact analysis summary with key fields.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeAnalyzeDump.ts`
+
+**Parameters:**
+- `dump_id` (string, required) - Runtime dump ID.
+- `include_payload` (boolean, optional (default: true)) - Include full parsed payload in response.
+- `view` (string, optional (default: default)) - Dump view mode to analyze: default payload, summary section, or formatted long text.
+
+---
+
+<a id="runtimeanalyzeprofilertrace-read-only-system"></a>
+#### RuntimeAnalyzeProfilerTrace (Read-Only / System)
+**Description:** [runtime] Read profiler trace view and return compact analysis summary (totals + top entries).
+
+**Source:** `src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts`
+
+**Parameters:**
+- `top` (number, optional) - Number of top rows for summary. Default: 10.
+- `trace_id_or_uri` (string, required) - Profiler trace ID or full trace URI.
+- `view` (string, optional (default: hitlist)) - 
+- `with_system_events` (boolean, optional) - Include system events.
+
+---
+
 <a id="runtimecreateprofilertraceparameters-read-only-system"></a>
 #### RuntimeCreateProfilerTraceParameters (Read-Only / System)
 **Description:** [runtime] Create ABAP profiler trace parameters and return profilerId (URI) for profiled execution.
@@ -385,7 +418,20 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.ts`
 
 **Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
 - `description` (string, required) - Human-readable trace description.
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `sql_trace` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) - 
 
 ---
 
@@ -397,6 +443,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `dump_id` (string, required) - Runtime dump ID (for example: 694AB694097211F1929806D06D234D38).
+- `view` (string, optional (default: default)) - Dump view mode: default payload, summary section, or formatted long text.
 
 ---
 
@@ -442,6 +489,56 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="runtimerunclasswithprofiling-read-only-system"></a>
+#### RuntimeRunClassWithProfiling (Read-Only / System)
+**Description:** [runtime] Execute ABAP class with profiler enabled and return created profilerId + traceId.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeRunClassWithProfiling.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `class_name` (string, required) - ABAP class name to execute.
+- `description` (string, optional) - Profiler trace description.
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `sql_trace` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) - 
+
+---
+
+<a id="runtimerunprogramwithprofiling-read-only-system"></a>
+#### RuntimeRunProgramWithProfiling (Read-Only / System)
+**Description:** [runtime] Execute ABAP program with profiler enabled and return created profilerId + traceId.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeRunProgramWithProfiling.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `description` (string, optional) - Profiler trace description.
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `program_name` (string, required) - ABAP program name to execute.
+- `sql_trace` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) - 
+
+---
+
 <a id="read-only-table"></a>
 ### Read-Only / Table
 
@@ -472,4 +569,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-02-15*
+*Last updated: 2026-02-21*

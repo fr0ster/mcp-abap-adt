@@ -72,6 +72,12 @@ import { handleCreateStructure } from '../../structure/high/handleCreateStructur
 import { handleDeleteStructure } from '../../structure/high/handleDeleteStructure';
 import { handleGetStructure } from '../../structure/high/handleGetStructure';
 import { handleUpdateStructure } from '../../structure/high/handleUpdateStructure';
+import { handleRuntimeGetDumpById } from '../../system/readonly/handleRuntimeGetDumpById';
+import { handleRuntimeGetProfilerTraceData } from '../../system/readonly/handleRuntimeGetProfilerTraceData';
+import { handleRuntimeListDumps } from '../../system/readonly/handleRuntimeListDumps';
+import { handleRuntimeListProfilerTraceFiles } from '../../system/readonly/handleRuntimeListProfilerTraceFiles';
+import { handleRuntimeRunClassWithProfiling } from '../../system/readonly/handleRuntimeRunClassWithProfiling';
+import { handleRuntimeRunProgramWithProfiling } from '../../system/readonly/handleRuntimeRunProgramWithProfiling';
 import { handleCreateTable } from '../../table/high/handleCreateTable';
 import { handleDeleteTable } from '../../table/high/handleDeleteTable';
 import { handleGetTable } from '../../table/high/handleGetTable';
@@ -95,9 +101,12 @@ import { handleDeleteView } from '../../view/high/handleDeleteView';
 import { handleGetView } from '../../view/high/handleGetView';
 import { handleUpdateView } from '../../view/high/handleUpdateView';
 import type { CompactAction } from './compactActions';
+import {
+  COMPACT_ACTION_MATRIX,
+  COMPACT_CRUD_MATRIX,
+  type CompactCrudOperation,
+} from './compactMatrix';
 import type { CompactObjectType } from './compactObjectTypes';
-
-type CompactOperation = 'create' | 'get' | 'update' | 'delete';
 
 type CompactHandler = (
   context: HandlerContext,
@@ -106,7 +115,7 @@ type CompactHandler = (
 
 type CompactRouterMap = Record<
   CompactObjectType,
-  Partial<Record<CompactOperation, CompactHandler>>
+  Partial<Record<CompactCrudOperation, CompactHandler>>
 >;
 
 type CompactActionRouterMap = Record<
@@ -248,6 +257,8 @@ export const compactRouterMap: CompactRouterMap = {
     update: handleUpdateMetadataExtension as unknown as CompactHandler,
     delete: handleDeleteMetadataExtension as unknown as CompactHandler,
   },
+  RUNTIME_PROFILE: {},
+  RUNTIME_DUMP: {},
 };
 
 export const compactActionRouterMap: CompactActionRouterMap = {
@@ -265,7 +276,10 @@ export const compactActionRouterMap: CompactActionRouterMap = {
     list_types: handleListServiceBindingTypes as unknown as CompactHandler,
     validate: handleValidateServiceBinding as unknown as CompactHandler,
   },
-  CLASS: {},
+  CLASS: {
+    runProfiling:
+      handleRuntimeRunClassWithProfiling as unknown as CompactHandler,
+  },
   UNIT_TEST: {
     run: handleRunUnitTest as unknown as CompactHandler,
     status: handleGetUnitTestStatus as unknown as CompactHandler,
@@ -279,26 +293,80 @@ export const compactActionRouterMap: CompactActionRouterMap = {
   LOCAL_TYPES: {},
   LOCAL_DEFINITIONS: {},
   LOCAL_MACROS: {},
-  PROGRAM: {},
+  PROGRAM: {
+    runProfiling:
+      handleRuntimeRunProgramWithProfiling as unknown as CompactHandler,
+  },
   INTERFACE: {},
   FUNCTION_GROUP: {},
   FUNCTION_MODULE: {},
   BEHAVIOR_DEFINITION: {},
   BEHAVIOR_IMPLEMENTATION: {},
   METADATA_EXTENSION: {},
+  RUNTIME_PROFILE: {
+    viewProfiles:
+      handleRuntimeListProfilerTraceFiles as unknown as CompactHandler,
+    viewProfile: handleRuntimeGetProfilerTraceData as unknown as CompactHandler,
+  },
+  RUNTIME_DUMP: {
+    viewDump: handleRuntimeGetDumpById as unknown as CompactHandler,
+    viewDumps: handleRuntimeListDumps as unknown as CompactHandler,
+  },
 };
+
+function validateCompactRouterAgainstMatrix() {
+  for (const [objectType, expectedCrud] of Object.entries(
+    COMPACT_CRUD_MATRIX,
+  )) {
+    const actualCrud = Object.keys(
+      compactRouterMap[objectType as CompactObjectType] || {},
+    ).sort();
+    const expected = [...expectedCrud].sort();
+    if (JSON.stringify(actualCrud) !== JSON.stringify(expected)) {
+      throw new Error(
+        `compactRouterMap mismatch for ${objectType}. Expected CRUD: [${expected.join(', ')}], got: [${actualCrud.join(', ')}]`,
+      );
+    }
+  }
+
+  for (const [objectType, expectedActions] of Object.entries(
+    COMPACT_ACTION_MATRIX,
+  )) {
+    const actualActions = Object.keys(
+      compactActionRouterMap[objectType as CompactObjectType] || {},
+    ).sort();
+    const expected = [...expectedActions].sort();
+    if (JSON.stringify(actualActions) !== JSON.stringify(expected)) {
+      throw new Error(
+        `compactActionRouterMap mismatch for ${objectType}. Expected actions: [${expected.join(', ')}], got: [${actualActions.join(', ')}]`,
+      );
+    }
+  }
+}
+
+validateCompactRouterAgainstMatrix();
 
 export async function routeCompactOperation(
   context: HandlerContext,
-  operation: CompactOperation,
+  operation: CompactCrudOperation,
   args: { object_type: CompactObjectType } & Record<string, unknown>,
 ) {
+  context.logger?.info?.(
+    `[compact-router] route operation=${operation} object_type=${args?.object_type ?? 'undefined'}`,
+  );
+
   if (!args?.object_type) {
+    context.logger?.warn?.(
+      `[compact-router] object_type is required for operation=${operation}`,
+    );
     return return_error(new Error('object_type is required'));
   }
 
   const handler = compactRouterMap[args.object_type]?.[operation];
   if (!handler) {
+    context.logger?.warn?.(
+      `[compact-router] unsupported operation=${operation} object_type=${args.object_type}`,
+    );
     return return_error(
       new Error(
         `Unsupported ${operation} for object_type: ${args.object_type}`,
@@ -314,12 +382,22 @@ export async function routeCompactAction(
   action: CompactAction,
   args: { object_type: CompactObjectType } & Record<string, unknown>,
 ) {
+  context.logger?.info?.(
+    `[compact-router] route action=${action} object_type=${args?.object_type ?? 'undefined'}`,
+  );
+
   if (!args?.object_type) {
+    context.logger?.warn?.(
+      `[compact-router] object_type is required for action=${action}`,
+    );
     return return_error(new Error('object_type is required'));
   }
 
   const handler = compactActionRouterMap[args.object_type]?.[action];
   if (!handler) {
+    context.logger?.warn?.(
+      `[compact-router] unsupported action=${action} object_type=${args.object_type}`,
+    );
     return return_error(
       new Error(
         `Unsupported action ${action} for object_type: ${args.object_type}`,

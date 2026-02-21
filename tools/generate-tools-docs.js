@@ -8,15 +8,26 @@
  * - Hierarchy in output: Group(level) -> Object(folder) -> Tools
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const HANDLERS_ROOT = path.join(__dirname, '../src/handlers');
+const COMPACT_MATRIX_PATH = path.join(
+  __dirname,
+  '../src/handlers/compact/high/compactMatrix.ts',
+);
 const OUTPUT_PATHS = {
   all: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS.md'),
-  readonly: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_READONLY.md'),
+  readonly: path.join(
+    __dirname,
+    '../docs/user-guide/AVAILABLE_TOOLS_READONLY.md',
+  ),
   high: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_HIGH.md'),
   low: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_LOW.md'),
+  compact: path.join(
+    __dirname,
+    '../docs/user-guide/AVAILABLE_TOOLS_COMPACT.md',
+  ),
 };
 const LEVELS = ['readonly', 'high', 'low'];
 
@@ -29,6 +40,7 @@ Scans src/handlers/**/(readonly|high|low)/*.ts and generates:
   docs/user-guide/AVAILABLE_TOOLS_READONLY.md
   docs/user-guide/AVAILABLE_TOOLS_HIGH.md
   docs/user-guide/AVAILABLE_TOOLS_LOW.md
+  docs/user-guide/AVAILABLE_TOOLS_COMPACT.md
 
 Output hierarchy:
   1) Group (level)
@@ -41,7 +53,7 @@ Output hierarchy:
 function titleCaseFolder(folder) {
   return folder
     .split('_')
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 }
 
@@ -84,18 +96,18 @@ function findToolDefinitionBlock(content) {
   let inSingle = false;
   let inDouble = false;
   let inTemplate = false;
-  let escape = false;
+  let isEscaped = false;
 
   for (let i = firstBrace; i < content.length; i++) {
     const ch = content[i];
 
-    if (escape) {
-      escape = false;
+    if (isEscaped) {
+      isEscaped = false;
       continue;
     }
 
     if (ch === '\\') {
-      escape = true;
+      isEscaped = true;
       continue;
     }
 
@@ -149,6 +161,169 @@ function extractInputSchemaBlock(toolBlock) {
   return null;
 }
 
+function extractInputSchemaRef(toolBlock) {
+  const refMatch = toolBlock.match(/inputSchema\s*:\s*([A-Za-z0-9_]+)\b/);
+  return refMatch ? refMatch[1] : null;
+}
+
+function findMatchingBrace(content, openIndex) {
+  let depth = 0;
+  let inSingle = false;
+  let inDouble = false;
+  let inTemplate = false;
+  let isEscaped = false;
+
+  for (let i = openIndex; i < content.length; i++) {
+    const ch = content[i];
+    if (isEscaped) {
+      isEscaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      isEscaped = true;
+      continue;
+    }
+    if (!inDouble && !inTemplate && ch === "'") {
+      inSingle = !inSingle;
+      continue;
+    }
+    if (!inSingle && !inTemplate && ch === '"') {
+      inDouble = !inDouble;
+      continue;
+    }
+    if (!inSingle && !inDouble && ch === '`') {
+      inTemplate = !inTemplate;
+      continue;
+    }
+    if (inSingle || inDouble || inTemplate) continue;
+
+    if (ch === '{') depth++;
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+function extractNamedObjectContent(block, key) {
+  const keyPos = block.indexOf(key);
+  if (keyPos === -1) return null;
+  const open = block.indexOf('{', keyPos);
+  if (open === -1) return null;
+  const close = findMatchingBrace(block, open);
+  if (close === -1) return null;
+  return block.slice(open + 1, close);
+}
+
+function extractTopLevelRequiredArray(block) {
+  const matches = [...block.matchAll(/required\s*:\s*\[([^\]]*)\]/g)];
+  if (matches.length === 0) return [];
+  const raw = matches[matches.length - 1][1];
+  return raw
+    .split(',')
+    .map((s) => s.trim().replace(/['"]/g, ''))
+    .filter(Boolean);
+}
+
+function parseTopLevelProperties(propertiesContent) {
+  const props = {};
+  let i = 0;
+  while (i < propertiesContent.length) {
+    while (
+      i < propertiesContent.length &&
+      /[\s,\n\r\t]/.test(propertiesContent[i])
+    ) {
+      i++;
+    }
+    if (i >= propertiesContent.length) break;
+
+    const keyMatch = propertiesContent.slice(i).match(/^([A-Za-z0-9_]+)/);
+    if (!keyMatch) {
+      i++;
+      continue;
+    }
+    const key = keyMatch[1];
+    i += key.length;
+
+    while (i < propertiesContent.length && /\s/.test(propertiesContent[i])) i++;
+    if (propertiesContent[i] !== ':') continue;
+    i++;
+    while (i < propertiesContent.length && /\s/.test(propertiesContent[i])) i++;
+    if (propertiesContent[i] === '{') {
+      const open = i;
+      const close = findMatchingBrace(propertiesContent, open);
+      if (close === -1) break;
+      const body = propertiesContent.slice(open + 1, close);
+
+      const type = body.match(/type\s*:\s*['"]([^'"]+)['"]/)?.[1] || 'any';
+      const description =
+        body.match(/description\s*:\s*['"]([^'"]+)['"]/)?.[1] || '';
+      const defaultRaw = body.match(/default\s*:\s*([^,\n]+)/)?.[1]?.trim();
+
+      props[key] = {
+        type,
+        description,
+        default: defaultRaw
+          ? defaultRaw.replace(/^['"]|['"]$/g, '')
+          : undefined,
+      };
+      i = close + 1;
+      continue;
+    }
+
+    // Fallback for schema references like "object_type: commonObjectTypeSchema"
+    props[key] = { type: 'any', description: '', default: undefined };
+    while (
+      i < propertiesContent.length &&
+      propertiesContent[i] !== ',' &&
+      propertiesContent[i] !== '\n'
+    ) {
+      i++;
+    }
+    i++;
+  }
+  return props;
+}
+
+function parseInputSchemaBlock(inputSchemaBlock) {
+  const inputSchema = {
+    properties: {},
+    required: [],
+  };
+
+  if (!inputSchemaBlock) return inputSchema;
+
+  inputSchema.required = extractTopLevelRequiredArray(inputSchemaBlock);
+  const propertiesContent = extractNamedObjectContent(
+    inputSchemaBlock,
+    'properties',
+  );
+  if (propertiesContent) {
+    inputSchema.properties = parseTopLevelProperties(propertiesContent);
+  }
+
+  return inputSchema;
+}
+
+function extractImportPathForSymbol(content, symbol) {
+  const importRegex = /import\s*\{([\s\S]*?)\}\s*from\s*['"]([^'"]+)['"]/g;
+  let m = importRegex.exec(content);
+  while (m !== null) {
+    const symbolsRaw = m[1];
+    const importPath = m[2];
+    const symbols = symbolsRaw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (symbols.includes(symbol)) {
+      return importPath;
+    }
+    m = importRegex.exec(content);
+  }
+  return null;
+}
+
 function extractToolDefinition(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
   const block = findToolDefinitionBlock(content);
@@ -159,40 +334,28 @@ function extractToolDefinition(filePath) {
 
   const descMatch = block.match(/description\s*:\s*['"]([^'"]+)['"]/);
   const inputSchemaBlock = extractInputSchemaBlock(block);
+  const inputSchemaRef = inputSchemaBlock ? null : extractInputSchemaRef(block);
+  let inputSchema = parseInputSchemaBlock(inputSchemaBlock);
 
-  const inputSchema = {
-    properties: {},
-    required: [],
-  };
-
-  if (inputSchemaBlock) {
-    const requiredMatch = inputSchemaBlock.match(/required\s*:\s*\[([\s\S]*?)\]/m);
-    if (requiredMatch) {
-      inputSchema.required = requiredMatch[1]
-        .split(',')
-        .map(s => s.trim().replace(/['"]/g, ''))
-        .filter(Boolean);
-    }
-
-    const propertiesMatch = inputSchemaBlock.match(/properties\s*:\s*\{([\s\S]*?)\}\s*,\s*required/m);
-    const propertiesBlock = propertiesMatch
-      ? propertiesMatch[1]
-      : (inputSchemaBlock.match(/properties\s*:\s*\{([\s\S]*?)\}/m)?.[1] || '');
-
-    const propPattern = /([a-zA-Z0-9_]+)\s*:\s*\{([\s\S]*?)\n\s*\}/g;
-    let m;
-    while ((m = propPattern.exec(propertiesBlock)) !== null) {
-      const propName = m[1];
-      const body = m[2];
-      const type = body.match(/type\s*:\s*['"]([^'"]+)['"]/)?.[1] || 'any';
-      const description = body.match(/description\s*:\s*['"]([^'"]+)['"]/)?.[1] || '';
-      const defaultRaw = body.match(/default\s*:\s*([^,\n]+)/)?.[1]?.trim();
-
-      inputSchema.properties[propName] = {
-        type,
-        description,
-        default: defaultRaw ? defaultRaw.replace(/^['"]|['"]$/g, '') : undefined,
-      };
+  // Resolve referenced schema (e.g. compactActionSchema) from imported file.
+  if (
+    inputSchemaRef &&
+    Object.keys(inputSchema.properties).length === 0 &&
+    filePath.endsWith('.ts')
+  ) {
+    const importPath = extractImportPathForSymbol(content, inputSchemaRef);
+    if (importPath) {
+      const resolvedPath = path.resolve(
+        path.dirname(filePath),
+        `${importPath}.ts`,
+      );
+      if (fs.existsSync(resolvedPath)) {
+        const refContent = fs.readFileSync(resolvedPath, 'utf8');
+        const refBlock = extractConstObjectBlock(refContent, inputSchemaRef);
+        if (refBlock) {
+          inputSchema = parseInputSchemaBlock(refBlock);
+        }
+      }
     }
   }
 
@@ -200,6 +363,64 @@ function extractToolDefinition(filePath) {
     name: nameMatch[1],
     description: descMatch ? descMatch[1] : '',
     inputSchema,
+    inputSchemaRef,
+  };
+}
+
+function extractConstObjectBlock(content, constName) {
+  const marker = `export const ${constName}`;
+  const start = content.indexOf(marker);
+  if (start === -1) return null;
+
+  const firstBrace = content.indexOf('{', start);
+  if (firstBrace === -1) return null;
+
+  let depth = 0;
+  for (let i = firstBrace; i < content.length; i++) {
+    const ch = content[i];
+    if (ch === '{') depth++;
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        return content.slice(firstBrace, i + 1);
+      }
+    }
+  }
+  return null;
+}
+
+function parseMatrixObject(block) {
+  const result = {};
+  const entryPattern = /([A-Z_]+)\s*:\s*\[([^\]]*)\]/g;
+  let entry = entryPattern.exec(block);
+  while (entry !== null) {
+    const objectType = entry[1];
+    const rawValues = entry[2].trim();
+    const values = rawValues
+      ? rawValues
+          .split(',')
+          .map((s) => s.trim().replace(/['"]/g, ''))
+          .filter(Boolean)
+      : [];
+    result[objectType] = values;
+    entry = entryPattern.exec(block);
+  }
+  return result;
+}
+
+function loadCompactMatrix() {
+  const content = fs.readFileSync(COMPACT_MATRIX_PATH, 'utf8');
+  const crudBlock = extractConstObjectBlock(content, 'COMPACT_CRUD_MATRIX');
+  const actionBlock = extractConstObjectBlock(content, 'COMPACT_ACTION_MATRIX');
+  if (!crudBlock || !actionBlock) {
+    throw new Error(
+      'Failed to read COMPACT_CRUD_MATRIX / COMPACT_ACTION_MATRIX from compactMatrix.ts',
+    );
+  }
+
+  return {
+    crud: parseMatrixObject(crudBlock),
+    actions: parseMatrixObject(actionBlock),
   };
 }
 
@@ -231,8 +452,10 @@ function loadToolsFromHandlers() {
   }
 
   tools.sort((a, b) => {
-    if (a.level !== b.level) return LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level);
-    if (a.objectTitle !== b.objectTitle) return a.objectTitle.localeCompare(b.objectTitle);
+    if (a.level !== b.level)
+      return LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level);
+    if (a.objectTitle !== b.objectTitle)
+      return a.objectTitle.localeCompare(b.objectTitle);
     return a.name.localeCompare(b.name);
   });
 
@@ -266,7 +489,12 @@ function groupByLevelAndObject(tools) {
 function renderParams(tool) {
   const props = tool.inputSchema?.properties || {};
   const keys = Object.keys(props);
-  if (keys.length === 0) return '- None\n';
+  if (keys.length === 0) {
+    if (tool.inputSchemaRef) {
+      return `- See schema reference \`${tool.inputSchemaRef}\` in source file\n`;
+    }
+    return '- None\n';
+  }
 
   const required = new Set(tool.inputSchema?.required || []);
   let out = '';
@@ -279,13 +507,61 @@ function renderParams(tool) {
   return out;
 }
 
+function renderCompactHandlerActionRoutes(compactMatrix) {
+  const requiredByRoute = {
+    'UNIT_TEST:run': '`tests[]`',
+    'UNIT_TEST:status': '`run_id`',
+    'UNIT_TEST:result': '`run_id`',
+    'CDS_UNIT_TEST:status': '`run_id`',
+    'CDS_UNIT_TEST:result': '`run_id`',
+    'SERVICE_BINDING:list_types': 'none',
+    'SERVICE_BINDING:validate':
+      '`service_binding_name`, `service_definition_name`',
+    'TRANSPORT:create_transport': '`description`',
+    'CLASS:runProfiling': '`class_name`',
+    'PROGRAM:runProfiling': '`program_name`',
+    'RUNTIME_PROFILE:viewProfiles': 'none',
+    'RUNTIME_PROFILE:viewProfile': '`trace_id_or_uri`, `view`',
+    'RUNTIME_DUMP:viewDumps': 'none',
+    'RUNTIME_DUMP:viewDump': '`dump_id`',
+  };
+
+  let md = `**Routes (by object_type + action):**\n`;
+  md += `| object_type | action | Minimal required fields |\n`;
+  md += `| --- | --- | --- |\n`;
+
+  for (const objectType of Object.keys(compactMatrix.actions).sort()) {
+    const actions = compactMatrix.actions[objectType] || [];
+    for (const action of actions) {
+      const routeKey = `${objectType}:${action}`;
+      md += `| \`${objectType}\` | \`${action}\` | ${
+        requiredByRoute[routeKey] || 'depends on downstream handler'
+      } |\n`;
+    }
+  }
+
+  md += `\n`;
+  return md;
+}
+
+function renderCompactHandlerActionParamsShort() {
+  return [
+    '- `object_type` (string, required) - Compact object family to route.',
+    '- `action` (string, required) - Action within the selected `object_type` route.',
+    '- Extra fields are action-specific. Use the route table above and examples in `Action Recipes`.',
+  ].join('\n');
+}
+
 function generateMarkdown(tools) {
   const grouped = groupByLevelAndObject(tools);
   const summary = {
     total: tools.length,
-    readonly: tools.filter(t => t.level === 'readonly').length,
-    high: tools.filter(t => t.level === 'high').length,
-    low: tools.filter(t => t.level === 'low').length,
+    readonly: tools.filter((t) => t.level === 'readonly').length,
+    high: tools.filter((t) => t.level === 'high').length,
+    low: tools.filter((t) => t.level === 'low').length,
+    compact: tools.filter(
+      (t) => t.level === 'high' && t.objectFolder === 'compact',
+    ).length,
   };
 
   let md = `# Available Tools Reference - MCP ABAP ADT Server\n\n`;
@@ -295,10 +571,20 @@ function generateMarkdown(tools) {
   md += `- Read-only tools: ${summary.readonly}\n`;
   md += `- High-level tools: ${summary.high}\n`;
   md += `- Low-level tools: ${summary.low}\n\n`;
+  md += `- Compact tools: ${summary.compact} (included in High-level group)\n\n`;
+
+  md += `## Handler Sets\n\n`;
+  md += `- \`readonly\` -> [Read-Only Group](#read-only-group)\n`;
+  md += `- \`high\` -> [High-Level Group](#high-level-group)\n`;
+  md += `- \`low\` -> [Low-Level Group](#low-level-group)\n`;
+  md += `- \`compact\` -> [High-Level / Compact](#high-level-compact)\n\n`;
 
   md += `## Navigation\n\n`;
+  md += `- [Compact Set](#high-level-compact)\n`;
   for (const level of LEVELS) {
-    const objects = Object.values(grouped[level]).sort((a, b) => a.objectTitle.localeCompare(b.objectTitle));
+    const objects = Object.values(grouped[level]).sort((a, b) =>
+      a.objectTitle.localeCompare(b.objectTitle),
+    );
     if (objects.length === 0) continue;
 
     const levelHeading = `${levelTitle(level)} Group`;
@@ -319,7 +605,9 @@ function generateMarkdown(tools) {
   md += `\n---\n\n`;
 
   for (const level of LEVELS) {
-    const objects = Object.values(grouped[level]).sort((a, b) => a.objectTitle.localeCompare(b.objectTitle));
+    const objects = Object.values(grouped[level]).sort((a, b) =>
+      a.objectTitle.localeCompare(b.objectTitle),
+    );
     if (objects.length === 0) continue;
 
     const levelHeading = `${levelTitle(level)} Group`;
@@ -352,9 +640,11 @@ function generateMarkdown(tools) {
 }
 
 function generateLevelMarkdown(tools, level) {
-  const levelTools = tools.filter(t => t.level === level);
+  const levelTools = tools.filter((t) => t.level === level);
   const grouped = groupByLevelAndObject(levelTools);
-  const objects = Object.values(grouped[level]).sort((a, b) => a.objectTitle.localeCompare(b.objectTitle));
+  const objects = Object.values(grouped[level]).sort((a, b) =>
+    a.objectTitle.localeCompare(b.objectTitle),
+  );
 
   let md = `# ${levelTitle(level)} Tools - MCP ABAP ADT Server\n\n`;
   md += `Generated from code in \`src/handlers/**\` (not from docs).\n\n`;
@@ -398,6 +688,148 @@ function generateLevelMarkdown(tools, level) {
   return md;
 }
 
+function generateCompactMarkdown(tools) {
+  const compactTools = tools.filter(
+    (t) => t.level === 'high' && t.objectFolder === 'compact',
+  );
+  const compactMatrix = loadCompactMatrix();
+
+  let md = `# Compact Tools - MCP ABAP ADT Server\n\n`;
+  md += `Generated from code in \`src/handlers/compact/high\` (not from docs).\n\n`;
+  md += `- Group: Compact\n`;
+  md += `- Total tools: ${compactTools.length}\n\n`;
+
+  md += `## How It Works\n\n`;
+  md += `Compact is a facade over existing high-level/runtime handlers.\n`;
+  md += `You call one compact tool by intent and route by typed payload fields.\n\n`;
+  md += `## Start Here\n\n`;
+  md += `Pick tool by intent:\n\n`;
+  md += `- Create object -> \`HandlerCreate\`\n`;
+  md += `- Read object -> \`HandlerGet\`\n`;
+  md += `- Update object -> \`HandlerUpdate\`\n`;
+  md += `- Delete object -> \`HandlerDelete\`\n`;
+  md += `- Validate object/binding -> \`HandlerValidate\`\n`;
+  md += `- Activate object(s) -> \`HandlerActivate\`\n`;
+  md += `- Lock object -> \`HandlerLock\`\n`;
+  md += `- Unlock object -> \`HandlerUnlock\`\n`;
+  md += `- Check run (syntax) -> \`HandlerCheckRun\`\n`;
+  md += `- ABAP Unit run/status/result -> \`HandlerUnitTestRun|HandlerUnitTestStatus|HandlerUnitTestResult\`\n`;
+  md += `- CDS Unit status/result -> \`HandlerCdsUnitTestStatus|HandlerCdsUnitTestResult\`\n`;
+  md += `- Runtime profile run/list/view -> \`HandlerProfileRun|HandlerProfileList|HandlerProfileView\`\n`;
+  md += `- Runtime dump list/view -> \`HandlerDumpList|HandlerDumpView\`\n`;
+  md += `- Service binding list/validate -> \`HandlerServiceBindingListTypes|HandlerServiceBindingValidate\`\n`;
+  md += `- Transport create -> \`HandlerTransportCreate\`\n`;
+  md += `- Legacy catch-all (compat only) -> \`HandlerAction\`\n\n`;
+  md += `Request contract:\n\n`;
+  md += `- CRUD: \`HandlerCreate|HandlerGet|HandlerUpdate|HandlerDelete\` with required \`object_type\`.\n`;
+  md += `- Lifecycle: \`HandlerValidate|HandlerActivate|HandlerLock|HandlerUnlock|HandlerCheckRun\` with compact lifecycle params.\n`;
+  md += `- Action-specific tools above use narrow typed payloads and no \`action\` discriminator.\n`;
+  md += `- \`HandlerAction\` remains for backward compatibility and still requires \`object_type\` + \`action\`.\n\n`;
+  md += `### Supported Actions (Current)\n\n`;
+  md += `- \`UNIT_TEST\`: \`run\`, \`status\`, \`result\`\n`;
+  md += `- \`CDS_UNIT_TEST\`: \`status\`, \`result\`\n`;
+  md += `- \`SERVICE_BINDING\`: \`list_types\`, \`validate\`\n`;
+  md += `- \`TRANSPORT\`: \`create_transport\`\n`;
+  md += `- \`CLASS\`: \`runProfiling\`\n`;
+  md += `- \`PROGRAM\`: \`runProfiling\`\n`;
+  md += `- \`RUNTIME_PROFILE\`: \`viewProfiles\`, \`viewProfile\`\n`;
+  md += `- \`RUNTIME_DUMP\`: \`viewDumps\`, \`viewDump\`\n\n`;
+  md += `## Routing Matrix\n\n`;
+  md += `Source of truth: \`src/handlers/compact/high/compactMatrix.ts\`.\n`;
+  md += `Facade dispatch is deterministic by \`object_type\` and operation/action.\n\n`;
+  md += `| object_type | CRUD | Actions |\n`;
+  md += `| --- | --- | --- |\n`;
+  for (const objectType of Object.keys(compactMatrix.crud).sort()) {
+    const crud = compactMatrix.crud[objectType];
+    const actions = compactMatrix.actions[objectType] || [];
+    md += `| \`${objectType}\` | ${
+      crud.length > 0 ? `\`${crud.join('`, `')}\`` : '-'
+    } | ${actions.length > 0 ? `\`${actions.join('`, `')}\`` : '-'} |\n`;
+  }
+  md += `\n`;
+  md += `Unsupported combinations return deterministic error:\n`;
+  md += `- \`Unsupported <operation|action> for object_type: <TYPE>\`\n\n`;
+
+  md += `## Action Recipes\n\n`;
+  md += `Preferred dedicated compact tools and minimal payloads:\n\n`;
+  md += `| Goal | Tool | Required fields |\n`;
+  md += `| --- | --- | --- |\n`;
+  md += `| Run ABAP Unit | \`HandlerUnitTestRun\` | \`tests[]\` |\n`;
+  md += `| Unit status | \`HandlerUnitTestStatus\` | \`run_id\` |\n`;
+  md += `| Unit result | \`HandlerUnitTestResult\` | \`run_id\` |\n`;
+  md += `| CDS unit status | \`HandlerCdsUnitTestStatus\` | \`run_id\` |\n`;
+  md += `| CDS unit result | \`HandlerCdsUnitTestResult\` | \`run_id\` |\n`;
+  md += `| List binding types | \`HandlerServiceBindingListTypes\` | none |\n`;
+  md += `| Validate binding | \`HandlerServiceBindingValidate\` | \`service_binding_name\`, \`service_definition_name\` |\n`;
+  md += `| Create transport | \`HandlerTransportCreate\` | \`description\` |\n`;
+  md += `| Run profiling (class/program) | \`HandlerProfileRun\` | \`target_type\` + target name |\n`;
+  md += `| List profiler traces | \`HandlerProfileList\` | none |\n`;
+  md += `| Read profiler trace | \`HandlerProfileView\` | \`trace_id_or_uri\`, \`view\` |\n`;
+  md += `| List dumps | \`HandlerDumpList\` | none |\n`;
+  md += `| Read dump | \`HandlerDumpView\` | \`dump_id\` |\n\n`;
+
+  md += `## Minimal Payload Contracts\n\n`;
+  md += `- \`HandlerCreate|Get|Update|Delete\`: always require \`object_type\`, plus object-specific fields.\n`;
+  md += `- Dedicated action tools above expose narrow payloads and are preferred.\n`;
+  md += `- \`HandlerAction\`: legacy fallback requiring \`object_type\` and \`action\`.\n`;
+  md += `- Common required pairs:\n`;
+  md += `  - unit tests status/result: \`run_id\`\n`;
+  md += `  - dump details: \`dump_id\`\n`;
+  md += `  - profiler details: \`trace_id_or_uri\` + \`view\` (\`hitlist|statements|db_accesses\`)\n`;
+  md += `  - service binding validate: \`service_binding_name\` + \`service_definition_name\`\n`;
+  md += `  - class profiling: \`class_name\`\n`;
+  md += `  - program profiling: \`program_name\`\n\n`;
+  md += `### Quick Examples\n\n`;
+  md += `- Run profiling for class:\n`;
+  md += `  - \`HandlerProfileRun\` + \`{ "target_type":"CLASS", "class_name":"ZCL_FOO" }\`\n`;
+  md += `- Read one profiler trace:\n`;
+  md += `  - \`HandlerProfileView\` + \`{ "trace_id_or_uri":"...", "view":"hitlist" }\`\n`;
+  md += `- Read one dump:\n`;
+  md += `  - \`HandlerDumpView\` + \`{ "dump_id":"...", "view":"summary" }\`\n\n`;
+  md += `- List dumps:\n`;
+  md += `  - \`HandlerDumpList\` + \`{ "top":20, "orderby":"CREATED_AT desc" }\`\n`;
+  md += `- List profiler traces:\n`;
+  md += `  - \`HandlerProfileList\` + \`{}\`\n`;
+  md += `- Validate service binding:\n`;
+  md += `  - \`HandlerServiceBindingValidate\` + \`{ "service_binding_name":"ZSB_FOO", "service_definition_name":"ZSD_FOO" }\`\n\n`;
+
+  md += `## Navigation\n\n`;
+  md += `- [Compact Group](#compact-group)\n`;
+  for (const tool of compactTools) {
+    const toolHeading = `${tool.name} (Compact)`;
+    md += `  - [${tool.name}](#${anchorFromHeading(toolHeading)})\n`;
+  }
+
+  md += `\n---\n\n`;
+  md += `<a id="compact-group"></a>\n`;
+  md += `## Compact Group\n\n`;
+  md += `<a id="compact"></a>\n`;
+  md += `### Compact\n\n`;
+
+  for (const tool of compactTools.sort((a, b) =>
+    a.name.localeCompare(b.name),
+  )) {
+    const toolHeading = `${tool.name} (Compact)`;
+    md += `<a id="${anchorFromHeading(toolHeading)}"></a>\n`;
+    md += `#### ${toolHeading}\n`;
+    md += `**Description:** ${tool.description || 'No description'}\n\n`;
+    md += `**Source:** \`${tool.filePath}\`\n\n`;
+    if (tool.name === 'HandlerAction') {
+      md += renderCompactHandlerActionRoutes(compactMatrix);
+    }
+    md += `**Parameters:**\n`;
+    if (tool.name === 'HandlerAction') {
+      md += `${renderCompactHandlerActionParamsShort()}\n`;
+    } else {
+      md += renderParams(tool);
+    }
+    md += `\n---\n\n`;
+  }
+
+  md += `*Last updated: ${new Date().toISOString().slice(0, 10)}*\n`;
+  return md;
+}
+
 function main() {
   console.log('🔍 Scanning handler code in src/handlers...');
   const tools = loadToolsFromHandlers();
@@ -425,10 +857,16 @@ function main() {
     generateLevelMarkdown(tools, 'low'),
     'utf8',
   );
+  fs.writeFileSync(
+    OUTPUT_PATHS.compact,
+    generateCompactMarkdown(tools),
+    'utf8',
+  );
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.all}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.readonly}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.high}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.low}`);
+  console.log(`✅ Documentation generated: ${OUTPUT_PATHS.compact}`);
 }
 
 if (require.main === module) {
@@ -440,4 +878,5 @@ module.exports = {
   loadToolsFromHandlers,
   generateMarkdown,
   generateLevelMarkdown,
+  generateCompactMarkdown,
 };

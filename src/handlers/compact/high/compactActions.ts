@@ -4,7 +4,12 @@ export type CompactAction =
   | 'result'
   | 'validate'
   | 'list_types'
-  | 'create_transport';
+  | 'create_transport'
+  | 'runProfiling'
+  | 'viewProfile'
+  | 'viewProfiles'
+  | 'viewDump'
+  | 'viewDumps';
 
 export const COMPACT_ACTIONS: CompactAction[] = [
   'run',
@@ -13,4 +18,9 @@ export const COMPACT_ACTIONS: CompactAction[] = [
   'validate',
   'list_types',
   'create_transport',
+  'runProfiling',
+  'viewProfile',
+  'viewProfiles',
+  'viewDump',
+  'viewDumps',
 ];

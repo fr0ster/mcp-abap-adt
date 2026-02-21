@@ -4,11 +4,14 @@
 - Build a compact facade layer over existing high-level handlers.
 - Keep existing high-level handlers as execution backend.
 - Implement a typed router by `object_type` + `operation`.
+- Keep one source of truth for compact route coverage:
+  - `src/handlers/compact/high/compactMatrix.ts`
+  - used by router validation, tests, and generated compact docs.
 
 ## Requirements (Locked)
 - [x] All high-level object types are addressable through compact facade.
 - [x] Full CRUD parity where CRUD exists in high-level handlers.
-- [x] Full non-CRUD parity via action routing (`run`, `status`, `result`, `validate`, `list_types`, `create_transport`, etc.).
+- [x] Full non-CRUD parity via action routing (`run`, `status`, `result`, `validate`, `list_types`, `create_transport`, `runProfiling`, `viewProfile`, `viewProfiles`, `viewDump`, `viewDumps`, etc.).
 - [x] Implemented as router/dispatcher to existing handlers (no business logic duplication).
 - [ ] Covered by automated tests (routing + parity smoke coverage).
 
@@ -22,20 +25,23 @@
 - [x] `VIEW`: create, get, update, delete
 - [x] `SERVICE_DEFINITION`: create, get, update, delete
 - [x] `SERVICE_BINDING`: create, get, update, delete, list_types, validate
-- [x] `CLASS`: create, get, update, delete
+- [x] `CLASS`: create, get, update, delete, runProfiling
 - [x] `UNIT_TEST`: create, get, update, delete, run, status, result
 - [x] `CDS_UNIT_TEST`: create, get, update, delete, status, result
 - [x] `LOCAL_TEST_CLASS`: create, get, update, delete
 - [x] `LOCAL_TYPES`: create, get, update, delete
 - [x] `LOCAL_DEFINITIONS`: create, get, update, delete
 - [x] `LOCAL_MACROS`: create, get, update, delete
-- [x] `PROGRAM`: create, get, update, delete
+- [x] `PROGRAM`: create, get, update, delete, runProfiling
 - [x] `INTERFACE`: create, get, update, delete
 - [x] `FUNCTION_GROUP`: create, get, update, delete
 - [x] `FUNCTION_MODULE`: create, get, update, delete
 - [x] `BEHAVIOR_DEFINITION`: create, get, update, delete
 - [x] `BEHAVIOR_IMPLEMENTATION`: create, get, update, delete
 - [x] `METADATA_EXTENSION`: create, get, update, delete
+- [x] `RUNTIME_PROFILE`: viewProfiles, viewProfile
+- [x] `RUNTIME_DUMP`: viewDump
+- [x] `RUNTIME_DUMP`: viewDumps
 
 ## Implementation Phases
 

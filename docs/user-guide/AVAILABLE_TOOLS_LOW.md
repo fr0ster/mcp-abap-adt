@@ -457,8 +457,14 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/low/handleRunClassUnitTests.ts`
 
 **Parameters:**
-- `test_class` (string, required) - Test class name inside the include (e.g., LTCL_MAIN_CLASS).
-- `tests` (array, optional) - List of container/test class pairs to execute.
+- `context` (string, optional) - Optional context string shown in SAP tools.
+- `duration` (object, optional) - 
+- `risk_level` (object, optional) - 
+- `scope` (object, optional) - 
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `tests` (array, required) - List of container/test class pairs to execute.
+- `title` (string, optional) - Optional title for the ABAP Unit run.
 
 ---
 
@@ -542,7 +548,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/common/low/handleActivateObject.ts`
 
 **Parameters:**
-- `objects` (array, optional) - Array of objects to activate. Each object must have 
+- `objects` (array, required) - Array of objects to activate. Each object must have 
+- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true
 
 ---
 
@@ -1686,9 +1693,11 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/low/handleGetVirtualFolders.ts`
 
 **Parameters:**
+- `facet_order` (array, optional (default: ['package)) - Order of facets in response (e.g., [
+- `ignore_short_descriptions` (boolean, optional (default: false)) - Ignore short descriptions in response
 - `object_search_pattern` (string, optional (default: *)) - Object search pattern (e.g., 
 - `preselection` (array, optional) - Optional preselection filters (facet-value pairs for filtering)
-- `values` (array, required) - Array of facet values to filter by
+- `with_versions` (boolean, optional (default: false)) - Include version information in response
 
 ---
 
@@ -1942,4 +1951,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-02-15*
+*Last updated: 2026-02-21*

@@ -7,7 +7,7 @@ import { compactActionSchema } from './compactSchemas';
 export const TOOL_DEFINITION = {
   name: 'HandlerAction',
   description:
-    'Compact facade non-CRUD action router. Routes by object_type + action.',
+    'Compact legacy action router (backward compatibility). Prefer dedicated compact action handlers.',
   inputSchema: compactActionSchema,
 } as const;
 

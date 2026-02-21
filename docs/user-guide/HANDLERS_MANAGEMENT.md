@@ -28,11 +28,30 @@ V2 server supports flexible handler set configuration through the `--exposition`
 
 4. **compact** - Compact facade operations
    - `HandlerAction`
+   - `HandlerValidate`
+   - `HandlerActivate`
+   - `HandlerLock`
+   - `HandlerUnlock`
+   - `HandlerCheckRun`
    - `HandlerCreate`
    - `HandlerGet`
    - `HandlerUpdate`
    - `HandlerDelete`
-   - Routes by `object_type` (and `action` for non-CRUD) to high-level handlers
+   - Contract:
+     - CRUD via `HandlerCreate|Get|Update|Delete` + required `object_type`
+     - Lifecycle via `HandlerValidate|Activate|Lock|Unlock|CheckRun`
+     - Runtime/tests extras via `HandlerAction` + required `object_type` + `action`
+   - Source of truth for compact route coverage:
+     - `src/handlers/compact/high/compactMatrix.ts`
+     - auto-reflected into `docs/user-guide/AVAILABLE_TOOLS_COMPACT.md`
+   - Current action coverage:
+     - `UNIT_TEST`: `run`, `status`, `result`
+     - `CDS_UNIT_TEST`: `status`, `result`
+     - `SERVICE_BINDING`: `list_types`, `validate`
+     - `TRANSPORT`: `create_transport`
+     - `CLASS` / `PROGRAM`: `runProfiling`
+     - `RUNTIME_PROFILE`: `viewProfiles`, `viewProfile`
+     - `RUNTIME_DUMP`: `viewDumps`, `viewDump`
 
 5. **search** - Always included automatically
    - Object search
@@ -102,7 +121,14 @@ node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env
 npm run docs:tools
 ```
 
-This generates `docs/user-guide/AVAILABLE_TOOLS.md` with:
+This generates:
+- `docs/user-guide/AVAILABLE_TOOLS.md`
+- `docs/user-guide/AVAILABLE_TOOLS_READONLY.md`
+- `docs/user-guide/AVAILABLE_TOOLS_HIGH.md`
+- `docs/user-guide/AVAILABLE_TOOLS_LOW.md`
+- `docs/user-guide/AVAILABLE_TOOLS_COMPACT.md`
+
+With:
 - All available handlers
 - Parameters and types
 - Usage examples

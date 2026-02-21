@@ -59,6 +59,7 @@ See [Installation Guide](../installation/INSTALLATION.md) for full instructions.
 - **[AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md)** - Read-only tools (auto-generated)
 - **[AVAILABLE_TOOLS_HIGH.md](AVAILABLE_TOOLS_HIGH.md)** - High-level tools (auto-generated)
 - **[AVAILABLE_TOOLS_LOW.md](AVAILABLE_TOOLS_LOW.md)** - Low-level tools (auto-generated)
+- **[AVAILABLE_TOOLS_COMPACT.md](AVAILABLE_TOOLS_COMPACT.md)** - Compact facade tools (auto-generated)
 - **[AVAILABLE_TOOLS.md](AVAILABLE_TOOLS.md)** - Full combined tools reference (auto-generated)
 - **[AUTHENTICATION.md](AUTHENTICATION.md)** - Destination-based auth, service key locations, and header-based auth
 - **[TERMINOLOGY.md](TERMINOLOGY.md)** - Project-specific terminology
@@ -74,6 +75,7 @@ See [Installation Guide](../installation/INSTALLATION.md) for full instructions.
    - [Read-only tools](AVAILABLE_TOOLS_READONLY.md)
    - [High-level tools](AVAILABLE_TOOLS_HIGH.md)
    - [Low-level tools](AVAILABLE_TOOLS_LOW.md)
+   - [Compact tools](AVAILABLE_TOOLS_COMPACT.md)
 
 ## Package Tree Output
 

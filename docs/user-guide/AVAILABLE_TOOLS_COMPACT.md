@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/compact/high` (not from docs).
 
 - Group: Compact
-- Total tools: 23
+- Total tools: 22
 
 ## How It Works
 
@@ -29,61 +29,48 @@ Pick tool by intent:
 - Runtime dump list/view -> `HandlerDumpList|HandlerDumpView`
 - Service binding list/validate -> `HandlerServiceBindingListTypes|HandlerServiceBindingValidate`
 - Transport create -> `HandlerTransportCreate`
-- Legacy catch-all (compat only) -> `HandlerAction`
 
 Request contract:
 
 - CRUD: `HandlerCreate|HandlerGet|HandlerUpdate|HandlerDelete` with required `object_type`.
 - Lifecycle: `HandlerValidate|HandlerActivate|HandlerLock|HandlerUnlock|HandlerCheckRun` with compact lifecycle params.
-- Action-specific tools above use narrow typed payloads and no `action` discriminator.
-- `HandlerAction` remains for backward compatibility and still requires `object_type` + `action`.
-
-### Supported Actions (Current)
-
-- `UNIT_TEST`: `run`, `status`, `result`
-- `CDS_UNIT_TEST`: `status`, `result`
-- `SERVICE_BINDING`: `list_types`, `validate`
-- `TRANSPORT`: `create_transport`
-- `CLASS`: `runProfiling`
-- `PROGRAM`: `runProfiling`
-- `RUNTIME_PROFILE`: `viewProfiles`, `viewProfile`
-- `RUNTIME_DUMP`: `viewDumps`, `viewDump`
+- Action-specific tools above use narrow typed payloads.
 
 ## Routing Matrix
 
 Source of truth: `src/handlers/compact/high/compactMatrix.ts`.
-Facade dispatch is deterministic by `object_type` and operation/action.
+Facade dispatch is deterministic by `object_type` and CRUD operation.
 
-| object_type | CRUD | Actions |
-| --- | --- | --- |
-| `BEHAVIOR_DEFINITION` | `create`, `get`, `update`, `delete` | - |
-| `BEHAVIOR_IMPLEMENTATION` | `create`, `get`, `update`, `delete` | - |
-| `CDS_UNIT_TEST` | `create`, `get`, `update`, `delete` | `status`, `result` |
-| `CLASS` | `create`, `get`, `update`, `delete` | `runProfiling` |
-| `DATA_ELEMENT` | `create`, `get`, `update`, `delete` | - |
-| `DOMAIN` | `create`, `get`, `update`, `delete` | - |
-| `FUNCTION_GROUP` | `create`, `get`, `update`, `delete` | - |
-| `FUNCTION_MODULE` | `create`, `get`, `update`, `delete` | - |
-| `INTERFACE` | `create`, `get`, `update`, `delete` | - |
-| `LOCAL_DEFINITIONS` | `create`, `get`, `update`, `delete` | - |
-| `LOCAL_MACROS` | `create`, `get`, `update`, `delete` | - |
-| `LOCAL_TEST_CLASS` | `create`, `get`, `update`, `delete` | - |
-| `LOCAL_TYPES` | `create`, `get`, `update`, `delete` | - |
-| `METADATA_EXTENSION` | `create`, `get`, `update`, `delete` | - |
-| `PACKAGE` | `create`, `get` | - |
-| `PROGRAM` | `create`, `get`, `update`, `delete` | `runProfiling` |
-| `RUNTIME_DUMP` | - | `viewDump`, `viewDumps` |
-| `RUNTIME_PROFILE` | - | `viewProfiles`, `viewProfile` |
-| `SERVICE_BINDING` | `create`, `get`, `update`, `delete` | `list_types`, `validate` |
-| `SERVICE_DEFINITION` | `create`, `get`, `update`, `delete` | - |
-| `STRUCTURE` | `create`, `get`, `update`, `delete` | - |
-| `TABLE` | `create`, `get`, `update`, `delete` | - |
-| `TRANSPORT` | `create` | `create_transport` |
-| `UNIT_TEST` | `create`, `get`, `update`, `delete` | `run`, `status`, `result` |
-| `VIEW` | `create`, `get`, `update`, `delete` | - |
+| object_type | CRUD |
+| --- | --- |
+| `BEHAVIOR_DEFINITION` | `create`, `get`, `update`, `delete` |
+| `BEHAVIOR_IMPLEMENTATION` | `create`, `get`, `update`, `delete` |
+| `CDS_UNIT_TEST` | `create`, `get`, `update`, `delete` |
+| `CLASS` | `create`, `get`, `update`, `delete` |
+| `DATA_ELEMENT` | `create`, `get`, `update`, `delete` |
+| `DOMAIN` | `create`, `get`, `update`, `delete` |
+| `FUNCTION_GROUP` | `create`, `get`, `update`, `delete` |
+| `FUNCTION_MODULE` | `create`, `get`, `update`, `delete` |
+| `INTERFACE` | `create`, `get`, `update`, `delete` |
+| `LOCAL_DEFINITIONS` | `create`, `get`, `update`, `delete` |
+| `LOCAL_MACROS` | `create`, `get`, `update`, `delete` |
+| `LOCAL_TEST_CLASS` | `create`, `get`, `update`, `delete` |
+| `LOCAL_TYPES` | `create`, `get`, `update`, `delete` |
+| `METADATA_EXTENSION` | `create`, `get`, `update`, `delete` |
+| `PACKAGE` | `create`, `get` |
+| `PROGRAM` | `create`, `get`, `update`, `delete` |
+| `RUNTIME_DUMP` | - |
+| `RUNTIME_PROFILE` | - |
+| `SERVICE_BINDING` | `create`, `get`, `update`, `delete` |
+| `SERVICE_DEFINITION` | `create`, `get`, `update`, `delete` |
+| `STRUCTURE` | `create`, `get`, `update`, `delete` |
+| `TABLE` | `create`, `get`, `update`, `delete` |
+| `TRANSPORT` | `create` |
+| `UNIT_TEST` | `create`, `get`, `update`, `delete` |
+| `VIEW` | `create`, `get`, `update`, `delete` |
 
 Unsupported combinations return deterministic error:
-- `Unsupported <operation|action> for object_type: <TYPE>`
+- `Unsupported <operation> for object_type: <TYPE>`
 
 ## Action Recipes
 
@@ -108,8 +95,7 @@ Preferred dedicated compact tools and minimal payloads:
 ## Minimal Payload Contracts
 
 - `HandlerCreate|Get|Update|Delete`: always require `object_type`, plus object-specific fields.
-- Dedicated action tools above expose narrow payloads and are preferred.
-- `HandlerAction`: legacy fallback requiring `object_type` and `action`.
+- Dedicated action tools above expose narrow payloads.
 - Common required pairs:
   - unit tests status/result: `run_id`
   - dump details: `dump_id`
@@ -137,7 +123,6 @@ Preferred dedicated compact tools and minimal payloads:
 ## Navigation
 
 - [Compact Group](#compact-group)
-  - [HandlerAction](#handleraction-compact)
   - [HandlerActivate](#handleractivate-compact)
   - [HandlerCdsUnitTestResult](#handlercdsunittestresult-compact)
   - [HandlerCdsUnitTestStatus](#handlercdsunitteststatus-compact)
@@ -168,37 +153,6 @@ Preferred dedicated compact tools and minimal payloads:
 
 <a id="compact"></a>
 ### Compact
-
-<a id="handleraction-compact"></a>
-#### HandlerAction (Compact)
-**Description:** Compact legacy action router (backward compatibility). Prefer dedicated compact action handlers.
-
-**Source:** `src/handlers/compact/high/handleHandlerAction.ts`
-
-**Routes (by object_type + action):**
-| object_type | action | Minimal required fields |
-| --- | --- | --- |
-| `CDS_UNIT_TEST` | `status` | `run_id` |
-| `CDS_UNIT_TEST` | `result` | `run_id` |
-| `CLASS` | `runProfiling` | `class_name` |
-| `PROGRAM` | `runProfiling` | `program_name` |
-| `RUNTIME_DUMP` | `viewDump` | `dump_id` |
-| `RUNTIME_DUMP` | `viewDumps` | none |
-| `RUNTIME_PROFILE` | `viewProfiles` | none |
-| `RUNTIME_PROFILE` | `viewProfile` | `trace_id_or_uri`, `view` |
-| `SERVICE_BINDING` | `list_types` | none |
-| `SERVICE_BINDING` | `validate` | `service_binding_name`, `service_definition_name` |
-| `TRANSPORT` | `create_transport` | `description` |
-| `UNIT_TEST` | `run` | `tests[]` |
-| `UNIT_TEST` | `status` | `run_id` |
-| `UNIT_TEST` | `result` | `run_id` |
-
-**Parameters:**
-- `object_type` (string, required) - Compact object family to route.
-- `action` (string, required) - Action within the selected `object_type` route.
-- Extra fields are action-specific. Use the route table above and examples in `Action Recipes`.
-
----
 
 <a id="handleractivate-compact"></a>
 #### HandlerActivate (Compact)

@@ -27,12 +27,17 @@ V2 server supports flexible handler set configuration through the `--exposition`
    - Database operations
 
 4. **compact** - Compact facade operations
-   - `HandlerAction`
    - `HandlerValidate`
    - `HandlerActivate`
    - `HandlerLock`
    - `HandlerUnlock`
    - `HandlerCheckRun`
+   - `HandlerUnitTestRun`, `HandlerUnitTestStatus`, `HandlerUnitTestResult`
+   - `HandlerCdsUnitTestStatus`, `HandlerCdsUnitTestResult`
+   - `HandlerProfileRun`, `HandlerProfileList`, `HandlerProfileView`
+   - `HandlerDumpList`, `HandlerDumpView`
+   - `HandlerServiceBindingListTypes`, `HandlerServiceBindingValidate`
+   - `HandlerTransportCreate`
    - `HandlerCreate`
    - `HandlerGet`
    - `HandlerUpdate`
@@ -40,7 +45,7 @@ V2 server supports flexible handler set configuration through the `--exposition`
    - Contract:
      - CRUD via `HandlerCreate|Get|Update|Delete` + required `object_type`
      - Lifecycle via `HandlerValidate|Activate|Lock|Unlock|CheckRun`
-     - Runtime/tests extras via `HandlerAction` + required `object_type` + `action`
+     - Runtime/tests/service-binding/transport via dedicated compact handlers
    - Source of truth for compact route coverage:
      - `src/handlers/compact/high/compactMatrix.ts`
      - auto-reflected into `docs/user-guide/AVAILABLE_TOOLS_COMPACT.md`

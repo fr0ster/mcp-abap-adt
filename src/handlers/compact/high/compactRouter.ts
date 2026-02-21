@@ -61,9 +61,7 @@ import { handleUpdateProgram } from '../../program/high/handleUpdateProgram';
 import { handleCreateServiceBinding } from '../../service_binding/high/handleCreateServiceBinding';
 import { handleDeleteServiceBinding } from '../../service_binding/high/handleDeleteServiceBinding';
 import { handleGetServiceBinding } from '../../service_binding/high/handleGetServiceBinding';
-import { handleListServiceBindingTypes } from '../../service_binding/high/handleListServiceBindingTypes';
 import { handleUpdateServiceBinding } from '../../service_binding/high/handleUpdateServiceBinding';
-import { handleValidateServiceBinding } from '../../service_binding/high/handleValidateServiceBinding';
 import { handleCreateServiceDefinition } from '../../service_definition/high/handleCreateServiceDefinition';
 import { handleDeleteServiceDefinition } from '../../service_definition/high/handleDeleteServiceDefinition';
 import { handleGetServiceDefinition } from '../../service_definition/high/handleGetServiceDefinition';
@@ -72,12 +70,6 @@ import { handleCreateStructure } from '../../structure/high/handleCreateStructur
 import { handleDeleteStructure } from '../../structure/high/handleDeleteStructure';
 import { handleGetStructure } from '../../structure/high/handleGetStructure';
 import { handleUpdateStructure } from '../../structure/high/handleUpdateStructure';
-import { handleRuntimeGetDumpById } from '../../system/readonly/handleRuntimeGetDumpById';
-import { handleRuntimeGetProfilerTraceData } from '../../system/readonly/handleRuntimeGetProfilerTraceData';
-import { handleRuntimeListDumps } from '../../system/readonly/handleRuntimeListDumps';
-import { handleRuntimeListProfilerTraceFiles } from '../../system/readonly/handleRuntimeListProfilerTraceFiles';
-import { handleRuntimeRunClassWithProfiling } from '../../system/readonly/handleRuntimeRunClassWithProfiling';
-import { handleRuntimeRunProgramWithProfiling } from '../../system/readonly/handleRuntimeRunProgramWithProfiling';
 import { handleCreateTable } from '../../table/high/handleCreateTable';
 import { handleDeleteTable } from '../../table/high/handleDeleteTable';
 import { handleGetTable } from '../../table/high/handleGetTable';
@@ -88,21 +80,14 @@ import { handleCreateUnitTest } from '../../unit_test/high/handleCreateUnitTest'
 import { handleDeleteCdsUnitTest } from '../../unit_test/high/handleDeleteCdsUnitTest';
 import { handleDeleteUnitTest } from '../../unit_test/high/handleDeleteUnitTest';
 import { handleGetCdsUnitTest } from '../../unit_test/high/handleGetCdsUnitTest';
-import { handleGetCdsUnitTestResult } from '../../unit_test/high/handleGetCdsUnitTestResult';
-import { handleGetCdsUnitTestStatus } from '../../unit_test/high/handleGetCdsUnitTestStatus';
 import { handleGetUnitTest } from '../../unit_test/high/handleGetUnitTest';
-import { handleGetUnitTestResult } from '../../unit_test/high/handleGetUnitTestResult';
-import { handleGetUnitTestStatus } from '../../unit_test/high/handleGetUnitTestStatus';
-import { handleRunUnitTest } from '../../unit_test/high/handleRunUnitTest';
 import { handleUpdateCdsUnitTest } from '../../unit_test/high/handleUpdateCdsUnitTest';
 import { handleUpdateUnitTest } from '../../unit_test/high/handleUpdateUnitTest';
 import { handleCreateView } from '../../view/high/handleCreateView';
 import { handleDeleteView } from '../../view/high/handleDeleteView';
 import { handleGetView } from '../../view/high/handleGetView';
 import { handleUpdateView } from '../../view/high/handleUpdateView';
-import type { CompactAction } from './compactActions';
 import {
-  COMPACT_ACTION_MATRIX,
   COMPACT_CRUD_MATRIX,
   type CompactCrudOperation,
 } from './compactMatrix';
@@ -116,11 +101,6 @@ type CompactHandler = (
 type CompactRouterMap = Record<
   CompactObjectType,
   Partial<Record<CompactCrudOperation, CompactHandler>>
->;
-
-type CompactActionRouterMap = Record<
-  CompactObjectType,
-  Partial<Record<CompactAction, CompactHandler>>
 >;
 
 export const compactRouterMap: CompactRouterMap = {
@@ -261,59 +241,6 @@ export const compactRouterMap: CompactRouterMap = {
   RUNTIME_DUMP: {},
 };
 
-export const compactActionRouterMap: CompactActionRouterMap = {
-  PACKAGE: {},
-  DOMAIN: {},
-  DATA_ELEMENT: {},
-  TRANSPORT: {
-    create_transport: handleCreateTransport as unknown as CompactHandler,
-  },
-  TABLE: {},
-  STRUCTURE: {},
-  VIEW: {},
-  SERVICE_DEFINITION: {},
-  SERVICE_BINDING: {
-    list_types: handleListServiceBindingTypes as unknown as CompactHandler,
-    validate: handleValidateServiceBinding as unknown as CompactHandler,
-  },
-  CLASS: {
-    runProfiling:
-      handleRuntimeRunClassWithProfiling as unknown as CompactHandler,
-  },
-  UNIT_TEST: {
-    run: handleRunUnitTest as unknown as CompactHandler,
-    status: handleGetUnitTestStatus as unknown as CompactHandler,
-    result: handleGetUnitTestResult as unknown as CompactHandler,
-  },
-  CDS_UNIT_TEST: {
-    status: handleGetCdsUnitTestStatus as unknown as CompactHandler,
-    result: handleGetCdsUnitTestResult as unknown as CompactHandler,
-  },
-  LOCAL_TEST_CLASS: {},
-  LOCAL_TYPES: {},
-  LOCAL_DEFINITIONS: {},
-  LOCAL_MACROS: {},
-  PROGRAM: {
-    runProfiling:
-      handleRuntimeRunProgramWithProfiling as unknown as CompactHandler,
-  },
-  INTERFACE: {},
-  FUNCTION_GROUP: {},
-  FUNCTION_MODULE: {},
-  BEHAVIOR_DEFINITION: {},
-  BEHAVIOR_IMPLEMENTATION: {},
-  METADATA_EXTENSION: {},
-  RUNTIME_PROFILE: {
-    viewProfiles:
-      handleRuntimeListProfilerTraceFiles as unknown as CompactHandler,
-    viewProfile: handleRuntimeGetProfilerTraceData as unknown as CompactHandler,
-  },
-  RUNTIME_DUMP: {
-    viewDump: handleRuntimeGetDumpById as unknown as CompactHandler,
-    viewDumps: handleRuntimeListDumps as unknown as CompactHandler,
-  },
-};
-
 function validateCompactRouterAgainstMatrix() {
   for (const [objectType, expectedCrud] of Object.entries(
     COMPACT_CRUD_MATRIX,
@@ -329,19 +256,6 @@ function validateCompactRouterAgainstMatrix() {
     }
   }
 
-  for (const [objectType, expectedActions] of Object.entries(
-    COMPACT_ACTION_MATRIX,
-  )) {
-    const actualActions = Object.keys(
-      compactActionRouterMap[objectType as CompactObjectType] || {},
-    ).sort();
-    const expected = [...expectedActions].sort();
-    if (JSON.stringify(actualActions) !== JSON.stringify(expected)) {
-      throw new Error(
-        `compactActionRouterMap mismatch for ${objectType}. Expected actions: [${expected.join(', ')}], got: [${actualActions.join(', ')}]`,
-      );
-    }
-  }
 }
 
 validateCompactRouterAgainstMatrix();
@@ -370,37 +284,6 @@ export async function routeCompactOperation(
     return return_error(
       new Error(
         `Unsupported ${operation} for object_type: ${args.object_type}`,
-      ),
-    );
-  }
-
-  return handler(context, args);
-}
-
-export async function routeCompactAction(
-  context: HandlerContext,
-  action: CompactAction,
-  args: { object_type: CompactObjectType } & Record<string, unknown>,
-) {
-  context.logger?.info?.(
-    `[compact-router] route action=${action} object_type=${args?.object_type ?? 'undefined'}`,
-  );
-
-  if (!args?.object_type) {
-    context.logger?.warn?.(
-      `[compact-router] object_type is required for action=${action}`,
-    );
-    return return_error(new Error('object_type is required'));
-  }
-
-  const handler = compactActionRouterMap[args.object_type]?.[action];
-  if (!handler) {
-    context.logger?.warn?.(
-      `[compact-router] unsupported action=${action} object_type=${args.object_type}`,
-    );
-    return return_error(
-      new Error(
-        `Unsupported action ${action} for object_type: ${args.object_type}`,
       ),
     );
   }

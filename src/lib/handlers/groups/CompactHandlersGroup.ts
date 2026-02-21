@@ -1,8 +1,4 @@
 import {
-  TOOL_DEFINITION as HandlerAction_Tool,
-  handleHandlerAction,
-} from '../../../handlers/compact/high/handleHandlerAction';
-import {
   TOOL_DEFINITION as HandlerActivate_Tool,
   handleHandlerActivate,
 } from '../../../handlers/compact/high/handleHandlerActivate';
@@ -251,14 +247,6 @@ export class CompactHandlersGroup extends BaseHandlerGroup {
           inputSchema: HandlerTransportCreate_Tool.inputSchema,
         },
         handler: withContext(handleHandlerTransportCreate),
-      },
-      {
-        toolDefinition: {
-          name: HandlerAction_Tool.name,
-          description: HandlerAction_Tool.description,
-          inputSchema: HandlerAction_Tool.inputSchema,
-        },
-        handler: withContext(handleHandlerAction),
       },
       {
         toolDefinition: {

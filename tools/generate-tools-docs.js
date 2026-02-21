@@ -411,16 +411,14 @@ function parseMatrixObject(block) {
 function loadCompactMatrix() {
   const content = fs.readFileSync(COMPACT_MATRIX_PATH, 'utf8');
   const crudBlock = extractConstObjectBlock(content, 'COMPACT_CRUD_MATRIX');
-  const actionBlock = extractConstObjectBlock(content, 'COMPACT_ACTION_MATRIX');
-  if (!crudBlock || !actionBlock) {
+  if (!crudBlock) {
     throw new Error(
-      'Failed to read COMPACT_CRUD_MATRIX / COMPACT_ACTION_MATRIX from compactMatrix.ts',
+      'Failed to read COMPACT_CRUD_MATRIX from compactMatrix.ts',
     );
   }
 
   return {
     crud: parseMatrixObject(crudBlock),
-    actions: parseMatrixObject(actionBlock),
   };
 }
 
@@ -505,51 +503,6 @@ function renderParams(tool) {
     out += `- \`${key}\` (${p.type}, ${req}${def}) - ${p.description}\n`;
   }
   return out;
-}
-
-function renderCompactHandlerActionRoutes(compactMatrix) {
-  const requiredByRoute = {
-    'UNIT_TEST:run': '`tests[]`',
-    'UNIT_TEST:status': '`run_id`',
-    'UNIT_TEST:result': '`run_id`',
-    'CDS_UNIT_TEST:status': '`run_id`',
-    'CDS_UNIT_TEST:result': '`run_id`',
-    'SERVICE_BINDING:list_types': 'none',
-    'SERVICE_BINDING:validate':
-      '`service_binding_name`, `service_definition_name`',
-    'TRANSPORT:create_transport': '`description`',
-    'CLASS:runProfiling': '`class_name`',
-    'PROGRAM:runProfiling': '`program_name`',
-    'RUNTIME_PROFILE:viewProfiles': 'none',
-    'RUNTIME_PROFILE:viewProfile': '`trace_id_or_uri`, `view`',
-    'RUNTIME_DUMP:viewDumps': 'none',
-    'RUNTIME_DUMP:viewDump': '`dump_id`',
-  };
-
-  let md = `**Routes (by object_type + action):**\n`;
-  md += `| object_type | action | Minimal required fields |\n`;
-  md += `| --- | --- | --- |\n`;
-
-  for (const objectType of Object.keys(compactMatrix.actions).sort()) {
-    const actions = compactMatrix.actions[objectType] || [];
-    for (const action of actions) {
-      const routeKey = `${objectType}:${action}`;
-      md += `| \`${objectType}\` | \`${action}\` | ${
-        requiredByRoute[routeKey] || 'depends on downstream handler'
-      } |\n`;
-    }
-  }
-
-  md += `\n`;
-  return md;
-}
-
-function renderCompactHandlerActionParamsShort() {
-  return [
-    '- `object_type` (string, required) - Compact object family to route.',
-    '- `action` (string, required) - Action within the selected `object_type` route.',
-    '- Extra fields are action-specific. Use the route table above and examples in `Action Recipes`.',
-  ].join('\n');
 }
 
 function generateMarkdown(tools) {
@@ -719,36 +672,25 @@ function generateCompactMarkdown(tools) {
   md += `- Runtime dump list/view -> \`HandlerDumpList|HandlerDumpView\`\n`;
   md += `- Service binding list/validate -> \`HandlerServiceBindingListTypes|HandlerServiceBindingValidate\`\n`;
   md += `- Transport create -> \`HandlerTransportCreate\`\n`;
-  md += `- Legacy catch-all (compat only) -> \`HandlerAction\`\n\n`;
+  md += `\n`;
   md += `Request contract:\n\n`;
   md += `- CRUD: \`HandlerCreate|HandlerGet|HandlerUpdate|HandlerDelete\` with required \`object_type\`.\n`;
   md += `- Lifecycle: \`HandlerValidate|HandlerActivate|HandlerLock|HandlerUnlock|HandlerCheckRun\` with compact lifecycle params.\n`;
-  md += `- Action-specific tools above use narrow typed payloads and no \`action\` discriminator.\n`;
-  md += `- \`HandlerAction\` remains for backward compatibility and still requires \`object_type\` + \`action\`.\n\n`;
-  md += `### Supported Actions (Current)\n\n`;
-  md += `- \`UNIT_TEST\`: \`run\`, \`status\`, \`result\`\n`;
-  md += `- \`CDS_UNIT_TEST\`: \`status\`, \`result\`\n`;
-  md += `- \`SERVICE_BINDING\`: \`list_types\`, \`validate\`\n`;
-  md += `- \`TRANSPORT\`: \`create_transport\`\n`;
-  md += `- \`CLASS\`: \`runProfiling\`\n`;
-  md += `- \`PROGRAM\`: \`runProfiling\`\n`;
-  md += `- \`RUNTIME_PROFILE\`: \`viewProfiles\`, \`viewProfile\`\n`;
-  md += `- \`RUNTIME_DUMP\`: \`viewDumps\`, \`viewDump\`\n\n`;
+  md += `- Action-specific tools above use narrow typed payloads.\n\n`;
   md += `## Routing Matrix\n\n`;
   md += `Source of truth: \`src/handlers/compact/high/compactMatrix.ts\`.\n`;
-  md += `Facade dispatch is deterministic by \`object_type\` and operation/action.\n\n`;
-  md += `| object_type | CRUD | Actions |\n`;
-  md += `| --- | --- | --- |\n`;
+  md += `Facade dispatch is deterministic by \`object_type\` and CRUD operation.\n\n`;
+  md += `| object_type | CRUD |\n`;
+  md += `| --- | --- |\n`;
   for (const objectType of Object.keys(compactMatrix.crud).sort()) {
     const crud = compactMatrix.crud[objectType];
-    const actions = compactMatrix.actions[objectType] || [];
     md += `| \`${objectType}\` | ${
       crud.length > 0 ? `\`${crud.join('`, `')}\`` : '-'
-    } | ${actions.length > 0 ? `\`${actions.join('`, `')}\`` : '-'} |\n`;
+    } |\n`;
   }
   md += `\n`;
   md += `Unsupported combinations return deterministic error:\n`;
-  md += `- \`Unsupported <operation|action> for object_type: <TYPE>\`\n\n`;
+  md += `- \`Unsupported <operation> for object_type: <TYPE>\`\n\n`;
 
   md += `## Action Recipes\n\n`;
   md += `Preferred dedicated compact tools and minimal payloads:\n\n`;
@@ -770,8 +712,7 @@ function generateCompactMarkdown(tools) {
 
   md += `## Minimal Payload Contracts\n\n`;
   md += `- \`HandlerCreate|Get|Update|Delete\`: always require \`object_type\`, plus object-specific fields.\n`;
-  md += `- Dedicated action tools above expose narrow payloads and are preferred.\n`;
-  md += `- \`HandlerAction\`: legacy fallback requiring \`object_type\` and \`action\`.\n`;
+  md += `- Dedicated action tools above expose narrow payloads.\n`;
   md += `- Common required pairs:\n`;
   md += `  - unit tests status/result: \`run_id\`\n`;
   md += `  - dump details: \`dump_id\`\n`;
@@ -814,15 +755,8 @@ function generateCompactMarkdown(tools) {
     md += `#### ${toolHeading}\n`;
     md += `**Description:** ${tool.description || 'No description'}\n\n`;
     md += `**Source:** \`${tool.filePath}\`\n\n`;
-    if (tool.name === 'HandlerAction') {
-      md += renderCompactHandlerActionRoutes(compactMatrix);
-    }
     md += `**Parameters:**\n`;
-    if (tool.name === 'HandlerAction') {
-      md += `${renderCompactHandlerActionParamsShort()}\n`;
-    } else {
-      md += renderParams(tool);
-    }
+    md += renderParams(tool);
     md += `\n---\n\n`;
   }
 

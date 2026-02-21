@@ -4,12 +4,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 276
+- Total tools: 275
 - Read-only tools: 36
-- High-level tools: 118
+- High-level tools: 117
 - Low-level tools: 122
 
-- Compact tools: 23 (included in High-level group)
+- Compact tools: 22 (included in High-level group)
 
 ## Handler Sets
 
@@ -100,7 +100,6 @@ Generated from code in `src/handlers/**` (not from docs).
     - [UpdateLocalTestClass](#updatelocaltestclass-high-level-class)
     - [UpdateLocalTypes](#updatelocaltypes-high-level-class)
   - [Compact](#high-level-compact)
-    - [HandlerAction](#handleraction-high-level-compact)
     - [HandlerActivate](#handleractivate-high-level-compact)
     - [HandlerCdsUnitTestResult](#handlercdsunittestresult-high-level-compact)
     - [HandlerCdsUnitTestStatus](#handlercdsunitteststatus-high-level-compact)
@@ -1258,64 +1257,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="high-level-compact"></a>
 ### High-Level / Compact
-
-<a id="handleraction-high-level-compact"></a>
-#### HandlerAction (High-Level / Compact)
-**Description:** Compact legacy action router (backward compatibility). Prefer dedicated compact action handlers.
-
-**Source:** `src/handlers/compact/high/handleHandlerAction.ts`
-
-**Parameters:**
-- `action` (string, required) - Action route to run for selected object_type (run/status/result/validate/list_types/create_transport/runProfiling/viewProfile/viewProfiles/viewDump/viewDumps).
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `auto_drill_down_threshold` (number, optional) - 
-- `class_name` (string, optional) - 
-- `context` (string, optional) - 
-- `description` (string, optional) - 
-- `dump_id` (string, optional) - 
-- `duration` (object, optional) - 
-- `explicit_on_off` (boolean, optional) - 
-- `format` (string, optional) - 
-- `id` (number, optional) - 
-- `inlinecount` (string, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `object_type` (any, required) - 
-- `orderby` (string, optional) - 
-- `owner` (string, optional) - 
-- `package_name` (string, optional) - 
-- `program_name` (string, optional) - 
-- `response_format` (string, optional) - 
-- `risk_level` (object, optional) - 
-- `run_id` (string, optional) - 
-- `scope` (object, optional) - 
-- `service_binding_name` (string, optional) - 
-- `service_binding_version` (string, optional) - 
-- `service_definition_name` (string, optional) - 
-- `skip` (number, optional) - 
-- `sql_trace` (boolean, optional) - 
-- `target_system` (string, optional) - 
-- `tests` (array, optional) - 
-- `title` (string, optional) - 
-- `top` (number, optional) - 
-- `trace_id_or_uri` (string, optional) - 
-- `transport_type` (string, optional) - 
-- `user` (string, optional) - 
-- `view` (string, optional) - 
-- `with_details` (boolean, optional) - 
-- `with_long_polling` (boolean, optional) - 
-- `with_navigation_uris` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
-- `with_system_events` (boolean, optional) - 
-
----
 
 <a id="handleractivate-high-level-compact"></a>
 #### HandlerActivate (High-Level / Compact)

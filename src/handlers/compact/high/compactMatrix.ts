@@ -1,4 +1,3 @@
-import type { CompactAction } from './compactActions';
 import type { CompactObjectType } from './compactObjectTypes';
 
 export type CompactCrudOperation = 'create' | 'get' | 'update' | 'delete';
@@ -32,35 +31,4 @@ export const COMPACT_CRUD_MATRIX: Record<
   METADATA_EXTENSION: ['create', 'get', 'update', 'delete'],
   RUNTIME_PROFILE: [],
   RUNTIME_DUMP: [],
-};
-
-export const COMPACT_ACTION_MATRIX: Record<
-  CompactObjectType,
-  readonly CompactAction[]
-> = {
-  PACKAGE: [],
-  DOMAIN: [],
-  DATA_ELEMENT: [],
-  TRANSPORT: ['create_transport'],
-  TABLE: [],
-  STRUCTURE: [],
-  VIEW: [],
-  SERVICE_DEFINITION: [],
-  SERVICE_BINDING: ['list_types', 'validate'],
-  CLASS: ['runProfiling'],
-  UNIT_TEST: ['run', 'status', 'result'],
-  CDS_UNIT_TEST: ['status', 'result'],
-  LOCAL_TEST_CLASS: [],
-  LOCAL_TYPES: [],
-  LOCAL_DEFINITIONS: [],
-  LOCAL_MACROS: [],
-  PROGRAM: ['runProfiling'],
-  INTERFACE: [],
-  FUNCTION_GROUP: [],
-  FUNCTION_MODULE: [],
-  BEHAVIOR_DEFINITION: [],
-  BEHAVIOR_IMPLEMENTATION: [],
-  METADATA_EXTENSION: [],
-  RUNTIME_PROFILE: ['viewProfiles', 'viewProfile'],
-  RUNTIME_DUMP: ['viewDump', 'viewDumps'],
 };

@@ -11,7 +11,7 @@
 ## Requirements (Locked)
 - [x] All high-level object types are addressable through compact facade.
 - [x] Full CRUD parity where CRUD exists in high-level handlers.
-- [x] Full non-CRUD parity via action routing (`run`, `status`, `result`, `validate`, `list_types`, `create_transport`, `runProfiling`, `viewProfile`, `viewProfiles`, `viewDump`, `viewDumps`, etc.).
+- [x] Full non-CRUD parity via dedicated compact handlers (`HandlerUnitTestRun/Status/Result`, `HandlerProfileRun/List/View`, `HandlerDumpList/View`, etc.).
 - [x] Implemented as router/dispatcher to existing handlers (no business logic duplication).
 - [ ] Covered by automated tests (routing + parity smoke coverage).
 
@@ -48,7 +48,7 @@
 ### Phase 1: Router Foundation
 - [x] Introduce compact CRUD handlers (`HandlerCreate/Get/Update/Delete`) for initial object set.
 - [x] Replace per-file switch statements with centralized router map.
-- [x] Add `HandlerAction` handler for non-CRUD operations.
+- [x] Add non-CRUD coverage (now split into dedicated compact handlers).
 
 ### Phase 2: Full Coverage
 - [x] Extend `object_type` enum and argument typing to full matrix.

@@ -4,7 +4,8 @@ import { compactCdsUnitTestStatusSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerCdsUnitTestStatus',
-  description: 'Compact CDS unit test status. Reads run status by run_id.',
+  description:
+    'CDS unit test status. object_type: not used. Required: run_id*. Optional: with_long_polling. Response: JSON.',
   inputSchema: compactCdsUnitTestStatusSchema,
 } as const;
 
@@ -19,4 +20,3 @@ export async function handleHandlerCdsUnitTestStatus(
 ) {
   return handleGetCdsUnitTestStatus(context, args);
 }
-

@@ -4,7 +4,8 @@ import { compactTransportCreateSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerTransportCreate',
-  description: 'Compact transport create. Creates a new transport request.',
+  description:
+    'Transport create. object_type: not used. Required: description*. Optional: transport_type(workbench|customizing), target_system, owner. Response: JSON.',
   inputSchema: compactTransportCreateSchema,
 } as const;
 
@@ -21,4 +22,3 @@ export async function handleHandlerTransportCreate(
 ) {
   return handleCreateTransport(context, args);
 }
-

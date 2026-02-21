@@ -7,7 +7,7 @@ import { compactLockSchema } from './compactSchemas';
 export const TOOL_DEFINITION = {
   name: 'HandlerLock',
   description:
-    'Compact lifecycle lock operation. Locks object for subsequent updates.',
+    'Lock operation. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), VIEW(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).',
   inputSchema: compactLockSchema,
 } as const;
 

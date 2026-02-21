@@ -8,7 +8,7 @@ import { compactValidateSchema } from './compactSchemas';
 export const TOOL_DEFINITION = {
   name: 'HandlerValidate',
   description:
-    'Compact lifecycle validate operation. Validates object names/params by object_type.',
+    'Validate before create only. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), VIEW(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).',
   inputSchema: compactValidateSchema,
 } as const;
 

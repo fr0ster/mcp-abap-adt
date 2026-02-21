@@ -4,7 +4,8 @@ import { compactUnitTestStatusSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUnitTestStatus',
-  description: 'Compact ABAP Unit status. Reads run status by run_id.',
+  description:
+    'ABAP Unit status. object_type: not used. Required: run_id*. Optional: with_long_polling. Response: JSON.',
   inputSchema: compactUnitTestStatusSchema,
 } as const;
 
@@ -19,4 +20,3 @@ export async function handleHandlerUnitTestStatus(
 ) {
   return handleGetUnitTestStatus(context, args);
 }
-

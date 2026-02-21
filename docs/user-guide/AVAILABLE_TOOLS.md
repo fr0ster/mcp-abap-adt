@@ -1260,194 +1260,207 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handleractivate-high-level-compact"></a>
 #### HandlerActivate (High-Level / Compact)
-**Description:** Compact lifecycle activate operation. Activate objects by ADT type list or single object mapping.
+**Description:** Activate operation. Single mode(object_name*, object_adt_type*). Batch mode(objects[].name*, objects[].type*).
 
 **Source:** `src/handlers/compact/high/handleHandlerActivate.ts`
 
 **Parameters:**
 - `object_adt_type` (string, optional) - ADT object type code (e.g. CLAS/OC, PROG/P). Required for single-object activation form.
-- `object_name` (string, optional) - 
+- `object_name` (string, optional) - Object name for single-object activation form.
 - `object_type` (any, optional) - 
-- `objects` (array, optional) - 
-- `preaudit` (boolean, optional) - 
+- `objects` (array, optional) - Explicit objects list for batch activation.
+- `preaudit` (boolean, optional) - Run pre-audit checks before activation.
 
 ---
 
 <a id="handlercdsunittestresult-high-level-compact"></a>
 #### HandlerCdsUnitTestResult (High-Level / Compact)
-**Description:** Compact CDS unit test result. Reads run result by run_id.
+**Description:** CDS unit test result. object_type: not used. Required: run_id*. Optional: with_navigation_uris, format(abapunit|junit). Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerCdsUnitTestResult.ts`
 
 **Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `class_name` (string, optional) - 
-- `description` (string, optional) - 
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `program_name` (string, optional) - 
-- `sql_trace` (boolean, optional) - 
+- `aggregate` (boolean, optional) - Aggregate profiling data.
+- `all_db_events` (boolean, optional) - Trace all DB events.
+- `all_dynpro_events` (boolean, optional) - Trace dynpro events.
+- `all_internal_table_events` (boolean, optional) - Trace internal table events.
+- `all_misc_abap_statements` (boolean, optional) - Trace miscellaneous ABAP statements.
+- `all_procedural_units` (boolean, optional) - Trace all procedural units.
+- `all_system_kernel_events` (boolean, optional) - Trace system kernel events.
+- `amdp_trace` (boolean, optional) - Enable AMDP tracing.
+- `class_name` (string, optional) - Class name for profiling.
+- `description` (string, optional) - Profiler run description.
+- `explicit_on_off` (boolean, optional) - Use explicit on/off trace sections.
+- `max_size_for_trace_file` (number, optional) - Maximum trace file size.
+- `max_time_for_tracing` (number, optional) - Maximum tracing time.
+- `program_name` (string, optional) - Program name for profiling.
+- `sql_trace` (boolean, optional) - Enable SQL trace.
 - `target_type` (string, required) - Profile execution target kind.
-- `with_rfc_tracing` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) - Enable RFC tracing.
 
 ---
 
 <a id="handlercdsunitteststatus-high-level-compact"></a>
 #### HandlerCdsUnitTestStatus (High-Level / Compact)
-**Description:** Compact CDS unit test status. Reads run status by run_id.
+**Description:** CDS unit test status. object_type: not used. Required: run_id*. Optional: with_long_polling. Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerCdsUnitTestStatus.ts`
 
 **Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `class_name` (string, optional) - 
-- `description` (string, optional) - 
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `program_name` (string, optional) - 
-- `sql_trace` (boolean, optional) - 
+- `aggregate` (boolean, optional) - Aggregate profiling data.
+- `all_db_events` (boolean, optional) - Trace all DB events.
+- `all_dynpro_events` (boolean, optional) - Trace dynpro events.
+- `all_internal_table_events` (boolean, optional) - Trace internal table events.
+- `all_misc_abap_statements` (boolean, optional) - Trace miscellaneous ABAP statements.
+- `all_procedural_units` (boolean, optional) - Trace all procedural units.
+- `all_system_kernel_events` (boolean, optional) - Trace system kernel events.
+- `amdp_trace` (boolean, optional) - Enable AMDP tracing.
+- `class_name` (string, optional) - Class name for profiling.
+- `description` (string, optional) - Profiler run description.
+- `explicit_on_off` (boolean, optional) - Use explicit on/off trace sections.
+- `max_size_for_trace_file` (number, optional) - Maximum trace file size.
+- `max_time_for_tracing` (number, optional) - Maximum tracing time.
+- `program_name` (string, optional) - Program name for profiling.
+- `sql_trace` (boolean, optional) - Enable SQL trace.
 - `target_type` (string, required) - Profile execution target kind.
-- `with_rfc_tracing` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) - Enable RFC tracing.
 
 ---
 
 <a id="handlercheckrun-high-level-compact"></a>
 #### HandlerCheckRun (High-Level / Compact)
-**Description:** Compact lifecycle check-run operation. Runs syntax check without activation.
+**Description:** CheckRun operation (syntax, no activation). object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), VIEW(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerCheckRun.ts`
 
 **Parameters:**
-- `session_id` (string, optional) - 
-- `session_state` (object, optional) - 
-- `version` (string, optional (default: active)) - 
+- `session_id` (string, optional) - Optional ADT session id for stateful check flow.
+- `session_state` (object, optional) - Optional ADT session state container (cookies/CSRF) for stateful check flow.
+- `version` (string, optional (default: active)) - Version to syntax-check.
 
 ---
 
 <a id="handlercreate-high-level-compact"></a>
 #### HandlerCreate (High-Level / Compact)
-**Description:** Compact facade create operation. Routes by object_type to create supported ABAP object types.
+**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerCreate.ts`
 
 **Parameters:**
-- `activate` (boolean, optional) - 
-- `application` (string, optional) - 
-- `class_name` (string, optional) - 
-- `conversion_exit` (string, optional) - 
-- `datatype` (string, optional) - 
-- `decimals` (number, optional) - 
-- `description` (string, optional) - 
-- `domain_name` (string, optional) - 
-- `fixed_values` (array, optional) - 
-- `function_group_name` (string, optional) - 
-- `function_module_name` (string, optional) - 
-- `length` (number, optional) - 
-- `lowercase` (boolean, optional) - 
+- `activate` (boolean, optional) - Activate object after create.
+- `application` (string, optional) - Domain application area.
+- `class_name` (string, optional) - ABAP class name.
+- `conversion_exit` (string, optional) - Conversion exit name.
+- `datatype` (string, optional) - ABAP data type.
+- `decimals` (number, optional) - Decimal places.
+- `description` (string, optional) - Human-readable object description.
+- `domain_name` (string, optional) - ABAP domain name.
+- `fixed_values` (array, optional) - Domain fixed values list.
+- `function_group_name` (string, optional) - ABAP function group name.
+- `function_module_name` (string, optional) - ABAP function module name.
+- `length` (number, optional) - Length for typed artifacts.
+- `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
 - `object_type` (any, required) - 
-- `package_name` (string, optional) - 
-- `program_name` (string, optional) - 
-- `program_type` (string, optional) - 
-- `sign_exists` (boolean, optional) - 
-- `source_code` (string, optional) - 
-- `transport_request` (string, optional) - 
-- `value_table` (string, optional) - 
+- `package_name` (string, optional) - ABAP package name.
+- `program_name` (string, optional) - ABAP program name.
+- `program_type` (string, optional) - ABAP program type.
+- `sign_exists` (boolean, optional) - Allow signed values (domain setting).
+- `source_code` (string, optional) - ABAP source code payload.
+- `transport_request` (string, optional) - Transport request id (if required by system).
+- `value_table` (string, optional) - Foreign key value table.
 
 ---
 
 <a id="handlerdelete-high-level-compact"></a>
 #### HandlerDelete (High-Level / Compact)
-**Description:** Compact facade delete operation. Routes by object_type to delete supported ABAP object types.
+**Description:** Delete operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerDelete.ts`
 
 **Parameters:**
-- `class_name` (string, optional) - 
-- `domain_name` (string, optional) - 
-- `function_group_name` (string, optional) - 
-- `function_module_name` (string, optional) - 
+- `class_name` (string, optional) - ABAP class name.
+- `domain_name` (string, optional) - ABAP domain name.
+- `function_group_name` (string, optional) - ABAP function group name.
+- `function_module_name` (string, optional) - ABAP function module name.
 - `object_type` (any, required) - 
-- `program_name` (string, optional) - 
-- `transport_request` (string, optional) - 
+- `program_name` (string, optional) - ABAP program name.
+- `transport_request` (string, optional) - Transport request id (if required by system).
 
 ---
 
 <a id="handlerdumplist-high-level-compact"></a>
 #### HandlerDumpList (High-Level / Compact)
-**Description:** Compact runtime dump list. Returns runtime dumps with filters.
+**Description:** Runtime dump list. object_type: not used. Required: none. Optional: user, inlinecount, top, skip, orderby. Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerDumpList.ts`
 
 **Parameters:**
-- `inlinecount` (string, optional) - 
-- `orderby` (string, optional) - 
-- `skip` (number, optional) - 
-- `top` (number, optional) - 
-- `user` (string, optional) - 
+- `inlinecount` (string, optional) - Include total count in response.
+- `orderby` (string, optional) - Sort expression.
+- `skip` (number, optional) - Offset for pagination.
+- `top` (number, optional) - Limit number of returned dumps.
+- `user` (string, optional) - Filter dumps by user.
 
 ---
 
 <a id="handlerdumpview-high-level-compact"></a>
 #### HandlerDumpView (High-Level / Compact)
-**Description:** Compact runtime dump view. Reads one dump by dump_id.
+**Description:** Runtime dump view. object_type: not used. Required: dump_id*. Optional: view(default|summary|formatted). Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerDumpView.ts`
 
 **Parameters:**
-- `dump_id` (string, required) - 
-- `view` (string, optional (default: default)) - 
+- `dump_id` (string, required) - Runtime dump id.
+- `view` (string, optional (default: default)) - Dump rendering mode.
 
 ---
 
 <a id="handlerget-high-level-compact"></a>
 #### HandlerGet (High-Level / Compact)
-**Description:** Compact facade read operation. Routes by object_type to get supported ABAP object types.
+**Description:** Read operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerGet.ts`
 
 **Parameters:**
-- `class_name` (string, optional) - 
-- `domain_name` (string, optional) - 
-- `function_group_name` (string, optional) - 
-- `function_module_name` (string, optional) - 
+- `behavior_definition_name` (string, optional) - Behavior definition name.
+- `behavior_implementation_name` (string, optional) - Behavior implementation name.
+- `class_name` (string, optional) - Class name.
+- `data_element_name` (string, optional) - Data element name.
+- `domain_name` (string, optional) - Domain name.
+- `function_group_name` (string, optional) - Function group name.
+- `function_module_name` (string, optional) - Function module name.
+- `interface_name` (string, optional) - Interface name.
+- `metadata_extension_name` (string, optional) - Metadata extension name.
 - `object_type` (any, required) - 
-- `program_name` (string, optional) - 
+- `package_name` (string, optional) - Package name.
+- `program_name` (string, optional) - Program name.
+- `response_format` (string, optional) - Response format for SERVICE_BINDING reads.
+- `run_id` (string, optional) - Unit test run id.
+- `service_binding_name` (string, optional) - Service binding name.
+- `service_definition_name` (string, optional) - Service definition name.
+- `structure_name` (string, optional) - Structure name.
+- `table_name` (string, optional) - Table name.
 - `version` (any, optional) - 
+- `view_name` (string, optional) - View name.
 
 ---
 
 <a id="handlerlock-high-level-compact"></a>
 #### HandlerLock (High-Level / Compact)
-**Description:** Compact lifecycle lock operation. Locks object for subsequent updates.
+**Description:** Lock operation. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), VIEW(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerLock.ts`
 
 **Parameters:**
-- `session_id` (string, optional) - 
-- `session_state` (object, optional) - 
-- `super_package` (string, optional) - 
+- `session_id` (string, optional) - Optional ADT session id for stateful lock flow.
+- `session_state` (object, optional) - Optional ADT session state container (cookies/CSRF) for stateful lock flow.
+- `super_package` (string, optional) - Super package context when relevant.
 
 ---
 
 <a id="handlerprofilelist-high-level-compact"></a>
 #### HandlerProfileList (High-Level / Compact)
-**Description:** Compact runtime profiling list. Returns available profiler traces.
+**Description:** Runtime profiling list. object_type: not used. Required: none. Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerProfileList.ts`
 
@@ -1458,186 +1471,188 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerprofilerun-high-level-compact"></a>
 #### HandlerProfileRun (High-Level / Compact)
-**Description:** Compact runtime profiling run. Executes CLASS or PROGRAM with profiling enabled.
+**Description:** Runtime profiling run. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM. Optional profiling flags and description. Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerProfileRun.ts`
 
 **Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `class_name` (string, optional) - 
-- `description` (string, optional) - 
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `program_name` (string, optional) - 
-- `sql_trace` (boolean, optional) - 
+- `aggregate` (boolean, optional) - Aggregate profiling data.
+- `all_db_events` (boolean, optional) - Trace all DB events.
+- `all_dynpro_events` (boolean, optional) - Trace dynpro events.
+- `all_internal_table_events` (boolean, optional) - Trace internal table events.
+- `all_misc_abap_statements` (boolean, optional) - Trace miscellaneous ABAP statements.
+- `all_procedural_units` (boolean, optional) - Trace all procedural units.
+- `all_system_kernel_events` (boolean, optional) - Trace system kernel events.
+- `amdp_trace` (boolean, optional) - Enable AMDP tracing.
+- `class_name` (string, optional) - Class name for profiling.
+- `description` (string, optional) - Profiler run description.
+- `explicit_on_off` (boolean, optional) - Use explicit on/off trace sections.
+- `max_size_for_trace_file` (number, optional) - Maximum trace file size.
+- `max_time_for_tracing` (number, optional) - Maximum tracing time.
+- `program_name` (string, optional) - Program name for profiling.
+- `sql_trace` (boolean, optional) - Enable SQL trace.
 - `target_type` (string, required) - Profile execution target kind.
-- `with_rfc_tracing` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) - Enable RFC tracing.
 
 ---
 
 <a id="handlerprofileview-high-level-compact"></a>
 #### HandlerProfileView (High-Level / Compact)
-**Description:** Compact runtime profiling view. Reads one profiler trace by trace_id_or_uri.
+**Description:** Runtime profiling view. object_type: not used. Required: trace_id_or_uri*, view*(hitlist|statements|db_accesses). Optional: with_system_events, id, with_details, auto_drill_down_threshold. Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerProfileView.ts`
 
 **Parameters:**
-- `auto_drill_down_threshold` (number, optional) - 
-- `id` (number, optional) - 
-- `trace_id_or_uri` (string, required) - 
-- `view` (string, required) - 
-- `with_details` (boolean, optional) - 
-- `with_system_events` (boolean, optional) - 
+- `auto_drill_down_threshold` (number, optional) - Auto drill-down threshold.
+- `id` (number, optional) - Optional statement/access id.
+- `trace_id_or_uri` (string, required) - Profiler trace id or URI.
+- `view` (string, required) - Profiler trace view kind.
+- `with_details` (boolean, optional) - Include detailed payload.
+- `with_system_events` (boolean, optional) - Include system events in analysis.
 
 ---
 
 <a id="handlerservicebindinglisttypes-high-level-compact"></a>
 #### HandlerServiceBindingListTypes (High-Level / Compact)
-**Description:** Compact service binding list types. Returns available binding protocol types.
+**Description:** Service binding types list. object_type: not used. Required: none. Optional: response_format(xml|json|plain). Response: XML/JSON/plain by response_format.
 
 **Source:** `src/handlers/compact/high/handleHandlerServiceBindingListTypes.ts`
 
 **Parameters:**
-- `response_format` (string, optional (default: xml)) - 
+- `response_format` (string, optional (default: xml)) - Response format for protocol types list.
 
 ---
 
 <a id="handlerservicebindingvalidate-high-level-compact"></a>
 #### HandlerServiceBindingValidate (High-Level / Compact)
-**Description:** Compact service binding validate. Validates binding and service definition pair.
+**Description:** Service binding validate before create. object_type: not used. Required: service_binding_name*, service_definition_name*. Optional: service_binding_version, package_name, description. Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerServiceBindingValidate.ts`
 
 **Parameters:**
-- `description` (string, optional) - 
-- `package_name` (string, optional) - 
-- `service_binding_name` (string, required) - 
-- `service_binding_version` (string, optional) - 
-- `service_definition_name` (string, required) - 
+- `description` (string, optional) - Binding description.
+- `package_name` (string, optional) - Target package name.
+- `service_binding_name` (string, required) - Service binding name to validate.
+- `service_binding_version` (string, optional) - Service binding version.
+- `service_definition_name` (string, required) - Service definition name to pair with binding.
 
 ---
 
 <a id="handlertransportcreate-high-level-compact"></a>
 #### HandlerTransportCreate (High-Level / Compact)
-**Description:** Compact transport create. Creates a new transport request.
+**Description:** Transport create. object_type: not used. Required: description*. Optional: transport_type(workbench|customizing), target_system, owner. Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerTransportCreate.ts`
 
 **Parameters:**
-- `description` (string, required) - 
-- `owner` (string, optional) - 
-- `target_system` (string, optional) - 
-- `transport_type` (string, optional (default: workbench)) - 
+- `description` (string, required) - Transport description.
+- `owner` (string, optional) - Transport owner user.
+- `target_system` (string, optional) - Target system id.
+- `transport_type` (string, optional (default: workbench)) - Transport type.
 
 ---
 
 <a id="handlerunittestresult-high-level-compact"></a>
 #### HandlerUnitTestResult (High-Level / Compact)
-**Description:** Compact ABAP Unit result. Reads run result by run_id.
+**Description:** ABAP Unit result. object_type: not used. Required: run_id*. Optional: with_navigation_uris, format(abapunit|junit). Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerUnitTestResult.ts`
 
 **Parameters:**
-- `format` (string, optional) - 
-- `run_id` (string, required) - 
-- `with_navigation_uris` (boolean, optional (default: false)) - 
+- `format` (string, optional) - Result format.
+- `run_id` (string, required) - Unit test run id.
+- `with_navigation_uris` (boolean, optional (default: false)) - Include ADT navigation URIs in the result payload.
 
 ---
 
 <a id="handlerunittestrun-high-level-compact"></a>
 #### HandlerUnitTestRun (High-Level / Compact)
-**Description:** Compact ABAP Unit run. Starts a test run and returns run_id.
+**Description:** ABAP Unit run. object_type: not used. Required: tests[]{container_class*, test_class*}. Optional: title, context, scope, risk_level, duration. Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerUnitTestRun.ts`
 
 **Parameters:**
-- `context` (string, optional) - 
-- `duration` (object, optional) - 
-- `risk_level` (object, optional) - 
-- `scope` (object, optional) - 
-- `tests` (array, required) - 
-- `title` (string, optional) - 
+- `context` (string, optional) - Run context label.
+- `duration` (object, optional) - Allowed duration classes.
+- `risk_level` (object, optional) - Allowed risk levels.
+- `scope` (object, optional) - ABAP Unit scope flags.
+- `tests` (array, required) - List of test classes to run.
+- `title` (string, optional) - Run title shown in ABAP Unit logs.
 
 ---
 
 <a id="handlerunitteststatus-high-level-compact"></a>
 #### HandlerUnitTestStatus (High-Level / Compact)
-**Description:** Compact ABAP Unit status. Reads run status by run_id.
+**Description:** ABAP Unit status. object_type: not used. Required: run_id*. Optional: with_long_polling. Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerUnitTestStatus.ts`
 
 **Parameters:**
-- `run_id` (string, required) - 
-- `with_long_polling` (boolean, optional (default: true)) - 
+- `run_id` (string, required) - Unit test run id.
+- `with_long_polling` (boolean, optional (default: true)) - Use long polling while waiting for completion.
 
 ---
 
 <a id="handlerunlock-high-level-compact"></a>
 #### HandlerUnlock (High-Level / Compact)
-**Description:** Compact lifecycle unlock operation. Unlocks object after modifications.
+**Description:** Unlock operation. object_type required: CLASS(object_name*, lock_handle*, session_id*), PROGRAM(object_name*, lock_handle*, session_id*), INTERFACE(object_name*, lock_handle*, session_id*), FUNCTION_GROUP(object_name*, lock_handle*, session_id*), FUNCTION_MODULE(object_name*, lock_handle*, session_id*), TABLE(object_name*, lock_handle*, session_id*), STRUCTURE(object_name*, lock_handle*, session_id*), VIEW(object_name*, lock_handle*, session_id*), DOMAIN(object_name*, lock_handle*, session_id*), DATA_ELEMENT(object_name*, lock_handle*, session_id*), PACKAGE(object_name*, lock_handle*, session_id*), BEHAVIOR_DEFINITION(object_name*, lock_handle*, session_id*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*, session_id*), METADATA_EXTENSION(object_name*, lock_handle*, session_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerUnlock.ts`
 
 **Parameters:**
-- `lock_handle` (string, required) - 
-- `session_id` (string, required) - 
-- `session_state` (object, optional) - 
+- `lock_handle` (string, required) - Lock handle returned by lock.
+- `session_id` (string, required) - ADT session id used during lock.
+- `session_state` (object, optional) - Optional ADT session state container (cookies/CSRF) for stateful unlock flow.
 
 ---
 
 <a id="handlerupdate-high-level-compact"></a>
 #### HandlerUpdate (High-Level / Compact)
-**Description:** Compact facade update operation. Routes by object_type to update supported ABAP object types.
+**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerUpdate.ts`
 
 **Parameters:**
-- `activate` (boolean, optional) - 
-- `class_name` (string, optional) - 
-- `conversion_exit` (string, optional) - 
-- `datatype` (string, optional) - 
-- `decimals` (number, optional) - 
-- `description` (string, optional) - 
-- `domain_name` (string, optional) - 
-- `fixed_values` (array, optional) - 
-- `function_group_name` (string, optional) - 
-- `function_module_name` (string, optional) - 
-- `length` (number, optional) - 
-- `lowercase` (boolean, optional) - 
+- `activate` (boolean, optional) - Activate object after update.
+- `class_name` (string, optional) - ABAP class name.
+- `conversion_exit` (string, optional) - Conversion exit name.
+- `datatype` (string, optional) - ABAP data type.
+- `decimals` (number, optional) - Decimal places.
+- `description` (string, optional) - Human-readable object description.
+- `domain_name` (string, optional) - ABAP domain name.
+- `fixed_values` (array, optional) - Domain fixed values list.
+- `function_group_name` (string, optional) - ABAP function group name.
+- `function_module_name` (string, optional) - ABAP function module name.
+- `length` (number, optional) - Length for typed artifacts.
+- `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
 - `object_type` (any, required) - 
-- `package_name` (string, optional) - 
-- `program_name` (string, optional) - 
-- `sign_exists` (boolean, optional) - 
-- `source_code` (string, optional) - 
-- `transport_request` (string, optional) - 
-- `value_table` (string, optional) - 
+- `package_name` (string, optional) - ABAP package name.
+- `program_name` (string, optional) - ABAP program name.
+- `sign_exists` (boolean, optional) - Allow signed values (domain setting).
+- `source_code` (string, optional) - ABAP source code payload.
+- `transport_request` (string, optional) - Transport request id (if required by system).
+- `value_table` (string, optional) - Foreign key value table.
 
 ---
 
 <a id="handlervalidate-high-level-compact"></a>
 #### HandlerValidate (High-Level / Compact)
-**Description:** Compact lifecycle validate operation. Validates object names/params by object_type.
+**Description:** Validate before create only. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), VIEW(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerValidate.ts`
 
 **Parameters:**
-- `behavior_definition` (string, optional) - 
-- `description` (string, optional) - 
-- `implementation_type` (string, optional) - 
-- `package_name` (string, optional) - 
-- `root_entity` (string, optional) - 
-- `service_binding_version` (string, optional) - 
-- `service_definition_name` (string, optional) - 
-- `session_id` (string, optional) - 
-- `session_state` (object, optional) - 
+- `behavior_definition` (string, optional) - Optional behavior definition name, used when validating behavior implementation.
+- `description` (string, optional) - Optional object description used during validation.
+- `implementation_type` (string, optional) - Optional implementation type, used for behavior implementation validation.
+- `object_name` (string, required) - Required object name. For SERVICE_BINDING this is the service binding name.
+- `object_type` (string, required) - Object type to validate before create. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, VIEW, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.
+- `package_name` (string, optional) - Optional package context for validation (especially for create scenarios).
+- `root_entity` (string, optional) - Optional CDS root entity name, used for behavior-related validation.
+- `service_binding_version` (string, optional) - Optional service binding version for SERVICE_BINDING.
+- `service_definition_name` (string, optional) - Required when object_type=SERVICE_BINDING. Service definition paired with the binding.
+- `session_id` (string, optional) - Optional ADT session id for stateful validation flow.
+- `session_state` (object, optional) - Optional ADT session state container (cookies/CSRF) for stateful validation flow.
 
 ---
 

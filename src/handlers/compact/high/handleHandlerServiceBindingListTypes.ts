@@ -5,7 +5,7 @@ import { compactServiceBindingListTypesSchema } from './compactSchemas';
 export const TOOL_DEFINITION = {
   name: 'HandlerServiceBindingListTypes',
   description:
-    'Compact service binding list types. Returns available binding protocol types.',
+    'Service binding types list. object_type: not used. Required: none. Optional: response_format(xml|json|plain). Response: XML/JSON/plain by response_format.',
   inputSchema: compactServiceBindingListTypesSchema,
 } as const;
 
@@ -19,4 +19,3 @@ export async function handleHandlerServiceBindingListTypes(
 ) {
   return handleListServiceBindingTypes(context, args);
 }
-

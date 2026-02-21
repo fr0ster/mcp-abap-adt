@@ -5,7 +5,7 @@ import { compactProfileViewSchema } from './compactSchemas';
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileView',
   description:
-    'Compact runtime profiling view. Reads one profiler trace by trace_id_or_uri.',
+    'Runtime profiling view. object_type: not used. Required: trace_id_or_uri*, view*(hitlist|statements|db_accesses). Optional: with_system_events, id, with_details, auto_drill_down_threshold. Response: JSON.',
   inputSchema: compactProfileViewSchema,
 } as const;
 
@@ -24,4 +24,3 @@ export async function handleHandlerProfileView(
 ) {
   return handleRuntimeGetProfilerTraceData(context, args);
 }
-

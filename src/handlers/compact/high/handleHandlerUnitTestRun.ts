@@ -4,7 +4,8 @@ import { compactUnitTestRunSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUnitTestRun',
-  description: 'Compact ABAP Unit run. Starts a test run and returns run_id.',
+  description:
+    'ABAP Unit run. object_type: not used. Required: tests[]{container_class*, test_class*}. Optional: title, context, scope, risk_level, duration. Response: JSON.',
   inputSchema: compactUnitTestRunSchema,
 } as const;
 
@@ -38,4 +39,3 @@ export async function handleHandlerUnitTestRun(
 ) {
   return handleRunUnitTest(context, args);
 }
-

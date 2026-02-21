@@ -4,7 +4,8 @@ import { compactCdsUnitTestResultSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerCdsUnitTestResult',
-  description: 'Compact CDS unit test result. Reads run result by run_id.',
+  description:
+    'CDS unit test result. object_type: not used. Required: run_id*. Optional: with_navigation_uris, format(abapunit|junit). Response: JSON.',
   inputSchema: compactCdsUnitTestResultSchema,
 } as const;
 
@@ -20,4 +21,3 @@ export async function handleHandlerCdsUnitTestResult(
 ) {
   return handleGetCdsUnitTestResult(context, args);
 }
-

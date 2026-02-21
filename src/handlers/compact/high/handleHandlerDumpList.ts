@@ -4,7 +4,8 @@ import { compactDumpListSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDumpList',
-  description: 'Compact runtime dump list. Returns runtime dumps with filters.',
+  description:
+    'Runtime dump list. object_type: not used. Required: none. Optional: user, inlinecount, top, skip, orderby. Response: JSON.',
   inputSchema: compactDumpListSchema,
 } as const;
 
@@ -22,4 +23,3 @@ export async function handleHandlerDumpList(
 ) {
   return handleRuntimeListDumps(context, args);
 }
-

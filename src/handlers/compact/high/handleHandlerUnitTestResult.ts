@@ -4,7 +4,8 @@ import { compactUnitTestResultSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUnitTestResult',
-  description: 'Compact ABAP Unit result. Reads run result by run_id.',
+  description:
+    'ABAP Unit result. object_type: not used. Required: run_id*. Optional: with_navigation_uris, format(abapunit|junit). Response: JSON.',
   inputSchema: compactUnitTestResultSchema,
 } as const;
 
@@ -20,4 +21,3 @@ export async function handleHandlerUnitTestResult(
 ) {
   return handleGetUnitTestResult(context, args);
 }
-

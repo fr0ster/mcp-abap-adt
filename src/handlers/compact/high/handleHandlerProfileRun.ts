@@ -6,7 +6,7 @@ import { compactProfileRunSchema } from './compactSchemas';
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileRun',
   description:
-    'Compact runtime profiling run. Executes CLASS or PROGRAM with profiling enabled.',
+    'Runtime profiling run. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM. Optional profiling flags and description. Response: JSON.',
   inputSchema: compactProfileRunSchema,
 } as const;
 

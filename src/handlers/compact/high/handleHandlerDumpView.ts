@@ -4,7 +4,8 @@ import { compactDumpViewSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDumpView',
-  description: 'Compact runtime dump view. Reads one dump by dump_id.',
+  description:
+    'Runtime dump view. object_type: not used. Required: dump_id*. Optional: view(default|summary|formatted). Response: JSON.',
   inputSchema: compactDumpViewSchema,
 } as const;
 
@@ -19,4 +20,3 @@ export async function handleHandlerDumpView(
 ) {
   return handleRuntimeGetDumpById(context, args);
 }
-

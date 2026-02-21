@@ -7,7 +7,7 @@ import { compactActivateSchema } from './compactSchemas';
 export const TOOL_DEFINITION = {
   name: 'HandlerActivate',
   description:
-    'Compact lifecycle activate operation. Activate objects by ADT type list or single object mapping.',
+    'Activate operation. Single mode(object_name*, object_adt_type*). Batch mode(objects[].name*, objects[].type*).',
   inputSchema: compactActivateSchema,
 } as const;
 

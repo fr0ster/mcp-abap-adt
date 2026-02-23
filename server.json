@@ -6,12 +6,12 @@
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"
   },
-  "version": "2.5.0",
+  "version": "2.5.2",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@mcp-abap-adt/core",
-      "version": "2.5.0",
+      "version": "2.5.2",
       "transport": {
         "type": "stdio"
       }

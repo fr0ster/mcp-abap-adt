@@ -299,7 +299,10 @@ Inline comments are not parsed, so keep comments on separate lines.
 **Authentication:**
 - `--auth-broker` - Force use of auth-broker (service keys), ignore .env file
 - `--auth-broker-path=<path>` - Custom path for auth-broker service keys and sessions
+- `--browser-auth-port=<port>` - Override OAuth browser callback port (default: 5000 for HTTP, 4000 for SSE, 4001 for stdio)
 - `--unsafe` - Enable file-based session storage (persists tokens to disk). By default, sessions are stored in-memory (secure, lost on restart)
+
+When `--mcp=<destination>` is specified, automatic fallback loading of `./.env` is skipped.
 
 **Examples:**
 ```bash

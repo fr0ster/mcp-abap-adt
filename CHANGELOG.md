@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [2.5.2] - 2026-02-23
+### Fixed
+- **`--mcp` precedence over local `.env`**:
+  - Fixed CLI fallback logic so `.env` from current working directory is no longer auto-loaded when `--mcp=<destination>` is provided.
+  - Startup auth source display now correctly prioritizes `service-key: <destination>` over `.env`.
+- **JWT auth error diagnostics**:
+  - Improved HTTP/SSE request-time error reporting for missing JWT tokens by surfacing token provider failure reason in `BaseMcpServer`.
+- **Auth broker runtime behavior**:
+  - Fixed v2 auth-broker config to respect `--unsafe` instead of always forcing safe in-memory stores.
+
+### Added
+- **Browser OAuth callback port override**:
+  - Added `--browser-auth-port=<port>` and `MCP_BROWSER_AUTH_PORT` to override auth callback server port (useful when default ports are occupied).
+- **Inspector runtime dependency safety**:
+  - Added explicit `express-rate-limit` dev dependency to avoid missing transitive package issues during `dev:http` inspector startup.
+
+### Documentation
+- Updated auth and CLI docs for `--mcp` behavior and browser auth callback port override:
+  - `README.md`
+  - `docs/user-guide/AUTHENTICATION.md`
+  - CLI help text via `ServerConfigManager`.
+
 ## [2.5.1] - 2026-02-21
 ### Changed
 - **Compact handler descriptions**:

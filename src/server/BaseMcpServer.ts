@@ -79,6 +79,7 @@ export abstract class BaseMcpServer extends McpServer {
     // Try to get fresh token from broker
     // If broker can't refresh (no UAA credentials), use existing token from connectionConfig
     let freshToken: string | undefined;
+    let tokenError: unknown;
     try {
       freshToken = await authBroker.getToken(destination);
     } catch (error) {
@@ -87,6 +88,7 @@ export abstract class BaseMcpServer extends McpServer {
       this.logger.debug(
         `Broker can't refresh token, using existing token from session: ${error instanceof Error ? error.message : String(error)}`,
       );
+      tokenError = error;
       freshToken = connectionConfig.authorizationToken;
     }
     const tokenToUse = freshToken || connectionConfig.authorizationToken || '';
@@ -97,6 +99,14 @@ export abstract class BaseMcpServer extends McpServer {
       (connectionConfig.username && connectionConfig.password
         ? 'basic'
         : 'jwt');
+
+    if (authType === 'jwt' && !tokenToUse) {
+      const reason =
+        tokenError instanceof Error ? tokenError.message : String(tokenError);
+      throw new Error(
+        `JWT token is missing for destination "${destination}". ${reason ? `Token provider error: ${reason}. ` : ''}Provide a valid session token (or refresh token) for this destination, or use --env-path with SAP_JWT_TOKEN.`,
+      );
+    }
 
     this.connectionContext = {
       sessionId: destination,

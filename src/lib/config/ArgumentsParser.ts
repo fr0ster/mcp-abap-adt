@@ -45,6 +45,8 @@ export interface ParsedArguments {
   sseAllowedHosts?: string[];
   /** SSE enable DNS protection */
   sseEnableDnsProtection?: boolean;
+  /** Port for browser auth callback server */
+  browserAuthPort?: number;
 }
 
 export class ArgumentsParser {
@@ -134,6 +136,18 @@ export class ArgumentsParser {
     // Parse --auth-broker-path
     result.authBrokerPath = getArgValue('--auth-broker-path');
 
+    // Parse browser auth callback port
+    {
+      const raw =
+        getArgValue('--browser-auth-port') || process.env.MCP_BROWSER_AUTH_PORT;
+      if (raw) {
+        const port = parseInt(raw, 10);
+        if (!Number.isNaN(port) && port > 0 && port <= 65535) {
+          result.browserAuthPort = port;
+        }
+      }
+    }
+
     // Parse --env and --env-path
     // --env: destination name (resolved to sessions/<name>.env in platform path)
     // --env-path: explicit file path or file name (resolved against cwd if relative)
@@ -149,7 +163,7 @@ export class ArgumentsParser {
 
     if (resolvedEnv) {
       result.env = resolvedEnv;
-    } else {
+    } else if (!result.mcp) {
       // Backward-compatible fallback: .env in current directory
       const cwdEnvPath = path.resolve(process.cwd(), '.env');
       if (fs.existsSync(cwdEnvPath)) {

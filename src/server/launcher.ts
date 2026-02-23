@@ -199,10 +199,10 @@ async function main() {
 
         // Determine source
         let source = 'unknown';
-        if (config.envFile) {
-          source = config.envFile;
-        } else if (config.mcpDestination) {
+        if (config.mcpDestination) {
           source = `service-key: ${config.mcpDestination}`;
+        } else if (config.envFile) {
+          source = config.envFile;
         }
 
         console.error(formatAuthConfigForDisplay(displayConfig, source));

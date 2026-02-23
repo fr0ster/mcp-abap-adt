@@ -126,6 +126,7 @@ export class ServerConfigManager {
       mcpDestination: parsed.mcp,
       unsafe: parsed.unsafe,
       useAuthBroker: parsed.useAuthBroker,
+      browserAuthPort: parsed.browserAuthPort,
     };
   }
 
@@ -253,6 +254,8 @@ AUTHENTICATION:
                                    Example: --mcp=TRIAL
   --auth-broker-path=<path>        Custom path for auth-broker storage
                                    Example: --auth-broker-path=~/prj/tmp/
+  --browser-auth-port=<port>       OAuth callback port for browser authentication
+                                   (default: 5000 http, 4000 sse, 4001 stdio)
 
 ${ServerConfigManager.getHandlerSetsDescription()}
 HTTP OPTIONS:

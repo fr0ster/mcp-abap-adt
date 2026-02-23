@@ -35,6 +35,8 @@ export interface IServerConfig {
    * - 'none': Logs URL and rejects immediately (automated tests)
    */
   browser?: string;
+  /** Port for browser auth callback server */
+  browserAuthPort?: number;
 
   // ============================================================================
   // TRANSPORT CONFIGURATION

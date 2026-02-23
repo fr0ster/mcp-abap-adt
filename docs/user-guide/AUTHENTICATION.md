@@ -24,6 +24,7 @@ mcp-abap-adt --transport=stdio --mcp=TRIAL
 ```
 
 The server will load the matching service key and manage tokens automatically.
+When `--mcp=<destination>` is specified, automatic fallback loading of local `./.env` is skipped.
 
 ## .env Authentication
 
@@ -48,6 +49,12 @@ mcp-auth auth -k path/to/service-key.json
 This writes JWT details to `.env`.
 
 **Claude recommendation:** for Claude, prefer service keys in `service-keys` and use `--mcp=<destination>` instead of manual tokens.
+
+If browser-based OAuth callback port is occupied, override it:
+
+```bash
+mcp-abap-adt --transport=http --mcp=TRIAL --browser-auth-port=5100
+```
 
 ## HTTP/SSE Headers
 

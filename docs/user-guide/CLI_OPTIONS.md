@@ -175,6 +175,20 @@ mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
 # This will use ~/prj/tmp/service-keys and ~/prj/tmp/sessions
 ```
 
+**--browser-auth-port=\<port\>**
+
+Override OAuth browser callback port used by token providers.
+
+Defaults by transport:
+- HTTP: `5000`
+- SSE: `4000`
+- stdio: `4001`
+
+```bash
+# Avoid callback port collision in HTTP mode
+mcp-abap-adt --transport=http --mcp=TRIAL --browser-auth-port=5100
+```
+
 ## HTTP Server Options
 
 Used with `--transport=http` or `--transport=streamable-http`.

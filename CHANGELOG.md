@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2.6.1] - 2026-02-27
+
+### Fixed
+- **`UpdateProgram` missing `transport_request`**: Added `transport_request` to schema, interface, and `.update()` call — same fix as other handlers in 2.6.0.
+
+### Changed
+- **Upgraded `@mcp-abap-adt/adt-clients`** to `1.2.2`.
+
 ## [2.6.0] - 2026-02-27
 
 ### Added

@@ -26,7 +26,8 @@ export const TOOL_DEFINITION = {
       },
       transport_request: {
         type: 'string',
-        description: 'Transport request number (e.g., E19K905635). Required for transportable packages.',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
       lock_handle: {
         type: 'string',
@@ -80,12 +81,14 @@ export async function handleUpdateBehaviorDefinition(
     }
 
     // Update - using types from adt-clients
-    const updateConfig: Pick<IBehaviorDefinitionConfig, 'name' | 'sourceCode'> & { transportRequest?: string } =
-      {
-        name,
-        sourceCode: args.source_code,
-        transportRequest: args.transport_request,
-      };
+    const updateConfig: Pick<
+      IBehaviorDefinitionConfig,
+      'name' | 'sourceCode'
+    > & { transportRequest?: string } = {
+      name,
+      sourceCode: args.source_code,
+      transportRequest: args.transport_request,
+    };
     await client
       .getBehaviorDefinition()
       .update(updateConfig, { lockHandle: lockHandle });

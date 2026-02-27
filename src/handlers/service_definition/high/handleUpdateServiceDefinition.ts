@@ -104,12 +104,14 @@ export async function handleUpdateServiceDefinition(
 
       try {
         // Update source code
-        await client
-          .getServiceDefinition()
-          .update(
-            { serviceDefinitionName, sourceCode: source_code, transportRequest: args.transport_request },
-            { lockHandle },
-          );
+        await client.getServiceDefinition().update(
+          {
+            serviceDefinitionName,
+            sourceCode: source_code,
+            transportRequest: args.transport_request,
+          },
+          { lockHandle },
+        );
 
         // Check
         try {

@@ -176,12 +176,14 @@ export async function handleCreateTable(
           logger?.info(
             `[CreateTable] Updating table with DDL code: ${tableName}`,
           );
-          await client
-            .getTable()
-            .update(
-              { tableName, ddlCode: createTableArgs.ddl_code, transportRequest: createTableArgs.transport_request },
-              { lockHandle },
-            );
+          await client.getTable().update(
+            {
+              tableName,
+              ddlCode: createTableArgs.ddl_code,
+              transportRequest: createTableArgs.transport_request,
+            },
+            { lockHandle },
+          );
           logger?.info(`[CreateTable] Table source code updated: ${tableName}`);
         } else {
           logger?.info(

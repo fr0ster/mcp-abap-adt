@@ -41,8 +41,8 @@ import {
   handleGetTransport,
 } from '../../../handlers/transport/readonly/handleGetTransport';
 import {
-  TOOL_DEFINITION as ListTransports_Tool,
   handleListTransports,
+  TOOL_DEFINITION as ListTransports_Tool,
 } from '../../../handlers/transport/readonly/handleListTransports';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';

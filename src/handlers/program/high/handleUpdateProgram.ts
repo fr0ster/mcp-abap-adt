@@ -31,6 +31,11 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Complete ABAP program source code.',
       },
+      transport_request: {
+        type: 'string',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable packages.',
+      },
       activate: {
         type: 'boolean',
         description:
@@ -44,6 +49,7 @@ export const TOOL_DEFINITION = {
 interface UpdateProgramArgs {
   program_name: string;
   source_code: string;
+  transport_request?: string;
   activate?: boolean;
 }
 
@@ -142,12 +148,14 @@ export async function handleUpdateProgram(
       // Update (only if check passed)
       if (checkNewCodePassed) {
         logger?.debug(`Updating program source code: ${programName}`);
-        await client
-          .getProgram()
-          .update(
-            { programName, sourceCode: args.source_code },
-            { lockHandle },
-          );
+        await client.getProgram().update(
+          {
+            programName,
+            sourceCode: args.source_code,
+            transportRequest: args.transport_request,
+          },
+          { lockHandle },
+        );
         logger?.info(`Program source code updated: ${programName}`);
       } else {
         logger?.warn(`Skipping update - new code check failed: ${programName}`);

@@ -7,10 +7,7 @@
 
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  makeAdtRequestWithTimeout,
-  return_error,
-} from '../../../lib/utils';
+import { makeAdtRequestWithTimeout, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ListTransports',
@@ -60,23 +57,20 @@ function parseTransportListXml(xmlData: string): TransportEntry[] {
   const result = parser.parse(xmlData);
 
   // Response can be under different roots depending on SAP version
-  const root =
-    result['tm:root'] ||
-    result['tm:roots'] ||
-    result;
+  const root = result['tm:root'] || result['tm:roots'] || result;
 
   // Extract requests
-  const requests = root?.['tm:request'] || root?.['tm:workbench']?.['tm:request'] || [];
+  const requests =
+    root?.['tm:request'] || root?.['tm:workbench']?.['tm:request'] || [];
   const requestList = Array.isArray(requests) ? requests : [requests];
 
   return requestList
     .filter((req: Record<string, unknown>) => req)
     .map((req: Record<string, unknown>) => ({
       number:
-        (req['tm:number'] as string) ||
-        (req['adtcore:name'] as string) ||
-        '',
-      description: (req['tm:desc'] as string) || (req['tm:description'] as string) || '',
+        (req['tm:number'] as string) || (req['adtcore:name'] as string) || '',
+      description:
+        (req['tm:desc'] as string) || (req['tm:description'] as string) || '',
       type: (req['tm:type'] as string) || '',
       status: (req['tm:status'] as string) || '',
       owner: (req['tm:owner'] as string) || '',

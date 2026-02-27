@@ -31,7 +31,8 @@ export const TOOL_DEFINITION = {
       },
       transport_request: {
         type: 'string',
-        description: 'Transport request number (e.g., E19K905635). Required for transportable packages.',
+        description:
+          'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
       activate: {
         type: 'boolean',
@@ -114,12 +115,14 @@ export async function handleUpdateClass(
       // Update (if check passed)
       if (checkNewCodePassed) {
         logger?.debug(`Updating class source code: ${className}`);
-        await client
-          .getClass()
-          .update(
-            { className: className, sourceCode: args.source_code, transportRequest: args.transport_request },
-            { lockHandle },
-          );
+        await client.getClass().update(
+          {
+            className: className,
+            sourceCode: args.source_code,
+            transportRequest: args.transport_request,
+          },
+          { lockHandle },
+        );
         logger?.info(`Class source code updated: ${className}`);
       } else {
         logger?.warn(`Skipping update - new code check failed: ${className}`);

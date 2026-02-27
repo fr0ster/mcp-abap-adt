@@ -172,7 +172,7 @@ export async function handleUpdateStructure(
           );
           await client
             .getStructure()
-            .update({ structureName, ddlCode: ddl_code }, { lockHandle });
+            .update({ structureName, ddlCode: ddl_code, transportRequest: args.transport_request }, { lockHandle });
           logger?.info(
             `[UpdateStructure] Structure source code updated: ${structureName}`,
           );

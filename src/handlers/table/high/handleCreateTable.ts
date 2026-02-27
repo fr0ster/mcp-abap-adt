@@ -179,7 +179,7 @@ export async function handleCreateTable(
           await client
             .getTable()
             .update(
-              { tableName, ddlCode: createTableArgs.ddl_code },
+              { tableName, ddlCode: createTableArgs.ddl_code, transportRequest: createTableArgs.transport_request },
               { lockHandle },
             );
           logger?.info(`[CreateTable] Table source code updated: ${tableName}`);

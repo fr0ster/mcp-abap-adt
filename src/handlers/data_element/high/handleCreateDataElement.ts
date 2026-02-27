@@ -229,6 +229,7 @@ export async function handleCreateDataElement(
         searchHelp: typedArgs.search_help,
         searchHelpParameter: typedArgs.search_help_parameter,
         setGetParameter: typedArgs.set_get_parameter,
+        transportRequest: typedArgs.transport_request,
       };
 
       await client

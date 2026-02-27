@@ -196,6 +196,7 @@ export async function handleCreateDomain(
           sign_exists: typedArgs.sign_exists || false,
           value_table: typedArgs.value_table,
           fixed_values: typedArgs.fixed_values,
+          transportRequest: typedArgs.transport_request,
         },
         { lockHandle },
       );

@@ -29,6 +29,10 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Complete ABAP class source code.',
       },
+      transport_request: {
+        type: 'string',
+        description: 'Transport request number (e.g., E19K905635). Required for transportable packages.',
+      },
       activate: {
         type: 'boolean',
         description: 'Activate after update. Default: false.',
@@ -41,6 +45,7 @@ export const TOOL_DEFINITION = {
 interface UpdateClassArgs {
   class_name: string;
   source_code: string;
+  transport_request?: string;
   activate?: boolean;
 }
 
@@ -112,7 +117,7 @@ export async function handleUpdateClass(
         await client
           .getClass()
           .update(
-            { className: className, sourceCode: args.source_code },
+            { className: className, sourceCode: args.source_code, transportRequest: args.transport_request },
             { lockHandle },
           );
         logger?.info(`Class source code updated: ${className}`);

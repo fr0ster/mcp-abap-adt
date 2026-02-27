@@ -136,6 +136,7 @@ export async function handleCreateFunctionModule(
             functionModuleName,
             functionGroupName,
             sourceCode: typedArgs.source_code,
+            transportRequest: typedArgs.transport_request,
           },
           { lockHandle },
         );

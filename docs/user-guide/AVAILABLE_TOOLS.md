@@ -4,8 +4,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 275
-- Read-only tools: 36
+- Total tools: 276
+- Read-only tools: 37
 - High-level tools: 117
 - Low-level tools: 122
 
@@ -67,6 +67,7 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetTableContents](#gettablecontents-read-only-table)
   - [Transport](#read-only-transport)
     - [GetTransport](#gettransport-read-only-transport)
+    - [ResolveTransport](#resolvetransport-read-only-transport)
 - [High-Level Group](#high-level-group)
   - [Behavior Definition](#high-level-behavior-definition)
     - [CreateBehaviorDefinition](#createbehaviordefinition-high-level-behavior-definition)
@@ -862,6 +863,22 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="resolvetransport-read-only-transport"></a>
+#### ResolveTransport (Read-Only / Transport)
+**Description:** [read-only] Resolve transport request for an ABAP object. Returns locked transport, available transports, and whether the package is local. Call before create/update to determine the correct transport request.
+
+**Source:** `src/handlers/transport/readonly/handleResolveTransport.ts`
+
+**Parameters:**
+- `object_name` (string, optional) - Object name, e.g. ZCL_MY_CLASS.
+- `object_type` (string, optional) - Object type, e.g. CLAS, PROG, DDLS, TABL, DOMA, DTEL, FUGR, INTF, DEVC, SRVD, BDEF, DDLX.
+- `object_uri` (string, optional) - Object ADT URI, e.g. /sap/bc/adt/oo/classes/zcl_my_class. Optional.
+- `operation` (string, optional) - Operation: I = insert (create new object), U = update (modify existing). Default: I.
+- `package_name` (string, required) - Package name (DEVCLASS), e.g. ZPACKAGE, $TMP, ZLOCAL.
+- `pgmid` (string, optional) - Program ID, e.g. R3TR. Default: R3TR.
+
+---
+
 <a id="high-level-group"></a>
 ## High-Level Group
 
@@ -920,6 +937,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lock_handle` (string, optional) - Lock handle from LockObject. If not provided, will attempt to lock internally (not recommended for stateful flows).
 - `name` (string, required) - Behavior Definition name
 - `source_code` (string, required) - New source code
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
 ---
 
@@ -1196,6 +1214,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional) - Activate after update. Default: false.
 - `class_name` (string, required) - Class name (e.g., ZCL_TEST_CLASS_001).
 - `source_code` (string, required) - Complete ABAP class source code.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
 ---
 
@@ -2648,6 +2667,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: false.
 - `ddl_source` (string, required) - Complete DDL source code.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 - `view_name` (string, required) - View name (e.g., ZOK_R_TEST_0002).
 
 ---
@@ -4454,4 +4474,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-02-21*
+*Last updated: 2026-02-27*

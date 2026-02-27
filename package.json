@@ -112,8 +112,8 @@
     "commander": "^14.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
-    "express-rate-limit": "^8.2.1",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.2.1",
     "jest": "^30.2.0",
     "jest-util": "^30.2.0",
     "open": "^11.0.0",
@@ -126,7 +126,7 @@
     "yaml": "^2.8.1"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^0.3.22",
+    "@mcp-abap-adt/adt-clients": "^1.2.1",
     "@mcp-abap-adt/auth-broker": "^1.0.5",
     "@mcp-abap-adt/auth-providers": "^1.0.5",
     "@mcp-abap-adt/auth-stores": "^1.0.2",

@@ -291,7 +291,7 @@ export async function handleCreateProgram(
         logger?.debug(`Updating program source code: ${programName}`);
         await client
           .getProgram()
-          .update({ programName, sourceCode }, { lockHandle: lockHandle });
+          .update({ programName, sourceCode, transportRequest: args.transport_request }, { lockHandle: lockHandle });
         logger?.info(`Program source code updated: ${programName}`);
       } else {
         logger?.warn(`Skipping update - new code check failed: ${programName}`);

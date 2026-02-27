@@ -214,7 +214,7 @@ export async function handleCreateInterface(
             );
             await client
               .getInterface()
-              .update({ interfaceName, sourceCode }, { lockHandle });
+              .update({ interfaceName, sourceCode, transportRequest: args.transport_request }, { lockHandle });
             logger?.info(
               `[CreateInterface] Interface source code updated: ${interfaceName}`,
             );

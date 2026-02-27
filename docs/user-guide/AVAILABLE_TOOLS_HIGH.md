@@ -208,6 +208,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lock_handle` (string, optional) - Lock handle from LockObject. If not provided, will attempt to lock internally (not recommended for stateful flows).
 - `name` (string, required) - Behavior Definition name
 - `source_code` (string, required) - New source code
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
 ---
 
@@ -484,6 +485,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional) - Activate after update. Default: false.
 - `class_name` (string, required) - Class name (e.g., ZCL_TEST_CLASS_001).
 - `source_code` (string, required) - Complete ABAP class source code.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
 ---
 
@@ -1936,8 +1938,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: false.
 - `ddl_source` (string, required) - Complete DDL source code.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 - `view_name` (string, required) - View name (e.g., ZOK_R_TEST_0002).
 
 ---
 
-*Last updated: 2026-02-21*
+*Last updated: 2026-02-27*

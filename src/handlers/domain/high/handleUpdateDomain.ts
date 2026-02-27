@@ -182,6 +182,7 @@ export async function handleUpdateDomain(
           signExists: typedArgs.sign_exists,
           valueTable: typedArgs.value_table,
           fixedValues: typedArgs.fixed_values,
+          transportRequest: typedArgs.transport_request,
         };
         updateState = await client
           .getDomain()

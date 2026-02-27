@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-02-27
+
+### Added
+- **`ResolveTransport` tool** (read-only):
+  - Resolves transport request for any ABAP object via `/sap/bc/adt/cts/transportchecks`.
+  - Returns locked transport, available transports, and whether the package is local.
+  - Use before create/update to determine the correct transport request and avoid ABAP dumps.
+
+### Fixed
+- **`transportRequest` forwarding in all high-level handlers** (issue #11):
+  - Create handlers now forward `transportRequest` to the internal update (PUT) step: `CreateFunctionModule`, `CreateTable`, `CreateInterface`, `CreateView`, `CreateProgram`, `CreateDomain`, `CreateDataElement`.
+  - Standalone update handlers now forward `transportRequest`: `UpdateStructure`, `UpdateDomain`, `UpdateServiceDefinition`.
+  - Added `transport_request` to tool schemas where it was missing: `UpdateClass`, `UpdateView`, `UpdateBehaviorDefinition`.
+
+### Changed
+- **Upgraded `@mcp-abap-adt/adt-clients`** from `0.3.22` to `1.2.1`.
+
+### Documentation
+- Regenerated tools documentation:
+  - `docs/user-guide/AVAILABLE_TOOLS.md`
+  - `docs/user-guide/AVAILABLE_TOOLS_HIGH.md`
+  - `docs/user-guide/AVAILABLE_TOOLS_LOW.md`
+  - `docs/user-guide/AVAILABLE_TOOLS_COMPACT.md`
+  - `docs/user-guide/AVAILABLE_TOOLS_READONLY.md`
+
 ## [2.5.2] - 2026-02-23
 ### Fixed
 - **`--mcp` precedence over local `.env`**:

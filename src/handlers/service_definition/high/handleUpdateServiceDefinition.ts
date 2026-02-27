@@ -107,7 +107,7 @@ export async function handleUpdateServiceDefinition(
         await client
           .getServiceDefinition()
           .update(
-            { serviceDefinitionName, sourceCode: source_code },
+            { serviceDefinitionName, sourceCode: source_code, transportRequest: args.transport_request },
             { lockHandle },
           );
 

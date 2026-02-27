@@ -165,7 +165,7 @@ export async function handleCreateView(context: HandlerContext, params: any) {
         logger?.debug(`Updating view DDL source: ${viewName}`);
         await client
           .getView()
-          .update({ viewName, ddlSource: args.ddl_source }, { lockHandle });
+          .update({ viewName, ddlSource: args.ddl_source, transportRequest: args.transport_request }, { lockHandle });
         logger?.info(`View DDL source updated: ${viewName}`);
       } else {
         logger?.warn(`Skipping update - new code check failed: ${viewName}`);

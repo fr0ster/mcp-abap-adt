@@ -53,7 +53,7 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetTableContents](#gettablecontents-read-only-table)
   - [Transport](#read-only-transport)
     - [GetTransport](#gettransport-read-only-transport)
-    - [ResolveTransport](#resolvetransport-read-only-transport)
+    - [ListTransports](#listtransports-read-only-transport)
 
 ---
 
@@ -570,19 +570,15 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="resolvetransport-read-only-transport"></a>
-#### ResolveTransport (Read-Only / Transport)
-**Description:** [read-only] Resolve transport request for an ABAP object. Returns locked transport, available transports, and whether the package is local. Call before create/update to determine the correct transport request.
+<a id="listtransports-read-only-transport"></a>
+#### ListTransports (Read-Only / Transport)
+**Description:** [read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests.
 
-**Source:** `src/handlers/transport/readonly/handleResolveTransport.ts`
+**Source:** `src/handlers/transport/readonly/handleListTransports.ts`
 
 **Parameters:**
-- `object_name` (string, optional) - Object name, e.g. ZCL_MY_CLASS.
-- `object_type` (string, optional) - Object type, e.g. CLAS, PROG, DDLS, TABL, DOMA, DTEL, FUGR, INTF, DEVC, SRVD, BDEF, DDLX.
-- `object_uri` (string, optional) - Object ADT URI, e.g. /sap/bc/adt/oo/classes/zcl_my_class. Optional.
-- `operation` (string, optional) - Operation: I = insert (create new object), U = update (modify existing). Default: I.
-- `package_name` (string, required) - Package name (DEVCLASS), e.g. ZPACKAGE, $TMP, ZLOCAL.
-- `pgmid` (string, optional) - Program ID, e.g. R3TR. Default: R3TR.
+- `modifiable_only` (boolean, optional) - Only return modifiable (not yet released) transports. Default: true.
+- `user` (string, optional) - SAP user name. If not provided, returns transports for the current user.
 
 ---
 

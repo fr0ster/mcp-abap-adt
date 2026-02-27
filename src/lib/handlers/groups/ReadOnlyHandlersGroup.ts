@@ -41,9 +41,9 @@ import {
   handleGetTransport,
 } from '../../../handlers/transport/readonly/handleGetTransport';
 import {
-  TOOL_DEFINITION as ResolveTransport_Tool,
-  handleResolveTransport,
-} from '../../../handlers/transport/readonly/handleResolveTransport';
+  TOOL_DEFINITION as ListTransports_Tool,
+  handleListTransports,
+} from '../../../handlers/transport/readonly/handleListTransports';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';
 
@@ -133,11 +133,11 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
-          name: ResolveTransport_Tool.name,
-          description: ResolveTransport_Tool.description,
-          inputSchema: ResolveTransport_Tool.inputSchema,
+          name: ListTransports_Tool.name,
+          description: ListTransports_Tool.description,
+          inputSchema: ListTransports_Tool.inputSchema,
         },
-        handler: (args: any) => handleResolveTransport(this.context, args),
+        handler: (args: any) => handleListTransports(this.context, args),
       },
       {
         toolDefinition: {

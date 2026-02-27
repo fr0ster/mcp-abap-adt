@@ -5,10 +5,10 @@
 ## [2.6.0] - 2026-02-27
 
 ### Added
-- **`ResolveTransport` tool** (read-only):
-  - Resolves transport request for any ABAP object via `/sap/bc/adt/cts/transportchecks`.
-  - Returns locked transport, available transports, and whether the package is local.
-  - Use before create/update to determine the correct transport request and avoid ABAP dumps.
+- **`ListTransports` tool** (read-only):
+  - Lists transport requests for the current or specified user.
+  - Filters by modifiable status (default: modifiable only).
+  - Use before create/update to find the correct transport request.
 
 ### Fixed
 - **`transportRequest` forwarding in all high-level handlers** (issue #11):

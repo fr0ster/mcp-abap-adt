@@ -86,3 +86,4 @@ SAP_ADT.json
 dev.json
 desktop.ini
 .vscode/mcp.json
+.claude/settings.local.json

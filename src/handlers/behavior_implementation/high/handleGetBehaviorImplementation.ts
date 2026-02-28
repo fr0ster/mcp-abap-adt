@@ -5,7 +5,7 @@
  * Supports both active and inactive versions.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -63,7 +63,7 @@ export async function handleGetBehaviorImplementation(
       );
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const behaviorImplementationName =
       behavior_implementation_name.toUpperCase();
 

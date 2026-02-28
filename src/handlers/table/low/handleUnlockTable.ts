@@ -5,7 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -74,7 +74,7 @@ export async function handleUnlockTable(
     const { table_name, lock_handle, session_id, session_state } =
       args as UnlockTableArgs;
 
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
 
     // Restore session state if provided
     if (session_state) {

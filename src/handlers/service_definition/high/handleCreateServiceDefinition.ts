@@ -8,8 +8,8 @@
  */
 
 import type { IServiceDefinitionConfig } from '@mcp-abap-adt/adt-clients';
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   encodeSapObjectName,
@@ -106,7 +106,7 @@ export async function handleCreateServiceDefinition(
 
     try {
       // Create client
-      const client = new AdtClient(connection);
+      const client = createAdtClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
       let activateResponse: any | undefined;
 

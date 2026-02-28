@@ -5,7 +5,7 @@
  * Requires function group name.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -104,7 +104,7 @@ export async function handleValidateFunctionModule(
     );
 
     try {
-      const client = new AdtClient(connection);
+      const client = createAdtClient(connection);
 
       const validationState = await client.getFunctionModule().validate({
         functionModuleName: functionModuleName,

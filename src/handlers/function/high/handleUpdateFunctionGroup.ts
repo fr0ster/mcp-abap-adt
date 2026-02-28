@@ -11,7 +11,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';.
  * Workflow: lock -> get current -> update metadata -> unlock
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   encodeSapObjectName,
@@ -82,7 +82,7 @@ export async function handleUpdateFunctionGroup(
 
     try {
       // Use AdtClient for lock/unlock
-      const crudClient = new AdtClient(connection);
+      const crudClient = createAdtClient(connection);
 
       let lockHandle: string | undefined;
       try {

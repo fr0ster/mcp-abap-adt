@@ -5,7 +5,7 @@
  * Connection management handled internally.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -162,7 +162,7 @@ export async function handleValidateObject(
       );
     }
 
-    const validationClient = new AdtClient(connection);
+    const validationClient = createAdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {

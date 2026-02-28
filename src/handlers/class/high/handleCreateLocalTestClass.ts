@@ -5,7 +5,7 @@
  * Includes lock, check, update, unlock, and optional activation.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -83,7 +83,7 @@ export async function handleCreateLocalTestClass(
       return return_error(new Error('test_class_code is required'));
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const className = class_name.toUpperCase();
 
     logger?.info(`Creating local test class for ${className}`);

@@ -2,7 +2,7 @@
  * UpdateMetadataExtension Handler - ABAP Metadata Extension Update via ADT API
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   extractAdtErrorMessage,
@@ -57,7 +57,7 @@ export async function handleUpdateMetadataExtension(
   const name = args.name.toUpperCase();
 
   try {
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
     const shouldActivate = args.activate !== false;
     let lockHandle = args.lock_handle;
 

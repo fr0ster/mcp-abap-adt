@@ -7,8 +7,8 @@
  * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   encodeSapObjectName,
@@ -150,7 +150,7 @@ export async function handleCreateInterface(
         );
 
       // Create AdtClient
-      const client = new AdtClient(connection);
+      const client = createAdtClient(connection);
       const description = typedArgs.description || interfaceName;
       const packageName = typedArgs.package_name;
       const transportRequest = typedArgs.transport_request || '';

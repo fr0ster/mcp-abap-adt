@@ -7,7 +7,7 @@
  * Workflow: create
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   ErrorCode,
@@ -82,7 +82,7 @@ export async function handleCreateTransport(
 
     try {
       // Create client
-      const client = new AdtClient(connection);
+      const client = createAdtClient(connection);
 
       // Create transport
       const createState = await client.getRequest().create({

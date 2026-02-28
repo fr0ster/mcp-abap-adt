@@ -5,7 +5,7 @@
  * Includes deletion check before actual deletion.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -61,7 +61,7 @@ export async function handleDeleteBehaviorImplementation(
       );
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const behaviorImplementationName =
       behavior_implementation_name.toUpperCase();
 

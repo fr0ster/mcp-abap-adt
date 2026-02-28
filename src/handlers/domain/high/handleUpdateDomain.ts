@@ -8,7 +8,7 @@
  * Note: No validation step - lock will fail if domain doesn't exist
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -156,7 +156,7 @@ export async function handleUpdateDomain(
 
     try {
       // Create client
-      const client = new AdtClient(connection);
+      const client = createAdtClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Lock domain (will fail if domain doesn't exist)

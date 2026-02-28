@@ -5,7 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -57,7 +57,7 @@ export async function handleCreateTransport(
       return return_error(new Error('description is required'));
     }
 
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
 
     // Ensure connection is established
     logger?.info(`Starting transport creation: ${description}`);

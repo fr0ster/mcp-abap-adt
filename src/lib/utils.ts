@@ -940,17 +940,17 @@ export async function makeAdtRequest(
 }
 
 /**
- * Get system information from SAP ADT (for cloud systems)
- * @deprecated Use getAdtClient().getSystemInformation() instead
+ * Get system information from SAP ADT
+ * Returns cached system context resolved during connection init
  */
 export async function getSystemInformation(): Promise<{
   systemID?: string;
   userName?: string;
 } | null> {
-  // TODO: Add getSystemInformation to AdtClient
-  throw new Error('getSystemInformation not implemented in AdtClient yet');
-  // const { getAdtClient } = await import('./clients.js');
-  // return getAdtClient().getSystemInformation();
+  const { getSystemContext } = await import('./systemContext.js');
+  const ctx = getSystemContext();
+  if (!ctx.masterSystem && !ctx.responsible) return null;
+  return { systemID: ctx.masterSystem, userName: ctx.responsible };
 }
 
 /**

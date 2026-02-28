@@ -5,7 +5,7 @@
  * Retrieves hierarchical virtual folder contents from ADT information system.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 
@@ -84,7 +84,7 @@ export async function handleGetVirtualFolders(
   const { connection, logger } = context;
   try {
     // Create AdtClient and get utilities
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const utils = client.getUtils();
 
     logger?.info('Fetching virtual folders contents');

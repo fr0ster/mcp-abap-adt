@@ -5,7 +5,7 @@
  * Retrieves test run status and result for a previously started run.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -51,7 +51,7 @@ export async function handleGetUnitTest(
       return return_error(new Error('run_id is required'));
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const unitTest = client.getUnitTest();
 
     logger?.info(`Reading unit test run status/result for run_id: ${run_id}`);

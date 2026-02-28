@@ -5,8 +5,8 @@
  */
 
 import type { IClassState } from '@mcp-abap-adt/adt-clients';
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -120,7 +120,7 @@ export async function handleCreateClass(
       args.source_code ||
       generateClassTemplate(className, args.description || className);
     const shouldActivate = args.activate !== false; // default true
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const adtClass = client.getClass();
 
     // Use AdtClass.create() which handles the full workflow automatically:

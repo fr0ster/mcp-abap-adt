@@ -13,13 +13,13 @@
  * Run: npm test -- --testPathPattern=integration/package
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { handleCreatePackage } from '../../../../handlers/package/low/handleCreatePackage';
 import { handleDeletePackage } from '../../../../handlers/package/low/handleDeletePackage';
 import { handleLockPackage } from '../../../../handlers/package/low/handleLockPackage';
 import { handleUnlockPackage } from '../../../../handlers/package/low/handleUnlockPackage';
 import { handleValidatePackage } from '../../../../handlers/package/low/handleValidatePackage';
+import { createAdtClient } from '../../../../lib/clients';
 import {
   getCleanupAfter,
   getEnabledTestCase,
@@ -68,7 +68,7 @@ describe('Package Low-Level Handlers Integration', () => {
       const defaultPackage = config.environment?.default_package;
       if (defaultPackage && connection) {
         try {
-          const client = new AdtClient(connection);
+          const client = createAdtClient(connection);
           const defaultPackageCheck = await client.getPackage().check({
             packageName: defaultPackage.trim(),
             superPackage: undefined,

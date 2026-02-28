@@ -7,8 +7,8 @@
  * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   encodeSapObjectName,
@@ -107,7 +107,7 @@ export async function handleUpdateTable(
 
     try {
       // Create client
-      const client = new AdtClient(connection);
+      const client = createAdtClient(connection);
 
       // Build operation chain: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
       // Note: No validation needed for update - table must already exist

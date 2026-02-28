@@ -12,12 +12,12 @@
  * Run: npm test -- --testPathPattern=integration/class/ClassAdtClientDirect
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import {
   type AbapConnection,
   createAbapConnection,
 } from '@mcp-abap-adt/connection';
 import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
+import { createAdtClient } from '../../../../lib/clients';
 import {
   getCleanupAfter,
   getEnabledTestCase,
@@ -129,7 +129,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         if (connectionAny.connect) {
           await connectionAny.connect();
         }
-        client = new AdtClient(connection);
+        client = createAdtClient(connection);
         isCloud = config.authType === 'jwt';
 
         // Persist session snapshot for diagnostics

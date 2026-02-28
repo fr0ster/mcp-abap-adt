@@ -2,7 +2,8 @@
  * ActivateObject Handler - Universal ABAP Object Activation via ADT API
  */
 
-import { AdtClient, type ObjectReference } from '@mcp-abap-adt/adt-clients';
+import type { ObjectReference } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   parseActivationResponse,
@@ -74,7 +75,7 @@ export async function handleActivateObject(
     }
 
     const preaudit = args.preaudit !== false; // default true
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
 
     logger?.info(`Starting activation of ${args.objects.length} object(s)`);
 

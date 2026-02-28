@@ -5,7 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -132,7 +132,7 @@ export async function handleCreateClass(
       logger?.debug(`Connection can refresh token: ${canRefresh}`);
     }
 
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
 
     const className = class_name.toUpperCase();
 

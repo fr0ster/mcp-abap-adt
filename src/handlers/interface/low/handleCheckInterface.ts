@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -75,7 +75,7 @@ export async function handleCheckInterface(
       return return_error(new Error('interface_name is required'));
     }
 
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {

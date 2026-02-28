@@ -4,7 +4,7 @@
  * Uses AdtClient.getCdsUnitTest().getResult() for result retrieval.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -61,7 +61,7 @@ export async function handleGetCdsUnitTestResult(
       return return_error(new Error('run_id is required'));
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const cdsUnitTest = client.getCdsUnitTest();
 
     logger?.info(`Reading CDS unit test result for run_id: ${run_id}`);

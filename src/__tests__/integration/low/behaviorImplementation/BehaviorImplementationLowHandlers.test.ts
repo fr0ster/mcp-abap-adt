@@ -13,7 +13,6 @@
  * Run: npm test -- --testPathPattern=integration/behaviorImplementation
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { handleLockBehaviorImplementation } from '../../../../handlers/behavior_implementation/low/handleLockBehaviorImplementation';
 import { handleValidateBehaviorImplementation } from '../../../../handlers/behavior_implementation/low/handleValidateBehaviorImplementation';
@@ -22,6 +21,7 @@ import { handleCheckClass } from '../../../../handlers/class/low/handleCheckClas
 import { handleCreateClass } from '../../../../handlers/class/low/handleCreateClass';
 import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
 import { handleUnlockClass } from '../../../../handlers/class/low/handleUnlockClass';
+import { createAdtClient } from '../../../../lib/clients';
 import { generateSessionId } from '../../../../lib/sessionUtils';
 import { getManagedConnection } from '../../../../lib/utils';
 import {
@@ -295,7 +295,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
           }
           const implementationCode = testCase.params.implementation_code;
 
-          const client = new AdtClient(connection);
+          const client = createAdtClient(connection);
 
           // Update main source + implementations include in low-level mode
           await client.getBehaviorImplementation().update(

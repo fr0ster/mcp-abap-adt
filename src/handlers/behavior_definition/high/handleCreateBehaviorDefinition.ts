@@ -6,7 +6,7 @@ import type {
   BehaviorDefinitionImplementationType,
   IBehaviorDefinitionConfig,
 } from '@mcp-abap-adt/adt-clients';
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
@@ -91,7 +91,7 @@ export async function handleCreateBehaviorDefinition(
   logger?.info(`Starting BDEF creation: ${name}`);
 
   try {
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
     const shouldActivate = args.activate !== false;
 
     // Create - using types from adt-clients

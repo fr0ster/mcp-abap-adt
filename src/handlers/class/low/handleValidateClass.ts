@@ -5,7 +5,7 @@
  * Supports package, description, and superclass validation.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -106,7 +106,7 @@ export async function handleValidateClass(
     logger?.info(`Starting class validation: ${className}`);
 
     try {
-      const builder = new AdtClient(connection);
+      const builder = createAdtClient(connection);
 
       // validateClass may throw for non-400 errors, but returns response for 400
       let validationResponse: AxiosResponse | undefined;

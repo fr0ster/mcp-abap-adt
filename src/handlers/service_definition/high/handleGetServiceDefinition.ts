@@ -5,7 +5,7 @@
  * Supports both active and inactive versions.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -60,7 +60,7 @@ export async function handleGetServiceDefinition(
       return return_error(new Error('service_definition_name is required'));
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const serviceDefinitionName = service_definition_name.toUpperCase();
 
     logger?.info(

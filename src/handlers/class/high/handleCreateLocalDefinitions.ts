@@ -2,7 +2,7 @@
  * CreateLocalDefinitions Handler - Create Local Definitions via AdtClient
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -65,7 +65,7 @@ export async function handleCreateLocalDefinitions(
       );
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const className = class_name.toUpperCase();
 
     logger?.info(`Creating local definitions for ${className}`);

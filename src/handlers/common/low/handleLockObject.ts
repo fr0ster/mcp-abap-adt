@@ -5,7 +5,7 @@
  * Returns lock handle that must be reused with the same session.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import {
@@ -126,7 +126,7 @@ export async function handleLockObject(
       );
     }
 
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);

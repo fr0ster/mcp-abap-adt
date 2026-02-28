@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -105,7 +105,7 @@ export async function handleDeletePackage(
         }
       }
     }
-    const client = new AdtClient(deleteConnection);
+    const client = createAdtClient(deleteConnection);
 
     logger?.info(`Starting package deletion: ${packageName}`);
 

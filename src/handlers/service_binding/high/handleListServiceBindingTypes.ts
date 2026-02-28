@@ -1,4 +1,4 @@
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 import {
@@ -34,7 +34,7 @@ export async function handleListServiceBindingTypes(
 
   try {
     const responseFormat = args.response_format ?? 'xml';
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const response = await client.getServiceBinding().getServiceBindingTypes();
 
     return return_response({

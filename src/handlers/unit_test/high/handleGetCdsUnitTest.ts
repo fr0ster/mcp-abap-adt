@@ -4,7 +4,7 @@
  * Uses AdtClient.getCdsUnitTest().read() for high-level read operation.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -49,7 +49,7 @@ export async function handleGetCdsUnitTest(
       return return_error(new Error('run_id is required'));
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const cdsUnitTest = client.getCdsUnitTest();
 
     logger?.info(

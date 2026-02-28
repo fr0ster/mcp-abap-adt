@@ -4,9 +4,9 @@
  * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   encodeSapObjectName,
@@ -210,7 +210,7 @@ export async function handleCreateProgram(
       );
 
     // Create client
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
     const shouldActivate = args.activate !== false; // Default to true if not specified
     let lockHandle: string | undefined;
     let activateResponse: any | undefined;

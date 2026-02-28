@@ -1,5 +1,5 @@
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
@@ -183,7 +183,7 @@ export async function handleGetSqlQuery(context: HandlerContext, args: any) {
 
     logger?.info(`Executing SQL query (rows=${rowNumber})`);
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const response = await client
       .getUtils()
       .getSqlQuery({ sql_query: sqlQuery, row_number: rowNumber });

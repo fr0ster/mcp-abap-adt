@@ -1,5 +1,5 @@
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError } from '../../../lib/utils';
 
@@ -34,7 +34,7 @@ export async function handleGetFunction(context: HandlerContext, args: any) {
     );
 
     // Create client
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
     const result = await client
       .getFunctionModule()
       .read(

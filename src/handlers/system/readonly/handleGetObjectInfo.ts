@@ -1,6 +1,6 @@
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
 import convert from 'xml-js';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
@@ -50,7 +50,7 @@ async function fetchNodeStructureRaw(
   node_id?: string,
 ) {
   const { connection, logger } = context;
-  const client = new AdtClient(connection, logger);
+  const client = createAdtClient(connection, logger);
   const utils = client.getUtils();
 
   const response = await utils.fetchNodeStructure(

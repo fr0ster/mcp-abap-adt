@@ -5,7 +5,7 @@
  * Fetches node structure from ADT repository for object tree navigation.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 
@@ -100,7 +100,7 @@ export async function handleGetNodeStructure(
     }
 
     // Create AdtClient and get utilities
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const utils = client.getUtils();
 
     logger?.info(

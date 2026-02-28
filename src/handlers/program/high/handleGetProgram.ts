@@ -5,7 +5,7 @@
  * Supports both active and inactive versions.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -59,7 +59,7 @@ export async function handleGetProgram(
       return return_error(new Error('program_name is required'));
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const programName = program_name.toUpperCase();
 
     logger?.info(`Reading program ${programName}, version: ${version}`);

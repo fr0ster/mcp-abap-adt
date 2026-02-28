@@ -2,7 +2,7 @@
  * DeleteObject Handler - Delete ABAP objects via ADT API
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -61,7 +61,7 @@ export async function handleDeleteObject(
       );
     }
 
-    const crudClient = new AdtClient(connection);
+    const crudClient = createAdtClient(connection);
     const objectName = object_name.toUpperCase();
     const objectType = object_type.toLowerCase();
 

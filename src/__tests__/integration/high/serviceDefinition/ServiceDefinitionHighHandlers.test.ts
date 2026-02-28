@@ -14,9 +14,9 @@
  * Run: npm test -- --testPathPattern=integration/serviceDefinition
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { handleCreateServiceDefinition } from '../../../../handlers/service_definition/high/handleCreateServiceDefinition';
 import { handleUpdateServiceDefinition } from '../../../../handlers/service_definition/high/handleUpdateServiceDefinition';
+import { createAdtClient } from '../../../../lib/clients';
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import { getTimeout } from '../../helpers/configHelpers';
 import { HighTester } from '../../helpers/testers/HighTester';
@@ -27,7 +27,7 @@ async function deleteServiceDefinitionWrapper(
   args: any,
 ): Promise<any> {
   try {
-    const client = new AdtClient(context.connection);
+    const client = createAdtClient(context.connection);
     await client.getServiceDefinition().delete({
       serviceDefinitionName: args.service_definition_name,
       transportRequest: args.transport_request,

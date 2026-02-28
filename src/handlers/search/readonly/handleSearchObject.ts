@@ -1,6 +1,6 @@
 import type { SearchObjectsParams } from '@mcp-abap-adt/adt-clients';
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { createAdtClient } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError, return_response } from '../../../lib/utils';
@@ -57,7 +57,7 @@ export async function handleSearchObject(context: HandlerContext, args: any) {
       throw new McpError(ErrorCode.InvalidParams, 'object_name is required');
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const utils = client.getUtils();
 
     const searchParams: SearchObjectsParams = {

@@ -7,7 +7,7 @@
  * - Create temporary class with division by zero, run, then read/analyze runtime dump
  */
 
-import { AdtClient, AdtExecutor } from '@mcp-abap-adt/adt-clients';
+import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { handleRuntimeAnalyzeDump } from '../../../../handlers/system/readonly/handleRuntimeAnalyzeDump';
 import { handleRuntimeAnalyzeProfilerTrace } from '../../../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace';
 import { handleRuntimeGetDumpById } from '../../../../handlers/system/readonly/handleRuntimeGetDumpById';
@@ -16,6 +16,7 @@ import { handleRuntimeListDumps } from '../../../../handlers/system/readonly/han
 import { handleRuntimeListProfilerTraceFiles } from '../../../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles';
 import { handleRuntimeRunClassWithProfiling } from '../../../../handlers/system/readonly/handleRuntimeRunClassWithProfiling';
 import { handleRuntimeRunProgramWithProfiling } from '../../../../handlers/system/readonly/handleRuntimeRunProgramWithProfiling';
+import { createAdtClient } from '../../../../lib/clients';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -138,7 +139,7 @@ async function createRunnableClass(
   className: string,
   sourceCode: string,
 ): Promise<void> {
-  const client = new AdtClient(context.connection, context.logger);
+  const client = createAdtClient(context.connection, context.logger);
   await client.getClass().create({
     className,
     packageName: context.packageName,
@@ -160,7 +161,7 @@ async function deleteClassIfExists(
     return;
   }
   try {
-    const client = new AdtClient(context.connection, context.logger);
+    const client = createAdtClient(context.connection, context.logger);
     await client.getClass().delete({
       className,
       transportRequest: context.transportRequest,
@@ -177,7 +178,7 @@ async function createRunnableProgram(
   programName: string,
   sourceCode: string,
 ): Promise<void> {
-  const client = new AdtClient(context.connection, context.logger);
+  const client = createAdtClient(context.connection, context.logger);
   await client.getProgram().create({
     programName,
     packageName: context.packageName,
@@ -199,7 +200,7 @@ async function deleteProgramIfExists(
     return;
   }
   try {
-    const client = new AdtClient(context.connection, context.logger);
+    const client = createAdtClient(context.connection, context.logger);
     await client.getProgram().delete({
       programName,
       transportRequest: context.transportRequest,

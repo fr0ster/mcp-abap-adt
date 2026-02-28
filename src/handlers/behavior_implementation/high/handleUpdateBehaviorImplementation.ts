@@ -7,8 +7,8 @@
  * Workflow: lock -> update main source -> update implementations -> check -> unlock -> (activate)
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   encodeSapObjectName,
@@ -100,7 +100,7 @@ export async function handleUpdateBehaviorImplementation(
 
     try {
       // Create client
-      const client = new AdtClient(connection);
+      const client = createAdtClient(connection);
 
       // Update behavior implementation using AdtClient chain
       const shouldActivate = activate !== false; // Default to true if not specified

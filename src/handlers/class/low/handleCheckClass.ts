@@ -5,8 +5,8 @@
  * Supports checking existing classes or hypothetical source code.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -109,7 +109,7 @@ export async function handleCheckClass(
     );
 
     try {
-      const client = new AdtClient(connection);
+      const client = createAdtClient(connection);
       const checkState = await client
         .getClass()
         .check({ className, sourceCode: source_code }, checkVersion);

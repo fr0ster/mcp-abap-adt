@@ -7,7 +7,7 @@
  * Workflow: validate -> lock -> update -> check -> unlock -> (activate)
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 
@@ -97,7 +97,7 @@ export async function handleUpdateFunctionModule(
     );
 
     try {
-      const client = new AdtClient(connection);
+      const client = createAdtClient(connection);
       const shouldActivate = args.activate === true;
 
       // Execute operation chain: lock -> update -> check -> unlock -> (activate)

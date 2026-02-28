@@ -5,7 +5,7 @@
  * Must reuse session_id and lock_handle from LockObject.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -122,7 +122,7 @@ export async function handleUnlockObject(
       );
     }
 
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
 
     if (session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);

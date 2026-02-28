@@ -3,8 +3,8 @@
  * Uses AdtClient check methods per object type.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -126,7 +126,7 @@ export async function handleCheckObject(
       ? (version.toLowerCase() as 'active' | 'inactive')
       : 'active';
 
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);

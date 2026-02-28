@@ -2,7 +2,7 @@
  * GetInactiveObjects Handler - Retrieve list of inactive ABAP objects
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 
@@ -23,7 +23,7 @@ export async function handleGetInactiveObjects(
 ) {
   const { connection, logger } = context;
   try {
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
     const utils = client.getUtils();
 
     logger?.info('Retrieving inactive objects...');

@@ -2,8 +2,8 @@
  * Handler for retrieving all valid ADT object types and validating a type.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   name: 'GetAdtTypes',
@@ -77,7 +77,7 @@ function extractNamedItems(xml: string) {
 export async function handleGetAdtTypes(context: HandlerContext, _args: any) {
   const { connection, logger } = context;
   try {
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const response = await client
       .getUtils()
       .getAllTypes(999, '*', 'usedByProvider');

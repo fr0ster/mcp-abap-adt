@@ -2,7 +2,7 @@
  * CreateLocalMacros Handler - Create Local Macros via AdtClient
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -63,7 +63,7 @@ export async function handleCreateLocalMacros(
       return return_error(new Error('class_name and macros_code are required'));
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const className = class_name.toUpperCase();
 
     logger?.info(`Creating local macros for ${className}`);

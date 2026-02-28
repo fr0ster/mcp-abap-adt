@@ -2,7 +2,7 @@
  * DeleteStructure Handler - Delete ABAP Structure via AdtClient
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -48,7 +48,7 @@ export async function handleDeleteStructure(
       return return_error(new Error('structure_name is required'));
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const structureName = structure_name.toUpperCase();
 
     logger?.info(`Starting structure deletion: ${structureName}`);

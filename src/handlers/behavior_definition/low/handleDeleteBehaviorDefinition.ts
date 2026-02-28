@@ -6,7 +6,7 @@
  */
 
 import type { IBehaviorDefinitionConfig } from '@mcp-abap-adt/adt-clients';
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -58,7 +58,7 @@ export async function handleDeleteBehaviorDefinition(
       return return_error(new Error('name is required'));
     }
 
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
     const bdefName = name.toUpperCase();
 
     logger?.info(`Starting behavior definition deletion: ${bdefName}`);

@@ -3,7 +3,7 @@
  */
 
 import type { IBehaviorDefinitionConfig } from '@mcp-abap-adt/adt-clients';
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   extractAdtErrorMessage,
@@ -68,7 +68,7 @@ export async function handleUpdateBehaviorDefinition(
   logger?.info(`Starting BDEF update: ${name}`);
 
   try {
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
     const shouldActivate = args.activate !== false;
     let lockHandle = args.lock_handle;
 

@@ -5,7 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -81,7 +81,7 @@ export async function handleUnlockDomain(
       );
     }
 
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
 
     const domainName = domain_name.toUpperCase();
 

@@ -5,7 +5,7 @@
  */
 
 import type { ITableConfig } from '@mcp-abap-adt/adt-clients';
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -96,7 +96,7 @@ export async function handleValidateTable(
     logger?.info(`Starting table validation: ${tableName}`);
 
     try {
-      const client = new AdtClient(connection);
+      const client = createAdtClient(connection);
 
       const validationState = await client.getTable().validate({
         tableName: tableName,

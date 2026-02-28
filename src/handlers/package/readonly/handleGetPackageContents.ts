@@ -1,5 +1,5 @@
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
@@ -45,7 +45,7 @@ export async function handleGetPackageContents(
       throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const utils = client.getUtils();
 
     // Use the optimized list method from adt-clients 0.3.13

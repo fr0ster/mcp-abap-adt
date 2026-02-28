@@ -8,8 +8,8 @@
  */
 
 import type { IBehaviorImplementationConfig } from '@mcp-abap-adt/adt-clients';
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   encodeSapObjectName,
@@ -115,7 +115,7 @@ export async function handleCreateBehaviorImplementation(
 
     try {
       // Create client
-      const client = new AdtClient(connection);
+      const client = createAdtClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Create behavior implementation (full workflow)

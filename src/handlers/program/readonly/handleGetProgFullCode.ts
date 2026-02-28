@@ -55,7 +55,7 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleGetInclude } from '../../include/readonly/handleGetInclude';
 
@@ -116,7 +116,7 @@ export async function handleGetProgFullCode(
     let codeObjects: any[] = [];
     if (typeUpper === 'PROG/P') {
       // Get main program code
-      const client = new AdtClient(connection);
+      const client = createAdtClient(connection);
       const progState = await client.getProgram().read({
         programName: name,
       });
@@ -204,7 +204,7 @@ export async function handleGetProgFullCode(
       }
     } else if (typeUpper === 'FUGR') {
       // Get function group main code
-      const client = new AdtClient(connection);
+      const client = createAdtClient(connection);
       const fgState = await client.getFunctionGroup().read({
         functionGroupName: name,
       });

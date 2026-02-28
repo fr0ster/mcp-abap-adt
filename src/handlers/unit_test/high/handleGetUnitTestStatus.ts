@@ -4,7 +4,7 @@
  * Uses AdtClient.getUnitTest().getStatus() for status retrieval.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -54,7 +54,7 @@ export async function handleGetUnitTestStatus(
       return return_error(new Error('run_id is required'));
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const unitTest = client.getUnitTest();
 
     logger?.info(`Reading unit test status for run_id: ${run_id}`);

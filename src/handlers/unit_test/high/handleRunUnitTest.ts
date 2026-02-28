@@ -5,7 +5,7 @@
  * Starts unit test execution and returns run_id for status/result queries.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -134,7 +134,7 @@ export async function handleRunUnitTest(
       testClass: test.test_class.toUpperCase(),
     }));
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const unitTest = client.getUnitTest();
 
     logger?.info(

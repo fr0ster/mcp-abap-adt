@@ -1,4 +1,4 @@
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 import { parseServiceBindingPayload } from './serviceBindingPayloadUtils';
@@ -58,7 +58,7 @@ export async function handleValidateServiceBinding(
     }
 
     const serviceBindingName = args.service_binding_name.trim().toUpperCase();
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const response = await client.getServiceBinding().validateServiceBinding({
       objname: serviceBindingName,
       serviceDefinition: args.service_definition_name.trim().toUpperCase(),

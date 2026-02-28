@@ -5,8 +5,8 @@
  * Low-level handler: single method call.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   restoreSessionInConnection,
@@ -80,7 +80,7 @@ export async function handleGetClassUnitTestResult(
       return return_error(new Error('run_id is required'));
     }
 
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);

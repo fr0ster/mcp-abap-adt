@@ -5,8 +5,8 @@
  * Supports both active and inactive versions.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 
@@ -56,7 +56,7 @@ export async function handleGetLocalTestClass(
       return return_error(new Error('class_name is required'));
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const className = class_name.toUpperCase();
 
     logger?.info(

@@ -5,7 +5,7 @@
  * Note: Macros are supported in older ABAP versions but not in newer ones.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -53,7 +53,7 @@ export async function handleGetLocalMacros(
       return return_error(new Error('class_name is required'));
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const className = class_name.toUpperCase();
 
     logger?.info(`Reading local macros for ${className}, version: ${version}`);

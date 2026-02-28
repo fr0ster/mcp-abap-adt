@@ -5,8 +5,8 @@
  * Requires session_id for stateful operations.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import {
@@ -125,7 +125,7 @@ export async function handleCheckTable(
     );
 
     try {
-      const builder = new AdtClient(connection);
+      const builder = createAdtClient(connection);
 
       // Check table with optional source code (for validating new/unsaved code)
       // If ddl_code is provided, it will be base64 encoded in the request body

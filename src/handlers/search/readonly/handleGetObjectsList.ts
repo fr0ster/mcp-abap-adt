@@ -1,4 +1,5 @@
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import type { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 
 export const TOOL_DEFINITION = {
   name: 'GetObjectsList',
@@ -182,7 +183,7 @@ export async function handleGetObjectsList(context: HandlerContext, args: any) {
         : true;
 
     // Create AdtClient and get utilities
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const utils = client.getUtils();
 
     // Begin traversal from node_id '000000' (the root node)

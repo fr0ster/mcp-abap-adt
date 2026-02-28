@@ -1,7 +1,7 @@
 // import { McpError, ErrorCode } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-// import { AdtClient } from '@mcp-abap-adt/adt-clients';
+// import { createAdtClient } from '../../../lib/clients';
 export const TOOL_DEFINITION = {
   name: 'GetTransaction',
   description: '[read-only] Retrieve ABAP transaction details.',
@@ -52,7 +52,7 @@ export async function handleGetTransaction(
   //         throw new McpError(ErrorCode.InvalidParams, 'Transaction name is required');
   //     }
   //     logger?.info(`Fetching transaction info for ${args.transaction_name}`);
-  //     const client = new AdtClient(connection);
+  //     const client = createAdtClient(connection);
   //     const result = await client.readTransaction(args.transaction_name);
   //     return result;
   // } catch (error) {

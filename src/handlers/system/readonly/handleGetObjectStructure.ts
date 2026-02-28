@@ -2,8 +2,8 @@
  * Handler for retrieving ADT object structure and returning compact JSON tree.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { XMLParser } from 'fast-xml-parser';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   name: 'GetObjectStructure',
@@ -93,7 +93,7 @@ export async function handleGetObjectStructure(
       );
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const response = await client
       .getUtils()
       .getObjectStructure(objectType, objectName);

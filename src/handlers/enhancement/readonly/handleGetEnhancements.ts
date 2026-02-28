@@ -1,5 +1,5 @@
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   ErrorCode,
@@ -407,7 +407,7 @@ async function getIncludesListInternal(
     }
 
     // Create AdtClient and get utilities
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const utils = client.getUtils();
 
     // Step 1: Get root node structure to find includes node (with timeout)

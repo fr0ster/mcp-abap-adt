@@ -8,8 +8,8 @@
  */
 
 import type { IPackageConfig } from '@mcp-abap-adt/adt-clients';
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import * as z from 'zod';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -111,7 +111,7 @@ export async function handleCreatePackage(
 
     logger?.info(`Starting package creation: ${packageName}`);
 
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
 
     try {
       // Validate

@@ -4,7 +4,7 @@
  * Uses AdtClient.getCdsUnitTest().update() for CDS-specific update operation.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -65,7 +65,7 @@ export async function handleUpdateCdsUnitTest(
 
     const className = class_name.toUpperCase();
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const cdsUnitTest = client.getCdsUnitTest();
 
     logger?.info(`Updating CDS unit test class source: ${className}`);

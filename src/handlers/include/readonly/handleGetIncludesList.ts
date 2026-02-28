@@ -1,4 +1,4 @@
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError, return_error } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
@@ -168,7 +168,7 @@ export async function handleGetIncludesList(
     );
 
     // Create AdtClient and get utilities
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const utils = client.getUtils();
 
     // Step 1: Get root node structure to find includes node (with timeout)

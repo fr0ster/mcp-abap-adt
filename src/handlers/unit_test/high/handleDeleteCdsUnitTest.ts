@@ -4,7 +4,7 @@
  * Uses AdtClient.getCdsUnitTest().delete() for CDS-specific delete operation.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -56,7 +56,7 @@ export async function handleDeleteCdsUnitTest(
 
     const className = class_name.toUpperCase();
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const cdsUnitTest = client.getCdsUnitTest();
 
     logger?.info(`Deleting CDS unit test class: ${className}`);

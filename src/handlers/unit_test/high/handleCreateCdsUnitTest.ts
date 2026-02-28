@@ -4,7 +4,7 @@
  * Uses AdtClient.getCdsUnitTest().validate() and .create() for CDS-specific lifecycle.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -107,7 +107,7 @@ export async function handleCreateCdsUnitTest(
     const className = class_name.toUpperCase();
     const cdsViewName = cds_view_name.toUpperCase();
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const cdsUnitTest = client.getCdsUnitTest();
 
     logger?.info(

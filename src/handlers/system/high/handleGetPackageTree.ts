@@ -5,7 +5,7 @@
  * using AdtClient.getPackageHierarchy() from @mcp-abap-adt/adt-clients.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 
@@ -79,7 +79,7 @@ export async function handleGetPackageTree(
       `Fetching package tree for ${packageName} (include_subpackages: ${includeSubpackages}, max_depth: ${maxDepth}) using adt-clients`,
     );
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const utils = client.getUtils();
 
     // Use the optimized and fixed hierarchy builder from adt-clients

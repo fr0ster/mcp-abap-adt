@@ -5,7 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -58,7 +58,7 @@ export async function handleDeleteFunctionGroup(
       return return_error(new Error('function_group_name is required'));
     }
 
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
     const functionGroupName = function_group_name.toUpperCase();
     logger?.info(`Starting function group deletion: ${functionGroupName}`);
 

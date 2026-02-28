@@ -6,7 +6,7 @@
  */
 
 import type { ITableConfig } from '@mcp-abap-adt/adt-clients';
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -101,7 +101,7 @@ export async function handleCreateTable(
       );
     }
 
-    const client = new AdtClient(connection);
+    const client = createAdtClient(connection);
 
     // Restore session state if provided
     if (session_id && session_state) {

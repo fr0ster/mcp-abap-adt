@@ -5,7 +5,7 @@
  * Local types are in the implementations include.
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
@@ -53,7 +53,7 @@ export async function handleGetLocalTypes(
       return return_error(new Error('class_name is required'));
     }
 
-    const client = new AdtClient(connection, logger);
+    const client = createAdtClient(connection, logger);
     const className = class_name.toUpperCase();
 
     logger?.info(`Reading local types for ${className}, version: ${version}`);

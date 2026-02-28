@@ -10,6 +10,7 @@ import type { HandlerContext } from '../handlers/interfaces.js';
 import type { IHandlersRegistry } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
+import { resolveSystemContext } from '../lib/systemContext.js';
 import { registerAuthBroker } from '../lib/utils.js';
 import type { ConnectionContext } from './ConnectionContext.js';
 
@@ -222,6 +223,9 @@ export abstract class BaseMcpServer extends McpServer {
     const connection = createAbapConnection(
       this.connectionContext.connectionParams,
     );
+
+    // Resolve system context (masterSystem/responsible) once per connection
+    await resolveSystemContext(connection);
 
     // Cache connection for stdio mode (when sessionId === destination, it's stdio)
     // SSE/HTTP modes use different sessionId per request, so caching won't interfere

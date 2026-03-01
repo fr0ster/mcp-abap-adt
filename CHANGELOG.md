@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [2.7.1] - 2026-03-01
+
+### Added
+- **`SAP_MASTER_SYSTEM` and `SAP_RESPONSIBLE`** documented in CLI help (`--help`) and `.env.example`.
+
 ## [2.7.0] - 2026-03-01
 
 ### Added

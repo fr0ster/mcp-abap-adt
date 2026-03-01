@@ -100,6 +100,12 @@ SAP CONNECTION (.env file):
     SAP_UAA_CLIENT_ID              UAA Client ID (or UAA_CLIENT_ID)
     SAP_UAA_CLIENT_SECRET          UAA Client Secret (or UAA_CLIENT_SECRET)
 
+  System Context (on-premise):
+    SAP_MASTER_SYSTEM              SAP system ID (e.g., DEV, QAS). Required for on-prem
+                                   create/update — ensures correct transport request binding.
+                                   Cloud systems resolve this automatically via API.
+    SAP_RESPONSIBLE                Responsible user (optional, falls back to SAP_USERNAME)
+
 GENERATING .ENV FROM SERVICE KEY:
   Install connection package: npm install -g @mcp-abap-adt/connection
   Generate .env: sap-abap-auth auth -k path/to/service-key.json

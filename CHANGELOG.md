@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-03-01
+
+### Added
+- **System context support for on-premise systems** (issue #11):
+  - `masterSystem` and `responsible` are now passed to all ADT create/update XML requests via `IAdtSystemContext`.
+  - On-prem resolution: `SAP_MASTER_SYSTEM` env var → `getSystemInformation()` API fallback (cloud).
+  - Responsible resolution: `SAP_RESPONSIBLE` env var → `SAP_USERNAME` fallback → API.
+  - Ensures correct transport request binding on on-premise systems.
+- **New `.env` variables for on-premise configuration**:
+  - `SAP_MASTER_SYSTEM` — SAP system ID (e.g., `E19`, `DEV`). Required for on-prem create/update operations.
+  - `SAP_RESPONSIBLE` — Responsible user (optional, falls back to `SAP_USERNAME`).
+- **Test infrastructure**: `resolveTestSystemContext()` resolves system context from YAML config for integration tests.
+
+### Changed
+- **Upgraded `@mcp-abap-adt/adt-clients`** from `^2.0.0` to `^2.2.0`.
+- Renamed `default_system` → `default_master_system` in test config template.
+
 ## [2.6.1] - 2026-02-27
 
 ### Fixed

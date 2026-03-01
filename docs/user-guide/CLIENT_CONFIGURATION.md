@@ -483,13 +483,62 @@ SAP_JWT_TOKEN=your_jwt_token_here
 SAP_REFRESH_TOKEN=your_refresh_token_here
 ```
 
-**For basic authentication:**
+**For basic authentication (on-premise):**
 ```env
 SAP_URL=https://your-onpremise-system.com:8000
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your_username
 SAP_PASSWORD=your_password
 SAP_CLIENT=100
+
+# System context (required for on-prem create/update operations)
+SAP_MASTER_SYSTEM=DEV
+# SAP_RESPONSIBLE is optional — falls back to SAP_USERNAME
+```
+
+### System Context for On-Premise Systems
+
+When creating or updating ABAP objects on on-premise systems, SAP ADT requires `masterSystem` and `responsible` attributes in the XML request body. These ensure that objects are correctly bound to transport requests.
+
+**How system context is resolved:**
+
+| Variable | Purpose | Resolution order |
+|----------|---------|-----------------|
+| `SAP_MASTER_SYSTEM` | SAP system ID (e.g., `E19`, `DEV`) | 1. Env var `SAP_MASTER_SYSTEM` → 2. `getSystemInformation()` API (cloud only) |
+| `SAP_RESPONSIBLE` | Responsible user for the object | 1. Env var `SAP_RESPONSIBLE` → 2. Env var `SAP_USERNAME` → 3. `getSystemInformation()` API (cloud only) |
+
+**On-premise systems** do not support the `getSystemInformation()` API endpoint, so `SAP_MASTER_SYSTEM` **must** be set in the `.env` file. Without it, create/update operations may fail with `403 Forbidden` because the object gets bound to the wrong transport request.
+
+**Cloud systems** (ABAP Cloud / BTP) resolve system context automatically via the `getSystemInformation()` API — no additional configuration is needed.
+
+**Example `.env` for on-premise:**
+```env
+SAP_URL=http://your-sap-system:8000
+SAP_AUTH_TYPE=basic
+SAP_USERNAME=JSMITH
+SAP_PASSWORD=secret
+SAP_CLIENT=100
+SAP_MASTER_SYSTEM=DEV
+```
+
+In Claude Code (`claude_desktop_config.json` or `mcp.json`):
+```json
+{
+  "mcpServers": {
+    "mcp-abap-adt": {
+      "command": "mcp-abap-adt",
+      "args": ["--transport=stdio"],
+      "env": {
+        "SAP_URL": "http://your-sap-system:8000",
+        "SAP_AUTH_TYPE": "basic",
+        "SAP_USERNAME": "JSMITH",
+        "SAP_PASSWORD": "secret",
+        "SAP_CLIENT": "100",
+        "SAP_MASTER_SYSTEM": "DEV"
+      }
+    }
+  }
+}
 ```
 
 When using `.env` configuration, HTTP headers in the client configuration are optional and will override the `.env` values if provided.

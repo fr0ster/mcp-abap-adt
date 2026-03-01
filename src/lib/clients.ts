@@ -2,7 +2,6 @@ import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { registerConnectionResetHook } from './connectionEvents';
-import { getSystemContext } from './systemContext';
 import { getManagedConnection } from './utils';
 
 let adtClient: AdtClient | undefined;
@@ -12,7 +11,7 @@ export function createAdtClient(
   connection: IAbapConnection,
   logger?: ILogger,
 ): AdtClient {
-  return new AdtClient(connection, logger, getSystemContext());
+  return new AdtClient(connection, logger);
 }
 
 export function getAdtClient(): AdtClient {

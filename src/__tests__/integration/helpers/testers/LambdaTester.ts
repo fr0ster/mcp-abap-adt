@@ -18,6 +18,7 @@ import {
   loadTestConfig,
   loadTestEnv,
   resolvePackageName,
+  resolveTestSystemContext,
   resolveTransportRequest,
 } from '../configHelpers';
 import { createTestLogger, type LoggerWithExtras } from '../loggerHelpers';
@@ -25,6 +26,7 @@ import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../sessionHelpers';
+import { resolveSystemContext } from '../../../../lib/systemContext';
 import type { LambdaTesterContext } from './types';
 
 export type TLambda = (context: LambdaTesterContext) => Promise<void>;
@@ -122,6 +124,17 @@ export class LambdaTester {
       const connectionResult = await createTestConnectionAndSession();
       connection = connectionResult.connection;
       session = connectionResult.session;
+
+      // Resolve system context for tests (set SAP_MASTER_SYSTEM from YAML if not already set)
+      const testCtx = resolveTestSystemContext();
+      if (testCtx.masterSystem && !process.env.SAP_MASTER_SYSTEM) {
+        process.env.SAP_MASTER_SYSTEM = testCtx.masterSystem;
+      }
+      if (testCtx.responsible && !process.env.SAP_RESPONSIBLE) {
+        process.env.SAP_RESPONSIBLE = testCtx.responsible;
+      }
+      // Populate system context cache so createAdtClient() picks it up
+      await resolveSystemContext(connection);
       authType =
         connectionResult.authType ||
         ((connection as any)?.getConfig?.()?.authType as string | undefined);

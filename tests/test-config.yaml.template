@@ -43,7 +43,8 @@ test_settings:
 environment:
   default_package: "<YOUR_PACKAGE_NAME>"  # Test package from GROUP 2
   default_transport: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-  default_system: "<YOUR_SYSTEM>"  # ⚠️ UPDATE WITH YOUR SYSTEM (e.g., E19)
+  default_master_system: "<YOUR_SYSTEM>"  # ⚠️ UPDATE WITH YOUR SYSTEM ID (e.g., E19)
+  default_responsible: "<YOUR_USERNAME>"  # ⚠️ UPDATE WITH YOUR SAP USERNAME (e.g., OKYSLYTSIA), falls back to SAP_USERNAME env var
   default_client: "<YOUR_CLIENT>"  # ⚠️ UPDATE WITH YOUR CLIENT (e.g., 100)
   # Cleanup configuration (applies to all tests)
   cleanup_after: false    # Clean up objects after test (default: false)

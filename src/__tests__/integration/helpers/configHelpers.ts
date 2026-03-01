@@ -436,6 +436,26 @@ export function getSapConfigFromEnv(): SapConfig {
 }
 
 /**
+ * Resolve system context (masterSystem + responsible) from YAML config and env vars.
+ * Used by test infrastructure to populate system context before creating AdtClient.
+ */
+export function resolveTestSystemContext(): {
+  masterSystem?: string;
+  responsible?: string;
+} {
+  const config = loadTestConfig();
+  return {
+    masterSystem:
+      config.environment?.default_master_system ||
+      process.env.SAP_MASTER_SYSTEM,
+    responsible:
+      config.environment?.default_responsible ||
+      process.env.SAP_RESPONSIBLE ||
+      process.env.SAP_USERNAME,
+  };
+}
+
+/**
  * Get operation delay
  */
 export function getOperationDelay(operation: string, testCase?: any): number {

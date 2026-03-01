@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/core",
   "mcpName": "io.github.fr0ster/mcp-abap-adt",
-  "version": "2.6.1",
+  "version": "2.7.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -126,7 +126,7 @@
     "yaml": "^2.8.1"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^2.0.0",
+    "@mcp-abap-adt/adt-clients": "^2.2.0",
     "@mcp-abap-adt/auth-broker": "^1.0.5",
     "@mcp-abap-adt/auth-providers": "^1.0.5",
     "@mcp-abap-adt/auth-stores": "^1.0.2",

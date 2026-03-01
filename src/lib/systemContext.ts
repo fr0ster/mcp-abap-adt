@@ -9,15 +9,31 @@ export interface IAdtSystemContext {
 let cached: IAdtSystemContext | undefined;
 
 export async function resolveSystemContext(
-  _connection: IAbapConnection,
+  connection: IAbapConnection,
 ): Promise<IAdtSystemContext> {
   if (cached) return cached;
 
-  // Try env vars (on-prem or explicitly configured)
+  // Try env vars first (on-prem or explicitly configured)
   const masterSystem = process.env.SAP_MASTER_SYSTEM;
   const responsible = process.env.SAP_RESPONSIBLE || process.env.SAP_USERNAME;
 
-  cached = { masterSystem, responsible };
+  if (masterSystem || responsible) {
+    cached = { masterSystem, responsible };
+    return cached;
+  }
+
+  // Cloud: try getSystemInformation API
+  try {
+    const { getSystemInformation } = await import('@mcp-abap-adt/adt-clients');
+    const info = await getSystemInformation(connection);
+    cached = {
+      masterSystem: info?.systemID,
+      responsible: info?.userName,
+    };
+  } catch {
+    cached = {};
+  }
+
   return cached;
 }
 

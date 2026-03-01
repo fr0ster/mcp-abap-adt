@@ -10,6 +10,7 @@
  */
 
 import type { AbapConnection } from '@mcp-abap-adt/connection';
+import { resolveSystemContext } from '../../../../lib/systemContext';
 import {
   getCleanupAfter,
   getEnabledTestCase,
@@ -26,7 +27,6 @@ import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../sessionHelpers';
-import { resolveSystemContext } from '../../../../lib/systemContext';
 import type { LambdaTesterContext } from './types';
 
 export type TLambda = (context: LambdaTesterContext) => Promise<void>;

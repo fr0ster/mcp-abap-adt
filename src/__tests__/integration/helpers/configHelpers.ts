@@ -501,8 +501,16 @@ export function resolvePackageName(testCase?: any): string {
 export function resolveTransportRequest(testCase?: any): string | undefined {
   let transportRequest: string | undefined;
 
-  if (testCase?.params?.transport_request) {
-    transportRequest = String(testCase.params.transport_request).trim();
+  // Check if transport_request key explicitly exists in test case params
+  // This allows overriding to "no transport" by setting transport_request: "" or null in YAML
+  // (e.g., for $TMP package which does not require a transport request)
+  const hasExplicitTransport =
+    testCase?.params != null &&
+    'transport_request' in (testCase.params as Record<string, unknown>);
+
+  if (hasExplicitTransport) {
+    const raw = testCase.params.transport_request;
+    transportRequest = raw ? String(raw).trim() : undefined;
   } else {
     const config = loadTestConfig();
     const defaultTransport = config.environment?.default_transport;

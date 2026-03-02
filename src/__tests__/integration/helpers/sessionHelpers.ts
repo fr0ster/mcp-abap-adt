@@ -106,6 +106,17 @@ async function createConnectionViaBroker(
       return null;
     }
 
+    // Skip AuthBroker when no broker usage is indicated
+    // AuthBroker requires destination, auth_broker config section, or explicit flag
+    if (
+      !actualDestination &&
+      !config?.auth_broker &&
+      !config?.environment?.use_auth_broker &&
+      !process.env.MCP_USE_AUTH_BROKER
+    ) {
+      return null;
+    }
+
     let sessionStore: ISessionStore;
     let serviceKeyStore: IServiceKeyStore;
     let storeType: 'abap' | 'btp';

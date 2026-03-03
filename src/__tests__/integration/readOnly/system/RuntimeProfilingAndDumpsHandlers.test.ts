@@ -156,7 +156,9 @@ async function createRunnableClass(
         activate: true,
       },
       async () => {
-        throw new Error('Direct CreateClass call is not available in hard mode');
+        throw new Error(
+          'Direct CreateClass call is not available in hard mode',
+        );
       },
     );
     if (createResponse?.isError) {
@@ -658,7 +660,9 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
                 max_time_for_tracing: 600,
               },
               async () => {
-                throw new Error('Direct runtime run is not available in hard mode');
+                throw new Error(
+                  'Direct runtime run is not available in hard mode',
+                );
               },
             );
             if (runResult.isError) {
@@ -669,7 +673,9 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           } else {
             const executor = new AdtExecutor(context.connection, logger);
             try {
-              await executor.getClassExecutor().run({ className: dumpClassName });
+              await executor
+                .getClassExecutor()
+                .run({ className: dumpClassName });
             } catch (runError: any) {
               logger?.info(
                 `Expected failing run for dump generation: ${runError?.message || String(runError)}`,

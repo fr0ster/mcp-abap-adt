@@ -67,7 +67,9 @@ describe('Class High-Level Handlers Integration', () => {
               });
               return handleDeleteClass(deleteCtx, {
                 class_name: objectName,
-                ...(transportRequest && { transport_request: transportRequest }),
+                ...(transportRequest && {
+                  transport_request: transportRequest,
+                }),
               });
             },
           );

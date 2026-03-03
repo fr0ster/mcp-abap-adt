@@ -74,7 +74,10 @@ describe('System High-Level Handlers Integration', () => {
               include_descriptions: true,
             },
             async () => {
-              const handlerContext = createHandlerContext({ connection, logger });
+              const handlerContext = createHandlerContext({
+                connection,
+                logger,
+              });
               return handleGetPackageTree(handlerContext, {
                 package_name: testPackage,
                 include_subpackages: false,
@@ -132,7 +135,10 @@ describe('System High-Level Handlers Integration', () => {
               include_descriptions: true,
             },
             async () => {
-              const handlerContext = createHandlerContext({ connection, logger });
+              const handlerContext = createHandlerContext({
+                connection,
+                logger,
+              });
               return handleGetPackageTree(handlerContext, {
                 package_name: testPackage,
                 include_subpackages: true,
@@ -192,7 +198,10 @@ describe('System High-Level Handlers Integration', () => {
               include_descriptions: false,
             },
             async () => {
-              const handlerContext = createHandlerContext({ connection, logger });
+              const handlerContext = createHandlerContext({
+                connection,
+                logger,
+              });
               return handleGetPackageTree(handlerContext, {
                 package_name: testPackage,
                 include_subpackages: true,
@@ -235,7 +244,10 @@ describe('System High-Level Handlers Integration', () => {
               package_name: '',
             },
             async () => {
-              const handlerContext = createHandlerContext({ connection, logger });
+              const handlerContext = createHandlerContext({
+                connection,
+                logger,
+              });
               return handleGetPackageTree(handlerContext, {
                 package_name: '',
               });
@@ -272,7 +284,10 @@ describe('System High-Level Handlers Integration', () => {
               package_name: 'INVALID_PACKAGE_XYZ_123',
             },
             async () => {
-              const handlerContext = createHandlerContext({ connection, logger });
+              const handlerContext = createHandlerContext({
+                connection,
+                logger,
+              });
               return handleGetPackageTree(handlerContext, {
                 package_name: 'INVALID_PACKAGE_XYZ_123',
               });

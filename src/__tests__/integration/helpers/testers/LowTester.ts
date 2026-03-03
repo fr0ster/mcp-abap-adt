@@ -9,6 +9,12 @@
 
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import {
+  createHandlerContext,
+  delay,
+  extractLockHandle,
+  parseHandlerResponse,
+} from '../testHelpers';
+import {
   callTool,
   createHardModeClient,
   isHardModeEnabled,
@@ -16,12 +22,6 @@ import {
   resolveEntityFromHandlerName,
   toolCandidates,
 } from './hardMode';
-import {
-  createHandlerContext,
-  delay,
-  extractLockHandle,
-  parseHandlerResponse,
-} from '../testHelpers';
 import { LambdaTester, type TLambda } from './LambdaTester';
 import type { LambdaTesterContext } from './types';
 
@@ -227,7 +227,9 @@ export class LowTester extends LambdaTester {
       throw new Error('Tester not initialized. Call beforeAll() first.');
     }
     const logger = this.context.logger;
-    const entity = resolveEntityFromHandlerName((this as any).handlerName || '');
+    const entity = resolveEntityFromHandlerName(
+      (this as any).handlerName || '',
+    );
     const mcp = await createHardModeClient();
 
     try {
@@ -350,8 +352,7 @@ export class LowTester extends LambdaTester {
       }
       const parsed = JSON.parse(sessionText);
       const sessionId = parsed?.session_id || parsed?.data?.session_id;
-      const sessionState =
-        parsed?.session_state || parsed?.data?.session_state;
+      const sessionState = parsed?.session_state || parsed?.data?.session_state;
       if (!sessionId) {
         return;
       }

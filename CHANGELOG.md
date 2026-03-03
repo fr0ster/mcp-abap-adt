@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [2.7.3] - 2026-03-03
+
+### Fixed
+- **Release workflow lint gate** for `v2.7.2`:
+  - Applied Biome formatting/import ordering fixes in updated hard-mode test infrastructure and integration suites.
+  - Kept hard-mode behavior unchanged; this patch is focused on CI/release pipeline stability.
+
 ## [2.7.2] - 2026-03-03
 
 ### Added

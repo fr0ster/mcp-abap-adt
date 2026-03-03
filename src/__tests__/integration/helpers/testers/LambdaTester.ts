@@ -12,11 +12,6 @@
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { resolveSystemContext } from '../../../../lib/systemContext';
 import {
-  createHardModeClient,
-  isHardModeEnabled,
-  parseToolText,
-} from './hardMode';
-import {
   getCleanupAfter,
   getEnabledTestCase,
   getOperationDelay,
@@ -32,6 +27,11 @@ import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../sessionHelpers';
+import {
+  createHardModeClient,
+  isHardModeEnabled,
+  parseToolText,
+} from './hardMode';
 import type { LambdaTesterContext } from './types';
 
 export type TLambda = (context: LambdaTesterContext) => Promise<void>;
@@ -39,10 +39,7 @@ type HandlerLikeResponse = {
   isError: boolean;
   content: Array<{ type: 'text'; text: string }>;
 };
-const HARD_MODE_RUN_ID = Math.random()
-  .toString(36)
-  .slice(2, 6)
-  .toUpperCase();
+const HARD_MODE_RUN_ID = Math.random().toString(36).slice(2, 6).toUpperCase();
 
 export class LambdaTester {
   // Configuration
@@ -54,9 +51,11 @@ export class LambdaTester {
   protected testParams: any = null;
   protected context: LambdaTesterContext | undefined;
   protected cleanupAfterLambda: TLambda | null = null;
-  private hardModeMcp:
-    | { client: any; toolNames: Set<string>; close: () => Promise<void> }
-    | null = null;
+  private hardModeMcp: {
+    client: any;
+    toolNames: Set<string>;
+    close: () => Promise<void>;
+  } | null = null;
 
   /**
    * Constructor
@@ -179,19 +178,16 @@ export class LambdaTester {
           objectName = suffixed.slice(0, 30);
 
           // Keep params in sync with object name for arg builders
-          if (testParams.program_name)
-            testParams.program_name = objectName;
+          if (testParams.program_name) testParams.program_name = objectName;
           if (testParams.class_name) testParams.class_name = objectName;
-          if (testParams.interface_name)
-            testParams.interface_name = objectName;
+          if (testParams.interface_name) testParams.interface_name = objectName;
           if (testParams.function_name) testParams.function_name = objectName;
           if (testParams.table_name) testParams.table_name = objectName;
           if (testParams.view_name) testParams.view_name = objectName;
           if (testParams.domain_name) testParams.domain_name = objectName;
           if (testParams.data_element_name)
             testParams.data_element_name = objectName;
-          if (testParams.structure_name)
-            testParams.structure_name = objectName;
+          if (testParams.structure_name) testParams.structure_name = objectName;
           if (testParams.name) testParams.name = objectName;
 
           // Adjust embedded source to avoid name mismatch in checks/update
@@ -202,10 +198,11 @@ export class LambdaTester {
             );
           }
           if (typeof testParams.update_source_code === 'string') {
-            testParams.update_source_code = testParams.update_source_code.replace(
-              new RegExp(String(originalObjectName), 'gi'),
-              String(objectName),
-            );
+            testParams.update_source_code =
+              testParams.update_source_code.replace(
+                new RegExp(String(originalObjectName), 'gi'),
+                String(objectName),
+              );
           }
           if (typeof testParams.ddl_code === 'string') {
             testParams.ddl_code = testParams.ddl_code.replace(
@@ -580,14 +577,19 @@ export class LambdaTester {
       throw new Error(`MCP tool "${toolName}" not found in hard mode`);
     }
 
-    const result = await mcp.client.callTool({ name: toolName, arguments: args });
+    const result = await mcp.client.callTool({
+      name: toolName,
+      arguments: args,
+    });
     if (result?.isError) {
       const text = (result.content || [])
         .map((c: any) => (typeof c?.text === 'string' ? c.text : ''))
         .join('\n');
       return {
         isError: true,
-        content: [{ type: 'text', text: text || `${toolName} returned MCP error` }],
+        content: [
+          { type: 'text', text: text || `${toolName} returned MCP error` },
+        ],
       };
     }
 

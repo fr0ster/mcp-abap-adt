@@ -34,8 +34,7 @@ export function getHardModeConfig(): HardModeConfig {
   return {
     enabled: hard.enabled === true,
     transport: normalizedTransport,
-    http_url:
-      hard.http_url || 'http://127.0.0.1:3000/mcp/stream/http',
+    http_url: hard.http_url || 'http://127.0.0.1:3000/mcp/stream/http',
     sse_url: hard.sse_url || 'http://127.0.0.1:3001/sse',
     stdio_command: hard.stdio_command || process.execPath,
     env_path: hard.env_path || '.env',
@@ -67,12 +66,17 @@ export async function createHardModeClient(): Promise<{
   );
 
   if (hard.transport === 'http') {
-    await client.connect(new StreamableHTTPClientTransport(new URL(hard.http_url!)));
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(hard.http_url!)),
+    );
   } else if (hard.transport === 'sse') {
     await client.connect(new SSEClientTransport(new URL(hard.sse_url!)));
   } else {
     const launcherPath = path.resolve(process.cwd(), 'dist/server/launcher.js');
-    const envPath = path.resolve(process.cwd(), String(hard.env_path || '.env'));
+    const envPath = path.resolve(
+      process.cwd(),
+      String(hard.env_path || '.env'),
+    );
     const args = [
       launcherPath,
       '--transport=stdio',

@@ -72,7 +72,8 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
               });
               return handleDeleteCdsUnitTest(handlerContext, {
                 class_name: className,
-                transport_request: params?.transport_request || transportRequest,
+                transport_request:
+                  params?.transport_request || transportRequest,
               });
             },
           );

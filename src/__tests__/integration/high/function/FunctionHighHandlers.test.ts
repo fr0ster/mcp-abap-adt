@@ -40,15 +40,15 @@ import {
   updateSessionFromResponse,
 } from '../../helpers/sessionHelpers';
 import {
-  debugLog,
-  delay,
-  parseHandlerResponse,
-} from '../../helpers/testHelpers';
-import {
   callTool,
   createHardModeClient,
   isHardModeEnabled,
 } from '../../helpers/testers/hardMode';
+import {
+  debugLog,
+  delay,
+  parseHandlerResponse,
+} from '../../helpers/testHelpers';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -59,7 +59,11 @@ describe('Function High-Level Handlers Integration', () => {
   let connection: AbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
-  let mcp: { client: any; toolNames: Set<string>; close: () => Promise<void> } | null = null;
+  let mcp: {
+    client: any;
+    toolNames: Set<string>;
+    close: () => Promise<void>;
+  } | null = null;
 
   beforeAll(async () => {
     try {
@@ -168,7 +172,9 @@ describe('Function High-Level Handlers Integration', () => {
           } catch (error: any) {
             return {
               isError: true,
-              content: [{ type: 'text', text: error?.message || String(error) }],
+              content: [
+                { type: 'text', text: error?.message || String(error) },
+              ],
             };
           }
         };

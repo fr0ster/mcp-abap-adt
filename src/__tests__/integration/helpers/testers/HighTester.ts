@@ -186,7 +186,9 @@ export class HighTester extends LambdaTester {
       throw new Error('Tester not initialized. Call beforeAll() first.');
     }
     const logger = this.context.logger;
-    const entity = resolveEntityFromHandlerName((this as any).handlerName || '');
+    const entity = resolveEntityFromHandlerName(
+      (this as any).handlerName || '',
+    );
     const mcp = await createHardModeClient();
     try {
       if (this.workflowFunctions?.create) {

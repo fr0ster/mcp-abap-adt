@@ -81,7 +81,10 @@ describe('System Low-Level Handlers Integration', () => {
               ],
             },
             async () => {
-              const handlerContext = createHandlerContext({ connection, logger });
+              const handlerContext = createHandlerContext({
+                connection,
+                logger,
+              });
               return handleGetVirtualFolders(handlerContext, {
                 object_search_pattern: '*',
                 preselection: [
@@ -120,7 +123,10 @@ describe('System Low-Level Handlers Integration', () => {
               facet_order: ['package', 'type'],
             },
             async () => {
-              const handlerContext = createHandlerContext({ connection, logger });
+              const handlerContext = createHandlerContext({
+                connection,
+                logger,
+              });
               return handleGetVirtualFolders(handlerContext, {
                 object_search_pattern: 'Z*',
                 facet_order: ['package', 'type'],
@@ -163,7 +169,10 @@ describe('System Low-Level Handlers Integration', () => {
               with_short_descriptions: true,
             },
             async () => {
-              const handlerContext = createHandlerContext({ connection, logger });
+              const handlerContext = createHandlerContext({
+                connection,
+                logger,
+              });
               return handleGetNodeStructure(handlerContext, {
                 parent_type: 'DEVC/K',
                 parent_name: testPackage,
@@ -207,7 +216,10 @@ describe('System Low-Level Handlers Integration', () => {
               with_short_descriptions: true,
             },
             async () => {
-              const handlerContext = createHandlerContext({ connection, logger });
+              const handlerContext = createHandlerContext({
+                connection,
+                logger,
+              });
               return handleGetNodeStructure(handlerContext, {
                 parent_type: 'CLAS/OC',
                 parent_name: testClass,
@@ -241,7 +253,10 @@ describe('System Low-Level Handlers Integration', () => {
               parent_name: 'TEST',
             },
             async () => {
-              const handlerContext = createHandlerContext({ connection, logger });
+              const handlerContext = createHandlerContext({
+                connection,
+                logger,
+              });
               return handleGetNodeStructure(handlerContext, {
                 parent_type: '',
                 parent_name: 'TEST',
@@ -289,7 +304,10 @@ describe('System Low-Level Handlers Integration', () => {
               object_name: testPackage,
             },
             async () => {
-              const handlerContext = createHandlerContext({ connection, logger });
+              const handlerContext = createHandlerContext({
+                connection,
+                logger,
+              });
               return handleGetObjectStructure(handlerContext, {
                 object_type: 'DEVC/K',
                 object_name: testPackage,
@@ -329,7 +347,10 @@ describe('System Low-Level Handlers Integration', () => {
               object_name: testClass,
             },
             async () => {
-              const handlerContext = createHandlerContext({ connection, logger });
+              const handlerContext = createHandlerContext({
+                connection,
+                logger,
+              });
               return handleGetObjectStructure(handlerContext, {
                 object_type: 'CLAS/OC',
                 object_name: testClass,
@@ -361,7 +382,10 @@ describe('System Low-Level Handlers Integration', () => {
               object_name: 'TEST',
             },
             async () => {
-              const handlerContext = createHandlerContext({ connection, logger });
+              const handlerContext = createHandlerContext({
+                connection,
+                logger,
+              });
               return handleGetObjectStructure(handlerContext, {
                 object_type: '',
                 object_name: 'TEST',

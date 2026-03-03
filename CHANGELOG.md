@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [2.7.5] - 2026-03-03
+
+### Fixed
+- **MCP Registry publish**: sync `server.json` version with npm package version (`2.5.2` → `2.7.5`).
+
 ## [2.7.4] - 2026-03-03
 
 ### Added

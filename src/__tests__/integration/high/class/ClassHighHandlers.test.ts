@@ -54,14 +54,23 @@ describe('Class High-Level Handlers Integration', () => {
         logger?.info(`   • cleanup: delete ${objectName}`);
         try {
           const deleteLogger = createTestLogger('class-high-delete');
-          const deleteCtx = createHandlerContext({
-            connection,
-            logger: deleteLogger,
-          });
-          const deleteResponse = await handleDeleteClass(deleteCtx, {
-            class_name: objectName,
-            ...(transportRequest && { transport_request: transportRequest }),
-          });
+          const deleteResponse = await tester.invokeToolOrHandler(
+            'DeleteClass',
+            {
+              class_name: objectName,
+              ...(transportRequest && { transport_request: transportRequest }),
+            },
+            async () => {
+              const deleteCtx = createHandlerContext({
+                connection,
+                logger: deleteLogger,
+              });
+              return handleDeleteClass(deleteCtx, {
+                class_name: objectName,
+                ...(transportRequest && { transport_request: transportRequest }),
+              });
+            },
+          );
           if (deleteResponse.isError) {
             const errorMsg = extractErrorMessage(deleteResponse);
             logger?.warn(`Delete failed (ignored in cleanup): ${errorMsg}`);
@@ -106,20 +115,34 @@ describe('Class High-Level Handlers Integration', () => {
         // Step 1: Create
         logger?.info(`   • create: ${objectName}`);
         const createLogger = createTestLogger('class-high-create');
-        const createCtx = createHandlerContext({
-          connection,
-          logger: createLogger,
-        });
         const sourceCode = params.source_code || '';
-        const createResponse = await handleCreateClass(createCtx, {
-          class_name: objectName,
-          package_name: packageName,
-          source_code: sourceCode,
-          activate: true,
-          ...(transportRequest && { transport_request: transportRequest }),
-          ...(params.description && { description: params.description }),
-          ...(params.superclass && { superclass: params.superclass }),
-        });
+        const createResponse = await tester.invokeToolOrHandler(
+          'CreateClass',
+          {
+            class_name: objectName,
+            package_name: packageName,
+            source_code: sourceCode,
+            activate: true,
+            ...(transportRequest && { transport_request: transportRequest }),
+            ...(params.description && { description: params.description }),
+            ...(params.superclass && { superclass: params.superclass }),
+          },
+          async () => {
+            const createCtx = createHandlerContext({
+              connection,
+              logger: createLogger,
+            });
+            return handleCreateClass(createCtx, {
+              class_name: objectName,
+              package_name: packageName,
+              source_code: sourceCode,
+              activate: true,
+              ...(transportRequest && { transport_request: transportRequest }),
+              ...(params.description && { description: params.description }),
+              ...(params.superclass && { superclass: params.superclass }),
+            });
+          },
+        );
 
         expect(createResponse.isError).toBe(false);
         if (createResponse.isError) {
@@ -177,10 +200,6 @@ describe('Class High-Level Handlers Integration', () => {
         // Step 2: Update
         logger?.info(`   • update: ${objectName}`);
         const updateLogger = createTestLogger('class-high-update');
-        const updateCtx = createHandlerContext({
-          connection,
-          logger: updateLogger,
-        });
         let updatedSourceCode = params.update_source_code;
         if (!updatedSourceCode) {
           const originalSourceCode = params.source_code || '';
@@ -193,11 +212,25 @@ describe('Class High-Level Handlers Integration', () => {
           }
         }
 
-        const updateResponse = await handleUpdateClass(updateCtx, {
-          class_name: className,
-          source_code: updatedSourceCode,
-          activate: true,
-        });
+        const updateResponse = await tester.invokeToolOrHandler(
+          'UpdateClass',
+          {
+            class_name: className,
+            source_code: updatedSourceCode,
+            activate: true,
+          },
+          async () => {
+            const updateCtx = createHandlerContext({
+              connection,
+              logger: updateLogger,
+            });
+            return handleUpdateClass(updateCtx, {
+              class_name: className,
+              source_code: updatedSourceCode,
+              activate: true,
+            });
+          },
+        );
 
         expect(updateResponse.isError).toBe(false);
         if (updateResponse.isError) {
@@ -244,14 +277,23 @@ describe('Class High-Level Handlers Integration', () => {
         // Step 3: Get (read)
         logger?.info(`   • get: ${objectName}`);
         const getLogger = createTestLogger('class-high-get');
-        const getCtx = createHandlerContext({
-          connection,
-          logger: getLogger,
-        });
-        const getResponse = await handleGetClass(getCtx, {
-          class_name: className,
-          version: 'active',
-        });
+        const getResponse = await tester.invokeToolOrHandler(
+          'GetClass',
+          {
+            class_name: className,
+            version: 'active',
+          },
+          async () => {
+            const getCtx = createHandlerContext({
+              connection,
+              logger: getLogger,
+            });
+            return handleGetClass(getCtx, {
+              class_name: className,
+              version: 'active',
+            });
+          },
+        );
 
         expect(getResponse.isError).toBe(false);
         if (getResponse.isError) {

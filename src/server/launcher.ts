@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as dotenv from 'dotenv';
 import { AuthBrokerFactory } from '../lib/auth/index.js';
 import { ServerConfigManager } from '../lib/config/index.js';
 import {
@@ -44,6 +45,35 @@ let activeServer: StdioServer | SseServer | StreamableHttpServer | undefined;
 
 function hasArg(name: string): boolean {
   return process.argv.includes(name);
+}
+
+/**
+ * In v2 flow, .env can be loaded into auth-broker session storage without
+ * populating process.env. System context resolver relies on process.env
+ * for SAP_MASTER_SYSTEM / SAP_RESPONSIBLE, so bridge these values here.
+ */
+function hydrateSystemContextFromEnvFile(envFilePath?: string): void {
+  if (!envFilePath || !fs.existsSync(envFilePath)) {
+    return;
+  }
+
+  try {
+    const parsed = dotenv.parse(fs.readFileSync(envFilePath, 'utf8'));
+    const keys: Array<keyof NodeJS.ProcessEnv> = [
+      'SAP_MASTER_SYSTEM',
+      'SAP_RESPONSIBLE',
+      'SAP_USERNAME',
+    ];
+
+    for (const key of keys) {
+      const value = parsed[key];
+      if (!process.env[key] && value) {
+        process.env[key] = value;
+      }
+    }
+  } catch {
+    // Ignore .env parse errors here; auth-broker initialization handles config validation.
+  }
 }
 
 function showVersion(): void {
@@ -130,6 +160,7 @@ async function main() {
   // Use ServerConfigManager for all config parsing
   const configManager = new ServerConfigManager();
   const config = await configManager.getConfig();
+  hydrateSystemContextFromEnvFile(config.envFile);
 
   const baseContext = {
     connection: undefined as any,

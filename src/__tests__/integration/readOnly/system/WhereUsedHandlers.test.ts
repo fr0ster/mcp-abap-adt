@@ -20,6 +20,18 @@ import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
 
+function extractResultData(result: any): any {
+  const jsonContent = result.content.find((c: any) => c.type === 'json') as any;
+  if (jsonContent?.json) {
+    return jsonContent.json;
+  }
+  const textContent = result.content.find((c: any) => c.type === 'text') as any;
+  if (textContent?.text) {
+    return JSON.parse(textContent.text);
+  }
+  throw new Error('No response payload found');
+}
+
 describe('WhereUsed Handler Integration', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('whereused-test');
@@ -59,24 +71,28 @@ describe('WhereUsed Handler Integration', () => {
         logger?.info('🔍 Testing where-used with default scope');
         logger?.info(`📋 Object: ${testClass} (class)`);
 
-        const handlerContext = createHandlerContext({ connection, logger });
-        const result = await handleGetWhereUsed(handlerContext, {
-          object_name: testClass,
-          object_type: 'class',
-          enable_all_types: false,
-        });
+        const result = await tester.invokeToolOrHandler(
+          'GetWhereUsed',
+          {
+            object_name: testClass,
+            object_type: 'class',
+            enable_all_types: false,
+          },
+          async () => {
+            const handlerContext = createHandlerContext({ connection, logger });
+            return handleGetWhereUsed(handlerContext, {
+              object_name: testClass,
+              object_type: 'class',
+              enable_all_types: false,
+            });
+          },
+        );
 
         expect(result.isError).toBe(false);
         expect(result.content).toBeDefined();
         expect(result.content.length).toBeGreaterThan(0);
 
-        const jsonContent = result.content.find(
-          (c: any) => c.type === 'json',
-        ) as any;
-        expect(jsonContent).toBeDefined();
-        expect(jsonContent?.json).toBeDefined();
-
-        const data = jsonContent?.json;
+        const data = extractResultData(result);
         expect(data.object_name).toBe(testClass);
         expect(data.object_type).toBe('class');
         expect(data.enable_all_types).toBe(false);
@@ -100,24 +116,28 @@ describe('WhereUsed Handler Integration', () => {
         logger?.info('🔍 Testing where-used with all types enabled');
         logger?.info(`📋 Object: ${testClass} (class)`);
 
-        const handlerContext = createHandlerContext({ connection, logger });
-        const result = await handleGetWhereUsed(handlerContext, {
-          object_name: testClass,
-          object_type: 'class',
-          enable_all_types: true,
-        });
+        const result = await tester.invokeToolOrHandler(
+          'GetWhereUsed',
+          {
+            object_name: testClass,
+            object_type: 'class',
+            enable_all_types: true,
+          },
+          async () => {
+            const handlerContext = createHandlerContext({ connection, logger });
+            return handleGetWhereUsed(handlerContext, {
+              object_name: testClass,
+              object_type: 'class',
+              enable_all_types: true,
+            });
+          },
+        );
 
         expect(result.isError).toBe(false);
         expect(result.content).toBeDefined();
         expect(result.content.length).toBeGreaterThan(0);
 
-        const jsonContent = result.content.find(
-          (c: any) => c.type === 'json',
-        ) as any;
-        expect(jsonContent).toBeDefined();
-        expect(jsonContent?.json).toBeDefined();
-
-        const data = jsonContent?.json;
+        const data = extractResultData(result);
         expect(data.object_name).toBe(testClass);
         expect(data.object_type).toBe('class');
         expect(data.enable_all_types).toBe(true);
@@ -141,24 +161,28 @@ describe('WhereUsed Handler Integration', () => {
         logger?.info('🔍 Testing where-used for table');
         logger?.info(`📋 Object: ${testTable} (table)`);
 
-        const handlerContext = createHandlerContext({ connection, logger });
-        const result = await handleGetWhereUsed(handlerContext, {
-          object_name: testTable,
-          object_type: 'table',
-          enable_all_types: false,
-        });
+        const result = await tester.invokeToolOrHandler(
+          'GetWhereUsed',
+          {
+            object_name: testTable,
+            object_type: 'table',
+            enable_all_types: false,
+          },
+          async () => {
+            const handlerContext = createHandlerContext({ connection, logger });
+            return handleGetWhereUsed(handlerContext, {
+              object_name: testTable,
+              object_type: 'table',
+              enable_all_types: false,
+            });
+          },
+        );
 
         expect(result.isError).toBe(false);
         expect(result.content).toBeDefined();
         expect(result.content.length).toBeGreaterThan(0);
 
-        const jsonContent = result.content.find(
-          (c: any) => c.type === 'json',
-        ) as any;
-        expect(jsonContent).toBeDefined();
-        expect(jsonContent?.json).toBeDefined();
-
-        const data = jsonContent?.json;
+        const data = extractResultData(result);
         expect(data.object_name).toBe(testTable);
         expect(data.object_type).toBe('table');
         expect(data.total_references).toBeGreaterThanOrEqual(0);
@@ -177,11 +201,20 @@ describe('WhereUsed Handler Integration', () => {
 
         logger?.info('🔍 Testing error handling: missing object name');
 
-        const handlerContext = createHandlerContext({ connection, logger });
-        const result = await handleGetWhereUsed(handlerContext, {
-          object_name: '',
-          object_type: 'class',
-        });
+        const result = await tester.invokeToolOrHandler(
+          'GetWhereUsed',
+          {
+            object_name: '',
+            object_type: 'class',
+          },
+          async () => {
+            const handlerContext = createHandlerContext({ connection, logger });
+            return handleGetWhereUsed(handlerContext, {
+              object_name: '',
+              object_type: 'class',
+            });
+          },
+        );
 
         expect(result.isError).toBe(true);
         expect(result.content).toBeDefined();
@@ -207,11 +240,20 @@ describe('WhereUsed Handler Integration', () => {
 
         logger?.info('🔍 Testing error handling: missing object type');
 
-        const handlerContext = createHandlerContext({ connection, logger });
-        const result = await handleGetWhereUsed(handlerContext, {
-          object_name: 'CL_ABAP_CHAR_UTILITIES',
-          object_type: '',
-        });
+        const result = await tester.invokeToolOrHandler(
+          'GetWhereUsed',
+          {
+            object_name: 'CL_ABAP_CHAR_UTILITIES',
+            object_type: '',
+          },
+          async () => {
+            const handlerContext = createHandlerContext({ connection, logger });
+            return handleGetWhereUsed(handlerContext, {
+              object_name: 'CL_ABAP_CHAR_UTILITIES',
+              object_type: '',
+            });
+          },
+        );
 
         expect(result.isError).toBe(true);
         expect(result.content).toBeDefined();
@@ -239,29 +281,43 @@ describe('WhereUsed Handler Integration', () => {
         logger?.info('🔍 Comparing default scope vs all-types scope');
         logger?.info(`📋 Object: ${testClass} (class)`);
 
-        const handlerContext = createHandlerContext({ connection, logger });
-
         // Get results with default scope
-        const defaultResult = await handleGetWhereUsed(handlerContext, {
-          object_name: testClass,
-          object_type: 'class',
-          enable_all_types: false,
-        });
-
-        const defaultData = (
-          defaultResult.content.find((c: any) => c.type === 'json') as any
-        )?.json;
+        const defaultResult = await tester.invokeToolOrHandler(
+          'GetWhereUsed',
+          {
+            object_name: testClass,
+            object_type: 'class',
+            enable_all_types: false,
+          },
+          async () => {
+            const handlerContext = createHandlerContext({ connection, logger });
+            return handleGetWhereUsed(handlerContext, {
+              object_name: testClass,
+              object_type: 'class',
+              enable_all_types: false,
+            });
+          },
+        );
+        const defaultData = extractResultData(defaultResult);
 
         // Get results with all types enabled
-        const allTypesResult = await handleGetWhereUsed(handlerContext, {
-          object_name: testClass,
-          object_type: 'class',
-          enable_all_types: true,
-        });
-
-        const allTypesData = (
-          allTypesResult.content.find((c: any) => c.type === 'json') as any
-        )?.json;
+        const allTypesResult = await tester.invokeToolOrHandler(
+          'GetWhereUsed',
+          {
+            object_name: testClass,
+            object_type: 'class',
+            enable_all_types: true,
+          },
+          async () => {
+            const handlerContext = createHandlerContext({ connection, logger });
+            return handleGetWhereUsed(handlerContext, {
+              object_name: testClass,
+              object_type: 'class',
+              enable_all_types: true,
+            });
+          },
+        );
+        const allTypesData = extractResultData(allTypesResult);
 
         // Compare results
         logger?.info(

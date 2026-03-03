@@ -69,16 +69,30 @@ describe('System Low-Level Handlers Integration', () => {
           logger?.info('🔍 Testing GetVirtualFoldersLow with default pattern');
           logger?.info(`📋 Package: ${testPackage}`);
 
-          const handlerContext = createHandlerContext({ connection, logger });
-          const result = await handleGetVirtualFolders(handlerContext, {
-            object_search_pattern: '*',
-            preselection: [
-              {
-                facet: 'package',
-                values: [testPackage],
-              },
-            ],
-          });
+          const result = await tester.invokeToolOrHandler(
+            'GetVirtualFoldersLow',
+            {
+              object_search_pattern: '*',
+              preselection: [
+                {
+                  facet: 'package',
+                  values: [testPackage],
+                },
+              ],
+            },
+            async () => {
+              const handlerContext = createHandlerContext({ connection, logger });
+              return handleGetVirtualFolders(handlerContext, {
+                object_search_pattern: '*',
+                preselection: [
+                  {
+                    facet: 'package',
+                    values: [testPackage],
+                  },
+                ],
+              });
+            },
+          );
 
           expect(result.isError).toBe(false);
           expect(result.content).toBeDefined();
@@ -99,11 +113,20 @@ describe('System Low-Level Handlers Integration', () => {
           logger?.info('🔍 Testing GetVirtualFoldersLow with custom pattern');
           logger?.info('📋 Pattern: Z*');
 
-          const handlerContext = createHandlerContext({ connection, logger });
-          const result = await handleGetVirtualFolders(handlerContext, {
-            object_search_pattern: 'Z*',
-            facet_order: ['package', 'type'],
-          });
+          const result = await tester.invokeToolOrHandler(
+            'GetVirtualFoldersLow',
+            {
+              object_search_pattern: 'Z*',
+              facet_order: ['package', 'type'],
+            },
+            async () => {
+              const handlerContext = createHandlerContext({ connection, logger });
+              return handleGetVirtualFolders(handlerContext, {
+                object_search_pattern: 'Z*',
+                facet_order: ['package', 'type'],
+              });
+            },
+          );
 
           expect(result.isError).toBe(false);
           expect(result.content).toBeDefined();
@@ -131,13 +154,24 @@ describe('System Low-Level Handlers Integration', () => {
           logger?.info('🔍 Testing GetNodeStructureLow for package');
           logger?.info(`📋 Package: ${testPackage}`);
 
-          const handlerContext = createHandlerContext({ connection, logger });
-          const result = await handleGetNodeStructure(handlerContext, {
-            parent_type: 'DEVC/K',
-            parent_name: testPackage,
-            node_id: '0000',
-            with_short_descriptions: true,
-          });
+          const result = await tester.invokeToolOrHandler(
+            'GetNodeStructureLow',
+            {
+              parent_type: 'DEVC/K',
+              parent_name: testPackage,
+              node_id: '0000',
+              with_short_descriptions: true,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({ connection, logger });
+              return handleGetNodeStructure(handlerContext, {
+                parent_type: 'DEVC/K',
+                parent_name: testPackage,
+                node_id: '0000',
+                with_short_descriptions: true,
+              });
+            },
+          );
 
           expect(result.isError).toBe(false);
           expect(result.content).toBeDefined();
@@ -164,13 +198,24 @@ describe('System Low-Level Handlers Integration', () => {
           logger?.info('🔍 Testing GetNodeStructureLow for class');
           logger?.info(`📋 Class: ${testClass}`);
 
-          const handlerContext = createHandlerContext({ connection, logger });
-          const result = await handleGetNodeStructure(handlerContext, {
-            parent_type: 'CLAS/OC',
-            parent_name: testClass,
-            node_id: '0000',
-            with_short_descriptions: true,
-          });
+          const result = await tester.invokeToolOrHandler(
+            'GetNodeStructureLow',
+            {
+              parent_type: 'CLAS/OC',
+              parent_name: testClass,
+              node_id: '0000',
+              with_short_descriptions: true,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({ connection, logger });
+              return handleGetNodeStructure(handlerContext, {
+                parent_type: 'CLAS/OC',
+                parent_name: testClass,
+                node_id: '0000',
+                with_short_descriptions: true,
+              });
+            },
+          );
 
           expect(result.isError).toBe(false);
           expect(result.content).toBeDefined();
@@ -189,11 +234,20 @@ describe('System Low-Level Handlers Integration', () => {
 
           logger?.info('🔍 Testing error handling: missing parent_type');
 
-          const handlerContext = createHandlerContext({ connection, logger });
-          const result = await handleGetNodeStructure(handlerContext, {
-            parent_type: '',
-            parent_name: 'TEST',
-          });
+          const result = await tester.invokeToolOrHandler(
+            'GetNodeStructureLow',
+            {
+              parent_type: '',
+              parent_name: 'TEST',
+            },
+            async () => {
+              const handlerContext = createHandlerContext({ connection, logger });
+              return handleGetNodeStructure(handlerContext, {
+                parent_type: '',
+                parent_name: 'TEST',
+              });
+            },
+          );
 
           expect(result.isError).toBe(true);
           expect(result.content).toBeDefined();
@@ -228,11 +282,20 @@ describe('System Low-Level Handlers Integration', () => {
           logger?.info('🔍 Testing GetObjectStructureLow for package');
           logger?.info(`📋 Package: ${testPackage}`);
 
-          const handlerContext = createHandlerContext({ connection, logger });
-          const result = await handleGetObjectStructure(handlerContext, {
-            object_type: 'DEVC/K',
-            object_name: testPackage,
-          });
+          const result = await tester.invokeToolOrHandler(
+            'GetObjectStructureLow',
+            {
+              object_type: 'DEVC/K',
+              object_name: testPackage,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({ connection, logger });
+              return handleGetObjectStructure(handlerContext, {
+                object_type: 'DEVC/K',
+                object_name: testPackage,
+              });
+            },
+          );
 
           expect(result.isError).toBe(false);
           expect(result.content).toBeDefined();
@@ -259,11 +322,20 @@ describe('System Low-Level Handlers Integration', () => {
           logger?.info('🔍 Testing GetObjectStructureLow for class');
           logger?.info(`📋 Class: ${testClass}`);
 
-          const handlerContext = createHandlerContext({ connection, logger });
-          const result = await handleGetObjectStructure(handlerContext, {
-            object_type: 'CLAS/OC',
-            object_name: testClass,
-          });
+          const result = await tester.invokeToolOrHandler(
+            'GetObjectStructureLow',
+            {
+              object_type: 'CLAS/OC',
+              object_name: testClass,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({ connection, logger });
+              return handleGetObjectStructure(handlerContext, {
+                object_type: 'CLAS/OC',
+                object_name: testClass,
+              });
+            },
+          );
 
           expect(result.isError).toBe(false);
           expect(result.content).toBeDefined();
@@ -282,11 +354,20 @@ describe('System Low-Level Handlers Integration', () => {
 
           logger?.info('🔍 Testing error handling: missing object_type');
 
-          const handlerContext = createHandlerContext({ connection, logger });
-          const result = await handleGetObjectStructure(handlerContext, {
-            object_type: '',
-            object_name: 'TEST',
-          });
+          const result = await tester.invokeToolOrHandler(
+            'GetObjectStructureLow',
+            {
+              object_type: '',
+              object_name: 'TEST',
+            },
+            async () => {
+              const handlerContext = createHandlerContext({ connection, logger });
+              return handleGetObjectStructure(handlerContext, {
+                object_type: '',
+                object_name: 'TEST',
+              });
+            },
+          );
 
           expect(result.isError).toBe(true);
           expect(result.content).toBeDefined();

@@ -65,13 +65,24 @@ describe('System High-Level Handlers Integration', () => {
           logger?.info('🔍 Testing GetPackageTree without subpackages');
           logger?.info(`📋 Package: ${testPackage}`);
 
-          const handlerContext = createHandlerContext({ connection, logger });
-          const result = await handleGetPackageTree(handlerContext, {
-            package_name: testPackage,
-            include_subpackages: false,
-            max_depth: 0,
-            include_descriptions: true,
-          });
+          const result = await tester.invokeToolOrHandler(
+            'GetPackageTree',
+            {
+              package_name: testPackage,
+              include_subpackages: false,
+              max_depth: 0,
+              include_descriptions: true,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({ connection, logger });
+              return handleGetPackageTree(handlerContext, {
+                package_name: testPackage,
+                include_subpackages: false,
+                max_depth: 0,
+                include_descriptions: true,
+              });
+            },
+          );
 
           expect(result.isError).toBe(false);
           expect(result.content).toBeDefined();
@@ -112,13 +123,24 @@ describe('System High-Level Handlers Integration', () => {
           logger?.info('🔍 Testing GetPackageTree with subpackages');
           logger?.info(`📋 Package: ${testPackage}`);
 
-          const handlerContext = createHandlerContext({ connection, logger });
-          const result = await handleGetPackageTree(handlerContext, {
-            package_name: testPackage,
-            include_subpackages: true,
-            max_depth: 2,
-            include_descriptions: true,
-          });
+          const result = await tester.invokeToolOrHandler(
+            'GetPackageTree',
+            {
+              package_name: testPackage,
+              include_subpackages: true,
+              max_depth: 2,
+              include_descriptions: true,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({ connection, logger });
+              return handleGetPackageTree(handlerContext, {
+                package_name: testPackage,
+                include_subpackages: true,
+                max_depth: 2,
+                include_descriptions: true,
+              });
+            },
+          );
 
           expect(result.isError).toBe(false);
           expect(result.content).toBeDefined();
@@ -161,13 +183,24 @@ describe('System High-Level Handlers Integration', () => {
           logger?.info('🔍 Testing GetPackageTree with limited depth');
           logger?.info(`📋 Package: ${testPackage}, Max depth: 1`);
 
-          const handlerContext = createHandlerContext({ connection, logger });
-          const result = await handleGetPackageTree(handlerContext, {
-            package_name: testPackage,
-            include_subpackages: true,
-            max_depth: 1,
-            include_descriptions: false,
-          });
+          const result = await tester.invokeToolOrHandler(
+            'GetPackageTree',
+            {
+              package_name: testPackage,
+              include_subpackages: true,
+              max_depth: 1,
+              include_descriptions: false,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({ connection, logger });
+              return handleGetPackageTree(handlerContext, {
+                package_name: testPackage,
+                include_subpackages: true,
+                max_depth: 1,
+                include_descriptions: false,
+              });
+            },
+          );
 
           expect(result.isError).toBe(false);
           expect(result.content).toBeDefined();
@@ -196,10 +229,18 @@ describe('System High-Level Handlers Integration', () => {
 
           logger?.info('🔍 Testing error handling: missing package_name');
 
-          const handlerContext = createHandlerContext({ connection, logger });
-          const result = await handleGetPackageTree(handlerContext, {
-            package_name: '',
-          });
+          const result = await tester.invokeToolOrHandler(
+            'GetPackageTree',
+            {
+              package_name: '',
+            },
+            async () => {
+              const handlerContext = createHandlerContext({ connection, logger });
+              return handleGetPackageTree(handlerContext, {
+                package_name: '',
+              });
+            },
+          );
 
           expect(result.isError).toBe(true);
           expect(result.content).toBeDefined();
@@ -225,10 +266,18 @@ describe('System High-Level Handlers Integration', () => {
 
           logger?.info('🔍 Testing error handling: invalid package name');
 
-          const handlerContext = createHandlerContext({ connection, logger });
-          const result = await handleGetPackageTree(handlerContext, {
-            package_name: 'INVALID_PACKAGE_XYZ_123',
-          });
+          const result = await tester.invokeToolOrHandler(
+            'GetPackageTree',
+            {
+              package_name: 'INVALID_PACKAGE_XYZ_123',
+            },
+            async () => {
+              const handlerContext = createHandlerContext({ connection, logger });
+              return handleGetPackageTree(handlerContext, {
+                package_name: 'INVALID_PACKAGE_XYZ_123',
+              });
+            },
+          );
 
           // Should either return error or empty tree
           if (result.isError) {

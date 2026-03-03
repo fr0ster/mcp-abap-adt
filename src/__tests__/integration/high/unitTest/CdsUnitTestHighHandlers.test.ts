@@ -58,16 +58,24 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
           return;
         }
 
-        const handlerContext = createHandlerContext({
-          connection,
-          logger: testLogger,
-        });
-
         try {
-          const deleteResponse = await handleDeleteCdsUnitTest(handlerContext, {
-            class_name: className,
-            transport_request: params?.transport_request || transportRequest,
-          });
+          const deleteResponse = await tester.invokeToolOrHandler(
+            'DeleteCdsUnitTest',
+            {
+              class_name: className,
+              transport_request: params?.transport_request || transportRequest,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({
+                connection,
+                logger: testLogger,
+              });
+              return handleDeleteCdsUnitTest(handlerContext, {
+                class_name: className,
+                transport_request: params?.transport_request || transportRequest,
+              });
+            },
+          );
 
           if (deleteResponse.isError) {
             const errorMsg = extractErrorMessage(deleteResponse);
@@ -136,22 +144,35 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
           return;
         }
 
-        const handlerContext = createHandlerContext({
-          connection,
-          logger: testLogger,
-        });
-
         // Step 1: Create CDS unit test class
         testLogger?.info(`   • create cds unit test: ${className}`);
-        const createResponse = await handleCreateCdsUnitTest(handlerContext, {
-          class_name: className,
-          package_name: packageName,
-          cds_view_name: cdsViewName,
-          class_template: classTemplate,
-          test_class_source: testClassSource,
-          description: params.description,
-          transport_request: params.transport_request,
-        });
+        const createResponse = await tester.invokeToolOrHandler(
+          'CreateCdsUnitTest',
+          {
+            class_name: className,
+            package_name: packageName,
+            cds_view_name: cdsViewName,
+            class_template: classTemplate,
+            test_class_source: testClassSource,
+            description: params.description,
+            transport_request: params.transport_request,
+          },
+          async () => {
+            const handlerContext = createHandlerContext({
+              connection,
+              logger: testLogger,
+            });
+            return handleCreateCdsUnitTest(handlerContext, {
+              class_name: className,
+              package_name: packageName,
+              cds_view_name: cdsViewName,
+              class_template: classTemplate,
+              test_class_source: testClassSource,
+              description: params.description,
+              transport_request: params.transport_request,
+            });
+          },
+        );
 
         if (createResponse.isError) {
           const errorMsg = extractErrorMessage(createResponse);
@@ -166,10 +187,23 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
 
         // Step 2: Read CDS unit test class (via GetClass)
         testLogger?.info(`   • read cds unit test class: ${className}`);
-        const readResponse = await handleGetClass(handlerContext, {
-          class_name: className,
-          version: 'active',
-        });
+        const readResponse = await tester.invokeToolOrHandler(
+          'GetClass',
+          {
+            class_name: className,
+            version: 'active',
+          },
+          async () => {
+            const handlerContext = createHandlerContext({
+              connection,
+              logger: testLogger,
+            });
+            return handleGetClass(handlerContext, {
+              class_name: className,
+              version: 'active',
+            });
+          },
+        );
 
         if (readResponse.isError) {
           const errorMsg = extractErrorMessage(readResponse);
@@ -183,11 +217,25 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
         // Step 3: Update CDS unit test class (optional)
         if (updateTestClassSource) {
           testLogger?.info(`   • update cds unit test: ${className}`);
-          const updateResponse = await handleUpdateCdsUnitTest(handlerContext, {
-            class_name: className,
-            test_class_source: updateTestClassSource,
-            transport_request: params.transport_request,
-          });
+          const updateResponse = await tester.invokeToolOrHandler(
+            'UpdateCdsUnitTest',
+            {
+              class_name: className,
+              test_class_source: updateTestClassSource,
+              transport_request: params.transport_request,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({
+                connection,
+                logger: testLogger,
+              });
+              return handleUpdateCdsUnitTest(handlerContext, {
+                class_name: className,
+                test_class_source: updateTestClassSource,
+                transport_request: params.transport_request,
+              });
+            },
+          );
 
           if (updateResponse.isError) {
             const errorMsg = extractErrorMessage(updateResponse);
@@ -207,15 +255,33 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
         testLogger?.info(
           `   • run cds unit test: ${className}/${testClassName}`,
         );
-        const runResponse = await handleRunUnitTest(handlerContext, {
-          tests: [
-            {
-              container_class: className,
-              test_class: testClassName,
-            },
-          ],
-          title: `CDS unit test run for ${className}`,
-        });
+        const runResponse = await tester.invokeToolOrHandler(
+          'RunUnitTest',
+          {
+            tests: [
+              {
+                container_class: className,
+                test_class: testClassName,
+              },
+            ],
+            title: `CDS unit test run for ${className}`,
+          },
+          async () => {
+            const handlerContext = createHandlerContext({
+              connection,
+              logger: testLogger,
+            });
+            return handleRunUnitTest(handlerContext, {
+              tests: [
+                {
+                  container_class: className,
+                  test_class: testClassName,
+                },
+              ],
+              title: `CDS unit test run for ${className}`,
+            });
+          },
+        );
 
         if (runResponse.isError) {
           const errorMsg = extractErrorMessage(runResponse);
@@ -234,11 +300,21 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
         await delay(5000);
 
         testLogger?.info(`   • get cds unit test status: run_id ${runId}`);
-        const getStatusResponse = await handleGetCdsUnitTestStatus(
-          handlerContext,
+        const getStatusResponse = await tester.invokeToolOrHandler(
+          'GetCdsUnitTestStatus',
           {
             run_id: runId,
             with_long_polling: true,
+          },
+          async () => {
+            const handlerContext = createHandlerContext({
+              connection,
+              logger: testLogger,
+            });
+            return handleGetCdsUnitTestStatus(handlerContext, {
+              run_id: runId,
+              with_long_polling: true,
+            });
           },
         );
 
@@ -255,12 +331,23 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
         }
 
         testLogger?.info(`   • get cds unit test result: run_id ${runId}`);
-        const getResultResponse = await handleGetCdsUnitTestResult(
-          handlerContext,
+        const getResultResponse = await tester.invokeToolOrHandler(
+          'GetCdsUnitTestResult',
           {
             run_id: runId,
             with_navigation_uris: false,
             format: 'abapunit',
+          },
+          async () => {
+            const handlerContext = createHandlerContext({
+              connection,
+              logger: testLogger,
+            });
+            return handleGetCdsUnitTestResult(handlerContext, {
+              run_id: runId,
+              with_navigation_uris: false,
+              format: 'abapunit',
+            });
           },
         );
 
@@ -278,10 +365,23 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
 
         // Step 5: Delete CDS unit test class (final step)
         testLogger?.info(`   • delete cds unit test: ${className}`);
-        const deleteResponse = await handleDeleteCdsUnitTest(handlerContext, {
-          class_name: className,
-          transport_request: params.transport_request,
-        });
+        const deleteResponse = await tester.invokeToolOrHandler(
+          'DeleteCdsUnitTest',
+          {
+            class_name: className,
+            transport_request: params.transport_request,
+          },
+          async () => {
+            const handlerContext = createHandlerContext({
+              connection,
+              logger: testLogger,
+            });
+            return handleDeleteCdsUnitTest(handlerContext, {
+              class_name: className,
+              transport_request: params.transport_request,
+            });
+          },
+        );
 
         if (deleteResponse.isError) {
           const errorMsg = extractErrorMessage(deleteResponse);

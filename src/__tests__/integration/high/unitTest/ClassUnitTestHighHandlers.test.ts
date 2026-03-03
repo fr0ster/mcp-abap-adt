@@ -99,23 +99,36 @@ describe('Unit Test High-Level Handlers Integration', () => {
           return;
         }
 
-        const handlerContext = createHandlerContext({
-          connection,
-          logger: testLogger,
-        });
-
         testLogger?.info(
           `   • create unit test: ${containerClass}/${testClassName}`,
         );
-        const createResponse = await handleCreateUnitTest(handlerContext, {
-          tests: [
-            {
-              container_class: containerClass,
-              test_class: testClassName,
-            },
-          ],
-          title: `Unit test run for ${containerClass}`,
-        });
+        const createResponse = await tester.invokeToolOrHandler(
+          'CreateUnitTest',
+          {
+            tests: [
+              {
+                container_class: containerClass,
+                test_class: testClassName,
+              },
+            ],
+            title: `Unit test run for ${containerClass}`,
+          },
+          async () => {
+            const handlerContext = createHandlerContext({
+              connection,
+              logger: testLogger,
+            });
+            return handleCreateUnitTest(handlerContext, {
+              tests: [
+                {
+                  container_class: containerClass,
+                  test_class: testClassName,
+                },
+              ],
+              title: `Unit test run for ${containerClass}`,
+            });
+          },
+        );
 
         if (createResponse.isError) {
           const errorMsg = extractErrorMessage(createResponse);
@@ -134,9 +147,21 @@ describe('Unit Test High-Level Handlers Integration', () => {
         await delay(5000);
 
         testLogger?.info(`   • read unit test: run_id ${runId}`);
-        const getResponse = await handleGetUnitTest(handlerContext, {
-          run_id: runId,
-        });
+        const getResponse = await tester.invokeToolOrHandler(
+          'GetUnitTest',
+          {
+            run_id: runId,
+          },
+          async () => {
+            const handlerContext = createHandlerContext({
+              connection,
+              logger: testLogger,
+            });
+            return handleGetUnitTest(handlerContext, {
+              run_id: runId,
+            });
+          },
+        );
 
         if (getResponse.isError) {
           const errorMsg = extractErrorMessage(getResponse);
@@ -153,23 +178,53 @@ describe('Unit Test High-Level Handlers Integration', () => {
         }
 
         testLogger?.info(`   • update unit test: run_id ${runId}`);
-        const updateResponse = await handleUpdateUnitTest(handlerContext, {
-          run_id: runId,
-        });
+        const updateResponse = await tester.invokeToolOrHandler(
+          'UpdateUnitTest',
+          {
+            run_id: runId,
+          },
+          async () => {
+            const handlerContext = createHandlerContext({
+              connection,
+              logger: testLogger,
+            });
+            return handleUpdateUnitTest(handlerContext, {
+              run_id: runId,
+            });
+          },
+        );
         expect(updateResponse.isError).toBe(true);
 
         testLogger?.info(
           `   • run unit test: ${containerClass}/${testClassName}`,
         );
-        const runResponse = await handleRunUnitTest(handlerContext, {
-          tests: [
-            {
-              container_class: containerClass,
-              test_class: testClassName,
-            },
-          ],
-          title: `Unit test run for ${containerClass}`,
-        });
+        const runResponse = await tester.invokeToolOrHandler(
+          'RunUnitTest',
+          {
+            tests: [
+              {
+                container_class: containerClass,
+                test_class: testClassName,
+              },
+            ],
+            title: `Unit test run for ${containerClass}`,
+          },
+          async () => {
+            const handlerContext = createHandlerContext({
+              connection,
+              logger: testLogger,
+            });
+            return handleRunUnitTest(handlerContext, {
+              tests: [
+                {
+                  container_class: containerClass,
+                  test_class: testClassName,
+                },
+              ],
+              title: `Unit test run for ${containerClass}`,
+            });
+          },
+        );
 
         if (runResponse.isError) {
           const errorMsg = extractErrorMessage(runResponse);
@@ -188,11 +243,21 @@ describe('Unit Test High-Level Handlers Integration', () => {
         await delay(5000);
 
         testLogger?.info(`   • get unit test status: run_id ${secondRunId}`);
-        const getStatusResponse = await handleGetUnitTestStatus(
-          handlerContext,
+        const getStatusResponse = await tester.invokeToolOrHandler(
+          'GetUnitTestStatus',
           {
             run_id: secondRunId,
             with_long_polling: true,
+          },
+          async () => {
+            const handlerContext = createHandlerContext({
+              connection,
+              logger: testLogger,
+            });
+            return handleGetUnitTestStatus(handlerContext, {
+              run_id: secondRunId,
+              with_long_polling: true,
+            });
           },
         );
 
@@ -211,12 +276,23 @@ describe('Unit Test High-Level Handlers Integration', () => {
         }
 
         testLogger?.info(`   • get unit test result: run_id ${secondRunId}`);
-        const getResultResponse = await handleGetUnitTestResult(
-          handlerContext,
+        const getResultResponse = await tester.invokeToolOrHandler(
+          'GetUnitTestResult',
           {
             run_id: secondRunId,
             with_navigation_uris: false,
             format: 'abapunit',
+          },
+          async () => {
+            const handlerContext = createHandlerContext({
+              connection,
+              logger: testLogger,
+            });
+            return handleGetUnitTestResult(handlerContext, {
+              run_id: secondRunId,
+              with_navigation_uris: false,
+              format: 'abapunit',
+            });
           },
         );
 
@@ -235,9 +311,21 @@ describe('Unit Test High-Level Handlers Integration', () => {
         }
 
         testLogger?.info(`   • delete unit test: run_id ${secondRunId}`);
-        const deleteResponse = await handleDeleteUnitTest(handlerContext, {
-          run_id: secondRunId,
-        });
+        const deleteResponse = await tester.invokeToolOrHandler(
+          'DeleteUnitTest',
+          {
+            run_id: secondRunId,
+          },
+          async () => {
+            const handlerContext = createHandlerContext({
+              connection,
+              logger: testLogger,
+            });
+            return handleDeleteUnitTest(handlerContext, {
+              run_id: secondRunId,
+            });
+          },
+        );
         expect(deleteResponse.isError).toBe(true);
       });
     },

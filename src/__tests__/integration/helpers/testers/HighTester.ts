@@ -9,6 +9,13 @@
 
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import { createHandlerContext } from '../testHelpers';
+import {
+  callTool,
+  createHardModeClient,
+  isHardModeEnabled,
+  resolveEntityFromHandlerName,
+  toolCandidates,
+} from './hardMode';
 import { LambdaTester, type TLambda } from './LambdaTester';
 import type { LambdaTesterContext } from './types';
 
@@ -65,6 +72,28 @@ export class HighTester extends LambdaTester {
 
         logger?.info?.(`   • cleanup: delete ${objectName}`);
         try {
+          if (isHardModeEnabled()) {
+            const entity = resolveEntityFromHandlerName(
+              (this as any).handlerName || '',
+            );
+            const mcp = await createHardModeClient();
+            try {
+              const deleteArgs = this.buildDeleteArgs(context);
+              await callTool(
+                mcp.client,
+                mcp.toolNames,
+                toolCandidates('delete', entity, 'high', this.handlerName),
+                deleteArgs,
+              );
+              logger?.success?.(
+                `✅ cleanup: deleted ${objectName} successfully`,
+              );
+            } finally {
+              await mcp.close();
+            }
+            return;
+          }
+
           const handlerContext = createHandlerContext({
             connection,
             logger: logger || undefined,
@@ -112,6 +141,11 @@ export class HighTester extends LambdaTester {
       throw new Error('Workflow functions not provided');
     }
 
+    if (isHardModeEnabled()) {
+      await this.runInHardMode();
+      return;
+    }
+
     const handlerContext = createHandlerContext({
       connection: this.context.connection,
       logger: this.context.logger,
@@ -144,6 +178,42 @@ export class HighTester extends LambdaTester {
 
       this.context.logger?.error(`❌ Test failed: ${error.message}`);
       throw error;
+    }
+  }
+
+  private async runInHardMode(): Promise<void> {
+    if (!this.context) {
+      throw new Error('Tester not initialized. Call beforeAll() first.');
+    }
+    const logger = this.context.logger;
+    const entity = resolveEntityFromHandlerName((this as any).handlerName || '');
+    const mcp = await createHardModeClient();
+    try {
+      if (this.workflowFunctions?.create) {
+        logger?.info(`   • create ${this.context.objectName} (hard mode)`);
+        const args = this.buildCreateArgs(this.context);
+        await callTool(
+          mcp.client,
+          mcp.toolNames,
+          toolCandidates('create', entity, 'high', this.handlerName),
+          args,
+        );
+        logger?.info(`   ✅ create completed`);
+      }
+
+      if (this.workflowFunctions?.update) {
+        logger?.info(`   • update ${this.context.objectName} (hard mode)`);
+        const args = this.buildUpdateArgs(this.context);
+        await callTool(
+          mcp.client,
+          mcp.toolNames,
+          toolCandidates('update', entity, 'high', this.handlerName),
+          args,
+        );
+        logger?.info(`   ✅ update completed`);
+      }
+    } finally {
+      await mcp.close();
     }
   }
 

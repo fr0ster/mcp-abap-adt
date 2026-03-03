@@ -12,6 +12,11 @@
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { resolveSystemContext } from '../../../../lib/systemContext';
 import {
+  createHardModeClient,
+  isHardModeEnabled,
+  parseToolText,
+} from './hardMode';
+import {
   getCleanupAfter,
   getEnabledTestCase,
   getOperationDelay,
@@ -30,6 +35,14 @@ import {
 import type { LambdaTesterContext } from './types';
 
 export type TLambda = (context: LambdaTesterContext) => Promise<void>;
+type HandlerLikeResponse = {
+  isError: boolean;
+  content: Array<{ type: 'text'; text: string }>;
+};
+const HARD_MODE_RUN_ID = Math.random()
+  .toString(36)
+  .slice(2, 6)
+  .toUpperCase();
 
 export class LambdaTester {
   // Configuration
@@ -41,6 +54,9 @@ export class LambdaTester {
   protected testParams: any = null;
   protected context: LambdaTesterContext | undefined;
   protected cleanupAfterLambda: TLambda | null = null;
+  private hardModeMcp:
+    | { client: any; toolNames: Set<string>; close: () => Promise<void> }
+    | null = null;
 
   /**
    * Constructor
@@ -84,12 +100,18 @@ export class LambdaTester {
     let isCloudSystem = false;
 
     try {
-      // Load environment variables
-      await loadTestEnv();
-      hasConfig = true;
-
       // Load test config from YAML
       const config = loadTestConfig();
+      const hardModeEnabled =
+        config?.environment?.integration_hard_mode?.enabled === true ||
+        config?.integration_hard_mode?.enabled === true;
+
+      // Load environment variables only for in-process mode
+      if (!hardModeEnabled) {
+        await loadTestEnv();
+      }
+      hasConfig = true;
+
       testCase = getEnabledTestCase(this.handlerName, this.testCaseName);
 
       if (!testCase) {
@@ -119,6 +141,114 @@ export class LambdaTester {
 
       // Create logger for tests
       logger = createTestLogger(this.logPrefix);
+
+      // Hard mode: do not require direct SAP connection/session in tester init.
+      // MCP client connection will be created on-demand inside HighTester/LowTester run methods.
+      if (hardModeEnabled) {
+        const hardCfg =
+          config?.environment?.integration_hard_mode ||
+          config?.integration_hard_mode ||
+          {};
+        const suffixRaw = String(hardCfg.name_suffix || '').trim();
+
+        // Resolve object name from params
+        const originalObjectName =
+          testParams.name ||
+          testParams.class_name ||
+          testParams.interface_name ||
+          testParams.function_name ||
+          testParams.program_name ||
+          testParams.table_name ||
+          testParams.view_name ||
+          testParams.domain_name ||
+          testParams.data_element_name ||
+          testParams.structure_name ||
+          testParams.bdef_name ||
+          testParams.ddlx_name ||
+          testParams.bimp_name ||
+          testParams.metadata_extension_name ||
+          testParams.service_definition_name ||
+          null;
+
+        objectName = originalObjectName;
+        if (originalObjectName && suffixRaw) {
+          const normalizedSuffix = `${suffixRaw}_${HARD_MODE_RUN_ID}`
+            .toUpperCase()
+            .replace(/[^A-Z0-9_]/g, '_');
+          const suffixed = `${String(originalObjectName).toUpperCase()}_${normalizedSuffix}`;
+          objectName = suffixed.slice(0, 30);
+
+          // Keep params in sync with object name for arg builders
+          if (testParams.program_name)
+            testParams.program_name = objectName;
+          if (testParams.class_name) testParams.class_name = objectName;
+          if (testParams.interface_name)
+            testParams.interface_name = objectName;
+          if (testParams.function_name) testParams.function_name = objectName;
+          if (testParams.table_name) testParams.table_name = objectName;
+          if (testParams.view_name) testParams.view_name = objectName;
+          if (testParams.domain_name) testParams.domain_name = objectName;
+          if (testParams.data_element_name)
+            testParams.data_element_name = objectName;
+          if (testParams.structure_name)
+            testParams.structure_name = objectName;
+          if (testParams.name) testParams.name = objectName;
+
+          // Adjust embedded source to avoid name mismatch in checks/update
+          if (typeof testParams.source_code === 'string') {
+            testParams.source_code = testParams.source_code.replace(
+              new RegExp(String(originalObjectName), 'gi'),
+              String(objectName),
+            );
+          }
+          if (typeof testParams.update_source_code === 'string') {
+            testParams.update_source_code = testParams.update_source_code.replace(
+              new RegExp(String(originalObjectName), 'gi'),
+              String(objectName),
+            );
+          }
+          if (typeof testParams.ddl_code === 'string') {
+            testParams.ddl_code = testParams.ddl_code.replace(
+              new RegExp(String(originalObjectName), 'gi'),
+              String(objectName),
+            );
+          }
+          if (typeof testParams.update_ddl_code === 'string') {
+            testParams.update_ddl_code = testParams.update_ddl_code.replace(
+              new RegExp(String(originalObjectName), 'gi'),
+              String(objectName),
+            );
+          }
+        }
+
+        const testCaseWithParams = { ...testCase, params: testParams };
+        packageName = resolvePackageName(testCaseWithParams);
+        transportRequest = resolveTransportRequest(testCaseWithParams);
+        const defaultPackage = config.environment?.default_package;
+        const getOperationDelayForContext = (operation: string): number =>
+          getOperationDelay(operation, testCase);
+
+        this.context = {
+          hasConfig: true,
+          connection: {} as AbapConnection,
+          session: {} as SessionInfo,
+          logger,
+          authType: undefined,
+          connectionSource: 'unknown',
+          isCloudSystem: false,
+          objectName,
+          params: testParams,
+          packageName,
+          transportRequest,
+          cleanupAfter: this.cleanupAfter.bind(this),
+          getOperationDelay: getOperationDelayForContext,
+          defaultPackage,
+          testCase,
+        };
+        this.testCase = testCase;
+        this.testParams = testParams;
+        return;
+      }
 
       // Create connection and session
       const connectionResult = await createTestConnectionAndSession();
@@ -307,7 +437,11 @@ export class LambdaTester {
     if (!this.context) {
       throw new Error('Context not initialized');
     }
-    await lambda(this.context);
+    try {
+      await lambda(this.context);
+    } finally {
+      await this.closeHardModeClient();
+    }
   }
 
   /**
@@ -425,6 +559,60 @@ export class LambdaTester {
       // Note: Cleanup will still run via afterEach() hook, which Jest guarantees to execute
       // even when test fails. This ensures cleanup runs regardless of test outcome.
       throw error;
+    }
+  }
+
+  isHardMode(): boolean {
+    return isHardModeEnabled();
+  }
+
+  async invokeToolOrHandler<T>(
+    toolName: string,
+    args: Record<string, unknown>,
+    directCall: () => Promise<T>,
+  ): Promise<T | HandlerLikeResponse> {
+    if (!this.isHardMode()) {
+      return directCall();
+    }
+
+    const mcp = await this.getHardModeClient();
+    if (!mcp.toolNames.has(toolName)) {
+      throw new Error(`MCP tool "${toolName}" not found in hard mode`);
+    }
+
+    const result = await mcp.client.callTool({ name: toolName, arguments: args });
+    if (result?.isError) {
+      const text = (result.content || [])
+        .map((c: any) => (typeof c?.text === 'string' ? c.text : ''))
+        .join('\n');
+      return {
+        isError: true,
+        content: [{ type: 'text', text: text || `${toolName} returned MCP error` }],
+      };
+    }
+
+    const text = parseToolText(result);
+    return {
+      isError: false,
+      content: [{ type: 'text', text: text || '{}' }],
+    };
+  }
+
+  private async getHardModeClient() {
+    if (!this.hardModeMcp) {
+      this.hardModeMcp = await createHardModeClient();
+    }
+    return this.hardModeMcp;
+  }
+
+  private async closeHardModeClient(): Promise<void> {
+    if (!this.hardModeMcp) {
+      return;
+    }
+    try {
+      await this.hardModeMcp.close();
+    } finally {
+      this.hardModeMcp = null;
     }
   }
 }

@@ -9,6 +9,14 @@
 
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import {
+  callTool,
+  createHardModeClient,
+  isHardModeEnabled,
+  parseToolText,
+  resolveEntityFromHandlerName,
+  toolCandidates,
+} from './hardMode';
+import {
   createHandlerContext,
   delay,
   extractLockHandle,
@@ -73,6 +81,27 @@ export class LowTester extends LambdaTester {
         if (!objectName) return;
 
         try {
+          if (isHardModeEnabled()) {
+            const entity = resolveEntityFromHandlerName(
+              (this as any).handlerName || '',
+            );
+            const mcp = await createHardModeClient();
+            try {
+              await this.ensureHardModeSession(mcp, context);
+              const deleteArgs = this.buildDeleteArgs(context);
+              await callTool(
+                mcp.client,
+                mcp.toolNames,
+                toolCandidates('delete', entity, 'low', this.handlerName),
+                deleteArgs,
+              );
+              logger?.info?.(`🗑️ Deleted ${objectName}`);
+            } finally {
+              await mcp.close();
+            }
+            return;
+          }
+
           await delay(2000); // Ensure object is ready for deletion
           const handlerContext = createHandlerContext({
             connection,
@@ -119,6 +148,11 @@ export class LowTester extends LambdaTester {
 
     if (!this.workflowFunctions) {
       throw new Error('Workflow functions not provided');
+    }
+
+    if (isHardModeEnabled()) {
+      await this.runInHardMode();
+      return;
     }
 
     const handlerContext = createHandlerContext({
@@ -185,6 +219,149 @@ export class LowTester extends LambdaTester {
 
       this.context.logger?.error(`❌ Test failed: ${error.message}`);
       throw error;
+    }
+  }
+
+  private async runInHardMode(): Promise<void> {
+    if (!this.context) {
+      throw new Error('Tester not initialized. Call beforeAll() first.');
+    }
+    const logger = this.context.logger;
+    const entity = resolveEntityFromHandlerName((this as any).handlerName || '');
+    const mcp = await createHardModeClient();
+
+    try {
+      await this.ensureHardModeSession(mcp, this.context);
+
+      if (this.workflowFunctions?.validate) {
+        const args = this.buildValidateArgs(this.context);
+        await callTool(
+          mcp.client,
+          mcp.toolNames,
+          toolCandidates('validate', entity, 'low', this.handlerName),
+          args,
+        );
+        logger?.info(`✅ Validated ${this.context.objectName}`);
+      }
+
+      if (this.workflowFunctions?.create) {
+        const args = this.buildCreateArgs(this.context);
+        await callTool(
+          mcp.client,
+          mcp.toolNames,
+          toolCandidates('create', entity, 'low', this.handlerName),
+          args,
+        );
+        logger?.info(`✅ Created ${this.context.objectName}`);
+      }
+
+      if (this.workflowFunctions?.lock) {
+        const args = this.buildLockArgs(this.context);
+        const lockResult = await callTool(
+          mcp.client,
+          mcp.toolNames,
+          toolCandidates('lock', entity, 'low', this.handlerName),
+          args,
+        );
+        const lockText = parseToolText(lockResult);
+        if (lockText) {
+          try {
+            const parsed = JSON.parse(lockText);
+            const lockHandle = extractLockHandle(parsed);
+            this.context.lockHandle = lockHandle;
+          } catch {
+            // keep going - lock handle can already be managed by server-side session
+          }
+        }
+        logger?.info(`🔒 Locked ${this.context.objectName}`);
+      }
+
+      if (this.workflowFunctions?.update) {
+        const args = this.buildUpdateArgs(this.context);
+        await callTool(
+          mcp.client,
+          mcp.toolNames,
+          toolCandidates('update', entity, 'low', this.handlerName),
+          args,
+        );
+        logger?.info(`📝 Updated ${this.context.objectName}`);
+      }
+
+      if (this.workflowFunctions?.unlock) {
+        const args = this.buildUnlockArgs(this.context);
+        await callTool(
+          mcp.client,
+          mcp.toolNames,
+          toolCandidates('unlock', entity, 'low', this.handlerName),
+          args,
+        );
+        logger?.info(`🔓 Unlocked ${this.context.objectName}`);
+      }
+
+      if (this.workflowFunctions?.activate) {
+        const args = this.buildActivateArgs(this.context);
+        await callTool(
+          mcp.client,
+          mcp.toolNames,
+          toolCandidates('activate', entity, 'low', this.handlerName),
+          args,
+        );
+        logger?.info(`⚡ Activated ${this.context.objectName}`);
+      }
+    } catch (error: any) {
+      if (error.message?.startsWith('SKIP:')) {
+        const skipReason = error.message.replace(/^SKIP:\s*/, '');
+        this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
+        return;
+      }
+
+      this.context.logger?.error(`❌ Test failed: ${error.message}`);
+      throw error;
+    } finally {
+      await mcp.close();
+    }
+  }
+
+  private async ensureHardModeSession(
+    mcp: { client: any; toolNames: Set<string> },
+    context?: LambdaTesterContext,
+  ): Promise<void> {
+    const target = context || this.context;
+    if (!target) {
+      return;
+    }
+    if ((target.session as any)?.session_id) {
+      return;
+    }
+    if (!mcp.toolNames.has('GetSession')) {
+      return;
+    }
+
+    try {
+      const sessionResult = await callTool(
+        mcp.client,
+        mcp.toolNames,
+        ['GetSession'],
+        {},
+      );
+      const sessionText = parseToolText(sessionResult);
+      if (!sessionText) {
+        return;
+      }
+      const parsed = JSON.parse(sessionText);
+      const sessionId = parsed?.session_id || parsed?.data?.session_id;
+      const sessionState =
+        parsed?.session_state || parsed?.data?.session_state;
+      if (!sessionId) {
+        return;
+      }
+      (target.session as any) = {
+        ...(target.session || {}),
+        session_id: sessionId,
+        ...(sessionState ? { session_state: sessionState } : {}),
+      };
+    } catch {
+      // Some systems/transports may not expose session API in hard mode; leave unset.
     }
   }
 

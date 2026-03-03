@@ -138,7 +138,33 @@ async function createRunnableClass(
   context: LambdaTesterContext,
   className: string,
   sourceCode: string,
+  invokeTool?: (
+    toolName: string,
+    args: Record<string, unknown>,
+    directCall: () => Promise<any>,
+  ) => Promise<any>,
 ): Promise<void> {
+  if (invokeTool) {
+    const createResponse = await invokeTool(
+      'CreateClass',
+      {
+        class_name: className,
+        package_name: context.packageName,
+        transport_request: context.transportRequest,
+        description: `MCP runtime test ${className}`.slice(0, 60),
+        source_code: sourceCode,
+        activate: true,
+      },
+      async () => {
+        throw new Error('Direct CreateClass call is not available in hard mode');
+      },
+    );
+    if (createResponse?.isError) {
+      throw new Error(extractHandlerErrorText(createResponse));
+    }
+    return;
+  }
+
   const client = createAdtClient(context.connection, context.logger);
   await client.getClass().create({
     className,
@@ -156,11 +182,35 @@ async function createRunnableClass(
 async function deleteClassIfExists(
   context: LambdaTesterContext,
   className?: string,
+  invokeTool?: (
+    toolName: string,
+    args: Record<string, unknown>,
+    directCall: () => Promise<any>,
+  ) => Promise<any>,
 ): Promise<void> {
   if (!className) {
     return;
   }
   try {
+    if (invokeTool) {
+      const deleteResponse = await invokeTool(
+        'DeleteClass',
+        {
+          class_name: className,
+          transport_request: context.transportRequest,
+        },
+        async () => {
+          throw new Error(
+            'Direct DeleteClass call is not available in hard mode',
+          );
+        },
+      );
+      if (deleteResponse?.isError) {
+        throw new Error(extractHandlerErrorText(deleteResponse));
+      }
+      return;
+    }
+
     const client = createAdtClient(context.connection, context.logger);
     await client.getClass().delete({
       className,
@@ -177,7 +227,35 @@ async function createRunnableProgram(
   context: LambdaTesterContext,
   programName: string,
   sourceCode: string,
+  invokeTool?: (
+    toolName: string,
+    args: Record<string, unknown>,
+    directCall: () => Promise<any>,
+  ) => Promise<any>,
 ): Promise<void> {
+  if (invokeTool) {
+    const createResponse = await invokeTool(
+      'CreateProgram',
+      {
+        program_name: programName,
+        package_name: context.packageName,
+        transport_request: context.transportRequest,
+        description: `MCP runtime test ${programName}`.slice(0, 60),
+        source_code: sourceCode,
+        activate: true,
+      },
+      async () => {
+        throw new Error(
+          'Direct CreateProgram call is not available in hard mode',
+        );
+      },
+    );
+    if (createResponse?.isError) {
+      throw new Error(extractHandlerErrorText(createResponse));
+    }
+    return;
+  }
+
   const client = createAdtClient(context.connection, context.logger);
   await client.getProgram().create({
     programName,
@@ -195,11 +273,35 @@ async function createRunnableProgram(
 async function deleteProgramIfExists(
   context: LambdaTesterContext,
   programName?: string,
+  invokeTool?: (
+    toolName: string,
+    args: Record<string, unknown>,
+    directCall: () => Promise<any>,
+  ) => Promise<any>,
 ): Promise<void> {
   if (!programName) {
     return;
   }
   try {
+    if (invokeTool) {
+      const deleteResponse = await invokeTool(
+        'DeleteProgram',
+        {
+          program_name: programName,
+          transport_request: context.transportRequest,
+        },
+        async () => {
+          throw new Error(
+            'Direct DeleteProgram call is not available in hard mode',
+          );
+        },
+      );
+      if (deleteResponse?.isError) {
+        throw new Error(extractHandlerErrorText(deleteResponse));
+      }
+      return;
+    }
+
     const client = createAdtClient(context.connection, context.logger);
     await client.getProgram().delete({
       programName,
@@ -256,20 +358,22 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             'ZADT_RTCLS',
           ),
         );
-        const handlerContext = createHandlerContext({
-          connection: context.connection,
-          logger,
-        });
+        const invoke = async (
+          toolName: string,
+          args: Record<string, unknown>,
+          directCall: () => Promise<any>,
+        ) => tester.invokeToolOrHandler(toolName, args, directCall);
 
         try {
           await createRunnableClass(
             context,
             className,
             buildRunnableClassSource(className),
+            tester.isHardMode() ? invoke : undefined,
           );
 
-          const profiledRun = await handleRuntimeRunClassWithProfiling(
-            handlerContext,
+          const profiledRun = await invoke(
+            'RuntimeRunClassWithProfiling',
             {
               class_name: className,
               description: `MCP_RUNTIME_CLASS_${Date.now()}`,
@@ -277,6 +381,20 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
               sql_trace: true,
               all_db_events: true,
               max_time_for_tracing: 1800,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({
+                connection: context.connection,
+                logger,
+              });
+              return handleRuntimeRunClassWithProfiling(handlerContext, {
+                class_name: className,
+                description: `MCP_RUNTIME_CLASS_${Date.now()}`,
+                all_procedural_units: true,
+                sql_trace: true,
+                all_db_events: true,
+                max_time_for_tracing: 1800,
+              });
             },
           );
 
@@ -287,25 +405,48 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           const traceId = String(runData.trace_id).toUpperCase();
           createdTraceIds.add(traceId);
 
-          const traceData = await handleRuntimeGetProfilerTraceData(
-            handlerContext,
+          const traceData = await invoke(
+            'RuntimeGetProfilerTraceData',
             {
               trace_id_or_uri: traceId,
               view: 'hitlist',
               with_system_events: false,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({
+                connection: context.connection,
+                logger,
+              });
+              return handleRuntimeGetProfilerTraceData(handlerContext, {
+                trace_id_or_uri: traceId,
+                view: 'hitlist',
+                with_system_events: false,
+              });
             },
           );
           expect(traceData.isError).toBe(false);
           const tracePayload = parseTextPayload(traceData);
           expect(tracePayload.success).toBe(true);
 
-          const analyze = await handleRuntimeAnalyzeProfilerTrace(
-            handlerContext,
+          const analyze = await invoke(
+            'RuntimeAnalyzeProfilerTrace',
             {
               trace_id_or_uri: traceId,
               view: 'hitlist',
               top: 5,
               with_system_events: false,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({
+                connection: context.connection,
+                logger,
+              });
+              return handleRuntimeAnalyzeProfilerTrace(handlerContext, {
+                trace_id_or_uri: traceId,
+                view: 'hitlist',
+                top: 5,
+                with_system_events: false,
+              });
             },
           );
           expect(analyze.isError).toBe(false);
@@ -313,7 +454,11 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           expect(analyzePayload.success).toBe(true);
           expect(analyzePayload.summary).toBeDefined();
         } finally {
-          await deleteClassIfExists(context, className);
+          await deleteClassIfExists(
+            context,
+            className,
+            tester.isHardMode() ? invoke : undefined,
+          );
         }
       });
     },
@@ -341,20 +486,22 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             'ZADT_RTPRG',
           ),
         );
-        const handlerContext = createHandlerContext({
-          connection: context.connection,
-          logger,
-        });
+        const invoke = async (
+          toolName: string,
+          args: Record<string, unknown>,
+          directCall: () => Promise<any>,
+        ) => tester.invokeToolOrHandler(toolName, args, directCall);
 
         try {
           await createRunnableProgram(
             context,
             programName,
             buildRunnableProgramSource(programName),
+            tester.isHardMode() ? invoke : undefined,
           );
 
-          const profiledRun = await handleRuntimeRunProgramWithProfiling(
-            handlerContext,
+          const profiledRun = await invoke(
+            'RuntimeRunProgramWithProfiling',
             {
               program_name: programName,
               description: `MCP_RUNTIME_PROGRAM_${Date.now()}`,
@@ -362,6 +509,20 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
               sql_trace: true,
               all_db_events: true,
               max_time_for_tracing: 1800,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({
+                connection: context.connection,
+                logger,
+              });
+              return handleRuntimeRunProgramWithProfiling(handlerContext, {
+                program_name: programName,
+                description: `MCP_RUNTIME_PROGRAM_${Date.now()}`,
+                all_procedural_units: true,
+                sql_trace: true,
+                all_db_events: true,
+                max_time_for_tracing: 1800,
+              });
             },
           );
 
@@ -372,19 +533,34 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           const traceId = String(runData.trace_id).toUpperCase();
           createdTraceIds.add(traceId);
 
-          const traceData = await handleRuntimeGetProfilerTraceData(
-            handlerContext,
+          const traceData = await invoke(
+            'RuntimeGetProfilerTraceData',
             {
               trace_id_or_uri: traceId,
               view: 'hitlist',
               with_system_events: false,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({
+                connection: context.connection,
+                logger,
+              });
+              return handleRuntimeGetProfilerTraceData(handlerContext, {
+                trace_id_or_uri: traceId,
+                view: 'hitlist',
+                with_system_events: false,
+              });
             },
           );
           expect(traceData.isError).toBe(false);
           const tracePayload = parseTextPayload(traceData);
           expect(tracePayload.success).toBe(true);
         } finally {
-          await deleteProgramIfExists(context, programName);
+          await deleteProgramIfExists(
+            context,
+            programName,
+            tester.isHardMode() ? invoke : undefined,
+          );
         }
       });
     },
@@ -399,10 +575,11 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           throw new Error('SKIP: no trace IDs were created by profiling tests');
         }
 
-        const handlerContext = createHandlerContext({
-          connection: context.connection,
-          logger,
-        });
+        const invoke = async (
+          toolName: string,
+          args: Record<string, unknown>,
+          directCall: () => Promise<any>,
+        ) => tester.invokeToolOrHandler(toolName, args, directCall);
         const maxAttempts = toPositiveInt(
           context.params?.trace_feed_retries,
           6,
@@ -414,8 +591,17 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
 
         let found = false;
         for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-          const result =
-            await handleRuntimeListProfilerTraceFiles(handlerContext);
+          const result = await invoke(
+            'RuntimeListProfilerTraceFiles',
+            {},
+            async () => {
+              const handlerContext = createHandlerContext({
+                connection: context.connection,
+                logger,
+              });
+              return handleRuntimeListProfilerTraceFiles(handlerContext);
+            },
+          );
           expect(result.isError).toBe(false);
           const data = parseTextPayload(result);
           const traceIds = extractTraceIdsFromPayload(data.payload);
@@ -447,25 +633,48 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         const dumpClassName = createName(
           normalizeNamePrefix(context.params?.dump_class_prefix, 'ZADT_RTDMP'),
         );
-        const handlerContext = createHandlerContext({
-          connection: context.connection,
-          logger,
-        });
+        const invoke = async (
+          toolName: string,
+          args: Record<string, unknown>,
+          directCall: () => Promise<any>,
+        ) => tester.invokeToolOrHandler(toolName, args, directCall);
 
         try {
           await createRunnableClass(
             context,
             dumpClassName,
             buildDumpClassSource(dumpClassName),
+            tester.isHardMode() ? invoke : undefined,
           );
 
-          const executor = new AdtExecutor(context.connection, logger);
-          try {
-            await executor.getClassExecutor().run({ className: dumpClassName });
-          } catch (runError: any) {
-            logger?.info(
-              `Expected failing run for dump generation: ${runError?.message || String(runError)}`,
+          if (tester.isHardMode()) {
+            const runResult = await invoke(
+              'RuntimeRunClassWithProfiling',
+              {
+                class_name: dumpClassName,
+                description: `MCP_RUNTIME_DUMP_${Date.now()}`,
+                all_procedural_units: true,
+                sql_trace: false,
+                max_time_for_tracing: 600,
+              },
+              async () => {
+                throw new Error('Direct runtime run is not available in hard mode');
+              },
             );
+            if (runResult.isError) {
+              logger?.info(
+                `Expected failing run for dump generation: ${extractHandlerErrorText(runResult)}`,
+              );
+            }
+          } else {
+            const executor = new AdtExecutor(context.connection, logger);
+            try {
+              await executor.getClassExecutor().run({ className: dumpClassName });
+            } catch (runError: any) {
+              logger?.info(
+                `Expected failing run for dump generation: ${runError?.message || String(runError)}`,
+              );
+            }
           }
 
           const maxAttempts = toPositiveInt(
@@ -485,21 +694,45 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           const dumpsUser = context.params?.dumps_user || undefined;
 
           for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-            const listResult = await handleRuntimeListDumps(handlerContext, {
-              user: dumpsUser,
-              inlinecount: 'allpages',
-              top: dumpFeedTop,
-            });
+            const listResult = await invoke(
+              'RuntimeListDumps',
+              {
+                user: dumpsUser,
+                inlinecount: 'allpages',
+                top: dumpFeedTop,
+              },
+              async () => {
+                const handlerContext = createHandlerContext({
+                  connection: context.connection,
+                  logger,
+                });
+                return handleRuntimeListDumps(handlerContext, {
+                  user: dumpsUser,
+                  inlinecount: 'allpages',
+                  top: dumpFeedTop,
+                });
+              },
+            );
             expect(listResult.isError).toBe(false);
             const listData = parseTextPayload(listResult);
             let dumpIds = extractDumpIdsFromPayload(listData.payload);
             if (dumpIds.length === 0 && dumpsUser) {
               // Fallback to unfiltered feed if user filter returns empty on this system.
-              const unfilteredResult = await handleRuntimeListDumps(
-                handlerContext,
+              const unfilteredResult = await invoke(
+                'RuntimeListDumps',
                 {
                   inlinecount: 'allpages',
                   top: dumpFeedTop,
+                },
+                async () => {
+                  const handlerContext = createHandlerContext({
+                    connection: context.connection,
+                    logger,
+                  });
+                  return handleRuntimeListDumps(handlerContext, {
+                    inlinecount: 'allpages',
+                    top: dumpFeedTop,
+                  });
                 },
               );
               expect(unfilteredResult.isError).toBe(false);
@@ -529,10 +762,23 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
               ? context.params?.dump_view
               : 'default';
 
-          const dumpResult = await handleRuntimeGetDumpById(handlerContext, {
-            dump_id: dumpId,
-            view: dumpView,
-          });
+          const dumpResult = await invoke(
+            'RuntimeGetDumpById',
+            {
+              dump_id: dumpId,
+              view: dumpView,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({
+                connection: context.connection,
+                logger,
+              });
+              return handleRuntimeGetDumpById(handlerContext, {
+                dump_id: dumpId,
+                view: dumpView,
+              });
+            },
+          );
           if (dumpResult.isError) {
             throw new Error(
               `RuntimeGetDumpById failed: ${extractHandlerErrorText(dumpResult)}`,
@@ -544,11 +790,25 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           expect(dumpData.dump_id).toBe(dumpId);
           expect(dumpData.view).toBe(dumpView);
 
-          const analyze = await handleRuntimeAnalyzeDump(handlerContext, {
-            dump_id: dumpId,
-            view: dumpView,
-            include_payload: false,
-          });
+          const analyze = await invoke(
+            'RuntimeAnalyzeDump',
+            {
+              dump_id: dumpId,
+              view: dumpView,
+              include_payload: false,
+            },
+            async () => {
+              const handlerContext = createHandlerContext({
+                connection: context.connection,
+                logger,
+              });
+              return handleRuntimeAnalyzeDump(handlerContext, {
+                dump_id: dumpId,
+                view: dumpView,
+                include_payload: false,
+              });
+            },
+          );
           if (analyze.isError) {
             throw new Error(
               `RuntimeAnalyzeDump failed: ${extractHandlerErrorText(analyze)}`,
@@ -560,7 +820,11 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           expect(analyzeData.view).toBe(dumpView);
           expect(analyzeData.summary).toBeDefined();
         } finally {
-          await deleteClassIfExists(context, dumpClassName);
+          await deleteClassIfExists(
+            context,
+            dumpClassName,
+            tester.isHardMode() ? invoke : undefined,
+          );
         }
       });
     },

@@ -61,6 +61,8 @@
     "auth": "npx sap-abap-auth auth",
     "clean": "make clean",
     "chrono": "./tools/version-stats.sh",
+    "smoke:mcp:crud": "node ./tools/mcp-crud-smoke.js",
+    "smoke:mcp:matrix": "node ./tools/mcp-crud-matrix.js",
     "docs:tools": "node ./tools/generate-tools-docs.js",
     "prepublishOnly": "npm run build",
     "package": "npm pack",

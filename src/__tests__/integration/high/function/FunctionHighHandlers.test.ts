@@ -44,6 +44,11 @@ import {
   delay,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
+import {
+  callTool,
+  createHardModeClient,
+  isHardModeEnabled,
+} from '../../helpers/testers/hardMode';
 
 // Load environment variables
 // loadTestEnv will be called in beforeAll
@@ -54,9 +59,15 @@ describe('Function High-Level Handlers Integration', () => {
   let connection: AbapConnection | null = null;
   let session: SessionInfo | null = null;
   let hasConfig = false;
+  let mcp: { client: any; toolNames: Set<string>; close: () => Promise<void> } | null = null;
 
   beforeAll(async () => {
     try {
+      if (isHardModeEnabled()) {
+        mcp = await createHardModeClient();
+        hasConfig = true;
+        return;
+      }
       // Create connection and session
       const { connection: testConnection, session: testSession } =
         await createTestConnectionAndSession();
@@ -73,6 +84,13 @@ describe('Function High-Level Handlers Integration', () => {
         );
       }
       hasConfig = false;
+    }
+  });
+
+  afterAll(async () => {
+    if (mcp) {
+      await mcp.close();
+      mcp = null;
     }
   });
 
@@ -134,6 +152,27 @@ describe('Function High-Level Handlers Integration', () => {
         .join('\n');
 
       try {
+        const invoke = async (
+          toolName: string,
+          args: Record<string, unknown>,
+          directCall: () => Promise<any>,
+        ) => {
+          if (!isHardModeEnabled()) {
+            return directCall();
+          }
+          if (!mcp) {
+            throw new Error('Hard mode MCP client is not initialized');
+          }
+          try {
+            return await callTool(mcp.client, mcp.toolNames, [toolName], args);
+          } catch (error: any) {
+            return {
+              isError: true,
+              content: [{ type: 'text', text: error?.message || String(error) }],
+            };
+          }
+        };
+
         // Step 1: CreateFunctionGroup (High-Level)
         // High-level handler does validation internally, but we check the result
         testLogger?.info(
@@ -142,8 +181,8 @@ describe('Function High-Level Handlers Integration', () => {
         testLogger?.info(
           `📦 High Create: Package: ${packageName}, Transport: ${transportRequest || '(empty)'}`,
         );
-        const createFGResponse = await handleCreateFunctionGroup(
-          { connection, logger: testLogger },
+        const createFGResponse = await invoke(
+          'CreateFunctionGroup',
           {
             function_group_name: functionGroupName,
             description: functionGroupDescription,
@@ -151,6 +190,17 @@ describe('Function High-Level Handlers Integration', () => {
             transport_request: transportRequest,
             activate: true,
           },
+          () =>
+            handleCreateFunctionGroup(
+              { connection, logger: testLogger },
+              {
+                function_group_name: functionGroupName,
+                description: functionGroupDescription,
+                package_name: packageName,
+                transport_request: transportRequest,
+                activate: true,
+              },
+            ),
         );
 
         if (createFGResponse.isError) {
@@ -171,13 +221,22 @@ describe('Function High-Level Handlers Integration', () => {
           testLogger?.info(
             `📝 High Update: Updating function group ${functionGroupName}...`,
           );
-          const updateFGResponse = await handleUpdateFunctionGroup(
-            { connection, logger: testLogger },
+          const updateFGResponse = await invoke(
+            'UpdateFunctionGroup',
             {
               function_group_name: functionGroupName,
               description: updateFunctionGroupDescription,
               transport_request: transportRequest,
             },
+            () =>
+              handleUpdateFunctionGroup(
+                { connection, logger: testLogger },
+                {
+                  function_group_name: functionGroupName,
+                  description: updateFunctionGroupDescription,
+                  transport_request: transportRequest,
+                },
+              ),
           );
 
           if (updateFGResponse.isError) {
@@ -197,8 +256,8 @@ describe('Function High-Level Handlers Integration', () => {
         testLogger?.info(
           `📦 High Create: Creating function module ${functionModuleName}...`,
         );
-        const createFMResponse = await handleCreateFunctionModule(
-          { connection, logger: testLogger },
+        const createFMResponse = await invoke(
+          'CreateFunctionModule',
           {
             function_group_name: functionGroupName,
             function_module_name: functionModuleName,
@@ -207,6 +266,18 @@ describe('Function High-Level Handlers Integration', () => {
             source_code: sourceCode,
             activate: true,
           },
+          () =>
+            handleCreateFunctionModule(
+              { connection, logger: testLogger },
+              {
+                function_group_name: functionGroupName,
+                function_module_name: functionModuleName,
+                description: functionModuleDescription,
+                transport_request: transportRequest,
+                source_code: sourceCode,
+                activate: true,
+              },
+            ),
         );
 
         if (createFMResponse.isError) {
@@ -237,8 +308,8 @@ describe('Function High-Level Handlers Integration', () => {
         testLogger?.info(
           `📝 High Update: Updating function module ${functionModuleName}...`,
         );
-        const updateFMResponse = await handleUpdateFunctionModule(
-          { connection, logger: testLogger },
+        const updateFMResponse = await invoke(
+          'UpdateFunctionModule',
           {
             function_group_name: functionGroupName,
             function_module_name: functionModuleName,
@@ -246,6 +317,17 @@ describe('Function High-Level Handlers Integration', () => {
             transport_request: transportRequest,
             activate: true,
           },
+          () =>
+            handleUpdateFunctionModule(
+              { connection, logger: testLogger },
+              {
+                function_group_name: functionGroupName,
+                function_module_name: functionModuleName,
+                source_code: updatedSourceCode,
+                transport_request: transportRequest,
+                activate: true,
+              },
+            ),
         );
 
         if (updateFMResponse.isError) {
@@ -269,13 +351,22 @@ describe('Function High-Level Handlers Integration', () => {
             // Delete function module only if cleanup_after is true
             if (shouldCleanup) {
               await delay(2000); // Ensure function module is ready for deletion
-              const deleteFMResponse = await handleDeleteFunctionModule(
-                { connection, logger: testLogger },
+              const deleteFMResponse = await invoke(
+                'DeleteFunctionModule',
                 {
                   function_module_name: functionModuleName,
                   function_group_name: functionGroupName,
                   transport_request: transportRequest,
                 },
+                () =>
+                  handleDeleteFunctionModule(
+                    { connection, logger: testLogger },
+                    {
+                      function_module_name: functionModuleName,
+                      function_group_name: functionGroupName,
+                      transport_request: transportRequest,
+                    },
+                  ),
               );
 
               if (!deleteFMResponse.isError) {
@@ -306,12 +397,20 @@ describe('Function High-Level Handlers Integration', () => {
             // Delete function group only if cleanup_after is true
             if (shouldCleanup) {
               await delay(2000); // Ensure function group is ready for deletion
-              const deleteFGResponse = await handleDeleteFunctionGroup(
-                { connection, logger: testLogger },
+              const deleteFGResponse = await invoke(
+                'DeleteFunctionGroup',
                 {
                   function_group_name: functionGroupName,
                   transport_request: transportRequest,
                 },
+                () =>
+                  handleDeleteFunctionGroup(
+                    { connection, logger: testLogger },
+                    {
+                      function_group_name: functionGroupName,
+                      transport_request: transportRequest,
+                    },
+                  ),
               );
 
               if (!deleteFGResponse.isError) {

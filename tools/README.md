@@ -82,6 +82,62 @@ node tools/runtime-profiling-dumps-explorer.js --env-path=/path/to/.env
 
 ---
 
+### 0.6 MCP CRUD Smoke Runner
+
+**`mcp-crud-smoke.js`** - MCP client script that validates real CRUD via running MCP server transport (HTTP/SSE/stdio) using `tests/test-config.yaml`.
+
+**Purpose:**
+- Reproduce real client/server integration (instead of direct handler invocation)
+- Run `CreateProgram -> GetProgram -> UpdateProgram -> GetProgram -> DeleteProgramLow`
+- Use normal YAML test cases (`create_program.test_cases`) with package/transport defaults
+- Detect transport-level/config/session issues that integration handler tests can miss
+
+**Usage:**
+```bash
+# Recommended: connect to already running HTTP MCP server
+npm run smoke:mcp:crud -- --transport=http
+
+# Target specific case
+npm run smoke:mcp:crud -- --case=builder_program --fail-fast
+
+# Avoid object name collisions
+npm run smoke:mcp:crud -- --suffix=SMOKE01
+```
+
+If CLI flags are omitted, defaults are taken from `tests/test-config.yaml` -> `environment.integration_hard_mode` (`transport`, `http_url`, `sse_url`, `stdio_command`, `env_path`).
+
+---
+
+### 0.7 MCP CRUD Matrix Runner
+
+**`mcp-crud-matrix.js`** - Wrapper over `mcp-crud-smoke.js` that runs the same YAML-driven CRUD smoke tests across multiple transports.
+
+**Default mode:**
+- runs only one protocol from `tests/test-config.yaml` -> `environment.integration_hard_mode.transport`
+- override with `--protocol=http|sse|stdio`
+
+**Optional matrix mode (explicit only):**
+- use `--protocols=http,sse,stdio` when you intentionally need all protocols
+
+**Usage:**
+```bash
+# Run one protocol from YAML (recommended)
+npm run smoke:mcp:matrix
+
+# Force single protocol
+npm run smoke:mcp:matrix -- --protocol=sse
+
+# Explicit full matrix (opt-in)
+npm run smoke:mcp:matrix -- --protocols=http,sse,stdio
+
+# Single YAML case with fail-fast
+npm run smoke:mcp:matrix -- --case=builder_program --fail-fast
+```
+
+HTTP/SSE URLs default to `tests/test-config.yaml` -> `environment.integration_hard_mode`.
+
+---
+
 ### 1. Documentation Generator
 
 **`generate-tools-docs.js`** - Automatically generates tool documentation from handler files.

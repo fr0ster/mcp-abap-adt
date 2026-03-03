@@ -10,7 +10,10 @@ import type { HandlerContext } from '../handlers/interfaces.js';
 import type { IHandlersRegistry } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
-import { resolveSystemContext } from '../lib/systemContext.js';
+import {
+  resetSystemContextCache,
+  resolveSystemContext,
+} from '../lib/systemContext.js';
 import { registerAuthBroker } from '../lib/utils.js';
 import type { ConnectionContext } from './ConnectionContext.js';
 
@@ -149,10 +152,16 @@ export abstract class BaseMcpServer extends McpServer {
     const username = getHeader('x-sap-login');
     const password = getHeader('x-sap-password');
     const client = getHeader('x-sap-client') || '';
+    const masterSystem = getHeader('x-sap-master-system');
+    const responsible = getHeader('x-sap-responsible');
 
     if (!url) {
       throw new Error('x-sap-url header is required for direct SAP connection');
     }
+
+    const metadata: Record<string, string> = {};
+    if (masterSystem) metadata.masterSystem = masterSystem;
+    if (responsible) metadata.responsible = responsible;
 
     if (jwtToken) {
       // JWT auth
@@ -164,7 +173,7 @@ export abstract class BaseMcpServer extends McpServer {
           jwtToken,
           client,
         },
-        metadata: {},
+        metadata,
       };
     } else if (username && password) {
       // Basic auth
@@ -177,7 +186,7 @@ export abstract class BaseMcpServer extends McpServer {
           password,
           client,
         },
-        metadata: {},
+        metadata,
       };
     } else {
       throw new Error(
@@ -220,12 +229,26 @@ export abstract class BaseMcpServer extends McpServer {
       return this.cachedConnection;
     }
 
+    // For non-stdio connections, reset system context cache so each request
+    // resolves fresh (different requests may target different systems)
+    const isStdio = destination && sessionId === destination;
+    if (!isStdio) {
+      resetSystemContextCache();
+    }
+
     const connection = createAbapConnection(
       this.connectionContext.connectionParams,
     );
 
+    // Build overrides from metadata (HTTP headers)
+    const metadata = this.connectionContext?.metadata || {};
+    const masterSystem = metadata.masterSystem as string | undefined;
+    const responsible = metadata.responsible as string | undefined;
+    const overrides =
+      masterSystem || responsible ? { masterSystem, responsible } : undefined;
+
     // Resolve system context (masterSystem/responsible) once per connection
-    await resolveSystemContext(connection);
+    await resolveSystemContext(connection, overrides);
 
     // Cache connection for stdio mode (when sessionId === destination, it's stdio)
     // SSE/HTTP modes use different sessionId per request, so caching won't interfere

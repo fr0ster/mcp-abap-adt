@@ -76,6 +76,8 @@ The server processes the following HTTP headers (as checked in `applyAuthHeaders
 | `x-sap-password` | Yes* (for basic) | Password for basic authentication | `your_password` |
 | `x-sap-destination` | No | Destination name for service key-based authentication | `TRIAL`, `DEV`, `PROD` |
 | `x-mcp-destination` | No | Destination name for MCP destination-based authentication | `TRIAL`, `DEV`, `PROD` |
+| `x-sap-master-system` | No | SAP system ID for on-prem transport binding | `DEV`, `QAS` |
+| `x-sap-responsible` | No | Responsible user for transport operations | `DEVELOPER1` |
 
 \* Required when not using `.env` file configuration or destination-based authentication. If headers are not provided, the server will use configuration from `.env` file or environment variables.
 
@@ -101,13 +103,17 @@ For on-premise systems using basic authentication:
       "x-sap-url": "https://your-onpremise-system.com:8000",
       "x-sap-auth-type": "basic",
       "x-sap-login": "your_username",
-      "x-sap-password": "your_password"
+      "x-sap-password": "your_password",
+      "x-sap-master-system": "DEV",
+      "x-sap-responsible": "DEVELOPER1"
     }
   }
 }
 ```
 
 **Note:** For basic authentication, you can pass username and password via HTTP headers (`x-sap-login` and `x-sap-password`) or configure them in the server's `.env` file (`SAP_USERNAME`, `SAP_PASSWORD`). Headers take priority over `.env` values.
+
+**System context headers** (`x-sap-master-system`, `x-sap-responsible`) are optional. When provided, they override `SAP_MASTER_SYSTEM` / `SAP_RESPONSIBLE` from `.env` and the cloud `getSystemInformation()` API. This is useful for on-premise HTTP/SSE setups where no `.env` file is used.
 
 ## Destination-Based Authentication
 

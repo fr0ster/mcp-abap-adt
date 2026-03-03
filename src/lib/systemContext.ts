@@ -10,10 +10,20 @@ let cached: IAdtSystemContext | undefined;
 
 export async function resolveSystemContext(
   connection: IAbapConnection,
+  overrides?: Partial<IAdtSystemContext>,
 ): Promise<IAdtSystemContext> {
+  // Priority 1: explicit overrides (from HTTP headers)
+  if (overrides && (overrides.masterSystem || overrides.responsible)) {
+    cached = {
+      masterSystem: overrides.masterSystem,
+      responsible: overrides.responsible,
+    };
+    return cached;
+  }
+
   if (cached) return cached;
 
-  // Try env vars first (on-prem or explicitly configured)
+  // Priority 2: env vars (on-prem or explicitly configured)
   const masterSystem = process.env.SAP_MASTER_SYSTEM;
   const responsible = process.env.SAP_RESPONSIBLE || process.env.SAP_USERNAME;
 

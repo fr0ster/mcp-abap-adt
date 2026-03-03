@@ -136,6 +136,10 @@ SAP CONNECTION (.env file):
                                    Cloud systems resolve this automatically via API.
     SAP_RESPONSIBLE                Responsible user (optional, falls back to SAP_USERNAME)
 
+  HTTP/SSE Headers (System Context):
+    x-sap-master-system              Per-request SAP system ID (overrides SAP_MASTER_SYSTEM)
+    x-sap-responsible                Per-request responsible user (overrides SAP_RESPONSIBLE)
+
 GENERATING .ENV FROM SERVICE KEY:
   Install connection package: npm install -g @mcp-abap-adt/connection
   Generate .env: sap-abap-auth auth -k path/to/service-key.json

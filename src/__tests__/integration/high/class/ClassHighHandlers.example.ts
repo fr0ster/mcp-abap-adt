@@ -86,8 +86,6 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
         const createResponse = await handleCreateClass(handlerContext, {
           class_name: objectName!,
           package_name: packageName,
-          source_code: params.source_code || '',
-          activate: true,
           ...(transportRequest && { transport_request: transportRequest }),
           ...(params.description && { description: params.description }),
           ...(params.superclass && { superclass: params.superclass }),

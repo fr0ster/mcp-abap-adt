@@ -9,10 +9,6 @@ import { handleDeleteBehaviorImplementation } from '../../behavior_implementatio
 import { handleGetBehaviorImplementation } from '../../behavior_implementation/high/handleGetBehaviorImplementation';
 import { handleUpdateBehaviorImplementation } from '../../behavior_implementation/high/handleUpdateBehaviorImplementation';
 import { handleCreateClass } from '../../class/high/handleCreateClass';
-import { handleCreateLocalDefinitions } from '../../class/high/handleCreateLocalDefinitions';
-import { handleCreateLocalMacros } from '../../class/high/handleCreateLocalMacros';
-import { handleCreateLocalTestClass } from '../../class/high/handleCreateLocalTestClass';
-import { handleCreateLocalTypes } from '../../class/high/handleCreateLocalTypes';
 import { handleDeleteClass } from '../../class/high/handleDeleteClass';
 import { handleDeleteLocalDefinitions } from '../../class/high/handleDeleteLocalDefinitions';
 import { handleDeleteLocalMacros } from '../../class/high/handleDeleteLocalMacros';
@@ -172,25 +168,21 @@ export const compactRouterMap: CompactRouterMap = {
     delete: handleDeleteCdsUnitTest as unknown as CompactHandler,
   },
   LOCAL_TEST_CLASS: {
-    create: handleCreateLocalTestClass as unknown as CompactHandler,
     get: handleGetLocalTestClass as unknown as CompactHandler,
     update: handleUpdateLocalTestClass as unknown as CompactHandler,
     delete: handleDeleteLocalTestClass as unknown as CompactHandler,
   },
   LOCAL_TYPES: {
-    create: handleCreateLocalTypes as unknown as CompactHandler,
     get: handleGetLocalTypes as unknown as CompactHandler,
     update: handleUpdateLocalTypes as unknown as CompactHandler,
     delete: handleDeleteLocalTypes as unknown as CompactHandler,
   },
   LOCAL_DEFINITIONS: {
-    create: handleCreateLocalDefinitions as unknown as CompactHandler,
     get: handleGetLocalDefinitions as unknown as CompactHandler,
     update: handleUpdateLocalDefinitions as unknown as CompactHandler,
     delete: handleDeleteLocalDefinitions as unknown as CompactHandler,
   },
   LOCAL_MACROS: {
-    create: handleCreateLocalMacros as unknown as CompactHandler,
     get: handleGetLocalMacros as unknown as CompactHandler,
     update: handleUpdateLocalMacros as unknown as CompactHandler,
     delete: handleDeleteLocalMacros as unknown as CompactHandler,

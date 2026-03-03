@@ -8,7 +8,6 @@
  */
 
 import type { IBehaviorImplementationConfig } from '@mcp-abap-adt/adt-clients';
-import { XMLParser } from 'fast-xml-parser';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -21,7 +20,7 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 export const TOOL_DEFINITION = {
   name: 'CreateBehaviorImplementation',
   description:
-    'Create a new ABAP behavior implementation class for a behavior definition. Behavior implementations contain the business logic for RAP entities. Uses stateful session for proper lock management.',
+    'Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state. Use UpdateBehaviorImplementation to set implementation code afterwards.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -49,16 +48,6 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
-      implementation_code: {
-        type: 'string',
-        description:
-          'Implementation code for the implementations include (optional). Contains the actual behavior implementation methods.',
-      },
-      activate: {
-        type: 'boolean',
-        description:
-          'Activate behavior implementation after creation. Default: true.',
-      },
     },
     required: ['class_name', 'behavior_definition', 'package_name'],
   },
@@ -70,8 +59,6 @@ interface CreateBehaviorImplementationArgs {
   description?: string;
   package_name: string;
   transport_request?: string;
-  implementation_code?: string;
-  activate?: boolean;
 }
 
 /**
@@ -103,11 +90,8 @@ export async function handleCreateBehaviorImplementation(
       return return_error(error as Error);
     }
 
-    const typedArgs = args as CreateBehaviorImplementationArgs;
-    // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const className = typedArgs.class_name.toUpperCase();
-    const behaviorDefinition = typedArgs.behavior_definition.toUpperCase();
+    const className = args.class_name.toUpperCase();
+    const behaviorDefinition = args.behavior_definition.toUpperCase();
 
     logger?.info(
       `Starting behavior implementation creation: ${className} for ${behaviorDefinition}`,
@@ -116,8 +100,6 @@ export async function handleCreateBehaviorImplementation(
     try {
       // Create client
       const client = createAdtClient(connection);
-      const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
-
       // Create behavior implementation (full workflow)
       const createConfig: Partial<IBehaviorImplementationConfig> &
         Pick<
@@ -126,12 +108,9 @@ export async function handleCreateBehaviorImplementation(
         > = {
         className: className,
         behaviorDefinition: behaviorDefinition,
-        description: typedArgs.description || className,
-        packageName: typedArgs.package_name.toUpperCase(),
-        transportRequest: typedArgs.transport_request,
-        ...(typedArgs.implementation_code && {
-          sourceCode: typedArgs.implementation_code,
-        }),
+        description: args.description || className,
+        packageName: args.package_name.toUpperCase(),
+        transportRequest: args.transport_request,
       };
 
       const createState = await client
@@ -145,58 +124,20 @@ export async function handleCreateBehaviorImplementation(
         );
       }
 
-      // Parse activation warnings if activation was performed
-      let activationWarnings: string[] = [];
-      const activateResponse = createState.activateResult;
-      if (
-        shouldActivate &&
-        activateResponse &&
-        typeof activateResponse.data === 'string' &&
-        activateResponse.data.includes('<chkl:messages')
-      ) {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@_',
-        });
-        const result = parser.parse(activateResponse.data);
-        const messages = result?.['chkl:messages']?.msg;
-        if (messages) {
-          const msgArray = Array.isArray(messages) ? messages : [messages];
-          activationWarnings = msgArray.map(
-            (msg: any) =>
-              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-          );
-        }
-      }
-
       logger?.info(
-        `✅ CreateBehaviorImplementation completed successfully: ${className}`,
+        `CreateBehaviorImplementation completed successfully: ${className}`,
       );
-
-      // Return success result
-      const stepsCompleted = ['create', 'lock', 'update_main_source'];
-      if (typedArgs.implementation_code) {
-        stepsCompleted.push('update_implementations');
-      }
-      stepsCompleted.push('unlock');
-      if (shouldActivate) {
-        stepsCompleted.push('activate');
-      }
 
       const result = {
         success: true,
         class_name: className,
         behavior_definition: behaviorDefinition,
-        package_name: typedArgs.package_name.toUpperCase(),
-        transport_request: typedArgs.transport_request || null,
+        package_name: args.package_name.toUpperCase(),
+        transport_request: args.transport_request || null,
         type: 'CLAS/OC',
-        message: shouldActivate
-          ? `Behavior Implementation ${className} created and activated successfully`
-          : `Behavior Implementation ${className} created successfully (not activated)`,
+        message: `Behavior Implementation ${className} created successfully. Use UpdateBehaviorImplementation to set implementation code.`,
         uri: `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}`,
-        steps_completed: stepsCompleted,
-        activation_warnings:
-          activationWarnings.length > 0 ? activationWarnings : undefined,
+        steps_completed: ['create'],
       };
 
       return return_response({

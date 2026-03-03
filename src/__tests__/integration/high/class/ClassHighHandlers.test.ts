@@ -114,17 +114,14 @@ describe('Class High-Level Handlers Integration', () => {
         }
         const className = objectName;
 
-        // Step 1: Create
+        // Step 1: Create (object in initial state, no source code)
         logger?.info(`   • create: ${objectName}`);
         const createLogger = createTestLogger('class-high-create');
-        const sourceCode = params.source_code || '';
         const createResponse = await tester.invokeToolOrHandler(
           'CreateClass',
           {
             class_name: objectName,
             package_name: packageName,
-            source_code: sourceCode,
-            activate: true,
             ...(transportRequest && { transport_request: transportRequest }),
             ...(params.description && { description: params.description }),
             ...(params.superclass && { superclass: params.superclass }),
@@ -137,8 +134,6 @@ describe('Class High-Level Handlers Integration', () => {
             return handleCreateClass(createCtx, {
               class_name: objectName,
               package_name: packageName,
-              source_code: sourceCode,
-              activate: true,
               ...(transportRequest && { transport_request: transportRequest }),
               ...(params.description && { description: params.description }),
               ...(params.superclass && { superclass: params.superclass }),

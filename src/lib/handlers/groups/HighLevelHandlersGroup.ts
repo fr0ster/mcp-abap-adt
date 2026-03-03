@@ -35,22 +35,6 @@ import {
   handleCreateClass,
 } from '../../../handlers/class/high/handleCreateClass';
 import {
-  TOOL_DEFINITION as CreateLocalDefinitions_Tool,
-  handleCreateLocalDefinitions,
-} from '../../../handlers/class/high/handleCreateLocalDefinitions';
-import {
-  TOOL_DEFINITION as CreateLocalMacros_Tool,
-  handleCreateLocalMacros,
-} from '../../../handlers/class/high/handleCreateLocalMacros';
-import {
-  TOOL_DEFINITION as CreateLocalTestClass_Tool,
-  handleCreateLocalTestClass,
-} from '../../../handlers/class/high/handleCreateLocalTestClass';
-import {
-  TOOL_DEFINITION as CreateLocalTypes_Tool,
-  handleCreateLocalTypes,
-} from '../../../handlers/class/high/handleCreateLocalTypes';
-import {
   TOOL_DEFINITION as DeleteClass_Tool,
   handleDeleteClass,
 } from '../../../handlers/class/high/handleDeleteClass';
@@ -807,14 +791,6 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
-          name: CreateLocalTestClass_Tool.name,
-          description: CreateLocalTestClass_Tool.description,
-          inputSchema: CreateLocalTestClass_Tool.inputSchema,
-        },
-        handler: withContext(handleCreateLocalTestClass),
-      },
-      {
-        toolDefinition: {
           name: UpdateLocalTestClass_Tool.name,
           description: UpdateLocalTestClass_Tool.description,
           inputSchema: UpdateLocalTestClass_Tool.inputSchema,
@@ -836,14 +812,6 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           inputSchema: GetLocalTypes_Tool.inputSchema,
         },
         handler: withContext(handleGetLocalTypes),
-      },
-      {
-        toolDefinition: {
-          name: CreateLocalTypes_Tool.name,
-          description: CreateLocalTypes_Tool.description,
-          inputSchema: CreateLocalTypes_Tool.inputSchema,
-        },
-        handler: withContext(handleCreateLocalTypes),
       },
       {
         toolDefinition: {
@@ -871,14 +839,6 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
-          name: CreateLocalDefinitions_Tool.name,
-          description: CreateLocalDefinitions_Tool.description,
-          inputSchema: CreateLocalDefinitions_Tool.inputSchema,
-        },
-        handler: withContext(handleCreateLocalDefinitions),
-      },
-      {
-        toolDefinition: {
           name: UpdateLocalDefinitions_Tool.name,
           description: UpdateLocalDefinitions_Tool.description,
           inputSchema: UpdateLocalDefinitions_Tool.inputSchema,
@@ -900,14 +860,6 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
           inputSchema: GetLocalMacros_Tool.inputSchema,
         },
         handler: withContext(handleGetLocalMacros),
-      },
-      {
-        toolDefinition: {
-          name: CreateLocalMacros_Tool.name,
-          description: CreateLocalMacros_Tool.description,
-          inputSchema: CreateLocalMacros_Tool.inputSchema,
-        },
-        handler: withContext(handleCreateLocalMacros),
       },
       {
         toolDefinition: {

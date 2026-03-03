@@ -17,7 +17,7 @@ import {
 export const TOOL_DEFINITION = {
   name: 'CreateClass',
   description:
-    'Create a new ABAP class with optional activation. Manages validation, lock, check, update, unlock, and optional activation.',
+    'Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code afterwards.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -51,15 +51,6 @@ export const TOOL_DEFINITION = {
         type: 'boolean',
         description: 'Protected constructor. Default: false',
       },
-      source_code: {
-        type: 'string',
-        description:
-          'Full ABAP class source code. If omitted, a minimal template is generated.',
-      },
-      activate: {
-        type: 'boolean',
-        description: 'Activate after creation. Default: true.',
-      },
     },
     required: ['class_name', 'package_name'],
   },
@@ -74,27 +65,6 @@ interface CreateClassArgs {
   final?: boolean;
   abstract?: boolean;
   create_protected?: boolean;
-  source_code?: string;
-  activate?: boolean;
-}
-
-function generateClassTemplate(className: string, description: string): string {
-  return `CLASS ${className} DEFINITION
-  PUBLIC
-  FINAL
-  CREATE PUBLIC .
-
-  PUBLIC SECTION.
-    METHODS: constructor.
-  PROTECTED SECTION.
-  PRIVATE SECTION.
-ENDCLASS.
-
-CLASS ${className} IMPLEMENTATION.
-  METHOD constructor.
-    " ${description}
-  ENDMETHOD.
-ENDCLASS.`;
 }
 
 export async function handleCreateClass(
@@ -111,15 +81,9 @@ export async function handleCreateClass(
   }
 
   const className = args.class_name.toUpperCase();
-  logger?.info(
-    `Starting class creation: ${className} (activate=${args.activate !== false})`,
-  );
+  logger?.info(`Starting class creation: ${className}`);
 
   try {
-    const sourceCode =
-      args.source_code ||
-      generateClassTemplate(className, args.description || className);
-    const shouldActivate = args.activate !== false; // default true
     const client = createAdtClient(connection, logger);
     const adtClass = client.getClass();
 
@@ -140,10 +104,10 @@ export async function handleCreateClass(
           final: args.final || false,
           abstract: args.abstract || false,
           createProtected: args.create_protected || false,
-          sourceCode: sourceCode,
+          sourceCode: undefined,
         },
         {
-          activateOnCreate: shouldActivate,
+          activateOnCreate: false,
         },
       );
     } catch (createError: any) {
@@ -247,15 +211,15 @@ export async function handleCreateClass(
             class_name: className,
             package_name: args.package_name,
             transport_request: args.transport_request || null,
-            activated: shouldActivate,
+            activated: false,
             errors: errors,
           },
           class_name: className,
           package_name: args.package_name,
           transport_request: args.transport_request || null,
-          activated: shouldActivate,
+          activated: false,
           errors: errors,
-          message: `Class ${className} created${shouldActivate ? ' and activated' : ''} successfully${errorCount > 0 ? ` (with ${errorCount} error(s))` : ''}`,
+          message: `Class ${className} created successfully${errorCount > 0 ? ` (with ${errorCount} error(s))` : ''}. Use UpdateClass to set source code.`,
         },
         null,
         2,

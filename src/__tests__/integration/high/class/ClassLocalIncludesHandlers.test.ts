@@ -2,10 +2,10 @@
  * Integration tests for Class Local Includes High-Level Handlers
  *
  * Tests all high-level handlers for Class local includes:
- * - LocalTestClass: Get, Create, Update, Delete
- * - LocalTypes: Get, Create, Update, Delete
- * - LocalDefinitions: Get, Create, Update, Delete
- * - LocalMacros: Get, Create, Update, Delete
+ * - LocalTestClass: Get, Update, Delete
+ * - LocalTypes: Get, Update, Delete
+ * - LocalDefinitions: Get, Update, Delete
+ * - LocalMacros: Get, Update, Delete
  *
  * Enable debug logs:
  *   DEBUG_TESTS=true         - Test execution logs
@@ -17,10 +17,6 @@
  */
 
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
-import { handleCreateLocalDefinitions } from '../../../../handlers/class/high/handleCreateLocalDefinitions';
-import { handleCreateLocalMacros } from '../../../../handlers/class/high/handleCreateLocalMacros';
-import { handleCreateLocalTestClass } from '../../../../handlers/class/high/handleCreateLocalTestClass';
-import { handleCreateLocalTypes } from '../../../../handlers/class/high/handleCreateLocalTypes';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleDeleteLocalDefinitions } from '../../../../handlers/class/high/handleDeleteLocalDefinitions';
 import { handleDeleteLocalMacros } from '../../../../handlers/class/high/handleDeleteLocalMacros';
@@ -130,27 +126,14 @@ describe('Class Local Includes High-Level Handlers Integration', () => {
           directCall: () => Promise<any>,
         ) => tester.invokeToolOrHandler(toolName, args, directCall);
 
-        // Step 1: Create empty parent class (minimal code for local includes testing)
+        // Step 1: Create empty parent class (no source code — initial state)
         logger?.info(`   • create empty parent class: ${objectName}`);
         const createLogger = createTestLogger('class-local-includes-create');
-        // Use minimal empty class code for local includes testing
-        const sourceCode =
-          params.source_code ||
-          `CLASS ${objectName} DEFINITION PUBLIC FINAL CREATE PUBLIC.
-  PUBLIC SECTION.
-  PROTECTED SECTION.
-  PRIVATE SECTION.
-ENDCLASS.
-
-CLASS ${objectName} IMPLEMENTATION.
-ENDCLASS.`;
         const createResponse = await invoke(
           'CreateClass',
           {
             class_name: className,
             package_name: packageName,
-            source_code: sourceCode,
-            activate: true,
             ...(transportRequest && { transport_request: transportRequest }),
           },
           async () => {
@@ -161,8 +144,6 @@ ENDCLASS.`;
             return handleCreateClass(createCtx, {
               class_name: className,
               package_name: packageName,
-              source_code: sourceCode,
-              activate: true,
               ...(transportRequest && { transport_request: transportRequest }),
             });
           },
@@ -193,36 +174,34 @@ CLASS lcl_test IMPLEMENTATION.
   ENDMETHOD.
 ENDCLASS.`;
 
-        // Create LocalTestClass
-        const createTestClassLogger = createTestLogger(
-          'local-test-class-create',
-        );
-        const createTestClassResponse = await invoke(
-          'CreateLocalTestClass',
+        // Update LocalTestClass (local includes exist after class creation — use Update to set content)
+        const setTestClassLogger = createTestLogger('local-test-class-set');
+        const setTestClassResponse = await invoke(
+          'UpdateLocalTestClass',
           {
             class_name: className,
             test_class_code: testClassCode,
-            activate_on_create: false,
+            activate_on_update: false,
           },
           async () => {
-            const createTestClassCtx = createHandlerContext({
+            const setTestClassCtx = createHandlerContext({
               connection,
-              logger: createTestClassLogger,
+              logger: setTestClassLogger,
             });
-            return handleCreateLocalTestClass(createTestClassCtx, {
+            return handleUpdateLocalTestClass(setTestClassCtx, {
               class_name: className,
               test_class_code: testClassCode,
-              activate_on_create: false,
+              activate_on_update: false,
             });
           },
         );
-        expect(createTestClassResponse.isError).toBe(false);
+        expect(setTestClassResponse.isError).toBe(false);
 
-        // Wait after creation before update (like in ClassHighHandlers.test.ts)
+        // Wait after update
         const createDelay = context.getOperationDelay('create');
         await new Promise((resolve) => setTimeout(resolve, createDelay));
 
-        logger?.success(`✅ LocalTestClass create completed`);
+        logger?.success(`✅ LocalTestClass set completed`);
 
         // Step 3: Test LocalTypes handlers
         logger?.info(`   • testing LocalTypes handlers`);
@@ -237,33 +216,33 @@ CLASS lcl_helper IMPLEMENTATION.
   ENDMETHOD.
 ENDCLASS.`;
 
-        // Create LocalTypes
-        const createLocalTypesLogger = createTestLogger('local-types-create');
-        const createLocalTypesResponse = await invoke(
-          'CreateLocalTypes',
+        // Update LocalTypes (set content via Update)
+        const setLocalTypesLogger = createTestLogger('local-types-set');
+        const setLocalTypesResponse = await invoke(
+          'UpdateLocalTypes',
           {
             class_name: className,
             local_types_code: localTypesCode,
-            activate_on_create: false,
+            activate_on_update: false,
           },
           async () => {
-            const createLocalTypesCtx = createHandlerContext({
+            const setLocalTypesCtx = createHandlerContext({
               connection,
-              logger: createLocalTypesLogger,
+              logger: setLocalTypesLogger,
             });
-            return handleCreateLocalTypes(createLocalTypesCtx, {
+            return handleUpdateLocalTypes(setLocalTypesCtx, {
               class_name: className,
               local_types_code: localTypesCode,
-              activate_on_create: false,
+              activate_on_update: false,
             });
           },
         );
-        expect(createLocalTypesResponse.isError).toBe(false);
+        expect(setLocalTypesResponse.isError).toBe(false);
 
-        // Wait after creation before update
+        // Wait after update
         await new Promise((resolve) => setTimeout(resolve, createDelay));
 
-        logger?.success(`✅ LocalTypes create completed`);
+        logger?.success(`✅ LocalTypes set completed`);
 
         // Step 4: Test LocalDefinitions handlers
         logger?.info(`   • testing LocalDefinitions handlers`);
@@ -272,33 +251,33 @@ ENDCLASS.`;
            field2 TYPE i,
          END OF ty_test.`;
 
-        // Create LocalDefinitions
-        const createLocalDefsLogger = createTestLogger('local-defs-create');
-        const createLocalDefsResponse = await invoke(
-          'CreateLocalDefinitions',
+        // Update LocalDefinitions (set content via Update)
+        const setLocalDefsLogger = createTestLogger('local-defs-set');
+        const setLocalDefsResponse = await invoke(
+          'UpdateLocalDefinitions',
           {
             class_name: className,
             definitions_code: localDefinitionsCode,
-            activate_on_create: false,
+            activate_on_update: false,
           },
           async () => {
-            const createLocalDefsCtx = createHandlerContext({
+            const setLocalDefsCtx = createHandlerContext({
               connection,
-              logger: createLocalDefsLogger,
+              logger: setLocalDefsLogger,
             });
-            return handleCreateLocalDefinitions(createLocalDefsCtx, {
+            return handleUpdateLocalDefinitions(setLocalDefsCtx, {
               class_name: className,
               definitions_code: localDefinitionsCode,
-              activate_on_create: false,
+              activate_on_update: false,
             });
           },
         );
-        expect(createLocalDefsResponse.isError).toBe(false);
+        expect(setLocalDefsResponse.isError).toBe(false);
 
-        // Wait after creation before update
+        // Wait after update
         await new Promise((resolve) => setTimeout(resolve, createDelay));
 
-        logger?.success(`✅ LocalDefinitions create completed`);
+        logger?.success(`✅ LocalDefinitions set completed`);
 
         // Step 5: Test LocalMacros handlers (may not be supported on all systems)
         logger?.info(`   • testing LocalMacros handlers`);
@@ -307,34 +286,32 @@ ENDCLASS.`;
 END-OF-DEFINITION.`;
 
         try {
-          // Create LocalMacros
-          const createLocalMacrosLogger = createTestLogger(
-            'local-macros-create',
-          );
-          const createLocalMacrosResponse = await invoke(
-            'CreateLocalMacros',
+          // Update LocalMacros (set content via Update)
+          const setLocalMacrosLogger = createTestLogger('local-macros-set');
+          const setLocalMacrosResponse = await invoke(
+            'UpdateLocalMacros',
             {
               class_name: className,
               macros_code: localMacrosCode,
-              activate_on_create: false,
+              activate_on_update: false,
             },
             async () => {
-              const createLocalMacrosCtx = createHandlerContext({
+              const setLocalMacrosCtx = createHandlerContext({
                 connection,
-                logger: createLocalMacrosLogger,
+                logger: setLocalMacrosLogger,
               });
-              return handleCreateLocalMacros(createLocalMacrosCtx, {
+              return handleUpdateLocalMacros(setLocalMacrosCtx, {
                 class_name: className,
                 macros_code: localMacrosCode,
-                activate_on_create: false,
+                activate_on_update: false,
               });
             },
           );
 
-          if (!createLocalMacrosResponse.isError) {
-            // Wait after creation before update
+          if (!setLocalMacrosResponse.isError) {
+            // Wait after update
             await new Promise((resolve) => setTimeout(resolve, createDelay));
-            logger?.success(`✅ LocalMacros create completed`);
+            logger?.success(`✅ LocalMacros set completed`);
           } else {
             logger?.warn(
               `⚠️ LocalMacros not supported on this system (expected for newer ABAP versions)`,

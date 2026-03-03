@@ -45,6 +45,11 @@ import {
   updateSessionFromResponse,
 } from '../../helpers/sessionHelpers';
 import {
+  callTool,
+  createHardModeClient,
+  isHardModeEnabled,
+} from '../../helpers/testers/hardMode';
+import {
   debugLog,
   delay,
   extractLockHandle,
@@ -56,9 +61,33 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
   let session: SessionInfo | null = null;
   let hasConfig = false;
   const testLogger = createTestLogger('function-low');
+  let mcp: {
+    client: any;
+    toolNames: Set<string>;
+    close: () => Promise<void>;
+  } | null = null;
 
   beforeAll(async () => {
     try {
+      if (isHardModeEnabled()) {
+        mcp = await createHardModeClient();
+        // Get session through MCP
+        const sessionResponse = await callTool(
+          mcp.client,
+          mcp.toolNames,
+          ['GetSession'],
+          {},
+        );
+        const sessionData = parseHandlerResponse(sessionResponse);
+        session = {
+          session_id:
+            sessionData.session_id || sessionData.data?.session_id || '',
+          session_state:
+            sessionData.session_state || sessionData.data?.session_state || '',
+        };
+        hasConfig = true;
+        return;
+      }
       const { connection: testConnection, session: testSession } =
         await createTestConnectionAndSession();
       connection = testConnection;
@@ -77,11 +106,18 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
     }
   });
 
+  afterAll(async () => {
+    if (mcp) {
+      await mcp.close();
+      mcp = null;
+    }
+  });
+
   describe('Full Workflow (FUGR + FM)', () => {
     it(
       'should execute full workflow: FUGR (V→C→L→U→A) then FM (V→C→L→U→U→A)',
       async () => {
-        if (!hasConfig || !connection || !session) {
+        if (!hasConfig || (!isHardModeEnabled() && (!connection || !session))) {
           testLogger?.info(
             '⏭️  Skipping test: No configuration, connection or session',
           );
@@ -93,6 +129,40 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
           testLogger?.info('⏭️  Skipping test: No test case configuration');
           return;
         }
+
+        const invoke = async (
+          toolName: string,
+          args: Record<string, unknown>,
+          directCall: () => Promise<any>,
+        ) => {
+          if (!isHardModeEnabled()) {
+            return directCall();
+          }
+          if (!mcp) {
+            throw new Error('Hard mode MCP client is not initialized');
+          }
+          // Remove null/empty session_state to avoid schema validation errors
+          // (low-level tools define session_state as type: 'object')
+          const cleanArgs = { ...args };
+          if (!cleanArgs.session_state) {
+            delete cleanArgs.session_state;
+          }
+          try {
+            return await callTool(
+              mcp.client,
+              mcp.toolNames,
+              [toolName],
+              cleanArgs,
+            );
+          } catch (error: any) {
+            return {
+              isError: true,
+              content: [
+                { type: 'text', text: error?.message || String(error) },
+              ],
+            };
+          }
+        };
 
         const functionGroupName = testCase.params.function_group_name;
         const functionModuleName = testCase.params.function_module_name;
@@ -110,13 +180,22 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
 
             // Try to delete FM first (if exists)
             try {
-              await handleDeleteFunctionModule(
-                { connection, logger: testLogger },
+              await invoke(
+                'DeleteFunctionModuleLow',
                 {
                   function_module_name: functionModuleName,
                   function_group_name: functionGroupName,
                   transport_request: transportRequest,
                 },
+                () =>
+                  handleDeleteFunctionModule(
+                    { connection, logger: testLogger },
+                    {
+                      function_module_name: functionModuleName,
+                      function_group_name: functionGroupName,
+                      transport_request: transportRequest,
+                    },
+                  ),
               );
               testLogger?.debug(
                 `✅ Pre-cleanup: deleted leftover FM ${functionModuleName}`,
@@ -130,12 +209,20 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
 
             // Try to delete FUGR (if exists)
             try {
-              await handleDeleteFunctionGroup(
-                { connection, logger: testLogger },
+              await invoke(
+                'DeleteFunctionGroupLow',
                 {
                   function_group_name: functionGroupName,
                   transport_request: transportRequest,
                 },
+                () =>
+                  handleDeleteFunctionGroup(
+                    { connection, logger: testLogger },
+                    {
+                      function_group_name: functionGroupName,
+                      transport_request: transportRequest,
+                    },
+                  ),
               );
               testLogger?.debug(
                 `✅ Pre-cleanup: deleted leftover FUGR ${functionGroupName}`,
@@ -190,15 +277,26 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
 
           // Step 1.1: Validate FUGR
           debugLog('FUGR-VALIDATE', `Validating ${functionGroupName}`);
-          const validateFGResponse = await handleValidateFunctionGroup(
-            { connection, logger: testLogger },
+          const validateFGResponse = await invoke(
+            'ValidateFunctionGroupLow',
             {
               function_group_name: functionGroupName,
               package_name: packageName,
               description: functionGroupDescription,
-              session_id: session.session_id,
-              session_state: session.session_state,
+              session_id: session!.session_id,
+              session_state: session!.session_state,
             },
+            () =>
+              handleValidateFunctionGroup(
+                { connection, logger: testLogger },
+                {
+                  function_group_name: functionGroupName,
+                  package_name: packageName,
+                  description: functionGroupDescription,
+                  session_id: session!.session_id,
+                  session_state: session!.session_state,
+                },
+              ),
           );
 
           if (validateFGResponse.isError) {
@@ -220,16 +318,28 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
 
           // Step 1.2: Create FUGR
           debugLog('FUGR-CREATE', `Creating ${functionGroupName}`);
-          const createFGResponse = await handleCreateFunctionGroup(
-            { connection, logger: testLogger },
+          const createFGResponse = await invoke(
+            'CreateFunctionGroupLow',
             {
               function_group_name: functionGroupName,
               description: functionGroupDescription,
               package_name: packageName,
               transport_request: transportRequest,
-              session_id: session.session_id,
-              session_state: session.session_state,
+              session_id: session!.session_id,
+              session_state: session!.session_state,
             },
+            () =>
+              handleCreateFunctionGroup(
+                { connection, logger: testLogger },
+                {
+                  function_group_name: functionGroupName,
+                  description: functionGroupDescription,
+                  package_name: packageName,
+                  transport_request: transportRequest,
+                  session_id: session!.session_id,
+                  session_state: session!.session_state,
+                },
+              ),
           );
 
           if (createFGResponse.isError) {
@@ -245,13 +355,22 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
 
           // Step 1.3: Lock FUGR
           debugLog('FUGR-LOCK', `Locking ${functionGroupName}`);
-          const lockFGResponse = await handleLockFunctionGroup(
-            { connection, logger: testLogger },
+          const lockFGResponse = await invoke(
+            'LockFunctionGroupLow',
             {
               function_group_name: functionGroupName,
-              session_id: session.session_id,
-              session_state: session.session_state,
+              session_id: session!.session_id,
+              session_state: session!.session_state,
             },
+            () =>
+              handleLockFunctionGroup(
+                { connection, logger: testLogger },
+                {
+                  function_group_name: functionGroupName,
+                  session_id: session!.session_id,
+                  session_state: session!.session_state,
+                },
+              ),
           );
 
           if (lockFGResponse.isError) {
@@ -276,14 +395,24 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
 
           // Step 1.4: Unlock FUGR
           debugLog('FUGR-UNLOCK', `Unlocking ${functionGroupName}`);
-          const unlockFGResponse = await handleUnlockFunctionGroup(
-            { connection, logger: testLogger },
+          const unlockFGResponse = await invoke(
+            'UnlockFunctionGroupLow',
             {
               function_group_name: functionGroupName,
               lock_handle: fgLockHandle,
               session_id: fgLockSession.session_id!,
               session_state: fgLockSession.session_state,
             },
+            () =>
+              handleUnlockFunctionGroup(
+                { connection, logger: testLogger },
+                {
+                  function_group_name: functionGroupName,
+                  lock_handle: fgLockHandle,
+                  session_id: fgLockSession!.session_id!,
+                  session_state: fgLockSession!.session_state,
+                },
+              ),
           );
 
           if (unlockFGResponse.isError) {
@@ -300,13 +429,22 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
 
           // Step 1.5: Activate FUGR
           debugLog('FUGR-ACTIVATE', `Activating ${functionGroupName}`);
-          const activateFGResponse = await handleActivateFunctionGroup(
-            { connection, logger: testLogger },
+          const activateFGResponse = await invoke(
+            'ActivateFunctionGroupLow',
             {
               function_group_name: functionGroupName,
-              session_id: session.session_id,
-              session_state: session.session_state,
+              session_id: session!.session_id,
+              session_state: session!.session_state,
             },
+            () =>
+              handleActivateFunctionGroup(
+                { connection, logger: testLogger },
+                {
+                  function_group_name: functionGroupName,
+                  session_id: session!.session_id,
+                  session_state: session!.session_state,
+                },
+              ),
           );
 
           if (activateFGResponse.isError) {
@@ -330,15 +468,26 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
 
           // Step 2.1: Validate FM
           debugLog('FM-VALIDATE', `Validating ${functionModuleName}`);
-          const validateFMResponse = await handleValidateFunctionModule(
-            { connection, logger: testLogger },
+          const validateFMResponse = await invoke(
+            'ValidateFunctionModuleLow',
             {
               function_module_name: functionModuleName,
               function_group_name: functionGroupName,
               description: functionModuleDescription,
-              session_id: session.session_id,
-              session_state: session.session_state,
+              session_id: session!.session_id,
+              session_state: session!.session_state,
             },
+            () =>
+              handleValidateFunctionModule(
+                { connection, logger: testLogger },
+                {
+                  function_module_name: functionModuleName,
+                  function_group_name: functionGroupName,
+                  description: functionModuleDescription,
+                  session_id: session!.session_id,
+                  session_state: session!.session_state,
+                },
+              ),
           );
 
           if (validateFMResponse.isError) {
@@ -372,17 +521,30 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
 
           // Step 2.2: Create FM
           debugLog('FM-CREATE', `Creating ${functionModuleName}`);
-          const createFMResponse = await handleCreateFunctionModule(
-            { connection, logger: testLogger },
+          const createFMResponse = await invoke(
+            'CreateFunctionModuleLow',
             {
               function_module_name: functionModuleName,
               function_group_name: functionGroupName,
               description: functionModuleDescription,
               package_name: packageName,
               transport_request: transportRequest,
-              session_id: session.session_id,
-              session_state: session.session_state,
+              session_id: session!.session_id,
+              session_state: session!.session_state,
             },
+            () =>
+              handleCreateFunctionModule(
+                { connection, logger: testLogger },
+                {
+                  function_module_name: functionModuleName,
+                  function_group_name: functionGroupName,
+                  description: functionModuleDescription,
+                  package_name: packageName,
+                  transport_request: transportRequest,
+                  session_id: session!.session_id,
+                  session_state: session!.session_state,
+                },
+              ),
           );
 
           if (createFMResponse.isError) {
@@ -398,14 +560,24 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
 
           // Step 2.3: Lock FM
           debugLog('FM-LOCK', `Locking ${functionModuleName}`);
-          const lockFMResponse = await handleLockFunctionModule(
-            { connection, logger: testLogger },
+          const lockFMResponse = await invoke(
+            'LockFunctionModuleLow',
             {
               function_module_name: functionModuleName,
               function_group_name: functionGroupName,
-              session_id: session.session_id,
-              session_state: session.session_state,
+              session_id: session!.session_id,
+              session_state: session!.session_state,
             },
+            () =>
+              handleLockFunctionModule(
+                { connection, logger: testLogger },
+                {
+                  function_module_name: functionModuleName,
+                  function_group_name: functionGroupName,
+                  session_id: session!.session_id,
+                  session_state: session!.session_state,
+                },
+              ),
           );
 
           if (lockFMResponse.isError) {
@@ -433,16 +605,30 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             'FM-UPDATE',
             `Updating ${functionModuleName} with source code`,
           );
-          const updateFMResponse = await handleUpdateFunctionModule(
-            { connection, logger: testLogger },
+          const updateFMResponse = await invoke(
+            'UpdateFunctionModuleLow',
             {
               function_module_name: functionModuleName,
               function_group_name: functionGroupName,
               source_code: sourceCode,
+              transport_request: transportRequest,
               lock_handle: fmLockHandle,
-              session_id: fmLockSession.session_id!,
-              session_state: fmLockSession.session_state,
+              session_id: fmLockSession!.session_id!,
+              session_state: fmLockSession!.session_state,
             },
+            () =>
+              handleUpdateFunctionModule(
+                { connection, logger: testLogger },
+                {
+                  function_module_name: functionModuleName,
+                  function_group_name: functionGroupName,
+                  source_code: sourceCode,
+                  transport_request: transportRequest,
+                  lock_handle: fmLockHandle,
+                  session_id: fmLockSession!.session_id!,
+                  session_state: fmLockSession!.session_state,
+                },
+              ),
           );
 
           if (updateFMResponse.isError) {
@@ -458,15 +644,26 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
 
           // Step 2.5: Unlock FM
           debugLog('FM-UNLOCK', `Unlocking ${functionModuleName}`);
-          const unlockFMResponse = await handleUnlockFunctionModule(
-            { connection, logger: testLogger },
+          const unlockFMResponse = await invoke(
+            'UnlockFunctionModuleLow',
             {
               function_module_name: functionModuleName,
               function_group_name: functionGroupName,
               lock_handle: fmLockHandle,
-              session_id: fmLockSession.session_id!,
-              session_state: fmLockSession.session_state,
+              session_id: fmLockSession!.session_id!,
+              session_state: fmLockSession!.session_state,
             },
+            () =>
+              handleUnlockFunctionModule(
+                { connection, logger: testLogger },
+                {
+                  function_module_name: functionModuleName,
+                  function_group_name: functionGroupName,
+                  lock_handle: fmLockHandle,
+                  session_id: fmLockSession!.session_id!,
+                  session_state: fmLockSession!.session_state,
+                },
+              ),
           );
 
           if (unlockFMResponse.isError) {
@@ -483,14 +680,24 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
 
           // Step 2.6: Activate FM
           debugLog('FM-ACTIVATE', `Activating ${functionModuleName}`);
-          const activateFMResponse = await handleActivateFunctionModule(
-            { connection, logger: testLogger },
+          const activateFMResponse = await invoke(
+            'ActivateFunctionModuleLow',
             {
               function_module_name: functionModuleName,
               function_group_name: functionGroupName,
-              session_id: session.session_id,
-              session_state: session.session_state,
+              session_id: session!.session_id,
+              session_state: session!.session_state,
             },
+            () =>
+              handleActivateFunctionModule(
+                { connection, logger: testLogger },
+                {
+                  function_module_name: functionModuleName,
+                  function_group_name: functionGroupName,
+                  session_id: session!.session_id,
+                  session_state: session!.session_state,
+                },
+              ),
           );
 
           if (activateFMResponse.isError) {
@@ -537,8 +744,8 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             // Unlock FM if still locked
             if (fmLockHandle && fmLockSession) {
               try {
-                await handleUnlockFunctionModule(
-                  { connection, logger: testLogger },
+                await invoke(
+                  'UnlockFunctionModuleLow',
                   {
                     function_module_name: functionModuleName,
                     function_group_name: functionGroupName,
@@ -546,6 +753,17 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
                     session_id: fmLockSession.session_id!,
                     session_state: fmLockSession.session_state,
                   },
+                  () =>
+                    handleUnlockFunctionModule(
+                      { connection, logger: testLogger },
+                      {
+                        function_module_name: functionModuleName,
+                        function_group_name: functionGroupName,
+                        lock_handle: fmLockHandle!,
+                        session_id: fmLockSession!.session_id!,
+                        session_state: fmLockSession!.session_state,
+                      },
+                    ),
                 );
               } catch (unlockError) {
                 // Silent cleanup failure
@@ -555,13 +773,22 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             // Delete FM
             try {
               await delay(2000);
-              const deleteFMResponse = await handleDeleteFunctionModule(
-                { connection, logger: testLogger },
+              const deleteFMResponse = await invoke(
+                'DeleteFunctionModuleLow',
                 {
                   function_module_name: functionModuleName,
                   function_group_name: functionGroupName,
                   transport_request: transportRequest,
                 },
+                () =>
+                  handleDeleteFunctionModule(
+                    { connection, logger: testLogger },
+                    {
+                      function_module_name: functionModuleName,
+                      function_group_name: functionGroupName,
+                      transport_request: transportRequest,
+                    },
+                  ),
               );
 
               if (!deleteFMResponse.isError) {
@@ -584,14 +811,24 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             // Unlock FUGR if still locked
             if (fgLockHandle && fgLockSession) {
               try {
-                await handleUnlockFunctionGroup(
-                  { connection, logger: testLogger },
+                await invoke(
+                  'UnlockFunctionGroupLow',
                   {
                     function_group_name: functionGroupName,
                     lock_handle: fgLockHandle,
                     session_id: fgLockSession.session_id!,
                     session_state: fgLockSession.session_state,
                   },
+                  () =>
+                    handleUnlockFunctionGroup(
+                      { connection, logger: testLogger },
+                      {
+                        function_group_name: functionGroupName,
+                        lock_handle: fgLockHandle!,
+                        session_id: fgLockSession!.session_id!,
+                        session_state: fgLockSession!.session_state,
+                      },
+                    ),
                 );
               } catch (unlockError) {
                 // Silent cleanup failure
@@ -601,12 +838,20 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             // Delete FUGR
             try {
               await delay(2000);
-              const deleteFGResponse = await handleDeleteFunctionGroup(
-                { connection, logger: testLogger },
+              const deleteFGResponse = await invoke(
+                'DeleteFunctionGroupLow',
                 {
                   function_group_name: functionGroupName,
                   transport_request: transportRequest,
                 },
+                () =>
+                  handleDeleteFunctionGroup(
+                    { connection, logger: testLogger },
+                    {
+                      function_group_name: functionGroupName,
+                      transport_request: transportRequest,
+                    },
+                  ),
               );
 
               if (!deleteFGResponse.isError) {

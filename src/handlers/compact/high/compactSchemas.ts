@@ -37,7 +37,6 @@ export const compactCreateSchema = {
       type: 'string',
       description: 'Transport request id (if required by system).',
     },
-    source_code: { type: 'string', description: 'ABAP source code payload.' },
     activate: { type: 'boolean', description: 'Activate object after create.' },
     program_type: { type: 'string', description: 'ABAP program type.' },
     application: { type: 'string', description: 'Domain application area.' },

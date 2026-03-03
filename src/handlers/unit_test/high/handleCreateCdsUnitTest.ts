@@ -15,7 +15,7 @@ import {
 export const TOOL_DEFINITION = {
   name: 'CreateCdsUnitTest',
   description:
-    'Create a CDS unit test class with CDS validation, class template, and local test class source.',
+    'Create a CDS unit test class with CDS validation. Creates the test class in initial state.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -31,14 +31,6 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'CDS view name to validate for unit test doubles.',
       },
-      class_template: {
-        type: 'string',
-        description: 'ABAP class template used for CDS unit tests.',
-      },
-      test_class_source: {
-        type: 'string',
-        description: 'Local test class ABAP source code.',
-      },
       description: {
         type: 'string',
         description: 'Optional description for the global test class.',
@@ -49,13 +41,7 @@ export const TOOL_DEFINITION = {
           'Transport request number (required for transportable packages).',
       },
     },
-    required: [
-      'class_name',
-      'package_name',
-      'cds_view_name',
-      'class_template',
-      'test_class_source',
-    ],
+    required: ['class_name', 'package_name', 'cds_view_name'],
   },
 } as const;
 
@@ -63,8 +49,8 @@ interface CreateCdsUnitTestArgs {
   class_name: string;
   package_name: string;
   cds_view_name: string;
-  class_template: string;
-  test_class_source: string;
+  class_template?: string;
+  test_class_source?: string;
   description?: string;
   transport_request?: string;
 }
@@ -90,16 +76,10 @@ export async function handleCreateCdsUnitTest(
       transport_request,
     } = args as CreateCdsUnitTestArgs;
 
-    if (
-      !class_name ||
-      !package_name ||
-      !cds_view_name ||
-      !class_template ||
-      !test_class_source
-    ) {
+    if (!class_name || !package_name || !cds_view_name) {
       return return_error(
         new Error(
-          'Missing required parameters: class_name, package_name, cds_view_name, class_template, test_class_source',
+          'Missing required parameters: class_name, package_name, cds_view_name',
         ),
       );
     }
@@ -121,8 +101,8 @@ export async function handleCreateCdsUnitTest(
         className,
         packageName: package_name,
         cdsViewName,
-        classTemplate: class_template,
-        testClassSource: test_class_source,
+        classTemplate: class_template || '',
+        testClassSource: test_class_source || '',
         description,
         transportRequest: transport_request,
       });

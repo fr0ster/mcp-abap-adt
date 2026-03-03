@@ -101,7 +101,7 @@ describe('Function High-Level Handlers Integration', () => {
   it(
     'should test all Function high-level handlers',
     async () => {
-      if (!hasConfig || !connection || !session) {
+      if (!hasConfig || (!isHardModeEnabled() && (!connection || !session))) {
         testLogger?.info(
           '⏭️  Skipping test: No configuration, connection or session',
         );
@@ -128,19 +128,6 @@ describe('Function High-Level Handlers Integration', () => {
         `Test function module for high-level handler`;
       const updateFunctionGroupDescription =
         testCase.params.update_function_group_description;
-
-      if (!testCase.params.source_code) {
-        throw new Error(
-          'source_code is required in test configuration for create_function',
-        );
-      }
-      // Remove comment blocks from source code as SAP doesn't allow them in function modules
-      let sourceCode = testCase.params.source_code;
-      // Remove comment blocks (lines starting with *")
-      sourceCode = sourceCode
-        .split('\n')
-        .filter((line: string) => !line.trim().startsWith('*"'))
-        .join('\n');
 
       if (!testCase.params.update_source_code) {
         throw new Error(
@@ -258,7 +245,7 @@ describe('Function High-Level Handlers Integration', () => {
           await delay(getOperationDelay('update', testCase));
         }
 
-        // Step 3: CreateFunctionModule (High-Level)
+        // Step 3: CreateFunctionModule (High-Level) — creates in initial state
         testLogger?.info(
           `📦 High Create: Creating function module ${functionModuleName}...`,
         );
@@ -269,8 +256,6 @@ describe('Function High-Level Handlers Integration', () => {
             function_module_name: functionModuleName,
             description: functionModuleDescription,
             transport_request: transportRequest,
-            source_code: sourceCode,
-            activate: true,
           },
           () =>
             handleCreateFunctionModule(
@@ -280,8 +265,6 @@ describe('Function High-Level Handlers Integration', () => {
                 function_module_name: functionModuleName,
                 description: functionModuleDescription,
                 transport_request: transportRequest,
-                source_code: sourceCode,
-                activate: true,
               },
             ),
         );

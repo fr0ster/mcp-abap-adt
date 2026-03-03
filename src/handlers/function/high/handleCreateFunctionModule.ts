@@ -1,10 +1,8 @@
 /**
  * CreateFunctionModule Handler - ABAP Function Module Creation via ADT API
  *
- * Uses FunctionModuleBuilder from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by builder.
- *
- * Workflow: validate -> create -> lock -> update -> check -> unlock -> (activate)
+ * Workflow: validate -> create (object in initial state)
+ * Source code is set via UpdateFunctionModule handler.
  */
 
 import { createAdtClient } from '../../../lib/clients';
@@ -18,7 +16,7 @@ import {
 export const TOOL_DEFINITION = {
   name: 'CreateFunctionModule',
   description:
-    'Create a new ABAP function module within an existing function group. Uses stateful session with LOCK/UNLOCK workflow for source code upload.',
+    'Create a new ABAP function module within an existing function group. Creates the function module in initial state. Use UpdateFunctionModule to set source code afterwards.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -31,11 +29,6 @@ export const TOOL_DEFINITION = {
         description:
           'Function module name (e.g., Z_TEST_FUNCTION_001). Must follow SAP naming conventions (start with Z or Y, max 30 chars).',
       },
-      source_code: {
-        type: 'string',
-        description:
-          'ABAP source code for the function module including signature (FUNCTION name IMPORTING/EXPORTING ... ENDFUNCTION).',
-      },
       description: {
         type: 'string',
         description: 'Optional description for the function module',
@@ -45,31 +38,20 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
-      activate: {
-        type: 'boolean',
-        description:
-          'Whether to activate the function module after creation (default: true)',
-        default: true,
-      },
     },
-    required: ['function_group_name', 'function_module_name', 'source_code'],
+    required: ['function_group_name', 'function_module_name'],
   },
 };
 
 interface CreateFunctionModuleArgs {
   function_group_name: string;
   function_module_name: string;
-  source_code: string; // Required: no default generation
   description?: string;
   transport_request?: string;
-  activate?: boolean;
 }
 
 /**
  * Main handler for CreateFunctionModule MCP tool
- *
- * Uses FunctionModuleBuilder from @mcp-abap-adt/adt-clients for all operations
- * Session and lock management handled internally by builder
  */
 export async function handleCreateFunctionModule(
   context: HandlerContext,
@@ -84,31 +66,23 @@ export async function handleCreateFunctionModule(
     if (!args?.function_module_name) {
       return return_error(new Error('function_module_name is required'));
     }
-    if (!args?.source_code) {
-      return return_error(new Error('source_code is required'));
-    }
 
-    const typedArgs = args as CreateFunctionModuleArgs;
-    // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const functionGroupName = typedArgs.function_group_name.toUpperCase();
-    const functionModuleName = typedArgs.function_module_name.toUpperCase();
+    const functionGroupName = args.function_group_name.toUpperCase();
+    const functionModuleName = args.function_module_name.toUpperCase();
 
     logger?.info(
       `Starting function module creation: ${functionModuleName} in ${functionGroupName}`,
     );
 
     try {
-      // Create client
       const client = createAdtClient(connection);
-      const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Validate
       await client.getFunctionModule().validate({
         functionModuleName,
         functionGroupName,
         packageName: '',
-        description: typedArgs.description || functionModuleName,
+        description: args.description || functionModuleName,
       });
 
       // Create
@@ -116,71 +90,21 @@ export async function handleCreateFunctionModule(
       await client.getFunctionModule().create({
         functionModuleName,
         functionGroupName,
-        description: typedArgs.description || functionModuleName,
+        description: args.description || functionModuleName,
         packageName: '', // packageName inherited from function group
-        sourceCode: typedArgs.source_code || '',
-        transportRequest: typedArgs.transport_request,
+        sourceCode: '',
+        transportRequest: args.transport_request,
       });
 
-      let lockHandle: string | undefined;
-      try {
-        // Lock
-        lockHandle = await client.getFunctionModule().lock({
-          functionModuleName,
-          functionGroupName,
-        });
-
-        // Update with source code
-        await client.getFunctionModule().update(
-          {
-            functionModuleName,
-            functionGroupName,
-            sourceCode: typedArgs.source_code,
-            transportRequest: typedArgs.transport_request,
-          },
-          { lockHandle },
-        );
-
-        // Check
-        await client.getFunctionModule().check({
-          functionModuleName,
-          functionGroupName,
-        });
-      } finally {
-        // Always unlock if we got a lock handle
-        if (lockHandle) {
-          try {
-            await client
-              .getFunctionModule()
-              .unlock({ functionModuleName, functionGroupName }, lockHandle);
-          } catch (unlockError: any) {
-            logger?.warn(
-              `Failed to unlock function module ${functionModuleName}: ${unlockError?.message || unlockError}`,
-            );
-          }
-        }
-      }
-
-      // Activate if requested
-      if (shouldActivate) {
-        await client.getFunctionModule().activate({
-          functionModuleName,
-          functionGroupName,
-        });
-      }
-
-      logger?.info(
-        `✅ CreateFunctionModule completed successfully: ${functionModuleName}`,
-      );
+      logger?.info(`Function module created: ${functionModuleName}`);
 
       return return_response({
         data: JSON.stringify({
           success: true,
           function_module_name: functionModuleName,
           function_group_name: functionGroupName,
-          transport_request: typedArgs.transport_request || 'local',
-          activated: shouldActivate,
-          message: `Function module ${functionModuleName} created successfully${shouldActivate ? ' and activated' : ''}`,
+          transport_request: args.transport_request || 'local',
+          message: `Function module ${functionModuleName} created successfully. Use UpdateFunctionModule to set source code.`,
         }),
       } as AxiosResponse);
     } catch (error: any) {

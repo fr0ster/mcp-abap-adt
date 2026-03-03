@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [2.7.4] - 2026-03-03
+
+### Added
+- **System context HTTP headers for HTTP/SSE transport**:
+  - `x-sap-master-system` and `x-sap-responsible` headers allow per-request system context override.
+  - Priority: HTTP headers → `process.env` → cloud `getSystemInformation()` API.
+  - Enables on-prem transport request binding for HTTP/SSE connections without `.env` file.
+- **System context cache isolation**: cache is reset before each non-stdio request to prevent stale values leaking between requests targeting different SAP systems.
+
 ## [2.7.3] - 2026-03-03
 
 ### Fixed

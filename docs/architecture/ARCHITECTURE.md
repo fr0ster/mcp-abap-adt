@@ -340,6 +340,8 @@ export async function handleGetProgram(context: HandlerContext, args: GetProgram
 
 All transports extend `BaseMcpServer` which handles handler registration, connection context management, and per-request context injection.
 
+> **Design invariant:** One MCP session always maps to one SAP system. System context (`masterSystem`, `responsible`) is kept in a singleton cache that is resolved once per session. For HTTP/SSE the cache is reset before each request as a safety measure, but switching SAP systems within the same session is not a supported scenario.
+
 ---
 
 ### 2.10 @mcp-abap-adt/proxy (Auxiliary Utility)

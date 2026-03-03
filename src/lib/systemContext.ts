@@ -6,6 +6,8 @@ export interface IAdtSystemContext {
   responsible?: string;
 }
 
+// Singleton cache is sufficient: one MCP session always maps to one SAP system.
+// For HTTP/SSE the cache is reset before each request as a safety measure.
 let cached: IAdtSystemContext | undefined;
 
 export async function resolveSystemContext(

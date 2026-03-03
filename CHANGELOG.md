@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [2.7.2] - 2026-03-03
+
+### Added
+- **YAML-driven MCP hard mode test infrastructure**:
+  - Added `environment.integration_hard_mode` support for integration tests.
+  - Added real MCP client execution path for `stdio`, `sse`, and `http` transports.
+  - Added MCP CRUD smoke/matrix scripts in `tools/`.
+
+### Fixed
+- **Real MCP integration gaps in tests**:
+  - Lambda-based integration suites now support hard mode via real MCP tool calls.
+  - `LowTester` hard mode now bootstraps MCP session (`GetSession`) so low-level lock/unlock flows receive required `session_id`.
+  - Hard mode test object names now include per-run suffix to prevent object name collisions between runs.
+- **System context bootstrap on server startup**:
+  - Launcher now hydrates on-prem system context env values earlier so real MCP runs consistently resolve context.
+
 ## [2.7.1] - 2026-03-01
 
 ### Added

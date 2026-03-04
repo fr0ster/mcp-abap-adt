@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-03-04
+
+### Added
+- **BehaviorImplementation low-level MCP tools**: registered `ValidateBehaviorImplementationLow`, `CreateBehaviorImplementationLow`, `LockBehaviorImplementationLow` in LowLevelHandlersGroup.
+
+### Fixed
+- **System context not passed to AdtClient**: `createAdtClient()` now forwards `responsible` and `masterSystem` from resolved system context to `AdtClient` options. Fixes package creation on BTP Cloud failing with "Enter a valid user, not , as the person responsible".
+- **ValidatePackageLow schema**: added missing `super_package` property to `inputSchema.properties` (was in `required` but not declared — MCP SDK rejected the parameter in hard mode).
+- **CreatePackageLow handler**: removed incorrect `createResult` check — `AdtPackage.create()` returns `{ errors: [] }` without `createResult` (packages are containers with no response body).
+
+## [3.0.0] - 2026-03-04
+
+### Changed
+- **BREAKING: Separate Create and Update** — Create handlers no longer accept source code. Use Update after Create to set source code.
+
 ## [2.7.5] - 2026-03-03
 
 ### Fixed

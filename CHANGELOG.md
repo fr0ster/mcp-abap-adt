@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-03-05
+
+### Added
+- **GetTableContents handler**: fully implemented — was a stub returning "temporarily unavailable", now reads table data via ADT Data Preview API with field extraction and SQL query generation.
+
+### Changed
+- **parseSqlQueryXml**: exported from `handleGetSqlQuery` for reuse in `GetTableContents`.
+
 ## [3.1.0] - 2026-03-04
 
 ### Added

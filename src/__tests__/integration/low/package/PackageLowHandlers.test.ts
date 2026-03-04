@@ -1,8 +1,8 @@
 /**
  * Integration tests for Package Low-Level Handlers
  *
- * Tests the complete workflow using handler functions directly:
- * GetSession → ValidatePackageLow → CreatePackageLow → LockPackageLow →
+ * Tests the complete workflow using handler functions:
+ * ValidatePackageLow → CreatePackageLow → LockPackageLow →
  * UnlockPackageLow → DeletePackageLow
  *
  * Enable debug logs:
@@ -13,480 +13,281 @@
  * Run: npm test -- --testPathPattern=integration/package
  */
 
-import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { handleCreatePackage } from '../../../../handlers/package/low/handleCreatePackage';
 import { handleDeletePackage } from '../../../../handlers/package/low/handleDeletePackage';
 import { handleLockPackage } from '../../../../handlers/package/low/handleLockPackage';
 import { handleUnlockPackage } from '../../../../handlers/package/low/handleUnlockPackage';
 import { handleValidatePackage } from '../../../../handlers/package/low/handleValidatePackage';
-import { createAdtClient } from '../../../../lib/clients';
-import {
-  getCleanupAfter,
-  getEnabledTestCase,
-  getOperationDelay,
-  getTimeout,
-  loadTestConfig,
-  loadTestEnv,
-  resolvePackageName,
-  resolveTransportRequest,
-} from '../../helpers/configHelpers';
+import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
-import { createDiagnosticsTracker } from '../../helpers/persistenceHelpers';
+import { LambdaTester } from '../../helpers/testers/LambdaTester';
+import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
-  createTestConnectionAndSession,
-  extractLockSession,
-  type SessionInfo,
-  updateSessionFromResponse,
-} from '../../helpers/sessionHelpers';
-import {
+  createHandlerContext,
   delay,
+  extractErrorMessage,
   extractLockHandle,
-  logTestStep,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
 
-// Load environment variables
-// loadTestEnv will be called in beforeAll
-
 describe('Package Low-Level Handlers Integration', () => {
-  let connection: AbapConnection | null = null;
-  let session: SessionInfo | null = null;
-  let hasConfig = false;
-  let defaultPackageExists = false;
-  const testLogger = createTestLogger('package-low');
+  let tester: LambdaTester;
+  const logger = createTestLogger('package-low');
 
   beforeAll(async () => {
-    try {
-      const { connection: testConnection, session: testSession } =
-        await createTestConnectionAndSession();
-      connection = testConnection;
-      session = testSession;
-      hasConfig = true;
+    tester = new LambdaTester(
+      'create_package_low',
+      'full_workflow',
+      'package-low',
+    );
+    await tester.beforeAll(
+      async (_context: LambdaTesterContext) => {
+        // Basic setup
+      },
+      // Cleanup lambda
+      async (context: LambdaTesterContext) => {
+        const { connection, objectName, transportRequest } = context;
+        if (!objectName) return;
 
-      // Pre-check: Verify default_package exists (required for package tests)
-      const config = loadTestConfig();
-      const defaultPackage = config.environment?.default_package;
-      if (defaultPackage && connection) {
+        logger?.info(`   • cleanup: delete ${objectName}`);
         try {
-          const client = createAdtClient(connection);
-          const defaultPackageCheck = await client.getPackage().check({
-            packageName: defaultPackage.trim(),
-            superPackage: undefined,
-          });
-          if (defaultPackageCheck?.checkResult?.status === 200) {
-            defaultPackageExists = true;
-            if (process.env.DEBUG_TESTS === 'true') {
-              testLogger?.debug(
-                `[PRE_CHECK] ✓ Default package ${defaultPackage} exists and is accessible`,
-              );
-            }
+          const deleteLogger = createTestLogger('package-low-delete');
+          const deleteResponse = await tester.invokeToolOrHandler(
+            'DeletePackageLow',
+            {
+              package_name: objectName,
+              ...(transportRequest && { transport_request: transportRequest }),
+            },
+            async () => {
+              const deleteCtx = createHandlerContext({
+                connection,
+                logger: deleteLogger,
+              });
+              return handleDeletePackage(deleteCtx, {
+                package_name: objectName,
+                ...(transportRequest && {
+                  transport_request: transportRequest,
+                }),
+              });
+            },
+          );
+          if (deleteResponse.isError) {
+            const errorMsg = extractErrorMessage(deleteResponse);
+            logger?.warn(`Delete failed (ignored in cleanup): ${errorMsg}`);
           } else {
-            console.error(
-              `❌ Default package ${defaultPackage} check returned status ${defaultPackageCheck?.checkResult?.status}. All package tests will fail.`,
-            );
+            logger?.success(`✅ cleanup: deleted ${objectName} successfully`);
           }
-        } catch (defaultPackageError: any) {
-          const status = defaultPackageError.response?.status;
-          if (status === 404) {
-            console.error(
-              `❌ Default package ${defaultPackage} does not exist! Please create it or update environment.default_package in test-config.yaml`,
-            );
-          } else {
-            console.warn(
-              `⚠️  Cannot verify default package ${defaultPackage} (HTTP ${status}): ${defaultPackageError.message}`,
-            );
-          }
+        } catch (error: any) {
+          logger?.warn(
+            `Cleanup delete error (ignored): ${error.message || String(error)}`,
+          );
         }
-      } else {
-        console.error(
-          `❌ environment.default_package is not configured in test-config.yaml. Package tests require a default package.`,
-        );
-      }
-    } catch (error) {
-      if (
-        process.env.DEBUG_TESTS === 'true' ||
-        process.env.FULL_LOG_LEVEL === 'true'
-      ) {
-        console.warn(
-          '⚠️ Skipping tests: No .env file or SAP configuration found',
-        );
-      }
-      hasConfig = false;
-    }
+      },
+    );
+  }, getTimeout('long'));
+
+  afterEach(async () => {
+    await tester.afterEach();
   });
 
-  describe('Full Workflow', () => {
-    let testCase: any = null;
-    let testPackageName: string | null = null;
+  it(
+    'should execute full workflow: Validate → Create → Lock → Unlock',
+    async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const {
+          connection,
+          objectName,
+          params,
+          packageName,
+          transportRequest,
+        } = context;
 
-    beforeEach(async () => {
-      if (!hasConfig || !session) {
-        return;
-      }
-
-      testCase = getEnabledTestCase('create_package_low', 'full_workflow');
-      if (!testCase) {
-        return;
-      }
-
-      // package_name = parent package (super_package), test_package = package to create
-      testPackageName = testCase.params.test_package;
-    });
-
-    it(
-      'should execute full workflow: Validate → Create → Lock → Unlock',
-      async () => {
-        if (
-          !hasConfig ||
-          !connection ||
-          !session ||
-          !testCase ||
-          !testPackageName
-        ) {
-          testLogger?.info(
-            '⏭️  Skipping test: No configuration, connection or test case',
-          );
-          return;
+        expect(objectName).toBeDefined();
+        expect(objectName).not.toBe('');
+        if (!objectName) {
+          fail('objectName is required');
         }
 
-        if (!defaultPackageExists) {
-          testLogger?.info(
-            '⏭️  Skipping test: Default package does not exist or is not accessible',
-          );
-          return;
-        }
-
-        // package_name = parent package (super_package), test_package = package to create
-        // If package_name is not specified, use default_package from environment
-        const packageName = testPackageName; // Package to create (from test_package)
-        const superPackage = resolvePackageName(testCase); // Parent package (from package_name or default_package)
-        const transportRequest = resolveTransportRequest(testCase);
+        // For packages: objectName = test_package (package to create),
+        // packageName = parent package (super_package)
+        const superPackage = packageName;
         const description =
-          testCase.params.description || `Test package for low-level handler`;
-        const diagnosticsTracker = createDiagnosticsTracker(
-          'package_low_full_workflow',
-          testCase,
-          session,
+          params.description || `Test package for low-level handler`;
+
+        // Step 1: Validate
+        logger?.info(`   • validate: ${objectName}`);
+        const validateLogger = createTestLogger('package-low-validate');
+        const validateResponse = await tester.invokeToolOrHandler(
+          'ValidatePackageLow',
           {
-            handler: 'create_package_low',
-            object_name: packageName,
+            package_name: objectName,
+            super_package: superPackage,
+          },
+          async () => {
+            const validateCtx = createHandlerContext({
+              connection,
+              logger: validateLogger,
+            });
+            return handleValidatePackage(validateCtx, {
+              package_name: objectName,
+              super_package: superPackage,
+            });
           },
         );
 
-        let lockHandleForCleanup: string | null = null;
-        let lockSessionForCleanup: SessionInfo | null = null;
-        let cleanupSession: SessionInfo | null = null;
-
-        try {
-          // Step 1: Validate
-          logTestStep('validate');
-          if (!session || !connection) {
-            throw new Error('Session or connection is null');
+        if (validateResponse.isError) {
+          const errorMsg = extractErrorMessage(validateResponse);
+          const errorMsgLower = errorMsg.toLowerCase();
+          if (
+            errorMsgLower.includes('already exists') ||
+            errorMsgLower.includes('does already exist')
+          ) {
+            logger?.info(
+              `⏭️  Package ${objectName} already exists, skipping test`,
+            );
+            return;
           }
-          const validateResponse = await handleValidatePackage(
-            { connection, logger: testLogger },
-            {
-              package_name: packageName,
-              super_package: superPackage,
-              session_id: session.session_id,
-              session_state: session.session_state,
-            },
-          );
-
-          if (validateResponse.isError) {
-            const errorMsg =
-              validateResponse.content[0]?.text || 'Unknown error';
-            if (errorMsg.includes('already exists')) {
-              testLogger?.info(
-                `⏭️  Package ${packageName} already exists, skipping test`,
-              );
-              return;
-            }
-            const errorMsgLower = errorMsg.toLowerCase();
-            // Warn about Kerberos/Business partner configuration issues but continue
-            if (
-              errorMsgLower.includes('business partner') ||
-              errorMsgLower.includes('kerberos')
-            ) {
-              testLogger?.warn(
-                `⚠️  SAP configuration issue (continuing test): ${errorMsg}`,
-              );
-            }
-            testLogger?.error(`Validation failed: ${errorMsg}`);
-            throw new Error(`Validation failed: ${errorMsg}`);
-          }
-
-          const validateData = parseHandlerResponse(validateResponse);
-
-          if (!validateData.validation_result?.valid) {
-            // Try to get detailed error message from various sources
-            const message = validateData.validation_result?.message || '';
-            const details = validateData.validation_result?.details || '';
-            const fullMessage = validateData.message || '';
-            // Use the most detailed message available
-            const detailedMessage = details || fullMessage || message;
-            const messageLower = detailedMessage.toLowerCase();
-            if (
-              validateData.validation_result?.exists ||
-              messageLower.includes('already exists') ||
-              messageLower.includes('does already exist')
-            ) {
-              testLogger?.info(
-                `⏭️  Package ${packageName} already exists, skipping test`,
-              );
-              return;
-            }
-            // Warn about Kerberos/Business partner configuration issues but continue
-            if (
-              messageLower.includes('business partner') ||
-              messageLower.includes('kerberos')
-            ) {
-              testLogger?.warn(
-                `⚠️  SAP configuration issue (continuing test): ${detailedMessage}`,
-              );
-            }
-            // Don't log if message is just generic "Validation failed with status" - it's not useful
-            if (!messageLower.includes('validation failed with status')) {
-              testLogger?.warn(
-                `⚠️  Validation failed for ${packageName}: ${detailedMessage}. Will attempt create and handle if object exists...`,
-              );
-            }
-          }
-
-          session = updateSessionFromResponse(session, validateData);
-          await delay(getOperationDelay('validate', testCase));
-
-          // Step 2: Create
-          logTestStep('create');
-          if (!session) {
-            throw new Error('Session is null');
-          }
-          // Build create args - only include optional params if explicitly provided
-          const createArgs: any = {
-            package_name: packageName,
-            super_package: superPackage,
-            description,
-            package_type: testCase.params.package_type || 'development', // Must be 'development' or 'structure', not 'DEVC'
-            transport_request: transportRequest,
-            session_id: session.session_id,
-            session_state: session.session_state,
-          };
-          // Only add optional params if explicitly provided in config
-          if (testCase.params.software_component) {
-            createArgs.software_component = testCase.params.software_component;
-          }
-          if (testCase.params.transport_layer) {
-            createArgs.transport_layer = testCase.params.transport_layer;
-          }
-
-          const createResponse = await handleCreatePackage(
-            { connection, logger: testLogger },
-            createArgs,
-          );
-
-          if (createResponse.isError) {
-            const errorMsg = createResponse.content[0]?.text || 'Unknown error';
-            if (
-              errorMsg.includes('already exists') ||
-              errorMsg.includes('does already exist')
-            ) {
-              testLogger?.info(
-                `⏭️  Package ${packageName} already exists, skipping test`,
-              );
-              return;
-            }
-            throw new Error(`Create failed: ${errorMsg}`);
-          }
-
-          const createData = parseHandlerResponse(createResponse);
-          expect(createData.success).toBe(true);
-          expect(createData.package_name).toBe(packageName);
-
-          session = updateSessionFromResponse(session, createData);
-          await delay(getOperationDelay('create', testCase));
-
-          // Step 3: Lock
-          logTestStep('lock');
-          if (!session) {
-            throw new Error('Session is null');
-          }
-          const lockResponse = await handleLockPackage(
-            { connection, logger: testLogger },
-            {
-              package_name: packageName,
-              super_package: superPackage || '',
-              session_id: session.session_id,
-              session_state: session.session_state,
-            },
-          );
-
-          if (lockResponse.isError) {
-            const errorMsg = lockResponse.content[0]?.text || 'Unknown error';
-            console.error(`Lock failed: ${errorMsg}`);
-            throw new Error(`Lock failed: ${errorMsg}`);
-          }
-
-          const lockData = parseHandlerResponse(lockResponse);
-          const lockHandle = extractLockHandle(lockData);
-          const lockSession = extractLockSession(lockData);
-
-          expect(lockSession.session_id).toBeDefined();
-          expect(lockSession.session_state).toBeDefined();
-
-          lockHandleForCleanup = lockHandle;
-          lockSessionForCleanup = lockSession;
-
-          diagnosticsTracker.persistLock(lockSession, lockHandle, {
-            object_type: 'DEVC',
-            object_name: packageName,
-            transport_request: transportRequest,
-          });
-
-          // IMPORTANT: Update session with lock session to use correct session_id and session_state
-          session = {
-            session_id: lockSession.session_id!,
-            session_state: lockSession.session_state,
-          };
-
-          await delay(getOperationDelay('lock', testCase));
-
-          // Step 4: Unlock
-          logTestStep('unlock');
-          const unlockResponse = await handleUnlockPackage(
-            { connection, logger: testLogger },
-            {
-              package_name: packageName,
-              super_package: superPackage, // Required for package unlock
-              lock_handle: lockHandle,
-              session_id: lockSession.session_id!,
-              session_state: lockSession.session_state,
-            },
-          );
-
-          if (unlockResponse.isError) {
-            const errorMsg = unlockResponse.content[0]?.text || 'Unknown error';
-            console.error(`Unlock failed: ${errorMsg}`);
-            throw new Error(`Unlock failed: ${errorMsg}`);
-          }
-
-          const unlockData = parseHandlerResponse(unlockResponse);
-          expect(unlockData.success).toBe(true);
-          expect(unlockData.session_id).toBe(lockSession.session_id);
-
-          session = updateSessionFromResponse(session, unlockData);
-          lockHandleForCleanup = null;
-          lockSessionForCleanup = null;
-          await delay(getOperationDelay('unlock', testCase));
-
-          // Store session for cleanup (after unlock, use updated session)
-          cleanupSession = session;
-        } catch (error: any) {
-          // Extract step from error message
-          const errorMessage = error.message || String(error);
-          let failedStep = 'UNKNOWN';
-          if (errorMessage.includes('Validation failed'))
-            failedStep = 'VALIDATE';
-          else if (errorMessage.includes('Create failed'))
-            failedStep = 'CREATE';
-          else if (errorMessage.includes('Lock failed')) failedStep = 'LOCK';
-          else if (errorMessage.includes('Update failed'))
-            failedStep = 'UPDATE';
-          else if (errorMessage.includes('Unlock failed'))
-            failedStep = 'UNLOCK';
-          else if (errorMessage.includes('Activate failed'))
-            failedStep = 'ACTIVATE';
-
-          // Find where error was actually thrown (not where it was caught)
-          const stackLines = error.stack?.split('\n') || [];
-          const errorOrigin =
-            stackLines.find(
-              (line: string) =>
-                (line.includes('PackageBuilder') ||
-                  line.includes('AdtClient.createPackage') ||
-                  line.includes('handleCreatePackage') ||
-                  line.includes('createPackage')) &&
-                !line.includes('test.ts') &&
-                !line.includes('catch'),
-            ) ||
-            stackLines[0] ||
-            'unknown';
-
-          console.error(`❌ Test failed at ${failedStep}: ${errorMessage}`);
-          if (errorOrigin !== 'unknown') {
-            console.error(`   Error origin: ${errorOrigin.trim()}`);
-          }
-          throw error;
-        } finally {
-          // Cleanup: Unlock and optionally delete
-          if (session && packageName) {
-            try {
-              const shouldCleanup = getCleanupAfter(testCase);
-
-              // Always unlock (unlock is always performed)
-              if (lockHandleForCleanup && lockSessionForCleanup) {
-                try {
-                  await handleUnlockPackage(
-                    { connection, logger: testLogger },
-                    {
-                      package_name: packageName,
-                      super_package: superPackage, // Required for package unlock
-                      lock_handle: lockHandleForCleanup,
-                      session_id: lockSessionForCleanup.session_id!,
-                      session_state: lockSessionForCleanup.session_state,
-                    },
-                  );
-                } catch (unlockError: any) {
-                  // Silent cleanup failure
-                }
-              }
-
-              // Delete only if cleanup_after is true
-              if (shouldCleanup) {
-                await delay(2000); // Increased delay to ensure unlock is processed
-
-                // For delete, force a new connection to bypass cache
-                // Even if package was unlocked, it may still be locked in the cached connection
-                testLogger?.info(
-                  `🧹 Cleanup: Deleting package ${packageName}...`,
-                );
-                const cleanupConfig = (connection as any).getConfig?.();
-                const deleteResponse = await handleDeletePackage(
-                  { connection, logger: testLogger },
-                  {
-                    package_name: packageName,
-                    transport_request: transportRequest,
-                    force_new_connection: true,
-                    connection_config: cleanupConfig,
-                  },
-                );
-
-                if (deleteResponse.isError) {
-                  const errorMsg =
-                    deleteResponse.content[0]?.text || 'Unknown error';
-                  testLogger?.warn(
-                    `⚠️  Failed to delete package ${packageName}: ${errorMsg}`,
-                  );
-                } else {
-                  testLogger?.info(
-                    `✅ Cleanup: Deleted test package ${packageName} successfully`,
-                  );
-                }
-              } else {
-                testLogger?.info(
-                  `⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${packageName}`,
-                );
-              }
-            } catch (cleanupError: any) {
-              testLogger?.warn(
-                `⚠️  Failed to cleanup test package ${packageName}: ${cleanupError.message || cleanupError}`,
-              );
-            }
-          }
-
-          diagnosticsTracker.cleanup();
+          fail(`Validate failed: ${errorMsg}`);
         }
-      },
-      getTimeout('long'),
-    );
-  });
+
+        const validateData = parseHandlerResponse(validateResponse);
+        if (!validateData.validation_result?.valid) {
+          const message = validateData.validation_result?.message || '';
+          const messageLower = message.toLowerCase();
+          if (
+            validateData.validation_result?.exists ||
+            messageLower.includes('already exists') ||
+            messageLower.includes('does already exist')
+          ) {
+            logger?.info(
+              `⏭️  Package ${objectName} already exists, skipping test`,
+            );
+            return;
+          }
+        }
+        logger?.success(`✅ validate: ${objectName} completed`);
+
+        const validateDelay = context.getOperationDelay('validate');
+        await delay(validateDelay);
+
+        // Step 2: Create
+        logger?.info(`   • create: ${objectName}`);
+        const createLogger = createTestLogger('package-low-create');
+        const createArgs: Record<string, unknown> = {
+          package_name: objectName,
+          super_package: superPackage,
+          description,
+          package_type: params.package_type || 'development',
+          ...(transportRequest && { transport_request: transportRequest }),
+        };
+        if (params.software_component) {
+          createArgs.software_component = params.software_component;
+        }
+        if (params.transport_layer) {
+          createArgs.transport_layer = params.transport_layer;
+        }
+
+        const createResponse = await tester.invokeToolOrHandler(
+          'CreatePackageLow',
+          createArgs,
+          async () => {
+            const createCtx = createHandlerContext({
+              connection,
+              logger: createLogger,
+            });
+            return handleCreatePackage(createCtx, createArgs as any);
+          },
+        );
+
+        if (createResponse.isError) {
+          const errorMsg = extractErrorMessage(createResponse);
+          const errorMsgLower = errorMsg.toLowerCase();
+          if (
+            errorMsgLower.includes('already exists') ||
+            errorMsgLower.includes('does already exist')
+          ) {
+            logger?.info(
+              `⏭️  Package ${objectName} already exists, skipping test`,
+            );
+            return;
+          }
+          fail(`Create failed: ${errorMsg}`);
+        }
+
+        const createData = parseHandlerResponse(createResponse);
+        expect(createData.success).toBe(true);
+        expect(createData.package_name).toBe(objectName);
+        logger?.success(`✅ create: ${objectName} completed`);
+
+        const createDelay = context.getOperationDelay('create');
+        await delay(createDelay);
+
+        // Step 3: Lock
+        logger?.info(`   • lock: ${objectName}`);
+        const lockLogger = createTestLogger('package-low-lock');
+        const lockResponse = await tester.invokeToolOrHandler(
+          'LockPackageLow',
+          {
+            package_name: objectName,
+            super_package: superPackage || '',
+          },
+          async () => {
+            const lockCtx = createHandlerContext({
+              connection,
+              logger: lockLogger,
+            });
+            return handleLockPackage(lockCtx, {
+              package_name: objectName,
+              super_package: superPackage || '',
+            });
+          },
+        );
+
+        if (lockResponse.isError) {
+          const errorMsg = extractErrorMessage(lockResponse);
+          fail(`Lock failed: ${errorMsg}`);
+        }
+
+        const lockData = parseHandlerResponse(lockResponse);
+        const lockHandle = extractLockHandle(lockData);
+        logger?.success(`✅ lock: ${objectName} completed`);
+
+        const lockDelay = context.getOperationDelay('lock');
+        await delay(lockDelay);
+
+        // Step 4: Unlock
+        logger?.info(`   • unlock: ${objectName}`);
+        const unlockLogger = createTestLogger('package-low-unlock');
+        const unlockResponse = await tester.invokeToolOrHandler(
+          'UnlockPackageLow',
+          {
+            package_name: objectName,
+            super_package: superPackage,
+            lock_handle: lockHandle,
+          },
+          async () => {
+            const unlockCtx = createHandlerContext({
+              connection,
+              logger: unlockLogger,
+            });
+            return handleUnlockPackage(unlockCtx, {
+              package_name: objectName,
+              super_package: superPackage,
+              lock_handle: lockHandle,
+            });
+          },
+        );
+
+        if (unlockResponse.isError) {
+          const errorMsg = extractErrorMessage(unlockResponse);
+          fail(`Unlock failed: ${errorMsg}`);
+        }
+
+        const unlockData = parseHandlerResponse(unlockResponse);
+        expect(unlockData.success).toBe(true);
+        logger?.success(`✅ unlock: ${objectName} completed`);
+      });
+    },
+    getTimeout('long'),
+  );
 });

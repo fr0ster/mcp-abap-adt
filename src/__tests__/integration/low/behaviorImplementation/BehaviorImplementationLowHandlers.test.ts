@@ -1,9 +1,10 @@
 /**
  * Integration tests for BehaviorImplementation Low-Level Handlers
  *
- * Tests the complete workflow using handler functions directly:
- * GetSession → ValidateBehaviorImplementationLow → CreateClass → CheckClass → LockBehaviorImplementationLow →
- * UpdateClass → UnlockClass → ActivateClass → DeleteClass
+ * Tests the complete workflow:
+ * ValidateBehaviorImplementationLow → CreateClassLow → CheckClassLow →
+ * LockBehaviorImplementationLow → Update (AdtClient) → UnlockClassLow →
+ * ActivateClassLow → DeleteClassLow
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Test execution logs
@@ -13,7 +14,6 @@
  * Run: npm test -- --testPathPattern=integration/behaviorImplementation
  */
 
-import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { handleLockBehaviorImplementation } from '../../../../handlers/behavior_implementation/low/handleLockBehaviorImplementation';
 import { handleValidateBehaviorImplementation } from '../../../../handlers/behavior_implementation/low/handleValidateBehaviorImplementation';
 import { handleActivateClass } from '../../../../handlers/class/low/handleActivateClass';
@@ -22,423 +22,352 @@ import { handleCreateClass } from '../../../../handlers/class/low/handleCreateCl
 import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
 import { handleUnlockClass } from '../../../../handlers/class/low/handleUnlockClass';
 import { createAdtClient } from '../../../../lib/clients';
-import { generateSessionId } from '../../../../lib/sessionUtils';
-import { getManagedConnection } from '../../../../lib/utils';
-import {
-  getCleanupAfter,
-  getEnabledTestCase,
-  getOperationDelay,
-  getTimeout,
-  loadTestEnv,
-  resolvePackageName,
-  resolveTransportRequest,
-} from '../../helpers/configHelpers';
+import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
-import { createDiagnosticsTracker } from '../../helpers/persistenceHelpers';
+import { LambdaTester } from '../../helpers/testers/LambdaTester';
+import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
-  extractLockSession,
-  getTestSession,
-  type SessionInfo,
-  updateSessionFromResponse,
-} from '../../helpers/sessionHelpers';
-import {
-  debugLog,
+  createHandlerContext,
   delay,
+  extractErrorMessage,
   extractLockHandle,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
 
-// Load environment variables
-// loadTestEnv will be called in beforeAll
-
 const testLogger = createTestLogger('bimpl-low');
 
 describe('BehaviorImplementation Low-Level Handlers Integration', () => {
-  let session: SessionInfo | null = null;
-  let hasConfig = false;
-  let connection: AbapConnection;
+  let tester: LambdaTester;
+
   beforeAll(async () => {
-    try {
-      connection = getManagedConnection();
-      // connect() is not part of IAbapConnection interface, use type assertion
-      const connectionAny = connection as any;
-      if (connectionAny.connect) {
-        await connectionAny.connect();
-      }
-      const sessionId = generateSessionId();
-      session = await getTestSession();
-      hasConfig = true;
-    } catch (error) {
-      testLogger?.warn(
-        '⚠️ Skipping tests: No .env file or SAP configuration found',
-      );
-      hasConfig = false;
-    }
-  });
+    tester = new LambdaTester(
+      'create_behavior_implementation_low',
+      'full_workflow',
+      'bimpl-low',
+    );
+    await tester.beforeAll(
+      async (_context: LambdaTesterContext) => {
+        // Basic setup
+      },
+      // Cleanup lambda
+      async (context: LambdaTesterContext) => {
+        const { connection, objectName, transportRequest } = context;
+        if (!objectName) return;
 
-  describe('Full Workflow', () => {
-    let testCase: any = null;
-    let testClassName: string | null = null;
-
-    beforeEach(async () => {
-      if (!hasConfig || !session) {
-        return;
-      }
-
-      testCase = getEnabledTestCase(
-        'create_behavior_implementation_low',
-        'full_workflow',
-      );
-      if (!testCase) {
-        return;
-      }
-
-      testClassName = testCase.params.class_name;
-    });
-
-    it(
-      'should execute full workflow: Validate → Create → Check → Lock → Update → Unlock → Activate',
-      async () => {
-        if (!hasConfig || !session || !testCase || !testClassName) {
-          debugLog(
-            'TEST_SKIP',
-            'Skipping test: No configuration or test case',
+        // objectName here is class_name
+        testLogger?.info(`   • cleanup: delete ${objectName}`);
+        try {
+          const deleteLogger = createTestLogger('bimpl-low-delete');
+          const deleteResponse = await tester.invokeToolOrHandler(
+            'DeleteClassLow',
             {
-              hasConfig,
-              hasSession: !!session,
-              hasTestCase: !!testCase,
-              hasTestClassName: !!testClassName,
+              class_name: objectName,
+              ...(transportRequest && { transport_request: transportRequest }),
+            },
+            async () => {
+              const deleteCtx = createHandlerContext({
+                connection,
+                logger: deleteLogger,
+              });
+              return handleDeleteClass(deleteCtx, {
+                class_name: objectName,
+                ...(transportRequest && {
+                  transport_request: transportRequest,
+                }),
+              });
             },
           );
-          testLogger?.info('⏭️  Skipping test: No configuration or test case');
-          return;
+          if (deleteResponse.isError) {
+            const errorMsg = extractErrorMessage(deleteResponse);
+            // 404 / not found is fine — object may not exist
+            if (
+              !errorMsg.includes('not found') &&
+              !errorMsg.includes('already be deleted')
+            ) {
+              testLogger?.warn(
+                `Delete failed (ignored in cleanup): ${errorMsg}`,
+              );
+            }
+          } else {
+            testLogger?.success(
+              `✅ cleanup: deleted ${objectName} successfully`,
+            );
+          }
+        } catch (error: any) {
+          testLogger?.warn(
+            `Cleanup delete error (ignored): ${error.message || String(error)}`,
+          );
         }
+      },
+    );
+  }, getTimeout('long'));
 
-        const className = testClassName;
-        const packageName = resolvePackageName(testCase);
-        const transportRequest = resolveTransportRequest(testCase);
+  afterEach(async () => {
+    await tester.afterEach();
+  });
 
-        // All parameters must come from configuration - no defaults
-        if (!testCase.params.description) {
+  it(
+    'should execute full workflow: Validate → Create → Check → Lock → Update → Unlock → Activate',
+    async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const {
+          connection,
+          objectName,
+          params,
+          packageName,
+          transportRequest,
+        } = context;
+
+        expect(objectName).toBeDefined();
+        if (!objectName) {
+          fail('objectName (class_name) is required');
+        }
+        const className = objectName;
+
+        if (!params.description) {
           throw new Error('description is required in test configuration');
         }
-        const description = testCase.params.description;
-
-        if (!testCase.params.behavior_definition) {
+        if (!params.behavior_definition) {
           throw new Error(
             'behavior_definition is required in test configuration',
           );
         }
-        const behaviorDefinition = testCase.params.behavior_definition;
+        const description = params.description;
+        const behaviorDefinition = params.behavior_definition;
 
-        let lockHandleForCleanup: string | null = null;
-        let lockSessionForCleanup: SessionInfo | null = null;
-        let objectWasCreated = false; // Track if object was actually created
-        const diagnosticsTracker = createDiagnosticsTracker(
-          'behavior_implementation_low_full_workflow',
-          testCase,
-          session,
+        // Step 1: Validate
+        testLogger?.info(`   • validate: ${className}`);
+        const validateLogger = createTestLogger('bimpl-low-validate');
+        const validateResponse = await tester.invokeToolOrHandler(
+          'ValidateBehaviorImplementationLow',
           {
-            handler: 'create_behavior_implementation_low',
-            object_name: className,
+            class_name: className,
+            behavior_definition: behaviorDefinition,
+            package_name: packageName,
+            description,
           },
-        );
-
-        try {
-          // Step 1: Validate
-          testLogger?.info(`🔍 Step 1: Validating ${className}...`);
-          const validateResponse = await handleValidateBehaviorImplementation(
-            { connection, logger: testLogger },
-            {
+          async () => {
+            const validateCtx = createHandlerContext({
+              connection,
+              logger: validateLogger,
+            });
+            return handleValidateBehaviorImplementation(validateCtx, {
               class_name: className,
               behavior_definition: behaviorDefinition,
               package_name: packageName,
-              description: description,
-              session_id: session.session_id,
-              session_state: session.session_state,
-            },
-          );
+              description,
+            });
+          },
+        );
 
-          if (validateResponse.isError) {
-            const errorMsg =
-              validateResponse.content[0]?.text || 'Unknown error';
-            testLogger?.info(
-              `⏭️  Validation error for ${className}: ${errorMsg}, skipping test`,
-            );
-            return;
-          }
-
-          const validateData = parseHandlerResponse(validateResponse);
-          if (!validateData.validation_result?.valid) {
-            const message = validateData.validation_result?.message || '';
-            testLogger?.info(
-              `⏭️  Validation failed for ${className}: ${message}, skipping test`,
-            );
-            return;
-          }
-
-          session = updateSessionFromResponse(session, validateData);
-          testLogger?.success(
-            `✅ Step 1: Validation successful for ${className}`,
-          );
-
-          // Step 2: Create (as regular class first)
-          testLogger?.info(`📦 Step 2: Creating ${className}...`);
-          const createArgs: any = {
-            class_name: className,
-            description,
-            package_name: packageName,
-            session_id: session.session_id,
-            session_state: session.session_state,
-          };
-          // Only include transport_request if it's provided (required for non-local packages)
-          if (transportRequest) {
-            createArgs.transport_request = transportRequest;
-          }
-          const createResponse = await handleCreateClass(
-            { connection, logger: testLogger },
-            createArgs,
-          );
-
-          if (createResponse.isError) {
-            const errorMsg = createResponse.content[0]?.text || 'Unknown error';
-            if (
-              errorMsg.includes('already exists') ||
-              errorMsg.includes('does already exist')
-            ) {
-              testLogger?.info(
-                `⏭️  BehaviorImplementation ${className} already exists, skipping test`,
-              );
-              return;
-            }
-            throw new Error(`Create failed: ${errorMsg}`);
-          }
-
-          const createData = parseHandlerResponse(createResponse);
-          expect(createData.success).toBe(true);
-          expect(createData.class_name).toBe(className);
-
-          // Mark that object was successfully created
-          objectWasCreated = true;
-          testLogger?.success(`✅ Step 2: Created ${className} successfully`);
-
-          session = updateSessionFromResponse(session, createData);
-          await delay(getOperationDelay('create', testCase));
-
-          // Step 3: Check
-          testLogger?.info(`🔍 Step 3: Checking ${className}...`);
-          const checkResponse = await handleCheckClass(
-            { connection, logger: testLogger },
-            {
-              class_name: className,
-              session_id: session.session_id,
-              session_state: session.session_state,
-            },
-          );
-
-          if (checkResponse.isError) {
-            throw new Error(
-              `Check failed: ${checkResponse.content[0]?.text || 'Unknown error'}`,
-            );
-          }
-
-          const checkData = parseHandlerResponse(checkResponse);
-          expect(checkData.success).toBeDefined();
-          testLogger?.success(`✅ Step 3: Check successful for ${className}`);
-
-          await delay(getOperationDelay('create', testCase));
-
-          // Step 4: Lock
-          testLogger?.info(`🔒 Step 4: Locking ${className}...`);
-          const lockResponse = await handleLockBehaviorImplementation(
-            { connection, logger: testLogger },
-            {
-              class_name: className,
-              session_id: session.session_id,
-              session_state: session.session_state,
-            },
-          );
-
-          if (lockResponse.isError) {
-            throw new Error(
-              `Lock failed: ${lockResponse.content[0]?.text || 'Unknown error'}`,
-            );
-          }
-
-          const lockData = parseHandlerResponse(lockResponse);
-          const lockHandle = extractLockHandle(lockData);
-          const lockSession = extractLockSession(lockData);
-
-          expect(lockSession.session_id).toBeDefined();
-          expect(lockSession.session_state).toBeDefined();
-
-          lockHandleForCleanup = lockHandle;
-          lockSessionForCleanup = lockSession;
-          testLogger?.success(`✅ Step 4: Locked ${className} successfully`);
-
-          diagnosticsTracker.persistLock(lockSession, lockHandle, {
-            object_type: 'CLAS',
-            object_name: className,
-            transport_request: transportRequest,
-          });
-
-          await delay(getOperationDelay('lock', testCase));
-
-          // Step 5: Update implementations include (local handler class)
+        if (validateResponse.isError) {
+          const errorMsg = extractErrorMessage(validateResponse);
           testLogger?.info(
-            `📝 Step 5: Updating implementations include for ${className}...`,
+            `⏭️  Validation error for ${className}: ${errorMsg}, skipping test`,
           );
-          if (!testCase.params.implementation_code) {
-            throw new Error(
-              'implementation_code is required in test configuration for update step (implementations include)',
+          return;
+        }
+
+        const validateData = parseHandlerResponse(validateResponse);
+        if (!validateData.validation_result?.valid) {
+          testLogger?.info(
+            `⏭️  Validation failed for ${className}: ${validateData.validation_result?.message || ''}, skipping test`,
+          );
+          return;
+        }
+        testLogger?.success(`✅ validate: ${className} completed`);
+
+        // Step 2: Create (as regular class)
+        testLogger?.info(`   • create: ${className}`);
+        const createLogger = createTestLogger('bimpl-low-create');
+        const createArgs: Record<string, unknown> = {
+          class_name: className,
+          description,
+          package_name: packageName,
+          ...(transportRequest && { transport_request: transportRequest }),
+        };
+
+        const createResponse = await tester.invokeToolOrHandler(
+          'CreateClassLow',
+          createArgs,
+          async () => {
+            const createCtx = createHandlerContext({
+              connection,
+              logger: createLogger,
+            });
+            return handleCreateClass(createCtx, createArgs as any);
+          },
+        );
+
+        if (createResponse.isError) {
+          const errorMsg = extractErrorMessage(createResponse);
+          const errorMsgLower = errorMsg.toLowerCase();
+          if (
+            errorMsgLower.includes('already exists') ||
+            errorMsgLower.includes('does already exist')
+          ) {
+            testLogger?.info(
+              `⏭️  BehaviorImplementation ${className} already exists, skipping test`,
             );
+            return;
           }
-          const implementationCode = testCase.params.implementation_code;
+          fail(`Create failed: ${errorMsg}`);
+        }
 
+        const createData = parseHandlerResponse(createResponse);
+        expect(createData.success).toBe(true);
+        expect(createData.class_name).toBe(className);
+        testLogger?.success(`✅ create: ${className} completed`);
+
+        const createDelay = context.getOperationDelay('create');
+        await delay(createDelay);
+
+        // Step 3: Check
+        testLogger?.info(`   • check: ${className}`);
+        const checkLogger = createTestLogger('bimpl-low-check');
+        const checkResponse = await tester.invokeToolOrHandler(
+          'CheckClassLow',
+          { class_name: className },
+          async () => {
+            const checkCtx = createHandlerContext({
+              connection,
+              logger: checkLogger,
+            });
+            return handleCheckClass(checkCtx, { class_name: className });
+          },
+        );
+
+        if (checkResponse.isError) {
+          const errorMsg = extractErrorMessage(checkResponse);
+          fail(`Check failed: ${errorMsg}`);
+        }
+        testLogger?.success(`✅ check: ${className} completed`);
+
+        await delay(context.getOperationDelay('create'));
+
+        // Step 4: Lock
+        testLogger?.info(`   • lock: ${className}`);
+        const lockLogger = createTestLogger('bimpl-low-lock');
+        const lockResponse = await tester.invokeToolOrHandler(
+          'LockBehaviorImplementationLow',
+          { class_name: className },
+          async () => {
+            const lockCtx = createHandlerContext({
+              connection,
+              logger: lockLogger,
+            });
+            return handleLockBehaviorImplementation(lockCtx, {
+              class_name: className,
+            });
+          },
+        );
+
+        if (lockResponse.isError) {
+          const errorMsg = extractErrorMessage(lockResponse);
+          fail(`Lock failed: ${errorMsg}`);
+        }
+
+        const lockData = parseHandlerResponse(lockResponse);
+        const lockHandle = extractLockHandle(lockData);
+        testLogger?.success(`✅ lock: ${className} completed`);
+
+        await delay(context.getOperationDelay('lock'));
+
+        // Step 5: Update implementations include (AdtClient direct — no MCP tool for this)
+        testLogger?.info(`   • update implementations include: ${className}`);
+        if (!params.implementation_code) {
+          throw new Error(
+            'implementation_code is required in test configuration for update step',
+          );
+        }
+
+        if (tester.isHardMode()) {
+          // In hard mode we skip the raw AdtClient update step —
+          // there is no dedicated MCP tool for updating behavior
+          // implementation includes at low level.
+          testLogger?.info(
+            `⏭️  Skipping AdtClient update in hard mode (no MCP tool for behavior implementation update)`,
+          );
+        } else {
           const client = createAdtClient(connection);
-
-          // Update main source + implementations include in low-level mode
           await client.getBehaviorImplementation().update(
             {
-              className: className,
+              className,
               behaviorDefinition: behaviorDefinition,
-              implementationCode: implementationCode,
+              implementationCode: params.implementation_code,
             },
             { lockHandle },
           );
-
           testLogger?.success(
-            `✅ Step 5: Updated implementations include for ${className} successfully`,
+            `✅ update implementations include: ${className} completed`,
           );
+        }
 
-          await delay(getOperationDelay('update', testCase));
+        await delay(context.getOperationDelay('update'));
 
-          // Step 6: Unlock
-          testLogger?.info(`🔓 Step 6: Unlocking ${className}...`);
-          const unlockResponse = await handleUnlockClass(
-            { connection, logger: testLogger },
-            {
+        // Step 6: Unlock
+        testLogger?.info(`   • unlock: ${className}`);
+        const unlockLogger = createTestLogger('bimpl-low-unlock');
+        const unlockResponse = await tester.invokeToolOrHandler(
+          'UnlockClassLow',
+          {
+            class_name: className,
+            lock_handle: lockHandle,
+          },
+          async () => {
+            const unlockCtx = createHandlerContext({
+              connection,
+              logger: unlockLogger,
+            });
+            return handleUnlockClass(unlockCtx, {
               class_name: className,
               lock_handle: lockHandle,
-            },
-          );
+            });
+          },
+        );
 
-          if (unlockResponse.isError) {
-            throw new Error(
-              `Unlock failed: ${unlockResponse.content[0]?.text || 'Unknown error'}`,
-            );
-          }
-
-          const unlockData = parseHandlerResponse(unlockResponse);
-          expect(unlockData.success).toBe(true);
-          testLogger?.success(`✅ Step 6: Unlocked ${className} successfully`);
-
-          session = updateSessionFromResponse(session, unlockData);
-          await delay(getOperationDelay('unlock', testCase));
-
-          // Step 7: Activate
-          testLogger?.info(`⚡ Step 7: Activating ${className}...`);
-          const activateResponse = await handleActivateClass(
-            { connection, logger: testLogger },
-            {
-              class_name: className,
-              session_id: session.session_id,
-              session_state: session.session_state,
-            },
-          );
-
-          if (activateResponse.isError) {
-            throw new Error(
-              `Activate failed: ${activateResponse.content[0]?.text || 'Unknown error'}`,
-            );
-          }
-
-          const activateData = parseHandlerResponse(activateResponse);
-          if (!activateData.success) {
-            testLogger?.error(
-              `❌ Activation failed. Response data: ${JSON.stringify(activateData, null, 2)}`,
-            );
-            throw new Error(
-              `Activation failed: ${JSON.stringify(activateData)}`,
-            );
-          }
-          expect(activateData.success).toBe(true);
-          testLogger?.success(`✅ Step 7: Activated ${className} successfully`);
-
-          testLogger?.success(
-            `✅ Full workflow completed successfully for ${className}`,
-          );
-        } catch (error: any) {
-          testLogger?.error(`❌ Test failed: ${error.message}`);
-          throw error;
-        } finally {
-          // Cleanup: only if object was actually created in this test run
-          if (!objectWasCreated) {
-            return;
-          }
-          // Only proceed with cleanup if object was successfully created
-          if (session && className) {
-            try {
-              const shouldCleanup = getCleanupAfter(testCase);
-
-              // Always unlock (unlock is always performed)
-              if (lockHandleForCleanup && lockSessionForCleanup) {
-                try {
-                  await handleUnlockClass(
-                    { connection, logger: testLogger },
-                    {
-                      class_name: className,
-                      lock_handle: lockHandleForCleanup,
-                    },
-                  );
-                } catch (unlockError: any) {
-                  // Ignore unlock errors during cleanup
-                }
-              }
-
-              // Delete only if cleanup_after is true
-              if (shouldCleanup) {
-                await delay(1000);
-                const deleteResponse = await handleDeleteClass(
-                  { connection, logger: testLogger },
-                  {
-                    class_name: className,
-                    transport_request: transportRequest,
-                  },
-                );
-                if (!deleteResponse.isError) {
-                  testLogger?.info(
-                    `🧹 Cleaned up test behavior implementation: ${className}`,
-                  );
-                } else {
-                  // Check if object doesn't exist (404) - that's okay, it may have been deleted already
-                  const errorMsg = deleteResponse.content[0]?.text || '';
-                  if (
-                    errorMsg.includes('not found') ||
-                    errorMsg.includes('already be deleted')
-                  ) {
-                    // Object doesn't exist - that's fine, no need to log error
-                  } else {
-                    // Other error - log but don't fail test
-                    testLogger?.warn(
-                      `⚠️  Failed to delete behavior implementation ${className}: ${errorMsg}`,
-                    );
-                  }
-                }
-              } else {
-                testLogger?.info(
-                  `⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${className}`,
-                );
-              }
-            } catch (cleanupError: any) {
-              // Ignore cleanup errors - object may not exist or may have been deleted already
-            }
-          }
-
-          diagnosticsTracker.cleanup();
+        if (unlockResponse.isError) {
+          const errorMsg = extractErrorMessage(unlockResponse);
+          fail(`Unlock failed: ${errorMsg}`);
         }
-      },
-      getTimeout('long'),
-    );
-  });
+
+        const unlockData = parseHandlerResponse(unlockResponse);
+        expect(unlockData.success).toBe(true);
+        testLogger?.success(`✅ unlock: ${className} completed`);
+
+        await delay(context.getOperationDelay('unlock'));
+
+        // Step 7: Activate
+        testLogger?.info(`   • activate: ${className}`);
+        const activateLogger = createTestLogger('bimpl-low-activate');
+        const activateResponse = await tester.invokeToolOrHandler(
+          'ActivateClassLow',
+          { class_name: className },
+          async () => {
+            const activateCtx = createHandlerContext({
+              connection,
+              logger: activateLogger,
+            });
+            return handleActivateClass(activateCtx, {
+              class_name: className,
+            });
+          },
+        );
+
+        if (activateResponse.isError) {
+          const errorMsg = extractErrorMessage(activateResponse);
+          fail(`Activate failed: ${errorMsg}`);
+        }
+
+        const activateData = parseHandlerResponse(activateResponse);
+        expect(activateData.success).toBe(true);
+        testLogger?.success(`✅ activate: ${className} completed`);
+
+        testLogger?.success(
+          `✅ Full workflow completed successfully for ${className}`,
+        );
+      });
+    },
+    getTimeout('long'),
+  );
 });

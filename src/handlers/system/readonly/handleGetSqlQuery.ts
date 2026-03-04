@@ -48,7 +48,7 @@ export interface SqlQueryResponse {
  * @param rowNumber - Number of rows requested
  * @returns Parsed SQL query response
  */
-function parseSqlQueryXml(
+export function parseSqlQueryXml(
   xmlData: string,
   sqlQuery: string,
   rowNumber: number,

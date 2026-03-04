@@ -168,16 +168,7 @@ export async function handleCreatePackage(
       if (application_component) {
         createConfig.applicationComponent = application_component;
       }
-      const createState = await client.getPackage().create(createConfig);
-      const createResult = createState.createResult;
-
-      if (!createResult) {
-        throw new Error(
-          `Create did not return a response for package ${packageName}`,
-        );
-      }
-
-      // Get updated session state after create
+      await client.getPackage().create(createConfig);
 
       logger?.info(`✅ CreatePackage completed: ${packageName}`);
 

@@ -110,7 +110,7 @@ describe('Class High-Level Handlers Integration', () => {
         expect(objectName).toBeDefined();
         expect(objectName).not.toBe('');
         if (!objectName) {
-          fail('objectName is required');
+          throw new Error('objectName is required');
         }
         const className = objectName;
 
@@ -160,7 +160,7 @@ describe('Class High-Level Handlers Integration', () => {
           createLogger?.error(
             `Full error response: ${JSON.stringify(createResponse.content, null, 2)}`,
           );
-          fail(`Create failed: ${detailedError}`);
+          throw new Error(`Create failed: ${detailedError}`);
         }
 
         const createData = parseHandlerResponse(createResponse);
@@ -244,7 +244,7 @@ describe('Class High-Level Handlers Integration', () => {
               updateLogger?.error(`Update error: ${detailedError}`);
             }
           }
-          fail(`Update failed: ${detailedError}`);
+          throw new Error(`Update failed: ${detailedError}`);
         }
 
         const updateData = parseHandlerResponse(updateResponse);
@@ -295,7 +295,7 @@ describe('Class High-Level Handlers Integration', () => {
         expect(getResponse.isError).toBe(false);
         if (getResponse.isError) {
           const errorMsg = extractErrorMessage(getResponse);
-          fail(`Get failed: ${errorMsg}`);
+          throw new Error(`Get failed: ${errorMsg}`);
         }
 
         const getData = parseHandlerResponse(getResponse);

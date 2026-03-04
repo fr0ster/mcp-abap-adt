@@ -120,7 +120,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         expect(objectName).toBeDefined();
         if (!objectName) {
-          fail('objectName (class_name) is required');
+          throw new Error('objectName (class_name) is required');
         }
         const className = objectName;
 
@@ -211,7 +211,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
             );
             return;
           }
-          fail(`Create failed: ${errorMsg}`);
+          throw new Error(`Create failed: ${errorMsg}`);
         }
 
         const createData = parseHandlerResponse(createResponse);
@@ -239,7 +239,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         if (checkResponse.isError) {
           const errorMsg = extractErrorMessage(checkResponse);
-          fail(`Check failed: ${errorMsg}`);
+          throw new Error(`Check failed: ${errorMsg}`);
         }
         testLogger?.success(`✅ check: ${className} completed`);
 
@@ -264,7 +264,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         if (lockResponse.isError) {
           const errorMsg = extractErrorMessage(lockResponse);
-          fail(`Lock failed: ${errorMsg}`);
+          throw new Error(`Lock failed: ${errorMsg}`);
         }
 
         const lockData = parseHandlerResponse(lockResponse);
@@ -328,7 +328,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         if (unlockResponse.isError) {
           const errorMsg = extractErrorMessage(unlockResponse);
-          fail(`Unlock failed: ${errorMsg}`);
+          throw new Error(`Unlock failed: ${errorMsg}`);
         }
 
         const unlockData = parseHandlerResponse(unlockResponse);
@@ -356,7 +356,7 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
 
         if (activateResponse.isError) {
           const errorMsg = extractErrorMessage(activateResponse);
-          fail(`Activate failed: ${errorMsg}`);
+          throw new Error(`Activate failed: ${errorMsg}`);
         }
 
         const activateData = parseHandlerResponse(activateResponse);

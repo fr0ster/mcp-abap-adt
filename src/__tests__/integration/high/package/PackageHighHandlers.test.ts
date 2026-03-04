@@ -101,7 +101,7 @@ describe('Package High-Level Handlers Integration', () => {
         expect(objectName).toBeDefined();
         expect(objectName).not.toBe('');
         if (!objectName) {
-          fail('objectName is required');
+          throw new Error('objectName is required');
         }
 
         // For packages: objectName = test_package (package to create),
@@ -164,15 +164,13 @@ describe('Package High-Level Handlers Integration', () => {
             );
             return;
           }
-          fail(`Create failed: ${errorMsg}`);
+          throw new Error(`Create failed: ${errorMsg}`);
         }
 
         const createData = parseHandlerResponse(createResponse);
         expect(createData.success).toBe(true);
         expect(createData.package_name).toBe(objectName);
-        logger?.success(
-          `✅ create: ${objectName} completed successfully`,
-        );
+        logger?.success(`✅ create: ${objectName} completed successfully`);
       });
     },
     getTimeout('long'),

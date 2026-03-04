@@ -122,7 +122,7 @@ ENDCLASS.`;
 
           if (lockResponse.isError) {
             const errorMsg = extractErrorMessage(lockResponse);
-            fail(`Lock test classes failed: ${errorMsg}`);
+            throw new Error(`Lock test classes failed: ${errorMsg}`);
           }
 
           const lockData = parseHandlerResponse(lockResponse);
@@ -136,9 +136,7 @@ ENDCLASS.`;
           await delay(context.getOperationDelay('lock'));
 
           // Step 2: Update test classes
-          testLogger?.info(
-            `   • update test classes: ${containerClassName}`,
-          );
+          testLogger?.info(`   • update test classes: ${containerClassName}`);
           const updateLogger = createTestLogger('class-unittest-update');
           const updateResponse = await tester.invokeToolOrHandler(
             'UpdateClassTestClassesLow',
@@ -162,7 +160,7 @@ ENDCLASS.`;
 
           if (updateResponse.isError) {
             const errorMsg = extractErrorMessage(updateResponse);
-            fail(`Update test classes failed: ${errorMsg}`);
+            throw new Error(`Update test classes failed: ${errorMsg}`);
           }
 
           const updateData = parseHandlerResponse(updateResponse);
@@ -174,9 +172,7 @@ ENDCLASS.`;
           await delay(context.getOperationDelay('update'));
 
           // Step 3: Unlock test classes
-          testLogger?.info(
-            `   • unlock test classes: ${containerClassName}`,
-          );
+          testLogger?.info(`   • unlock test classes: ${containerClassName}`);
           const unlockLogger = createTestLogger('class-unittest-unlock');
           const unlockResponse = await tester.invokeToolOrHandler(
             'UnlockClassTestClassesLow',
@@ -198,7 +194,7 @@ ENDCLASS.`;
 
           if (unlockResponse.isError) {
             const errorMsg = extractErrorMessage(unlockResponse);
-            fail(`Unlock test classes failed: ${errorMsg}`);
+            throw new Error(`Unlock test classes failed: ${errorMsg}`);
           }
 
           const unlockData = parseHandlerResponse(unlockResponse);
@@ -211,9 +207,7 @@ ENDCLASS.`;
           await delay(context.getOperationDelay('unlock'));
 
           // Step 4: Activate test classes
-          testLogger?.info(
-            `   • activate test classes: ${containerClassName}`,
-          );
+          testLogger?.info(`   • activate test classes: ${containerClassName}`);
           const activateLogger = createTestLogger('class-unittest-activate');
           const activateResponse = await tester.invokeToolOrHandler(
             'ActivateClassTestClassesLow',
@@ -235,7 +229,7 @@ ENDCLASS.`;
 
           if (activateResponse.isError) {
             const errorMsg = extractErrorMessage(activateResponse);
-            fail(`Activate test classes failed: ${errorMsg}`);
+            throw new Error(`Activate test classes failed: ${errorMsg}`);
           }
 
           const activateData = parseHandlerResponse(activateResponse);
@@ -247,9 +241,7 @@ ENDCLASS.`;
           await delay(context.getOperationDelay('activate'));
 
           // Step 5: Run unit tests
-          testLogger?.info(
-            `   • run unit tests: ${containerClassName}`,
-          );
+          testLogger?.info(`   • run unit tests: ${containerClassName}`);
           const runLogger = createTestLogger('class-unittest-run');
           const runResponse = await tester.invokeToolOrHandler(
             'RunClassUnitTestsLow',
@@ -281,7 +273,7 @@ ENDCLASS.`;
 
           if (runResponse.isError) {
             const errorMsg = extractErrorMessage(runResponse);
-            fail(`Run unit tests failed: ${errorMsg}`);
+            throw new Error(`Run unit tests failed: ${errorMsg}`);
           }
 
           const runData = parseHandlerResponse(runResponse);
@@ -316,9 +308,7 @@ ENDCLASS.`;
             if (!statusResponse.isError) {
               testLogger?.success(`✅ get test status completed`);
             } else {
-              testLogger?.warn(
-                `⚠️  get test status failed (non-critical)`,
-              );
+              testLogger?.warn(`⚠️  get test status failed (non-critical)`);
             }
           }
 
@@ -345,9 +335,7 @@ ENDCLASS.`;
             if (!resultResponse.isError) {
               testLogger?.success(`✅ get test result completed`);
             } else {
-              testLogger?.warn(
-                `⚠️  get test result failed (non-critical)`,
-              );
+              testLogger?.warn(`⚠️  get test result failed (non-critical)`);
             }
           }
 
@@ -358,9 +346,7 @@ ENDCLASS.`;
           // Emergency unlock if still locked
           if (testClassesLocked && testClassesLockHandle) {
             try {
-              testLogger?.info(
-                `   • emergency unlock: ${containerClassName}`,
-              );
+              testLogger?.info(`   • emergency unlock: ${containerClassName}`);
               const emergencyUnlockLogger = createTestLogger(
                 'class-unittest-emergency-unlock',
               );

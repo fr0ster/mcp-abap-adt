@@ -105,7 +105,7 @@ describe('Package Low-Level Handlers Integration', () => {
         expect(objectName).toBeDefined();
         expect(objectName).not.toBe('');
         if (!objectName) {
-          fail('objectName is required');
+          throw new Error('objectName is required');
         }
 
         // For packages: objectName = test_package (package to create),
@@ -147,7 +147,7 @@ describe('Package Low-Level Handlers Integration', () => {
             );
             return;
           }
-          fail(`Validate failed: ${errorMsg}`);
+          throw new Error(`Validate failed: ${errorMsg}`);
         }
 
         const validateData = parseHandlerResponse(validateResponse);
@@ -211,7 +211,7 @@ describe('Package Low-Level Handlers Integration', () => {
             );
             return;
           }
-          fail(`Create failed: ${errorMsg}`);
+          throw new Error(`Create failed: ${errorMsg}`);
         }
 
         const createData = parseHandlerResponse(createResponse);
@@ -245,11 +245,12 @@ describe('Package Low-Level Handlers Integration', () => {
 
         if (lockResponse.isError) {
           const errorMsg = extractErrorMessage(lockResponse);
-          fail(`Lock failed: ${errorMsg}`);
+          throw new Error(`Lock failed: ${errorMsg}`);
         }
 
         const lockData = parseHandlerResponse(lockResponse);
         const lockHandle = extractLockHandle(lockData);
+        const sessionId = lockData.session_id;
         logger?.success(`✅ lock: ${objectName} completed`);
 
         const lockDelay = context.getOperationDelay('lock');
@@ -264,6 +265,7 @@ describe('Package Low-Level Handlers Integration', () => {
             package_name: objectName,
             super_package: superPackage,
             lock_handle: lockHandle,
+            session_id: sessionId,
           },
           async () => {
             const unlockCtx = createHandlerContext({
@@ -274,13 +276,14 @@ describe('Package Low-Level Handlers Integration', () => {
               package_name: objectName,
               super_package: superPackage,
               lock_handle: lockHandle,
+              session_id: sessionId,
             });
           },
         );
 
         if (unlockResponse.isError) {
           const errorMsg = extractErrorMessage(unlockResponse);
-          fail(`Unlock failed: ${errorMsg}`);
+          throw new Error(`Unlock failed: ${errorMsg}`);
         }
 
         const unlockData = parseHandlerResponse(unlockResponse);

@@ -18,6 +18,10 @@ import { handleLockBehaviorDefinition } from '../../../handlers/behavior_definit
 import { handleUnlockBehaviorDefinition } from '../../../handlers/behavior_definition/low/handleUnlockBehaviorDefinition';
 import { handleUpdateBehaviorDefinition as handleUpdateBehaviorDefinitionLow } from '../../../handlers/behavior_definition/low/handleUpdateBehaviorDefinition';
 import { handleValidateBehaviorDefinition } from '../../../handlers/behavior_definition/low/handleValidateBehaviorDefinition';
+// Import low-level handlers - BehaviorImplementation
+import { handleCreateBehaviorImplementation as handleCreateBehaviorImplementationLow } from '../../../handlers/behavior_implementation/low/handleCreateBehaviorImplementation';
+import { handleLockBehaviorImplementation } from '../../../handlers/behavior_implementation/low/handleLockBehaviorImplementation';
+import { handleValidateBehaviorImplementation } from '../../../handlers/behavior_implementation/low/handleValidateBehaviorImplementation';
 import { handleActivateClass } from '../../../handlers/class/low/handleActivateClass';
 import { handleActivateClassTestClasses } from '../../../handlers/class/low/handleActivateClassTestClasses';
 import { handleCheckClass } from '../../../handlers/class/low/handleCheckClass';
@@ -150,6 +154,10 @@ import { TOOL_DEFINITION as LockBehaviorDefinition_Tool } from '../../../handler
 import { TOOL_DEFINITION as UnlockBehaviorDefinition_Tool } from '../../../handlers/behavior_definition/low/handleUnlockBehaviorDefinition';
 import { TOOL_DEFINITION as UpdateBehaviorDefinitionLow_Tool } from '../../../handlers/behavior_definition/low/handleUpdateBehaviorDefinition';
 import { TOOL_DEFINITION as ValidateBehaviorDefinition_Tool } from '../../../handlers/behavior_definition/low/handleValidateBehaviorDefinition';
+// Import TOOL_DEFINITION from behavior_implementation low handlers
+import { TOOL_DEFINITION as CreateBehaviorImplementationLow_Tool } from '../../../handlers/behavior_implementation/low/handleCreateBehaviorImplementation';
+import { TOOL_DEFINITION as LockBehaviorImplementation_Tool } from '../../../handlers/behavior_implementation/low/handleLockBehaviorImplementation';
+import { TOOL_DEFINITION as ValidateBehaviorImplementation_Tool } from '../../../handlers/behavior_implementation/low/handleValidateBehaviorImplementation';
 import { TOOL_DEFINITION as ActivateClass_Tool } from '../../../handlers/class/low/handleActivateClass';
 import { TOOL_DEFINITION as ActivateClassTestClasses_Tool } from '../../../handlers/class/low/handleActivateClassTestClasses';
 import { TOOL_DEFINITION as CheckClass_Tool } from '../../../handlers/class/low/handleCheckClass';
@@ -1348,6 +1356,37 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
         },
         handler: (args: any) => {
           return handleActivateBehaviorDefinition(this.context, args);
+        },
+      },
+      // BehaviorImplementation low-level handlers
+      {
+        toolDefinition: {
+          name: ValidateBehaviorImplementation_Tool.name,
+          description: ValidateBehaviorImplementation_Tool.description,
+          inputSchema: ValidateBehaviorImplementation_Tool.inputSchema,
+        },
+        handler: (args: any) => {
+          return handleValidateBehaviorImplementation(this.context, args);
+        },
+      },
+      {
+        toolDefinition: {
+          name: CreateBehaviorImplementationLow_Tool.name,
+          description: CreateBehaviorImplementationLow_Tool.description,
+          inputSchema: CreateBehaviorImplementationLow_Tool.inputSchema,
+        },
+        handler: (args: any) => {
+          return handleCreateBehaviorImplementationLow(this.context, args);
+        },
+      },
+      {
+        toolDefinition: {
+          name: LockBehaviorImplementation_Tool.name,
+          description: LockBehaviorImplementation_Tool.description,
+          inputSchema: LockBehaviorImplementation_Tool.inputSchema,
+        },
+        handler: (args: any) => {
+          return handleLockBehaviorImplementation(this.context, args);
         },
       },
       // MetadataExtension low-level handlers

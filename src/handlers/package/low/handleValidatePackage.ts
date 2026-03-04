@@ -26,6 +26,11 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Package name to validate (e.g., Z_MY_PROGRAM).',
       },
+      super_package: {
+        type: 'string',
+        description:
+          'Parent (super) package name. The new package will be created under this package.',
+      },
       session_id: {
         type: 'string',
         description:

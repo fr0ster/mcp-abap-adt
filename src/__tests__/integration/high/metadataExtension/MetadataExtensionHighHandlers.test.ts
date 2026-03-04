@@ -15,8 +15,8 @@
  */
 
 import { handleCreateMetadataExtension } from '../../../../handlers/ddlx/high/handleCreateMetadataExtension';
-import { handleDeleteMetadataExtension } from '../../../../handlers/metadata_extension/high/handleDeleteMetadataExtension';
 import { handleUpdateMetadataExtension } from '../../../../handlers/ddlx/high/handleUpdateMetadataExtension';
+import { handleDeleteMetadataExtension } from '../../../../handlers/metadata_extension/high/handleDeleteMetadataExtension';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -48,7 +48,9 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
 
         logger?.info(`   • cleanup: delete ${objectName}`);
         try {
-          const deleteLogger = createTestLogger('metadata-extension-high-delete');
+          const deleteLogger = createTestLogger(
+            'metadata-extension-high-delete',
+          );
           const deleteResponse = await tester.invokeToolOrHandler(
             'DeleteMetadataExtension',
             {
@@ -102,7 +104,7 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
         expect(objectName).toBeDefined();
         expect(objectName).not.toBe('');
         if (!objectName) {
-          fail('objectName is required');
+          throw new Error('objectName is required');
         }
         const ddlxName = objectName;
 
@@ -184,7 +186,7 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
             }
             return;
           }
-          fail(`Create failed: ${errorMsg}`);
+          throw new Error(`Create failed: ${errorMsg}`);
         }
 
         const createData = parseHandlerResponse(createResponse);
@@ -234,7 +236,7 @@ annotate view ZI_TEST_ENTITY with {
 
         if (updateResponse.isError) {
           const errorMsg = extractErrorMessage(updateResponse);
-          fail(`Update failed: ${errorMsg}`);
+          throw new Error(`Update failed: ${errorMsg}`);
         }
 
         const updateData = parseHandlerResponse(updateResponse);

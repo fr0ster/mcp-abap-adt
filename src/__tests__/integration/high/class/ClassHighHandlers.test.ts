@@ -309,14 +309,23 @@ describe('Class High-Level Handlers Integration', () => {
         // Step 4: Delete (high-level)
         logger?.info(`   • delete (high): ${objectName}`);
         const deleteLogger = createTestLogger('class-high-delete');
-        const deleteCtx = createHandlerContext({
-          connection,
-          logger: deleteLogger,
-        });
-        const deleteResponse = await handleDeleteClass(deleteCtx, {
-          class_name: className,
-          ...(transportRequest && { transport_request: transportRequest }),
-        });
+        const deleteResponse = await tester.invokeToolOrHandler(
+          'DeleteClass',
+          {
+            class_name: className,
+            ...(transportRequest && { transport_request: transportRequest }),
+          },
+          async () => {
+            const deleteCtx = createHandlerContext({
+              connection,
+              logger: deleteLogger,
+            });
+            return handleDeleteClass(deleteCtx, {
+              class_name: className,
+              ...(transportRequest && { transport_request: transportRequest }),
+            });
+          },
+        );
 
         expect(deleteResponse.isError).toBe(false);
         if (deleteResponse.isError) {

@@ -10,8 +10,13 @@ export interface HardModeConfig {
   transport: 'http' | 'sse' | 'stdio';
   http_url?: string;
   sse_url?: string;
+  // stdio only: server launch parameters
   stdio_command?: string;
-  env_path?: string;
+  mcp_destination?: string; // --mcp=<dest> (auth-broker / service key)
+  env_destination?: string; // --env=<dest> (session .env from default folder)
+  env_path?: string; // --env-path=<path> (explicit .env file)
+  // http/sse only: auth headers sent to a running server
+  headers?: Record<string, string>;
 }
 
 function toPascalCase(value: string): string {
@@ -31,13 +36,24 @@ export function getHardModeConfig(): HardModeConfig {
   const normalizedTransport =
     transport === 'sse' || transport === 'stdio' ? transport : 'http';
 
+  // Build headers map from YAML (supports arbitrary x-sap-* / x-mcp-* headers)
+  const headers: Record<string, string> = {};
+  if (hard.headers && typeof hard.headers === 'object') {
+    for (const [k, v] of Object.entries(hard.headers)) {
+      if (typeof v === 'string') headers[k] = v;
+    }
+  }
+
   return {
     enabled: hard.enabled === true,
     transport: normalizedTransport,
     http_url: hard.http_url || 'http://127.0.0.1:3000/mcp/stream/http',
     sse_url: hard.sse_url || 'http://127.0.0.1:3001/sse',
     stdio_command: hard.stdio_command || process.execPath,
-    env_path: hard.env_path || '.env',
+    mcp_destination: hard.mcp_destination,
+    env_destination: hard.env_destination,
+    env_path: hard.env_path,
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
   };
 }
 
@@ -67,22 +83,37 @@ export async function createHardModeClient(): Promise<{
 
   if (hard.transport === 'http') {
     await client.connect(
-      new StreamableHTTPClientTransport(new URL(hard.http_url!)),
+      new StreamableHTTPClientTransport(
+        new URL(hard.http_url!),
+        hard.headers ? { requestInit: { headers: hard.headers } } : undefined,
+      ),
     );
   } else if (hard.transport === 'sse') {
-    await client.connect(new SSEClientTransport(new URL(hard.sse_url!)));
-  } else {
-    const launcherPath = path.resolve(process.cwd(), 'dist/server/launcher.js');
-    const envPath = path.resolve(
-      process.cwd(),
-      String(hard.env_path || '.env'),
+    await client.connect(
+      new SSEClientTransport(
+        new URL(hard.sse_url!),
+        hard.headers ? { requestInit: { headers: hard.headers } } : undefined,
+      ),
     );
+  } else {
+    // stdio: launch server process with connection parameters
+    const launcherPath = path.resolve(process.cwd(), 'dist/server/launcher.js');
     const args = [
       launcherPath,
       '--transport=stdio',
       '--exposition=readonly,high,low',
-      `--env-path=${envPath}`,
     ];
+    if (hard.mcp_destination) {
+      args.push(`--mcp=${hard.mcp_destination}`);
+    } else if (hard.env_destination) {
+      args.push(`--env=${hard.env_destination}`);
+    } else {
+      const envPath = path.resolve(
+        process.cwd(),
+        String(hard.env_path || '.env'),
+      );
+      args.push(`--env-path=${envPath}`);
+    }
     await client.connect(
       new StdioClientTransport({
         command: String(hard.stdio_command || process.execPath),

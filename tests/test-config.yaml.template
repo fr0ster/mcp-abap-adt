@@ -51,15 +51,32 @@ environment:
                           # Set to true to auto-delete objects after tests
                           # Note: cleanup_before was removed - not used in code
   # Real MCP client mode for integration tests (cross-platform, shell-independent)
-  # Uncomment block below to enable hard mode:
-  # integration_hard_mode:
-  #   enabled: true
-  #   transport: "stdio"   # http | sse | stdio
-  #   http_url: "http://127.0.0.1:3000/mcp/stream/http"
-  #   sse_url: "http://127.0.0.1:3001/sse"
-  #   stdio_command: ""    # empty = use current Node executable
-  #   env_path: "e19.env"  # on-prem basic example
-  #   name_suffix: ""      # optional object suffix to avoid collisions
+  # Runs tests through a real MCP client (stdio/http/sse) instead of calling handlers directly.
+  # Recommended: keep enabled to test the full transport layer.
+  integration_hard_mode:
+    enabled: true
+    transport: "stdio"   # http | sse | stdio
+    #
+    # --- stdio: server launch parameters (use ONE) ---
+    stdio_command: ""                        # empty = use current Node executable
+    mcp_destination: "<YOUR_DESTINATION>"    # --mcp=<dest>      auth-broker / service key (e.g., "trial")
+    # env_destination: "<YOUR_DESTINATION>"  # --env=<dest>      session .env from default folder
+    # env_path: "<YOUR_ENV_FILE>"            # --env-path=<path> explicit .env file (e.g., "e19.env")
+    #
+    # --- http/sse: auth headers sent to a running server ---
+    # Server must be started separately (e.g., with --mcp or --env-path).
+    # If server already has a default connection, no headers are needed.
+    http_url: "http://127.0.0.1:3000/mcp/stream/http"
+    sse_url: "http://127.0.0.1:3001/sse"
+    # headers:
+    #   x-mcp-destination: "<YOUR_DESTINATION>"
+    #   # --- or direct connection headers ---
+    #   # x-sap-url: "https://your-system.com:8000"
+    #   # x-sap-auth-type: "basic"
+    #   # x-sap-login: "<USERNAME>"
+    #   # x-sap-password: "<PASSWORD>"
+    #
+    name_suffix: ""      # optional object suffix to avoid collisions
 
 # ============================================================================
 # AUTHENTICATION BROKER CONFIGURATION

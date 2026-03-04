@@ -14,274 +14,234 @@
  * Run: npm test -- --testPathPattern=integration/metadataExtension
  */
 
-import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { handleCreateMetadataExtension } from '../../../../handlers/ddlx/high/handleCreateMetadataExtension';
+import { handleDeleteMetadataExtension } from '../../../../handlers/metadata_extension/high/handleDeleteMetadataExtension';
 import { handleUpdateMetadataExtension } from '../../../../handlers/ddlx/high/handleUpdateMetadataExtension';
-import { handleDeleteMetadataExtension } from '../../../../handlers/ddlx/low/handleDeleteMetadataExtension';
-import { handleGetSession } from '../../../../handlers/system/readonly/handleGetSession';
-import {
-  getCleanupAfter,
-  getEnabledTestCase,
-  getOperationDelay,
-  getTimeout,
-  loadTestEnv,
-  resolvePackageName,
-  resolveTransportRequest,
-} from '../../helpers/configHelpers';
+import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { LambdaTester } from '../../helpers/testers/LambdaTester';
+import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
-  createTestConnectionAndSession,
-  type SessionInfo,
-  updateSessionFromResponse,
-} from '../../helpers/sessionHelpers';
-import {
-  debugLog,
-  delay,
+  createHandlerContext,
+  extractErrorMessage,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
 
-// Load environment variables
-// loadTestEnv will be called in beforeAll
-
 describe('MetadataExtension High-Level Handlers Integration', () => {
-  let connection: AbapConnection | null = null;
-  let session: SessionInfo | null = null;
-  let hasConfig = false;
-  const testLogger = createTestLogger('metadata-extension-high');
+  let tester: LambdaTester;
+  const logger = createTestLogger('metadata-extension-high');
+
   beforeAll(async () => {
-    try {
-      const { connection: testConnection, session: testSession } =
-        await createTestConnectionAndSession();
-      connection = testConnection;
-      session = testSession;
-      hasConfig = true;
-    } catch (error) {
-      if (
-        process.env.DEBUG_TESTS === 'true' ||
-        process.env.FULL_LOG_LEVEL === 'true'
-      ) {
-        console.warn(
-          '⚠️ Skipping tests: No .env file or SAP configuration found',
-        );
-      }
-      hasConfig = false;
-    }
+    tester = new LambdaTester(
+      'create_metadata_extension_low',
+      'full_workflow',
+      'metadata-extension-high',
+    );
+    await tester.beforeAll(
+      async (_context: LambdaTesterContext) => {
+        // Basic setup - connection is already created in tester
+      },
+      // Cleanup lambda - will be called by tester after checking YAML params
+      async (context: LambdaTesterContext) => {
+        const { connection, objectName, transportRequest } = context;
+        if (!objectName) return;
+
+        logger?.info(`   • cleanup: delete ${objectName}`);
+        try {
+          const deleteLogger = createTestLogger('metadata-extension-high-delete');
+          const deleteResponse = await tester.invokeToolOrHandler(
+            'DeleteMetadataExtension',
+            {
+              metadata_extension_name: objectName,
+              ...(transportRequest && { transport_request: transportRequest }),
+            },
+            async () => {
+              const deleteCtx = createHandlerContext({
+                connection,
+                logger: deleteLogger,
+              });
+              return handleDeleteMetadataExtension(deleteCtx, {
+                metadata_extension_name: objectName,
+                ...(transportRequest && {
+                  transport_request: transportRequest,
+                }),
+              });
+            },
+          );
+          if (deleteResponse.isError) {
+            const errorMsg = extractErrorMessage(deleteResponse);
+            logger?.warn(`Delete failed (ignored in cleanup): ${errorMsg}`);
+          } else {
+            logger?.success(`✅ cleanup: deleted ${objectName} successfully`);
+          }
+        } catch (error: any) {
+          logger?.warn(
+            `Cleanup delete error (ignored): ${error.message || String(error)}`,
+          );
+        }
+      },
+    );
+  }, getTimeout('long'));
+
+  afterEach(async () => {
+    await tester.afterEach();
   });
 
   it(
     'should test all MetadataExtension high-level handlers',
     async () => {
-      if (!hasConfig || !connection || !session) {
-        testLogger.info(
-          '⏭️  Skipping test: No configuration, connection or session',
-        );
-        return;
-      }
+      await tester.run(async (context: LambdaTesterContext) => {
+        const {
+          connection,
+          objectName,
+          params,
+          packageName,
+          transportRequest,
+        } = context;
 
-      // Get test case configuration - use low-level test case as template
-      const testCase = getEnabledTestCase(
-        'create_metadata_extension_low',
-        'full_workflow',
-      );
-      if (!testCase) {
-        testLogger.info('⏭️  Skipping test: No test case configuration');
-        return;
-      }
+        expect(objectName).toBeDefined();
+        expect(objectName).not.toBe('');
+        if (!objectName) {
+          fail('objectName is required');
+        }
+        const ddlxName = objectName;
 
-      const ddlxName = testCase.params.name;
-      const packageName = resolvePackageName(testCase);
-      const transportRequest = resolveTransportRequest(testCase);
-      const description =
-        testCase.params.description ||
-        `Test metadata extension for high-level handler`;
-      const sourceCode =
-        testCase.params.source_code ||
-        `@Metadata.layer: #CORE
-annotate view ZI_TEST_ENTITY with {
-  @EndUserText.label: '${description}'
-}`;
+        const description =
+          params.description ||
+          `Test metadata extension for high-level handler`;
 
-      try {
-        // Step 1: Test CreateMetadataExtension (High-Level)
-        testLogger.info(`📦 High Create: Creating ${ddlxName}...`);
-        let createResponse;
-        try {
-          createResponse = await handleCreateMetadataExtension(
-            { connection, logger: testLogger },
-            {
+        // Step 1: Create
+        logger?.info(`   • create: ${ddlxName}`);
+        const createLogger = createTestLogger('metadata-extension-high-create');
+        const createResponse = await tester.invokeToolOrHandler(
+          'CreateMetadataExtension',
+          {
+            name: ddlxName,
+            description,
+            package_name: packageName,
+            ...(transportRequest && { transport_request: transportRequest }),
+            activate: true,
+          },
+          async () => {
+            const createCtx = createHandlerContext({
+              connection,
+              logger: createLogger,
+            });
+            return handleCreateMetadataExtension(createCtx, {
               name: ddlxName,
               description,
               package_name: packageName,
               transport_request: transportRequest,
               activate: true,
-            },
-          );
-        } catch (error: any) {
-          const errorMsg = error.message || String(error);
-          // If metadata extension already exists, try to delete it first, then retry create
+            });
+          },
+        );
+
+        if (createResponse.isError) {
+          const errorMsg = extractErrorMessage(createResponse);
+          const errorMsgLower = errorMsg.toLowerCase();
           if (
-            errorMsg.includes('already exists') ||
-            errorMsg.includes('does already exist') ||
-            errorMsg.includes('ResourceAlreadyExists')
+            errorMsgLower.includes('already exists') ||
+            errorMsgLower.includes('does already exist') ||
+            errorMsgLower.includes('resourcealreadyexists')
           ) {
-            testLogger.warn(
+            // Try to delete and retry
+            logger?.warn(
               `⚠️  MetadataExtension ${ddlxName} appears to exist, attempting cleanup...`,
             );
             try {
-              await handleDeleteMetadataExtension(
-                { connection, logger: testLogger },
+              const retryDeleteLogger = createTestLogger(
+                'metadata-extension-high-retry-delete',
+              );
+              await tester.invokeToolOrHandler(
+                'DeleteMetadataExtension',
                 {
-                  name: ddlxName,
-                  transport_request: transportRequest,
+                  metadata_extension_name: ddlxName,
+                  ...(transportRequest && {
+                    transport_request: transportRequest,
+                  }),
+                },
+                async () => {
+                  const deleteCtx = createHandlerContext({
+                    connection,
+                    logger: retryDeleteLogger,
+                  });
+                  return handleDeleteMetadataExtension(deleteCtx, {
+                    metadata_extension_name: ddlxName,
+                    ...(transportRequest && {
+                      transport_request: transportRequest,
+                    }),
+                  });
                 },
               );
-              testLogger.info(
-                `🧹 Cleaned up existing metadata extension ${ddlxName}, retrying create...`,
-              );
-              // Retry create after cleanup
-              createResponse = await handleCreateMetadataExtension(
-                { connection, logger: testLogger },
-                {
-                  name: ddlxName,
-                  description,
-                  package_name: packageName,
-                  transport_request: transportRequest,
-                  activate: true,
-                },
+              logger?.info(
+                `🧹 Cleaned up existing metadata extension ${ddlxName}, but skipping retry for safety`,
               );
             } catch (deleteError: any) {
-              // If delete fails (object doesn't exist), it was a false positive from validation
-              testLogger.info(
-                `⏭️  High Create failed for ${ddlxName}: doesn't actually exist (validation false positive), skipping test`,
+              logger?.info(
+                `⏭️  High Create failed for ${ddlxName}: couldn't cleanup existing object`,
               );
-              return;
             }
-          } else {
-            testLogger.info(
-              `⏭️  High Create failed for ${ddlxName}: ${errorMsg}, skipping test`,
-            );
             return;
           }
-        }
-
-        if (createResponse.isError) {
-          const errorMsg = createResponse.content[0]?.text || 'Unknown error';
-          // Check if it's still "already exists" after retry
-          if (
-            errorMsg.includes('already exists') ||
-            errorMsg.includes('does already exist') ||
-            errorMsg.includes('ResourceAlreadyExists')
-          ) {
-            testLogger.info(
-              `⏭️  High Create failed for ${ddlxName}: ${errorMsg}, skipping test`,
-            );
-            return;
-          }
-          throw new Error(`Create failed: ${errorMsg}`);
+          fail(`Create failed: ${errorMsg}`);
         }
 
         const createData = parseHandlerResponse(createResponse);
         expect(createData.success).toBe(true);
         expect(createData.name).toBe(ddlxName);
-        testLogger.info(`✅ High Create: Created ${ddlxName} successfully`);
+        logger?.success(`✅ create: ${ddlxName} completed successfully`);
 
-        await delay(getOperationDelay('create', testCase));
+        // Wait after creation
+        const createDelay = context.getOperationDelay('create');
+        logger?.info(
+          `   • waiting ${createDelay}ms after creation before update...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, createDelay));
 
-        // Step 2: Test UpdateMetadataExtension (High-Level)
-        testLogger.info(`📝 High Update: Updating ${ddlxName}...`);
-        const updatedSourceCode = `@Metadata.layer: #CORE
+        // Step 2: Update
+        logger?.info(`   • update: ${ddlxName}`);
+        const updateLogger = createTestLogger('metadata-extension-high-update');
+        const updatedSourceCode =
+          params.update_source_code ||
+          `@Metadata.layer: #CORE
 annotate view ZI_TEST_ENTITY with {
   @EndUserText.label: '${description} (updated)'
   @UI.hidden: true
   field1;
 }`;
 
-        let updateResponse;
-        try {
-          updateResponse = await handleUpdateMetadataExtension(
-            { connection, logger: testLogger },
-            {
+        const updateResponse = await tester.invokeToolOrHandler(
+          'UpdateMetadataExtension',
+          {
+            name: ddlxName,
+            source_code: updatedSourceCode,
+            ...(transportRequest && { transport_request: transportRequest }),
+            activate: true,
+          },
+          async () => {
+            const updateCtx = createHandlerContext({
+              connection,
+              logger: updateLogger,
+            });
+            return handleUpdateMetadataExtension(updateCtx, {
               name: ddlxName,
               source_code: updatedSourceCode,
-              transport_request: transportRequest,
               activate: true,
-            },
-          );
-        } catch (error: any) {
-          const errorMsg = error.message || String(error);
-          // If metadata extension doesn't exist or other validation error, skip test
-          if (
-            errorMsg.includes('already exists') ||
-            errorMsg.includes('InvalidObjName') ||
-            errorMsg.includes('not found')
-          ) {
-            testLogger.info(
-              `⏭️  High Update failed for ${ddlxName}: ${errorMsg}, skipping test`,
-            );
-            return;
-          }
-          throw new Error(`Update failed: ${errorMsg}`);
-        }
+            });
+          },
+        );
 
         if (updateResponse.isError) {
-          const errorMsg = updateResponse.content[0]?.text || 'Unknown error';
-          testLogger.info(
-            `⏭️  High Update failed for ${ddlxName}: ${errorMsg}, skipping test`,
-          );
-          return;
+          const errorMsg = extractErrorMessage(updateResponse);
+          fail(`Update failed: ${errorMsg}`);
         }
 
         const updateData = parseHandlerResponse(updateResponse);
         expect(updateData.success).toBe(true);
         expect(updateData.name).toBe(ddlxName);
-        testLogger.info(`✅ High Update: Updated ${ddlxName} successfully`);
-
-        await delay(getOperationDelay('update', testCase));
-        testLogger.info(
-          `✅ Full high-level workflow completed successfully for ${ddlxName}`,
-        );
-      } catch (error: any) {
-        testLogger.error(`❌ Test failed: ${error.message}`);
-        throw error;
-      } finally {
-        // Cleanup: Optionally delete test metadata extension
-        if (session && ddlxName) {
-          try {
-            const shouldCleanup = getCleanupAfter(testCase);
-
-            // Delete only if cleanup_after is true
-            if (shouldCleanup) {
-              const deleteResponse = await handleDeleteMetadataExtension(
-                { connection, logger: testLogger },
-                {
-                  name: ddlxName,
-                  transport_request: transportRequest,
-                },
-              );
-
-              if (!deleteResponse.isError) {
-                testLogger.info(
-                  `🧹 Cleaned up test metadata extension: ${ddlxName}`,
-                );
-              } else {
-                const errorMsg =
-                  deleteResponse.content[0]?.text || 'Unknown error';
-                testLogger.warn(
-                  `⚠️  Failed to delete metadata extension ${ddlxName}: ${errorMsg}`,
-                );
-              }
-            } else {
-              testLogger.warn(
-                `⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${ddlxName}`,
-              );
-            }
-          } catch (cleanupError) {
-            testLogger.warn(
-              `⚠️  Failed to cleanup test metadata extension ${ddlxName}: ${cleanupError}`,
-            );
-          }
-        }
-      }
+        logger?.success(`✅ update: ${ddlxName} completed successfully`);
+      });
     },
     getTimeout('long'),
   );

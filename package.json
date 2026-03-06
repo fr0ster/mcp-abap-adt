@@ -128,11 +128,11 @@
     "yaml": "^2.8.1"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^2.2.2",
+    "@mcp-abap-adt/adt-clients": "^3.0.0",
     "@mcp-abap-adt/auth-broker": "^1.0.5",
     "@mcp-abap-adt/auth-providers": "^1.0.5",
     "@mcp-abap-adt/auth-stores": "^1.0.2",
-    "@mcp-abap-adt/connection": "^1.1.0",
+    "@mcp-abap-adt/connection": "^1.4.2",
     "@mcp-abap-adt/header-validator": "^0.1.8",
     "@mcp-abap-adt/interfaces": "^2.6.0",
     "@mcp-abap-adt/logger": "^0.1.4",

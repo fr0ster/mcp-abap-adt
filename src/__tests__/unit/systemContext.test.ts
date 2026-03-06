@@ -4,9 +4,16 @@ import {
   resolveSystemContext,
 } from '../../lib/systemContext';
 
-// Mock the dynamic import of @mcp-abap-adt/adt-clients
+// Mock @mcp-abap-adt/adt-clients — covers both static import and dynamic import()
+const mockGetSystemInformation = jest.fn().mockResolvedValue(undefined);
+const mockIsModernAdtSystem = jest.fn().mockResolvedValue(true);
 jest.mock('@mcp-abap-adt/adt-clients', () => ({
-  getSystemInformation: jest.fn().mockResolvedValue(undefined),
+  get getSystemInformation() {
+    return mockGetSystemInformation;
+  },
+  get isModernAdtSystem() {
+    return mockIsModernAdtSystem;
+  },
 }));
 
 // Minimal mock connection
@@ -19,6 +26,7 @@ describe('resolveSystemContext', () => {
 
   beforeEach(() => {
     resetSystemContextCache();
+    mockIsModernAdtSystem.mockResolvedValue(true);
     process.env = { ...originalEnv };
     delete process.env.SAP_MASTER_SYSTEM;
     delete process.env.SAP_RESPONSIBLE;
@@ -130,5 +138,45 @@ describe('resolveSystemContext', () => {
     });
 
     expect(result.masterSystem).toBe('OVERRIDE');
+  });
+
+  it('should detect modern system as not legacy', async () => {
+    mockIsModernAdtSystem.mockResolvedValue(true);
+    process.env.SAP_MASTER_SYSTEM = 'SYS';
+
+    const result = await resolveSystemContext(mockConnection);
+
+    expect(result.isLegacy).toBe(false);
+  });
+
+  it('should detect legacy system when core/discovery is absent', async () => {
+    mockIsModernAdtSystem.mockResolvedValue(false);
+    process.env.SAP_MASTER_SYSTEM = 'OLD_SYS';
+
+    const result = await resolveSystemContext(mockConnection);
+
+    expect(result.isLegacy).toBe(true);
+  });
+
+  it('should preserve isLegacy when overrides are applied', async () => {
+    mockIsModernAdtSystem.mockResolvedValue(false);
+    process.env.SAP_MASTER_SYSTEM = 'OLD_SYS';
+    await resolveSystemContext(mockConnection);
+
+    // Now apply overrides — isLegacy should be preserved from cache
+    const result = await resolveSystemContext(mockConnection, {
+      masterSystem: 'OVERRIDE',
+    });
+
+    expect(result.masterSystem).toBe('OVERRIDE');
+    expect(result.isLegacy).toBe(true);
+  });
+
+  it('should expose isLegacy via getSystemContext()', async () => {
+    mockIsModernAdtSystem.mockResolvedValue(false);
+    process.env.SAP_MASTER_SYSTEM = 'SYS';
+    await resolveSystemContext(mockConnection);
+
+    expect(getSystemContext().isLegacy).toBe(true);
   });
 });

@@ -11,11 +11,34 @@ import type { IHandlersRegistry } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
 import {
+  getSystemContext,
   resetSystemContextCache,
   resolveSystemContext,
 } from '../lib/systemContext.js';
 import { registerAuthBroker } from '../lib/utils.js';
 import type { ConnectionContext } from './ConnectionContext.js';
+
+/**
+ * Tool name prefixes for object types not available on legacy systems (BASIS < 7.50).
+ * Used to annotate tool descriptions when connected to a legacy system.
+ */
+const LEGACY_UNSUPPORTED_PREFIXES = [
+  'Domain',
+  'DataElement',
+  'Structure',
+  'Table',
+  'BehaviorDefinition',
+  'BehaviorImplementation',
+  'ServiceDefinition',
+  'ServiceBinding',
+  'MetadataExtension',
+  'Enhancement',
+  'GetWhereUsed',
+  'GetTableContents',
+  'GetSqlQuery',
+  'RuntimeProfiling',
+  'RuntimeDump',
+];
 
 /**
  * Base MCP Server class that extends SDK McpServer
@@ -380,6 +403,26 @@ export abstract class BaseMcpServer extends McpServer {
             entry.toolDefinition.inputSchema.properties
               ? jsonSchemaToZod(entry.toolDefinition.inputSchema)
               : entry.toolDefinition.inputSchema;
+
+          // Skip tools unsupported on legacy systems — don't expose them at all
+          if (getSystemContext().isLegacy) {
+            const name = entry.toolDefinition.name;
+            const isUnsupported = LEGACY_UNSUPPORTED_PREFIXES.some(
+              (prefix) =>
+                name === prefix ||
+                name.startsWith(prefix) ||
+                name.startsWith(`Create${prefix}`) ||
+                name.startsWith(`Update${prefix}`) ||
+                name.startsWith(`Delete${prefix}`) ||
+                name.startsWith(`Get${prefix}`) ||
+                name.startsWith(`Lock${prefix}`) ||
+                name.startsWith(`Unlock${prefix}`) ||
+                name.startsWith(`Validate${prefix}`) ||
+                name.startsWith(`Check${prefix}`) ||
+                name.startsWith(`Activate${prefix}`),
+            );
+            if (isUnsupported) continue;
+          }
 
           // Register wrapped handler via SDK registerTool
           // Note: connection is NOT part of MCP tool signature

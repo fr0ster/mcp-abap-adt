@@ -798,13 +798,13 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
               } else {
                 const errorMsg =
                   deleteFMResponse.content[0]?.text || 'Unknown error';
-                testLogger?.warn(
-                  `⚠️  Failed to delete function module ${functionModuleName}: ${errorMsg}`,
+                testLogger?.error(
+                  `⚠️  Failed to delete function module ${functionModuleName}: ${errorMsg}. Object left in SAP system.`,
                 );
               }
             } catch (cleanupError: any) {
-              testLogger?.warn(
-                `⚠️  Failed to cleanup function module ${functionModuleName}: ${cleanupError.message || cleanupError}`,
+              testLogger?.error(
+                `⚠️  Failed to cleanup function module ${functionModuleName}: ${cleanupError.message || cleanupError}. Object left in SAP system.`,
               );
             }
 
@@ -861,13 +861,13 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
               } else {
                 const errorMsg =
                   deleteFGResponse.content[0]?.text || 'Unknown error';
-                testLogger?.warn(
-                  `⚠️  Failed to delete function group ${functionGroupName}: ${errorMsg}`,
+                testLogger?.error(
+                  `⚠️  Failed to delete function group ${functionGroupName}: ${errorMsg}. Object left in SAP system.`,
                 );
               }
             } catch (cleanupError: any) {
-              testLogger?.warn(
-                `⚠️  Failed to cleanup function group ${functionGroupName}: ${cleanupError.message || cleanupError}`,
+              testLogger?.error(
+                `⚠️  Failed to cleanup function group ${functionGroupName}: ${cleanupError.message || cleanupError}. Object left in SAP system.`,
               );
             }
           } else {

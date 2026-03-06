@@ -98,6 +98,10 @@ describe('Class Local Includes High-Level Handlers Integration', () => {
     );
   }, getTimeout('long'));
 
+  afterAll(async () => {
+    await tester.afterAll(async () => {});
+  });
+
   afterEach(async () => {
     await tester.afterEach();
   });

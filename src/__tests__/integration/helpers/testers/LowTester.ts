@@ -8,6 +8,7 @@
  */
 
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
+import { getCleanupAfter } from '../configHelpers';
 import {
   createHandlerContext,
   delay,
@@ -116,13 +117,15 @@ export class LowTester extends LambdaTester {
           if (deleteResponse?.isError) {
             const errorMsg =
               deleteResponse.content?.[0]?.text || 'Unknown error';
-            logger?.warn?.(`⚠️ Delete failed (ignored): ${errorMsg}`);
+            logger?.error?.(
+              `⚠️ Delete failed: ${errorMsg}. Object left in SAP system.`,
+            );
           } else {
             logger?.info?.(`🗑️ Deleted ${objectName}`);
           }
         } catch (error: any) {
-          logger?.warn?.(
-            `⚠️ Cleanup error (ignored): ${error?.message || String(error)}`,
+          logger?.error?.(
+            `⚠️ Cleanup error: ${error?.message || String(error)}. Object left in SAP system.`,
           );
         }
       };
@@ -474,11 +477,26 @@ export class LowTester extends LambdaTester {
 
   // Compatibility methods - LowTester doesn't use lambdas for lifecycle hooks
   async afterAll(): Promise<void> {
-    // LowTester compatibility - no lambda needed
+    await super.afterAll(async () => {});
   }
 
   async beforeEach(): Promise<void> {
-    // LowTester compatibility - no lambda needed
+    // Pre-cleanup: Remove leftover objects from previous failed tests
+    const shouldCleanup = getCleanupAfter(this.testCase);
+    if (shouldCleanup && this.cleanupAfterLambda && this.context) {
+      try {
+        this.context.logger?.debug?.(
+          '🧹 Running pre-cleanup (removing leftover objects)...',
+        );
+        await this.cleanupAfterLambda(this.context);
+        this.context.logger?.debug?.('✅ Pre-cleanup completed');
+      } catch (error: any) {
+        // Pre-cleanup errors are non-fatal - object might not exist
+        this.context.logger?.debug?.(
+          `⚠️ Pre-cleanup warning (ignored): ${error?.message || String(error)}`,
+        );
+      }
+    }
   }
 
   async afterEach(): Promise<void> {

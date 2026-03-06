@@ -193,7 +193,8 @@
       "!src/**/index.ts"
     ],
     "maxWorkers": 1,
-    "testTimeout": 600000
+    "testTimeout": 600000,
+    "globalSetup": "<rootDir>/src/__tests__/integration/globalSetup.ts"
   },
   "private": false
 }

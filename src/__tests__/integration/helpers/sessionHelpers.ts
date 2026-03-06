@@ -36,6 +36,13 @@ import { extractSessionState } from './testHelpers';
 
 const sessionLogger = createTestLogger('connection');
 
+// Module-level cache for AuthBroker — reuse across test suites (maxWorkers: 1)
+let cachedBroker: {
+  broker: InstanceType<typeof AuthBroker>;
+  destination: string;
+  serviceUrl: string;
+} | null = null;
+
 function wrapLegacyTokenProvider(
   provider: AuthorizationCodeProvider,
 ): AuthorizationCodeProvider & {
@@ -161,67 +168,88 @@ async function createConnectionViaBroker(
     }
 
     const brokerDestination = actualDestination || 'default';
-    const authConfig =
-      (await sessionStore.getAuthorizationConfig(brokerDestination)) ||
-      (await serviceKeyStore.getAuthorizationConfig(brokerDestination));
-    if (!authConfig) {
-      throw new Error(
-        `Missing authorization config for destination "${brokerDestination}".`,
-      );
-    }
-    const sessionConnConfig =
-      await sessionStore.getConnectionConfig(brokerDestination);
 
-    // Create loggers based on environment variables (storeLogger already created above)
-    const providerLogger = createProviderLogger();
-    const brokerLogger = createBrokerLogger();
+    // Reuse cached broker if available (same destination, same process)
+    let authBroker: InstanceType<typeof AuthBroker>;
+    let serviceUrl: string;
 
-    const tokenProvider = wrapLegacyTokenProvider(
-      new AuthorizationCodeProvider({
-        uaaUrl: authConfig.uaaUrl,
-        clientId: authConfig.uaaClientId,
-        clientSecret: authConfig.uaaClientSecret,
-        refreshToken: authConfig.refreshToken,
-        accessToken: sessionConnConfig?.authorizationToken,
-        browser: 'system',
-        logger: providerLogger,
-      }),
-    );
-    const authBroker = new AuthBroker(
-      {
-        serviceKeyStore,
-        sessionStore,
-        tokenProvider,
-      },
-      'system',
-      brokerLogger,
-    );
-
-    // Try to get connection config and token from broker
-    const connConfig = await authBroker.getConnectionConfig(brokerDestination);
-    if (connConfig?.serviceUrl) {
-      const jwtToken = await authBroker.getToken(brokerDestination);
-      if (jwtToken) {
-        const config: SapConfig = {
-          url: connConfig.serviceUrl,
-          authType: 'jwt',
-          jwtToken,
-        };
-        sessionLogger?.info('Using connection from auth broker', {
-          destination: brokerDestination,
-          url: config.url,
-          authType: config.authType,
-        });
-        // Only pass connection logger if DEBUG_CONNECTION is set
-        const connectionLogger = createConnectionLogger();
-        const connectionLoggerWithCsrf = connectionLogger
-          ? {
-              ...connectionLogger,
-              csrfToken: connectionLogger.debug,
-            }
-          : undefined;
-        return createAbapConnection(config, connectionLoggerWithCsrf);
+    if (cachedBroker && cachedBroker.destination === brokerDestination) {
+      authBroker = cachedBroker.broker;
+      serviceUrl = cachedBroker.serviceUrl;
+    } else {
+      const authConfig =
+        (await sessionStore.getAuthorizationConfig(brokerDestination)) ||
+        (await serviceKeyStore.getAuthorizationConfig(brokerDestination));
+      if (!authConfig) {
+        throw new Error(
+          `Missing authorization config for destination "${brokerDestination}".`,
+        );
       }
+      const sessionConnConfig =
+        await sessionStore.getConnectionConfig(brokerDestination);
+
+      // Create loggers based on environment variables (storeLogger already created above)
+      const providerLogger = createProviderLogger();
+      const brokerLogger = createBrokerLogger();
+
+      const tokenProvider = wrapLegacyTokenProvider(
+        new AuthorizationCodeProvider({
+          uaaUrl: authConfig.uaaUrl,
+          clientId: authConfig.uaaClientId,
+          clientSecret: authConfig.uaaClientSecret,
+          refreshToken: authConfig.refreshToken,
+          accessToken: sessionConnConfig?.authorizationToken,
+          browser: 'system',
+          logger: providerLogger,
+        }),
+      );
+      authBroker = new AuthBroker(
+        {
+          serviceKeyStore,
+          sessionStore,
+          tokenProvider,
+        },
+        'system',
+        brokerLogger,
+      );
+
+      const connConfig =
+        await authBroker.getConnectionConfig(brokerDestination);
+      if (!connConfig?.serviceUrl) {
+        return null;
+      }
+      serviceUrl = connConfig.serviceUrl;
+
+      // Cache broker for reuse by subsequent test suites
+      cachedBroker = {
+        broker: authBroker,
+        destination: brokerDestination,
+        serviceUrl,
+      };
+    }
+
+    // Get token from cached broker — provider returns cached valid token without browser
+    const jwtToken = await authBroker.getToken(brokerDestination);
+    if (jwtToken) {
+      const config: SapConfig = {
+        url: serviceUrl,
+        authType: 'jwt',
+        jwtToken,
+      };
+      sessionLogger?.info('Using connection from auth broker', {
+        destination: brokerDestination,
+        url: config.url,
+        authType: config.authType,
+      });
+      // Only pass connection logger if DEBUG_CONNECTION is set
+      const connectionLogger = createConnectionLogger();
+      const connectionLoggerWithCsrf = connectionLogger
+        ? {
+            ...connectionLogger,
+            csrfToken: connectionLogger.debug,
+          }
+        : undefined;
+      return createAbapConnection(config, connectionLoggerWithCsrf);
     }
   } catch (error: any) {
     sessionLogger?.warn('Failed to create connection via AuthBroker', {

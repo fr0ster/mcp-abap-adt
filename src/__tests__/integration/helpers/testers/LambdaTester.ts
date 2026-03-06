@@ -396,8 +396,8 @@ export class LambdaTester {
       this.context.logger?.success?.('✅ Cleanup completed successfully');
     } catch (error: any) {
       // Log cleanup errors but don't throw - cleanup should not fail the test suite
-      this.context.logger?.warn?.(
-        `⚠️ Cleanup error (ignored): ${error?.message || String(error)}`,
+      this.context.logger?.error?.(
+        `⚠️ Cleanup error: ${error?.message || String(error)}. Object left in SAP system.`,
       );
     }
   }

@@ -98,10 +98,16 @@ export async function createHardModeClient(): Promise<{
   } else {
     // stdio: launch server process with connection parameters
     const launcherPath = path.resolve(process.cwd(), 'dist/server/launcher.js');
+    const cfg = loadTestConfig();
+    const useUnsafe =
+      process.env.MCP_UNSAFE === 'true' ||
+      cfg?.auth_broker?.unsafe === true ||
+      cfg?.auth_broker?.unsafe_session_store === true;
     const args = [
       launcherPath,
       '--transport=stdio',
       '--exposition=readonly,high,low',
+      ...(useUnsafe ? ['--unsafe'] : []),
     ];
     if (hard.mcp_destination) {
       args.push(`--mcp=${hard.mcp_destination}`);

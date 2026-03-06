@@ -8,6 +8,7 @@
  */
 
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
+import { getCleanupAfter } from '../configHelpers';
 import { createHandlerContext } from '../testHelpers';
 import {
   callTool,
@@ -107,13 +108,15 @@ export class HighTester extends LambdaTester {
           if (deleteResponse?.isError) {
             const errorMsg =
               deleteResponse.content?.[0]?.text || 'Unknown error';
-            logger?.warn?.(`Delete failed (ignored in cleanup): ${errorMsg}`);
+            logger?.error?.(
+              `Delete failed: ${errorMsg}. Object left in SAP system.`,
+            );
           } else {
             logger?.success?.(`✅ cleanup: deleted ${objectName} successfully`);
           }
         } catch (error: any) {
-          logger?.warn?.(
-            `Cleanup delete error (ignored): ${error?.message || String(error)}`,
+          logger?.error?.(
+            `Cleanup delete error: ${error?.message || String(error)}. Object left in SAP system.`,
           );
         }
       };
@@ -322,11 +325,26 @@ export class HighTester extends LambdaTester {
 
   // Compatibility methods - HighTester doesn't use lambdas for lifecycle hooks
   async afterAll(): Promise<void> {
-    // HighTester compatibility - no lambda needed
+    await super.afterAll(async () => {});
   }
 
   async beforeEach(): Promise<void> {
-    // HighTester compatibility - no lambda needed
+    // Pre-cleanup: Remove leftover objects from previous failed tests
+    const shouldCleanup = getCleanupAfter(this.testCase);
+    if (shouldCleanup && this.cleanupAfterLambda && this.context) {
+      try {
+        this.context.logger?.debug?.(
+          '🧹 Running pre-cleanup (removing leftover objects)...',
+        );
+        await this.cleanupAfterLambda(this.context);
+        this.context.logger?.debug?.('✅ Pre-cleanup completed');
+      } catch (error: any) {
+        // Pre-cleanup errors are non-fatal - object might not exist
+        this.context.logger?.debug?.(
+          `⚠️ Pre-cleanup warning (ignored): ${error?.message || String(error)}`,
+        );
+      }
+    }
   }
 
   async afterEach(): Promise<void> {

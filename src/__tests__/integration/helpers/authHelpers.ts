@@ -196,7 +196,9 @@ export async function setupAuthBrokerForTests(_options?: {
       unsafe: useUnsafe,
       transportType: 'stdio', // Tests use stdio transport
       useAuthBroker: true,
-      browserAuthPort: config?.auth_broker?.browser_auth_port ?? 3101,
+      browserAuthPort:
+        config?.auth_broker?.browser_auth_port ??
+        30000 + Math.floor(Math.random() * 10000),
       browser: 'system',
       // Don't pass default logger - only pass specific loggers if DEBUG vars are set
       logger: undefined,

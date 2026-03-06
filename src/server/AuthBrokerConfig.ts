@@ -32,15 +32,9 @@ export class AuthBrokerConfig implements IAuthBrokerFactoryConfig {
     if (serverConfig.browserAuthPort) {
       this.browserAuthPort = serverConfig.browserAuthPort;
     } else {
-      // Set browser auth port to avoid conflicts with server ports
-      // stdio: 4001 (no server port), sse: 4000 (SSE server uses 3001), http: 5000 (HTTP server uses 3000)
-      if (serverConfig.transport === 'sse') {
-        this.browserAuthPort = 4000;
-      } else if (serverConfig.transport === 'http') {
-        this.browserAuthPort = 5000;
-      } else {
-        this.browserAuthPort = 4001; // stdio: use 4001 to avoid conflict with HTTP (3000) and SSE (3001)
-      }
+      // Use random port from high range (30000-39999) to avoid conflicts
+      // with other services and parallel MCP instances
+      this.browserAuthPort = 30000 + Math.floor(Math.random() * 10000);
     }
 
     this.logger = logger;

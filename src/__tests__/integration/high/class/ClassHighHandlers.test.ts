@@ -88,6 +88,10 @@ describe('Class High-Level Handlers Integration', () => {
     );
   }, getTimeout('long'));
 
+  afterAll(async () => {
+    await tester.afterAll(async () => {});
+  });
+
   afterEach(async () => {
     // cleanupAfter is automatically called by tester.afterEach()
     // It checks YAML params and calls cleanup lambda if needed

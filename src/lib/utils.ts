@@ -1334,9 +1334,9 @@ SAP CONNECTION (.env file):
                                    Example: https://your-system.sap.com
   SAP_CLIENT                       SAP client number (required)
                                    Example: 100
-  SAP_AUTH_TYPE                    Authentication type: basic|jwt (default: basic)
-  SAP_USERNAME                     SAP username (required for basic auth)
-  SAP_PASSWORD                     SAP password (required for basic auth)
+  SAP_AUTH_TYPE                    Authentication type: basic|jwt|rfc (default: basic)
+  SAP_USERNAME                     SAP username (required for basic/rfc auth)
+  SAP_PASSWORD                     SAP password (required for basic/rfc auth)
   SAP_JWT_TOKEN                    JWT token (required for jwt auth)
 
 GENERATING .ENV FROM SERVICE KEY (JWT Authentication):
@@ -1885,14 +1885,17 @@ export function getConfig(): SapConfig {
     client = client.trim();
   }
 
-  // Auto-detect auth type: if JWT token is present, use JWT; otherwise check SAP_AUTH_TYPE or default to basic
+  // Auto-detect auth type: JWT token → jwt; SAP_AUTH_TYPE → explicit; default → basic
   let authType: SapConfig['authType'] = 'basic';
   if (process.env.SAP_JWT_TOKEN) {
     authType = 'jwt';
   } else if (process.env.SAP_AUTH_TYPE) {
-    const rawAuthType = process.env.SAP_AUTH_TYPE.trim();
-    authType =
-      rawAuthType === 'xsuaa' ? 'jwt' : (rawAuthType as SapConfig['authType']);
+    const rawAuthType = process.env.SAP_AUTH_TYPE.trim().toLowerCase();
+    if (rawAuthType === 'xsuaa') {
+      authType = 'jwt';
+    } else {
+      authType = rawAuthType as SapConfig['authType'];
+    }
   }
 
   if (!url) {
@@ -1954,11 +1957,12 @@ export function getConfig(): SapConfig {
     if (uaaClientId) config.uaaClientId = uaaClientId.trim();
     if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret.trim();
   } else {
+    // basic and rfc both require username/password
     const username = process.env.SAP_USERNAME;
     const password = process.env.SAP_PASSWORD;
     if (!username || !password) {
       throw new Error(
-        'Missing SAP_USERNAME or SAP_PASSWORD for basic authentication',
+        `Missing SAP_USERNAME or SAP_PASSWORD for ${authType} authentication`,
       );
     }
     config.username = username.trim();
@@ -2059,7 +2063,7 @@ export function formatAuthConfigForDisplay(
     lines.push(`║  Auth Type:     ${config.authType.padEnd(45)}║`);
   }
 
-  if (config.authType === 'basic') {
+  if (config.authType === 'basic' || config.authType === 'rfc') {
     if (config.username) {
       lines.push(`║  Username:      ${config.username.padEnd(45)}║`);
     }

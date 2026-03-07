@@ -401,10 +401,23 @@ export function getSapConfigFromEnv(): SapConfig {
     authType = 'jwt';
   } else if (process.env.SAP_AUTH_TYPE) {
     const raw = process.env.SAP_AUTH_TYPE.trim().toLowerCase();
-    authType = raw === 'xsuaa' ? 'jwt' : (raw as SapConfig['authType']);
+    if (raw === 'xsuaa') {
+      authType = 'jwt';
+    } else if (raw === 'basic' || raw === 'jwt' || raw === 'saml') {
+      authType = raw;
+    }
   }
 
-  const config: SapConfig = { url, authType };
+  const connectionType: SapConfig['connectionType'] =
+    process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc'
+      ? 'rfc'
+      : undefined;
+
+  const config: SapConfig = {
+    url,
+    authType,
+    ...(connectionType && { connectionType }),
+  };
 
   if (authType === 'jwt') {
     config.jwtToken = process.env.SAP_JWT_TOKEN || '';

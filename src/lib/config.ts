@@ -65,10 +65,20 @@ export function getConfig(): SapConfig {
     const rawAuthType = process.env.SAP_AUTH_TYPE.trim().toLowerCase();
     if (rawAuthType === 'xsuaa') {
       authType = 'jwt';
-    } else {
-      authType = rawAuthType as SapConfig['authType'];
+    } else if (
+      rawAuthType === 'basic' ||
+      rawAuthType === 'jwt' ||
+      rawAuthType === 'saml'
+    ) {
+      authType = rawAuthType;
     }
   }
+
+  // Connection type: http (default) or rfc (legacy systems)
+  const connectionType: SapConfig['connectionType'] =
+    process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc'
+      ? 'rfc'
+      : undefined;
 
   if (!url) {
     throw new Error(
@@ -103,6 +113,7 @@ export function getConfig(): SapConfig {
   const config: SapConfig = {
     url, // Already cleaned and validated above
     authType,
+    ...(connectionType && { connectionType }),
   };
 
   if (client) {
@@ -129,7 +140,7 @@ export function getConfig(): SapConfig {
     if (uaaClientId) config.uaaClientId = uaaClientId.trim();
     if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret.trim();
   } else {
-    // basic and rfc both require username/password
+    // basic (and rfc connection type) require username/password
     const username = process.env.SAP_USERNAME;
     const password = process.env.SAP_PASSWORD;
     if (!username || !password) {

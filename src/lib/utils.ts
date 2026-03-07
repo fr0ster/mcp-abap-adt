@@ -1334,9 +1334,10 @@ SAP CONNECTION (.env file):
                                    Example: https://your-system.sap.com
   SAP_CLIENT                       SAP client number (required)
                                    Example: 100
-  SAP_AUTH_TYPE                    Authentication type: basic|jwt|rfc (default: basic)
-  SAP_USERNAME                     SAP username (required for basic/rfc auth)
-  SAP_PASSWORD                     SAP password (required for basic/rfc auth)
+  SAP_AUTH_TYPE                    Authentication type: basic|jwt (default: basic)
+  SAP_CONNECTION_TYPE              Connection type: http|rfc (default: http)
+  SAP_USERNAME                     SAP username (required for basic auth)
+  SAP_PASSWORD                     SAP password (required for basic auth)
   SAP_JWT_TOKEN                    JWT token (required for jwt auth)
 
 GENERATING .ENV FROM SERVICE KEY (JWT Authentication):
@@ -1893,10 +1894,20 @@ export function getConfig(): SapConfig {
     const rawAuthType = process.env.SAP_AUTH_TYPE.trim().toLowerCase();
     if (rawAuthType === 'xsuaa') {
       authType = 'jwt';
-    } else {
-      authType = rawAuthType as SapConfig['authType'];
+    } else if (
+      rawAuthType === 'basic' ||
+      rawAuthType === 'jwt' ||
+      rawAuthType === 'saml'
+    ) {
+      authType = rawAuthType;
     }
   }
+
+  // Connection type: http (default) or rfc (legacy systems)
+  const connectionType: SapConfig['connectionType'] =
+    process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc'
+      ? 'rfc'
+      : undefined;
 
   if (!url) {
     throw new Error(
@@ -1931,6 +1942,7 @@ export function getConfig(): SapConfig {
   const config: SapConfig = {
     url, // Already cleaned and validated above
     authType,
+    ...(connectionType && { connectionType }),
   };
 
   if (client) {
@@ -2063,7 +2075,7 @@ export function formatAuthConfigForDisplay(
     lines.push(`║  Auth Type:     ${config.authType.padEnd(45)}║`);
   }
 
-  if (config.authType === 'basic' || config.authType === 'rfc') {
+  if (config.authType === 'basic') {
     if (config.username) {
       lines.push(`║  Username:      ${config.username.padEnd(45)}║`);
     }

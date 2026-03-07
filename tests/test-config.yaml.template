@@ -79,6 +79,22 @@ environment:
     name_suffix: ""      # optional object suffix to avoid collisions
 
 # ============================================================================
+# SHARED OBJECTS
+# ============================================================================
+# Objects created once and reused across multiple tests.
+# These are NOT deleted between test runs — they serve as dependencies
+# (e.g., a container class for unit test handlers).
+# Tests that need shared objects should reference them by name from this section.
+
+shared_objects:
+  # Container class for unit test handlers (ClassUnitTest, ClassUnitTestHigh)
+  unit_test_class:
+    class_name: "<YOUR_SHARED_UT_CLASS>"
+    package_name: "<YOUR_PACKAGE_NAME>"
+    transport_request: ""
+    description: "Shared container class for unit test integration tests"
+
+# ============================================================================
 # AUTHENTICATION BROKER CONFIGURATION
 # ============================================================================
 # Configuration for AuthBroker-based token refresh before integration tests
@@ -1658,12 +1674,16 @@ class_unit_test:
   test_cases:
     - name: "full_workflow"
       enabled: false
-      description: "Full workflow test for unit test handlers: Lock → Update → Unlock → Activate → Run → GetStatus → GetResult (low-level) or RunUnitTest → GetUnitTest (high-level)"
+      description: "Full workflow test for unit test handlers: Create class -> Lock → Update → Unlock → Activate → Run → GetStatus → GetResult. Container class is created as a shared object (not deleted between tests)."
       params:
-        # Container class that contains the test class
+        # class_name is used by LambdaTester for objectName resolution
+        class_name: "<YOUR_CONTAINER_CLASS_NAME>"
+        # Container class that contains the test class (created if not exists)
         container_class_name: "<YOUR_CONTAINER_CLASS_NAME>"
         # Test class name inside the container class's testclasses include
         test_class_name: "<YOUR_TEST_CLASS_NAME>"
+        package_name: "<YOUR_PACKAGE_NAME>"
+        transport_request: ""
         # Optional: test class source code (if not provided, default test class will be used)
         test_class_source: |
           CLASS <YOUR_TEST_CLASS_NAME> DEFINITION FINAL

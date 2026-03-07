@@ -63,6 +63,7 @@ function hydrateSystemContextFromEnvFile(envFilePath?: string): void {
       'SAP_MASTER_SYSTEM',
       'SAP_RESPONSIBLE',
       'SAP_USERNAME',
+      'SAP_CONNECTION_TYPE',
     ];
 
     for (const key of keys) {
@@ -118,9 +119,10 @@ SAP CONNECTION (.env file):
   Basic Authentication:
     SAP_URL                        SAP system URL (required)
     SAP_CLIENT                     SAP client number (required)
-    SAP_AUTH_TYPE                  Authentication type: basic|jwt|rfc (default: basic)
-    SAP_USERNAME                   SAP username (required for basic/rfc auth)
-    SAP_PASSWORD                   SAP password (required for basic/rfc auth)
+    SAP_AUTH_TYPE                  Authentication type: basic|jwt (default: basic)
+    SAP_CONNECTION_TYPE            Connection type: http|rfc (default: http)
+    SAP_USERNAME                   SAP username (required for basic auth)
+    SAP_PASSWORD                   SAP password (required for basic auth)
     SAP_LANGUAGE                   SAP language (optional, e.g., EN, DE)
 
   JWT/OAuth2 Authentication:
@@ -131,7 +133,7 @@ SAP CONNECTION (.env file):
     SAP_UAA_CLIENT_SECRET          UAA Client Secret (or UAA_CLIENT_SECRET)
 
   RFC Connection (legacy systems, BASIS < 7.50):
-    SAP_AUTH_TYPE=rfc              Enables RFC transport via SADT_REST_RFC_ENDPOINT
+    SAP_CONNECTION_TYPE=rfc        Enables RFC transport via SADT_REST_RFC_ENDPOINT
     SAP_URL                        SAP system URL (host:port used to derive RFC params)
     SAP_USERNAME                   SAP username
     SAP_PASSWORD                   SAP password

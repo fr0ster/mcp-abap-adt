@@ -135,6 +135,12 @@ export abstract class BaseMcpServer extends McpServer {
       );
     }
 
+    // Connection type from env (http or rfc) — not stored in broker/session
+    const connectionType =
+      process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc'
+        ? ('rfc' as const)
+        : undefined;
+
     this.connectionContext = {
       sessionId: destination,
       connectionParams:
@@ -145,6 +151,7 @@ export abstract class BaseMcpServer extends McpServer {
               username: connectionConfig.username || '',
               password: connectionConfig.password || '',
               client: connectionConfig.sapClient || '',
+              ...(connectionType && { connectionType }),
             }
           : {
               url: connectionConfig.serviceUrl || '',
@@ -262,6 +269,14 @@ export abstract class BaseMcpServer extends McpServer {
     const connection = createAbapConnection(
       this.connectionContext.connectionParams,
     );
+
+    // RFC connections require explicit connect() to open the stateful session
+    if (
+      this.connectionContext.connectionParams.connectionType === 'rfc' &&
+      typeof (connection as any).connect === 'function'
+    ) {
+      await (connection as any).connect();
+    }
 
     // Build overrides from metadata (HTTP headers)
     const metadata = this.connectionContext?.metadata || {};

@@ -18,8 +18,69 @@
 import { handleCreateBehaviorImplementation } from '../../../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleUpdateBehaviorImplementation } from '../../../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
 import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
-import { getTimeout } from '../../helpers/configHelpers';
+import {
+  getEnabledTestCase,
+  getTimeout,
+  resolvePackageName,
+  resolveTransportRequest,
+} from '../../helpers/configHelpers';
+import {
+  callTool,
+  createHardModeClient,
+  isHardModeEnabled,
+} from '../../helpers/testers/hardMode';
 import { HighTester } from '../../helpers/testers/HighTester';
+
+async function manageBdefPrerequisite(action: 'create' | 'delete'): Promise<void> {
+  if (!isHardModeEnabled()) return;
+  const implTestCase = getEnabledTestCase(
+    'create_behavior_implementation',
+    'builder_behavior_implementation',
+  );
+  if (!implTestCase) return;
+  const bdefName: string | undefined = implTestCase.params?.behavior_definition;
+  if (!bdefName) return;
+  const packageName = resolvePackageName(implTestCase);
+  const transportRequest = resolveTransportRequest(implTestCase);
+
+  // Source code for the prerequisite BDEF — taken from the BehaviorDefinition test config
+  const bdefTestCase = getEnabledTestCase('create_behavior_definition_low', 'full_workflow');
+  const sourceCode: string | undefined = bdefTestCase?.params?.source_code;
+
+  const mcp = await createHardModeClient();
+  try {
+    if (action === 'create') {
+      await callTool(
+        mcp.client,
+        mcp.toolNames,
+        ['CreateBehaviorDefinition'],
+        {
+          name: bdefName,
+          root_entity: bdefName,
+          package_name: packageName,
+          implementation_type: 'Managed',
+          description: `Prerequisite BDEF for BehaviorImplementation tests`,
+          ...(sourceCode && { source_code: sourceCode }),
+          ...(transportRequest && { transport_request: transportRequest }),
+        },
+      );
+    } else {
+      await callTool(
+        mcp.client,
+        mcp.toolNames,
+        ['DeleteBehaviorDefinition', 'DeleteBehaviorDefinitionLow'],
+        {
+          behavior_definition_name: bdefName,
+          ...(transportRequest && { transport_request: transportRequest }),
+        },
+      );
+    }
+  } catch {
+    // create: already exists — OK; delete: not found — OK
+  } finally {
+    await mcp.close();
+  }
+}
 
 describe('BehaviorImplementation High-Level Handlers Integration', () => {
   let tester: HighTester;
@@ -36,9 +97,11 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
       },
     );
     await tester.beforeAll();
-  });
+    await manageBdefPrerequisite('create');
+  }, getTimeout('long'));
 
   afterAll(async () => {
+    await manageBdefPrerequisite('delete');
     await tester.afterAll();
   });
 

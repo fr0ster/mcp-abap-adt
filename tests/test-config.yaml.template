@@ -151,7 +151,7 @@ create_behavior_definition_low:
         # ⚠️ IMPORTANT: root_entity MUST be an existing CDS view name (not just any name)
         # The CDS view must exist in the SAP system before creating behavior definition
         root_entity: "<YOUR_EXISTING_CDS_VIEW_NAME>"  # ⚠️ UPDATE: Replace with existing CDS view name
-        implementation_type: "managed"  # or "unmanaged", "abstract", "projection"
+        implementation_type: "Managed"  # or "Unmanaged", "Abstract", "Projection"
         # ⚠️ REQUIRED: source_code is mandatory for update step
         source_code: |
           managed implementation in class zbp_<your_cds_view_name_lowercase> unique;

@@ -53,8 +53,13 @@ describe('Class Unit Test Handlers Integration', () => {
     await tester.beforeAll(
       async (context: LambdaTesterContext) => {
         // Create container class for unit tests
-        const { connection, params, objectName, packageName, transportRequest } =
-          context;
+        const {
+          connection,
+          params,
+          objectName,
+          packageName,
+          transportRequest,
+        } = context;
         if (!objectName || !params?.container_class_name) return;
 
         const containerClassName = objectName;

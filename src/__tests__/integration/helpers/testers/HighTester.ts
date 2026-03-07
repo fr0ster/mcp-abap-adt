@@ -225,7 +225,7 @@ export class HighTester extends LambdaTester {
   private buildCreateArgs(context: LambdaTesterContext): any {
     const { objectName, params, packageName, transportRequest, session } =
       context;
-    const nameField = this.getNameField();
+    const nameField = this.getCreateUpdateNameField();
     return {
       [nameField]: objectName,
       package_name: packageName,
@@ -233,6 +233,18 @@ export class HighTester extends LambdaTester {
       ...(params.ddl_code && { ddl_code: params.ddl_code }),
       ...(params.source_code && { source_code: params.source_code }),
       ...(params.superclass && { superclass: params.superclass }),
+      // BehaviorDefinition specific
+      ...(params.root_entity && { root_entity: params.root_entity }),
+      ...(params.implementation_type && {
+        implementation_type: params.implementation_type,
+      }),
+      // BehaviorImplementation specific
+      ...(params.behavior_definition && {
+        behavior_definition: params.behavior_definition,
+      }),
+      ...(params.implementation_code && {
+        implementation_code: params.implementation_code,
+      }),
       // Data element specific fields
       ...(params.type_kind && { type_kind: params.type_kind }),
       ...(params.data_type && { data_type: params.data_type }),
@@ -259,7 +271,7 @@ export class HighTester extends LambdaTester {
   private buildUpdateArgs(context: LambdaTesterContext): any {
     const { objectName, params, packageName, transportRequest, session } =
       context;
-    const nameField = this.getNameField();
+    const nameField = this.getCreateUpdateNameField();
     return {
       [nameField]: objectName,
       ...(packageName && { package_name: packageName }),
@@ -274,6 +286,19 @@ export class HighTester extends LambdaTester {
       ...(params.update_description && {
         description: params.update_description,
       }),
+      // BehaviorDefinition specific for update
+      ...(params.root_entity && { root_entity: params.root_entity }),
+      // BehaviorImplementation specific for update
+      ...(params.behavior_definition && {
+        behavior_definition: params.behavior_definition,
+      }),
+      ...(params.update_implementation_code && {
+        implementation_code: params.update_implementation_code,
+      }),
+      ...(params.implementation_code &&
+        !params.update_implementation_code && {
+          implementation_code: params.implementation_code,
+        }),
       // Data element specific fields for update
       ...(params.type_kind && { type_kind: params.type_kind }),
       ...(params.data_type && { data_type: params.data_type }),
@@ -303,24 +328,42 @@ export class HighTester extends LambdaTester {
     };
   }
 
+  /**
+   * Returns the name field used for DELETE operations.
+   * May differ from the create/update name field for some types.
+   */
   private getNameField(): string {
-    // Determine name field based on handler name
     const handlerName = (this as any).handlerName || '';
+    // behavior_implementation must be checked before behavior_definition (substring)
+    if (handlerName.includes('behavior_implementation')) return 'class_name';
+    if (handlerName.includes('behavior_definition'))
+      return 'behavior_definition_name';
+    if (handlerName.includes('data_element')) return 'data_element_name';
+    if (handlerName.includes('metadata_extension')) return 'ddlx_name';
+    if (handlerName.includes('service_definition'))
+      return 'service_definition_name';
     if (handlerName.includes('class')) return 'class_name';
     if (handlerName.includes('table')) return 'table_name';
     if (handlerName.includes('view')) return 'view_name';
     if (handlerName.includes('program')) return 'program_name';
     if (handlerName.includes('interface')) return 'interface_name';
     if (handlerName.includes('domain')) return 'domain_name';
-    if (handlerName.includes('data_element')) return 'data_element_name';
     if (handlerName.includes('structure')) return 'structure_name';
     if (handlerName.includes('function')) return 'function_name';
-    if (handlerName.includes('behavior_definition')) return 'bdef_name';
-    if (handlerName.includes('behavior_implementation')) return 'bimp_name';
-    if (handlerName.includes('metadata_extension')) return 'ddlx_name';
-    if (handlerName.includes('service_definition'))
-      return 'service_definition_name';
     return 'name'; // fallback
+  }
+
+  /**
+   * Returns the name field used for CREATE and UPDATE operations.
+   * For some types this differs from the delete name field.
+   */
+  private getCreateUpdateNameField(): string {
+    const handlerName = (this as any).handlerName || '';
+    // behavior_implementation: create/update use class_name (same as delete)
+    if (handlerName.includes('behavior_implementation')) return 'class_name';
+    // behavior_definition: create/update use 'name', delete uses 'behavior_definition_name'
+    if (handlerName.includes('behavior_definition')) return 'name';
+    return this.getNameField();
   }
 
   // Compatibility methods - HighTester doesn't use lambdas for lifecycle hooks

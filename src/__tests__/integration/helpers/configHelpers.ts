@@ -357,6 +357,15 @@ export function getEnabledTestCase(
 }
 
 /**
+ * Get shared object configuration from shared_objects section.
+ * Shared objects are prerequisites used by multiple tests (e.g., BDEF for BehaviorImplementation).
+ */
+export function getSharedObject(key: string): any {
+  const config = loadTestConfig();
+  return config?.shared_objects?.[key] ?? null;
+}
+
+/**
  * Get test case definition
  */
 export function getTestCaseDefinition(

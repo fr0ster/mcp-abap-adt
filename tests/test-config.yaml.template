@@ -94,6 +94,27 @@ shared_objects:
     transport_request: ""
     description: "Shared container class for unit test integration tests"
 
+  # Behavior Definition prerequisite for BehaviorImplementation tests
+  behavior_definition_prerequisite:
+    name: "<YOUR_BDEF_NAME>"             # e.g., ZOK_I_CDS_TEST
+    implementation_type: "Managed"       # or "Unmanaged", "Abstract", "Projection"
+    # package_name: ""                   # uses environment.default_package if empty
+    # transport_request: ""              # uses environment.default_transport if empty
+    source_code: |
+      managed implementation in class zbp_<your_bdef_name> unique;
+
+      strict ( 2 );
+
+      define behavior for <YOUR_BDEF_NAME>
+      persistent table <your_table>
+      lock master
+      authorization master ( instance )
+      {
+        create;
+        update;
+        delete;
+      }
+
 # ============================================================================
 # AUTHENTICATION BROKER CONFIGURATION
 # ============================================================================

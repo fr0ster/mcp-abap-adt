@@ -9,7 +9,10 @@
 
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { resolveSystemContext } from '../../../lib/systemContext';
+import {
+  getSystemContext,
+  resolveSystemContext,
+} from '../../../lib/systemContext';
 import {
   getSharedDependenciesConfig,
   getTimeout,
@@ -34,7 +37,11 @@ describe('Admin: Teardown shared dependencies', () => {
       const result = await createTestConnectionAndSession();
       connection = result.connection;
       await resolveSystemContext(connection);
-      client = new AdtClient(connection);
+      const systemCtx = getSystemContext();
+      client = new AdtClient(connection, undefined, {
+        masterSystem: systemCtx.masterSystem,
+        responsible: systemCtx.responsible,
+      });
       hasConfig = true;
     } catch (error: any) {
       testsLogger?.warn?.(
@@ -70,9 +77,25 @@ describe('Admin: Teardown shared dependencies', () => {
         status: string;
       }> = [];
 
-      // Reverse dependency order: bdefs → views → tables → package
+      // Reverse dependency order: classes → bdefs → views → tables → package
 
-      // 1. Behavior definitions
+      // 1. Classes (implementation classes for BDEFs — delete before BDEFs)
+      const classes = sharedConfig.classes || [];
+      for (const item of classes) {
+        const status = await safeDelete(
+          `class ${item.name}`,
+          async () => {
+            await client.getClass().delete({
+              className: item.name,
+              transportRequest,
+            });
+          },
+          testsLogger,
+        );
+        results.push({ type: 'classes', name: item.name, status });
+      }
+
+      // 2. Behavior definitions
       const bdefs = sharedConfig.behavior_definitions || [];
       for (const item of bdefs) {
         const status = await safeDelete(
@@ -92,7 +115,7 @@ describe('Admin: Teardown shared dependencies', () => {
         });
       }
 
-      // 2. Views
+      // 3. Views
       const views = sharedConfig.views || [];
       for (const item of views) {
         const status = await safeDelete(
@@ -108,7 +131,7 @@ describe('Admin: Teardown shared dependencies', () => {
         results.push({ type: 'views', name: item.name, status });
       }
 
-      // 3. Tables
+      // 4. Tables
       const tables = sharedConfig.tables || [];
       for (const item of tables) {
         const status = await safeDelete(
@@ -124,7 +147,7 @@ describe('Admin: Teardown shared dependencies', () => {
         results.push({ type: 'tables', name: item.name, status });
       }
 
-      // 4. Package (last — after all contents removed)
+      // 5. Package (last — after all contents removed)
       if (sharedConfig.package) {
         const status = await safeDelete(
           `package ${sharedConfig.package}`,

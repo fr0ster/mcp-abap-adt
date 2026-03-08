@@ -203,6 +203,10 @@ shared_dependencies:
           association _parent;
         }
 
+  classes:
+    - name: "ZBP_<PREFIX>_SHR_I_ROOT"
+      description: "Shared BDEF implementation class for <PREFIX>_SHR_I_ROOT"
+
 # Legacy shared_objects section (kept for backward compatibility)
 shared_objects:
   unit_test_class:

@@ -130,9 +130,7 @@ describe('Config: shared_dependencies consistency', () => {
     }
 
     if (errors.length > 0) {
-      throw new Error(
-        `Unresolved dep_* references:\n  ${errors.join('\n  ')}`,
-      );
+      throw new Error(`Unresolved dep_* references:\n  ${errors.join('\n  ')}`);
     }
   });
 

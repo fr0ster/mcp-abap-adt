@@ -29,10 +29,7 @@ import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteCl
 import { handleUnlockClass } from '../../../../handlers/class/low/handleUnlockClass';
 import { handleActivateObject } from '../../../../handlers/common/low/handleActivateObject';
 import { createAdtClient } from '../../../../lib/clients';
-import {
-  getEnabledTestCase,
-  getTimeout,
-} from '../../helpers/configHelpers';
+import { getEnabledTestCase, getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -87,9 +84,7 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
           } catch (e: any) {
             const msg = e?.message || String(e);
             if (!msg.includes('not found') && !msg.includes('404')) {
-              testLogger?.warn?.(
-                `Failed to delete BIMPL class: ${msg}`,
-              );
+              testLogger?.warn?.(`Failed to delete BIMPL class: ${msg}`);
             }
           }
         }
@@ -217,9 +212,7 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
           'full_workflow',
         );
         if (!bimplTestCase) {
-          testLogger?.info?.(
-            'BIMPL test case not found or disabled, skipping',
-          );
+          testLogger?.info?.('BIMPL test case not found or disabled, skipping');
           return;
         }
 
@@ -337,9 +330,7 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
             }),
         );
         if (lockResponse.isError) {
-          throw new Error(
-            `Lock failed: ${extractErrorMessage(lockResponse)}`,
-          );
+          throw new Error(`Lock failed: ${extractErrorMessage(lockResponse)}`);
         }
         const lockData = parseHandlerResponse(lockResponse);
         const lockHandle = extractLockHandle(lockData);
@@ -404,9 +395,7 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
         // Part 3: Group-activate BDEF + BIMPL class together
         // ═══════════════════════════════════════════════════════════
 
-        testLogger?.info?.(
-          `   * group activate: ${objectName} + ${className}`,
-        );
+        testLogger?.info?.(`   * group activate: ${objectName} + ${className}`);
         await handleActivateObject(handlerCtx, {
           objects: [
             { name: objectName.toUpperCase(), type: 'BDEF/BDO' },

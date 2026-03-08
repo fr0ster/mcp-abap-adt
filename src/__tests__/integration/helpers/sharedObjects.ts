@@ -96,8 +96,8 @@ export async function ensureSharedPackage(
       packageName,
       description: 'Shared test dependencies package',
       superPackage: sharedConfig.super_package,
-      softwareComponent: sharedConfig.software_component,
-      transportLayer: sharedConfig.transport_layer,
+      softwareComponent: sharedConfig.software_component || undefined,
+      transportLayer: sharedConfig.transport_layer || undefined,
       packageType: 'development',
       transportRequest,
     });
@@ -130,6 +130,7 @@ export async function ensureSharedDependency(
   type: string,
   name: string,
   log?: ILogger,
+  options?: { skipActivation?: boolean },
 ): Promise<{ existed: boolean; created: boolean }> {
   const cacheKey = `${type}:${name}`;
   if (_verifiedDependencies[cacheKey]) {
@@ -173,6 +174,8 @@ export async function ensureSharedDependency(
   // Create the object
   log?.info?.(`Creating shared ${type} ${name}...`);
   try {
+    const activate = !options?.skipActivation;
+
     if (type === 'tables') {
       await client.getTable().create({
         tableName: name,
@@ -181,7 +184,7 @@ export async function ensureSharedDependency(
         ddlCode: depConfig.source,
         transportRequest,
       });
-      if (depConfig.source) {
+      if (depConfig.source && activate) {
         log?.info?.(`Activating shared table ${name}...`);
         await client.getTable().update(
           {
@@ -201,7 +204,7 @@ export async function ensureSharedDependency(
         ddlSource: depConfig.source,
         transportRequest,
       });
-      if (depConfig.source) {
+      if (depConfig.source && activate) {
         log?.info?.(`Activating shared view ${name}...`);
         await client.getView().update(
           {
@@ -223,7 +226,7 @@ export async function ensureSharedDependency(
         sourceCode: depConfig.source,
         transportRequest,
       });
-      if (depConfig.source) {
+      if (depConfig.source && activate) {
         log?.info?.(`Activating shared behavior definition ${name}...`);
         await client.getBehaviorDefinition().update(
           {
@@ -346,6 +349,10 @@ export async function ensureSharedObjects(
     {
       type: 'behavior_definitions',
       readFn: (name) => client.getBehaviorDefinition().read({ name }),
+    },
+    {
+      type: 'classes',
+      readFn: (name) => client.getClass().read({ className: name }),
     },
   ];
 

@@ -22,10 +22,7 @@ import { handleCreateBehaviorImplementation } from '../../../../handlers/behavio
 import { handleUpdateBehaviorImplementation } from '../../../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
 import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
 import { handleActivateObject } from '../../../../handlers/common/low/handleActivateObject';
-import {
-  getEnabledTestCase,
-  getTimeout,
-} from '../../helpers/configHelpers';
+import { getEnabledTestCase, getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -45,7 +42,7 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
     );
     await tester.beforeAll(
       async (context: LambdaTesterContext) => {
-        // Verify CDS view prerequisites exist (ZOK_SHR_I_BDEF etc.)
+        // Verify CDS view prerequisites exist (ZMCP_SHR_I_BDEF etc.)
         await ensureSharedObjects(context.connection);
       },
       // Cleanup lambda: delete BIMPL class first, then BDEF
@@ -76,9 +73,7 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
           } catch (e: any) {
             const msg = e?.message || String(e);
             if (!msg.includes('not found') && !msg.includes('404')) {
-              testLogger?.warn?.(
-                `Failed to delete BIMPL class: ${msg}`,
-              );
+              testLogger?.warn?.(`Failed to delete BIMPL class: ${msg}`);
             }
           }
         }

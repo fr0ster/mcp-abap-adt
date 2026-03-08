@@ -140,6 +140,18 @@ export async function handleCreateServiceDefinition(
         );
       }
 
+      // Update source code if provided (create only creates metadata, source needs update)
+      if (typedArgs.source_code) {
+        await client.getServiceDefinition().update(
+          {
+            serviceDefinitionName,
+            sourceCode: typedArgs.source_code,
+            transportRequest: typedArgs.transport_request,
+          },
+          { sourceCode: typedArgs.source_code },
+        );
+      }
+
       // Activate if requested
       if (shouldActivate) {
         const activateState = await client

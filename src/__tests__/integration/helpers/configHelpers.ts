@@ -378,7 +378,7 @@ export function getSharedDependenciesConfig(): any {
 /**
  * Resolve a shared dependency by type and name.
  * @param type - 'tables' | 'views' | 'behavior_definitions'
- * @param name - Object name (e.g., "ZOK_SHR_TABLE01")
+ * @param name - Object name (e.g., "ZMCP_SHR_TABLE01")
  */
 export function resolveSharedDependency(
   type: string,

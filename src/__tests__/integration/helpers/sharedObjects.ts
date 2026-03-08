@@ -1,26 +1,39 @@
 /**
- * Shared Objects Management — soft mode (direct adt-clients calls)
+ * Shared Dependencies Management — soft mode (direct adt-clients calls)
  *
  * Ensures shared prerequisite objects exist in SAP and match YAML config.
  * Used by tests that depend on shared objects (e.g., BehaviorImplementation depends on BDEF).
  *
  * Always runs in soft mode — no MCP server process needed.
+ *
+ * Commands:
+ *   npm run shared:setup    — create all shared dependencies in order
+ *   npm run shared:teardown — delete all shared dependencies in reverse order
+ *   npm run shared:check    — validate config consistency (offline)
  */
 
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
-import { getSharedObject, loadTestConfig } from './configHelpers';
+import {
+  getSharedDependenciesConfig,
+  loadTestConfig,
+  resolveSharedDependency,
+} from './configHelpers';
 import { createTestLogger } from './loggerHelpers';
 import { createTestConnectionAndSession } from './sessionHelpers';
 
 const logger = createTestLogger('shared-objects');
 
-interface SharedObjectResult {
+export interface SharedObjectResult {
   success: boolean;
   name: string;
   action: 'verified' | 'created' | 'updated' | 'skipped';
   reason?: string;
 }
+
+/** In-memory cache to skip re-verification within the same process */
+const _verifiedDependencies: Record<string, boolean> = {};
+let _sharedPackageReady = false;
 
 /**
  * Normalize source code for comparison: trim lines, collapse whitespace, remove empty lines.
@@ -33,182 +46,252 @@ function normalizeSource(source: string): string {
     .join('\n');
 }
 
+function resolveTransportRequest(override?: string): string | undefined {
+  if (override) return override;
+  const config = loadTestConfig();
+  return config?.environment?.default_transport || undefined;
+}
+
+function resolvePackageName(override?: string): string {
+  if (override) return override;
+  const sharedConfig = getSharedDependenciesConfig();
+  if (sharedConfig?.package) return sharedConfig.package;
+  const config = loadTestConfig();
+  return config?.environment?.default_package || 'ZLOCAL';
+}
+
 /**
- * Ensure behavior_definition_prerequisite shared object exists and matches YAML.
- *
- * Steps:
- * 1. Read BDEF from SAP
- * 2. If not found → create it
- * 3. If found → compare source code with YAML; update if different
+ * Ensure the shared sub-package exists (create if missing).
+ * Skips after first successful verification (in-memory flag).
  */
-export async function ensureBdefPrerequisite(
-  connection: IAbapConnection,
-  adtLogger?: ILogger,
-): Promise<SharedObjectResult> {
-  const config = getSharedObject('behavior_definition_prerequisite');
-  if (!config?.name) {
-    return {
-      success: true,
-      name: '',
-      action: 'skipped',
-      reason: 'No behavior_definition_prerequisite in shared_objects config',
-    };
+export async function ensureSharedPackage(
+  client: AdtClient,
+  log?: ILogger,
+): Promise<void> {
+  if (_sharedPackageReady) return;
+
+  const sharedConfig = getSharedDependenciesConfig();
+  if (!sharedConfig?.package) return;
+
+  const packageName = sharedConfig.package;
+
+  // Check if package exists
+  try {
+    const readResult = await client.getPackage().read({ packageName });
+    if (readResult?.readResult) {
+      log?.info?.(`Shared package ${packageName} already exists`);
+      _sharedPackageReady = true;
+      return;
+    }
+  } catch {
+    // Package doesn't exist — will create below
   }
 
-  const name = String(config.name).toUpperCase();
-  const yamlSource: string | undefined = config.source_code;
-  const implementationType = config.implementation_type || 'Managed';
-
-  const globalConfig = loadTestConfig();
-  const packageName =
-    config.package_name ||
-    globalConfig?.environment?.default_package ||
-    'ZOK_LOCAL';
-  const transportRequest =
-    config.transport_request ||
-    globalConfig?.environment?.default_transport ||
-    undefined;
-
-  const client = new AdtClient(connection, adtLogger);
-
-  // Step 1: Try to read
+  // Create the package
   try {
-    const state = await client.getBehaviorDefinition().read({ name }, 'active');
-
-    if (state) {
-      logger?.info(`✅ Shared BDEF ${name} exists`);
-
-      // Step 2: Compare source code if YAML has source_code defined
-      if (yamlSource) {
-        try {
-          const readState = await client
-            .getBehaviorDefinition()
-            .read({ name }, 'active');
-          const currentSource =
-            typeof readState?.readResult?.data === 'string'
-              ? readState.readResult.data
-              : '';
-
-          if (normalizeSource(currentSource) !== normalizeSource(yamlSource)) {
-            logger?.info(
-              `📝 Shared BDEF ${name} source differs from YAML, updating...`,
-            );
-            // Lock → Update → Unlock → Activate
-            try {
-              const lockHandle = await client
-                .getBehaviorDefinition()
-                .lock({ name });
-              try {
-                await client
-                  .getBehaviorDefinition()
-                  .update({ name, sourceCode: yamlSource }, { lockHandle });
-              } finally {
-                await client
-                  .getBehaviorDefinition()
-                  .unlock({ name }, lockHandle);
-              }
-              await client.getBehaviorDefinition().activate({ name });
-              logger?.info(`✅ Shared BDEF ${name} updated and activated`);
-              return { success: true, name, action: 'updated' };
-            } catch (updateError: any) {
-              logger?.warn?.(
-                `⚠️ Failed to update shared BDEF ${name}: ${updateError.message}`,
-              );
-              // Object exists but couldn't update — still usable
-              return { success: true, name, action: 'verified' };
-            }
-          }
-        } catch {
-          // Can't read source — object exists, skip comparison
-        }
-      }
-
-      return { success: true, name, action: 'verified' };
-    }
-  } catch (readError: any) {
-    if (readError.response?.status !== 404) {
-      return {
-        success: false,
-        name,
-        action: 'skipped',
-        reason: `Cannot read shared BDEF ${name}: ${readError.message}`,
-      };
-    }
-    // 404 — doesn't exist, create it
-  }
-
-  // Step 3: Create
-  logger?.info(`🔨 Creating shared BDEF ${name}...`);
-  try {
-    await client.getBehaviorDefinition().create({
-      name,
-      rootEntity: name,
+    const transportRequest = resolveTransportRequest(
+      sharedConfig.transport_request,
+    );
+    await client.getPackage().create({
       packageName,
-      implementationType,
-      description: `Shared prerequisite BDEF for integration tests`,
-      ...(yamlSource && { sourceCode: yamlSource }),
-      ...(transportRequest && { transportRequest }),
+      description: 'Shared test dependencies package',
+      superPackage: sharedConfig.super_package,
+      softwareComponent: sharedConfig.software_component,
+      transportLayer: sharedConfig.transport_layer,
+      packageType: 'development',
+      transportRequest,
     });
-    // Wait for SAP to fully propagate the activation
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-    logger?.info(`✅ Shared BDEF ${name} created and activated`);
-    return { success: true, name, action: 'created' };
-  } catch (createError: any) {
-    // "already exists" is OK (race condition or stale cache)
-    if (
-      createError.message?.includes('already exists') ||
-      createError.response?.status === 409
-    ) {
-      return { success: true, name, action: 'verified' };
-    }
-    return {
-      success: false,
-      name,
-      action: 'skipped',
-      reason: `Failed to create shared BDEF ${name}: ${createError.message}`,
-    };
-  }
-}
-
-/**
- * Verify a CDS view exists in SAP (read-only check, no create).
- * Returns success=true if exists, success=false with reason if not.
- */
-export async function verifyCdsViewExists(
-  connection: IAbapConnection,
-  viewName: string,
-  adtLogger?: ILogger,
-): Promise<SharedObjectResult> {
-  const name = viewName.toUpperCase();
-  const client = new AdtClient(connection, adtLogger);
-  try {
-    await client.getView().read({ viewName: name });
-    logger?.info(`✅ CDS view ${name} exists`);
-    return { success: true, name, action: 'verified' };
+    log?.info?.(`Created shared package ${packageName}`);
   } catch (error: any) {
-    if (error.response?.status === 404) {
-      return {
-        success: false,
-        name,
-        action: 'skipped',
-        reason: `CDS view ${name} does not exist in SAP. Create it manually.`,
-      };
+    if (
+      error.message?.includes('409') ||
+      error.message?.includes('already exist')
+    ) {
+      log?.info?.(`Shared package ${packageName} already exists`);
+    } else {
+      log?.warn?.(
+        `Failed to create shared package ${packageName}: ${error.message}`,
+      );
+      throw error;
     }
-    return {
-      success: false,
-      name,
-      action: 'skipped',
-      reason: `Cannot verify CDS view ${name}: ${error.message}`,
-    };
+  }
+
+  _sharedPackageReady = true;
+}
+
+/**
+ * Ensure a shared dependency object exists. Creates it if missing, never deletes.
+ * Uses in-memory cache to skip verification after first check.
+ *
+ * @returns { existed: boolean, created: boolean }
+ */
+export async function ensureSharedDependency(
+  client: AdtClient,
+  type: string,
+  name: string,
+  log?: ILogger,
+): Promise<{ existed: boolean; created: boolean }> {
+  const cacheKey = `${type}:${name}`;
+  if (_verifiedDependencies[cacheKey]) {
+    log?.info?.(`Shared ${type} ${name} already verified, skipping`);
+    return { existed: true, created: false };
+  }
+
+  const depConfig = resolveSharedDependency(type, name);
+  if (!depConfig) {
+    throw new Error(
+      `Shared dependency ${type}:${name} not found in shared_dependencies config`,
+    );
+  }
+
+  const packageName = resolvePackageName();
+  const transportRequest = resolveTransportRequest();
+
+  // Check if the object already exists
+  let exists = false;
+  try {
+    if (type === 'tables') {
+      const result = await client.getTable().read({ tableName: name });
+      exists = result?.readResult !== undefined;
+    } else if (type === 'views') {
+      const result = await client.getView().read({ viewName: name });
+      exists = result !== undefined;
+    } else if (type === 'behavior_definitions') {
+      const result = await client.getBehaviorDefinition().read({ name });
+      exists = result !== undefined;
+    }
+  } catch {
+    exists = false;
+  }
+
+  if (exists) {
+    log?.info?.(`Shared ${type} ${name} already exists`);
+    _verifiedDependencies[cacheKey] = true;
+    return { existed: true, created: false };
+  }
+
+  // Create the object
+  log?.info?.(`Creating shared ${type} ${name}...`);
+  try {
+    if (type === 'tables') {
+      await client.getTable().create({
+        tableName: name,
+        packageName,
+        description: depConfig.description || 'Shared test table',
+        ddlCode: depConfig.source,
+        transportRequest,
+      });
+      if (depConfig.source) {
+        log?.info?.(`Activating shared table ${name}...`);
+        await client.getTable().update(
+          {
+            tableName: name,
+            ddlCode: depConfig.source,
+            transportRequest,
+          },
+          { activateOnUpdate: true, sourceCode: depConfig.source },
+        );
+        log?.info?.(`Shared table ${name} activated`);
+      }
+    } else if (type === 'views') {
+      await client.getView().create({
+        viewName: name,
+        packageName,
+        description: depConfig.description || 'Shared test view',
+        ddlSource: depConfig.source,
+        transportRequest,
+      });
+      if (depConfig.source) {
+        log?.info?.(`Activating shared view ${name}...`);
+        await client.getView().update(
+          {
+            viewName: name,
+            ddlSource: depConfig.source,
+            transportRequest,
+          },
+          { activateOnUpdate: true, sourceCode: depConfig.source },
+        );
+        log?.info?.(`Shared view ${name} activated`);
+      }
+    } else if (type === 'behavior_definitions') {
+      await client.getBehaviorDefinition().create({
+        name,
+        packageName,
+        rootEntity: depConfig.root_entity || name,
+        implementationType: depConfig.implementation_type || 'Managed',
+        description: depConfig.description || 'Shared test BDEF',
+        sourceCode: depConfig.source,
+        transportRequest,
+      });
+      if (depConfig.source) {
+        log?.info?.(`Activating shared behavior definition ${name}...`);
+        await client.getBehaviorDefinition().update(
+          {
+            name,
+            sourceCode: depConfig.source,
+            transportRequest,
+          },
+          { activateOnUpdate: true, sourceCode: depConfig.source },
+        );
+        log?.info?.(`Shared behavior definition ${name} activated`);
+      }
+    }
+    log?.info?.(`Created shared ${type} ${name}`);
+    _verifiedDependencies[cacheKey] = true;
+    return { existed: false, created: true };
+  } catch (error: any) {
+    if (
+      error.message?.includes('409') ||
+      error.message?.includes('already exist')
+    ) {
+      log?.info?.(
+        `Shared ${type} ${name} already exists (concurrent creation)`,
+      );
+      _verifiedDependencies[cacheKey] = true;
+      return { existed: true, created: false };
+    }
+    throw error;
+  }
+}
+
+/** Try to delete an object; ignore 404 (already gone) */
+export async function safeDelete(
+  label: string,
+  deleteFn: () => Promise<void>,
+  log?: ILogger,
+): Promise<'deleted' | 'not_found' | 'failed'> {
+  try {
+    await deleteFn();
+    log?.info?.(`Deleted ${label}`);
+    return 'deleted';
+  } catch (error: any) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (
+      msg.includes('404') ||
+      msg.includes('not found') ||
+      msg.includes('does not exist')
+    ) {
+      log?.info?.(`${label} — already gone (404)`);
+      return 'not_found';
+    }
+    log?.error?.(`Failed to delete ${label}: ${msg}`);
+    return 'failed';
+  }
+}
+
+/** Clear in-memory caches for shared dependencies */
+export function resetSharedDependencyCache(): void {
+  _sharedPackageReady = false;
+  for (const key of Object.keys(_verifiedDependencies)) {
+    delete _verifiedDependencies[key];
   }
 }
 
 /**
- * Ensure all shared objects from YAML exist and match.
+ * Ensure all shared dependencies from YAML exist.
  * Call this in beforeAll() of tests that depend on shared objects.
  *
  * Always creates its own connection (soft mode) — works regardless of hard/soft mode context.
- * If connection is provided AND has makeAdtRequest, it will be used.
  */
 export async function ensureSharedObjects(
   connection?: IAbapConnection | null,
@@ -222,7 +305,7 @@ export async function ensureSharedObjects(
       conn = result.connection;
     } catch (connError: any) {
       logger?.warn?.(
-        `⚠️ Cannot create connection for shared objects: ${connError.message}`,
+        `Cannot create connection for shared objects: ${connError.message}`,
       );
       return [
         {
@@ -235,29 +318,53 @@ export async function ensureSharedObjects(
     }
   }
 
+  const client = new AdtClient(conn!, adtLogger);
   const results: SharedObjectResult[] = [];
 
-  // Verify CDS view prerequisites (must exist in SAP, not auto-created)
-  const sharedConfig = loadTestConfig()?.shared_objects || {};
-  const cdsPrerequisites: string[] = sharedConfig.cds_view_prerequisites || [];
-  for (const viewName of cdsPrerequisites) {
-    const cdsResult = await verifyCdsViewExists(conn!, viewName, adtLogger);
-    results.push(cdsResult);
-    if (!cdsResult.success) {
-      logger?.warn?.(
-        `⚠️ CDS view prerequisite ${viewName} missing: ${cdsResult.reason}`,
-      );
-    }
+  const sharedConfig = getSharedDependenciesConfig();
+  if (!sharedConfig) {
+    logger?.info?.('No shared_dependencies in config, skipping');
+    return results;
   }
 
-  // BDEF prerequisite
-  const bdefResult = await ensureBdefPrerequisite(conn!, adtLogger);
-  results.push(bdefResult);
+  // Dependency order: tables → views → behavior_definitions
+  const typeOrder = ['tables', 'views', 'behavior_definitions'];
+
+  for (const type of typeOrder) {
+    const items = sharedConfig[type];
+    if (!Array.isArray(items) || items.length === 0) continue;
+
+    for (const item of items) {
+      try {
+        const depResult = await ensureSharedDependency(
+          client,
+          type,
+          item.name,
+          logger,
+        );
+        results.push({
+          success: true,
+          name: item.name,
+          action: depResult.created ? 'created' : 'verified',
+        });
+      } catch (error: any) {
+        logger?.error?.(
+          `Failed to ensure ${type} ${item.name}: ${error.message}`,
+        );
+        results.push({
+          success: false,
+          name: item.name,
+          action: 'skipped',
+          reason: `Failed to ensure ${type} ${item.name}: ${error.message}`,
+        });
+      }
+    }
+  }
 
   // Log summary
   for (const r of results) {
     if (!r.success) {
-      logger?.warn?.(`⚠️ Shared object ${r.name}: ${r.reason}`);
+      logger?.warn?.(`Shared object ${r.name}: ${r.reason}`);
     }
   }
 

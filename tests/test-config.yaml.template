@@ -79,41 +79,137 @@ environment:
     name_suffix: ""      # optional object suffix to avoid collisions
 
 # ============================================================================
-# SHARED OBJECTS
+# SHARED DEPENDENCIES — persistent Lego library for integration tests
 # ============================================================================
-# Objects created once and reused across multiple tests.
-# These are NOT deleted between test runs — they serve as dependencies
-# (e.g., a container class for unit test handlers).
-# Tests that need shared objects should reference them by name from this section.
+# Objects are lazily created on first ensureSharedDependency() call, never deleted.
+# Manage with: npm run shared:setup / shared:teardown / shared:check
+# Naming convention: <PREFIX>_SHR_{COMPONENT}_{OBJTYPE}
 
+shared_dependencies:
+  package: "<YOUR_SHARED_PACKAGE>"          # Sub-package for all shared objects
+  super_package: "<YOUR_DEFAULT_PACKAGE>"   # Parent package (same as environment.default_package)
+  software_component: ""                    # e.g., HOME (leave empty for cloud)
+  transport_layer: ""                       # e.g., ZE19 (leave empty for cloud)
+
+  tables:
+    - name: "<PREFIX>_SHR_RTABL"
+      description: "Shared table for root CDS entity"
+      source: |
+        @EndUserText.label : 'Shared table for root CDS entity'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        @AbapCatalog.tableCategory : #TRANSPARENT
+        @AbapCatalog.deliveryClass : #A
+        @AbapCatalog.dataMaintenance : #RESTRICTED
+        define table <prefix>_shr_rtabl {
+          key client : abap.clnt not null;
+          key fld1   : abap.char(10) not null;
+          fld2       : abap.char(50);
+          fld3       : abap.dec(10,2);
+          fld4       : abap.dats;
+        }
+
+    - name: "<PREFIX>_SHR_CTABL"
+      description: "Shared table for child CDS entity"
+      source: |
+        @EndUserText.label : 'Shared table for child CDS entity'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        @AbapCatalog.tableCategory : #TRANSPARENT
+        @AbapCatalog.deliveryClass : #A
+        @AbapCatalog.dataMaintenance : #RESTRICTED
+        define table <prefix>_shr_ctabl {
+          key client    : abap.clnt not null;
+          key chld_id   : abap.char(10) not null;
+          parent_id     : abap.char(10) not null;
+          fld2          : abap.char(50);
+        }
+
+  views:
+    - name: "<PREFIX>_SHR_I_ROOT"
+      description: "Shared root CDS view entity"
+      source: |
+        @EndUserText.label : 'Shared root CDS view entity'
+        @AccessControl.authorizationCheck : #NOT_REQUIRED
+        define root view entity <PREFIX>_SHR_I_ROOT
+          as select from <prefix>_shr_rtabl
+          composition [0..*] of <PREFIX>_SHR_I_CHLD as _children
+        {
+          key fld1 as Fld1,
+          fld2 as Fld2,
+          fld3 as Fld3,
+          fld4 as Fld4,
+          _children
+        }
+
+    - name: "<PREFIX>_SHR_I_CHLD"
+      description: "Shared child CDS view entity"
+      source: |
+        @EndUserText.label : 'Shared child CDS view entity'
+        @AccessControl.authorizationCheck : #NOT_REQUIRED
+        define view entity <PREFIX>_SHR_I_CHLD
+          as select from <prefix>_shr_ctabl
+          association to parent <PREFIX>_SHR_I_ROOT as _parent
+            on $projection.ParentId = _parent.Fld1
+        {
+          key chld_id as ChldId,
+          parent_id as ParentId,
+          fld2 as Fld2,
+          _parent
+        }
+
+    - name: "<PREFIX>_SHR_C_ROOT"
+      description: "Shared consumption projection CDS view"
+      source: |
+        @EndUserText.label : 'Shared consumption projection'
+        @AccessControl.authorizationCheck : #NOT_REQUIRED
+        define root view entity <PREFIX>_SHR_C_ROOT
+          provider contract transactional_query
+          as projection on <PREFIX>_SHR_I_ROOT
+        {
+          key Fld1,
+          Fld2,
+          Fld3,
+          Fld4
+        }
+
+  behavior_definitions:
+    - name: "<PREFIX>_SHR_I_ROOT"
+      description: "Shared BDEF for BehaviorImplementation tests"
+      root_entity: "<PREFIX>_SHR_I_ROOT"
+      implementation_type: "Managed"
+      source: |
+        managed implementation in class zbp_<prefix>_shr_i_root unique;
+        strict ( 2 );
+
+        define behavior for <PREFIX>_SHR_I_ROOT
+        persistent table <prefix>_shr_rtabl
+        lock master
+        authorization master ( instance )
+        {
+          create ( authorization : global );
+          update;
+          delete;
+          field ( readonly ) Fld1;
+          association _children { create; }
+        }
+
+        define behavior for <PREFIX>_SHR_I_CHLD
+        persistent table <prefix>_shr_ctabl
+        lock dependent by _parent
+        authorization dependent by _parent
+        {
+          update;
+          delete;
+          field ( readonly:update ) ChldId, ParentId;
+          association _parent;
+        }
+
+# Legacy shared_objects section (kept for backward compatibility)
 shared_objects:
-  # Container class for unit test handlers (ClassUnitTest, ClassUnitTestHigh)
   unit_test_class:
     class_name: "<YOUR_SHARED_UT_CLASS>"
     package_name: "<YOUR_PACKAGE_NAME>"
     transport_request: ""
     description: "Shared container class for unit test integration tests"
-
-  # Behavior Definition prerequisite for BehaviorImplementation tests
-  behavior_definition_prerequisite:
-    name: "<YOUR_BDEF_NAME>"             # e.g., ZOK_I_CDS_TEST
-    implementation_type: "Managed"       # or "Unmanaged", "Abstract", "Projection"
-    # package_name: ""                   # uses environment.default_package if empty
-    # transport_request: ""              # uses environment.default_transport if empty
-    source_code: |
-      managed implementation in class zbp_<your_bdef_name> unique;
-
-      strict ( 2 );
-
-      define behavior for <YOUR_BDEF_NAME>
-      persistent table <your_table>
-      lock master
-      authorization master ( instance )
-      {
-        create;
-        update;
-        delete;
-      }
 
 # ============================================================================
 # AUTHENTICATION BROKER CONFIGURATION

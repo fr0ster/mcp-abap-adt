@@ -366,6 +366,37 @@ export function getSharedObject(key: string): any {
 }
 
 /**
+ * Get shared_dependencies configuration section.
+ * Shared dependencies are persistent prerequisite objects (tables, views, BDEFs)
+ * created once and reused across all tests.
+ */
+export function getSharedDependenciesConfig(): any {
+  const config = loadTestConfig();
+  return config?.shared_dependencies ?? null;
+}
+
+/**
+ * Resolve a shared dependency by type and name.
+ * @param type - 'tables' | 'views' | 'behavior_definitions'
+ * @param name - Object name (e.g., "ZOK_SHR_TABLE01")
+ */
+export function resolveSharedDependency(
+  type: string,
+  name: string,
+): any | null {
+  const sharedConfig = getSharedDependenciesConfig();
+  if (!sharedConfig) return null;
+  const collection = sharedConfig[type];
+  if (!Array.isArray(collection)) return null;
+  return (
+    collection.find(
+      (item: any) =>
+        String(item.name).toUpperCase() === String(name).toUpperCase(),
+    ) ?? null
+  );
+}
+
+/**
  * Get test case definition
  */
 export function getTestCaseDefinition(

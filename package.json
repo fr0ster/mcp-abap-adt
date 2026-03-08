@@ -41,9 +41,9 @@
   },
   "scripts": {
     "test": "jest --passWithNoTests",
-    "test:integration": "jest --testPathPattern=integration --runInBand --passWithNoTests",
-    "test:high": "jest --testPathPattern=integration.*HighHandlers --runInBand --passWithNoTests",
-    "test:low": "jest --testPathPattern=integration.*LowHandlers --runInBand --passWithNoTests",
+    "test:integration": "jest --testPathPatterns=integration --runInBand --passWithNoTests",
+    "test:high": "jest --testPathPatterns='integration.*High' --runInBand --passWithNoTests",
+    "test:low": "jest --testPathPatterns='integration.*Low' --runInBand --passWithNoTests",
     "test:check": "npx tsc --noEmit -p tsconfig.test.json",
     "shared:setup": "jest --testPathPatterns='admin/shared-deps/setup' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
     "shared:teardown": "jest --testPathPatterns='admin/shared-deps/teardown' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",

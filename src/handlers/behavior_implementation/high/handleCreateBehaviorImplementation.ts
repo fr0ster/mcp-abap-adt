@@ -19,6 +19,7 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 
 export const TOOL_DEFINITION = {
   name: 'CreateBehaviorImplementation',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state. Use UpdateBehaviorImplementation to set implementation code afterwards.',
   inputSchema: {

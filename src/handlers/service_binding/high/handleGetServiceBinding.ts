@@ -8,6 +8,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetServiceBinding',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve ABAP service binding source/metadata by name via ADT Business Services endpoint.',
   inputSchema: {

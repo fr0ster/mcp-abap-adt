@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetBehaviorDefinition',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve ABAP behavior definition definition. Supports reading active or inactive version.',
   inputSchema: {

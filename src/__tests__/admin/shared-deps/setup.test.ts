@@ -275,9 +275,7 @@ describe('Admin: Setup shared dependencies', () => {
                 type: TYPE_CODES.views,
               });
             } else {
-              testsLogger?.error?.(
-                `Failed to setup view ${item.name}: ${msg}`,
-              );
+              testsLogger?.error?.(`Failed to setup view ${item.name}: ${msg}`);
               results.push({
                 type: 'views',
                 name: item.name,

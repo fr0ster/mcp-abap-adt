@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'DeleteTableLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {

@@ -33,6 +33,7 @@ import {
   getEnabledTestCase,
   getOperationDelay,
   getTimeout,
+  isCloudConnection,
   resolvePackageName,
   resolveTransportRequest,
 } from '../../helpers/configHelpers';
@@ -117,6 +118,12 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
     it(
       'should execute full workflow: FUGR (V→C→L→U→A) then FM (V→C→L→U→U→A)',
       async () => {
+        if (isCloudConnection()) {
+          testLogger?.info(
+            '⏭️  Skipping test: Function groups are not available on cloud systems',
+          );
+          return;
+        }
         if (!hasConfig || (!isHardModeEnabled() && (!connection || !session))) {
           testLogger?.info(
             '⏭️  Skipping test: No configuration, connection or session',

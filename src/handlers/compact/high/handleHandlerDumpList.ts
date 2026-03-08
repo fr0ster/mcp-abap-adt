@@ -4,6 +4,7 @@ import { compactDumpListSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDumpList',
+  available_in: ['onprem'] as const,
   description:
     'Runtime dump list. object_type: not used. Required: none. Optional: user, inlinecount, top, skip, orderby. Response: JSON.',
   inputSchema: compactDumpListSchema,

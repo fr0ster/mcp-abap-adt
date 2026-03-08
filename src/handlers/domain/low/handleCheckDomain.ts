@@ -17,6 +17,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CheckDomainLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Perform syntax check on an ABAP domain. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {

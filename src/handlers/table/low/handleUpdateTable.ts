@@ -16,6 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdateTableLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update DDL source code of an existing ABAP table. Requires lock handle from LockObject. - use CreateTable for full workflow with lock/unlock.',
   inputSchema: {

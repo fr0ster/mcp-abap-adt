@@ -19,6 +19,7 @@ import {
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 export const TOOL_DEFINITION = {
   name: 'CreateServiceDefinition',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP service definition for OData services. Service definitions define the structure and behavior of OData services. Uses stateful session for proper lock management.',
   inputSchema: {

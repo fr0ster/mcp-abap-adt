@@ -328,1144 +328,692 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
       // },
       // Package low-level handlers
       {
-        toolDefinition: {
-          name: UpdatePackage_Tool.name,
-          description: UpdatePackage_Tool.description,
-          inputSchema: UpdatePackage_Tool.inputSchema,
-        },
+        toolDefinition: UpdatePackage_Tool,
         handler: (args: any) => {
           return handleUpdatePackage(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UnlockPackage_Tool.name,
-          description: UnlockPackage_Tool.description,
-          inputSchema: UnlockPackage_Tool.inputSchema,
-        },
+        toolDefinition: UnlockPackage_Tool,
         handler: (args: any) => {
           return handleUnlockPackage(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CheckPackage_Tool.name,
-          description: CheckPackage_Tool.description,
-          inputSchema: CheckPackage_Tool.inputSchema,
-        },
+        toolDefinition: CheckPackage_Tool,
         handler: (args: any) => {
           return handleCheckPackage(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: DeletePackage_Tool.name,
-          description: DeletePackage_Tool.description,
-          inputSchema: DeletePackage_Tool.inputSchema,
-        },
+        toolDefinition: DeletePackage_Tool,
         handler: (args: any) => {
           return handleDeletePackage(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: LockPackage_Tool.name,
-          description: LockPackage_Tool.description,
-          inputSchema: LockPackage_Tool.inputSchema,
-        },
+        toolDefinition: LockPackage_Tool,
         handler: (args: any) => {
           return handleLockPackage(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ValidatePackage_Tool.name,
-          description: ValidatePackage_Tool.description,
-          inputSchema: ValidatePackage_Tool.inputSchema,
-        },
+        toolDefinition: ValidatePackage_Tool,
         handler: (args: any) => {
           return handleValidatePackage(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CreatePackageLow_Tool.name,
-          description: CreatePackageLow_Tool.description,
-          inputSchema: CreatePackageLow_Tool.inputSchema,
-        },
+        toolDefinition: CreatePackageLow_Tool,
         handler: (args: any) => {
           return handleCreatePackageLow(this.context, args);
         },
       },
       // Domain low-level handlers
       {
-        toolDefinition: {
-          name: UpdateDomainLow_Tool.name,
-          description: UpdateDomainLow_Tool.description,
-          inputSchema: UpdateDomainLow_Tool.inputSchema,
-        },
+        toolDefinition: UpdateDomainLow_Tool,
         handler: (args: any) => {
           return handleUpdateDomain(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CheckDomain_Tool.name,
-          description: CheckDomain_Tool.description,
-          inputSchema: CheckDomain_Tool.inputSchema,
-        },
+        toolDefinition: CheckDomain_Tool,
         handler: (args: any) => {
           return handleCheckDomain(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: DeleteDomain_Tool.name,
-          description: DeleteDomain_Tool.description,
-          inputSchema: DeleteDomain_Tool.inputSchema,
-        },
+        toolDefinition: DeleteDomain_Tool,
         handler: (args: any) => {
           return handleDeleteDomain(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: LockDomain_Tool.name,
-          description: LockDomain_Tool.description,
-          inputSchema: LockDomain_Tool.inputSchema,
-        },
+        toolDefinition: LockDomain_Tool,
         handler: (args: any) => {
           return handleLockDomain(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UnlockDomain_Tool.name,
-          description: UnlockDomain_Tool.description,
-          inputSchema: UnlockDomain_Tool.inputSchema,
-        },
+        toolDefinition: UnlockDomain_Tool,
         handler: (args: any) => {
           return handleUnlockDomain(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ValidateDomain_Tool.name,
-          description: ValidateDomain_Tool.description,
-          inputSchema: ValidateDomain_Tool.inputSchema,
-        },
+        toolDefinition: ValidateDomain_Tool,
         handler: (args: any) => {
           return handleValidateDomain(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CreateDomainLow_Tool.name,
-          description: CreateDomainLow_Tool.description,
-          inputSchema: CreateDomainLow_Tool.inputSchema,
-        },
+        toolDefinition: CreateDomainLow_Tool,
         handler: (args: any) => {
           return handleCreateDomainLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ActivateDomain_Tool.name,
-          description: ActivateDomain_Tool.description,
-          inputSchema: ActivateDomain_Tool.inputSchema,
-        },
+        toolDefinition: ActivateDomain_Tool,
         handler: (args: any) => {
           return handleActivateDomain(this.context, args);
         },
       },
       // DataElement low-level handlers
       {
-        toolDefinition: {
-          name: UpdateDataElementLow_Tool.name,
-          description: UpdateDataElementLow_Tool.description,
-          inputSchema: UpdateDataElementLow_Tool.inputSchema,
-        },
+        toolDefinition: UpdateDataElementLow_Tool,
         handler: (args: any) => {
           return handleUpdateDataElement(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CheckDataElement_Tool.name,
-          description: CheckDataElement_Tool.description,
-          inputSchema: CheckDataElement_Tool.inputSchema,
-        },
+        toolDefinition: CheckDataElement_Tool,
         handler: (args: any) => {
           return handleCheckDataElement(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: DeleteDataElement_Tool.name,
-          description: DeleteDataElement_Tool.description,
-          inputSchema: DeleteDataElement_Tool.inputSchema,
-        },
+        toolDefinition: DeleteDataElement_Tool,
         handler: (args: any) => {
           return handleDeleteDataElement(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: LockDataElement_Tool.name,
-          description: LockDataElement_Tool.description,
-          inputSchema: LockDataElement_Tool.inputSchema,
-        },
+        toolDefinition: LockDataElement_Tool,
         handler: (args: any) => {
           return handleLockDataElement(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UnlockDataElement_Tool.name,
-          description: UnlockDataElement_Tool.description,
-          inputSchema: UnlockDataElement_Tool.inputSchema,
-        },
+        toolDefinition: UnlockDataElement_Tool,
         handler: (args: any) => {
           return handleUnlockDataElement(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ValidateDataElement_Tool.name,
-          description: ValidateDataElement_Tool.description,
-          inputSchema: ValidateDataElement_Tool.inputSchema,
-        },
+        toolDefinition: ValidateDataElement_Tool,
         handler: (args: any) => {
           return handleValidateDataElement(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CreateDataElementLow_Tool.name,
-          description: CreateDataElementLow_Tool.description,
-          inputSchema: CreateDataElementLow_Tool.inputSchema,
-        },
+        toolDefinition: CreateDataElementLow_Tool,
         handler: (args: any) => {
           return handleCreateDataElementLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ActivateDataElement_Tool.name,
-          description: ActivateDataElement_Tool.description,
-          inputSchema: ActivateDataElement_Tool.inputSchema,
-        },
+        toolDefinition: ActivateDataElement_Tool,
         handler: (args: any) => {
           return handleActivateDataElement(this.context, args);
         },
       },
       // Transport low-level handlers
       {
-        toolDefinition: {
-          name: CreateTransportLow_Tool.name,
-          description: CreateTransportLow_Tool.description,
-          inputSchema: CreateTransportLow_Tool.inputSchema,
-        },
+        toolDefinition: CreateTransportLow_Tool,
         handler: (args: any) => {
           return handleCreateTransportLow(this.context, args);
         },
       },
       // Table low-level handlers
       {
-        toolDefinition: {
-          name: UpdateTableLow_Tool.name,
-          description: UpdateTableLow_Tool.description,
-          inputSchema: UpdateTableLow_Tool.inputSchema,
-        },
+        toolDefinition: UpdateTableLow_Tool,
         handler: (args: any) => {
           return handleUpdateTableLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: DeleteTable_Tool.name,
-          description: DeleteTable_Tool.description,
-          inputSchema: DeleteTable_Tool.inputSchema,
-        },
+        toolDefinition: DeleteTable_Tool,
         handler: (args: any) => {
           return handleDeleteTable(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: LockTable_Tool.name,
-          description: LockTable_Tool.description,
-          inputSchema: LockTable_Tool.inputSchema,
-        },
+        toolDefinition: LockTable_Tool,
         handler: (args: any) => {
           return handleLockTable(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UnlockTable_Tool.name,
-          description: UnlockTable_Tool.description,
-          inputSchema: UnlockTable_Tool.inputSchema,
-        },
+        toolDefinition: UnlockTable_Tool,
         handler: (args: any) => {
           return handleUnlockTable(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CreateTableLow_Tool.name,
-          description: CreateTableLow_Tool.description,
-          inputSchema: CreateTableLow_Tool.inputSchema,
-        },
+        toolDefinition: CreateTableLow_Tool,
         handler: (args: any) => {
           return handleCreateTableLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CheckTable_Tool.name,
-          description: CheckTable_Tool.description,
-          inputSchema: CheckTable_Tool.inputSchema,
-        },
+        toolDefinition: CheckTable_Tool,
         handler: (args: any) => {
           return handleCheckTable(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ValidateTable_Tool.name,
-          description: ValidateTable_Tool.description,
-          inputSchema: ValidateTable_Tool.inputSchema,
-        },
+        toolDefinition: ValidateTable_Tool,
         handler: (args: any) => {
           return handleValidateTable(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ActivateTable_Tool.name,
-          description: ActivateTable_Tool.description,
-          inputSchema: ActivateTable_Tool.inputSchema,
-        },
+        toolDefinition: ActivateTable_Tool,
         handler: (args: any) => {
           return handleActivateTable(this.context, args);
         },
       },
       // Structure low-level handlers
       {
-        toolDefinition: {
-          name: UpdateStructureLow_Tool.name,
-          description: UpdateStructureLow_Tool.description,
-          inputSchema: UpdateStructureLow_Tool.inputSchema,
-        },
+        toolDefinition: UpdateStructureLow_Tool,
         handler: (args: any) => {
           return handleUpdateStructureLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CheckStructure_Tool.name,
-          description: CheckStructure_Tool.description,
-          inputSchema: CheckStructure_Tool.inputSchema,
-        },
+        toolDefinition: CheckStructure_Tool,
         handler: (args: any) => {
           return handleCheckStructure(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: DeleteStructure_Tool.name,
-          description: DeleteStructure_Tool.description,
-          inputSchema: DeleteStructure_Tool.inputSchema,
-        },
+        toolDefinition: DeleteStructure_Tool,
         handler: (args: any) => {
           return handleDeleteStructure(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: LockStructure_Tool.name,
-          description: LockStructure_Tool.description,
-          inputSchema: LockStructure_Tool.inputSchema,
-        },
+        toolDefinition: LockStructure_Tool,
         handler: (args: any) => {
           return handleLockStructure(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UnlockStructure_Tool.name,
-          description: UnlockStructure_Tool.description,
-          inputSchema: UnlockStructure_Tool.inputSchema,
-        },
+        toolDefinition: UnlockStructure_Tool,
         handler: (args: any) => {
           return handleUnlockStructure(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ValidateStructure_Tool.name,
-          description: ValidateStructure_Tool.description,
-          inputSchema: ValidateStructure_Tool.inputSchema,
-        },
+        toolDefinition: ValidateStructure_Tool,
         handler: (args: any) => {
           return handleValidateStructure(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CreateStructureLow_Tool.name,
-          description: CreateStructureLow_Tool.description,
-          inputSchema: CreateStructureLow_Tool.inputSchema,
-        },
+        toolDefinition: CreateStructureLow_Tool,
         handler: (args: any) => {
           return handleCreateStructureLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ActivateStructure_Tool.name,
-          description: ActivateStructure_Tool.description,
-          inputSchema: ActivateStructure_Tool.inputSchema,
-        },
+        toolDefinition: ActivateStructure_Tool,
         handler: (args: any) => {
           return handleActivateStructure(this.context, args);
         },
       },
       // View low-level handlers
       {
-        toolDefinition: {
-          name: UpdateView_Tool.name,
-          description: UpdateView_Tool.description,
-          inputSchema: UpdateView_Tool.inputSchema,
-        },
+        toolDefinition: UpdateView_Tool,
         handler: (args: any) => {
           return handleUpdateViewLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CheckView_Tool.name,
-          description: CheckView_Tool.description,
-          inputSchema: CheckView_Tool.inputSchema,
-        },
+        toolDefinition: CheckView_Tool,
         handler: (args: any) => {
           return handleCheckView(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: DeleteView_Tool.name,
-          description: DeleteView_Tool.description,
-          inputSchema: DeleteView_Tool.inputSchema,
-        },
+        toolDefinition: DeleteView_Tool,
         handler: (args: any) => {
           return handleDeleteView(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: LockView_Tool.name,
-          description: LockView_Tool.description,
-          inputSchema: LockView_Tool.inputSchema,
-        },
+        toolDefinition: LockView_Tool,
         handler: (args: any) => {
           return handleLockView(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UnlockView_Tool.name,
-          description: UnlockView_Tool.description,
-          inputSchema: UnlockView_Tool.inputSchema,
-        },
+        toolDefinition: UnlockView_Tool,
         handler: (args: any) => {
           return handleUnlockView(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ValidateView_Tool.name,
-          description: ValidateView_Tool.description,
-          inputSchema: ValidateView_Tool.inputSchema,
-        },
+        toolDefinition: ValidateView_Tool,
         handler: (args: any) => {
           return handleValidateView(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CreateViewLow_Tool.name,
-          description: CreateViewLow_Tool.description,
-          inputSchema: CreateViewLow_Tool.inputSchema,
-        },
+        toolDefinition: CreateViewLow_Tool,
         handler: (args: any) => {
           return handleCreateViewLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ActivateView_Tool.name,
-          description: ActivateView_Tool.description,
-          inputSchema: ActivateView_Tool.inputSchema,
-        },
+        toolDefinition: ActivateView_Tool,
         handler: (args: any) => {
           return handleActivateView(this.context, args);
         },
       },
       // Class low-level handlers
       {
-        toolDefinition: {
-          name: UpdateClass_Tool.name,
-          description: UpdateClass_Tool.description,
-          inputSchema: UpdateClass_Tool.inputSchema,
-        },
+        toolDefinition: UpdateClass_Tool,
         handler: (args: any) => {
           return handleUpdateClassLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: DeleteClass_Tool.name,
-          description: DeleteClass_Tool.description,
-          inputSchema: DeleteClass_Tool.inputSchema,
-        },
+        toolDefinition: DeleteClass_Tool,
         handler: (args: any) => {
           return handleDeleteClass(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: LockClass_Tool.name,
-          description: LockClass_Tool.description,
-          inputSchema: LockClass_Tool.inputSchema,
-        },
+        toolDefinition: LockClass_Tool,
         handler: (args: any) => {
           return handleLockClass(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UnlockClass_Tool.name,
-          description: UnlockClass_Tool.description,
-          inputSchema: UnlockClass_Tool.inputSchema,
-        },
+        toolDefinition: UnlockClass_Tool,
         handler: (args: any) => {
           return handleUnlockClass(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CreateClassLow_Tool.name,
-          description: CreateClassLow_Tool.description,
-          inputSchema: CreateClassLow_Tool.inputSchema,
-        },
+        toolDefinition: CreateClassLow_Tool,
         handler: (args: any) => {
           return handleCreateClassLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ValidateClass_Tool.name,
-          description: ValidateClass_Tool.description,
-          inputSchema: ValidateClass_Tool.inputSchema,
-        },
+        toolDefinition: ValidateClass_Tool,
         handler: (args: any) => {
           return handleValidateClass(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CheckClass_Tool.name,
-          description: CheckClass_Tool.description,
-          inputSchema: CheckClass_Tool.inputSchema,
-        },
+        toolDefinition: CheckClass_Tool,
         handler: (args: any) => {
           return handleCheckClass(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ActivateClass_Tool.name,
-          description: ActivateClass_Tool.description,
-          inputSchema: ActivateClass_Tool.inputSchema,
-        },
+        toolDefinition: ActivateClass_Tool,
         handler: (args: any) => {
           return handleActivateClass(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: LockClassTestClasses_Tool.name,
-          description: LockClassTestClasses_Tool.description,
-          inputSchema: LockClassTestClasses_Tool.inputSchema,
-        },
+        toolDefinition: LockClassTestClasses_Tool,
         handler: (args: any) => {
           return handleLockClassTestClasses(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UnlockClassTestClasses_Tool.name,
-          description: UnlockClassTestClasses_Tool.description,
-          inputSchema: UnlockClassTestClasses_Tool.inputSchema,
-        },
+        toolDefinition: UnlockClassTestClasses_Tool,
         handler: (args: any) => {
           return handleUnlockClassTestClasses(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UpdateClassTestClasses_Tool.name,
-          description: UpdateClassTestClasses_Tool.description,
-          inputSchema: UpdateClassTestClasses_Tool.inputSchema,
-        },
+        toolDefinition: UpdateClassTestClasses_Tool,
         handler: (args: any) => {
           return handleUpdateClassTestClasses(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ActivateClassTestClasses_Tool.name,
-          description: ActivateClassTestClasses_Tool.description,
-          inputSchema: ActivateClassTestClasses_Tool.inputSchema,
-        },
+        toolDefinition: ActivateClassTestClasses_Tool,
         handler: (args: any) => {
           return handleActivateClassTestClasses(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: RunClassUnitTests_Tool.name,
-          description: RunClassUnitTests_Tool.description,
-          inputSchema: RunClassUnitTests_Tool.inputSchema,
-        },
+        toolDefinition: RunClassUnitTests_Tool,
         handler: (args: any) => {
           return handleRunClassUnitTests(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: GetClassUnitTestStatus_Tool.name,
-          description: GetClassUnitTestStatus_Tool.description,
-          inputSchema: GetClassUnitTestStatus_Tool.inputSchema,
-        },
+        toolDefinition: GetClassUnitTestStatus_Tool,
         handler: (args: any) => {
           return handleGetClassUnitTestStatus(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: GetClassUnitTestResult_Tool.name,
-          description: GetClassUnitTestResult_Tool.description,
-          inputSchema: GetClassUnitTestResult_Tool.inputSchema,
-        },
+        toolDefinition: GetClassUnitTestResult_Tool,
         handler: (args: any) => {
           return handleGetClassUnitTestResult(this.context, args);
         },
       },
       // Program low-level handlers
       {
-        toolDefinition: {
-          name: UpdateProgram_Tool.name,
-          description: UpdateProgram_Tool.description,
-          inputSchema: UpdateProgram_Tool.inputSchema,
-        },
+        toolDefinition: UpdateProgram_Tool,
         handler: (args: any) => {
           return handleUpdateProgramLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CheckProgram_Tool.name,
-          description: CheckProgram_Tool.description,
-          inputSchema: CheckProgram_Tool.inputSchema,
-        },
+        toolDefinition: CheckProgram_Tool,
         handler: (args: any) => {
           return handleCheckProgram(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: DeleteProgram_Tool.name,
-          description: DeleteProgram_Tool.description,
-          inputSchema: DeleteProgram_Tool.inputSchema,
-        },
+        toolDefinition: DeleteProgram_Tool,
         handler: (args: any) => {
           return handleDeleteProgram(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: LockProgram_Tool.name,
-          description: LockProgram_Tool.description,
-          inputSchema: LockProgram_Tool.inputSchema,
-        },
+        toolDefinition: LockProgram_Tool,
         handler: (args: any) => {
           return handleLockProgram(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UnlockProgram_Tool.name,
-          description: UnlockProgram_Tool.description,
-          inputSchema: UnlockProgram_Tool.inputSchema,
-        },
+        toolDefinition: UnlockProgram_Tool,
         handler: (args: any) => {
           return handleUnlockProgram(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ValidateProgram_Tool.name,
-          description: ValidateProgram_Tool.description,
-          inputSchema: ValidateProgram_Tool.inputSchema,
-        },
+        toolDefinition: ValidateProgram_Tool,
         handler: (args: any) => {
           return handleValidateProgram(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CreateProgramLow_Tool.name,
-          description: CreateProgramLow_Tool.description,
-          inputSchema: CreateProgramLow_Tool.inputSchema,
-        },
+        toolDefinition: CreateProgramLow_Tool,
         handler: (args: any) => {
           return handleCreateProgramLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ActivateProgram_Tool.name,
-          description: ActivateProgram_Tool.description,
-          inputSchema: ActivateProgram_Tool.inputSchema,
-        },
+        toolDefinition: ActivateProgram_Tool,
         handler: (args: any) => {
           return handleActivateProgram(this.context, args);
         },
       },
       // Interface low-level handlers
       {
-        toolDefinition: {
-          name: UpdateInterface_Tool.name,
-          description: UpdateInterface_Tool.description,
-          inputSchema: UpdateInterface_Tool.inputSchema,
-        },
+        toolDefinition: UpdateInterface_Tool,
         handler: (args: any) => {
           return handleUpdateInterfaceLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CheckInterface_Tool.name,
-          description: CheckInterface_Tool.description,
-          inputSchema: CheckInterface_Tool.inputSchema,
-        },
+        toolDefinition: CheckInterface_Tool,
         handler: (args: any) => {
           return handleCheckInterface(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: DeleteInterface_Tool.name,
-          description: DeleteInterface_Tool.description,
-          inputSchema: DeleteInterface_Tool.inputSchema,
-        },
+        toolDefinition: DeleteInterface_Tool,
         handler: (args: any) => {
           return handleDeleteInterface(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: LockInterface_Tool.name,
-          description: LockInterface_Tool.description,
-          inputSchema: LockInterface_Tool.inputSchema,
-        },
+        toolDefinition: LockInterface_Tool,
         handler: (args: any) => {
           return handleLockInterface(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UnlockInterface_Tool.name,
-          description: UnlockInterface_Tool.description,
-          inputSchema: UnlockInterface_Tool.inputSchema,
-        },
+        toolDefinition: UnlockInterface_Tool,
         handler: (args: any) => {
           return handleUnlockInterface(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ValidateInterface_Tool.name,
-          description: ValidateInterface_Tool.description,
-          inputSchema: ValidateInterface_Tool.inputSchema,
-        },
+        toolDefinition: ValidateInterface_Tool,
         handler: (args: any) => {
           return handleValidateInterface(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CreateInterfaceLow_Tool.name,
-          description: CreateInterfaceLow_Tool.description,
-          inputSchema: CreateInterfaceLow_Tool.inputSchema,
-        },
+        toolDefinition: CreateInterfaceLow_Tool,
         handler: (args: any) => {
           return handleCreateInterfaceLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ActivateInterface_Tool.name,
-          description: ActivateInterface_Tool.description,
-          inputSchema: ActivateInterface_Tool.inputSchema,
-        },
+        toolDefinition: ActivateInterface_Tool,
         handler: (args: any) => {
           return handleActivateInterface(this.context, args);
         },
       },
       // Function low-level handlers
       {
-        toolDefinition: {
-          name: CheckFunctionGroup_Tool.name,
-          description: CheckFunctionGroup_Tool.description,
-          inputSchema: CheckFunctionGroup_Tool.inputSchema,
-        },
+        toolDefinition: CheckFunctionGroup_Tool,
         handler: (args: any) => {
           return handleCheckFunctionGroup(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: DeleteFunctionGroup_Tool.name,
-          description: DeleteFunctionGroup_Tool.description,
-          inputSchema: DeleteFunctionGroup_Tool.inputSchema,
-        },
+        toolDefinition: DeleteFunctionGroup_Tool,
         handler: (args: any) => {
           return handleDeleteFunctionGroup(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: DeleteFunctionModule_Tool.name,
-          description: DeleteFunctionModule_Tool.description,
-          inputSchema: DeleteFunctionModule_Tool.inputSchema,
-        },
+        toolDefinition: DeleteFunctionModule_Tool,
         handler: (args: any) => {
           return handleDeleteFunctionModule(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: LockFunctionGroup_Tool.name,
-          description: LockFunctionGroup_Tool.description,
-          inputSchema: LockFunctionGroup_Tool.inputSchema,
-        },
+        toolDefinition: LockFunctionGroup_Tool,
         handler: (args: any) => {
           return handleLockFunctionGroup(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: LockFunctionModule_Tool.name,
-          description: LockFunctionModule_Tool.description,
-          inputSchema: LockFunctionModule_Tool.inputSchema,
-        },
+        toolDefinition: LockFunctionModule_Tool,
         handler: (args: any) => {
           return handleLockFunctionModule(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UnlockFunctionGroup_Tool.name,
-          description: UnlockFunctionGroup_Tool.description,
-          inputSchema: UnlockFunctionGroup_Tool.inputSchema,
-        },
+        toolDefinition: UnlockFunctionGroup_Tool,
         handler: (args: any) => {
           return handleUnlockFunctionGroup(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UnlockFunctionModule_Tool.name,
-          description: UnlockFunctionModule_Tool.description,
-          inputSchema: UnlockFunctionModule_Tool.inputSchema,
-        },
+        toolDefinition: UnlockFunctionModule_Tool,
         handler: (args: any) => {
           return handleUnlockFunctionModule(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ValidateFunctionGroup_Tool.name,
-          description: ValidateFunctionGroup_Tool.description,
-          inputSchema: ValidateFunctionGroup_Tool.inputSchema,
-        },
+        toolDefinition: ValidateFunctionGroup_Tool,
         handler: (args: any) => {
           return handleValidateFunctionGroup(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CreateFunctionGroupLow_Tool.name,
-          description: CreateFunctionGroupLow_Tool.description,
-          inputSchema: CreateFunctionGroupLow_Tool.inputSchema,
-        },
+        toolDefinition: CreateFunctionGroupLow_Tool,
         handler: (args: any) => {
           return handleCreateFunctionGroupLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CreateFunctionModuleLow_Tool.name,
-          description: CreateFunctionModuleLow_Tool.description,
-          inputSchema: CreateFunctionModuleLow_Tool.inputSchema,
-        },
+        toolDefinition: CreateFunctionModuleLow_Tool,
         handler: (args: any) => {
           return handleCreateFunctionModuleLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UpdateFunctionModule_Tool.name,
-          description: UpdateFunctionModule_Tool.description,
-          inputSchema: UpdateFunctionModule_Tool.inputSchema,
-        },
+        toolDefinition: UpdateFunctionModule_Tool,
         handler: (args: any) => {
           return handleUpdateFunctionModuleLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ValidateFunctionModule_Tool.name,
-          description: ValidateFunctionModule_Tool.description,
-          inputSchema: ValidateFunctionModule_Tool.inputSchema,
-        },
+        toolDefinition: ValidateFunctionModule_Tool,
         handler: (args: any) => {
           return handleValidateFunctionModule(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CheckFunctionModule_Tool.name,
-          description: CheckFunctionModule_Tool.description,
-          inputSchema: CheckFunctionModule_Tool.inputSchema,
-        },
+        toolDefinition: CheckFunctionModule_Tool,
         handler: (args: any) => {
           return handleCheckFunctionModule(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ActivateFunctionModule_Tool.name,
-          description: ActivateFunctionModule_Tool.description,
-          inputSchema: ActivateFunctionModule_Tool.inputSchema,
-        },
+        toolDefinition: ActivateFunctionModule_Tool,
         handler: (args: any) => {
           return handleActivateFunctionModule(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ActivateFunctionGroup_Tool.name,
-          description: ActivateFunctionGroup_Tool.description,
-          inputSchema: ActivateFunctionGroup_Tool.inputSchema,
-        },
+        toolDefinition: ActivateFunctionGroup_Tool,
         handler: (args: any) => {
           return handleActivateFunctionGroup(this.context, args);
         },
       },
       // BehaviorDefinition low-level handlers
       {
-        toolDefinition: {
-          name: CheckBehaviorDefinition_Tool.name,
-          description: CheckBehaviorDefinition_Tool.description,
-          inputSchema: CheckBehaviorDefinition_Tool.inputSchema,
-        },
+        toolDefinition: CheckBehaviorDefinition_Tool,
         handler: (args: any) => {
           return handleCheckBehaviorDefinition(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: DeleteBehaviorDefinition_Tool.name,
-          description: DeleteBehaviorDefinition_Tool.description,
-          inputSchema: DeleteBehaviorDefinition_Tool.inputSchema,
-        },
+        toolDefinition: DeleteBehaviorDefinition_Tool,
         handler: (args: any) => {
           return handleDeleteBehaviorDefinition(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: LockBehaviorDefinition_Tool.name,
-          description: LockBehaviorDefinition_Tool.description,
-          inputSchema: LockBehaviorDefinition_Tool.inputSchema,
-        },
+        toolDefinition: LockBehaviorDefinition_Tool,
         handler: (args: any) => {
           return handleLockBehaviorDefinition(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UnlockBehaviorDefinition_Tool.name,
-          description: UnlockBehaviorDefinition_Tool.description,
-          inputSchema: UnlockBehaviorDefinition_Tool.inputSchema,
-        },
+        toolDefinition: UnlockBehaviorDefinition_Tool,
         handler: (args: any) => {
           return handleUnlockBehaviorDefinition(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ValidateBehaviorDefinition_Tool.name,
-          description: ValidateBehaviorDefinition_Tool.description,
-          inputSchema: ValidateBehaviorDefinition_Tool.inputSchema,
-        },
+        toolDefinition: ValidateBehaviorDefinition_Tool,
         handler: (args: any) => {
           return handleValidateBehaviorDefinition(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CreateBehaviorDefinitionLow_Tool.name,
-          description: CreateBehaviorDefinitionLow_Tool.description,
-          inputSchema: CreateBehaviorDefinitionLow_Tool.inputSchema,
-        },
+        toolDefinition: CreateBehaviorDefinitionLow_Tool,
         handler: (args: any) => {
           return handleCreateBehaviorDefinitionLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UpdateBehaviorDefinitionLow_Tool.name,
-          description: UpdateBehaviorDefinitionLow_Tool.description,
-          inputSchema: UpdateBehaviorDefinitionLow_Tool.inputSchema,
-        },
+        toolDefinition: UpdateBehaviorDefinitionLow_Tool,
         handler: (args: any) => {
           return handleUpdateBehaviorDefinitionLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ActivateBehaviorDefinition_Tool.name,
-          description: ActivateBehaviorDefinition_Tool.description,
-          inputSchema: ActivateBehaviorDefinition_Tool.inputSchema,
-        },
+        toolDefinition: ActivateBehaviorDefinition_Tool,
         handler: (args: any) => {
           return handleActivateBehaviorDefinition(this.context, args);
         },
       },
       // BehaviorImplementation low-level handlers
       {
-        toolDefinition: {
-          name: ValidateBehaviorImplementation_Tool.name,
-          description: ValidateBehaviorImplementation_Tool.description,
-          inputSchema: ValidateBehaviorImplementation_Tool.inputSchema,
-        },
+        toolDefinition: ValidateBehaviorImplementation_Tool,
         handler: (args: any) => {
           return handleValidateBehaviorImplementation(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CreateBehaviorImplementationLow_Tool.name,
-          description: CreateBehaviorImplementationLow_Tool.description,
-          inputSchema: CreateBehaviorImplementationLow_Tool.inputSchema,
-        },
+        toolDefinition: CreateBehaviorImplementationLow_Tool,
         handler: (args: any) => {
           return handleCreateBehaviorImplementationLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: LockBehaviorImplementation_Tool.name,
-          description: LockBehaviorImplementation_Tool.description,
-          inputSchema: LockBehaviorImplementation_Tool.inputSchema,
-        },
+        toolDefinition: LockBehaviorImplementation_Tool,
         handler: (args: any) => {
           return handleLockBehaviorImplementation(this.context, args);
         },
       },
       // MetadataExtension low-level handlers
       {
-        toolDefinition: {
-          name: CheckMetadataExtension_Tool.name,
-          description: CheckMetadataExtension_Tool.description,
-          inputSchema: CheckMetadataExtension_Tool.inputSchema,
-        },
+        toolDefinition: CheckMetadataExtension_Tool,
         handler: (args: any) => {
           return handleCheckMetadataExtension(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: DeleteMetadataExtension_Tool.name,
-          description: DeleteMetadataExtension_Tool.description,
-          inputSchema: DeleteMetadataExtension_Tool.inputSchema,
-        },
+        toolDefinition: DeleteMetadataExtension_Tool,
         handler: (args: any) => {
           return handleDeleteMetadataExtension(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: LockMetadataExtension_Tool.name,
-          description: LockMetadataExtension_Tool.description,
-          inputSchema: LockMetadataExtension_Tool.inputSchema,
-        },
+        toolDefinition: LockMetadataExtension_Tool,
         handler: (args: any) => {
           return handleLockMetadataExtension(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UnlockMetadataExtension_Tool.name,
-          description: UnlockMetadataExtension_Tool.description,
-          inputSchema: UnlockMetadataExtension_Tool.inputSchema,
-        },
+        toolDefinition: UnlockMetadataExtension_Tool,
         handler: (args: any) => {
           return handleUnlockMetadataExtension(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ValidateMetadataExtension_Tool.name,
-          description: ValidateMetadataExtension_Tool.description,
-          inputSchema: ValidateMetadataExtension_Tool.inputSchema,
-        },
+        toolDefinition: ValidateMetadataExtension_Tool,
         handler: (args: any) => {
           return handleValidateMetadataExtension(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: CreateMetadataExtensionLow_Tool.name,
-          description: CreateMetadataExtensionLow_Tool.description,
-          inputSchema: CreateMetadataExtensionLow_Tool.inputSchema,
-        },
+        toolDefinition: CreateMetadataExtensionLow_Tool,
         handler: (args: any) => {
           return handleCreateMetadataExtensionLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: UpdateMetadataExtensionLow_Tool.name,
-          description: UpdateMetadataExtensionLow_Tool.description,
-          inputSchema: UpdateMetadataExtensionLow_Tool.inputSchema,
-        },
+        toolDefinition: UpdateMetadataExtensionLow_Tool,
         handler: (args: any) => {
           return handleUpdateMetadataExtensionLow(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: ActivateMetadataExtension_Tool.name,
-          description: ActivateMetadataExtension_Tool.description,
-          inputSchema: ActivateMetadataExtension_Tool.inputSchema,
-        },
+        toolDefinition: ActivateMetadataExtension_Tool,
         handler: (args: any) => {
           return handleActivateMetadataExtension(this.context, args);
         },

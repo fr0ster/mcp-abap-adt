@@ -11,6 +11,7 @@ type ServiceTypeInput = 'ODataV2' | 'ODataV4';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateServiceBinding',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Update publication state for ABAP service binding via AdtServiceBinding workflow.',
   inputSchema: {

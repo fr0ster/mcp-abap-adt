@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetDomain',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve ABAP domain definition. Supports reading active or inactive version.',
   inputSchema: {

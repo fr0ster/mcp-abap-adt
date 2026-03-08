@@ -60,91 +60,47 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
   getHandlers(): HandlerEntry[] {
     return [
       {
-        toolDefinition: {
-          name: GetFunction_Tool.name,
-          description: GetFunction_Tool.description,
-          inputSchema: GetFunction_Tool.inputSchema,
-        },
+        toolDefinition: GetFunction_Tool,
         handler: (args: any) => handleGetFunction(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetTableContents_Tool.name,
-          description: GetTableContents_Tool.description,
-          inputSchema: GetTableContents_Tool.inputSchema,
-        },
+        toolDefinition: GetTableContents_Tool,
         handler: (args: any) => handleGetTableContents(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetPackageContents_Tool.name,
-          description: GetPackageContents_Tool.description,
-          inputSchema: GetPackageContents_Tool.inputSchema,
-        },
+        toolDefinition: GetPackageContents_Tool,
         handler: (args: any) => handleGetPackageContents(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetInclude_Tool.name,
-          description: GetInclude_Tool.description,
-          inputSchema: GetInclude_Tool.inputSchema,
-        },
+        toolDefinition: GetInclude_Tool,
         handler: (args: any) => handleGetInclude(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetIncludesList_Tool.name,
-          description: GetIncludesList_Tool.description,
-          inputSchema: GetIncludesList_Tool.inputSchema,
-        },
+        toolDefinition: GetIncludesList_Tool,
         handler: (args: any) => handleGetIncludesList(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetEnhancements_Tool.name,
-          description: GetEnhancements_Tool.description,
-          inputSchema: GetEnhancements_Tool.inputSchema,
-        },
+        toolDefinition: GetEnhancements_Tool,
         handler: (args: any) => handleGetEnhancements(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetEnhancementSpot_Tool.name,
-          description: GetEnhancementSpot_Tool.description,
-          inputSchema: GetEnhancementSpot_Tool.inputSchema,
-        },
+        toolDefinition: GetEnhancementSpot_Tool,
         handler: (args: any) => handleGetEnhancementSpot(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetEnhancementImpl_Tool.name,
-          description: GetEnhancementImpl_Tool.description,
-          inputSchema: GetEnhancementImpl_Tool.inputSchema,
-        },
+        toolDefinition: GetEnhancementImpl_Tool,
         handler: (args: any) => handleGetEnhancementImpl(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetTransport_Tool.name,
-          description: GetTransport_Tool.description,
-          inputSchema: GetTransport_Tool.inputSchema,
-        },
+        toolDefinition: GetTransport_Tool,
         handler: (args: any) => handleGetTransport(this.context, args),
       },
       {
-        toolDefinition: {
-          name: ListTransports_Tool.name,
-          description: ListTransports_Tool.description,
-          inputSchema: ListTransports_Tool.inputSchema,
-        },
+        toolDefinition: ListTransports_Tool,
         handler: (args: any) => handleListTransports(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetProgFullCode_Tool.name,
-          description: GetProgFullCode_Tool.description,
-          inputSchema: GetProgFullCode_Tool.inputSchema,
-        },
+        toolDefinition: GetProgFullCode_Tool,
         handler: (args: any) => handleGetProgFullCode(this.context, args),
       },
     ];

@@ -16,6 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UnlockFunctionGroupLow',
+  available_in: ['onprem', 'legacy'] as const,
   description:
     '[low-level] Unlock an ABAP function group after modification. Must use the same session_id and lock_handle from LockFunctionGroup operation.',
   inputSchema: {

@@ -18,6 +18,7 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 
 export const TOOL_DEFINITION = {
   name: 'CreateTable',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP table via the ADT API. Creates the table object in initial state. Use UpdateTable to set DDL code afterwards.',
   inputSchema: {

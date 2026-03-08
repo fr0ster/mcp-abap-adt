@@ -17,6 +17,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'ValidateTableLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Validate an ABAP table name before creation. Checks if the name is valid and available. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {

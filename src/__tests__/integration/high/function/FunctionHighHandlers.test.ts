@@ -29,6 +29,7 @@ import {
   getEnabledTestCase,
   getOperationDelay,
   getTimeout,
+  isCloudConnection,
   loadTestEnv,
   resolvePackageName,
   resolveTransportRequest,
@@ -101,6 +102,12 @@ describe('Function High-Level Handlers Integration', () => {
   it(
     'should test all Function high-level handlers',
     async () => {
+      if (isCloudConnection()) {
+        testLogger?.info(
+          '⏭️  Skipping test: Function groups are not available on cloud systems',
+        );
+        return;
+      }
       if (!hasConfig || (!isHardModeEnabled() && (!connection || !session))) {
         testLogger?.info(
           '⏭️  Skipping test: No configuration, connection or session',

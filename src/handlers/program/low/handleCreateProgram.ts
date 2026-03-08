@@ -17,6 +17,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CreateProgramLow',
+  available_in: ['onprem', 'legacy'] as const,
   description:
     '[low-level] Create a new ABAP program. - use CreateProgram (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
   inputSchema: {

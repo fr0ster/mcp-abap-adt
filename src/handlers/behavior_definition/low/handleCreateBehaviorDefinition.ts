@@ -20,6 +20,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CreateBehaviorDefinitionLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Create a new ABAP Behavior Definition. - use CreateBehaviorDefinition (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
   inputSchema: {

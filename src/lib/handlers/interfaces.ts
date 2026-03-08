@@ -7,10 +7,23 @@ export type { HandlerContext };
 /**
  * Tool definition structure
  */
+/**
+ * SAP environment types for tool availability filtering.
+ * - 'cloud'  — BTP ABAP Environment (jwt auth)
+ * - 'onprem' — Modern on-premise (BASIS >= 7.50)
+ * - 'legacy' — Legacy on-premise (BASIS < 7.50)
+ */
+export type SapEnvironment = 'cloud' | 'onprem' | 'legacy';
+
 export interface ToolDefinition {
   name: string;
   description: string;
   inputSchema: any; // JSON Schema or Zod schema object
+  /**
+   * SAP environments where this tool is available.
+   * If omitted, the tool is available in all environments.
+   */
+  available_in?: readonly SapEnvironment[];
 }
 
 /**

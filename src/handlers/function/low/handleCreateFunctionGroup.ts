@@ -16,6 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CreateFunctionGroupLow',
+  available_in: ['onprem', 'legacy'] as const,
   description:
     '[low-level] Create a new ABAP function group. - use CreateFunctionGroup (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
   inputSchema: {

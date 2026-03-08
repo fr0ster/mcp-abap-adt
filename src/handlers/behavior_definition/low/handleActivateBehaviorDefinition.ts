@@ -18,6 +18,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'ActivateBehaviorDefinitionLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Activate an ABAP behavior definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {

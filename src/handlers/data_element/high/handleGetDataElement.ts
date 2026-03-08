@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetDataElement',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve ABAP data element definition. Supports reading active or inactive version.',
   inputSchema: {

@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetFunctionGroup',
+  available_in: ['onprem', 'legacy'] as const,
   description:
     'Retrieve ABAP function group definition. Supports reading active or inactive version.',
   inputSchema: {

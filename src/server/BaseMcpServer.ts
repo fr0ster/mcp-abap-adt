@@ -7,7 +7,10 @@ import {
 import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
-import type { IHandlersRegistry } from '../lib/handlers/interfaces.js';
+import type {
+  IHandlersRegistry,
+  SapEnvironment,
+} from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
 import {
@@ -17,28 +20,6 @@ import {
 } from '../lib/systemContext.js';
 import { registerAuthBroker } from '../lib/utils.js';
 import type { ConnectionContext } from './ConnectionContext.js';
-
-/**
- * Tool name prefixes for object types not available on legacy systems (BASIS < 7.50).
- * Used to annotate tool descriptions when connected to a legacy system.
- */
-const LEGACY_UNSUPPORTED_PREFIXES = [
-  'Domain',
-  'DataElement',
-  'Structure',
-  'Table',
-  'BehaviorDefinition',
-  'BehaviorImplementation',
-  'ServiceDefinition',
-  'ServiceBinding',
-  'MetadataExtension',
-  'Enhancement',
-  'GetWhereUsed',
-  'GetTableContents',
-  'GetSqlQuery',
-  'RuntimeProfiling',
-  'RuntimeDump',
-];
 
 /**
  * Base MCP Server class that extends SDK McpServer
@@ -141,6 +122,39 @@ export abstract class BaseMcpServer extends McpServer {
         ? ('rfc' as const)
         : undefined;
 
+    // Resolve masterSystem/responsible early so handlers get proper context
+    // Create a temporary connection to call getSystemInformation
+    let masterSystem: string | undefined;
+    let responsible: string | undefined;
+    try {
+      const tempParams =
+        authType === 'jwt'
+          ? {
+              url: connectionConfig.serviceUrl || '',
+              authType: 'jwt' as const,
+              jwtToken: tokenToUse,
+              client: connectionConfig.sapClient || '',
+            }
+          : {
+              url: connectionConfig.serviceUrl || '',
+              authType: 'basic' as const,
+              username: connectionConfig.username || '',
+              password: connectionConfig.password || '',
+              client: connectionConfig.sapClient || '',
+            };
+      const tempConn = createAbapConnection(tempParams);
+      const systemCtx = await resolveSystemContext(tempConn);
+      masterSystem = systemCtx.masterSystem;
+      responsible = systemCtx.responsible;
+      this.logger.debug(
+        `[BaseMcpServer] Resolved systemContext: masterSystem=${masterSystem}, responsible=${responsible}`,
+      );
+    } catch (error) {
+      this.logger.debug(
+        `[BaseMcpServer] Could not resolve systemContext: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
     this.connectionContext = {
       sessionId: destination,
       connectionParams:
@@ -161,6 +175,8 @@ export abstract class BaseMcpServer extends McpServer {
             },
       metadata: {
         destination,
+        masterSystem,
+        responsible,
       },
     };
   }
@@ -266,8 +282,24 @@ export abstract class BaseMcpServer extends McpServer {
       resetSystemContextCache();
     }
 
+    // Create tokenRefresher from AuthBroker for automatic JWT token refresh on 401
+    let tokenRefresher: any;
+    if (
+      destination &&
+      this.authBroker &&
+      this.connectionContext.connectionParams.authType === 'jwt' &&
+      typeof (this.authBroker as any).createTokenRefresher === 'function'
+    ) {
+      tokenRefresher = (this.authBroker as any).createTokenRefresher(
+        destination,
+      );
+    }
+
     const connection = createAbapConnection(
       this.connectionContext.connectionParams,
+      undefined,
+      undefined,
+      tokenRefresher,
     );
 
     // RFC connections require explicit connect() to open the stateful session
@@ -419,24 +451,21 @@ export abstract class BaseMcpServer extends McpServer {
               ? jsonSchemaToZod(entry.toolDefinition.inputSchema)
               : entry.toolDefinition.inputSchema;
 
-          // Skip tools unsupported on legacy systems — don't expose them at all
-          if (getSystemContext().isLegacy) {
-            const name = entry.toolDefinition.name;
-            const isUnsupported = LEGACY_UNSUPPORTED_PREFIXES.some(
-              (prefix) =>
-                name === prefix ||
-                name.startsWith(prefix) ||
-                name.startsWith(`Create${prefix}`) ||
-                name.startsWith(`Update${prefix}`) ||
-                name.startsWith(`Delete${prefix}`) ||
-                name.startsWith(`Get${prefix}`) ||
-                name.startsWith(`Lock${prefix}`) ||
-                name.startsWith(`Unlock${prefix}`) ||
-                name.startsWith(`Validate${prefix}`) ||
-                name.startsWith(`Check${prefix}`) ||
-                name.startsWith(`Activate${prefix}`),
-            );
-            if (isUnsupported) continue;
+          // Skip tools not available in the current SAP environment
+          const systemCtx = getSystemContext();
+          const availableIn = entry.toolDefinition.available_in;
+          if (availableIn && availableIn.length > 0) {
+            const currentEnv: SapEnvironment = systemCtx.isLegacy
+              ? 'legacy'
+              : this.connectionContext?.connectionParams?.authType === 'jwt'
+                ? 'cloud'
+                : 'onprem';
+            if (!availableIn.includes(currentEnv)) {
+              this.logger.debug(
+                `[BaseMcpServer] Skipping tool ${entry.toolDefinition.name}: available_in=${JSON.stringify(availableIn)}, currentEnv=${currentEnv}, isLegacy=${systemCtx.isLegacy}, authType=${this.connectionContext?.connectionParams?.authType}`,
+              );
+              continue;
+            }
           }
 
           // Register wrapped handler via SDK registerTool

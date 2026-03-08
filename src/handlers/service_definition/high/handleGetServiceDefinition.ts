@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetServiceDefinition',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve ABAP service definition definition. Supports reading active or inactive version.',
   inputSchema: {

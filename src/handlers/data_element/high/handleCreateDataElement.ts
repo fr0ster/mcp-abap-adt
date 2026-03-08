@@ -20,6 +20,7 @@ import {
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 export const TOOL_DEFINITION = {
   name: 'CreateDataElement',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP data element in SAP system with all required steps: create, activate, and verify.',
   inputSchema: {

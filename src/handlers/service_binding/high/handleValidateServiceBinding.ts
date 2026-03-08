@@ -5,6 +5,7 @@ import { parseServiceBindingPayload } from './serviceBindingPayloadUtils';
 
 export const TOOL_DEFINITION = {
   name: 'ValidateServiceBinding',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Validate service binding parameters (name, service definition, package, version) via ADT validation endpoint.',
   inputSchema: {

@@ -22,6 +22,7 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 
 export const TOOL_DEFINITION = {
   name: 'UpdateDomain',
+  available_in: ['onprem', 'cloud'] as const,
   description: `Update an existing ABAP domain in SAP system.
 
 Workflow:

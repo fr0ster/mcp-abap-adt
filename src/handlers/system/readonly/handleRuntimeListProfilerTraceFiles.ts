@@ -5,6 +5,7 @@ import { parseRuntimePayloadToJson } from './runtimePayloadParser';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeListProfilerTraceFiles',
+  available_in: ['onprem'] as const,
   description:
     '[runtime] List ABAP profiler trace files available in ADT runtime. Returns parsed JSON payload.',
   inputSchema: {

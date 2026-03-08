@@ -21,6 +21,7 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 
 export const TOOL_DEFINITION = {
   name: 'CreateStructure',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP structure in SAP system with fields and type references. Includes create, activate, and verify steps.',
   inputSchema: {

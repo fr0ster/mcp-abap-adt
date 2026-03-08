@@ -382,723 +382,363 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
 
     return [
       {
-        toolDefinition: {
-          name: CreatePackage_Tool.name,
-          description: CreatePackage_Tool.description,
-          inputSchema: CreatePackage_Tool.inputSchema,
-        },
+        toolDefinition: CreatePackage_Tool,
         handler: withContext(handleCreatePackage),
       },
       {
-        toolDefinition: {
-          name: GetPackage_Tool.name,
-          description: GetPackage_Tool.description,
-          inputSchema: GetPackage_Tool.inputSchema,
-        },
+        toolDefinition: GetPackage_Tool,
         handler: withContext(handleGetPackage),
       },
       {
-        toolDefinition: {
-          name: CreateDomain_Tool.name,
-          description: CreateDomain_Tool.description,
-          inputSchema: CreateDomain_Tool.inputSchema,
-        },
+        toolDefinition: CreateDomain_Tool,
         handler: withContext(handleCreateDomain),
       },
       {
-        toolDefinition: {
-          name: GetDomain_Tool.name,
-          description: GetDomain_Tool.description,
-          inputSchema: GetDomain_Tool.inputSchema,
-        },
+        toolDefinition: GetDomain_Tool,
         handler: withContext(handleGetDomain),
       },
       {
-        toolDefinition: {
-          name: UpdateDomainHigh_Tool.name,
-          description: UpdateDomainHigh_Tool.description,
-          inputSchema: UpdateDomainHigh_Tool.inputSchema,
-        },
+        toolDefinition: UpdateDomainHigh_Tool,
         handler: withContext(handleUpdateDomainHigh),
       },
       {
-        toolDefinition: {
-          name: DeleteDomain_Tool.name,
-          description: DeleteDomain_Tool.description,
-          inputSchema: DeleteDomain_Tool.inputSchema,
-        },
+        toolDefinition: DeleteDomain_Tool,
         handler: withContext(handleDeleteDomain),
       },
       {
-        toolDefinition: {
-          name: CreateDataElement_Tool.name,
-          description: CreateDataElement_Tool.description,
-          inputSchema: CreateDataElement_Tool.inputSchema,
-        },
+        toolDefinition: CreateDataElement_Tool,
         handler: withContext(handleCreateDataElement),
       },
       {
-        toolDefinition: {
-          name: GetDataElement_Tool.name,
-          description: GetDataElement_Tool.description,
-          inputSchema: GetDataElement_Tool.inputSchema,
-        },
+        toolDefinition: GetDataElement_Tool,
         handler: withContext(handleGetDataElement),
       },
       {
-        toolDefinition: {
-          name: UpdateDataElementHigh_Tool.name,
-          description: UpdateDataElementHigh_Tool.description,
-          inputSchema: UpdateDataElementHigh_Tool.inputSchema,
-        },
+        toolDefinition: UpdateDataElementHigh_Tool,
         handler: withContext(handleUpdateDataElementHigh),
       },
       {
-        toolDefinition: {
-          name: DeleteDataElement_Tool.name,
-          description: DeleteDataElement_Tool.description,
-          inputSchema: DeleteDataElement_Tool.inputSchema,
-        },
+        toolDefinition: DeleteDataElement_Tool,
         handler: withContext(handleDeleteDataElement),
       },
       {
-        toolDefinition: {
-          name: CreateTransport_Tool.name,
-          description: CreateTransport_Tool.description,
-          inputSchema: CreateTransport_Tool.inputSchema,
-        },
+        toolDefinition: CreateTransport_Tool,
         handler: withContext(handleCreateTransport),
       },
       {
-        toolDefinition: {
-          name: CreateTable_Tool.name,
-          description: CreateTable_Tool.description,
-          inputSchema: CreateTable_Tool.inputSchema,
-        },
+        toolDefinition: CreateTable_Tool,
         handler: withContext(handleCreateTable),
       },
       {
-        toolDefinition: {
-          name: GetTable_Tool.name,
-          description: GetTable_Tool.description,
-          inputSchema: GetTable_Tool.inputSchema,
-        },
+        toolDefinition: GetTable_Tool,
         handler: withContext(handleGetTable),
       },
       {
-        toolDefinition: {
-          name: UpdateTableHigh_Tool.name,
-          description: UpdateTableHigh_Tool.description,
-          inputSchema: UpdateTableHigh_Tool.inputSchema,
-        },
+        toolDefinition: UpdateTableHigh_Tool,
         handler: withContext(handleUpdateTableHigh),
       },
       {
-        toolDefinition: {
-          name: DeleteTable_Tool.name,
-          description: DeleteTable_Tool.description,
-          inputSchema: DeleteTable_Tool.inputSchema,
-        },
+        toolDefinition: DeleteTable_Tool,
         handler: withContext(handleDeleteTable),
       },
       {
-        toolDefinition: {
-          name: CreateStructure_Tool.name,
-          description: CreateStructure_Tool.description,
-          inputSchema: CreateStructure_Tool.inputSchema,
-        },
+        toolDefinition: CreateStructure_Tool,
         handler: withContext(handleCreateStructure),
       },
       {
-        toolDefinition: {
-          name: GetStructure_Tool.name,
-          description: GetStructure_Tool.description,
-          inputSchema: GetStructure_Tool.inputSchema,
-        },
+        toolDefinition: GetStructure_Tool,
         handler: withContext(handleGetStructure),
       },
       {
-        toolDefinition: {
-          name: UpdateStructureHigh_Tool.name,
-          description: UpdateStructureHigh_Tool.description,
-          inputSchema: UpdateStructureHigh_Tool.inputSchema,
-        },
+        toolDefinition: UpdateStructureHigh_Tool,
         handler: withContext(handleUpdateStructureHigh),
       },
       {
-        toolDefinition: {
-          name: DeleteStructure_Tool.name,
-          description: DeleteStructure_Tool.description,
-          inputSchema: DeleteStructure_Tool.inputSchema,
-        },
+        toolDefinition: DeleteStructure_Tool,
         handler: withContext(handleDeleteStructure),
       },
       {
-        toolDefinition: {
-          name: CreateView_Tool.name,
-          description: CreateView_Tool.description,
-          inputSchema: CreateView_Tool.inputSchema,
-        },
+        toolDefinition: CreateView_Tool,
         handler: withContext(handleCreateView),
       },
       {
-        toolDefinition: {
-          name: GetView_Tool.name,
-          description: GetView_Tool.description,
-          inputSchema: GetView_Tool.inputSchema,
-        },
+        toolDefinition: GetView_Tool,
         handler: withContext(handleGetView),
       },
       {
-        toolDefinition: {
-          name: UpdateViewHigh_Tool.name,
-          description: UpdateViewHigh_Tool.description,
-          inputSchema: UpdateViewHigh_Tool.inputSchema,
-        },
+        toolDefinition: UpdateViewHigh_Tool,
         handler: withContext(handleUpdateViewHigh),
       },
       {
-        toolDefinition: {
-          name: DeleteView_Tool.name,
-          description: DeleteView_Tool.description,
-          inputSchema: DeleteView_Tool.inputSchema,
-        },
+        toolDefinition: DeleteView_Tool,
         handler: withContext(handleDeleteView),
       },
       {
-        toolDefinition: {
-          name: CreateServiceDefinition_Tool.name,
-          description: CreateServiceDefinition_Tool.description,
-          inputSchema: CreateServiceDefinition_Tool.inputSchema,
-        },
+        toolDefinition: CreateServiceDefinition_Tool,
         handler: withContext(handleCreateServiceDefinition),
       },
       {
-        toolDefinition: {
-          name: GetServiceDefinition_Tool.name,
-          description: GetServiceDefinition_Tool.description,
-          inputSchema: GetServiceDefinition_Tool.inputSchema,
-        },
+        toolDefinition: GetServiceDefinition_Tool,
         handler: withContext(handleGetServiceDefinition),
       },
       {
-        toolDefinition: {
-          name: UpdateServiceDefinition_Tool.name,
-          description: UpdateServiceDefinition_Tool.description,
-          inputSchema: UpdateServiceDefinition_Tool.inputSchema,
-        },
+        toolDefinition: UpdateServiceDefinition_Tool,
         handler: withContext(handleUpdateServiceDefinition),
       },
       {
-        toolDefinition: {
-          name: DeleteServiceDefinition_Tool.name,
-          description: DeleteServiceDefinition_Tool.description,
-          inputSchema: DeleteServiceDefinition_Tool.inputSchema,
-        },
+        toolDefinition: DeleteServiceDefinition_Tool,
         handler: withContext(handleDeleteServiceDefinition),
       },
       {
-        toolDefinition: {
-          name: CreateServiceBinding_Tool.name,
-          description: CreateServiceBinding_Tool.description,
-          inputSchema: CreateServiceBinding_Tool.inputSchema,
-        },
+        toolDefinition: CreateServiceBinding_Tool,
         handler: withContext(handleCreateServiceBinding),
       },
       {
-        toolDefinition: {
-          name: ListServiceBindingTypes_Tool.name,
-          description: ListServiceBindingTypes_Tool.description,
-          inputSchema: ListServiceBindingTypes_Tool.inputSchema,
-        },
+        toolDefinition: ListServiceBindingTypes_Tool,
         handler: withContext(handleListServiceBindingTypes),
       },
       {
-        toolDefinition: {
-          name: GetServiceBinding_Tool.name,
-          description: GetServiceBinding_Tool.description,
-          inputSchema: GetServiceBinding_Tool.inputSchema,
-        },
+        toolDefinition: GetServiceBinding_Tool,
         handler: withContext(handleGetServiceBinding),
       },
       {
-        toolDefinition: {
-          name: UpdateServiceBinding_Tool.name,
-          description: UpdateServiceBinding_Tool.description,
-          inputSchema: UpdateServiceBinding_Tool.inputSchema,
-        },
+        toolDefinition: UpdateServiceBinding_Tool,
         handler: withContext(handleUpdateServiceBinding),
       },
       {
-        toolDefinition: {
-          name: ValidateServiceBinding_Tool.name,
-          description: ValidateServiceBinding_Tool.description,
-          inputSchema: ValidateServiceBinding_Tool.inputSchema,
-        },
+        toolDefinition: ValidateServiceBinding_Tool,
         handler: withContext(handleValidateServiceBinding),
       },
       {
-        toolDefinition: {
-          name: DeleteServiceBinding_Tool.name,
-          description: DeleteServiceBinding_Tool.description,
-          inputSchema: DeleteServiceBinding_Tool.inputSchema,
-        },
+        toolDefinition: DeleteServiceBinding_Tool,
         handler: withContext(handleDeleteServiceBinding),
       },
       {
-        toolDefinition: {
-          name: GetClass_Tool.name,
-          description: GetClass_Tool.description,
-          inputSchema: GetClass_Tool.inputSchema,
-        },
+        toolDefinition: GetClass_Tool,
         handler: withContext(handleGetClass),
       },
       {
-        toolDefinition: {
-          name: CreateClass_Tool.name,
-          description: CreateClass_Tool.description,
-          inputSchema: CreateClass_Tool.inputSchema,
-        },
+        toolDefinition: CreateClass_Tool,
         handler: withContext(handleCreateClass),
       },
       {
-        toolDefinition: {
-          name: UpdateClassHigh_Tool.name,
-          description: UpdateClassHigh_Tool.description,
-          inputSchema: UpdateClassHigh_Tool.inputSchema,
-        },
+        toolDefinition: UpdateClassHigh_Tool,
         handler: withContext(handleUpdateClassHigh),
       },
       {
-        toolDefinition: {
-          name: DeleteClass_Tool.name,
-          description: DeleteClass_Tool.description,
-          inputSchema: DeleteClass_Tool.inputSchema,
-        },
+        toolDefinition: DeleteClass_Tool,
         handler: withContext(handleDeleteClass),
       },
       {
-        toolDefinition: {
-          name: CreateUnitTest_Tool.name,
-          description: CreateUnitTest_Tool.description,
-          inputSchema: CreateUnitTest_Tool.inputSchema,
-        },
+        toolDefinition: CreateUnitTest_Tool,
         handler: withContext(handleCreateUnitTest),
       },
       {
-        toolDefinition: {
-          name: RunUnitTest_Tool.name,
-          description: RunUnitTest_Tool.description,
-          inputSchema: RunUnitTest_Tool.inputSchema,
-        },
+        toolDefinition: RunUnitTest_Tool,
         handler: withContext(handleRunUnitTest),
       },
       {
-        toolDefinition: {
-          name: GetUnitTest_Tool.name,
-          description: GetUnitTest_Tool.description,
-          inputSchema: GetUnitTest_Tool.inputSchema,
-        },
+        toolDefinition: GetUnitTest_Tool,
         handler: withContext(handleGetUnitTest),
       },
       {
-        toolDefinition: {
-          name: GetUnitTestStatus_Tool.name,
-          description: GetUnitTestStatus_Tool.description,
-          inputSchema: GetUnitTestStatus_Tool.inputSchema,
-        },
+        toolDefinition: GetUnitTestStatus_Tool,
         handler: withContext(handleGetUnitTestStatus),
       },
       {
-        toolDefinition: {
-          name: GetUnitTestResult_Tool.name,
-          description: GetUnitTestResult_Tool.description,
-          inputSchema: GetUnitTestResult_Tool.inputSchema,
-        },
+        toolDefinition: GetUnitTestResult_Tool,
         handler: withContext(handleGetUnitTestResult),
       },
       {
-        toolDefinition: {
-          name: UpdateUnitTest_Tool.name,
-          description: UpdateUnitTest_Tool.description,
-          inputSchema: UpdateUnitTest_Tool.inputSchema,
-        },
+        toolDefinition: UpdateUnitTest_Tool,
         handler: withContext(handleUpdateUnitTest),
       },
       {
-        toolDefinition: {
-          name: DeleteUnitTest_Tool.name,
-          description: DeleteUnitTest_Tool.description,
-          inputSchema: DeleteUnitTest_Tool.inputSchema,
-        },
+        toolDefinition: DeleteUnitTest_Tool,
         handler: withContext(handleDeleteUnitTest),
       },
       {
-        toolDefinition: {
-          name: CreateCdsUnitTest_Tool.name,
-          description: CreateCdsUnitTest_Tool.description,
-          inputSchema: CreateCdsUnitTest_Tool.inputSchema,
-        },
+        toolDefinition: CreateCdsUnitTest_Tool,
         handler: withContext(handleCreateCdsUnitTest),
       },
       {
-        toolDefinition: {
-          name: GetCdsUnitTest_Tool.name,
-          description: GetCdsUnitTest_Tool.description,
-          inputSchema: GetCdsUnitTest_Tool.inputSchema,
-        },
+        toolDefinition: GetCdsUnitTest_Tool,
         handler: withContext(handleGetCdsUnitTest),
       },
       {
-        toolDefinition: {
-          name: GetCdsUnitTestStatus_Tool.name,
-          description: GetCdsUnitTestStatus_Tool.description,
-          inputSchema: GetCdsUnitTestStatus_Tool.inputSchema,
-        },
+        toolDefinition: GetCdsUnitTestStatus_Tool,
         handler: withContext(handleGetCdsUnitTestStatus),
       },
       {
-        toolDefinition: {
-          name: GetCdsUnitTestResult_Tool.name,
-          description: GetCdsUnitTestResult_Tool.description,
-          inputSchema: GetCdsUnitTestResult_Tool.inputSchema,
-        },
+        toolDefinition: GetCdsUnitTestResult_Tool,
         handler: withContext(handleGetCdsUnitTestResult),
       },
       {
-        toolDefinition: {
-          name: UpdateCdsUnitTest_Tool.name,
-          description: UpdateCdsUnitTest_Tool.description,
-          inputSchema: UpdateCdsUnitTest_Tool.inputSchema,
-        },
+        toolDefinition: UpdateCdsUnitTest_Tool,
         handler: withContext(handleUpdateCdsUnitTest),
       },
       {
-        toolDefinition: {
-          name: DeleteCdsUnitTest_Tool.name,
-          description: DeleteCdsUnitTest_Tool.description,
-          inputSchema: DeleteCdsUnitTest_Tool.inputSchema,
-        },
+        toolDefinition: DeleteCdsUnitTest_Tool,
         handler: withContext(handleDeleteCdsUnitTest),
       },
       {
-        toolDefinition: {
-          name: GetLocalTestClass_Tool.name,
-          description: GetLocalTestClass_Tool.description,
-          inputSchema: GetLocalTestClass_Tool.inputSchema,
-        },
+        toolDefinition: GetLocalTestClass_Tool,
         handler: withContext(handleGetLocalTestClass),
       },
       {
-        toolDefinition: {
-          name: UpdateLocalTestClass_Tool.name,
-          description: UpdateLocalTestClass_Tool.description,
-          inputSchema: UpdateLocalTestClass_Tool.inputSchema,
-        },
+        toolDefinition: UpdateLocalTestClass_Tool,
         handler: withContext(handleUpdateLocalTestClass),
       },
       {
-        toolDefinition: {
-          name: DeleteLocalTestClass_Tool.name,
-          description: DeleteLocalTestClass_Tool.description,
-          inputSchema: DeleteLocalTestClass_Tool.inputSchema,
-        },
+        toolDefinition: DeleteLocalTestClass_Tool,
         handler: withContext(handleDeleteLocalTestClass),
       },
       {
-        toolDefinition: {
-          name: GetLocalTypes_Tool.name,
-          description: GetLocalTypes_Tool.description,
-          inputSchema: GetLocalTypes_Tool.inputSchema,
-        },
+        toolDefinition: GetLocalTypes_Tool,
         handler: withContext(handleGetLocalTypes),
       },
       {
-        toolDefinition: {
-          name: UpdateLocalTypes_Tool.name,
-          description: UpdateLocalTypes_Tool.description,
-          inputSchema: UpdateLocalTypes_Tool.inputSchema,
-        },
+        toolDefinition: UpdateLocalTypes_Tool,
         handler: withContext(handleUpdateLocalTypes),
       },
       {
-        toolDefinition: {
-          name: DeleteLocalTypes_Tool.name,
-          description: DeleteLocalTypes_Tool.description,
-          inputSchema: DeleteLocalTypes_Tool.inputSchema,
-        },
+        toolDefinition: DeleteLocalTypes_Tool,
         handler: withContext(handleDeleteLocalTypes),
       },
       {
-        toolDefinition: {
-          name: GetLocalDefinitions_Tool.name,
-          description: GetLocalDefinitions_Tool.description,
-          inputSchema: GetLocalDefinitions_Tool.inputSchema,
-        },
+        toolDefinition: GetLocalDefinitions_Tool,
         handler: withContext(handleGetLocalDefinitions),
       },
       {
-        toolDefinition: {
-          name: UpdateLocalDefinitions_Tool.name,
-          description: UpdateLocalDefinitions_Tool.description,
-          inputSchema: UpdateLocalDefinitions_Tool.inputSchema,
-        },
+        toolDefinition: UpdateLocalDefinitions_Tool,
         handler: withContext(handleUpdateLocalDefinitions),
       },
       {
-        toolDefinition: {
-          name: DeleteLocalDefinitions_Tool.name,
-          description: DeleteLocalDefinitions_Tool.description,
-          inputSchema: DeleteLocalDefinitions_Tool.inputSchema,
-        },
+        toolDefinition: DeleteLocalDefinitions_Tool,
         handler: withContext(handleDeleteLocalDefinitions),
       },
       {
-        toolDefinition: {
-          name: GetLocalMacros_Tool.name,
-          description: GetLocalMacros_Tool.description,
-          inputSchema: GetLocalMacros_Tool.inputSchema,
-        },
+        toolDefinition: GetLocalMacros_Tool,
         handler: withContext(handleGetLocalMacros),
       },
       {
-        toolDefinition: {
-          name: UpdateLocalMacros_Tool.name,
-          description: UpdateLocalMacros_Tool.description,
-          inputSchema: UpdateLocalMacros_Tool.inputSchema,
-        },
+        toolDefinition: UpdateLocalMacros_Tool,
         handler: withContext(handleUpdateLocalMacros),
       },
       {
-        toolDefinition: {
-          name: DeleteLocalMacros_Tool.name,
-          description: DeleteLocalMacros_Tool.description,
-          inputSchema: DeleteLocalMacros_Tool.inputSchema,
-        },
+        toolDefinition: DeleteLocalMacros_Tool,
         handler: withContext(handleDeleteLocalMacros),
       },
       {
-        toolDefinition: {
-          name: CreateProgram_Tool.name,
-          description: CreateProgram_Tool.description,
-          inputSchema: CreateProgram_Tool.inputSchema,
-        },
+        toolDefinition: CreateProgram_Tool,
         handler: withContext(handleCreateProgram),
       },
       {
-        toolDefinition: {
-          name: GetProgram_Tool.name,
-          description: GetProgram_Tool.description,
-          inputSchema: GetProgram_Tool.inputSchema,
-        },
+        toolDefinition: GetProgram_Tool,
         handler: withContext(handleGetProgram),
       },
       {
-        toolDefinition: {
-          name: UpdateProgramHigh_Tool.name,
-          description: UpdateProgramHigh_Tool.description,
-          inputSchema: UpdateProgramHigh_Tool.inputSchema,
-        },
+        toolDefinition: UpdateProgramHigh_Tool,
         handler: withContext(handleUpdateProgramHigh),
       },
       {
-        toolDefinition: {
-          name: DeleteProgram_Tool.name,
-          description: DeleteProgram_Tool.description,
-          inputSchema: DeleteProgram_Tool.inputSchema,
-        },
+        toolDefinition: DeleteProgram_Tool,
         handler: withContext(handleDeleteProgram),
       },
       {
-        toolDefinition: {
-          name: CreateInterface_Tool.name,
-          description: CreateInterface_Tool.description,
-          inputSchema: CreateInterface_Tool.inputSchema,
-        },
+        toolDefinition: CreateInterface_Tool,
         handler: withContext(handleCreateInterface),
       },
       {
-        toolDefinition: {
-          name: GetInterface_Tool.name,
-          description: GetInterface_Tool.description,
-          inputSchema: GetInterface_Tool.inputSchema,
-        },
+        toolDefinition: GetInterface_Tool,
         handler: withContext(handleGetInterface),
       },
       {
-        toolDefinition: {
-          name: UpdateInterfaceHigh_Tool.name,
-          description: UpdateInterfaceHigh_Tool.description,
-          inputSchema: UpdateInterfaceHigh_Tool.inputSchema,
-        },
+        toolDefinition: UpdateInterfaceHigh_Tool,
         handler: withContext(handleUpdateInterfaceHigh),
       },
       {
-        toolDefinition: {
-          name: DeleteInterface_Tool.name,
-          description: DeleteInterface_Tool.description,
-          inputSchema: DeleteInterface_Tool.inputSchema,
-        },
+        toolDefinition: DeleteInterface_Tool,
         handler: withContext(handleDeleteInterface),
       },
       {
-        toolDefinition: {
-          name: CreateFunctionGroup_Tool.name,
-          description: CreateFunctionGroup_Tool.description,
-          inputSchema: CreateFunctionGroup_Tool.inputSchema,
-        },
+        toolDefinition: CreateFunctionGroup_Tool,
         handler: withContext(handleCreateFunctionGroup),
       },
       {
-        toolDefinition: {
-          name: GetFunctionGroup_Tool.name,
-          description: GetFunctionGroup_Tool.description,
-          inputSchema: GetFunctionGroup_Tool.inputSchema,
-        },
+        toolDefinition: GetFunctionGroup_Tool,
         handler: withContext(handleGetFunctionGroup),
       },
       {
-        toolDefinition: {
-          name: UpdateFunctionGroup_Tool.name,
-          description: UpdateFunctionGroup_Tool.description,
-          inputSchema: UpdateFunctionGroup_Tool.inputSchema,
-        },
+        toolDefinition: UpdateFunctionGroup_Tool,
         handler: withContext(handleUpdateFunctionGroup),
       },
       {
-        toolDefinition: {
-          name: DeleteFunctionGroup_Tool.name,
-          description: DeleteFunctionGroup_Tool.description,
-          inputSchema: DeleteFunctionGroup_Tool.inputSchema,
-        },
+        toolDefinition: DeleteFunctionGroup_Tool,
         handler: withContext(handleDeleteFunctionGroup),
       },
       {
-        toolDefinition: {
-          name: CreateFunctionModule_Tool.name,
-          description: CreateFunctionModule_Tool.description,
-          inputSchema: CreateFunctionModule_Tool.inputSchema,
-        },
+        toolDefinition: CreateFunctionModule_Tool,
         handler: withContext(handleCreateFunctionModule),
       },
       {
-        toolDefinition: {
-          name: GetFunctionModule_Tool.name,
-          description: GetFunctionModule_Tool.description,
-          inputSchema: GetFunctionModule_Tool.inputSchema,
-        },
+        toolDefinition: GetFunctionModule_Tool,
         handler: withContext(handleGetFunctionModule),
       },
       {
-        toolDefinition: {
-          name: UpdateFunctionModuleHigh_Tool.name,
-          description: UpdateFunctionModuleHigh_Tool.description,
-          inputSchema: UpdateFunctionModuleHigh_Tool.inputSchema,
-        },
+        toolDefinition: UpdateFunctionModuleHigh_Tool,
         handler: withContext(handleUpdateFunctionModuleHigh),
       },
       {
-        toolDefinition: {
-          name: DeleteFunctionModule_Tool.name,
-          description: DeleteFunctionModule_Tool.description,
-          inputSchema: DeleteFunctionModule_Tool.inputSchema,
-        },
+        toolDefinition: DeleteFunctionModule_Tool,
         handler: withContext(handleDeleteFunctionModule),
       },
       {
-        toolDefinition: {
-          name: CreateBdef_Tool.name,
-          description: CreateBdef_Tool.description,
-          inputSchema: CreateBdef_Tool.inputSchema,
-        },
+        toolDefinition: CreateBdef_Tool,
         handler: withContext(handleCreateBehaviorDefinition),
       },
       {
-        toolDefinition: {
-          name: GetBehaviorDefinition_Tool.name,
-          description: GetBehaviorDefinition_Tool.description,
-          inputSchema: GetBehaviorDefinition_Tool.inputSchema,
-        },
+        toolDefinition: GetBehaviorDefinition_Tool,
         handler: withContext(handleGetBehaviorDefinition),
       },
       {
-        toolDefinition: {
-          name: UpdateBdef_Tool.name,
-          description: UpdateBdef_Tool.description,
-          inputSchema: UpdateBdef_Tool.inputSchema,
-        },
+        toolDefinition: UpdateBdef_Tool,
         handler: withContext(handleUpdateBehaviorDefinitionHigh),
       },
       {
-        toolDefinition: {
-          name: DeleteBehaviorDefinition_Tool.name,
-          description: DeleteBehaviorDefinition_Tool.description,
-          inputSchema: DeleteBehaviorDefinition_Tool.inputSchema,
-        },
+        toolDefinition: DeleteBehaviorDefinition_Tool,
         handler: withContext(handleDeleteBehaviorDefinition),
       },
       {
-        toolDefinition: {
-          name: CreateBehaviorImplementation_Tool.name,
-          description: CreateBehaviorImplementation_Tool.description,
-          inputSchema: CreateBehaviorImplementation_Tool.inputSchema,
-        },
+        toolDefinition: CreateBehaviorImplementation_Tool,
         handler: withContext(handleCreateBehaviorImplementation),
       },
       {
-        toolDefinition: {
-          name: GetBehaviorImplementation_Tool.name,
-          description: GetBehaviorImplementation_Tool.description,
-          inputSchema: GetBehaviorImplementation_Tool.inputSchema,
-        },
+        toolDefinition: GetBehaviorImplementation_Tool,
         handler: withContext(handleGetBehaviorImplementation),
       },
       {
-        toolDefinition: {
-          name: UpdateBehaviorImplementation_Tool.name,
-          description: UpdateBehaviorImplementation_Tool.description,
-          inputSchema: UpdateBehaviorImplementation_Tool.inputSchema,
-        },
+        toolDefinition: UpdateBehaviorImplementation_Tool,
         handler: withContext(handleUpdateBehaviorImplementation),
       },
       {
-        toolDefinition: {
-          name: DeleteBehaviorImplementation_Tool.name,
-          description: DeleteBehaviorImplementation_Tool.description,
-          inputSchema: DeleteBehaviorImplementation_Tool.inputSchema,
-        },
+        toolDefinition: DeleteBehaviorImplementation_Tool,
         handler: withContext(handleDeleteBehaviorImplementation),
       },
       {
-        toolDefinition: {
-          name: CreateDdlx_Tool.name,
-          description: CreateDdlx_Tool.description,
-          inputSchema: CreateDdlx_Tool.inputSchema,
-        },
+        toolDefinition: CreateDdlx_Tool,
         handler: withContext(handleCreateMetadataExtension),
       },
       {
-        toolDefinition: {
-          name: GetMetadataExtension_Tool.name,
-          description: GetMetadataExtension_Tool.description,
-          inputSchema: GetMetadataExtension_Tool.inputSchema,
-        },
+        toolDefinition: GetMetadataExtension_Tool,
         handler: withContext(handleGetMetadataExtension),
       },
       {
-        toolDefinition: {
-          name: UpdateDdlx_Tool.name,
-          description: UpdateDdlx_Tool.description,
-          inputSchema: UpdateDdlx_Tool.inputSchema,
-        },
+        toolDefinition: UpdateDdlx_Tool,
         handler: withContext(handleUpdateMetadataExtensionHigh),
       },
       {
-        toolDefinition: {
-          name: DeleteMetadataExtension_Tool.name,
-          description: DeleteMetadataExtension_Tool.description,
-          inputSchema: DeleteMetadataExtension_Tool.inputSchema,
-        },
+        toolDefinition: DeleteMetadataExtension_Tool,
         handler: withContext(handleDeleteMetadataExtension),
       },
     ];

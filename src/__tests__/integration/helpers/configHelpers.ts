@@ -624,16 +624,55 @@ export function getCleanupAfter(testCase?: any): boolean {
 }
 
 /**
- * Check if current connection is cloud (JWT auth) or on-premise (basic auth)
- * Programs are not available on cloud, so tests should be skipped
+ * Check if current connection is cloud (JWT auth) or on-premise (basic auth).
+ * Programs/FunctionGroups are not available on cloud, so tests should be skipped.
+ *
+ * Detection order:
+ * 1. lib/utils sessionContext (when MCP server is running in-process)
+ * 2. process.env.SAP_JWT_TOKEN (set by test globalSetup from auth broker)
+ * 3. test-config.yaml auth_type field
  */
 export function isCloudConnection(): boolean {
   try {
-    const { isCloudConnection } = require('../../../lib/utils');
-    return isCloudConnection();
+    const { isCloudConnection: utilsIsCloud } = require('../../../lib/utils');
+    if (utilsIsCloud()) return true;
   } catch {
-    return false;
+    // lib/utils not available or sessionContext not set
   }
+
+  // Fallback: check env vars set by loadTestEnv / auth broker
+  if (process.env.SAP_JWT_TOKEN) {
+    return true;
+  }
+
+  // Fallback: check session file for hard mode destination (JWT = cloud)
+  try {
+    const config = loadTestConfig();
+    const destination =
+      config?.hard_mode?.mcp_destination ||
+      config?.auth_broker?.abap?.destination ||
+      config?.environment?.destination;
+    if (destination) {
+      const os = require('node:os');
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const sessionFile = path.join(
+        os.homedir(),
+        '.config',
+        'mcp-abap-adt',
+        'sessions',
+        `${destination}.env`,
+      );
+      if (fs.existsSync(sessionFile)) {
+        const content = fs.readFileSync(sessionFile, 'utf8');
+        if (content.includes('SAP_JWT_TOKEN=')) return true;
+      }
+    }
+  } catch {
+    // no config or session file
+  }
+
+  return false;
 }
 
 /**

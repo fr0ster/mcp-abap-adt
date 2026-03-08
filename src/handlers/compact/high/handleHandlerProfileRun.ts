@@ -5,6 +5,7 @@ import { compactProfileRunSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileRun',
+  available_in: ['onprem'] as const,
   description:
     'Runtime profiling run. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM. Optional profiling flags and description. Response: JSON.',
   inputSchema: compactProfileRunSchema,

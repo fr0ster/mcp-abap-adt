@@ -16,6 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CreateMetadataExtensionLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Create a new ABAP Metadata Extension. - use CreateMetadataExtension (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
   inputSchema: {

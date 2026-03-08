@@ -17,6 +17,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CreateBehaviorImplementationLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Create a new ABAP behavior implementation class with full workflow (create, lock, update main source, update implementations, unlock, activate). - use CreateBehaviorImplementation (high-level) for additional validation.',
   inputSchema: {

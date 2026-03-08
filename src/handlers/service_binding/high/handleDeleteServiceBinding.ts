@@ -8,6 +8,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'DeleteServiceBinding',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Delete ABAP service binding via ADT Business Services endpoint.',
   inputSchema: {

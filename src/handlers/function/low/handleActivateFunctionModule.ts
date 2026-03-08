@@ -17,6 +17,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'ActivateFunctionModuleLow',
+  available_in: ['onprem', 'legacy'] as const,
   description:
     '[low-level] Activate an ABAP function module. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {

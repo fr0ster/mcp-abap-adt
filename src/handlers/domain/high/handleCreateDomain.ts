@@ -21,6 +21,7 @@ import { validateTransportRequest } from '../../../utils/transportValidation';
 
 export const TOOL_DEFINITION = {
   name: 'CreateDomain',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP domain in SAP system with all required steps: lock, create, check, unlock, activate, and verify.',
   inputSchema: {

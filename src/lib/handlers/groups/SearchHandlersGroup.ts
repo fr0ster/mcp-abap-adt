@@ -28,20 +28,12 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
   getHandlers(): HandlerEntry[] {
     return [
       {
-        toolDefinition: {
-          name: SearchObject_Tool.name,
-          description: SearchObject_Tool.description,
-          inputSchema: SearchObject_Tool.inputSchema,
-        },
+        toolDefinition: SearchObject_Tool,
         handler: (args: any) => handleSearchObject(this.context, args),
       },
       // Dynamic import handlers
       {
-        toolDefinition: {
-          name: GetObjectsList_Tool.name,
-          description: GetObjectsList_Tool.description,
-          inputSchema: GetObjectsList_Tool.inputSchema,
-        },
+        toolDefinition: GetObjectsList_Tool,
         handler: (args: any) => {
           return handleGetObjectsList(
             this.context,
@@ -50,11 +42,7 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
         },
       },
       {
-        toolDefinition: {
-          name: GetObjectsByType_Tool.name,
-          description: GetObjectsByType_Tool.description,
-          inputSchema: GetObjectsByType_Tool.inputSchema,
-        },
+        toolDefinition: GetObjectsByType_Tool,
         handler: (args: any) => {
           return handleGetObjectsByType(
             this.context,

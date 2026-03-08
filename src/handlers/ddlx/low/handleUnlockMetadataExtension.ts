@@ -21,9 +21,9 @@ export const TOOL_DEFINITION = {
   inputSchema: {
     type: 'object',
     properties: {
-      objName: {
+      name: {
         type: 'string',
-        description: 'MetadataExtension name (e.g., Z_MY_PROGRAM).',
+        description: 'MetadataExtension name (e.g., ZI_MY_DDLX).',
       },
       lock_handle: {
         type: 'string',

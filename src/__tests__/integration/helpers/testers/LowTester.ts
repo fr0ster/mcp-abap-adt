@@ -369,16 +369,41 @@ export class LowTester extends LambdaTester {
     }
   }
 
+  private static readonly META_PARAMS = new Set([
+    'skip_cleanup',
+    'cleanup_after',
+    'delete_after_test',
+    'delete_object_type',
+  ]);
+
+  /**
+   * Returns params suitable for create/validate steps:
+   * - excludes test-infrastructure keys
+   * - excludes update-specific keys (update_*, updated_*)
+   */
+  private filterCreateParams(params: any): any {
+    const result: any = {};
+    for (const [key, value] of Object.entries(params)) {
+      if (
+        !LowTester.META_PARAMS.has(key) &&
+        !key.startsWith('update_') &&
+        !key.startsWith('updated_')
+      ) {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
   private buildValidateArgs(context: LambdaTesterContext): any {
     const { objectName, params, packageName, transportRequest, session } =
       context;
-    // Extract object-specific name field (class_name, table_name, etc.)
     const nameField = this.getNameField();
     return {
+      ...this.filterCreateParams(params),
       [nameField]: objectName,
       package_name: packageName,
       description: params.description || objectName,
-      ...(params.superclass && { superclass: params.superclass }),
       ...(transportRequest && { transport_request: transportRequest }),
       ...(session?.session_id && { session_id: session.session_id }),
       ...(session?.session_state && { session_state: session.session_state }),
@@ -386,19 +411,7 @@ export class LowTester extends LambdaTester {
   }
 
   private buildCreateArgs(context: LambdaTesterContext): any {
-    const { objectName, params, packageName, transportRequest, session } =
-      context;
-    const nameField = this.getNameField();
-    return {
-      [nameField]: objectName,
-      package_name: packageName,
-      description: params.description || objectName,
-      ...(params.source_code && { source_code: params.source_code }),
-      ...(params.superclass && { superclass: params.superclass }),
-      ...(transportRequest && { transport_request: transportRequest }),
-      ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state }),
-    };
+    return this.buildValidateArgs(context);
   }
 
   private buildLockArgs(context: LambdaTesterContext): any {
@@ -412,15 +425,85 @@ export class LowTester extends LambdaTester {
   }
 
   private buildUpdateArgs(context: LambdaTesterContext): any {
-    const { objectName, params, lockHandle, session } = context;
+    const { objectName, params, lockHandle, packageName, session } = context;
     const nameField = this.getNameField();
-    return {
+    const handlerName = (this as any).handlerName || '';
+
+    const args: any = {
       [nameField]: objectName,
-      source_code: params.source_code || params.update_source_code || '',
       lock_handle: lockHandle || context.lockHandle,
-      ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state }),
     };
+
+    // Domain and DataElement handlers require a 'properties' object
+    if (
+      handlerName.includes('domain') ||
+      handlerName.includes('data_element')
+    ) {
+      args.properties = this.buildUpdateProperties(params, packageName);
+    }
+
+    // Content fields: prefer "update" variants over originals
+    const sourceCode = params.update_source_code ?? params.source_code;
+    if (sourceCode !== undefined) args.source_code = sourceCode;
+
+    const ddlCode = params.updated_ddl_code ?? params.ddl_code;
+    if (ddlCode !== undefined) args.ddl_code = ddlCode;
+
+    const ddlSource = params.update_ddl_source ?? params.ddl_source;
+    if (ddlSource !== undefined) args.ddl_source = ddlSource;
+
+    if (params.implementation_code !== undefined) {
+      args.implementation_code = params.implementation_code;
+    }
+
+    if (session?.session_id) args.session_id = session.session_id;
+    if (session?.session_state) args.session_state = session.session_state;
+
+    return args;
+  }
+
+  /**
+   * Builds the `properties` object required by UpdateDomainLow and UpdateDataElementLow.
+   * Merges YAML params.properties (if present) with top-level update fields.
+   */
+  private buildUpdateProperties(
+    params: any,
+    packageName: string,
+  ): Record<string, any> {
+    const base: Record<string, any> = params.properties ?? {};
+    const props: Record<string, any> = {
+      package_name: base.package_name || packageName,
+      description:
+        params.update_description ?? base.description ?? params.description,
+    };
+
+    const lengthVal = params.update_length ?? base.length ?? params.length;
+    if (lengthVal !== undefined) props.length = lengthVal;
+
+    if (base.datatype || params.datatype) {
+      props.datatype = base.datatype || params.datatype;
+    }
+    if (params.decimals !== undefined) props.decimals = params.decimals;
+    if (params.lowercase !== undefined) props.lowercase = params.lowercase;
+    if (params.sign_exists !== undefined)
+      props.sign_exists = params.sign_exists;
+
+    // DataElement-specific fields
+    if (params.type_kind) props.type_kind = params.type_kind;
+    if (params.type_name) {
+      props.type_name = params.type_name;
+    } else if (params.domain_name) {
+      props.type_name = params.domain_name;
+    }
+    if (params.data_type) props.data_type = params.data_type;
+    if (params.short_label) props.short_label = params.short_label;
+    if (params.medium_label) props.medium_label = params.medium_label;
+    if (params.field_label_long)
+      props.field_label_long = params.field_label_long;
+    if (params.field_label_heading)
+      props.field_label_heading = params.field_label_heading;
+
+    return props;
   }
 
   private buildUnlockArgs(context: LambdaTesterContext): any {

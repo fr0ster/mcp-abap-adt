@@ -22,9 +22,17 @@ export const TOOL_DEFINITION = {
   inputSchema: {
     type: 'object',
     properties: {
-      objName: {
+      name: {
         type: 'string',
-        description: 'MetadataExtension name to validate (e.g., Z_MY_PROGRAM).',
+        description: 'MetadataExtension name to validate (e.g., ZI_MY_DDLX).',
+      },
+      description: {
+        type: 'string',
+        description: 'MetadataExtension description.',
+      },
+      package_name: {
+        type: 'string',
+        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects).',
       },
       session_id: {
         type: 'string',

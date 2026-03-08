@@ -71,7 +71,6 @@ export const TOOL_DEFINITION = {
       'name',
       'description',
       'package_name',
-      'transport_request',
       'root_entity',
       'implementation_type',
     ],

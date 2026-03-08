@@ -18,67 +18,9 @@
 import { handleCreateBehaviorImplementation } from '../../../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleUpdateBehaviorImplementation } from '../../../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
 import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
-import {
-  getEnabledTestCase,
-  getSharedObject,
-  getTimeout,
-  resolvePackageName,
-  resolveTransportRequest,
-} from '../../helpers/configHelpers';
+import { getTimeout } from '../../helpers/configHelpers';
+import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { HighTester } from '../../helpers/testers/HighTester';
-import {
-  callTool,
-  createHardModeClient,
-  isHardModeEnabled,
-} from '../../helpers/testers/hardMode';
-
-async function manageBdefPrerequisite(
-  action: 'create' | 'delete',
-): Promise<void> {
-  if (!isHardModeEnabled()) return;
-  const implTestCase = getEnabledTestCase(
-    'create_behavior_implementation',
-    'builder_behavior_implementation',
-  );
-  if (!implTestCase) return;
-  const bdefName: string | undefined = implTestCase.params?.behavior_definition;
-  if (!bdefName) return;
-  const packageName = resolvePackageName(implTestCase);
-  const transportRequest = resolveTransportRequest(implTestCase);
-
-  // Source code for the prerequisite BDEF — taken from shared_objects config
-  const sharedBdef = getSharedObject('behavior_definition_prerequisite');
-  const sourceCode: string | undefined = sharedBdef?.source_code;
-
-  const mcp = await createHardModeClient();
-  try {
-    if (action === 'create') {
-      await callTool(mcp.client, mcp.toolNames, ['CreateBehaviorDefinition'], {
-        name: bdefName,
-        root_entity: bdefName,
-        package_name: packageName,
-        implementation_type: 'Managed',
-        description: `Prerequisite BDEF for BehaviorImplementation tests`,
-        ...(sourceCode && { source_code: sourceCode }),
-        ...(transportRequest && { transport_request: transportRequest }),
-      });
-    } else {
-      await callTool(
-        mcp.client,
-        mcp.toolNames,
-        ['DeleteBehaviorDefinition', 'DeleteBehaviorDefinitionLow'],
-        {
-          behavior_definition_name: bdefName,
-          ...(transportRequest && { transport_request: transportRequest }),
-        },
-      );
-    }
-  } catch {
-    // create: already exists — OK; delete: not found — OK
-  } finally {
-    await mcp.close();
-  }
-}
 
 describe('BehaviorImplementation High-Level Handlers Integration', () => {
   let tester: HighTester;
@@ -95,11 +37,15 @@ describe('BehaviorImplementation High-Level Handlers Integration', () => {
       },
     );
     await tester.beforeAll();
-    await manageBdefPrerequisite('create');
+    // Ensure shared BDEF prerequisite exists and matches YAML (soft mode)
+    const connection = tester.getConnection();
+    if (connection) {
+      await ensureSharedObjects(connection);
+    }
   }, getTimeout('long'));
 
   afterAll(async () => {
-    await manageBdefPrerequisite('delete');
+    // Shared objects are NOT deleted — they persist for reuse across test suites
     await tester.afterAll();
   });
 

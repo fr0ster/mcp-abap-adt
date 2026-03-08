@@ -24,6 +24,7 @@ import { handleUnlockClass } from '../../../../handlers/class/low/handleUnlockCl
 import { createAdtClient } from '../../../../lib/clients';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import {
@@ -46,8 +47,9 @@ describe('BehaviorImplementation Low-Level Handlers Integration', () => {
       'bimpl-low',
     );
     await tester.beforeAll(
-      async (_context: LambdaTesterContext) => {
-        // Basic setup
+      async (context: LambdaTesterContext) => {
+        // Ensure shared BDEF prerequisite exists and matches YAML
+        await ensureSharedObjects(context.connection);
       },
       // Cleanup lambda
       async (context: LambdaTesterContext) => {

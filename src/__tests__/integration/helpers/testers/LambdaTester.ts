@@ -27,6 +27,7 @@ import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../sessionHelpers';
+import { delay } from '../testHelpers';
 import {
   createHardModeClient,
   isHardModeEnabled,
@@ -51,7 +52,7 @@ export class LambdaTester {
   protected testParams: any = null;
   protected context: LambdaTesterContext | undefined;
   protected cleanupAfterLambda: TLambda | null = null;
-  private hardModeMcp: {
+  protected hardModeMcp: {
     client: any;
     toolNames: Set<string>;
     close: () => Promise<void>;
@@ -465,6 +466,14 @@ export class LambdaTester {
         );
         await this.cleanupAfterLambda(this.context);
         this.context.logger?.debug?.('✅ Pre-cleanup completed');
+        // Wait for SAP to propagate the deletion before starting the test
+        const cleanupDelay = this.context.getOperationDelay('cleanup');
+        if (cleanupDelay > 0) {
+          this.context.logger?.debug?.(
+            `⏳ Waiting ${cleanupDelay}ms for SAP to propagate cleanup...`,
+          );
+          await delay(cleanupDelay);
+        }
       } catch (error: any) {
         // Pre-cleanup errors are non-fatal - object might not exist
         this.context.logger?.debug?.(
@@ -566,6 +575,10 @@ export class LambdaTester {
     return isHardModeEnabled();
   }
 
+  getConnection(): import('@mcp-abap-adt/interfaces').IAbapConnection | null {
+    return this.context?.connection ?? null;
+  }
+
   async invokeToolOrHandler<T>(
     toolName: string,
     args: Record<string, unknown>,
@@ -603,14 +616,14 @@ export class LambdaTester {
     };
   }
 
-  private async getHardModeClient() {
+  protected async getHardModeClient() {
     if (!this.hardModeMcp) {
       this.hardModeMcp = await createHardModeClient();
     }
     return this.hardModeMcp;
   }
 
-  private async closeHardModeClient(): Promise<void> {
+  protected async closeHardModeClient(): Promise<void> {
     if (!this.hardModeMcp) {
       return;
     }

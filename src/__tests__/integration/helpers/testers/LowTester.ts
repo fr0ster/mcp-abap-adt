@@ -9,6 +9,7 @@
 
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import { getCleanupAfter } from '../configHelpers';
+import type { LoggerWithExtras } from '../loggerHelpers';
 import {
   createHandlerContext,
   delay,
@@ -17,7 +18,6 @@ import {
 } from '../testHelpers';
 import {
   callTool,
-  createHardModeClient,
   isHardModeEnabled,
   parseToolText,
   resolveEntityFromHandlerName,
@@ -82,28 +82,68 @@ export class LowTester extends LambdaTester {
         if (!objectName) return;
 
         try {
+          // Step 1: Check if object is locked, force-release if so
+          // Uses deletion/check to detect locks, then ddlock/locks to release
+          try {
+            const objectUri = this.resolveObjectUri(objectName);
+            if (objectUri) {
+              const checkResponse = await connection.makeAdtRequest({
+                url: '/sap/bc/adt/deletion/check',
+                method: 'POST',
+                timeout: 30000,
+                data: `<?xml version="1.0" encoding="UTF-8"?><del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core"><del:object adtcore:uri="${objectUri}"/></del:checkRequest>`,
+                headers: {
+                  Accept:
+                    'application/vnd.sap.adt.deletion.check.response.v1+xml',
+                  'Content-Type':
+                    'application/vnd.sap.adt.deletion.check.request.v1+xml',
+                },
+              });
+              const responseText =
+                typeof checkResponse.data === 'string'
+                  ? checkResponse.data
+                  : '';
+              const isLocked =
+                responseText.includes('isDeletable="false"') &&
+                responseText.includes('lockUser');
+              if (isLocked) {
+                logger?.debug?.(
+                  `🔒 Object ${objectName} is locked, releasing DDIC lock...`,
+                );
+                await connection.makeAdtRequest({
+                  url: `/sap/bc/adt/ddic/ddlock/locks?lockAction=DELETE&name=${encodeURIComponent(objectName)}`,
+                  method: 'POST',
+                  timeout: 30000,
+                  data: '',
+                  headers: {},
+                });
+                logger?.debug?.(
+                  `🔓 Released DDIC lock for ${objectName} (pre-cleanup)`,
+                );
+              }
+            }
+          } catch {
+            // Ignore — object may not exist or check not applicable
+          }
+
+          // Step 2: Delete the object
           if (isHardModeEnabled()) {
             const entity = resolveEntityFromHandlerName(
               (this as any).handlerName || '',
             );
-            const mcp = await createHardModeClient();
-            try {
-              await this.ensureHardModeSession(mcp, context);
-              const deleteArgs = this.buildDeleteArgs(context);
-              await callTool(
-                mcp.client,
-                mcp.toolNames,
-                toolCandidates('delete', entity, 'low', this.handlerName),
-                deleteArgs,
-              );
-              logger?.info?.(`🗑️ Deleted ${objectName}`);
-            } finally {
-              await mcp.close();
-            }
+            const mcp = await this.getHardModeClient();
+            await this.ensureHardModeSession(mcp, context);
+            const deleteArgs = this.buildDeleteArgs(context);
+            await callTool(
+              mcp.client,
+              mcp.toolNames,
+              toolCandidates('delete', entity, 'low', this.handlerName),
+              deleteArgs,
+            );
+            logger?.info?.(`🗑️ Deleted ${objectName}`);
             return;
           }
 
-          await delay(2000); // Ensure object is ready for deletion
           const handlerContext = createHandlerContext({
             connection,
             logger: logger || undefined,
@@ -193,18 +233,38 @@ export class LowTester extends LambdaTester {
           }
         }
         logger?.info(`🔒 Locked ${this.context.objectName}`);
-      }
 
-      if (this.workflowFunctions.update) {
-        const args = this.buildUpdateArgs(this.context);
-        await this.workflowFunctions.update(handlerContext, args);
-        logger?.info(`📝 Updated ${this.context.objectName}`);
-      }
+        // Guarantee unlock even if update fails
+        try {
+          if (this.workflowFunctions.update) {
+            const updateArgs = this.buildUpdateArgs(this.context);
+            await this.retryOnConflict(
+              () => this.workflowFunctions!.update(handlerContext, updateArgs),
+              `Update ${this.context.objectName}`,
+              logger,
+            );
+            logger?.info(`📝 Updated ${this.context.objectName}`);
+          }
+        } finally {
+          if (this.workflowFunctions.unlock) {
+            const unlockArgs = this.buildUnlockArgs(this.context);
+            await this.workflowFunctions.unlock(handlerContext, unlockArgs);
+            logger?.info(`🔓 Unlocked ${this.context.objectName}`);
+          }
+        }
+      } else {
+        // No lock — run update and unlock independently (shouldn't normally happen)
+        if (this.workflowFunctions.update) {
+          const updateArgs = this.buildUpdateArgs(this.context);
+          await this.workflowFunctions.update(handlerContext, updateArgs);
+          logger?.info(`📝 Updated ${this.context.objectName}`);
+        }
 
-      if (this.workflowFunctions.unlock) {
-        const args = this.buildUnlockArgs(this.context);
-        await this.workflowFunctions.unlock(handlerContext, args);
-        logger?.info(`🔓 Unlocked ${this.context.objectName}`);
+        if (this.workflowFunctions.unlock) {
+          const unlockArgs = this.buildUnlockArgs(this.context);
+          await this.workflowFunctions.unlock(handlerContext, unlockArgs);
+          logger?.info(`🔓 Unlocked ${this.context.objectName}`);
+        }
       }
 
       if (this.workflowFunctions.activate) {
@@ -233,7 +293,7 @@ export class LowTester extends LambdaTester {
     const entity = resolveEntityFromHandlerName(
       (this as any).handlerName || '',
     );
-    const mcp = await createHardModeClient();
+    const mcp = await this.getHardModeClient();
 
     try {
       await this.ensureHardModeSession(mcp, this.context);
@@ -279,28 +339,54 @@ export class LowTester extends LambdaTester {
           }
         }
         logger?.info(`🔒 Locked ${this.context.objectName}`);
-      }
 
-      if (this.workflowFunctions?.update) {
-        const args = this.buildUpdateArgs(this.context);
-        await callTool(
-          mcp.client,
-          mcp.toolNames,
-          toolCandidates('update', entity, 'low', this.handlerName),
-          args,
-        );
-        logger?.info(`📝 Updated ${this.context.objectName}`);
-      }
+        // Guarantee unlock even if update fails
+        try {
+          const updateArgs = this.buildUpdateArgs(this.context);
+          await this.retryOnConflict(
+            () =>
+              callTool(
+                mcp.client,
+                mcp.toolNames,
+                toolCandidates('update', entity, 'low', this.handlerName),
+                updateArgs,
+              ),
+            `Update ${this.context.objectName} (hard mode)`,
+            logger,
+          );
+          logger?.info(`📝 Updated ${this.context.objectName}`);
+        } finally {
+          const unlockArgs = this.buildUnlockArgs(this.context);
+          await callTool(
+            mcp.client,
+            mcp.toolNames,
+            toolCandidates('unlock', entity, 'low', this.handlerName),
+            unlockArgs,
+          );
+          logger?.info(`🔓 Unlocked ${this.context.objectName}`);
+        }
+      } else {
+        if (this.workflowFunctions?.update) {
+          const updateArgs = this.buildUpdateArgs(this.context);
+          await callTool(
+            mcp.client,
+            mcp.toolNames,
+            toolCandidates('update', entity, 'low', this.handlerName),
+            updateArgs,
+          );
+          logger?.info(`📝 Updated ${this.context.objectName}`);
+        }
 
-      if (this.workflowFunctions?.unlock) {
-        const args = this.buildUnlockArgs(this.context);
-        await callTool(
-          mcp.client,
-          mcp.toolNames,
-          toolCandidates('unlock', entity, 'low', this.handlerName),
-          args,
-        );
-        logger?.info(`🔓 Unlocked ${this.context.objectName}`);
+        if (this.workflowFunctions?.unlock) {
+          const unlockArgs = this.buildUnlockArgs(this.context);
+          await callTool(
+            mcp.client,
+            mcp.toolNames,
+            toolCandidates('unlock', entity, 'low', this.handlerName),
+            unlockArgs,
+          );
+          logger?.info(`🔓 Unlocked ${this.context.objectName}`);
+        }
       }
 
       if (this.workflowFunctions?.activate) {
@@ -322,8 +408,6 @@ export class LowTester extends LambdaTester {
 
       this.context.logger?.error(`❌ Test failed: ${error.message}`);
       throw error;
-    } finally {
-      await mcp.close();
     }
   }
 
@@ -558,6 +642,69 @@ export class LowTester extends LambdaTester {
     return 'name'; // fallback
   }
 
+  /**
+   * Resolve ADT object URI for deletion/check API
+   * Returns null for object types where deletion/check is not applicable
+   */
+  private resolveObjectUri(objectName: string): string | null {
+    const name = encodeURIComponent(objectName.toLowerCase());
+    const handlerName = (this as any).handlerName || '';
+    if (handlerName.includes('table')) return `/sap/bc/adt/ddic/tables/${name}`;
+    if (handlerName.includes('view'))
+      return `/sap/bc/adt/ddic/ddl/sources/${name}`;
+    if (handlerName.includes('structure'))
+      return `/sap/bc/adt/ddic/structures/${name}`;
+    if (handlerName.includes('data_element'))
+      return `/sap/bc/adt/ddic/dataelements/${name}`;
+    if (handlerName.includes('domain'))
+      return `/sap/bc/adt/ddic/domains/${name}`;
+    if (handlerName.includes('metadata_extension'))
+      return `/sap/bc/adt/ddic/ddlx/sources/${name}`;
+    if (handlerName.includes('interface'))
+      return `/sap/bc/adt/oo/interfaces/${name}`;
+    if (handlerName.includes('class')) return `/sap/bc/adt/oo/classes/${name}`;
+    if (handlerName.includes('behavior_definition'))
+      return `/sap/bc/adt/bo/behaviordefinitions/${name}`;
+    if (handlerName.includes('service_definition'))
+      return `/sap/bc/adt/ddic/srvd/sources/${name}`;
+    return null;
+  }
+
+  /**
+   * Retry operation on HTTP 409 Conflict (TADIR stale entry).
+   * SAP BTP Cloud trial can return 409/TK754 after delete+create due to stale TADIR entries.
+   * SAP's own recommendation: "Repeat the function."
+   */
+  private async retryOnConflict<T>(
+    operation: () => Promise<T>,
+    label: string,
+    logger?: LoggerWithExtras | null,
+    maxRetries = 2,
+    delayMs = 3000,
+  ): Promise<T> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        const status =
+          error.response?.status ||
+          (typeof error.message === 'string' &&
+            error.message.includes('409') &&
+            409);
+        if (status === 409 && attempt < maxRetries) {
+          logger?.warn?.(
+            `⚠️ ${label}: HTTP 409 Conflict (TADIR stale entry), retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`,
+          );
+          await delay(delayMs);
+          continue;
+        }
+        throw error;
+      }
+    }
+    // unreachable, but TS needs it
+    throw new Error(`${label}: exceeded max retries`);
+  }
+
   // Compatibility methods - LowTester doesn't use lambdas for lifecycle hooks
   async afterAll(): Promise<void> {
     await super.afterAll(async () => {});
@@ -573,6 +720,14 @@ export class LowTester extends LambdaTester {
         );
         await this.cleanupAfterLambda(this.context);
         this.context.logger?.debug?.('✅ Pre-cleanup completed');
+        // Wait for SAP to propagate the deletion before starting the test
+        const cleanupDelay = this.context.getOperationDelay('cleanup');
+        if (cleanupDelay > 0) {
+          this.context.logger?.debug?.(
+            `⏳ Waiting ${cleanupDelay}ms for SAP to propagate cleanup...`,
+          );
+          await delay(cleanupDelay);
+        }
       } catch (error: any) {
         // Pre-cleanup errors are non-fatal - object might not exist
         this.context.logger?.debug?.(

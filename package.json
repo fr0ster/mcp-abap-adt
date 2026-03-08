@@ -41,9 +41,9 @@
   },
   "scripts": {
     "test": "jest --passWithNoTests",
-    "test:integration": "jest --testPathPattern=integration --passWithNoTests",
-    "test:high": "jest --testPathPattern=integration.*HighHandlers --passWithNoTests",
-    "test:low": "jest --testPathPattern=integration.*LowHandlers --passWithNoTests",
+    "test:integration": "jest --testPathPattern=integration --runInBand --passWithNoTests",
+    "test:high": "jest --testPathPattern=integration.*HighHandlers --runInBand --passWithNoTests",
+    "test:low": "jest --testPathPattern=integration.*LowHandlers --runInBand --passWithNoTests",
     "test:check": "npx tsc --noEmit -p tsconfig.test.json",
     "lint": "npx biome check --write src",
     "lint:check": "npx biome check src",

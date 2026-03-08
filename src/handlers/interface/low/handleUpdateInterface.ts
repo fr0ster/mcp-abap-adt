@@ -114,13 +114,8 @@ export async function handleUpdateInterface(
           { interfaceName: interfaceName, sourceCode: source_code },
           { lockHandle: lock_handle },
         );
+      // updateResult may be null for successful updates (interface PUT returns 204 No Content)
       const updateResult = updateState.updateResult;
-
-      if (!updateResult) {
-        throw new Error(
-          `Update did not return a response for interface ${interfaceName}`,
-        );
-      }
 
       // Get updated session state after update
 

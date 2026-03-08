@@ -9,10 +9,10 @@
 
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import { getCleanupAfter } from '../configHelpers';
-import { createHandlerContext } from '../testHelpers';
+import type { LoggerWithExtras } from '../loggerHelpers';
+import { createHandlerContext, delay } from '../testHelpers';
 import {
   callTool,
-  createHardModeClient,
   isHardModeEnabled,
   resolveEntityFromHandlerName,
   toolCandidates,
@@ -77,21 +77,15 @@ export class HighTester extends LambdaTester {
             const entity = resolveEntityFromHandlerName(
               (this as any).handlerName || '',
             );
-            const mcp = await createHardModeClient();
-            try {
-              const deleteArgs = this.buildDeleteArgs(context);
-              await callTool(
-                mcp.client,
-                mcp.toolNames,
-                toolCandidates('delete', entity, 'high', this.handlerName),
-                deleteArgs,
-              );
-              logger?.success?.(
-                `✅ cleanup: deleted ${objectName} successfully`,
-              );
-            } finally {
-              await mcp.close();
-            }
+            const mcp = await this.getHardModeClient();
+            const deleteArgs = this.buildDeleteArgs(context);
+            await callTool(
+              mcp.client,
+              mcp.toolNames,
+              toolCandidates('delete', entity, 'high', this.handlerName),
+              deleteArgs,
+            );
+            logger?.success?.(`✅ cleanup: deleted ${objectName} successfully`);
             return;
           }
 
@@ -168,7 +162,11 @@ export class HighTester extends LambdaTester {
       if (this.workflowFunctions.update) {
         logger?.info(`   • update ${this.context.objectName}`);
         const args = this.buildUpdateArgs(this.context);
-        await this.workflowFunctions.update(handlerContext, args);
+        await this.retryOnConflict(
+          () => this.workflowFunctions!.update(handlerContext, args),
+          `Update ${this.context.objectName}`,
+          logger,
+        );
         logger?.info(`   ✅ update completed`);
       }
     } catch (error: any) {
@@ -192,7 +190,8 @@ export class HighTester extends LambdaTester {
     const entity = resolveEntityFromHandlerName(
       (this as any).handlerName || '',
     );
-    const mcp = await createHardModeClient();
+    const mcp = await this.getHardModeClient();
+
     try {
       if (this.workflowFunctions?.create) {
         logger?.info(`   • create ${this.context.objectName} (hard mode)`);
@@ -209,17 +208,62 @@ export class HighTester extends LambdaTester {
       if (this.workflowFunctions?.update) {
         logger?.info(`   • update ${this.context.objectName} (hard mode)`);
         const args = this.buildUpdateArgs(this.context);
-        await callTool(
-          mcp.client,
-          mcp.toolNames,
-          toolCandidates('update', entity, 'high', this.handlerName),
-          args,
+        await this.retryOnConflict(
+          () =>
+            callTool(
+              mcp.client,
+              mcp.toolNames,
+              toolCandidates('update', entity, 'high', this.handlerName),
+              args,
+            ),
+          `Update ${this.context.objectName} (hard mode)`,
+          logger,
         );
         logger?.info(`   ✅ update completed`);
       }
-    } finally {
-      await mcp.close();
+    } catch (error: any) {
+      if (error.message?.startsWith('SKIP:')) {
+        const skipReason = error.message.replace(/^SKIP:\s*/, '');
+        this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
+        return;
+      }
+
+      this.context.logger?.error(`❌ Test failed: ${error.message}`);
+      throw error;
     }
+  }
+
+  /**
+   * Retry operation on HTTP 409 Conflict (TADIR stale entry).
+   * SAP BTP Cloud trial can return 409/TK754 after delete+create due to stale TADIR entries.
+   * SAP's own recommendation: "Repeat the function."
+   */
+  private async retryOnConflict<T>(
+    operation: () => Promise<T>,
+    label: string,
+    logger?: LoggerWithExtras | null,
+    maxRetries = 2,
+    delayMs = 3000,
+  ): Promise<T> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        const isTadirConflict =
+          error.response?.status === 409 ||
+          (typeof error.message === 'string' &&
+            error.message.includes('object directory entry'));
+        if (isTadirConflict && attempt < maxRetries) {
+          logger?.warn?.(
+            `⚠️ ${label}: TADIR conflict (stale entry), retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`,
+          );
+          await delay(delayMs);
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error(`${label}: exceeded max retries`);
   }
 
   private buildCreateArgs(context: LambdaTesterContext): any {
@@ -261,6 +305,21 @@ export class HighTester extends LambdaTester {
       ...(params.lowercase !== undefined && { lowercase: params.lowercase }),
       ...(params.sign_exists !== undefined && {
         sign_exists: params.sign_exists,
+      }),
+      // ServiceDefinition specific
+      ...(params.ddl_source && { ddl_source: params.ddl_source }),
+      // FunctionGroup specific
+      ...(params.function_group_name && {
+        function_group_name: params.function_group_name,
+      }),
+      ...(params.function_group_description && {
+        function_group_description: params.function_group_description,
+      }),
+      ...(params.function_module_name && {
+        function_module_name: params.function_module_name,
+      }),
+      ...(params.function_module_description && {
+        function_module_description: params.function_module_description,
       }),
       ...(transportRequest && { transport_request: transportRequest }),
       ...(session?.session_id && { session_id: session.session_id }),
@@ -312,6 +371,12 @@ export class HighTester extends LambdaTester {
       ...(params.sign_exists !== undefined && {
         sign_exists: params.sign_exists,
       }),
+      // ServiceDefinition specific for update
+      ...(params.update_ddl_source && {
+        ddl_source: params.update_ddl_source,
+      }),
+      ...(params.ddl_source &&
+        !params.update_ddl_source && { ddl_source: params.ddl_source }),
       ...(session?.session_id && { session_id: session.session_id }),
       ...(session?.session_state && { session_state: session.session_state }),
     };
@@ -381,6 +446,14 @@ export class HighTester extends LambdaTester {
         );
         await this.cleanupAfterLambda(this.context);
         this.context.logger?.debug?.('✅ Pre-cleanup completed');
+        // Wait for SAP to propagate the deletion before starting the test
+        const cleanupDelay = this.context.getOperationDelay('cleanup');
+        if (cleanupDelay > 0) {
+          this.context.logger?.debug?.(
+            `⏳ Waiting ${cleanupDelay}ms for SAP to propagate cleanup...`,
+          );
+          await delay(cleanupDelay);
+        }
       } catch (error: any) {
         // Pre-cleanup errors are non-fatal - object might not exist
         this.context.logger?.debug?.(

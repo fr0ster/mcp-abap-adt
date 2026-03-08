@@ -686,12 +686,11 @@ export class LowTester extends LambdaTester {
       try {
         return await operation();
       } catch (error: any) {
-        const status =
-          error.response?.status ||
+        const isTadirConflict =
+          error.response?.status === 409 ||
           (typeof error.message === 'string' &&
-            error.message.includes('409') &&
-            409);
-        if (status === 409 && attempt < maxRetries) {
+            error.message.includes('object directory entry'));
+        if (isTadirConflict && attempt < maxRetries) {
           logger?.warn?.(
             `⚠️ ${label}: HTTP 409 Conflict (TADIR stale entry), retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`,
           );

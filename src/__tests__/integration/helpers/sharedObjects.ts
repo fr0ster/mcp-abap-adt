@@ -171,6 +171,39 @@ export async function ensureBdefPrerequisite(
 }
 
 /**
+ * Verify a CDS view exists in SAP (read-only check, no create).
+ * Returns success=true if exists, success=false with reason if not.
+ */
+export async function verifyCdsViewExists(
+  connection: IAbapConnection,
+  viewName: string,
+  adtLogger?: ILogger,
+): Promise<SharedObjectResult> {
+  const name = viewName.toUpperCase();
+  const client = new AdtClient(connection, adtLogger);
+  try {
+    await client.getView().read({ viewName: name });
+    logger?.info(`✅ CDS view ${name} exists`);
+    return { success: true, name, action: 'verified' };
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      return {
+        success: false,
+        name,
+        action: 'skipped',
+        reason: `CDS view ${name} does not exist in SAP. Create it manually.`,
+      };
+    }
+    return {
+      success: false,
+      name,
+      action: 'skipped',
+      reason: `Cannot verify CDS view ${name}: ${error.message}`,
+    };
+  }
+}
+
+/**
  * Ensure all shared objects from YAML exist and match.
  * Call this in beforeAll() of tests that depend on shared objects.
  *
@@ -203,6 +236,19 @@ export async function ensureSharedObjects(
   }
 
   const results: SharedObjectResult[] = [];
+
+  // Verify CDS view prerequisites (must exist in SAP, not auto-created)
+  const sharedConfig = loadTestConfig()?.shared_objects || {};
+  const cdsPrerequisites: string[] = sharedConfig.cds_view_prerequisites || [];
+  for (const viewName of cdsPrerequisites) {
+    const cdsResult = await verifyCdsViewExists(conn!, viewName, adtLogger);
+    results.push(cdsResult);
+    if (!cdsResult.success) {
+      logger?.warn?.(
+        `⚠️ CDS view prerequisite ${viewName} missing: ${cdsResult.reason}`,
+      );
+    }
+  }
 
   // BDEF prerequisite
   const bdefResult = await ensureBdefPrerequisite(conn!, adtLogger);

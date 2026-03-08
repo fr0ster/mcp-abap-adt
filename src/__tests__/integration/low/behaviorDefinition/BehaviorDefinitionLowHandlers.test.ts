@@ -20,6 +20,7 @@ import { handleUnlockBehaviorDefinition } from '../../../../handlers/behavior_de
 import { handleUpdateBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleUpdateBehaviorDefinition';
 import { handleValidateBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleValidateBehaviorDefinition';
 import { getTimeout } from '../../helpers/configHelpers';
+import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { LowTester } from '../../helpers/testers/LowTester';
 
 describe('BehaviorDefinition Low-Level Handlers Integration', () => {
@@ -41,6 +42,8 @@ describe('BehaviorDefinition Low-Level Handlers Integration', () => {
       },
     );
     await tester.beforeAll();
+    // Verify CDS view prerequisites exist before BDEF test
+    await ensureSharedObjects(tester.getConnection());
   });
 
   afterAll(async () => {

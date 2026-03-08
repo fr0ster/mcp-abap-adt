@@ -288,8 +288,11 @@ export function resetSharedDependencyCache(): void {
 }
 
 /**
- * Ensure all shared dependencies from YAML exist.
+ * Verify all shared dependencies from YAML exist in SAP.
  * Call this in beforeAll() of tests that depend on shared objects.
+ *
+ * Verify-only mode — does NOT auto-create. If a dependency is missing,
+ * returns success=false with a message to run `npm run shared:setup`.
  *
  * Always creates its own connection (soft mode) — works regardless of hard/soft mode context.
  */
@@ -297,6 +300,12 @@ export async function ensureSharedObjects(
   connection?: IAbapConnection | null,
   adtLogger?: ILogger,
 ): Promise<SharedObjectResult[]> {
+  const sharedConfig = getSharedDependenciesConfig();
+  if (!sharedConfig) {
+    logger?.info?.('No shared_dependencies in config, skipping');
+    return [];
+  }
+
   // Ensure we have a real connection (not an empty stub from hard mode)
   let conn = connection;
   if (!conn || typeof (conn as any).makeAdtRequest !== 'function') {
@@ -321,51 +330,51 @@ export async function ensureSharedObjects(
   const client = new AdtClient(conn!, adtLogger);
   const results: SharedObjectResult[] = [];
 
-  const sharedConfig = getSharedDependenciesConfig();
-  if (!sharedConfig) {
-    logger?.info?.('No shared_dependencies in config, skipping');
-    return results;
-  }
+  // Verify all shared deps exist (read-only check)
+  const typeOrder: Array<{
+    type: string;
+    readFn: (name: string) => Promise<any>;
+  }> = [
+    {
+      type: 'tables',
+      readFn: (name) => client.getTable().read({ tableName: name }),
+    },
+    {
+      type: 'views',
+      readFn: (name) => client.getView().read({ viewName: name }),
+    },
+    {
+      type: 'behavior_definitions',
+      readFn: (name) => client.getBehaviorDefinition().read({ name }),
+    },
+  ];
 
-  // Dependency order: tables → views → behavior_definitions
-  const typeOrder = ['tables', 'views', 'behavior_definitions'];
-
-  for (const type of typeOrder) {
+  for (const { type, readFn } of typeOrder) {
     const items = sharedConfig[type];
     if (!Array.isArray(items) || items.length === 0) continue;
 
     for (const item of items) {
       try {
-        const depResult = await ensureSharedDependency(
-          client,
-          type,
-          item.name,
-          logger,
-        );
-        results.push({
-          success: true,
-          name: item.name,
-          action: depResult.created ? 'created' : 'verified',
-        });
-      } catch (error: any) {
-        logger?.error?.(
-          `Failed to ensure ${type} ${item.name}: ${error.message}`,
-        );
+        await readFn(item.name);
+        results.push({ success: true, name: item.name, action: 'verified' });
+      } catch {
+        const msg = `Shared ${type} "${item.name}" not found in SAP. Run: npm run shared:setup`;
+        logger?.error?.(msg);
         results.push({
           success: false,
           name: item.name,
           action: 'skipped',
-          reason: `Failed to ensure ${type} ${item.name}: ${error.message}`,
+          reason: msg,
         });
       }
     }
   }
 
-  // Log summary
-  for (const r of results) {
-    if (!r.success) {
-      logger?.warn?.(`Shared object ${r.name}: ${r.reason}`);
-    }
+  const missing = results.filter((r) => !r.success);
+  if (missing.length > 0) {
+    logger?.error?.(
+      `${missing.length} shared dependencies missing. Run: npm run shared:setup`,
+    );
   }
 
   return results;

@@ -6,15 +6,6 @@
 # Each object type uses the same object name across all operations
 
 # ============================================================================
-# TEST SETTINGS
-# ============================================================================
-
-# ============================================================================
-# GLOBAL CONFIGURATION
-# ============================================================================
-
-
-# ============================================================================
 # GLOBAL CONFIGURATION
 # ============================================================================
 
@@ -83,7 +74,7 @@ environment:
 # ============================================================================
 # Objects are lazily created on first ensureSharedDependency() call, never deleted.
 # Manage with: npm run shared:setup / shared:teardown / shared:check
-# Naming convention: <PREFIX>_SHR_{COMPONENT}_{OBJTYPE}
+# Naming convention: ZMCP_SHR_{COMPONENT}_{OBJTYPE}
 
 shared_dependencies:
   package: "<YOUR_SHARED_PACKAGE>"          # Sub-package for all shared objects
@@ -92,7 +83,7 @@ shared_dependencies:
   transport_layer: ""                       # e.g., ZE19 (leave empty for cloud)
 
   tables:
-    - name: "<PREFIX>_SHR_RTABL"
+    - name: "ZMCP_SHR_RTABL"
       description: "Shared table for root CDS entity"
       source: |
         @EndUserText.label : 'Shared table for root CDS entity'
@@ -100,7 +91,7 @@ shared_dependencies:
         @AbapCatalog.tableCategory : #TRANSPARENT
         @AbapCatalog.deliveryClass : #A
         @AbapCatalog.dataMaintenance : #RESTRICTED
-        define table <prefix>_shr_rtabl {
+        define table zmcp_shr_rtabl {
           key client : abap.clnt not null;
           key fld1   : abap.char(10) not null;
           fld2       : abap.char(50);
@@ -108,7 +99,7 @@ shared_dependencies:
           fld4       : abap.dats;
         }
 
-    - name: "<PREFIX>_SHR_CTABL"
+    - name: "ZMCP_SHR_CTABL"
       description: "Shared table for child CDS entity"
       source: |
         @EndUserText.label : 'Shared table for child CDS entity'
@@ -116,7 +107,39 @@ shared_dependencies:
         @AbapCatalog.tableCategory : #TRANSPARENT
         @AbapCatalog.deliveryClass : #A
         @AbapCatalog.dataMaintenance : #RESTRICTED
-        define table <prefix>_shr_ctabl {
+        define table zmcp_shr_ctabl {
+          key client    : abap.clnt not null;
+          key chld_id   : abap.char(10) not null;
+          parent_id     : abap.char(10) not null;
+          fld2          : abap.char(50);
+        }
+
+    # Tables for BDEF test (separate from shared BDEF to avoid 409 conflict)
+    - name: "ZMCP_SHR_BTABL"
+      description: "Shared table for BDEF test root entity"
+      source: |
+        @EndUserText.label : 'Shared table for BDEF test root entity'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        @AbapCatalog.tableCategory : #TRANSPARENT
+        @AbapCatalog.deliveryClass : #A
+        @AbapCatalog.dataMaintenance : #RESTRICTED
+        define table zmcp_shr_btabl {
+          key client : abap.clnt not null;
+          key fld1   : abap.char(10) not null;
+          fld2       : abap.char(50);
+          fld3       : abap.dec(10,2);
+          fld4       : abap.dats;
+        }
+
+    - name: "ZMCP_SHR_BCTBL"
+      description: "Shared table for BDEF test child entity"
+      source: |
+        @EndUserText.label : 'Shared table for BDEF test child entity'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        @AbapCatalog.tableCategory : #TRANSPARENT
+        @AbapCatalog.deliveryClass : #A
+        @AbapCatalog.dataMaintenance : #RESTRICTED
+        define table zmcp_shr_bctbl {
           key client    : abap.clnt not null;
           key chld_id   : abap.char(10) not null;
           parent_id     : abap.char(10) not null;
@@ -124,14 +147,14 @@ shared_dependencies:
         }
 
   views:
-    - name: "<PREFIX>_SHR_I_ROOT"
+    - name: "ZMCP_SHR_I_ROOT"
       description: "Shared root CDS view entity"
       source: |
         @EndUserText.label : 'Shared root CDS view entity'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
-        define root view entity <PREFIX>_SHR_I_ROOT
-          as select from <prefix>_shr_rtabl
-          composition [0..*] of <PREFIX>_SHR_I_CHLD as _children
+        define root view entity ZMCP_SHR_I_ROOT
+          as select from zmcp_shr_rtabl
+          composition [0..*] of ZMCP_SHR_I_CHLD as _children
         {
           key fld1 as Fld1,
           fld2 as Fld2,
@@ -140,14 +163,14 @@ shared_dependencies:
           _children
         }
 
-    - name: "<PREFIX>_SHR_I_CHLD"
+    - name: "ZMCP_SHR_I_CHLD"
       description: "Shared child CDS view entity"
       source: |
         @EndUserText.label : 'Shared child CDS view entity'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
-        define view entity <PREFIX>_SHR_I_CHLD
-          as select from <prefix>_shr_ctabl
-          association to parent <PREFIX>_SHR_I_ROOT as _parent
+        define view entity ZMCP_SHR_I_CHLD
+          as select from zmcp_shr_ctabl
+          association to parent ZMCP_SHR_I_ROOT as _parent
             on $projection.ParentId = _parent.Fld1
         {
           key chld_id as ChldId,
@@ -156,14 +179,14 @@ shared_dependencies:
           _parent
         }
 
-    - name: "<PREFIX>_SHR_C_ROOT"
+    - name: "ZMCP_SHR_C_ROOT"
       description: "Shared consumption projection CDS view"
       source: |
         @EndUserText.label : 'Shared consumption projection'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
-        define root view entity <PREFIX>_SHR_C_ROOT
+        define root view entity ZMCP_SHR_C_ROOT
           provider contract transactional_query
-          as projection on <PREFIX>_SHR_I_ROOT
+          as projection on ZMCP_SHR_I_ROOT
         {
           key Fld1,
           Fld2,
@@ -171,17 +194,50 @@ shared_dependencies:
           Fld4
         }
 
+    # CDS views for BDEF test (BDEF test creates/deletes its own BDEF on these views)
+    - name: "ZMCP_SHR_I_BDEF"
+      description: "Shared root CDS view for BDEF test"
+      source: |
+        @EndUserText.label : 'Shared root CDS view for BDEF test'
+        @AccessControl.authorizationCheck : #NOT_REQUIRED
+        define root view entity ZMCP_SHR_I_BDEF
+          as select from zmcp_shr_btabl
+          composition [0..*] of ZMCP_SHR_I_BCHD as _children
+        {
+          key fld1 as Fld1,
+          fld2 as Fld2,
+          fld3 as Fld3,
+          fld4 as Fld4,
+          _children
+        }
+
+    - name: "ZMCP_SHR_I_BCHD"
+      description: "Shared child CDS view for BDEF test"
+      source: |
+        @EndUserText.label : 'Shared child CDS view for BDEF test'
+        @AccessControl.authorizationCheck : #NOT_REQUIRED
+        define view entity ZMCP_SHR_I_BCHD
+          as select from zmcp_shr_bctbl
+          association to parent ZMCP_SHR_I_BDEF as _parent
+            on $projection.ParentId = _parent.Fld1
+        {
+          key chld_id as ChldId,
+          parent_id as ParentId,
+          fld2 as Fld2,
+          _parent
+        }
+
   behavior_definitions:
-    - name: "<PREFIX>_SHR_I_ROOT"
+    - name: "ZMCP_SHR_I_ROOT"
       description: "Shared BDEF for BehaviorImplementation tests"
-      root_entity: "<PREFIX>_SHR_I_ROOT"
+      root_entity: "ZMCP_SHR_I_ROOT"
       implementation_type: "Managed"
       source: |
-        managed implementation in class zbp_<prefix>_shr_i_root unique;
+        managed implementation in class zbp_zmcp_shr_i_root unique;
         strict ( 2 );
 
-        define behavior for <PREFIX>_SHR_I_ROOT
-        persistent table <prefix>_shr_rtabl
+        define behavior for ZMCP_SHR_I_ROOT
+        persistent table zmcp_shr_rtabl
         lock master
         authorization master ( instance )
         {
@@ -192,8 +248,8 @@ shared_dependencies:
           association _children { create; }
         }
 
-        define behavior for <PREFIX>_SHR_I_CHLD
-        persistent table <prefix>_shr_ctabl
+        define behavior for ZMCP_SHR_I_CHLD
+        persistent table zmcp_shr_ctabl
         lock dependent by _parent
         authorization dependent by _parent
         {
@@ -204,8 +260,8 @@ shared_dependencies:
         }
 
   classes:
-    - name: "ZBP_<PREFIX>_SHR_I_ROOT"
-      description: "Shared BDEF implementation class for <PREFIX>_SHR_I_ROOT"
+    - name: "ZBP_ZMCP_SHR_I_ROOT"
+      description: "Shared BDEF implementation class for ZMCP_SHR_I_ROOT"
 
 # Legacy shared_objects section (kept for backward compatibility)
 shared_objects:
@@ -941,7 +997,7 @@ create_function:
         function_module_name: "<YOUR_FUNCTION_MODULE_NAME>"
         function_module_description: "Function module for workflow tests"
         source_code: |
-          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>.
+          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>
               IMPORTING
                  VALUE(IV_PARAM) TYPE  STRING
               EXPORTING
@@ -949,7 +1005,7 @@ create_function:
             ev_result = |Result: { iv_param }|.
           ENDFUNCTION.
         update_source_code: |
-          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>.
+          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>
               IMPORTING
                  VALUE(IV_PARAM) TYPE  STRING
               EXPORTING
@@ -961,103 +1017,8 @@ create_function:
         # package_name: "<YOUR_PACKAGE_NAME>"
         # transport_request: "<YOUR_TRANSPORT_REQUEST>"
 
-# Function Group (Function Group)
-
-# Function Group (Function Group)
-create_function_group:
-  test_cases:
-    - name: "test_function_group_high"
-      enabled: true
-      description: "High-level test: create → update → delete function group"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        # Create step
-        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
-        description: "Test function group created via MCP"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
-        # Update step (update description)
-        update_description: "Updated test function group description"
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "FUGR"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-
-# Function Group (Function Group - Low-Level)
-
-# Function Group (Function Group - Low-Level)
-create_function_group_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>_LOW"
-        description: "Test function group created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # Update through low-level
-        update_description: "Updated via low-level"
-    - name: "test_function_group_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>_LOW"
-        description: "Test function group created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # Update through low-level
-        update_description: "Updated via low-level"
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "FUGR"
-
-# Step 3: Read-only test (separate read-only handler)
-
-# Function Module (Function Module)
-
-# Function Module (Function Module)
-create_function_module:
-  test_cases:
-    - name: "test_function_module"
-      enabled: true
-      description: "Create test function module (uses function group from GROUP 9)"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        function_module_name: "<YOUR_FUNCTION_MODULE_NAME>"
-        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
-        description: "Test function module created via MCP"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
-        source_code: |
-          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>
-            IMPORTING
-              VALUE(IV_PARAM) TYPE STRING
-            EXPORTING
-              VALUE(EV_RESULT) TYPE STRING.
-            ev_result = |Result: { iv_param }|.
-          ENDFUNCTION.
-        # Update step
-        update_source_code: |
-          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>
-            IMPORTING
-              VALUE(IV_PARAM) TYPE STRING
-              VALUE(IV_OPTIONAL) TYPE STRING OPTIONAL
-            EXPORTING
-              VALUE(EV_RESULT) TYPE STRING
-              VALUE(EV_STATUS) TYPE STRING.
-            ev_result = |Result: { iv_param }|.
-            ev_status = |Status: OK|.
-          ENDFUNCTION.
-        update_activate: true
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "FUGR/FF"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-
-# Step 3: Read-only test (separate read-only handler)
+# NOTE: Function Group and Function Module are tested together in create_function section above.
+# Standalone create_function_group / create_function_module sections are not needed.
 
 # Interface (Interface)
 
@@ -1675,6 +1636,32 @@ create_view_low:
         # Delete through low-level
         delete_after_test: true
         delete_object_type: "DDLS/DF"
+
+# Service Definition (Service Definition)
+create_service_definition:
+  test_cases:
+    - name: "builder_service_definition"
+      enabled: false
+      description: "Service definition reserved for ServiceDefinitionBuilder tests"
+      params:
+        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
+        service_definition_name: "<YOUR_SERVICE_DEFINITION_NAME>"
+        description: "ServiceDefinitionBuilder workflow service definition"
+        # package_name: "<YOUR_PACKAGE_NAME>"
+        # transport_request: "<YOUR_TRANSPORT_REQUEST>"
+        # ⚠️ IMPORTANT: source_code must reference an existing CDS view (e.g., a shared consumption projection)
+        source_code: |
+          @EndUserText.label: 'ServiceDefinitionBuilder workflow service definition'
+          define service <YOUR_SERVICE_DEFINITION_NAME> {
+            expose ZMCP_SHR_C_ROOT as _View;
+          }
+        # ⚠️ REQUIRED for UpdateServiceDefinition high-level test: update_source_code is mandatory for update step
+        update_source_code: |
+          @EndUserText.label: 'ServiceDefinitionBuilder workflow service definition (updated)'
+          define service <YOUR_SERVICE_DEFINITION_NAME> {
+            expose ZMCP_SHR_C_ROOT as _View;
+            expose ZMCP_SHR_C_ROOT as _View2;
+          }
 
 # ============================================================================
 # READ-ONLY HANDLER TESTS (for mcp-abap-adt integration tests)

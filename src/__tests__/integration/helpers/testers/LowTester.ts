@@ -82,46 +82,9 @@ export class LowTester extends LambdaTester {
         if (!objectName) return;
 
         try {
-          // Step 1: Check if object is locked, force-release if so
-          // Uses deletion/check to detect locks, then ddlock/locks to release
+          // Step 1: Force-release DDIC lock if object is locked
           try {
-            const objectUri = this.resolveObjectUri(objectName);
-            if (objectUri) {
-              const checkResponse = await connection.makeAdtRequest({
-                url: '/sap/bc/adt/deletion/check',
-                method: 'POST',
-                timeout: 30000,
-                data: `<?xml version="1.0" encoding="UTF-8"?><del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core"><del:object adtcore:uri="${objectUri}"/></del:checkRequest>`,
-                headers: {
-                  Accept:
-                    'application/vnd.sap.adt.deletion.check.response.v1+xml',
-                  'Content-Type':
-                    'application/vnd.sap.adt.deletion.check.request.v1+xml',
-                },
-              });
-              const responseText =
-                typeof checkResponse.data === 'string'
-                  ? checkResponse.data
-                  : '';
-              const isLocked =
-                responseText.includes('isDeletable="false"') &&
-                responseText.includes('lockUser');
-              if (isLocked) {
-                logger?.debug?.(
-                  `🔒 Object ${objectName} is locked, releasing DDIC lock...`,
-                );
-                await connection.makeAdtRequest({
-                  url: `/sap/bc/adt/ddic/ddlock/locks?lockAction=DELETE&name=${encodeURIComponent(objectName)}`,
-                  method: 'POST',
-                  timeout: 30000,
-                  data: '',
-                  headers: {},
-                });
-                logger?.debug?.(
-                  `🔓 Released DDIC lock for ${objectName} (pre-cleanup)`,
-                );
-              }
-            }
+            await this.forceReleaseLock(connection, objectName, logger);
           } catch {
             // Ignore — object may not exist or check not applicable
           }
@@ -246,11 +209,7 @@ export class LowTester extends LambdaTester {
             logger?.info(`📝 Updated ${this.context.objectName}`);
           }
         } finally {
-          if (this.workflowFunctions.unlock) {
-            const unlockArgs = this.buildUnlockArgs(this.context);
-            await this.workflowFunctions.unlock(handlerContext, unlockArgs);
-            logger?.info(`🔓 Unlocked ${this.context.objectName}`);
-          }
+          await this.guaranteedUnlock(this.context, handlerContext, logger);
         }
       } else {
         // No lock — run update and unlock independently (shouldn't normally happen)
@@ -356,14 +315,31 @@ export class LowTester extends LambdaTester {
           );
           logger?.info(`📝 Updated ${this.context.objectName}`);
         } finally {
-          const unlockArgs = this.buildUnlockArgs(this.context);
-          await callTool(
-            mcp.client,
-            mcp.toolNames,
-            toolCandidates('unlock', entity, 'low', this.handlerName),
-            unlockArgs,
-          );
-          logger?.info(`🔓 Unlocked ${this.context.objectName}`);
+          try {
+            const unlockArgs = this.buildUnlockArgs(this.context);
+            await callTool(
+              mcp.client,
+              mcp.toolNames,
+              toolCandidates('unlock', entity, 'low', this.handlerName),
+              unlockArgs,
+            );
+            logger?.info(`🔓 Unlocked ${this.context.objectName}`);
+          } catch (unlockError: any) {
+            logger?.warn?.(
+              `⚠️ Unlock failed, forcing DDIC lock release: ${unlockError.message}`,
+            );
+            try {
+              await this.forceReleaseLock(
+                this.context.connection,
+                this.context.objectName!,
+                logger,
+              );
+            } catch {
+              logger?.error?.(
+                `Force lock release also failed for ${this.context.objectName}`,
+              );
+            }
+          }
         }
       } else {
         if (this.workflowFunctions?.update) {
@@ -408,6 +384,39 @@ export class LowTester extends LambdaTester {
 
       this.context.logger?.error(`❌ Test failed: ${error.message}`);
       throw error;
+    }
+  }
+
+  /**
+   * Guaranteed unlock: tries handler unlock first, falls back to DDIC force-release.
+   * Never throws — swallows all errors to prevent masking the original test error.
+   */
+  private async guaranteedUnlock(
+    context: LambdaTesterContext,
+    handlerContext: any,
+    logger?: any,
+  ): Promise<void> {
+    if (!this.workflowFunctions?.unlock) return;
+
+    try {
+      const unlockArgs = this.buildUnlockArgs(context);
+      await this.workflowFunctions.unlock(handlerContext, unlockArgs);
+      logger?.info(`🔓 Unlocked ${context.objectName}`);
+    } catch (unlockError: any) {
+      logger?.warn?.(
+        `⚠️ Unlock failed, forcing DDIC lock release: ${unlockError.message}`,
+      );
+      try {
+        await this.forceReleaseLock(
+          context.connection,
+          context.objectName!,
+          logger,
+        );
+      } catch {
+        logger?.error?.(
+          `Force lock release also failed for ${context.objectName}`,
+        );
+      }
     }
   }
 
@@ -642,33 +651,7 @@ export class LowTester extends LambdaTester {
     return 'name'; // fallback
   }
 
-  /**
-   * Resolve ADT object URI for deletion/check API
-   * Returns null for object types where deletion/check is not applicable
-   */
-  private resolveObjectUri(objectName: string): string | null {
-    const name = encodeURIComponent(objectName.toLowerCase());
-    const handlerName = (this as any).handlerName || '';
-    if (handlerName.includes('table')) return `/sap/bc/adt/ddic/tables/${name}`;
-    if (handlerName.includes('view'))
-      return `/sap/bc/adt/ddic/ddl/sources/${name}`;
-    if (handlerName.includes('structure'))
-      return `/sap/bc/adt/ddic/structures/${name}`;
-    if (handlerName.includes('data_element'))
-      return `/sap/bc/adt/ddic/dataelements/${name}`;
-    if (handlerName.includes('domain'))
-      return `/sap/bc/adt/ddic/domains/${name}`;
-    if (handlerName.includes('metadata_extension'))
-      return `/sap/bc/adt/ddic/ddlx/sources/${name}`;
-    if (handlerName.includes('interface'))
-      return `/sap/bc/adt/oo/interfaces/${name}`;
-    if (handlerName.includes('class')) return `/sap/bc/adt/oo/classes/${name}`;
-    if (handlerName.includes('behavior_definition'))
-      return `/sap/bc/adt/bo/behaviordefinitions/${name}`;
-    if (handlerName.includes('service_definition'))
-      return `/sap/bc/adt/ddic/srvd/sources/${name}`;
-    return null;
-  }
+  // resolveObjectUri is inherited from LambdaTester
 
   /**
    * Retry operation on HTTP 409 Conflict (TADIR stale entry).

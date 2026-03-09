@@ -41,9 +41,9 @@
   },
   "scripts": {
     "test": "jest --passWithNoTests",
-    "test:integration": "jest --testPathPatterns=integration --runInBand --passWithNoTests",
-    "test:high": "jest --testPathPatterns='integration.*High' --runInBand --passWithNoTests",
-    "test:low": "jest --testPathPatterns='integration.*Low' --runInBand --passWithNoTests",
+    "test:integration": "jest --testPathPatterns=integration --runInBand --passWithNoTests --forceExit",
+    "test:high": "jest --testPathPatterns='integration.*High' --runInBand --passWithNoTests --forceExit",
+    "test:low": "jest --testPathPatterns='integration.*Low' --runInBand --passWithNoTests --forceExit",
     "test:check": "npx tsc --noEmit -p tsconfig.test.json",
     "shared:setup": "jest --testPathPatterns='admin/shared-deps/setup' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
     "shared:teardown": "jest --testPathPatterns='admin/shared-deps/teardown' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
@@ -131,7 +131,7 @@
     "yaml": "^2.8.1"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^3.8.0",
+    "@mcp-abap-adt/adt-clients": "^3.8.1",
     "@mcp-abap-adt/auth-broker": "^1.0.5",
     "@mcp-abap-adt/auth-providers": "^1.0.5",
     "@mcp-abap-adt/auth-stores": "^1.0.2",

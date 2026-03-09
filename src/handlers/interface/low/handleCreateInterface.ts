@@ -16,6 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CreateInterfaceLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Create a new ABAP interface. - use CreateInterface (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
   inputSchema: {

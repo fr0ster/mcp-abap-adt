@@ -11,6 +11,7 @@ import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetVirtualFoldersLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Retrieve hierarchical virtual folder contents from ADT information system. Used for browsing ABAP objects by package, group, type, etc.',
   inputSchema: {

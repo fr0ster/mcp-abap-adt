@@ -6,6 +6,7 @@ import { compactActivateSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerActivate',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Activate operation. Single mode(object_name*, object_adt_type*). Batch mode(objects[].name*, objects[].type*).',
   inputSchema: compactActivateSchema,

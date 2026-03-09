@@ -16,6 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdateInterfaceLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update source code of an existing ABAP interface. Requires lock handle from LockObject. - use UpdateInterface (high-level) for full workflow with lock/unlock/activate.',
   inputSchema: {

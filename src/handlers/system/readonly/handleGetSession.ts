@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetSession',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Get a new session ID and current session state (cookies, CSRF token) for reuse across multiple ADT operations. Use this to maintain the same session and lock handle across multiple requests.',
   inputSchema: {

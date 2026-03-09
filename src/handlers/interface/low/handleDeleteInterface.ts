@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'DeleteInterfaceLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {

@@ -34,6 +34,7 @@ type DurationOptions = {
 
 export const TOOL_DEFINITION = {
   name: 'RunClassUnitTestsLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers.',
   inputSchema: {

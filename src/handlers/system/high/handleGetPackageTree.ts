@@ -11,6 +11,7 @@ import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetPackageTree',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions.',
   inputSchema: {

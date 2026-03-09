@@ -3,6 +3,7 @@ import { ErrorCode, McpError } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetAbapAST',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Parse ABAP code and return AST (Abstract Syntax Tree) in JSON format.',
   inputSchema: {

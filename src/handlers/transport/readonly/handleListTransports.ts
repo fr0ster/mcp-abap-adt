@@ -11,6 +11,7 @@ import { makeAdtRequestWithTimeout, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ListTransports',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests.',
   inputSchema: {

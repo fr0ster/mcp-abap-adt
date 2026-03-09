@@ -26,6 +26,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetTransport',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve ABAP transport request information including metadata, included objects, and status from SAP system.',
   inputSchema: {

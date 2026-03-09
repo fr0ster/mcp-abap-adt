@@ -7,6 +7,7 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   name: 'GetObjectStructure',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve ADT object structure as a compact JSON tree.',
   inputSchema: {

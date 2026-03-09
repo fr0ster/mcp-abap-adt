@@ -20,6 +20,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetTypeInfo',
+  available_in: ['onprem', 'cloud'] as const,
   description: '[read-only] Retrieve ABAP type information.',
   inputSchema: {
     type: 'object',

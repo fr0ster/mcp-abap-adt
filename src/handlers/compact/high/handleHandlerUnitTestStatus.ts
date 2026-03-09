@@ -4,6 +4,7 @@ import { compactUnitTestStatusSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUnitTestStatus',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'ABAP Unit status. object_type: not used. Required: run_id*. Optional: with_long_polling. Response: JSON.',
   inputSchema: compactUnitTestStatusSchema,

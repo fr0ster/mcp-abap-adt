@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdateClassLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update source code of an existing ABAP class. Uses session from HandlerContext. Requires lock handle from LockClass operation. - use UpdateClass (high-level) for full workflow with lock/unlock/activate.',
   inputSchema: {

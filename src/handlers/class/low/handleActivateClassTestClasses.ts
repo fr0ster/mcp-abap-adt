@@ -16,6 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'ActivateClassTestClassesLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Activate ABAP Unit test classes include for an existing class. Should be executed after updating and unlocking test classes.',
   inputSchema: {

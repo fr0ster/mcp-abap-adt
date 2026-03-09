@@ -18,6 +18,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CreateTransport',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP transport request in SAP system for development objects.',
   inputSchema: {

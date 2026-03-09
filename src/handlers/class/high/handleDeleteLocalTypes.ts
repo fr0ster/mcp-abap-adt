@@ -12,6 +12,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'DeleteLocalTypes',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Delete local types from an ABAP class by clearing the implementations include. Manages lock, update, unlock, and optional activation.',
   inputSchema: {

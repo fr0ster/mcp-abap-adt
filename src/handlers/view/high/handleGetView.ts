@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetView',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve ABAP view definition. Supports reading active or inactive version.',
   inputSchema: {

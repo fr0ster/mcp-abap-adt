@@ -3,6 +3,7 @@ import { ErrorCode, McpError } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetAbapSemanticAnalysis',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Perform semantic analysis on ABAP code and return symbols, types, scopes, and dependencies.',
   inputSchema: {

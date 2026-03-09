@@ -16,6 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdateViewLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockObject. - use UpdateView (high-level) for full workflow with lock/unlock/activate.',
   inputSchema: {

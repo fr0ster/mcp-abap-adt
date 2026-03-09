@@ -16,6 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UnlockInterfaceLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Unlock an ABAP interface after modification. Must use the same session_id and lock_handle from LockInterface operation.',
   inputSchema: {

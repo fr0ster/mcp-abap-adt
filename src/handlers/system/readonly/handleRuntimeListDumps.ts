@@ -5,7 +5,7 @@ import { parseRuntimePayloadToJson } from './runtimePayloadParser';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeListDumps',
-  available_in: ['onprem'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[runtime] List ABAP runtime dumps with optional user filter and paging. Returns parsed JSON payload.',
   inputSchema: {

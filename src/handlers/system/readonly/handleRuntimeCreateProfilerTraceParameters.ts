@@ -4,7 +4,7 @@ import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeCreateProfilerTraceParameters',
-  available_in: ['onprem'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[runtime] Create ABAP profiler trace parameters and return profilerId (URI) for profiled execution.',
   inputSchema: {

@@ -154,7 +154,11 @@ export class HighTester extends LambdaTester {
       if (this.workflowFunctions.create) {
         logger?.info(`   • create ${this.context.objectName}`);
         const args = this.buildCreateArgs(this.context);
-        await this.workflowFunctions.create(handlerContext, args);
+        await this.retryOnConflict(
+          () => this.workflowFunctions!.create(handlerContext, args),
+          `Create ${this.context.objectName}`,
+          logger,
+        );
         logger?.info(`   ✅ create completed`);
       }
 
@@ -196,11 +200,16 @@ export class HighTester extends LambdaTester {
       if (this.workflowFunctions?.create) {
         logger?.info(`   • create ${this.context.objectName} (hard mode)`);
         const args = this.buildCreateArgs(this.context);
-        await callTool(
-          mcp.client,
-          mcp.toolNames,
-          toolCandidates('create', entity, 'high', this.handlerName),
-          args,
+        await this.retryOnConflict(
+          () =>
+            callTool(
+              mcp.client,
+              mcp.toolNames,
+              toolCandidates('create', entity, 'high', this.handlerName),
+              args,
+            ),
+          `Create ${this.context.objectName} (hard mode)`,
+          logger,
         );
         logger?.info(`   ✅ create completed`);
       }

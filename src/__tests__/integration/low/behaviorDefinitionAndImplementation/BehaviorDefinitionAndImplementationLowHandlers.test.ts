@@ -70,16 +70,27 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
         // 1. Delete BIMPL class
         if (bimplClassName) {
           try {
-            const deleteCtx = createHandlerContext({
-              connection,
-              logger: testLogger,
-            });
-            await handleDeleteClass(deleteCtx, {
-              class_name: bimplClassName,
-              ...(transportRequest && {
-                transport_request: transportRequest,
-              }),
-            });
+            await tester.invokeToolOrHandler(
+              'DeleteClassLow',
+              {
+                class_name: bimplClassName,
+                ...(transportRequest && {
+                  transport_request: transportRequest,
+                }),
+              },
+              async () => {
+                const deleteCtx = createHandlerContext({
+                  connection,
+                  logger: testLogger,
+                });
+                return handleDeleteClass(deleteCtx, {
+                  class_name: bimplClassName,
+                  ...(transportRequest && {
+                    transport_request: transportRequest,
+                  }),
+                });
+              },
+            );
             testLogger?.info?.(`Deleted BIMPL class ${bimplClassName}`);
           } catch (e: any) {
             const msg = e?.message || String(e);
@@ -92,16 +103,27 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
         // 2. Delete BDEF
         if (objectName) {
           try {
-            const deleteCtx = createHandlerContext({
-              connection,
-              logger: testLogger,
-            });
-            await handleDeleteBehaviorDefinition(deleteCtx, {
-              name: objectName,
-              ...(transportRequest && {
-                transport_request: transportRequest,
-              }),
-            });
+            await tester.invokeToolOrHandler(
+              'DeleteBehaviorDefinitionLow',
+              {
+                name: objectName,
+                ...(transportRequest && {
+                  transport_request: transportRequest,
+                }),
+              },
+              async () => {
+                const deleteCtx = createHandlerContext({
+                  connection,
+                  logger: testLogger,
+                });
+                return handleDeleteBehaviorDefinition(deleteCtx, {
+                  name: objectName,
+                  ...(transportRequest && {
+                    transport_request: transportRequest,
+                  }),
+                });
+              },
+            );
             testLogger?.info?.(`Deleted BDEF ${objectName}`);
           } catch (e: any) {
             const msg = e?.message || String(e);
@@ -147,35 +169,75 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
 
         // Validate BDEF
         testLogger?.info?.(`   * validate BDEF: ${objectName}`);
-        await handleValidateBehaviorDefinition(handlerCtx, {
-          name: objectName,
-          package_name: packageName,
-          description: params.description || objectName,
-          root_entity: params.root_entity,
-          implementation_type: params.implementation_type,
-        });
+        const validateBdefResponse = await tester.invokeToolOrHandler(
+          'ValidateBehaviorDefinitionLow',
+          {
+            name: objectName,
+            package_name: packageName,
+            description: params.description || objectName,
+            root_entity: params.root_entity,
+            implementation_type: params.implementation_type,
+          },
+          async () =>
+            handleValidateBehaviorDefinition(handlerCtx, {
+              name: objectName,
+              package_name: packageName,
+              description: params.description || objectName,
+              root_entity: params.root_entity,
+              implementation_type: params.implementation_type,
+            }),
+        );
+        if (validateBdefResponse.isError) {
+          throw new Error(
+            `Validate BDEF failed: ${extractErrorMessage(validateBdefResponse)}`,
+          );
+        }
         testLogger?.info?.(`   + BDEF validated`);
 
         // Create BDEF
         testLogger?.info?.(`   * create BDEF: ${objectName}`);
-        await handleCreateBehaviorDefinition(handlerCtx, {
-          name: objectName,
-          package_name: packageName,
-          description: params.description || objectName,
-          root_entity: params.root_entity,
-          implementation_type: params.implementation_type,
-          ...(transportRequest && { transport_request: transportRequest }),
-        });
+        const createBdefResponse = await tester.invokeToolOrHandler(
+          'CreateBehaviorDefinitionLow',
+          {
+            name: objectName,
+            package_name: packageName,
+            description: params.description || objectName,
+            root_entity: params.root_entity,
+            implementation_type: params.implementation_type,
+            ...(transportRequest && { transport_request: transportRequest }),
+          },
+          async () =>
+            handleCreateBehaviorDefinition(handlerCtx, {
+              name: objectName,
+              package_name: packageName,
+              description: params.description || objectName,
+              root_entity: params.root_entity,
+              implementation_type: params.implementation_type,
+              ...(transportRequest && { transport_request: transportRequest }),
+            }),
+        );
+        if (createBdefResponse.isError) {
+          throw new Error(
+            `Create BDEF failed: ${extractErrorMessage(createBdefResponse)}`,
+          );
+        }
         testLogger?.info?.(`   + BDEF created`);
 
         await delay(context.getOperationDelay('create'));
 
         // Lock BDEF
         testLogger?.info?.(`   * lock BDEF: ${objectName}`);
-        const bdefLockResponse = await handleLockBehaviorDefinition(
-          handlerCtx,
+        const bdefLockResponse = await tester.invokeToolOrHandler(
+          'LockBehaviorDefinitionLow',
           { name: objectName },
+          async () =>
+            handleLockBehaviorDefinition(handlerCtx, { name: objectName }),
         );
+        if (bdefLockResponse.isError) {
+          throw new Error(
+            `Lock BDEF failed: ${extractErrorMessage(bdefLockResponse)}`,
+          );
+        }
         const bdefLockData = parseHandlerResponse(bdefLockResponse);
         const bdefLockHandle = extractLockHandle(bdefLockData);
         testLogger?.info?.(`   + BDEF locked`);
@@ -185,19 +247,42 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
         // Update + Unlock BDEF (guarantee unlock even if update fails)
         try {
           testLogger?.info?.(`   * update BDEF: ${objectName}`);
-          await handleUpdateBehaviorDefinition(handlerCtx, {
-            name: objectName,
-            lock_handle: bdefLockHandle,
-            source_code: params.update_source_code || params.source_code,
-          });
+          const updateBdefResponse = await tester.invokeToolOrHandler(
+            'UpdateBehaviorDefinitionLow',
+            {
+              name: objectName,
+              lock_handle: bdefLockHandle,
+              source_code: params.update_source_code || params.source_code,
+            },
+            async () =>
+              handleUpdateBehaviorDefinition(handlerCtx, {
+                name: objectName,
+                lock_handle: bdefLockHandle,
+                source_code: params.update_source_code || params.source_code,
+              }),
+          );
+          if (updateBdefResponse.isError) {
+            throw new Error(
+              `Update BDEF failed: ${extractErrorMessage(updateBdefResponse)}`,
+            );
+          }
           testLogger?.info?.(`   + BDEF updated`);
         } finally {
           testLogger?.info?.(`   * unlock BDEF: ${objectName}`);
-          await handleUnlockBehaviorDefinition(handlerCtx, {
-            name: objectName,
-            lock_handle: bdefLockHandle,
-            session_id: '',
-          });
+          await tester.invokeToolOrHandler(
+            'UnlockBehaviorDefinitionLow',
+            {
+              name: objectName,
+              lock_handle: bdefLockHandle,
+              session_id: '',
+            },
+            async () =>
+              handleUnlockBehaviorDefinition(handlerCtx, {
+                name: objectName,
+                lock_handle: bdefLockHandle,
+                session_id: '',
+              }),
+          );
           testLogger?.info?.(`   + BDEF unlocked`);
         }
 
@@ -227,10 +312,6 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
 
         // Validate BIMPL
         testLogger?.info?.(`   * validate BIMPL: ${className}`);
-        const validateCtx = createHandlerContext({
-          connection,
-          logger: testLogger,
-        });
         const validateResponse = await tester.invokeToolOrHandler(
           'ValidateBehaviorImplementationLow',
           {
@@ -240,7 +321,7 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
             description: bimplParams.description,
           },
           async () =>
-            handleValidateBehaviorImplementation(validateCtx, {
+            handleValidateBehaviorImplementation(handlerCtx, {
               class_name: className,
               behavior_definition: behaviorDefinition,
               package_name: packageName,
@@ -259,10 +340,6 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
 
         // Create class
         testLogger?.info?.(`   * create class: ${className}`);
-        const createCtx = createHandlerContext({
-          connection,
-          logger: testLogger,
-        });
         const createArgs: Record<string, unknown> = {
           class_name: className,
           description: bimplParams.description,
@@ -272,7 +349,7 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
         const createResponse = await tester.invokeToolOrHandler(
           'CreateClassLow',
           createArgs,
-          async () => handleCreateClass(createCtx, createArgs as any),
+          async () => handleCreateClass(handlerCtx, createArgs as any),
         );
 
         if (createResponse.isError) {
@@ -297,14 +374,10 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
 
         // Check class
         testLogger?.info?.(`   * check class: ${className}`);
-        const checkCtx = createHandlerContext({
-          connection,
-          logger: testLogger,
-        });
         const checkResponse = await tester.invokeToolOrHandler(
           'CheckClassLow',
           { class_name: className },
-          async () => handleCheckClass(checkCtx, { class_name: className }),
+          async () => handleCheckClass(handlerCtx, { class_name: className }),
         );
         if (checkResponse.isError) {
           throw new Error(
@@ -317,15 +390,11 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
 
         // Lock behavior implementation
         testLogger?.info?.(`   * lock BIMPL: ${className}`);
-        const lockCtx = createHandlerContext({
-          connection,
-          logger: testLogger,
-        });
         const lockResponse = await tester.invokeToolOrHandler(
           'LockBehaviorImplementationLow',
           { class_name: className },
           async () =>
-            handleLockBehaviorImplementation(lockCtx, {
+            handleLockBehaviorImplementation(handlerCtx, {
               class_name: className,
             }),
         );
@@ -367,15 +436,11 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
 
         // Unlock class
         testLogger?.info?.(`   * unlock class: ${className}`);
-        const unlockCtx = createHandlerContext({
-          connection,
-          logger: testLogger,
-        });
         const unlockResponse = await tester.invokeToolOrHandler(
           'UnlockClassLow',
           { class_name: className, lock_handle: lockHandle },
           async () =>
-            handleUnlockClass(unlockCtx, {
+            handleUnlockClass(handlerCtx, {
               class_name: className,
               lock_handle: lockHandle,
             }),
@@ -396,12 +461,22 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
         // ═══════════════════════════════════════════════════════════
 
         testLogger?.info?.(`   * group activate: ${objectName} + ${className}`);
-        await handleActivateObject(handlerCtx, {
-          objects: [
-            { name: objectName.toUpperCase(), type: 'BDEF/BDO' },
-            { name: className.toUpperCase(), type: 'CLAS/OC' },
-          ],
-        });
+        await tester.invokeToolOrHandler(
+          'ActivateObjectLow',
+          {
+            objects: [
+              { name: objectName.toUpperCase(), type: 'BDEF/BDO' },
+              { name: className.toUpperCase(), type: 'CLAS/OC' },
+            ],
+          },
+          async () =>
+            handleActivateObject(handlerCtx, {
+              objects: [
+                { name: objectName.toUpperCase(), type: 'BDEF/BDO' },
+                { name: className.toUpperCase(), type: 'CLAS/OC' },
+              ],
+            }),
+        );
         testLogger?.info?.(`   + group activation completed`);
 
         testLogger?.info?.('Full BDEF+BIMPL low-level workflow completed');

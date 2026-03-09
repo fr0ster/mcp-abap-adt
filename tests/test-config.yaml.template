@@ -1,9 +1,27 @@
-# Template for MCP ABAP ADT test configuration
-# Copy this file to test-config.yaml and fill in real values before running tests
+# Test Configuration Template for @mcp-abap-adt/adt-clients
+# Copy this file to test-config.yaml and configure for your environment
+# Builder Tests Configuration
 #
-# Tests are organized in groups with dependencies:
-# 1. Transport -> 2. Package -> 3. Create -> 4. Update -> 5. Get -> 6. Delete
-# Each object type uses the same object name across all operations
+# Usage:
+#   cp tests/test-config.yaml.template tests/test-config.yaml
+#   # Edit test-config.yaml with your specific values
+#
+# IMPORTANT: Object Naming Convention
+# ===================================
+# All test objects must use the ZMCP_BLD_* naming convention:
+# - Classes: ZMCP_BLD_CLS01, ZMCP_BLD_CLS02, etc.
+# - Domains: ZMCP_BLD_DOM01, ZMCP_BLD_DOM02, etc.
+# - Data Elements: ZMCP_BLD_DTEL01, ZMCP_BLD_DTEL_H1, etc.
+# - Function Modules: Z_ADT_BLD_FM01, Z_ADT_BLD_FM02, etc. (must start with Z_ or Y_)
+# - Function Groups: ZMCP_BLD_FGR01, ZMCP_BLD_FGR02, etc.
+# - Interfaces: ZMCP_BLD_IF01, ZMCP_BLD_IF02, etc.
+# - Programs: ZMCP_BLD_PROG_H1, ZMCP_BLD_PROG02, etc.
+# - Tables: ZMCP_BLD_TAB01, ZMCP_BLD_TAB_H1, etc.
+# - Structures: ZMCP_BLD_STRU_H1, ZMCP_BLD_STRU02, etc.
+# - Views: ZMCP_BLD_VIEW01, ZMCP_BLD_VIEW_H1, etc.
+# - Packages: ZADT_BLD_PKG01, ZADT_BLD_PKG02, etc.
+#
+# Test settings
 
 # ============================================================================
 # GLOBAL CONFIGURATION
@@ -12,75 +30,73 @@
 test_settings:
   fail_fast: false
   verbose: true
-  timeout: 120000  # Global test timeout (ms)
+  timeout: 120000  # Global test timeout (120 seconds)
   retry_on_failure: false
   max_retries: 1
-  cleanup_after_test: false  # Legacy flag (handlers use environment.cleanup_after instead)
-  # Timeouts for different operations (ms)
+  cleanup_after_test: false
+  # Timeouts for different operations (in milliseconds)
   timeouts:
     default: 120000
-    long: 400000   # Long timeout for complex flows (e.g., group deletion)
+    long: 400000  # Long timeout for complex operations (group deletion, etc.)
     create: 120000
     test: 120000
-    delay: 3000    # Delay after delete/create operations
-# Operation delays (ms) - wait for SAP to persist state between steps
+    delay: 3000  # Delay after delete/create operations
+  # Operation delays (milliseconds) - time to wait for SAP to commit operations
+  # These delays ensure SAP has time to persist state changes between operations
   operation_delays:
-    lock: 3000
-    unlock: 3000
-    update: 3000
-    create: 3000
-    default: 3000
+    lock: 3000      # Delay after lock operation (default: 3 seconds)
+    unlock: 3000    # Delay after unlock operation (default: 3 seconds)
+    update: 3000    # Delay after update operation (default: 3 seconds)
+    create: 3000    # Delay after create operation (default: 3 seconds)
+    cleanup: 3000   # Delay after pre-test cleanup (delete) before test starts
+    default: 3000   # Default delay for any operation (default: 3 seconds)
+
+# Session persistence configuration
+
+session_config:
+  # Enable session persistence (saves cookies and CSRF tokens)
+  persist_session: true
+  # Directory for session files (relative to project root)
+  sessions_dir: ".sessions"
+  # Session ID format: {test_name}_{timestamp} or custom
+  session_id_format: "auto"  # "auto" or custom string
+  # Clean up session after test
+  cleanup_session_after_test: true
+
+# Lock persistence configuration
+
+lock_config:
+  # Directory for lock files (relative to project root)
+  locks_dir: ".locks"
+  # Track locks in persistent storage
+  persist_locks: true
+
+# Environment configuration
 
 environment:
-  default_package: "<YOUR_PACKAGE_NAME>"  # Test package from GROUP 2
-  default_transport: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-  default_master_system: "<YOUR_SYSTEM>"  # ⚠️ UPDATE WITH YOUR SYSTEM ID (e.g., E19)
-  default_responsible: "<YOUR_USERNAME>"  # ⚠️ UPDATE WITH YOUR SAP USERNAME (e.g., OKYSLYTSIA), falls back to SAP_USERNAME env var
-  default_client: "<YOUR_CLIENT>"  # ⚠️ UPDATE WITH YOUR CLIENT (e.g., 100)
+  default_package: "<YOUR_PACKAGE_NAME>"  # Default package for creating objects (used if not specified in test case)
+  default_transport: "<YOUR_TRANSPORT_REQUEST>"  # Default transport request (used if not specified in test case)
   # Cleanup configuration (applies to all tests)
-  cleanup_after: false    # Clean up objects after test (default: false)
+  cleanup_after: true    # Clean up objects after test (default: false)
                           # Set to true to auto-delete objects after tests
                           # Note: cleanup_before was removed - not used in code
-  # Real MCP client mode for integration tests (cross-platform, shell-independent)
-  # Runs tests through a real MCP client (stdio/http/sse) instead of calling handlers directly.
-  # Recommended: keep enabled to test the full transport layer.
+  # Real MCP client mode — tests go through full MCP transport layer
   integration_hard_mode:
     enabled: true
-    transport: "stdio"   # http | sse | stdio
-    #
-    # --- stdio: server launch parameters (use ONE) ---
-    stdio_command: ""                        # empty = use current Node executable
-    mcp_destination: "<YOUR_DESTINATION>"    # --mcp=<dest>      auth-broker / service key (e.g., "trial")
-    # env_destination: "<YOUR_DESTINATION>"  # --env=<dest>      session .env from default folder
-    # env_path: "<YOUR_ENV_FILE>"            # --env-path=<path> explicit .env file (e.g., "e19.env")
-    #
-    # --- http/sse: auth headers sent to a running server ---
-    # Server must be started separately (e.g., with --mcp or --env-path).
-    # If server already has a default connection, no headers are needed.
-    http_url: "http://127.0.0.1:3000/mcp/stream/http"
-    sse_url: "http://127.0.0.1:3001/sse"
-    # headers:
-    #   x-mcp-destination: "<YOUR_DESTINATION>"
-    #   # --- or direct connection headers ---
-    #   # x-sap-url: "https://your-system.com:8000"
-    #   # x-sap-auth-type: "basic"
-    #   # x-sap-login: "<USERNAME>"
-    #   # x-sap-password: "<PASSWORD>"
-    #
-    name_suffix: ""      # optional object suffix to avoid collisions
+    transport: "stdio"
+    mcp_destination: "<YOUR_DESTINATION>"
 
 # ============================================================================
 # SHARED DEPENDENCIES — persistent Lego library for integration tests
 # ============================================================================
 # Objects are lazily created on first ensureSharedDependency() call, never deleted.
 # Manage with: npm run shared:setup / shared:teardown / shared:check
-# Naming convention: ZMCP_SHR_{COMPONENT}_{OBJTYPE}
 
 shared_dependencies:
-  package: "<YOUR_SHARED_PACKAGE>"          # Sub-package for all shared objects
-  super_package: "<YOUR_DEFAULT_PACKAGE>"   # Parent package (same as environment.default_package)
-  software_component: ""                    # e.g., HOME (leave empty for cloud)
-  transport_layer: ""                       # e.g., ZE19 (leave empty for cloud)
+  package: "<YOUR_SHARED_PACKAGE>"
+  super_package: "<YOUR_SUPER_PACKAGE>"
+  software_component: "<YOUR_SOFTWARE_COMPONENT>"
+  transport_layer: ""
 
   tables:
     - name: "ZMCP_SHR_RTABL"
@@ -194,11 +210,11 @@ shared_dependencies:
           Fld4
         }
 
-    # CDS views for BDEF test (BDEF test creates/deletes its own BDEF on these views)
+    # CDS views for BDEF HIGH test (creates/deletes its own BDEF on these views)
     - name: "ZMCP_SHR_I_BDEF"
-      description: "Shared root CDS view for BDEF test"
+      description: "Shared root CDS view for BDEF HIGH test"
       source: |
-        @EndUserText.label : 'Shared root CDS view for BDEF test'
+        @EndUserText.label : 'Shared root CDS view for BDEF HIGH test'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
         define root view entity ZMCP_SHR_I_BDEF
           as select from zmcp_shr_btabl
@@ -212,9 +228,9 @@ shared_dependencies:
         }
 
     - name: "ZMCP_SHR_I_BCHD"
-      description: "Shared child CDS view for BDEF test"
+      description: "Shared child CDS view for BDEF HIGH test"
       source: |
-        @EndUserText.label : 'Shared child CDS view for BDEF test'
+        @EndUserText.label : 'Shared child CDS view for BDEF HIGH test'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
         define view entity ZMCP_SHR_I_BCHD
           as select from zmcp_shr_bctbl
@@ -227,13 +243,46 @@ shared_dependencies:
           _parent
         }
 
+    # CDS views for BDEF LOW test (separate pair to avoid conflict with HIGH test)
+    - name: "ZMCP_SHR_I_BDF2"
+      description: "Shared root CDS view for BDEF LOW test"
+      source: |
+        @EndUserText.label : 'Shared root CDS view for BDEF LOW test'
+        @AccessControl.authorizationCheck : #NOT_REQUIRED
+        define root view entity ZMCP_SHR_I_BDF2
+          as select from zmcp_shr_btabl
+          composition [0..*] of ZMCP_SHR_I_BCH2 as _children
+        {
+          key fld1 as Fld1,
+          fld2 as Fld2,
+          fld3 as Fld3,
+          fld4 as Fld4,
+          _children
+        }
+
+    - name: "ZMCP_SHR_I_BCH2"
+      description: "Shared child CDS view for BDEF LOW test"
+      source: |
+        @EndUserText.label : 'Shared child CDS view for BDEF LOW test'
+        @AccessControl.authorizationCheck : #NOT_REQUIRED
+        define view entity ZMCP_SHR_I_BCH2
+          as select from zmcp_shr_bctbl
+          association to parent ZMCP_SHR_I_BDF2 as _parent
+            on $projection.ParentId = _parent.Fld1
+        {
+          key chld_id as ChldId,
+          parent_id as ParentId,
+          fld2 as Fld2,
+          _parent
+        }
+
   behavior_definitions:
     - name: "ZMCP_SHR_I_ROOT"
-      description: "Shared BDEF for BehaviorImplementation tests"
+      description: "Shared BDEF for BehaviorDefinition and BehaviorImplementation tests"
       root_entity: "ZMCP_SHR_I_ROOT"
       implementation_type: "Managed"
       source: |
-        managed implementation in class zbp_zmcp_shr_i_root unique;
+        managed implementation in class zbp_mcp_shr_i_root unique;
         strict ( 2 );
 
         define behavior for ZMCP_SHR_I_ROOT
@@ -260,14 +309,14 @@ shared_dependencies:
         }
 
   classes:
-    - name: "ZBP_ZMCP_SHR_I_ROOT"
+    - name: "ZBP_MCP_SHR_I_ROOT"
       description: "Shared BDEF implementation class for ZMCP_SHR_I_ROOT"
 
-# Legacy shared_objects section (kept for backward compatibility)
+# Legacy shared_objects (kept for backward compatibility with unit_test_class)
 shared_objects:
   unit_test_class:
-    class_name: "<YOUR_SHARED_UT_CLASS>"
-    package_name: "<YOUR_PACKAGE_NAME>"
+    class_name: "ZMCP_BLD_CLSUT_L1"
+    package_name: "ZOK_LOCAL"
     transport_request: ""
     description: "Shared container class for unit test integration tests"
 
@@ -279,8 +328,6 @@ shared_objects:
 # instead of relying solely on refresh tokens from .env file
 
 auth_broker:
-  # Prefer auth-broker over .env (set MCP_USE_AUTH_BROKER=true)
-  use_auth_broker: true
   # Use file-based session store (unsafe) to reuse saved sessions for tests (set MCP_UNSAFE=true)
   unsafe: true
   # Browser auth callback port (default 3001). Change if port is busy.
@@ -291,15 +338,13 @@ auth_broker:
     # This is a BASE path - the system will automatically create service-keys/ and sessions/ subdirectories inside it
     # Service key files: <base_path>/service-keys/<destination>.json (e.g., TRIAL.json, mcp.json)
     # Session files: <base_path>/sessions/<destination>.env (e.g., TRIAL.env, mcp.env)
-    # Supports ~ (home directory) expansion on Unix
-    # Default values:
-    #   Unix: ~/.config/mcp-abap-adt
-    #   Windows: %USERPROFILE%\Documents\mcp-abap-adt
+    # If not specified, uses default: ~/.config/mcp-abap-adt/ (Unix) or %USERPROFILE%\Documents\mcp-abap-adt\ (Windows)
+    # Supports ~ (home directory) expansion
     # ⚠️ IMPORTANT: This is a BASE path, not the service-keys or sessions directory itself!
     # Example: ~/.config/mcp-abap-adt will create:
     #   - ~/.config/mcp-abap-adt/service-keys/<destination>.json
     #   - ~/.config/mcp-abap-adt/sessions/<destination>.env
-    service_keys_dir: <BASE_PATH>  # ⚠️ UPDATE: Replace with your base directory path (e.g., ~/.config/mcp-abap-adt)
+    service_keys_dir: <YOUR_SERVICE_KEYS_DIR>
 
   # ABAP destination configuration (for on-premise or cloud ABAP systems)
   abap:
@@ -307,121 +352,104 @@ auth_broker:
     # Example: "TRIAL" -> looks for TRIAL.json in service-keys directory and TRIAL.env in sessions directory
     # This destination is used by refreshTokensForTests() to automatically refresh tokens before integration tests
     # If not specified, token refresh will be skipped and tests will use tokens from .env file
-    destination: <TEST_ABAP_DESTINATION>  # ⚠️ UPDATE: Replace with your ABAP destination name (e.g., "TRIAL", "mcp")
+    destination: "<YOUR_DESTINATION>"  # ⚠️ UPDATE: Replace with your ABAP destination name (e.g., "TRIAL", "mcp")
 
 # ============================================================================
 # OBJECT TESTS (High-Level, then Low-Level for each object)
 # ============================================================================
 
 # Behavior Definition (Behavior Definition - Low-Level)
+# Uses separate shared CDS views ZMCP_SHR_I_BDF2/BCH2 to avoid conflict with HIGH test
 create_behavior_definition_low:
   test_cases:
     - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Behavior Definition low-level handler full workflow test"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        name: "<YOUR_BEHAVIOR_DEFINITION_NAME>"
-        description: "Test behavior definition created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        # ⚠️ IMPORTANT: root_entity MUST be an existing CDS view name (not just any name)
-        # The CDS view must exist in the SAP system before creating behavior definition
-        root_entity: "<YOUR_EXISTING_CDS_VIEW_NAME>"  # ⚠️ UPDATE: Replace with existing CDS view name
-        implementation_type: "Managed"  # or "Unmanaged", "Abstract", "Projection"
-        # ⚠️ REQUIRED: source_code is mandatory for update step
+        name: "ZMCP_SHR_I_BDF2"
+        description: "Behavior Definition low-level handler test"
+        root_entity: "ZMCP_SHR_I_BDF2"
+        implementation_type: "Managed"
         source_code: |
-          managed implementation in class zbp_<your_cds_view_name_lowercase> unique;
+          managed implementation in class zbp_mcp_shr_i_bdf2 unique;
           strict ( 2 );
 
-          define behavior for <YOUR_CDS_VIEW_NAME> //alias <alias_name>
-          persistent table <your_table_name>
+          define behavior for ZMCP_SHR_I_BDF2
+          persistent table zmcp_shr_btabl
           lock master
           authorization master ( instance )
           {
             create ( authorization : global );
             update;
             delete;
-            field ( readonly ) <field_name>;
+            field ( readonly ) Fld1;
             association _children { create; }
           }
 
-          define behavior for <YOUR_CHILD_ENTITY_NAME> //alias <alias_name>
-          persistent table <your_child_table_name>
+          define behavior for ZMCP_SHR_I_BCH2
+          persistent table zmcp_shr_bctbl
           lock dependent by _parent
           authorization dependent by _parent
           {
             update;
             delete;
-            field ( readonly ) <child_field_name>;
+            field ( readonly:update ) ChldId, ParentId;
             association _parent;
           }
-        # ⚠️ REQUIRED for HighHandlers test: update_source_code is mandatory for update step
         update_source_code: |
-          managed implementation in class zbp_<your_cds_view_name_lowercase> unique;
+          managed implementation in class zbp_mcp_shr_i_bdf2 unique;
           strict ( 2 );
 
-          define behavior for <YOUR_CDS_VIEW_NAME> //alias <alias_name>
-          persistent table <your_table_name>
+          define behavior for ZMCP_SHR_I_BDF2
+          persistent table zmcp_shr_btabl
           lock master
           authorization master ( instance )
           {
             create ( authorization : global );
             update;
             delete;
-            field ( readonly ) <field_name>;
-            field ( readonly ) <updated_field_name>;
+            field ( readonly ) Fld1;
+            field ( readonly ) Fld2;
             association _children { create; }
           }
 
-          define behavior for <YOUR_CHILD_ENTITY_NAME> //alias <alias_name>
-          persistent table <your_child_table_name>
+          define behavior for ZMCP_SHR_I_BCH2
+          persistent table zmcp_shr_bctbl
           lock dependent by _parent
           authorization dependent by _parent
           {
             update;
             delete;
-            field ( readonly ) <child_field_name>;
+            field ( readonly:update ) ChldId, ParentId;
             association _parent;
           }
-
-# ============================================================================
-# METADATA EXTENSION - Low-Level Handler
-# ============================================================================
-
-# ============================================================================
-# BEHAVIOR IMPLEMENTATION - High-Level Handler
-# ============================================================================
 
 # Behavior Implementation (Behavior Implementation - High-Level)
+# Used in combined BDEF+BIMPL test — BDEF (ZMCP_SHR_I_BDEF) is created first in the same test
 create_behavior_implementation:
   test_cases:
     - name: "builder_behavior_implementation"
-      enabled: false
-      description: "Behavior Implementation used by BehaviorImplementationBuilder workflow tests"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Behavior Implementation used by combined BDEF+BIMPL workflow tests (high-level)"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        class_name: "<YOUR_BEHAVIOR_IMPLEMENTATION_CLASS_NAME>"
-        description: "Behavior Implementation for <YOUR_BEHAVIOR_DEFINITION_NAME>"
-        # package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        # ⚠️ IMPORTANT: behavior_definition MUST be an existing Behavior Definition name
-        behavior_definition: "<YOUR_EXISTING_BEHAVIOR_DEFINITION_NAME>"  # ⚠️ UPDATE: Replace with existing Behavior Definition name
-        # ⚠️ implementation_code is implementations include (local handler class), NOT main class
-        # Main class is created automatically with "FOR BEHAVIOR OF" clause
+        class_name: "ZBP_MCP_SHR_I_BDEF"
+        description: "Behavior Implementation for ZMCP_SHR_I_BDEF (high-level)"
+        behavior_definition: "ZMCP_SHR_I_BDEF"
         implementation_code: |
-          CLASS lhc_<your_behavior_definition_lowercase> DEFINITION INHERITING FROM cl_abap_behavior_handler.
+          CLASS lhc_ZMCP_SHR_I_BDEF DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
 
               METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdef RESULT result.
 
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdef RESULT result.
 
           ENDCLASS.
 
-          CLASS lhc_<your_behavior_definition_lowercase> IMPLEMENTATION.
+          CLASS lhc_ZMCP_SHR_I_BDEF IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
             ENDMETHOD.
@@ -430,23 +458,22 @@ create_behavior_implementation:
             ENDMETHOD.
 
           ENDCLASS.
-        # ⚠️ update_implementation_code is for updating the implementations include
         update_implementation_code: |
-          CLASS lhc_<your_behavior_definition_lowercase> DEFINITION INHERITING FROM cl_abap_behavior_handler.
+          CLASS lhc_ZMCP_SHR_I_BDEF DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
 
               METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdef RESULT result.
 
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdef RESULT result.
 
               METHODS create FOR MODIFY
-                IMPORTING entities FOR CREATE <your_behavior_definition_lowercase>.
+                IMPORTING entities FOR CREATE zmcp_shr_i_bdef.
 
           ENDCLASS.
 
-          CLASS lhc_<your_behavior_definition_lowercase> IMPLEMENTATION.
+          CLASS lhc_ZMCP_SHR_I_BDEF IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
             ENDMETHOD.
@@ -460,41 +487,31 @@ create_behavior_implementation:
 
           ENDCLASS.
 
-# ============================================================================
-# BEHAVIOR IMPLEMENTATION - Low-Level Handler
-# ============================================================================
-
 # Behavior Implementation (Behavior Implementation - Low-Level)
-
-# Behavior Implementation (Behavior Implementation - Low-Level)
+# Used in combined BDEF+BIMPL test — BDEF (ZMCP_SHR_I_BDF2) is created first in the same test
 create_behavior_implementation_low:
   test_cases:
     - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Check → Lock → Update → Unlock → Activate"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Behavior Implementation low-level handler full workflow test (combined with BDEF)"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        class_name: "<YOUR_BEHAVIOR_IMPLEMENTATION_CLASS_NAME>"
-        description: "Behavior Implementation for <YOUR_BEHAVIOR_DEFINITION_NAME>"
-        # package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        # ⚠️ IMPORTANT: behavior_definition MUST be an existing Behavior Definition name
-        behavior_definition: "<YOUR_EXISTING_BEHAVIOR_DEFINITION_NAME>"  # ⚠️ UPDATE: Replace with existing Behavior Definition name
-        # ⚠️ source_code is implementations include (local handler class), NOT main class
-        # Main class is created by CreateClass and remains unchanged
+        class_name: "ZBP_MCP_SHR_I_BDF2"
+        description: "Behavior Implementation for ZMCP_SHR_I_BDF2"
+        behavior_definition: "ZMCP_SHR_I_BDF2"
         source_code: |
-          CLASS lhc_<your_behavior_definition_lowercase> DEFINITION INHERITING FROM cl_abap_behavior_handler.
+          CLASS lhc_ZMCP_SHR_I_BDF2 DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
 
               METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdf2 RESULT result.
 
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdf2 RESULT result.
 
           ENDCLASS.
 
-          CLASS lhc_<your_behavior_definition_lowercase> IMPLEMENTATION.
+          CLASS lhc_ZMCP_SHR_I_BDF2 IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
             ENDMETHOD.
@@ -503,20 +520,19 @@ create_behavior_implementation_low:
             ENDMETHOD.
 
           ENDCLASS.
-        # ⚠️ REQUIRED for update step: implementation_code is implementations include (local handler class) for update
         implementation_code: |
-          CLASS lhc_<your_behavior_definition_lowercase> DEFINITION INHERITING FROM cl_abap_behavior_handler.
+          CLASS lhc_ZMCP_SHR_I_BDF2 DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
 
               METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdf2 RESULT result.
 
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdf2 RESULT result.
 
           ENDCLASS.
 
-          CLASS lhc_<your_behavior_definition_lowercase> IMPLEMENTATION.
+          CLASS lhc_ZMCP_SHR_I_BDF2 IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
             ENDMETHOD.
@@ -525,21 +541,19 @@ create_behavior_implementation_low:
             ENDMETHOD.
 
           ENDCLASS.
-        # ⚠️ REQUIRED for HighHandlers test: update_source_code is implementations include (local handler class)
-        # ⚠️ NOTE: For managed behavior definitions, READ method is not needed (auto-generated)
         update_source_code: |
-          CLASS lhc_<your_behavior_definition_lowercase> DEFINITION INHERITING FROM cl_abap_behavior_handler.
+          CLASS lhc_ZMCP_SHR_I_BDF2 DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
 
               METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdf2 RESULT result.
 
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR <your_behavior_definition_lowercase> RESULT result.
+                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdf2 RESULT result.
 
           ENDCLASS.
 
-          CLASS lhc_<your_behavior_definition_lowercase> IMPLEMENTATION.
+          CLASS lhc_ZMCP_SHR_I_BDF2 IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
             ENDMETHOD.
@@ -549,175 +563,163 @@ create_behavior_implementation_low:
 
           ENDCLASS.
 
-
-# Class (Class)
+# Create Metadata Extension (Low-Level Handler)
 
 # Class (Class)
 create_class:
   test_cases:
-    - name: "test_class_high"
-      enabled: true
-      description: "High-level test: create → update → delete class"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        # Create step
-        class_name: "<YOUR_CLASS_NAME>"
-        description: "Test ABAP Class created via MCP ABAP ADT"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-        superclass: ""
-        final: false
-        abstract: false
-        create_protected: false
-        source_code: |
-          CLASS <YOUR_CLASS_NAME> DEFINITION
-            PUBLIC
-            FINAL
-            CREATE PUBLIC .
-
-            PUBLIC SECTION.
-              METHODS: constructor.
-            PROTECTED SECTION.
-            PRIVATE SECTION.
-          ENDCLASS.
-
-          CLASS <YOUR_CLASS_NAME> IMPLEMENTATION.
-            METHOD constructor.
-              " Initialization logic here
-              WRITE: / 'Class instance created'.
-            ENDMETHOD.
-          ENDCLASS.
-        # Update step (will be executed after create)
-        update_source_code: |
-          CLASS <YOUR_CLASS_NAME> DEFINITION
-            PUBLIC
-            FINAL
-            CREATE PUBLIC .
-
-            PUBLIC SECTION.
-              METHODS:
-                constructor,
-                get_message RETURNING VALUE(rv_message) TYPE string.
-            PROTECTED SECTION.
-            PRIVATE SECTION.
-          ENDCLASS.
-
-          CLASS <YOUR_CLASS_NAME> IMPLEMENTATION.
-            METHOD constructor.
-              " Updated initialization logic
-              WRITE: / 'Class instance created - UPDATED'.
-            ENDMETHOD.
-
-            METHOD get_message.
-              rv_message = 'Updated message from MCP test'.
-            ENDMETHOD.
-          ENDCLASS.
-        update_activate: true
-        # Delete step (will be executed after update)
-        delete_after_test: true
-        delete_object_type: "CLAS/OC"
     - name: "builder_class"
-      enabled: false
+      enabled: true
+      available_in: ["onprem", "cloud"]
       description: "High-level test for ClassHighHandlers and ClassLocalIncludesHandlers: create → update → get → delete class with local includes"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        # Create step
-        class_name: "<YOUR_CLASS_NAME>"
-        description: "Test ABAP Class created via MCP ABAP ADT for high-level handlers"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
+        class_name: "ZMCP_BLD_CLSLOC_H1"
+        description: "ClassBuilder workflow class"
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
         superclass: ""
-        final: false
-        abstract: false
-        create_protected: false
+        final: true
         source_code: |
-          CLASS <YOUR_CLASS_NAME> DEFINITION
+          CLASS ZMCP_BLD_CLSLOC_H1 DEFINITION
             PUBLIC
             FINAL
             CREATE PUBLIC .
 
             PUBLIC SECTION.
-              METHODS: constructor.
+              TYPES:
+                BEGIN OF ty_parent,
+                  fld1 TYPE char10,
+                  fld2 TYPE string,
+                  fld3 TYPE char8,
+                END OF ty_parent,
+                ty_parent_tab TYPE STANDARD TABLE OF ty_parent WITH DEFAULT KEY,
+                BEGIN OF ty_child,
+                  parent_id TYPE char10,
+                  chld_id   TYPE char10,
+                END OF ty_child,
+                ty_child_tab TYPE STANDARD TABLE OF ty_child WITH DEFAULT KEY.
+
+              METHODS:
+                get_text RETURNING VALUE(rv_text) TYPE string.
+              CLASS-METHODS:
+                build_parent_data RETURNING VALUE(rt_parent) TYPE ty_parent_tab,
+                build_child_data  RETURNING VALUE(rt_child)  TYPE ty_child_tab.
             PROTECTED SECTION.
             PRIVATE SECTION.
           ENDCLASS.
 
-          CLASS <YOUR_CLASS_NAME> IMPLEMENTATION.
-            METHOD constructor.
-              " Initialization logic here
-              WRITE: / 'Class instance created'.
+          CLASS ZMCP_BLD_CLSLOC_H1 IMPLEMENTATION.
+            METHOD get_text.
+              rv_text = |Parents: { lines( build_parent_data( ) ) }|.
+            ENDMETHOD.
+
+            METHOD build_parent_data.
+              rt_parent = VALUE #(
+                ( fld1 = '0000000001' fld2 = 'Parent 1' fld3 = '20250101' )
+                ( fld1 = '0000000002' fld2 = 'Parent 2' fld3 = '20250105' )
+              ).
+            ENDMETHOD.
+
+            METHOD build_child_data.
+              rt_child = VALUE #(
+                ( parent_id = '0000000001' chld_id = 'C01' )
+                ( parent_id = '0000000001' chld_id = 'C02' )
+                ( parent_id = '0000000002' chld_id = 'C03' )
+              ).
             ENDMETHOD.
           ENDCLASS.
-        # Update step (will be executed after create)
+        # Update step (will be executed after create in ClassHighHandlers test)
         update_source_code: |
-          CLASS <YOUR_CLASS_NAME> DEFINITION
+          CLASS ZMCP_BLD_CLSLOC_H1 DEFINITION
             PUBLIC
             FINAL
             CREATE PUBLIC .
 
             PUBLIC SECTION.
+              TYPES:
+                BEGIN OF ty_parent,
+                  fld1 TYPE char10,
+                  fld2 TYPE string,
+                  fld3 TYPE char8,
+                END OF ty_parent,
+                ty_parent_tab TYPE STANDARD TABLE OF ty_parent WITH DEFAULT KEY,
+                BEGIN OF ty_child,
+                  parent_id TYPE char10,
+                  chld_id   TYPE char10,
+                END OF ty_child,
+                ty_child_tab TYPE STANDARD TABLE OF ty_child WITH DEFAULT KEY.
+
               METHODS:
-                constructor,
+                get_text RETURNING VALUE(rv_text) TYPE string,
                 get_message RETURNING VALUE(rv_message) TYPE string.
+              CLASS-METHODS:
+                build_parent_data RETURNING VALUE(rt_parent) TYPE ty_parent_tab,
+                build_child_data  RETURNING VALUE(rt_child)  TYPE ty_child_tab.
             PROTECTED SECTION.
             PRIVATE SECTION.
           ENDCLASS.
 
-          CLASS <YOUR_CLASS_NAME> IMPLEMENTATION.
-            METHOD constructor.
-              " Updated initialization logic
-              WRITE: / 'Class instance created - UPDATED'.
+          CLASS ZMCP_BLD_CLSLOC_H1 IMPLEMENTATION.
+            METHOD get_text.
+              rv_text = |Parents: { lines( build_parent_data( ) ) }|.
             ENDMETHOD.
 
             METHOD get_message.
               rv_message = 'Updated message from MCP test'.
+            ENDMETHOD.
+
+            METHOD build_parent_data.
+              rt_parent = VALUE #(
+                ( fld1 = '0000000001' fld2 = 'Parent 1' fld3 = '20250101' )
+                ( fld1 = '0000000002' fld2 = 'Parent 2' fld3 = '20250105' )
+              ).
+            ENDMETHOD.
+
+            METHOD build_child_data.
+              rt_child = VALUE #(
+                ( parent_id = '0000000001' chld_id = 'C01' )
+                ( parent_id = '0000000001' chld_id = 'C02' )
+                ( parent_id = '0000000002' chld_id = 'C03' )
+              ).
             ENDMETHOD.
           ENDCLASS.
         update_activate: true
       # Parameters group for ClassLocalIncludesHandlers test
+      # Uses minimal empty class for testing local includes
       params_groups:
         builder_class:
-          class_name: "<YOUR_CLASS_NAME>"
-          description: "Test ABAP Class for local includes handlers"
-          package_name: "<YOUR_PACKAGE_NAME>"
-          # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
+          class_name: "ZMCP_BLD_CLSLOC_H1"
+          description: "Empty test class for local includes handlers"
+          # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+          # transport_request: ""  # Uses environment.default_transport if omitted
           source_code: |
-            CLASS <YOUR_CLASS_NAME> DEFINITION
-              PUBLIC
-              FINAL
-              CREATE PUBLIC .
-
+            CLASS ZMCP_BLD_CLSLOC_H1 DEFINITION PUBLIC FINAL CREATE PUBLIC.
               PUBLIC SECTION.
-                METHODS: constructor.
               PROTECTED SECTION.
               PRIVATE SECTION.
             ENDCLASS.
 
-            CLASS <YOUR_CLASS_NAME> IMPLEMENTATION.
-              METHOD constructor.
-                " Initialization logic here
-                WRITE: / 'Class instance created'.
-              ENDMETHOD.
+            CLASS ZMCP_BLD_CLSLOC_H1 IMPLEMENTATION.
             ENDCLASS.
 
-# Step 1.5: CrudClient Direct test (reference implementation - uses CrudClient without handlers)
+# Create Package
 
-# Class (Class - CrudClient Direct)
+# Class (Class - Low-Level)
 create_class_direct:
   test_cases:
     - name: "crud_direct"
-      enabled: false
+      enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Class CrudClient direct test (reference implementation)"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        class_name: "<YOUR_CLASS_NAME>_DIRECT"
+        class_name: "ZMCP_BLD_CLS_H1"
         description: "Class CrudClient direct test"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
         superclass: ""
         final: true
         source_code: |
-          CLASS <YOUR_CLASS_NAME>_DIRECT DEFINITION
+          CLASS ZMCP_BLD_CLS_H1 DEFINITION
             PUBLIC
             FINAL
             CREATE PUBLIC .
@@ -729,144 +731,104 @@ create_class_direct:
             PRIVATE SECTION.
           ENDCLASS.
 
-          CLASS <YOUR_CLASS_NAME>_DIRECT IMPLEMENTATION.
+          CLASS ZMCP_BLD_CLS_H1 IMPLEMENTATION.
             METHOD get_text.
-              rv_text = 'Hello from <YOUR_CLASS_NAME>_DIRECT'.
+              rv_text = 'Hello from ZMCP_BLD_CLS_H1'.
             ENDMETHOD.
           ENDCLASS.
 
         cleanup_after: true
 
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-
-# Class (Class - Low-Level)
-
-# Class (Class - Low-Level)
 create_class_low:
   test_cases:
     - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Class low-level handler full workflow test"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        class_name: "<YOUR_CLASS_NAME>_LOW"
-        description: "Test ABAP Class created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        superclass: ""
-        final: false
-        abstract: false
-        create_protected: false
+        class_name: "ZMCP_BLD_CLS_L1"
+        description: "Class low-level handler test"
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        # Extra delays to give backend time to persist between steps (especially in async env)
+        operation_delays:
+          create: 5000
+          lock: 5000
+          update: 5000
+          unlock: 5000
+          default: 5000
         source_code: |
-          CLASS <YOUR_CLASS_NAME>_LOW DEFINITION
+          CLASS ZMCP_BLD_CLS_L1 DEFINITION
             PUBLIC
             FINAL
             CREATE PUBLIC .
             PUBLIC SECTION.
               METHODS: constructor.
           ENDCLASS.
-          CLASS <YOUR_CLASS_NAME>_LOW IMPLEMENTATION.
+          CLASS ZMCP_BLD_CLS_L1 IMPLEMENTATION.
             METHOD constructor.
               WRITE: / 'Class instance created'.
             ENDMETHOD.
           ENDCLASS.
-        # Update through low-level
         update_source_code: |
-          CLASS <YOUR_CLASS_NAME>_LOW DEFINITION
+          CLASS ZMCP_BLD_CLS_L1 DEFINITION
             PUBLIC
             FINAL
             CREATE PUBLIC .
             PUBLIC SECTION.
               METHODS: get_message RETURNING VALUE(rv_message) TYPE string.
           ENDCLASS.
-          CLASS <YOUR_CLASS_NAME>_LOW IMPLEMENTATION.
+          CLASS ZMCP_BLD_CLS_L1 IMPLEMENTATION.
             METHOD get_message.
               rv_message = 'Updated via low-level handler'.
             ENDMETHOD.
           ENDCLASS.
-    - name: "test_class_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        class_name: "<YOUR_CLASS_NAME>_LOW"
-        description: "Test ABAP Class created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        superclass: ""
-        final: false
-        abstract: false
-        create_protected: false
-        # Update through low-level
-        update_source_code: |
-          CLASS <YOUR_CLASS_NAME>_LOW DEFINITION
-            PUBLIC
-            FINAL
-            CREATE PUBLIC .
-            PUBLIC SECTION.
-              METHODS: get_message RETURNING VALUE(rv_message) TYPE string.
-          ENDCLASS.
-          CLASS <YOUR_CLASS_NAME>_LOW IMPLEMENTATION.
-            METHOD get_message.
-              rv_message = 'Updated via low-level handler'.
-            ENDMETHOD.
-          ENDCLASS.
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "CLAS/OC"
 
-# Step 3: Read-only test (separate read-only handler)
-
-# Data Element (Data Element)
+# Create Domain (Low-Level Handler)
 
 # Data Element (Data Element)
 create_data_element:
   test_cases:
-    - name: "test_data_element_high"
+    - name: "builder_data_element"
       enabled: true
-      description: "High-level test: create → update → delete data element"
+      available_in: ["onprem", "cloud"]
+      description: "Data element reserved for DataElementBuilder tests"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        # Create step
-        data_element_name: "<YOUR_DATA_ELEMENT_NAME>"
-        description: "Test data element created via MCP"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-        domain_name: "<YOUR_DOMAIN_NAME>"  # Uses domain from GROUP 3
+        data_element_name: "ZMCP_BLD_DTEL_H1"
+        description: "DataElementBuilder workflow data element"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
+        # Allowed type_kind values:
+        #   - domain
+        #   - predefinedAbapType
+        #   - refToPredefinedAbapType
+        #   - refToDictionaryType
+        #   - refToClifType
+        type_kind: "predefinedAbapType"
         data_type: "CHAR"
-        length: 50
+        length: 100
         decimals: 0
-        short_label: "TestLbl"
-        medium_label: "Test Field"
-        field_label_long: "Test Field Long Label"
-        field_label_heading: "Test Heading"
-        # Update step
-        update_description: "Updated MCP data element"
-        update_field_label_short: "Upd Test"
-        update_field_label_medium: "Updated Test Field"
-        update_field_label_long: "Updated Test Field Long Label"
-        update_field_label_heading: "Updated Test Heading"
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "DTEL"
+        short_label: "Builder"
+        medium_label: "Builder Data"
+        long_label: "Builder Data Element"
+        heading_label: "Builder Data Element"
 
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-
-# Data Element (Data Element - Low-Level)
+# Create Interface
 
 # Data Element (Data Element - Low-Level)
 create_data_element_low:
   test_cases:
     - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "DataElement low-level handler full workflow test"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        data_element_name: "<YOUR_DATA_ELEMENT_NAME>_LOW"
-        description: "Test data element created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        domain_name: "<YOUR_DOMAIN_NAME>"
+        data_element_name: "ZMCP_BLD_DTEL_L1"
+        description: "DataElement low-level handler test"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
+        type_kind: "predefinedAbapType"
+        type_name: "CHAR"
         data_type: "CHAR"
         length: 50
         decimals: 0
@@ -874,924 +836,746 @@ create_data_element_low:
         medium_label: "Test Field"
         field_label_long: "Test Field Long Label"
         field_label_heading: "Test Heading"
-        # Update through low-level
-        update_description: "Updated via low-level"
-    - name: "test_data_element_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        data_element_name: "<YOUR_DATA_ELEMENT_NAME>_LOW"
-        description: "Test data element created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        domain_name: "<YOUR_DOMAIN_NAME>"
-        data_type: "CHAR"
-        length: 50
-        decimals: 0
-        short_label: "TestLbl"
-        medium_label: "Test Field"
-        field_label_long: "Test Field Long Label"
-        field_label_heading: "Test Heading"
-        # Update through low-level
-        update_description: "Updated via low-level"
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "DTEL"
+        domain_name: ""
+        properties:
+          # package_name: "ZADT_BLD_PKG01"
+          description: "DataElement low-level handler test (updated)"
+          type_kind: "predefinedAbapType"
+          type_name: "CHAR"
+          data_type: "CHAR"
+          length: 50
+          decimals: 0
+          field_label_short: "Upd Test"
+          field_label_medium: "Updated Test Field"
+          field_label_long: "Updated Test Field Long Label"
+          field_label_heading: "Updated Test Heading"
 
-# Step 3: Read-only test (separate read-only handler)
-
-# Domain (Domain)
+# Create Table (Low-Level Handler)
 
 # Domain (Domain)
 create_domain:
   test_cases:
-    - name: "test_domain_high"
+    - name: "builder_domain"
       enabled: true
-      description: "High-level test: create → update → delete domain"
+      available_in: ["onprem", "cloud"]
+      description: "Domain used by DomainBuilder workflow tests"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        # Create step
-        domain_name: "<YOUR_DOMAIN_NAME>"
-        description: "Test domain created via MCP"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
+        domain_name: "ZMCP_BLD_DOM_H1"  # Changed from ZMCP_BLD_DOM02 to avoid conflicts
+        description: "DomainBuilder workflow domain"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         datatype: "CHAR"
-        length: 50
+        length: 5
         decimals: 0
         lowercase: false
         sign_exists: false
-        # Update step
-        update_description: "Updated test domain description"
-        update_length: 60
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "DOMA"
 
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-
-# Domain (Domain - Low-Level)
+# Create Data Element
 
 # Domain (Domain - Low-Level)
 create_domain_low:
   test_cases:
     - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Domain low-level handler full workflow test"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        domain_name: "<YOUR_DOMAIN_NAME>_LOW"
-        description: "Test domain created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        domain_name: "ZMCP_BLD_DOM_L1"
+        description: "Domain low-level handler test domain"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         datatype: "CHAR"
-        length: 50
+        length: 10
         decimals: 0
         lowercase: false
         sign_exists: false
         properties:
-          description: "Test domain for low-level handler"
+          description: "Domain low-level handler test domain (updated)"
           datatype: "CHAR"
-          length: 50
-        # Update through low-level
-        update_description: "Updated via low-level"
-        update_length: 60
-    - name: "test_domain_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        domain_name: "<YOUR_DOMAIN_NAME>_LOW"
-        description: "Test domain created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        datatype: "CHAR"
-        length: 50
-        decimals: 0
-        lowercase: false
-        sign_exists: false
-        # Update through low-level
-        update_description: "Updated via low-level"
-        update_length: 60
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "DOMA"
+          length: 10
 
-# Step 3: Read-only test (separate read-only handler)
+# Create Data Element (Low-Level Handler)
 
 # Function Group & Function Module (High & Low Level Tests)
 create_function:
   test_cases:
     - name: "full_workflow"
       enabled: true
+      available_in: ["onprem"]
       description: "Complete function group and function module workflow for high and low level tests"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
         # Function Group parameters
-        function_group_name: "<YOUR_FUNCTION_GROUP_NAME>"
+        function_group_name: "ZMCP_BLD_FGR_EMPTY"
         function_group_description: "Function group for workflow tests"
         # ⚠️ DISABLED: update_description causes lock conflict after create
         # update_function_group_description: "Function group for workflow tests (updated)"
 
         # Function Module parameters
-        function_module_name: "<YOUR_FUNCTION_MODULE_NAME>"
+        function_module_name: "Z_ADT_BLD_FM01"
         function_module_description: "Function module for workflow tests"
         source_code: |
-          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>
+          FUNCTION Z_ADT_BLD_FM01
               IMPORTING
                  VALUE(IV_PARAM) TYPE  STRING
               EXPORTING
                  VALUE(EV_RESULT) TYPE  STRING.
             ev_result = |Result: { iv_param }|.
+            ev_result = |Additional processing|.
           ENDFUNCTION.
         update_source_code: |
-          FUNCTION <YOUR_FUNCTION_MODULE_NAME_LOWERCASE>
+          FUNCTION Z_ADT_BLD_FM01
               IMPORTING
                  VALUE(IV_PARAM) TYPE  STRING
               EXPORTING
                  VALUE(EV_RESULT) TYPE  STRING.
             ev_result = |Updated Result: { iv_param }|.
+            ev_result = |Additional processing|.
           ENDFUNCTION.
 
         # Common parameters
-        # package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
 
-# NOTE: Function Group and Function Module are tested together in create_function section above.
-# Standalone create_function_group / create_function_module sections are not needed.
+# Create Transport
 
-# Interface (Interface)
+# Create Package (Low-Level Handler)
 
 # Interface (Interface)
 create_interface:
   test_cases:
-    - name: "test_interface_high"
+    - name: "builder_interface"
       enabled: true
-      description: "High-level test: create → update → delete interface"
+      available_in: ["onprem", "cloud"]
+      description: "Interface reserved for InterfaceBuilder tests"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        # Create step
-        interface_name: "<YOUR_INTERFACE_NAME>"
-        description: "Test interface created via MCP"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
+        interface_name: "ZMCP_BLD_IF_H1"
+        description: "InterfaceBuilder workflow interface"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         source_code: |
-          INTERFACE <YOUR_INTERFACE_NAME>
-            PUBLIC.
-
-            METHODS test_method
-              IMPORTING
-                iv_param TYPE string
-              RETURNING
-                VALUE(rv_result) TYPE string.
-
+          INTERFACE ZMCP_BLD_IF_H1
+            PUBLIC .
+            METHODS: test_method.
           ENDINTERFACE.
-        # Update step
-        update_source_code: |
-          INTERFACE <YOUR_INTERFACE_NAME>
-            PUBLIC.
+      operation_delays:
+        create: 5000  # Increased delay for interface creation
+        lock: 3000
+        update: 3000
+        unlock: 3000
 
-            METHODS:
-              test_method
-                IMPORTING
-                  iv_param TYPE string
-                RETURNING
-                  VALUE(rv_result) TYPE string,
-              get_status RETURNING VALUE(rv_status) TYPE string.
-
-          ENDINTERFACE.
-        update_activate: true
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "INTF/OI"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-
-# Interface (Interface - Low-Level)
+# Create Program
 
 # Interface (Interface - Low-Level)
 create_interface_low:
   test_cases:
     - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Interface low-level handler full workflow test"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        interface_name: "<YOUR_INTERFACE_NAME>_LOW"
-        description: "Test ABAP Interface created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        interface_name: "ZMCP_BLD_IF_L1"
+        description: "Interface low-level handler test"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         source_code: |
-          INTERFACE <YOUR_INTERFACE_NAME>_LOW PUBLIC.
-            METHODS: test_method RETURNING VALUE(rv_result) TYPE string.
+          INTERFACE zadt_bld_if03.
+            METHODS: test_method.
           ENDINTERFACE.
-        # Update through low-level
-        update_source_code: |
-          INTERFACE <YOUR_INTERFACE_NAME>_LOW PUBLIC.
-            METHODS: get_status RETURNING VALUE(rv_status) TYPE string.
-          ENDINTERFACE.
-    - name: "test_interface_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        interface_name: "<YOUR_INTERFACE_NAME>_LOW"
-        description: "Test ABAP Interface created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        # Update through low-level
-        update_source_code: |
-          INTERFACE <YOUR_INTERFACE_NAME>_LOW PUBLIC.
-            METHODS: get_status RETURNING VALUE(rv_status) TYPE string.
-          ENDINTERFACE.
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "INTF/OI"
 
-# Step 3: Read-only test (separate read-only handler)
-
-# Metadata Extension (Metadata Extension - Low-Level)
+# Create Structure (Low-Level Handler)
 
 # Metadata Extension (Metadata Extension - Low-Level)
 create_metadata_extension_low:
   test_cases:
     - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Metadata Extension low-level handler full workflow test"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        name: "<YOUR_METADATA_EXTENSION_NAME>"
-        description: "Test metadata extension created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        # Example of complete metadata extension source code:
-        # @Metadata.layer: #CUSTOMER
-        # annotate entity ZOK_C_CDS_TEST with {
-        #   @EndUserText.label: 'Field 1 Label'
-        #   @UI.identification: [{ position: 10 }]
-        #   Fld1;
-        #   @EndUserText.label: 'Field 2 Label'
-        #   @UI.lineItem: [{ position: 20 }]
-        #   Fld2;
-        #   @EndUserText.label: 'Field 3 Label'
-        #   @UI.lineItem: [{ position: 30 }]
-        #   Fld3;
-        #   @EndUserText.label: 'Child Items'
-        #   @UI.lineItem: [{ position: 40 }]
-        #   @UI.selectionField: [{ position: 1 }]
-        #   _association_name;
-        # }
+        name: "ZMCP_SHR_C_ROOT_0002"
+        description: "Metadata Extension low-level handler test"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         source_code: |
           @Metadata.layer: #CUSTOMER
-          annotate entity <YOUR_ENTITY_NAME> with {
-            @EndUserText.label: 'Field 1 Label'
-            @UI.identification: [{ position: 10 }]
-            <YOUR_FIELD_1>;
-            @EndUserText.label: 'Field 2 Label'
-            @UI.lineItem: [{ position: 20 }]
-            <YOUR_FIELD_2>;
-            @EndUserText.label: 'Field 3 Label'
-            @UI.lineItem: [{ position: 30 }]
-            <YOUR_FIELD_3>;
+          annotate entity ZMCP_SHR_C_ROOT
+            with
+          {
+              @EndUserText.label: 'Field 1 Label'
+              @UI.identification: [{ position: 10 }]
+              Fld1;
+
+              @EndUserText.label: 'Field 2 Label'
+              @UI.lineItem: [{ position: 20 }]
+              Fld2;
+
+              @EndUserText.label: 'Field 3 Label'
+              @UI.lineItem: [{ position: 30 }]
+              Fld3;
+
+              @EndUserText.label: 'Child Items'
+              @UI.lineItem: [{ position: 40 }]
+              @UI.selectionField: [{ position: 1 }]
+              _association_name;
           }
 
-# ============================================================================
-# BEHAVIOR IMPLEMENTATION - Low-Level Handler
-# ============================================================================
-
-# Package (Package)
 
 # Package (Package)
 create_package:
   test_cases:
-    - name: "test_package_high"
+    - name: "builder_package"
       enabled: true
-      description: "High-level test: create → update → delete package"
+      available_in: ["onprem", "cloud"]
+      description: "Package reserved for PackageBuilder tests"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        # Create step
-        package_name: "<YOUR_PACKAGE_NAME>"  # Package where test objects are added (existing package)
-        description: "Test package created via MCP for test suite"
-        # super_package not needed for high-level handler
+        # package_name: "ZADT_BLD_PKG01"          # Package where test objects are added (existing package)
+        test_package: "ZMCP_BLD_PKG_H1"    # Package created by the test
+        description: "PackageBuilder workflow package"
+        updated_description: "PackageBuilder workflow package (UPDATED)"
         package_type: "development"
-        responsible: "<YOUR_RESPONSIBLE_USER>"  # ⚠️ UPDATE WITH YOUR USER ID (e.g., CB9980002377)
-        # software_component: "<YOUR_SOFTWARE_COMPONENT>"  # Optional - omit for local packages
-        # transport_layer: "<YOUR_TRANSPORT_LAYER>"  # Optional - omit for local packages
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional - omit for local packages
-        application_component: ""
-        # Update step (update description)
-        update_description: "Updated test package description"
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "DEVC/K"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-
-# Package (Package - Low-Level)
-
-# Package (Package - Low-Level)
-create_package_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        # package_name: "<YOUR_SUPER_PACKAGE>"  # Parent package (super_package) - optional, uses default_package from environment if not specified
-        test_package: "<YOUR_PACKAGE_NAME>_LOW"  # Package to create
-        description: "Test package created via low-level MCP handler"
-        updated_description: "Test package created via low-level MCP handler (UPDATED)"
-        package_type: "development"
-        software_component: "ZLOCAL"  # Use your system's software component
-        # responsible: "<YOUR_RESPONSIBLE_USER>"  # Optional
-        # application_component: ""  # Optional
+        software_component: "<YOUR_SOFTWARE_COMPONENT>"
         operation_delays:
           create: 5000
           update: 3000
           unlock: 5000
           delete: 20000
           delete_retry: 20000
-    - name: "test_package_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
+
+# Create Domain
+
+# Package (Package - Low-Level)
+create_package_low:
+  test_cases:
+    - name: "full_workflow"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Package low-level handler full workflow test"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        package_name: "<YOUR_SUPER_PACKAGE>"  # Parent package (super_package) - use your system's local package (e.g., ZLOCAL for cloud, $TMP for on-premise)
-        test_package: "<YOUR_PACKAGE_NAME>_LOW"  # Package to create
-        description: "Test package created via low-level MCP handler"
+        # package_name: "ZADT_BLD_PKG01"          # Parent package (existing)
+        test_package: "ZMCP_BLD_PKG_L1"    # Package created by the test
+        description: "PackageBuilder workflow package"
+        updated_description: "PackageBuilder workflow package (UPDATED)"
         package_type: "development"
-        responsible: "<YOUR_RESPONSIBLE_USER>"
-        application_component: ""
-        # Update through low-level
-        update_description: "Updated via low-level"
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "DEVC/K"
+        software_component: "<YOUR_SOFTWARE_COMPONENT>"
+        operation_delays:
+          create: 5000
+          update: 3000
+          unlock: 5000
+          delete: 20000
+          delete_retry: 20000
 
-# Step 3: Read-only test (separate read-only handler)
-
-# Program (Program)
+# Create Behavior Definition (Low-Level Handler)
 
 # Program (Program)
 create_program:
   test_cases:
-    - name: "test_program_high"
+    - name: "builder_program"
       enabled: true
-      description: "High-level test: create → update → delete program"
+      available_in: ["onprem"]
+      description: "Program reserved for ProgramBuilder tests"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        # Create step
-        program_name: "<YOUR_PROGRAM_NAME>"
-        description: "Test ABAP Program created via MCP ABAP ADT"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages (ZLOCAL)
-        program_type: "1"
-        application: "*"
+        program_name: "ZMCP_BLD_PROG_H1"
+        description: "ProgramBuilder workflow report"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
+        program_type: "executable"
         source_code: |
-          *&---------------------------------------------------------------------*
-          *& Report <YOUR_PROGRAM_NAME>
-          *& Test ABAP Program created via MCP ABAP ADT
-          *&---------------------------------------------------------------------*
-          REPORT <YOUR_PROGRAM_NAME>.
+          REPORT ZMCP_BLD_PROG_H1.
+          WRITE: / 'Builder test program'.
 
-          START-OF-SELECTION.
-            WRITE: / 'Program <YOUR_PROGRAM_NAME> executed successfully.'.
-            WRITE: / 'Created via MCP ABAP ADT API.'.
-        # Update step
-        update_source_code: |
-          *&---------------------------------------------------------------------*
-          *& Report <YOUR_PROGRAM_NAME>
-          *& UPDATED Test ABAP Program via MCP ABAP ADT
-          *&---------------------------------------------------------------------*
-          REPORT <YOUR_PROGRAM_NAME>.
-
-          START-OF-SELECTION.
-            WRITE: / 'Program <YOUR_PROGRAM_NAME> executed successfully - UPDATED'.
-            WRITE: / 'Updated via MCP ABAP ADT API.'.
-            WRITE: / 'Modification date:', sy-datum.
-        update_activate: true
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "PROG/P"
-
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-
-# Program (Program - Low-Level)
+# Create Table
 
 # Program (Program - Low-Level)
 create_program_low:
   test_cases:
     - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      enabled: true
+      available_in: ["onprem"]
+      description: "Program low-level handler full workflow test"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        program_name: "<YOUR_PROGRAM_NAME>_LOW"
-        description: "Test ABAP Program created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        program_name: "ZMCP_BLD_PROG_L1"
+        description: "Program low-level handler test"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         program_type: "1"
+        application: "*"
         source_code: |
-          *&---------------------------------------------------------------------*
-          *& Report <YOUR_PROGRAM_NAME>_LOW
-          *&---------------------------------------------------------------------*
-          REPORT <YOUR_PROGRAM_NAME>_LOW.
-          START-OF-SELECTION.
-            WRITE: / 'Program created via low-level handler'.
-        # Update through low-level
-        update_source_code: |
-          REPORT <YOUR_PROGRAM_NAME>_LOW.
-          START-OF-SELECTION.
-            WRITE: / 'Updated via low-level handler'.
-    - name: "test_program_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        program_name: "<YOUR_PROGRAM_NAME>_LOW"
-        description: "Test ABAP Program created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        program_type: "1"
-        # Update through low-level
-        update_source_code: |
-          REPORT <YOUR_PROGRAM_NAME>_LOW.
-          START-OF-SELECTION.
-            WRITE: / 'Updated via low-level handler'.
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "PROG/P"
+          * Test program
+          WRITE: / 'Hello World'.
 
-# Step 3: Read-only test (separate read-only handler)
-
-# Structure (Structure)
+# Create Interface (Low-Level Handler)
 
 # Structure (Structure)
 create_structure:
   test_cases:
-    - name: "test_structure_high"
-      enabled: false
-      description: "High-level test: create → update → delete structure"
+    - name: "builder_structure"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Structure reserved for StructureBuilder tests"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        # Create step
-        structure_name: "<YOUR_STRUCTURE_NAME>"
-        description: "Test structure created via MCP"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
+        structure_name: "ZMCP_BLD_STRU_H1"
+        description: "StructureBuilder workflow structure"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         fields:
-          - name: "FIELD1"
-            description: "First field"
-            data_type: "CHAR"
-            length: 10
-          - name: "FIELD2"
-            description: "Second field"
-            data_type: "CHAR"
-            length: 20
-        # Update step (update fields)
-        update_fields:
-          - name: "FIELD1"
-            description: "First field updated"
-            data_type: "CHAR"
-            length: 15
-          - name: "FIELD2"
-            description: "Second field updated"
-            data_type: "CHAR"
-            length: 25
-          - name: "FIELD3"
-            description: "Third field added"
-            data_type: "CHAR"
-            length: 30
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "TTYP/ST"
+          - name: "mandt"
+            type: "abap.clnt"
+          - name: "field1"
+            type: "abap.int1"
+        ddl_code: |
+          @EndUserText.label: 'StructureBuilder workflow structure'
+          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+          define structure ZMCP_BLD_STRU_H1 {
+            mandt : abap.clnt;
+            field1 : abap.int1;
+          }
+        # ⚠️ REQUIRED for UpdateStructure high-level test: update_ddl_code is mandatory for update step
+        update_ddl_code: |
+          @EndUserText.label: 'StructureBuilder workflow structure (updated)'
+          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+          define structure ZMCP_BLD_STRU_H1 {
+            mandt : abap.clnt;
+            field1 : abap.int1;
+            field2 : abap.char(20);
+          }
 
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-
-# Structure (Structure - Low-Level)
+# Create View
 
 # Structure (Structure - Low-Level)
 create_structure_low:
   test_cases:
     - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Structure low-level handler full workflow test"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        structure_name: "<YOUR_STRUCTURE_NAME>_LOW"
-        description: "Test structure created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        structure_name: "ZMCP_BLD_STRU_L1"
+        description: "Structure low-level handler test"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         ddl_code: |
-          @EndUserText.label: 'Test structure created via low-level MCP handler'
+          @EndUserText.label: 'Structure low-level handler test'
           @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          define structure <YOUR_STRUCTURE_NAME>_LOW {
+          define structure ZMCP_BLD_STRU_L1 {
             field1 : abap.char(10);
             field2 : abap.char(20);
           }
-        # Update through low-level
         updated_ddl_code: |
-          @EndUserText.label: 'Test structure created via low-level MCP handler'
+          @EndUserText.label: 'Structure low-level handler test'
           @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          define structure <YOUR_STRUCTURE_NAME>_LOW {
+          define structure ZMCP_BLD_STRU_L1 {
             field1 : abap.char(10);
             field2 : abap.char(20);
           }
-    - name: "test_structure_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        structure_name: "<YOUR_STRUCTURE_NAME>_LOW"
-        description: "Test structure created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        # Update through low-level
-        update_description: "Updated via low-level"
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "TTYP/ST"
 
-# Step 3: Read-only test (separate read-only handler)
-
-# Table (Table)
+# Create Function Group (Low-Level Handler)
 
 # Table (Table)
 create_table:
   test_cases:
-    - name: "test_table_high"
-      enabled: false
-      description: "High-level test: create → update → delete table"
+    - name: "builder_table"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Table reserved for TableBuilder tests"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        # Create step
-        table_name: "<YOUR_TABLE_NAME>"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
+        table_name: "ZMCP_BLD_TAB_H1"
+        description: "TableBuilder workflow table"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
+        delivery_class: "A"
+        data_class: "APPL0"
         ddl_code: |
-          @EndUserText.label : 'Test Table'
-          @AbapCatalog.tableCategory : #TRANSPARENT
-          define table <YOUR_TABLE_NAME_LOWER> {
-            key client : abap.clnt not null;
-            key id : abap.char(10);
-            name : abap.char(255);
-            created_at : abap.dats;
+          @EndUserText.label: 'Builder test table'
+          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+          @AbapCatalog.tableCategory: #TRANSPARENT
+          @AbapCatalog.deliveryClass: #A
+          @AbapCatalog.dataMaintenance: #RESTRICTED
+          define table ZMCP_BLD_TAB_H1 {
+            key mandt          : abap.clnt not null;
+            key builder_id     : abap.char(10) not null;
+            description        : abap.char(40);
+            last_changed_by    : abap.char(12);
+            last_changed_on    : abap.dats;
           }
-        # Update step (update DDL code)
-        updated_ddl_code: |
-          @EndUserText.label : 'Test Table Updated'
-          @AbapCatalog.tableCategory : #TRANSPARENT
-          define table <YOUR_TABLE_NAME_LOWER> {
-            key client : abap.clnt not null;
-            key id : abap.char(10);
-            name : abap.char(255);
-            created_at : abap.dats;
-            updated_at : abap.dats;
+        # ⚠️ REQUIRED for UpdateTable high-level test: update_ddl_code is mandatory for update step
+        update_ddl_code: |
+          @EndUserText.label: 'Builder test table (updated)'
+          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+          @AbapCatalog.tableCategory: #TRANSPARENT
+          @AbapCatalog.deliveryClass: #A
+          @AbapCatalog.dataMaintenance: #RESTRICTED
+          define table ZMCP_BLD_TAB_H1 {
+            key mandt          : abap.clnt not null;
+            key builder_id     : abap.char(10) not null;
+            description        : abap.char(40);
+            last_changed_by    : abap.char(12);
+            last_changed_on    : abap.dats;
+            additional_field   : abap.char(20);
           }
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "TABL/DT"
 
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-
-# Table (Table - Low-Level)
+# Create Structure
 
 # Table (Table - Low-Level)
 create_table_low:
   test_cases:
     - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Table low-level handler full workflow test"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        table_name: "<YOUR_TABLE_NAME>_LOW"
-        description: "Test table created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        delivery_class: "A"
-        data_browser: "X"
-        data_maintenance: "X"
+        table_name: "ZMCP_BLD_TAB_L1"
+        description: "Table low-level handler test table"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         ddl_code: |
-          @EndUserText.label : 'Test Table Low'
-          @AbapCatalog.tableCategory : #TRANSPARENT
-          define table <YOUR_TABLE_NAME_LOWER>_LOW {
-            key client : abap.clnt not null;
-            key id : abap.char(10);
-            name : abap.char(255);
+          @EndUserText.label: 'Table low-level handler test table'
+          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+          @AbapCatalog.tableCategory: #TRANSPARENT
+          @AbapCatalog.deliveryClass: #A
+          @AbapCatalog.dataMaintenance: #RESTRICTED
+          define table ZMCP_BLD_TAB_L1 {
+            key mandt          : abap.clnt not null;
+            key test_id        : abap.char(10) not null;
+            description        : abap.char(40);
           }
-        # Update through low-level
         updated_ddl_code: |
-          @EndUserText.label : 'Test Table Low Updated'
-          @AbapCatalog.tableCategory : #TRANSPARENT
-          define table <YOUR_TABLE_NAME_LOWER>_LOW {
-            key client : abap.clnt not null;
-            key id : abap.char(10);
-            name : abap.char(255);
-            updated_at : abap.dats;
+          @EndUserText.label: 'Table low-level handler test table (updated)'
+          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+          @AbapCatalog.tableCategory: #TRANSPARENT
+          @AbapCatalog.deliveryClass: #A
+          @AbapCatalog.dataMaintenance: #RESTRICTED
+          define table ZMCP_BLD_TAB_L1 {
+            key mandt          : abap.clnt not null;
+            key test_id        : abap.char(10) not null;
+            description        : abap.char(40);
+            additional_field   : abap.char(20);
           }
-    - name: "test_table_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        table_name: "<YOUR_TABLE_NAME>_LOW"
-        description: "Test table created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        delivery_class: "A"
-        data_browser: "X"
-        data_maintenance: "X"
-        # Update through low-level
-        update_description: "Updated via low-level"
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "TABL/DT"
 
-# Step 3: Read-only test (separate read-only handler)
-
-# Transport (Transport)
+# Create View (Low-Level Handler)
 
 # Transport (Transport)
 create_transport:
   test_cases:
-    - name: "workbench_transport"
+    - name: "builder_transport"
       enabled: true
-      description: "Create a workbench transport request (required for package and transportable objects)"
+      available_in: ["onprem", "cloud"]
+      description: "Transport reserved for TransportBuilder tests"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        transport_type: "workbench"
-        description: "Test transport created via MCP for test suite"
-        owner: "<YOUR_RESPONSIBLE_USER>"  # ⚠️ UPDATE WITH YOUR USERNAME (e.g., CB9980002377)
-        # target_system: "<YOUR_TARGET>"  # Optional: if not provided or empty, uses "LOCAL"
+        description: "TransportBuilder workflow transport"
+        # package_name: "ZADT_BLD_PKG01"
 
-# Step 2: Get transport (read created transport)
-
-# View (View)
+# Standard SAP objects registry for read-only tests
 
 # View (View)
 create_view:
   test_cases:
-    - name: "test_view_high"
+    - name: "builder_view"
       enabled: false
-      description: "High-level test: create → update → delete view"
+      available_in: ["onprem", "cloud"]
+      description: "View reserved for ViewBuilder tests"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        # Create step
-        view_name: "<YOUR_VIEW_NAME>"
-        description: "Test CDS view created via MCP"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Not needed for local packages (ZLOCAL)
+        # package_name: "ZADT_BLD_PKG01"
+        table_name: "ZMCP_VIEW_TBL02"
+        view_name: "ZMCP_BLD_VIEW_H1"
+        description: "ViewBuilder workflow view"
+        transport_request: ""
+        table_source: |
+          @EndUserText.label: 'Builder view test table'
+          @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+          @AbapCatalog.tableCategory : #TRANSPARENT
+          @AbapCatalog.deliveryClass : #A
+          @AbapCatalog.dataMaintenance : #RESTRICTED
+          define table zadt_view_tbl02 {
+            key client : abap.clnt not null;
+            key id     : abap.char(10) not null;
+            name       : abap.char(50);
+            value      : abap.dec(10,2);
+            created_at : abap.dats;
+          }
         ddl_source: |
-          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>'
-          @EndUserText.label: 'Test CDS View'
-          define view <YOUR_VIEW_NAME>
-            as select from mara
+          @EndUserText.label: 'Builder view on custom table'
+          @AccessControl.authorizationCheck: #NOT_REQUIRED
+          define view entity ZMCP_BLD_VIEW_H1
+          as select from zadt_view_tbl02
           {
-            matnr,
-            mbrsh,
-            mtart
+            key id,
+            name,
+            value,
+            created_at
           }
-        # Update step
-        update_ddl_source: |
-          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>'
-          @EndUserText.label: 'Test CDS View Updated'
-          define view <YOUR_VIEW_NAME>
-            as select from mara
+
+    - name: "cds_unit_test"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "CDS view with ABAP Unit verification"
+      params:
+        # package_name: "ZADT_BLD_PKG01"
+        table_name: "ZMCP_CDS_TBL02"
+        view_name: "ZMCP_BLD_CDSV_H1"
+        description: "ViewBuilder CDS unit test view"
+        transport_request: ""
+        table_source: |
+          @EndUserText.label: 'Builder CDS test table'
+          @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+          @AbapCatalog.tableCategory : #TRANSPARENT
+          @AbapCatalog.deliveryClass : #A
+          @AbapCatalog.dataMaintenance : #RESTRICTED
+          define table zadt_cds_tbl02 {
+            key client : abap.clnt not null;
+            key id     : abap.char(10) not null;
+            name       : abap.char(50);
+            value      : abap.dec(10,2);
+            created_at : abap.dats;
+          }
+        ddl_source: |
+          @EndUserText.label: 'Builder CDS sample view'
+          @AccessControl.authorizationCheck: #NOT_REQUIRED
+          define view entity ZMCP_BLD_CDSV_H1
+            as select from zadt_cds_tbl02
           {
-            matnr,
-            mbrsh,
-            mtart,
-            meins
+            key id,
+            name,
+            value,
+            created_at
           }
-        update_activate: true
-        # Delete step
-        delete_after_test: true
-        delete_object_type: "DDLS/DF"
+        cds_unit_test:
+          class_name: "ZMCP_BLD_CDSUT_H1"
+          test_class_name: "LTC_ZMCP_BLD_CDSV_H1"
+          description: "CDS unit test class"
+          transport_request: ""
+          unit_test_options:
+            title: "LTC_ZMCP_BLD_CDSV_H1"
+            context: "ViewBuilder CDS Unit"
+            scope:
+              own_tests: true
+              foreign_tests: false
+              add_foreign_tests_as_preview: true
+            risk_level:
+              harmless: true
+              dangerous: true
+              critical: true
+            duration:
+              short: true
+              medium: true
+              long: true
+          unit_test_status:
+            with_long_polling: true
+          unit_test_result:
+            with_navigation_uris: false
+            format: "abapunit"
 
-# Step 2: Low-level flow test (create → update → delete through low-level handlers)
-
-# View (View - Low-Level)
+# Create Function Group
 
 # View (View - Low-Level)
 create_view_low:
   test_cases:
     - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test: Validate → Create → Lock → Update → Unlock → Activate"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "View low-level handler full workflow test"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        view_name: "<YOUR_VIEW_NAME>_LOW"
-        description: "Test CDS view created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
+        view_name: "ZMCP_BLD_VIEW_L1"
+        description: "View low-level handler test view"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         ddl_source: |
-          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>_LOW'
-          @EndUserText.label: 'Test CDS View Low'
-          define view <YOUR_VIEW_NAME>_LOW
-            as select from mara
-          {
-            matnr,
-            mbrsh
+          @AbapCatalog.viewEnhancementCategory: [#NONE]
+          @AccessControl.authorizationCheck: #NOT_REQUIRED
+          @EndUserText.label: 'View low-level handler test view'
+          @Metadata.ignorePropagatedAnnotations: true
+          @Metadata.allowExtensions: true
+          define view entity ZMCP_BLD_VIEW_L1 as select from dummy {
+            key dummy.dummy as dummy_field
           }
-        # Update through low-level
-        update_ddl_source: |
-          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>_LOW'
-          @EndUserText.label: 'Test CDS View Low Updated'
-          define view <YOUR_VIEW_NAME>_LOW
-            as select from mara
-          {
-            matnr,
-            mbrsh,
-            mtart
+        updated_ddl_source: |
+          @AbapCatalog.viewEnhancementCategory: [#NONE]
+          @AccessControl.authorizationCheck: #NOT_REQUIRED
+          @EndUserText.label: 'View low-level handler test view (updated)'
+          @Metadata.ignorePropagatedAnnotations: true
+          @Metadata.allowExtensions: true
+          define view entity ZMCP_BLD_VIEW_L1 as select from dummy {
+            key dummy.dummy as dummy_field,
+            dummy.dummy as additional_field
           }
-    - name: "test_view_low_flow"
-      enabled: false
-      description: "Low-level flow test: create → update → delete through low-level handlers"
-      params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        view_name: "<YOUR_VIEW_NAME>_LOW"
-        description: "Test CDS view created via low-level MCP handler"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional: not needed for local packages
-        ddl_source: |
-          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>_LOW'
-          @EndUserText.label: 'Test CDS View Low'
-          define view <YOUR_VIEW_NAME>_LOW
-            as select from mara
-          {
-            matnr,
-            mbrsh
-          }
-        # Update through low-level
-        update_ddl_source: |
-          @AbapCatalog.sqlViewName: '<YOUR_VIEW_NAME>_LOW'
-          @EndUserText.label: 'Test CDS View Low Updated'
-          define view <YOUR_VIEW_NAME>_LOW
-            as select from mara
-          {
-            matnr,
-            mbrsh,
-            mtart
-          }
-        # Delete through low-level
-        delete_after_test: true
-        delete_object_type: "DDLS/DF"
 
-# Service Definition (Service Definition)
+# Create Program (Low-Level Handler)
+
+# Service Definition (Service Definition - High-Level)
 create_service_definition:
   test_cases:
     - name: "builder_service_definition"
-      enabled: false
+      enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Service definition reserved for ServiceDefinitionBuilder tests"
       params:
-        # skip_cleanup: true  # Uncomment to keep object after test (overrides global cleanup_after)
-        service_definition_name: "<YOUR_SERVICE_DEFINITION_NAME>"
+        service_definition_name: "ZMCP_BLD_SRVD01"
         description: "ServiceDefinitionBuilder workflow service definition"
-        # package_name: "<YOUR_PACKAGE_NAME>"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"
-        # ⚠️ IMPORTANT: source_code must reference an existing CDS view (e.g., a shared consumption projection)
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         source_code: |
           @EndUserText.label: 'ServiceDefinitionBuilder workflow service definition'
-          define service <YOUR_SERVICE_DEFINITION_NAME> {
+          define service ZMCP_BLD_SRVD01 {
             expose ZMCP_SHR_C_ROOT as _View;
           }
         # ⚠️ REQUIRED for UpdateServiceDefinition high-level test: update_source_code is mandatory for update step
         update_source_code: |
           @EndUserText.label: 'ServiceDefinitionBuilder workflow service definition (updated)'
-          define service <YOUR_SERVICE_DEFINITION_NAME> {
+          define service ZMCP_BLD_SRVD01 {
             expose ZMCP_SHR_C_ROOT as _View;
             expose ZMCP_SHR_C_ROOT as _View2;
           }
 
 # ============================================================================
-# READ-ONLY HANDLER TESTS (for mcp-abap-adt integration tests)
+# STANDARD SAP OBJECTS REGISTRY
 # ============================================================================
 
-# WhereUsed Read-Only Handler
-whereused_readonly:
-  test_cases:
-    - name: "test_whereused"
-      enabled: true
-      description: "WhereUsed handler read-only tests"
-      params:
-        # Test objects for where-used analysis
-        test_class: "CL_ABAP_CHAR_UTILITIES"  # Standard SAP class for testing
-        test_table: "SCARR"                    # Standard SAP table (Flight: Airlines)
+standard_objects:
+  classes:
+    - name: "CL_ABAP_CHAR_UTILITIES"
+      description: "Character utilities helper (available everywhere)"
+      available_in: ["onprem", "cloud"]
+    - name: "CL_ABAP_CORRESPONDING"
+      description: "Corresponding-move helper for ABAP"
+      available_in: ["onprem", "cloud"]
 
-# Runtime Read-Only Handlers (Profiling + Dumps)
-runtime_readonly_handlers:
-  test_cases:
-    - name: "test_runtime_readonly"
-      enabled: true
-      description: "Runtime profiling and dumps handlers integration tests"
-      params:
-        # ⚠️ UPDATE: Replace with class that supports ADT classrun execution in your system
-        profiled_class_name: "<YOUR_CLASSRUN_CLASS_NAME>"
-        # Prefix for temporary class created by profiling test
-        profiled_class_prefix: "ZADT_RTCLS"
-        # Optional: on-prem only. Program profiling test is skipped on ABAP Cloud.
-        # Set this to an existing executable report in your system.
-        profiled_program_name: "<YOUR_EXECUTABLE_PROGRAM_NAME>"
-        # Prefix for temporary program created by profiling test (on-prem only)
-        profiled_program_prefix: "ZADT_RTPRG"
-        # Optional fallback trace id/uri when trace list feed does not provide one
-        trace_id_or_uri: ""
-        # Retries for trace files feed lookup (trace can appear with delay)
-        trace_feed_retries: 6
-        trace_feed_retry_delay_ms: 1000
-        # Retries for reading profiler trace data (trace can become available with delay)
-        trace_read_retries: 6
-        trace_read_retry_delay_ms: 1500
-        # Optional user filter for dumps list; empty means all users.
-        # If your user cannot see global dumps, set the exact owner user here.
-        dumps_user: ""
-        # Number of dumps to read from feed in RuntimeGetDumpById integration test
-        dumps_read_limit: 5
-        # Prefix for temporary class that forces runtime dump (division by zero)
-        dump_class_prefix: "ZADT_RTDMP"
-        # Retries for dump feed lookup after forced failure
-        dump_feed_retries: 8
-        dump_feed_retry_delay_ms: 1500
-        # How many recent dumps to request per poll when looking for generated dump
-        dump_feed_top: 50
-        # Dump read view for RuntimeGetDumpById/RuntimeAnalyzeDump: default|summary|formatted
-        dump_view: "default"
-        # Fallback dump ID for systems with empty dumps feed.
-        # Recommended: set an existing dump ID to avoid skip in dump tests.
-        dump_id: ""
+  interfaces:
+    - name: "IF_BUPA_API_MODIFY"
+      description: "Interface zum BAdI: BUPA_API_MODIFY"
+      available_in: ["onprem", "cloud"]
 
-# ============================================================================
-# SYSTEM LOW-LEVEL HANDLERS
-# ============================================================================
+  domains:
+    - name: "MANDT"
+      description: "Client domain"
+      available_in: ["onprem", "cloud"]
+    - name: "ABAP_BOOL"
+      description: "Boolean domain"
+      available_in: ["onprem", "cloud"]
 
-# System Low-Level Handlers (VirtualFolders, NodeStructure, ObjectStructure)
-system_low_handlers:
-  test_cases:
-    - name: "test_system_low"
-      enabled: true
-      description: "System low-level handlers tests"
-      params:
-        # Test package for virtual folders and node structure
-        test_package: "<YOUR_TEST_PACKAGE>"  # ⚠️ UPDATE: Replace with your test package name
-        # Test class for node structure and object structure
-        test_class: "<YOUR_TEST_CLASS>"  # ⚠️ UPDATE: Replace with existing class name in your system
-        # Test program for node structure and object structure
-        test_program: "<YOUR_TEST_PROGRAM>"  # ⚠️ UPDATE: Replace with existing program name in your system
-        # Test interface for node structure and object structure
-        test_interface: "<YOUR_TEST_INTERFACE>"  # ⚠️ UPDATE: Replace with existing interface name in your system
-        # Test table for object structure
-        test_table: "<YOUR_TEST_TABLE>"  # ⚠️ UPDATE: Replace with existing table name in your system
-        # Virtual folders search patterns
-        virtual_folders_pattern_default: "*"  # Default search pattern (can be customized)
-        virtual_folders_pattern_custom: "Z*"  # Custom search pattern for testing (can be customized)
-        # Virtual folders preselection facets
-        virtual_folders_facets: ["package", "group", "type"]  # Facet order (can be customized)
-        # Node structure settings
-        node_structure_with_descriptions: true  # Include short descriptions in node structure
-        # Object structure settings
-        object_structure_include_metadata: true  # Include metadata in object structure
+  data_elements:
+    - name: "MANDT"
+      description: "Client data element"
+      available_in: ["onprem", "cloud"]
+    - name: "ABAP_BOOL"
+      description: "Boolean data element"
+      available_in: ["onprem", "cloud"]
 
-# ============================================================================
-# SYSTEM HIGH-LEVEL HANDLERS
-# ============================================================================
+  tables:
+    - name: "T000"
+      description: "Client table (on-premise SAP systems)"
+      available_in: ["onprem"]
+    - name: "T000"
+      description: "Clients"
+      available_in: ["cloud"]
 
-# System High-Level Handlers (PackageTree)
-system_high_handlers:
-  test_cases:
-    - name: "test_system_high"
-      enabled: true
-      description: "System high-level handlers tests"
-      params:
-        # Test package for package tree
-        test_package: "<YOUR_TEST_PACKAGE>"  # ⚠️ UPDATE: Replace with your test package name
-        # Package tree settings
-        package_tree_include_subpackages: true  # Include subpackages in tree (can be customized)
-        package_tree_max_depth: 5  # Maximum depth for recursive package traversal (can be customized)
-        package_tree_include_descriptions: true  # Include object descriptions in response (can be customized)
-        # Test package with subpackages (for testing recursive traversal)
-        test_package_with_subpackages: "<YOUR_TEST_PACKAGE_WITH_SUBPACKAGES>"  # ⚠️ UPDATE: Replace with package that has subpackages
-        # Invalid package name for error handling tests
-        test_invalid_package: "INVALID_PACKAGE_XYZ_123"  # Invalid package name for error tests (can be customized)
+  structures:
+    - name: "SYST"
+      description: "System fields structure"
+      available_in: ["onprem", "cloud"]
+
+  packages:
+    - name: "$TMP"
+      description: "Local package"
+      available_in: ["onprem"]
+    - name: "ZLOCAL"
+      description: "Placeholder for ABAP Cloud package – replace with existing package"
+      available_in: ["cloud"]
+
+  programs:
+    - name: "SAPLSETB"
+      description: "Standard SAP settings program"
+      available_in: ["onprem"]
+
+  views:
+    - name: "H_T000"
+      description: "Client table help view"
+      available_in: ["onprem"]
+    - name: "I_SapPackage"
+      description: "ABAP Cloud: replace with CDS view name existing in tenant"
+      available_in: ["cloud"]
+
+  function_groups:
+    - name: "EDIN"
+      description: "System function group"
+      available_in: ["onprem", "cloud"]
+
+  function_modules:
+    - name: "IDOC_INBOUND_XML_SOAP_HTTP"
+      group: "EDIN"
+      description: "Returns system metadata"
+      available_in: ["onprem", "cloud"]
+
+  standard_criteria:
+    note: "Update the entries above with objects that exist in your SAP system before running read tests."
 
 # ============================================================================
 # CLASS UNIT TEST - Low-Level and High-Level Handlers
 # ============================================================================
+
+# ============================================================================
+# CDS UNIT TEST - High-Level Handlers
+# ============================================================================
+
+cds_unit_test:
+  test_cases:
+    - name: "full_workflow"
+      enabled: false
+      available_in: ["onprem", "cloud"]
+      description: "Full workflow test for CDS unit test handlers: Create → Update → Run → Get → Delete"
+      params:
+        class_name: "ZMCP_BLD_CDSUT_H1"
+        test_class_name: "LTC_ZMCP_BLD_CDSV_H1"
+        package_name: "ZADT_BLD_PKG03"
+        cds_view_name: "ZMCP_BLD_CDSV_H1"
+        description: "CDS unit test class"
+        transport_request: ""
+        class_template: |
+          CLASS ZMCP_BLD_CDSUT_H1 DEFINITION
+            PUBLIC
+            FINAL
+            CREATE PUBLIC .
+
+            PUBLIC SECTION.
+            PROTECTED SECTION.
+            PRIVATE SECTION.
+          ENDCLASS.
+
+          CLASS ZMCP_BLD_CDSUT_H1 IMPLEMENTATION.
+          ENDCLASS.
+        test_class_source: |
+          CLASS LTC_ZMCP_BLD_CDSV_H1 DEFINITION FINAL
+            FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+            PRIVATE SECTION.
+              METHODS test_method FOR TESTING.
+          ENDCLASS.
+          CLASS LTC_ZMCP_BLD_CDSV_H1 IMPLEMENTATION.
+            METHOD test_method.
+              cl_abap_unit_assert=>assert_true( abap_true ).
+            ENDMETHOD.
+          ENDCLASS.
+        update_test_class_source: |
+          CLASS LTC_ZMCP_BLD_CDSV_H1 DEFINITION FINAL
+            FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+            PRIVATE SECTION.
+              METHODS test_method FOR TESTING.
+          ENDCLASS.
+          CLASS LTC_ZMCP_BLD_CDSV_H1 IMPLEMENTATION.
+            METHOD test_method.
+              cl_abap_unit_assert=>assert_true( abap_true ).
+            ENDMETHOD.
+          ENDCLASS.
 
 # Class Unit Test (Low-Level and High-Level)
 class_unit_test:
   test_cases:
     - name: "full_workflow"
       enabled: false
-      description: "Full workflow test for unit test handlers: Create class -> Lock → Update → Unlock → Activate → Run → GetStatus → GetResult. Container class is created as a shared object (not deleted between tests)."
+      available_in: ["onprem", "cloud"]
+      description: "Full workflow test for unit test handlers: Lock → Update → Unlock → Activate → Run → GetStatus → GetResult (low-level) or RunUnitTest → GetUnitTest (high-level)"
       params:
-        # class_name is used by LambdaTester for objectName resolution
-        class_name: "<YOUR_CONTAINER_CLASS_NAME>"
-        # Container class that contains the test class (created if not exists)
+        # Container class that contains the test class
         container_class_name: "<YOUR_CONTAINER_CLASS_NAME>"
         # Test class name inside the container class's testclasses include
         test_class_name: "<YOUR_TEST_CLASS_NAME>"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        transport_request: ""
         # Optional: test class source code (if not provided, default test class will be used)
         test_class_source: |
           CLASS <YOUR_TEST_CLASS_NAME> DEFINITION FINAL
@@ -1811,55 +1595,154 @@ class_unit_test:
           run_unit_test: true  # Enable unit test run for high-level handlers
 
 # ============================================================================
-# CDS UNIT TEST - High-Level Handlers
+# READ-ONLY HANDLER TESTS (for mcp-abap-adt integration tests)
 # ============================================================================
 
-cds_unit_test:
+# WhereUsed Read-Only Handler
+whereused_readonly:
   test_cases:
-    - name: "full_workflow"
-      enabled: false
-      description: "Full workflow test for CDS unit test handlers: Create → Update → Run → Get → Delete"
+    - name: "test_whereused"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "WhereUsed handler read-only tests"
       params:
-        class_name: "<YOUR_CDS_UNIT_TEST_CLASS_NAME>"
-        test_class_name: "<YOUR_CDS_TEST_CLASS_NAME>"
-        package_name: "<YOUR_PACKAGE_NAME>"
-        cds_view_name: "<YOUR_CDS_VIEW_NAME>"
-        description: "CDS unit test class"
-        # transport_request: "<YOUR_TRANSPORT_REQUEST>"  # Optional for local packages
-        class_template: |
-          CLASS <YOUR_CDS_UNIT_TEST_CLASS_NAME> DEFINITION
-            PUBLIC
-            FINAL
-            CREATE PUBLIC .
+        # Test objects for where-used analysis
+        test_class: "CL_ABAP_CHAR_UTILITIES"  # Standard SAP class for testing
+        test_table: "SCARR"                    # Standard SAP table (Flight: Airlines)
 
-            PUBLIC SECTION.
-            PROTECTED SECTION.
-            PRIVATE SECTION.
-          ENDCLASS.
+# Runtime Read-Only Handlers (Profiling + Dumps)
+runtime_readonly_handlers:
+  test_cases:
+    - name: "test_runtime_readonly"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Runtime profiling and dumps handlers integration tests"
+      params:
+        # Class for profiled execution (must support ADT classrun endpoint)
+        profiled_class_name: "ZMCP_BLD_CLSLOC_H1"
+        # Prefix for temporary class created by profiling test
+        profiled_class_prefix: "ZMCP_RTCLS"
+        # On-prem only: executable report for RuntimeRunProgramWithProfiling
+        profiled_program_name: "ZMCP_BLD_PROG023"
+        # Prefix for temporary program created by profiling test (on-prem only)
+        profiled_program_prefix: "ZMCP_RTPRG"
+        # Optional fallback trace id/uri when feed parsing does not provide one
+        trace_id_or_uri: ""
+        # Retries for trace files feed lookup (trace can appear with delay)
+        trace_feed_retries: 6
+        trace_feed_retry_delay_ms: 1000
+        # Retries for reading profiler trace data (trace can appear with delay)
+        trace_read_retries: 6
+        trace_read_retry_delay_ms: 1500
+        # Optional user filter for dumps list (empty = all users)
+        dumps_user: ""
+        # Number of dump IDs to read from feed
+        dumps_read_limit: 5
+        # Prefix for temporary class that forces runtime dump (division by zero)
+        dump_class_prefix: "ZMCP_RTDMP"
+        # Retries for dump feed lookup after forced failure
+        dump_feed_retries: 8
+        dump_feed_retry_delay_ms: 1500
+        # How many recent dumps to request per poll when looking for generated dump
+        dump_feed_top: 50
+        # Dump read view for RuntimeGetDumpById/RuntimeAnalyzeDump: default|summary|formatted
+        dump_view: "default"
+        # Optional fallback dump ID when feed parsing does not provide one
+        dump_id: ""
 
-          CLASS <YOUR_CDS_UNIT_TEST_CLASS_NAME> IMPLEMENTATION.
-          ENDCLASS.
-        test_class_source: |
-          CLASS <YOUR_CDS_TEST_CLASS_NAME> DEFINITION FINAL
-            FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
-            PRIVATE SECTION.
-              METHODS test_method FOR TESTING.
-          ENDCLASS.
-          CLASS <YOUR_CDS_TEST_CLASS_NAME> IMPLEMENTATION.
-            METHOD test_method.
-              cl_abap_unit_assert=>assert_true( abap_true ).
-            ENDMETHOD.
-          ENDCLASS.
-        update_test_class_source: |
-          CLASS <YOUR_CDS_TEST_CLASS_NAME> DEFINITION FINAL
-            FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
-            PRIVATE SECTION.
-              METHODS test_method FOR TESTING.
-          ENDCLASS.
-          CLASS <YOUR_CDS_TEST_CLASS_NAME> IMPLEMENTATION.
-            METHOD test_method.
-              cl_abap_unit_assert=>assert_true( abap_true ).
-            ENDMETHOD.
-          ENDCLASS.
+# ============================================================================
+# SYSTEM LOW-LEVEL HANDLERS
+# ============================================================================
 
-# Step 3: Read-only test (separate read-only handler)
+# System Low-Level Handlers (VirtualFolders, NodeStructure, ObjectStructure)
+system_low_handlers:
+  test_cases:
+    - name: "test_system_low"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "System low-level handlers tests"
+      params:
+        # Test package for virtual folders and node structure
+        test_package: "ZOK_TEST_PKG_01"  # Default test package (or use your package name)
+        # Test class for node structure and object structure
+        test_class: "CL_ABAP_CHAR_UTILITIES"  # Standard SAP class for testing
+        # Test program for node structure and object structure
+        test_program: "SAPLSLVC_FULLSCREEN"  # Standard SAP program for testing
+        # Test interface for node structure and object structure
+        test_interface: "IF_ABAP_CHAR_UTILITIES"  # Standard SAP interface for testing
+        # Test table for object structure
+        test_table: "SCARR"  # Standard SAP table (Flight: Airlines)
+        # Virtual folders search patterns
+        virtual_folders_pattern_default: "*"  # Default search pattern
+        virtual_folders_pattern_custom: "Z*"  # Custom search pattern for testing
+        # Virtual folders preselection facets
+        virtual_folders_facets: ["package", "group", "type"]  # Facet order
+        # Node structure settings
+        node_structure_with_descriptions: true  # Include short descriptions in node structure
+        # Object structure settings
+        object_structure_include_metadata: true  # Include metadata in object structure
+
+# ============================================================================
+# SYSTEM HIGH-LEVEL HANDLERS
+# ============================================================================
+
+# System High-Level Handlers (PackageTree)
+system_high_handlers:
+  test_cases:
+    - name: "test_system_high"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "System high-level handlers tests"
+      params:
+        # Test package for package tree
+        test_package: "ZOK_TEST_PKG_01"  # Default test package (or use your package name)
+        # Package tree settings
+        package_tree_include_subpackages: true  # Include subpackages in tree
+        package_tree_max_depth: 5  # Maximum depth for recursive package traversal
+        package_tree_include_descriptions: true  # Include object descriptions in response
+        # Test package with subpackages (for testing recursive traversal)
+        test_package_with_subpackages: "$TMP"  # Package that has subpackages for testing
+        # Invalid package name for error handling tests
+        test_invalid_package: "INVALID_PACKAGE_XYZ_123"  # Invalid package name for error tests
+
+# Table Contents (Read-Only)
+get_table_contents:
+  test_cases:
+    - name: "limited_rows"
+      enabled: true
+      available_in: ["onprem"]
+      description: "Read table contents with row limit"
+      params:
+        test_table: "T000"
+        max_rows: 10
+    - name: "full_table"
+      enabled: false
+      available_in: ["onprem"]
+      description: "Read full table contents (disabled by default)"
+      params:
+        test_table: "SCARR"
+        max_rows: 100
+
+# SQL Query (Read-Only)
+get_sql_query:
+  test_cases:
+    - name: "simple_select"
+      enabled: true
+      available_in: ["onprem"]
+      description: "Execute simple SQL query"
+      params:
+        test_sql_query: "SELECT MANDT, MTEXT FROM T000"
+        test_row_number: 10
+    - name: "filtered_select"
+      enabled: false
+      available_in: ["onprem"]
+      description: "Execute filtered SQL query (disabled by default)"
+      params:
+        test_sql_query: "SELECT * FROM SCARR WHERE MANDT = '100'"
+        test_row_number: 10
+
+# ============================================================================
+# LOW-LEVEL HANDLER TESTS (for mcp-abap-adt integration tests)
+# ============================================================================
+
+# Create Class (Low-Level Handler)

@@ -540,6 +540,18 @@ export class LambdaTester {
       return;
     }
 
+    // Check available_in constraint from test case config
+    const availableIn = this.context.testCase?.available_in as string[] | undefined;
+    if (availableIn && availableIn.length > 0) {
+      const systemType = this.context.isCloudSystem ? 'cloud' : 'onprem';
+      if (!availableIn.includes(systemType)) {
+        this.context.logger?.testSkip(
+          `Skipping test: not available on ${systemType} (available_in: ${availableIn.join(', ')})`,
+        );
+        return;
+      }
+    }
+
     if (!this.context.connection || !this.context.session) {
       throw new Error('Connection and session not available');
     }

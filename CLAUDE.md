@@ -21,6 +21,24 @@ npm run test:integration 2>&1 | tee /tmp/integration-test.log
 npm test -- --testPathPatterns=<specific-test>
 ```
 
+### Test Configuration
+
+All test parameters live in `tests/test-config.yaml` (gitignored). The template (`tests/test-config.yaml.template`) works out of the box with sensible defaults.
+
+**Setup:**
+```bash
+cp tests/test-config.yaml.template tests/test-config.yaml
+# Edit ONLY the lines marked "# ← CHANGE"
+```
+
+**Required changes** (3-4 lines):
+- `environment.default_package` — dev package (`ZMCP_TEST`, `$TMP`)
+- `environment.default_transport` — transport request or `""` for local packages
+- `shared_dependencies.package` — package for shared test objects
+- `shared_dependencies.software_component` — `"LOCAL"`, `"HOME"`, etc.
+
+Everything else (object names, timeouts, CDS sources, unit test code) has working defaults. See `docs/development/tests/TESTING_GUIDE.md` for full details.
+
 ### available_in
 
 Every handler's `TOOL_DEFINITION` must have `available_in` field:

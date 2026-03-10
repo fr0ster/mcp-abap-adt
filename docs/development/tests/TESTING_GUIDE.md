@@ -1,148 +1,13 @@
-# Tests Directory
+# Integration Testing Guide
 
-This directory contains test scripts for the MCP ABAP ADT server functionality.
+Integration tests run against a real SAP system using Jest. All test parameters are configured via `tests/test-config.yaml`.
 
-## 🎯 YAML-Based Testing (Recommended)
+## Quick Start
 
-All tests now support centralized configuration via `test-config.yaml`. This provides:
-- **One place** for all test parameters
-- **Easy updates** for transport requests and system-specific values
-- **Consistent testing** across all handlers
-- **Command-line override** still available for ad-hoc testing
+### 1. Environment file
 
-### Quick Start
+Create `.env` in the project root:
 
-1. **Update test parameters** in `test-config.yaml`:
-   ```yaml
-   create_domain:
-     test_cases:
-       - name: "basic_char_domain"
-         enabled: true
-         params:
-           domain_name: "ZZ_TEST_MCP_01"
-           transport_request: "E19K905635"  # ⚠️ UPDATE THIS!
-   ```
-
-2. **Run a single test**:
-   ```bash
-   node tests/test-create-domain.js
-   ```
-
-3. **Run all enabled tests**:
-   ```bash
-   node tests/run-all-tests.js
-   ```
-
-4. **List available tests**:
-   ```bash
-   node tests/run-all-tests.js --list
-   ```
-
-### Test Helper
-
-Common utilities in `test-helper.js`:
-- `getEnabledTestCase(handlerName)` - Load test from YAML
-- `printTestHeader()`, `printTestParams()`, `printTestResult()` - Formatted output
-- `validateTransportRequest()` - Warn about default transport values
-
-### Example Test Structure
-
-```javascript
-const { handleMyHandler } = require('../dist/handlers/handleMyHandler');
-const { getEnabledTestCase, printTestHeader, printTestParams, printTestResult } = require('./test-helper');
-
-async function main() {
-  const testCase = getEnabledTestCase('my_handler');
-  printTestHeader('MyHandler', testCase);
-  printTestParams(testCase.params);
-  
-  const result = await handleMyHandler(testCase.params);
-  
-  if (!printTestResult(result, 'MyHandler')) {
-    process.exit(1);
-  }
-}
-main();
-```
-
-## Test Categories
-
-### Enhancement Tests
-- `test-enhancement-by-name.js` - Test getting enhancements by specific name
-- `test-enhancement-timeout.js` - Test enhancement timeout handling
-- `test-enhancement-timeout-optimized.js` - Optimized enhancement timeout tests
-- `test-get-enhancements.js` - General enhancement retrieval tests
-- `test-rm07docs-enhancements.js` - Comprehensive RM07DOCS enhancement tests
-- `test-rm07docs-fast.js` - Fast timeout tests for RM07DOCS
-
-### Include Tests
-- `test-get-includes-list.js` - Test include list retrieval
-- `test-includes-list-timeout.js` - Test include list timeout handling
-
-### Program Tests
-- `test-get-program.js` - Test program retrieval
-- `test-sapmv45a-large-program.js` - Test large program handling (SAPMV45A)
-- `test-sapmv45a-large-program-fixed.js` - Fixed version of large program test
-
-### Object Structure Tests
-- `test-node-structure.js` - Test SAP node structure API
-- `test-related-objects.js` - Test related objects functionality
-- `test-simplified-related-types.js` - Simplified related types test
-
-### Infrastructure Tests
-- `test-csrf.js` - Test CSRF token handling
-- `test-list-tools.js` - Test MCP tools listing
-- `test-stdio.js` - Test STDIO communication
-- `test-simple-timeout.js` - Simple timeout functionality test
-- `test-two-step-approach.js` - Test two-step processing approach
-
-## Running Tests
-
-### Individual Tests
-```bash
-# Run specific test
-node tests/test-rm07docs-fast.js
-
-# Run enhancement tests
-node tests/test-get-enhancements.js
-node tests/test-rm07docs-enhancements.js
-
-# Run include tests
-node tests/test-get-includes-list.js
-node tests/test-includes-list-timeout.js
-```
-
-### Quick Performance Tests
-```bash
-# Fast RM07DOCS tests (recommended for development)
-node tests/test-rm07docs-fast.js
-
-# Comprehensive RM07DOCS tests
-node tests/test-rm07docs-enhancements.js
-
-# Large program tests (SAPMV45A)
-node tests/test-sapmv45a-large-program-fixed.js
-```
-
-## Test Requirements
-
-All tests require:
-1. **Environment file**: `.env` file in the project root with SAP connection details
-2. **Built server**: Run `npm run build` before testing
-3. **SAP system access**: Valid SAP credentials and accessible SAP system
-
-## Cleanup Behavior (Integration Tests)
-
-Integration tests that use `LowTester`/`HighTester` run cleanup automatically in `afterEach`
-(even if the test fails), unless disabled in `test-config.yaml` via `skip_cleanup=true`
-or `cleanup_after=false`.
-
-If a test creates **multiple objects** (e.g., domain + data element + structure),
-add explicit cleanup steps for the additional objects.
-
-## Environment Setup
-
-Create `.env` file in project root:
 ```env
 SAP_BASE_URL=https://your-sap-system.com:port
 SAP_USERNAME=your-username
@@ -150,59 +15,88 @@ SAP_PASSWORD=your-password
 SAP_CLIENT=100
 ```
 
-## Test Results Interpretation
+For non-unicode legacy systems add `SAP_UNICODE=false`.
 
-### Success Indicators
-- ✅ **Success messages** with timing information
-- 📊 **Object counts** (objects analyzed, enhancements found)
-- ⏱️ **Performance metrics** (duration in milliseconds)
+### 2. Test configuration
 
-### Failure Indicators
-- ❌ **Error messages** with specific error details
-- 🚨 **Timeout warnings** indicating performance issues
-- ⚠️ **Partial results** when some operations fail
+```bash
+cp tests/test-config.yaml.template tests/test-config.yaml
+```
 
-### Performance Benchmarks
+The template works out of the box with sensible defaults. Edit **only** the lines marked `# <- CHANGE`:
 
-**RM07DOCS (Small Program):**
-- Without nested: ~1-2 seconds
-- With nested: ~6-7 seconds
+| Parameter | Description | Example |
+|---|---|---|
+| `environment.default_package` | Dev package for test objects | `ZMCP_TEST`, `$TMP` |
+| `environment.default_transport` | Transport request (or `""` for local) | `E19K900001` |
+| `shared_dependencies.package` | Package for shared test objects | `ZMCP_SHARED` |
+| `shared_dependencies.software_component` | Software component | `LOCAL`, `HOME` |
 
-**SAPMV45A (Large Program):**
-- Without nested: ~3-5 seconds
-- With nested: ~15-30 seconds (depending on timeout)
+Optional (cloud/BTP only):
+
+| Parameter | Description |
+|---|---|
+| `auth_broker.abap.destination` | Auth broker destination (`TRIAL`, `mcp`) |
+| `auth_broker.service_keys_dir` | Path to service keys dir |
+
+All other values (object names, timeouts, CDS sources, unit test code) have working defaults.
+
+### 3. Run tests
+
+```bash
+# Build first
+npm run build
+
+# Run all integration tests (soft mode)
+npm run test:integration
+
+# Run specific object type
+npm test -- --testPathPatterns=class
+
+# Run selective tests (e.g. class + unit test + CDS)
+npm test -- --testPathPatterns="class|unitTest|cds"
+```
+
+## Test Modes
+
+- **Soft mode** (default, `integration_hard_mode.enabled: false`): calls handlers directly, no MCP subprocess. Use for mass regression testing.
+- **Hard mode** (`integration_hard_mode.enabled: true`): spawns full MCP server via stdio, calls tools through MCP protocol. Use for targeted verification.
+
+## Test Levels
+
+Each object type has up to three test levels:
+
+- **HIGH** (`HighTester`): Tests full handler workflow (create -> update -> activate -> delete)
+- **LOW** (`LowTester`): Tests low-level ADT client operations
+- **Lambda** (`LambdaTester`): Tests individual handler functions in isolation
+
+## Cleanup Behavior
+
+Tests run cleanup automatically in `afterEach` (even on failure), unless disabled via `cleanup_after: false` in config. Pre-test cleanup (`ensureObjectReady`) deletes leftover objects from previous runs.
+
+## Shared Dependencies
+
+Persistent SAP objects used across multiple tests (tables, CDS views, classes). Created lazily, never deleted automatically.
+
+```bash
+npm run shared:setup     # Create all shared objects
+npm run shared:teardown  # Delete all shared objects
+npm run shared:check     # Verify shared objects exist
+```
+
+## Debugging
+
+```bash
+# Connection debug logs
+DEBUG_TESTS=true npm test -- --testPathPatterns=class
+
+# ADT operation logs
+DEBUG_ADT_TESTS=true npm test -- --testPathPatterns=view
+```
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **Connection Errors**
-   - Check `.env` file configuration
-   - Verify SAP system accessibility
-   - Confirm credentials are correct
-
-2. **Timeout Errors**
-   - Increase timeout values in test parameters
-   - Check network connectivity
-   - Consider using non-nested mode for faster results
-
-3. **Authentication Errors**
-   - Verify username/password in `.env`
-   - Check if account is locked
-   - Confirm client number is correct
-
-### Debug Mode
-
-Add debug logging by setting environment variable:
-```bash
-DEBUG=1 node tests/test-name.js
-```
-
-## Contributing
-
-When adding new tests:
-1. Follow naming convention: `test-feature-name.js`
-2. Include comprehensive error handling
-3. Add timeout controls for long-running operations
-4. Document expected results and performance benchmarks
-5. Update this README with test description
+1. **"Object already exists"** — previous test run left objects. Run the test again (pre-cleanup will handle it) or delete manually.
+2. **Connection errors** — check `.env` credentials and SAP system availability.
+3. **Timeout errors** — increase `test_settings.timeout` in `test-config.yaml`.
+4. **"Resource is not locked"** — session management issue, retry or check stateful session support.

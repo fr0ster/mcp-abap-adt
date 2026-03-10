@@ -45,24 +45,24 @@ Template for test configuration:
 - Update transport requests and system-specific values
 - Enable/disable test cases as needed
 
-## 🚀 Quick Start
+## Quick Start
 
 1. **Create test configuration**:
    ```bash
-   cp doc/tests/test-config.yaml.template tests/test-config.yaml
+   cp tests/test-config.yaml.template tests/test-config.yaml
    ```
 
-2. **Update configuration**:
-   - Edit `tests/test-config.yaml`
-   - Set real transport request
-   - Enable desired test cases
+2. **Edit only the lines marked `# <- CHANGE`** (3-4 parameters):
+   - `environment.default_package` — your dev package
+   - `environment.default_transport` — transport request or `""`
+   - `shared_dependencies.package` — package for shared objects
+   - `shared_dependencies.software_component` — e.g. `LOCAL`
 
 3. **Run tests**:
    ```bash
    npm run build
-   node tests/run-all-tests.js --list  # See all tests
-   node tests/test-create-domain.js    # Run single test
-   node tests/run-all-tests.js         # Run all enabled
+   npm run test:integration              # All tests
+   npm test -- --testPathPatterns=class   # Specific object
    ```
 
 ## 📁 Related Files

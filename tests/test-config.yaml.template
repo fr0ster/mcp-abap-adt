@@ -1,10 +1,21 @@
-# Test Configuration Template for @mcp-abap-adt/adt-clients
-# Copy this file to test-config.yaml and configure for your environment
-# Builder Tests Configuration
+# Test Configuration for @mcp-abap-adt integration tests
 #
 # Usage:
 #   cp tests/test-config.yaml.template tests/test-config.yaml
-#   # Edit test-config.yaml with your specific values
+#   # Edit ONLY the lines marked with "# ← CHANGE" below
+#
+# ┌──────────────────────────────────────────────────────────────────┐
+# │  REQUIRED CHANGES (edit these after copying):                    │
+# │                                                                  │
+# │  1. environment.default_package    — your dev package (Z*/Y*)    │
+# │  2. environment.default_transport  — transport request or ""     │
+# │  3. shared_dependencies.package    — package for shared objects  │
+# │  4. shared_dependencies.software_component — e.g. "LOCAL"/"HOME"│
+# │                                                                  │
+# │  OPTIONAL (cloud/BTP only):                                      │
+# │  5. auth_broker.abap.destination   — auth broker destination     │
+# │  6. auth_broker.service_keys_dir   — path to service keys       │
+# └──────────────────────────────────────────────────────────────────┘
 #
 # IMPORTANT: Object Naming Convention
 # ===================================
@@ -74,8 +85,8 @@ lock_config:
 # Environment configuration
 
 environment:
-  default_package: "<YOUR_PACKAGE_NAME>"  # Default package for creating objects (used if not specified in test case)
-  default_transport: "<YOUR_TRANSPORT_REQUEST>"  # Default transport request (used if not specified in test case)
+  default_package: "ZMCP_TEST"              # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
+  default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
   # Cleanup configuration (applies to all tests)
   cleanup_after: true    # Clean up objects after test (default: false)
                           # Set to true to auto-delete objects after tests
@@ -84,7 +95,7 @@ environment:
   integration_hard_mode:
     enabled: true
     transport: "stdio"
-    mcp_destination: "<YOUR_DESTINATION>"
+    mcp_destination: ""                      # MCP destination (optional, for hard mode)
 
 # ============================================================================
 # SHARED DEPENDENCIES — persistent Lego library for integration tests
@@ -93,9 +104,9 @@ environment:
 # Manage with: npm run shared:setup / shared:teardown / shared:check
 
 shared_dependencies:
-  package: "<YOUR_SHARED_PACKAGE>"
-  super_package: "<YOUR_SUPER_PACKAGE>"
-  software_component: "<YOUR_SOFTWARE_COMPONENT>"
+  package: "ZMCP_SHARED"                   # ← CHANGE: package for shared test objects
+  super_package: ""                          # super package (optional, leave "" if none)
+  software_component: "LOCAL"                # ← CHANGE: software component ("LOCAL", "HOME", etc.)
   transport_layer: ""
 
   tables:
@@ -427,7 +438,7 @@ auth_broker:
     # Example: ~/.config/mcp-abap-adt will create:
     #   - ~/.config/mcp-abap-adt/service-keys/<destination>.json
     #   - ~/.config/mcp-abap-adt/sessions/<destination>.env
-    service_keys_dir: <YOUR_SERVICE_KEYS_DIR>
+    service_keys_dir: "~/.config/mcp-abap-adt"  # Base path for service keys and sessions
 
   # ABAP destination configuration (for on-premise or cloud ABAP systems)
   abap:
@@ -435,7 +446,7 @@ auth_broker:
     # Example: "TRIAL" -> looks for TRIAL.json in service-keys directory and TRIAL.env in sessions directory
     # This destination is used by refreshTokensForTests() to automatically refresh tokens before integration tests
     # If not specified, token refresh will be skipped and tests will use tokens from .env file
-    destination: "<YOUR_DESTINATION>"  # ⚠️ UPDATE: Replace with your ABAP destination name (e.g., "TRIAL", "mcp")
+    destination: ""                    # Auth broker destination (cloud/BTP only, e.g. "TRIAL", "mcp")
 
 # ============================================================================
 # OBJECT TESTS (High-Level, then Low-Level for each object)
@@ -1116,7 +1127,7 @@ create_package:
         description: "PackageBuilder workflow package"
         updated_description: "PackageBuilder workflow package (UPDATED)"
         package_type: "development"
-        software_component: "<YOUR_SOFTWARE_COMPONENT>"
+        software_component: "LOCAL"
         operation_delays:
           create: 5000
           update: 3000
@@ -1139,7 +1150,7 @@ create_package_low:
         description: "PackageBuilder workflow package"
         updated_description: "PackageBuilder workflow package (UPDATED)"
         package_type: "development"
-        software_component: "<YOUR_SOFTWARE_COMPONENT>"
+        software_component: "LOCAL"
         operation_delays:
           create: 5000
           update: 3000
@@ -1655,26 +1666,26 @@ class_unit_test:
       available_in: ["onprem", "cloud"]
       description: "Full workflow test for unit test handlers: Lock → Update → Unlock → Activate → Run → GetStatus → GetResult (low-level) or RunUnitTest → GetUnitTest (high-level)"
       params:
-        # Container class that contains the test class
-        container_class_name: "<YOUR_CONTAINER_CLASS_NAME>"
+        # Container class that contains the test class (from shared_dependencies)
+        container_class_name: "ZMCP_BLD_CLSUT_L1"
         # Test class name inside the container class's testclasses include
-        test_class_name: "<YOUR_TEST_CLASS_NAME>"
+        test_class_name: "LTC_ZMCP_BLD_CLSUT_L1"
         # Optional: test class source code (if not provided, default test class will be used)
         test_class_source: |
-          CLASS <YOUR_TEST_CLASS_NAME> DEFINITION FINAL
+          CLASS ltc_zmcp_bld_clsut_l1 DEFINITION FINAL
             FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
             PRIVATE SECTION.
               METHODS test_method FOR TESTING.
           ENDCLASS.
-          CLASS <YOUR_TEST_CLASS_NAME> IMPLEMENTATION.
+          CLASS ltc_zmcp_bld_clsut_l1 IMPLEMENTATION.
             METHOD test_method.
               cl_abap_unit_assert=>assert_true( abap_true ).
             ENDMETHOD.
           ENDCLASS.
         # For high-level handlers (RunUnitTest, GetUnitTest)
         test_class:
-          container_class: "<YOUR_CONTAINER_CLASS_NAME>"
-          name: "<YOUR_TEST_CLASS_NAME>"
+          container_class: "ZMCP_BLD_CLSUT_L1"
+          name: "LTC_ZMCP_BLD_CLSUT_L1"
           run_unit_test: true  # Enable unit test run for high-level handlers
 
 # ============================================================================

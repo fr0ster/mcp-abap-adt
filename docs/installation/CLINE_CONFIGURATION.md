@@ -13,7 +13,7 @@ npm run build
 ```env
 SAP_URL=https://your-sap-system.com
 SAP_CLIENT=100
-SAP_USER=your-username
+SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
 # or for JWT authentication:
 # SAP_AUTH_TYPE=jwt

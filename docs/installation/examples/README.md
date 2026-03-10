@@ -176,7 +176,7 @@ Create `.env` file with your SAP credentials:
 ```env
 SAP_URL=https://your-sap-system.com
 SAP_CLIENT=100
-SAP_USER=your-username
+SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
 ```
 

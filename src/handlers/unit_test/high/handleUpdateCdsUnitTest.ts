@@ -86,12 +86,20 @@ export async function handleUpdateCdsUnitTest(
 
       logger?.info(`✅ UpdateCdsUnitTest completed successfully: ${className}`);
 
+      // Extract safe fields — testClassState contains AxiosResponse objects
+      // with circular references that cannot be JSON.stringified
+      const safeState = {
+        testClassCode: updateResult.testClassState?.testClassCode,
+        lockHandle: updateResult.testClassState?.lockHandle,
+        errors: updateResult.testClassState?.errors,
+      };
+
       return return_response({
         data: JSON.stringify(
           {
             success: true,
             class_name: className,
-            test_class_state: updateResult.testClassState,
+            test_class_state: safeState,
             message: `CDS unit test class ${className} updated successfully.`,
           },
           null,

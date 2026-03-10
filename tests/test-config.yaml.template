@@ -162,6 +162,72 @@ shared_dependencies:
           fld2          : abap.char(50);
         }
 
+    # Table for CDS unit test view dependency
+    - name: "ZMCP_CDS_TBL02"
+      description: "Shared table for CDS unit test view"
+      source: |
+        @EndUserText.label : 'Shared table for CDS unit test view'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        @AbapCatalog.tableCategory : #TRANSPARENT
+        @AbapCatalog.deliveryClass : #A
+        @AbapCatalog.dataMaintenance : #RESTRICTED
+        define table zmcp_cds_tbl02 {
+          key client : abap.clnt not null;
+          key id     : abap.char(10) not null;
+          name       : abap.char(50);
+          value      : abap.dec(10,2);
+          created_at : abap.dats;
+        }
+
+    # Table for View builder test dependency
+    - name: "ZMCP_VIEW_TBL02"
+      description: "Shared table for View builder tests"
+      source: |
+        @EndUserText.label : 'Shared table for View builder tests'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        @AbapCatalog.tableCategory : #TRANSPARENT
+        @AbapCatalog.deliveryClass : #A
+        @AbapCatalog.dataMaintenance : #RESTRICTED
+        define table zmcp_view_tbl02 {
+          key client : abap.clnt not null;
+          key id     : abap.char(10) not null;
+          name       : abap.char(50);
+          value      : abap.dec(10,2);
+          created_at : abap.dats;
+        }
+
+    # Tables for BDEF LOW test (completely separate from HIGH to avoid any conflict)
+    - name: "ZMCP_SHR_BLTBL"
+      description: "Shared table for BDEF LOW test root entity"
+      source: |
+        @EndUserText.label : 'Shared table for BDEF LOW test root entity'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        @AbapCatalog.tableCategory : #TRANSPARENT
+        @AbapCatalog.deliveryClass : #A
+        @AbapCatalog.dataMaintenance : #RESTRICTED
+        define table zmcp_shr_bltbl {
+          key client : abap.clnt not null;
+          key fld1   : abap.char(10) not null;
+          fld2       : abap.char(50);
+          fld3       : abap.dec(10,2);
+          fld4       : abap.dats;
+        }
+
+    - name: "ZMCP_SHR_BLCTL"
+      description: "Shared table for BDEF LOW test child entity"
+      source: |
+        @EndUserText.label : 'Shared table for BDEF LOW test child entity'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        @AbapCatalog.tableCategory : #TRANSPARENT
+        @AbapCatalog.deliveryClass : #A
+        @AbapCatalog.dataMaintenance : #RESTRICTED
+        define table zmcp_shr_blctl {
+          key client    : abap.clnt not null;
+          key chld_id   : abap.char(10) not null;
+          parent_id     : abap.char(10) not null;
+          fld2          : abap.char(50);
+        }
+
   views:
     - name: "ZMCP_SHR_I_ROOT"
       description: "Shared root CDS view entity"
@@ -244,14 +310,14 @@ shared_dependencies:
         }
 
     # CDS views for BDEF LOW test (separate pair to avoid conflict with HIGH test)
-    - name: "ZMCP_SHR_I_BDF2"
+    - name: "ZMCP_SHR_I_BDFL"
       description: "Shared root CDS view for BDEF LOW test"
       source: |
         @EndUserText.label : 'Shared root CDS view for BDEF LOW test'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
-        define root view entity ZMCP_SHR_I_BDF2
-          as select from zmcp_shr_btabl
-          composition [0..*] of ZMCP_SHR_I_BCH2 as _children
+        define root view entity ZMCP_SHR_I_BDFL
+          as select from zmcp_shr_bltbl
+          composition [0..*] of ZMCP_SHR_I_BCHL as _children
         {
           key fld1 as Fld1,
           fld2 as Fld2,
@@ -260,20 +326,35 @@ shared_dependencies:
           _children
         }
 
-    - name: "ZMCP_SHR_I_BCH2"
+    - name: "ZMCP_SHR_I_BCHL"
       description: "Shared child CDS view for BDEF LOW test"
       source: |
         @EndUserText.label : 'Shared child CDS view for BDEF LOW test'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
-        define view entity ZMCP_SHR_I_BCH2
-          as select from zmcp_shr_bctbl
-          association to parent ZMCP_SHR_I_BDF2 as _parent
+        define view entity ZMCP_SHR_I_BCHL
+          as select from zmcp_shr_blctl
+          association to parent ZMCP_SHR_I_BDFL as _parent
             on $projection.ParentId = _parent.Fld1
         {
           key chld_id as ChldId,
           parent_id as ParentId,
           fld2 as Fld2,
           _parent
+        }
+
+    # CDS view for CDS unit test dependency
+    - name: "ZMCP_BLD_CDSV_H1"
+      description: "Shared CDS view for CDS unit test"
+      source: |
+        @EndUserText.label : 'Shared CDS view for CDS unit test'
+        @AccessControl.authorizationCheck : #NOT_REQUIRED
+        define view entity ZMCP_BLD_CDSV_H1
+          as select from zmcp_cds_tbl02
+        {
+          key id,
+          name,
+          value,
+          created_at
         }
 
   behavior_definitions:
@@ -311,6 +392,8 @@ shared_dependencies:
   classes:
     - name: "ZBP_MCP_SHR_I_ROOT"
       description: "Shared BDEF implementation class for ZMCP_SHR_I_ROOT"
+    - name: "ZMCP_BLD_CLSUT_L1"
+      description: "Shared container class for unit test integration tests"
 
 # Legacy shared_objects (kept for backward compatibility with unit_test_class)
 shared_objects:
@@ -359,7 +442,7 @@ auth_broker:
 # ============================================================================
 
 # Behavior Definition (Behavior Definition - Low-Level)
-# Uses separate shared CDS views ZMCP_SHR_I_BDF2/BCH2 to avoid conflict with HIGH test
+# Uses fully isolated shared CDS views ZMCP_SHR_I_BDFL/BCHL with own tables
 create_behavior_definition_low:
   test_cases:
     - name: "full_workflow"
@@ -367,16 +450,16 @@ create_behavior_definition_low:
       available_in: ["onprem", "cloud"]
       description: "Behavior Definition low-level handler full workflow test"
       params:
-        name: "ZMCP_SHR_I_BDF2"
+        name: "ZMCP_SHR_I_BDFL"
         description: "Behavior Definition low-level handler test"
-        root_entity: "ZMCP_SHR_I_BDF2"
+        root_entity: "ZMCP_SHR_I_BDFL"
         implementation_type: "Managed"
         source_code: |
-          managed implementation in class zbp_mcp_shr_i_bdf2 unique;
+          managed implementation in class zbp_mcp_shr_i_bdfl unique;
           strict ( 2 );
 
-          define behavior for ZMCP_SHR_I_BDF2
-          persistent table zmcp_shr_btabl
+          define behavior for ZMCP_SHR_I_BDFL
+          persistent table zmcp_shr_bltbl
           lock master
           authorization master ( instance )
           {
@@ -387,8 +470,8 @@ create_behavior_definition_low:
             association _children { create; }
           }
 
-          define behavior for ZMCP_SHR_I_BCH2
-          persistent table zmcp_shr_bctbl
+          define behavior for ZMCP_SHR_I_BCHL
+          persistent table zmcp_shr_blctl
           lock dependent by _parent
           authorization dependent by _parent
           {
@@ -398,11 +481,11 @@ create_behavior_definition_low:
             association _parent;
           }
         update_source_code: |
-          managed implementation in class zbp_mcp_shr_i_bdf2 unique;
+          managed implementation in class zbp_mcp_shr_i_bdfl unique;
           strict ( 2 );
 
-          define behavior for ZMCP_SHR_I_BDF2
-          persistent table zmcp_shr_btabl
+          define behavior for ZMCP_SHR_I_BDFL
+          persistent table zmcp_shr_bltbl
           lock master
           authorization master ( instance )
           {
@@ -414,8 +497,8 @@ create_behavior_definition_low:
             association _children { create; }
           }
 
-          define behavior for ZMCP_SHR_I_BCH2
-          persistent table zmcp_shr_bctbl
+          define behavior for ZMCP_SHR_I_BCHL
+          persistent table zmcp_shr_blctl
           lock dependent by _parent
           authorization dependent by _parent
           {
@@ -488,7 +571,7 @@ create_behavior_implementation:
           ENDCLASS.
 
 # Behavior Implementation (Behavior Implementation - Low-Level)
-# Used in combined BDEF+BIMPL test — BDEF (ZMCP_SHR_I_BDF2) is created first in the same test
+# Used in combined BDEF+BIMPL test — BDEF (ZMCP_SHR_I_BDFL) is created first in the same test
 create_behavior_implementation_low:
   test_cases:
     - name: "full_workflow"
@@ -496,22 +579,22 @@ create_behavior_implementation_low:
       available_in: ["onprem", "cloud"]
       description: "Behavior Implementation low-level handler full workflow test (combined with BDEF)"
       params:
-        class_name: "ZBP_MCP_SHR_I_BDF2"
-        description: "Behavior Implementation for ZMCP_SHR_I_BDF2"
-        behavior_definition: "ZMCP_SHR_I_BDF2"
+        class_name: "ZBP_MCP_SHR_I_BDFL"
+        description: "Behavior Implementation for ZMCP_SHR_I_BDFL"
+        behavior_definition: "ZMCP_SHR_I_BDFL"
         source_code: |
-          CLASS lhc_ZMCP_SHR_I_BDF2 DEFINITION INHERITING FROM cl_abap_behavior_handler.
+          CLASS lhc_ZMCP_SHR_I_BDFL DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
 
               METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdf2 RESULT result.
+                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdfl RESULT result.
 
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdf2 RESULT result.
+                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdfl RESULT result.
 
           ENDCLASS.
 
-          CLASS lhc_ZMCP_SHR_I_BDF2 IMPLEMENTATION.
+          CLASS lhc_ZMCP_SHR_I_BDFL IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
             ENDMETHOD.
@@ -521,18 +604,18 @@ create_behavior_implementation_low:
 
           ENDCLASS.
         implementation_code: |
-          CLASS lhc_ZMCP_SHR_I_BDF2 DEFINITION INHERITING FROM cl_abap_behavior_handler.
+          CLASS lhc_ZMCP_SHR_I_BDFL DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
 
               METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdf2 RESULT result.
+                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdfl RESULT result.
 
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdf2 RESULT result.
+                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdfl RESULT result.
 
           ENDCLASS.
 
-          CLASS lhc_ZMCP_SHR_I_BDF2 IMPLEMENTATION.
+          CLASS lhc_ZMCP_SHR_I_BDFL IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
             ENDMETHOD.
@@ -542,18 +625,18 @@ create_behavior_implementation_low:
 
           ENDCLASS.
         update_source_code: |
-          CLASS lhc_ZMCP_SHR_I_BDF2 DEFINITION INHERITING FROM cl_abap_behavior_handler.
+          CLASS lhc_ZMCP_SHR_I_BDFL DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
 
               METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdf2 RESULT result.
+                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdfl RESULT result.
 
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdf2 RESULT result.
+                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdfl RESULT result.
 
           ENDCLASS.
 
-          CLASS lhc_ZMCP_SHR_I_BDF2 IMPLEMENTATION.
+          CLASS lhc_ZMCP_SHR_I_BDFL IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
             ENDMETHOD.
@@ -901,7 +984,7 @@ create_function:
   test_cases:
     - name: "full_workflow"
       enabled: true
-      available_in: ["onprem"]
+      available_in: ["onprem", "cloud"]
       description: "Complete function group and function module workflow for high and low level tests"
       params:
         # Function Group parameters
@@ -1270,7 +1353,7 @@ create_transport:
 create_view:
   test_cases:
     - name: "builder_view"
-      enabled: false
+      enabled: true
       available_in: ["onprem", "cloud"]
       description: "View reserved for ViewBuilder tests"
       params:
@@ -1518,7 +1601,7 @@ standard_objects:
 cds_unit_test:
   test_cases:
     - name: "full_workflow"
-      enabled: false
+      enabled: true
       available_in: ["onprem", "cloud"]
       description: "Full workflow test for CDS unit test handlers: Create → Update → Run → Get → Delete"
       params:
@@ -1529,18 +1612,18 @@ cds_unit_test:
         description: "CDS unit test class"
         transport_request: ""
         class_template: |
-          CLASS ZMCP_BLD_CDSUT_H1 DEFINITION
-            PUBLIC
-            FINAL
-            CREATE PUBLIC .
-
-            PUBLIC SECTION.
-            PROTECTED SECTION.
-            PRIVATE SECTION.
-          ENDCLASS.
-
-          CLASS ZMCP_BLD_CDSUT_H1 IMPLEMENTATION.
-          ENDCLASS.
+          <abapsource:template abapsource:name="IF_FOR_AUTO_CLASS_GENERATION">
+            <abapsource:property abapsource:key="CCAU_CONTENT">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+          &lt;cds:cdstobetested xmlns:cds="http://www.sap.com/adt/cdsfrwk/cds"&gt;
+            &lt;cds:cdsundertest api_doc="true" cds_name="ZMCP_BLD_CDSV_H1" cds_test_type="UNIT_TEST"&gt;
+              &lt;cds:testmethods&gt;
+                &lt;cds:testmethod test_method_name="AUNIT_FOR_CDS_METHOD"/&gt;
+              &lt;/cds:testmethods&gt;
+            &lt;/cds:cdsundertest&gt;
+          &lt;/cds:cdstobetested&gt;
+          </abapsource:property>
+            <abapsource:property abapsource:key="Content-Type">application/vnd.sap.adt.oo.cds.codgen.v1+xml</abapsource:property>
+          </abapsource:template>
         test_class_source: |
           CLASS LTC_ZMCP_BLD_CDSV_H1 DEFINITION FINAL
             FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
@@ -1568,7 +1651,7 @@ cds_unit_test:
 class_unit_test:
   test_cases:
     - name: "full_workflow"
-      enabled: false
+      enabled: true
       available_in: ["onprem", "cloud"]
       description: "Full workflow test for unit test handlers: Lock → Update → Unlock → Activate → Run → GetStatus → GetResult (low-level) or RunUnitTest → GetUnitTest (high-level)"
       params:

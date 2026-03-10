@@ -541,7 +541,9 @@ export class LambdaTester {
     }
 
     // Check available_in constraint from test case config
-    const availableIn = this.context.testCase?.available_in as string[] | undefined;
+    const availableIn = this.context.testCase?.available_in as
+      | string[]
+      | undefined;
     if (availableIn && availableIn.length > 0) {
       const systemType = this.context.isCloudSystem ? 'cloud' : 'onprem';
       if (!availableIn.includes(systemType)) {

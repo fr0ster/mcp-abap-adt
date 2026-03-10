@@ -107,6 +107,10 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
     await tester.afterAll(async () => {});
   });
 
+  beforeEach(async () => {
+    await tester.beforeEach(async () => {});
+  });
+
   afterEach(async () => {
     await tester.afterEach();
   });

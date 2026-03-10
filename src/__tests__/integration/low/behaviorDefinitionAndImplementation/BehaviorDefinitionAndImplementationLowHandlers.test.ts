@@ -140,6 +140,10 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
     await tester.afterAll(async () => {});
   });
 
+  beforeEach(async () => {
+    await tester.beforeEach(async () => {});
+  });
+
   afterEach(async () => {
     await tester.afterEach();
   });

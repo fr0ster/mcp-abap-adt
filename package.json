@@ -40,7 +40,7 @@
     }
   },
   "scripts": {
-    "test:init": "cp -n tests/test-config.yaml.template tests/test-config.yaml && echo 'Created tests/test-config.yaml — edit lines marked ← CHANGE'",
+    "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping')}else{fs.copyFileSync(t,s);console.log('Created '+s+' — edit lines marked CHANGE')}\"",
     "test": "jest --passWithNoTests",
     "test:integration": "jest --testPathPatterns=integration --runInBand --passWithNoTests --forceExit",
     "test:high": "jest --testPathPatterns='integration.*High' --runInBand --passWithNoTests --forceExit",

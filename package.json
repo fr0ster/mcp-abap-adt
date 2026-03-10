@@ -40,6 +40,7 @@
     }
   },
   "scripts": {
+    "test:init": "cp -n tests/test-config.yaml.template tests/test-config.yaml && echo 'Created tests/test-config.yaml — edit lines marked ← CHANGE'",
     "test": "jest --passWithNoTests",
     "test:integration": "jest --testPathPatterns=integration --runInBand --passWithNoTests --forceExit",
     "test:high": "jest --testPathPatterns='integration.*High' --runInBand --passWithNoTests --forceExit",

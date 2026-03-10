@@ -160,9 +160,9 @@ export async function handleCreateDomain(
 
     logger?.info(`Starting domain creation: ${domainName}`);
 
+    let lockHandle: string | undefined;
+    const client = createAdtClient(connection);
     try {
-      // Create client
-      const client = createAdtClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Validate
@@ -181,7 +181,7 @@ export async function handleCreateDomain(
       });
 
       // Lock
-      const lockHandle = await client.getDomain().lock({ domainName });
+      lockHandle = await client.getDomain().lock({ domainName });
 
       // Update with properties
       await client.getDomain().update(
@@ -258,6 +258,16 @@ export async function handleCreateDomain(
         }),
       } as AxiosResponse);
     } catch (error: any) {
+      // Try to unlock if lock was acquired
+      if (lockHandle) {
+        try {
+          await client.getDomain().unlock({ domainName }, lockHandle);
+          logger?.debug(`Unlocked domain ${domainName} after error`);
+        } catch (_unlockError) {
+          // Ignore unlock errors
+        }
+      }
+
       logger?.error(
         `Error creating domain ${domainName}: ${error?.message || error}`,
       );

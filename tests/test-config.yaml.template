@@ -10,7 +10,7 @@
 # │  1. environment.default_package    — your dev package (Z*/Y*)    │
 # │  2. environment.default_transport  — transport request or ""     │
 # │  3. shared_dependencies.package    — package for shared objects  │
-# │  4. shared_dependencies.software_component — e.g. "LOCAL"/"HOME"│
+# │  4. shared_dependencies.software_component — "ZLOCAL"/"HOME"    │
 # │                                                                  │
 # │  OPTIONAL (cloud/BTP only):                                      │
 # │  5. auth_broker.abap.destination   — auth broker destination     │
@@ -22,15 +22,15 @@
 # All test objects must use the ZMCP_BLD_* naming convention:
 # - Classes: ZMCP_BLD_CLS01, ZMCP_BLD_CLS02, etc.
 # - Domains: ZMCP_BLD_DOM01, ZMCP_BLD_DOM02, etc.
-# - Data Elements: ZMCP_BLD_DTEL01, ZMCP_BLD_DTEL_H1, etc.
-# - Function Modules: Z_ADT_BLD_FM01, Z_ADT_BLD_FM02, etc. (must start with Z_ or Y_)
+# - Data Elements: ZMCP_BLD_DTEL01, ZMCP_BLD_DTEL_H2, etc.
+# - Function Modules: Z_MCP_BLD_FM01, Z_MCP_BLD_FM02, etc. (must start with Z_ or Y_)
 # - Function Groups: ZMCP_BLD_FGR01, ZMCP_BLD_FGR02, etc.
 # - Interfaces: ZMCP_BLD_IF01, ZMCP_BLD_IF02, etc.
 # - Programs: ZMCP_BLD_PROG_H1, ZMCP_BLD_PROG02, etc.
 # - Tables: ZMCP_BLD_TAB01, ZMCP_BLD_TAB_H1, etc.
 # - Structures: ZMCP_BLD_STRU_H1, ZMCP_BLD_STRU02, etc.
 # - Views: ZMCP_BLD_VIEW01, ZMCP_BLD_VIEW_H1, etc.
-# - Packages: ZADT_BLD_PKG01, ZADT_BLD_PKG02, etc.
+# - Packages: ZMCP_BLD_PKG01, ZMCP_BLD_PKG02, etc.
 #
 # Test settings
 
@@ -93,7 +93,7 @@ environment:
                           # Note: cleanup_before was removed - not used in code
   # Real MCP client mode — tests go through full MCP transport layer
   integration_hard_mode:
-    enabled: true
+    enabled: false
     transport: "stdio"
     mcp_destination: ""                      # MCP destination (optional, for hard mode)
 
@@ -106,7 +106,7 @@ environment:
 shared_dependencies:
   package: "ZMCP_SHARED"                   # ← CHANGE: package for shared test objects
   super_package: ""                          # super package (optional, leave "" if none)
-  software_component: "LOCAL"                # ← CHANGE: software component ("LOCAL", "HOME", etc.)
+  software_component: "ZLOCAL"               # ← CHANGE: "ZLOCAL" for cloud, "LOCAL"/"HOME" for onprem
   transport_layer: ""
 
   tables:
@@ -410,7 +410,7 @@ shared_dependencies:
 shared_objects:
   unit_test_class:
     class_name: "ZMCP_BLD_CLSUT_L1"
-    package_name: "ZOK_LOCAL"
+    package_name: "ZMCP_SHR_PKG"
     transport_request: ""
     description: "Shared container class for unit test integration tests"
 
@@ -669,7 +669,7 @@ create_class:
       params:
         class_name: "ZMCP_BLD_CLSLOC_H1"
         description: "ClassBuilder workflow class"
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # package_name: "ZMCP_BLD_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         superclass: ""
         final: true
@@ -784,7 +784,7 @@ create_class:
         builder_class:
           class_name: "ZMCP_BLD_CLSLOC_H1"
           description: "Empty test class for local includes handlers"
-          # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+          # package_name: "ZMCP_BLD_PKG01"  # Uses environment.default_package if omitted
           # transport_request: ""  # Uses environment.default_transport if omitted
           source_code: |
             CLASS ZMCP_BLD_CLSLOC_H1 DEFINITION PUBLIC FINAL CREATE PUBLIC.
@@ -808,7 +808,7 @@ create_class_direct:
       params:
         class_name: "ZMCP_BLD_CLS_H1"
         description: "Class CrudClient direct test"
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # package_name: "ZMCP_BLD_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         superclass: ""
         final: true
@@ -842,7 +842,7 @@ create_class_low:
       params:
         class_name: "ZMCP_BLD_CLS_L1"
         description: "Class low-level handler test"
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # package_name: "ZMCP_BLD_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         # Extra delays to give backend time to persist between steps (especially in async env)
         operation_delays:
@@ -888,9 +888,9 @@ create_data_element:
       available_in: ["onprem", "cloud"]
       description: "Data element reserved for DataElementBuilder tests"
       params:
-        data_element_name: "ZMCP_BLD_DTEL_H1"
+        data_element_name: "ZMCP_BLD_DTEL_H2"
         description: "DataElementBuilder workflow data element"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
         # Allowed type_kind values:
         #   - domain
@@ -919,7 +919,7 @@ create_data_element_low:
       params:
         data_element_name: "ZMCP_BLD_DTEL_L1"
         description: "DataElement low-level handler test"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
         type_kind: "predefinedAbapType"
         type_name: "CHAR"
@@ -932,7 +932,7 @@ create_data_element_low:
         field_label_heading: "Test Heading"
         domain_name: ""
         properties:
-          # package_name: "ZADT_BLD_PKG01"
+          # package_name: "ZMCP_BLD_PKG01"
           description: "DataElement low-level handler test (updated)"
           type_kind: "predefinedAbapType"
           type_name: "CHAR"
@@ -956,7 +956,7 @@ create_domain:
       params:
         domain_name: "ZMCP_BLD_DOM_H1"  # Changed from ZMCP_BLD_DOM02 to avoid conflicts
         description: "DomainBuilder workflow domain"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
         datatype: "CHAR"
         length: 5
@@ -976,7 +976,7 @@ create_domain_low:
       params:
         domain_name: "ZMCP_BLD_DOM_L1"
         description: "Domain low-level handler test domain"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
         datatype: "CHAR"
         length: 10
@@ -1005,10 +1005,10 @@ create_function:
         # update_function_group_description: "Function group for workflow tests (updated)"
 
         # Function Module parameters
-        function_module_name: "Z_ADT_BLD_FM01"
+        function_module_name: "Z_MCP_BLD_FM01"
         function_module_description: "Function module for workflow tests"
         source_code: |
-          FUNCTION Z_ADT_BLD_FM01
+          FUNCTION Z_MCP_BLD_FM01
               IMPORTING
                  VALUE(IV_PARAM) TYPE  STRING
               EXPORTING
@@ -1017,7 +1017,7 @@ create_function:
             ev_result = |Additional processing|.
           ENDFUNCTION.
         update_source_code: |
-          FUNCTION Z_ADT_BLD_FM01
+          FUNCTION Z_MCP_BLD_FM01
               IMPORTING
                  VALUE(IV_PARAM) TYPE  STRING
               EXPORTING
@@ -1027,7 +1027,7 @@ create_function:
           ENDFUNCTION.
 
         # Common parameters
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
 
 # Create Transport
@@ -1044,7 +1044,7 @@ create_interface:
       params:
         interface_name: "ZMCP_BLD_IF_H1"
         description: "InterfaceBuilder workflow interface"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
         source_code: |
           INTERFACE ZMCP_BLD_IF_H1
@@ -1069,7 +1069,7 @@ create_interface_low:
       params:
         interface_name: "ZMCP_BLD_IF_L1"
         description: "Interface low-level handler test"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
         source_code: |
           INTERFACE zadt_bld_if03.
@@ -1088,7 +1088,7 @@ create_metadata_extension_low:
       params:
         name: "ZMCP_SHR_C_ROOT_0002"
         description: "Metadata Extension low-level handler test"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
         source_code: |
           @Metadata.layer: #CUSTOMER
@@ -1122,12 +1122,12 @@ create_package:
       available_in: ["onprem", "cloud"]
       description: "Package reserved for PackageBuilder tests"
       params:
-        # package_name: "ZADT_BLD_PKG01"          # Package where test objects are added (existing package)
+        # package_name: "ZMCP_BLD_PKG01"          # Package where test objects are added (existing package)
         test_package: "ZMCP_BLD_PKG_H1"    # Package created by the test
         description: "PackageBuilder workflow package"
         updated_description: "PackageBuilder workflow package (UPDATED)"
         package_type: "development"
-        software_component: "LOCAL"
+        software_component: "ZLOCAL"              # "ZLOCAL" for cloud, "LOCAL"/"HOME" for onprem
         operation_delays:
           create: 5000
           update: 3000
@@ -1145,12 +1145,12 @@ create_package_low:
       available_in: ["onprem", "cloud"]
       description: "Package low-level handler full workflow test"
       params:
-        # package_name: "ZADT_BLD_PKG01"          # Parent package (existing)
+        # package_name: "ZMCP_BLD_PKG01"          # Parent package (existing)
         test_package: "ZMCP_BLD_PKG_L1"    # Package created by the test
         description: "PackageBuilder workflow package"
         updated_description: "PackageBuilder workflow package (UPDATED)"
         package_type: "development"
-        software_component: "LOCAL"
+        software_component: "ZLOCAL"              # "ZLOCAL" for cloud, "LOCAL"/"HOME" for onprem
         operation_delays:
           create: 5000
           update: 3000
@@ -1170,7 +1170,7 @@ create_program:
       params:
         program_name: "ZMCP_BLD_PROG_H1"
         description: "ProgramBuilder workflow report"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
         program_type: "executable"
         source_code: |
@@ -1189,7 +1189,7 @@ create_program_low:
       params:
         program_name: "ZMCP_BLD_PROG_L1"
         description: "Program low-level handler test"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
         program_type: "1"
         application: "*"
@@ -1209,7 +1209,7 @@ create_structure:
       params:
         structure_name: "ZMCP_BLD_STRU_H1"
         description: "StructureBuilder workflow structure"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
         fields:
           - name: "mandt"
@@ -1245,7 +1245,7 @@ create_structure_low:
       params:
         structure_name: "ZMCP_BLD_STRU_L1"
         description: "Structure low-level handler test"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
         ddl_code: |
           @EndUserText.label: 'Structure low-level handler test'
@@ -1274,7 +1274,7 @@ create_table:
       params:
         table_name: "ZMCP_BLD_TAB_H1"
         description: "TableBuilder workflow table"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
         delivery_class: "A"
         data_class: "APPL0"
@@ -1319,7 +1319,7 @@ create_table_low:
       params:
         table_name: "ZMCP_BLD_TAB_L1"
         description: "Table low-level handler test table"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
         ddl_code: |
           @EndUserText.label: 'Table low-level handler test table'
@@ -1356,7 +1356,7 @@ create_transport:
       description: "Transport reserved for TransportBuilder tests"
       params:
         description: "TransportBuilder workflow transport"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
 
 # Standard SAP objects registry for read-only tests
 
@@ -1368,7 +1368,7 @@ create_view:
       available_in: ["onprem", "cloud"]
       description: "View reserved for ViewBuilder tests"
       params:
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         table_name: "ZMCP_VIEW_TBL02"
         view_name: "ZMCP_BLD_VIEW_H1"
         description: "ViewBuilder workflow view"
@@ -1403,7 +1403,7 @@ create_view:
       available_in: ["onprem", "cloud"]
       description: "CDS view with ABAP Unit verification"
       params:
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         table_name: "ZMCP_CDS_TBL02"
         view_name: "ZMCP_BLD_CDSV_H1"
         description: "ViewBuilder CDS unit test view"
@@ -1470,7 +1470,7 @@ create_view_low:
       params:
         view_name: "ZMCP_BLD_VIEW_L1"
         description: "View low-level handler test view"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
         ddl_source: |
           @AbapCatalog.viewEnhancementCategory: [#NONE]
@@ -1504,7 +1504,7 @@ create_service_definition:
       params:
         service_definition_name: "ZMCP_BLD_SRVD01"
         description: "ServiceDefinitionBuilder workflow service definition"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
         source_code: |
           @EndUserText.label: 'ServiceDefinitionBuilder workflow service definition'
@@ -1618,7 +1618,7 @@ cds_unit_test:
       params:
         class_name: "ZMCP_BLD_CDSUT_H1"
         test_class_name: "LTC_ZMCP_BLD_CDSV_H1"
-        package_name: "ZADT_BLD_PKG03"
+        package_name: "ZMCP_SHR_PKG"  # Package for CDS unit test class (must exist)
         cds_view_name: "ZMCP_BLD_CDSV_H1"
         description: "CDS unit test class"
         transport_request: ""
@@ -1757,7 +1757,7 @@ system_low_handlers:
       description: "System low-level handlers tests"
       params:
         # Test package for virtual folders and node structure
-        test_package: "ZOK_TEST_PKG_01"  # Default test package (or use your package name)
+        # test_package: ""  # Uses environment.default_package if omitted
         # Test class for node structure and object structure
         test_class: "CL_ABAP_CHAR_UTILITIES"  # Standard SAP class for testing
         # Test program for node structure and object structure
@@ -1789,7 +1789,7 @@ system_high_handlers:
       description: "System high-level handlers tests"
       params:
         # Test package for package tree
-        test_package: "ZOK_TEST_PKG_01"  # Default test package (or use your package name)
+        # test_package: ""  # Uses environment.default_package if omitted
         # Package tree settings
         package_tree_include_subpackages: true  # Include subpackages in tree
         package_tree_max_depth: 5  # Maximum depth for recursive package traversal

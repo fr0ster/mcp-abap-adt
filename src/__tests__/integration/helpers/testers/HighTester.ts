@@ -336,6 +336,7 @@ export class HighTester extends LambdaTester {
       }),
       // Data element specific fields
       ...(params.type_kind && { type_kind: params.type_kind }),
+      ...(params.type_name && { type_name: params.type_name }),
       ...(params.data_type && { data_type: params.data_type }),
       ...(params.length !== undefined && { length: params.length }),
       ...(params.decimals !== undefined && { decimals: params.decimals }),
@@ -405,6 +406,7 @@ export class HighTester extends LambdaTester {
         }),
       // Data element specific fields for update
       ...(params.type_kind && { type_kind: params.type_kind }),
+      ...(params.type_name && { type_name: params.type_name }),
       ...(params.data_type && { data_type: params.data_type }),
       ...(params.length !== undefined && { length: params.length }),
       ...(params.decimals !== undefined && { decimals: params.decimals }),

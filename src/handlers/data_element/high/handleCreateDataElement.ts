@@ -167,9 +167,6 @@ export async function handleCreateDataElement(
       throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
     }
 
-    // Determine typeKind - default to 'domain' if not specified
-    const _typeKind = args?.type_kind || 'domain';
-
     // Validate transport_request: required for non-$TMP packages
     validateTransportRequest(args.package_name, args.transport_request);
 
@@ -180,9 +177,9 @@ export async function handleCreateDataElement(
 
     logger?.info(`Starting data element creation: ${dataElementName}`);
 
+    let lockHandle: string | undefined;
+    const client = createAdtClient(connection);
     try {
-      // Create client
-      const client = createAdtClient(connection);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Validate
@@ -209,9 +206,7 @@ export async function handleCreateDataElement(
       });
 
       // Lock
-      const lockHandle = await client
-        .getDataElement()
-        .lock({ dataElementName });
+      lockHandle = await client.getDataElement().lock({ dataElementName });
 
       // Update with properties
       const updateConfig: any = {
@@ -303,6 +298,16 @@ export async function handleCreateDataElement(
         config: {} as any,
       } as AxiosResponse);
     } catch (error: any) {
+      // Try to unlock if lock was acquired
+      if (lockHandle) {
+        try {
+          await client.getDataElement().unlock({ dataElementName }, lockHandle);
+          logger?.debug(`Unlocked data element ${dataElementName} after error`);
+        } catch (_unlockError) {
+          // Ignore unlock errors
+        }
+      }
+
       logger?.error(
         `Error creating data element ${dataElementName}: ${error?.message || error}`,
       );

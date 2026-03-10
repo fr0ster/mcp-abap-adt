@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CreateTransportLow',
+  available_in: ['onprem', 'cloud'] as const,
   description: '[low-level] Create a new ABAP transport request.',
   inputSchema: {
     type: 'object',

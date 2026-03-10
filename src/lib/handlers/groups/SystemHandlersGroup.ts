@@ -118,120 +118,64 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
   getHandlers(): HandlerEntry[] {
     return [
       {
-        toolDefinition: {
-          name: GetTypeInfo_Tool.name,
-          description: GetTypeInfo_Tool.description,
-          inputSchema: GetTypeInfo_Tool.inputSchema,
-        },
+        toolDefinition: GetTypeInfo_Tool,
         handler: (args: any) => handleGetTypeInfo(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetTransaction_Tool.name,
-          description: GetTransaction_Tool.description,
-          inputSchema: GetTransaction_Tool.inputSchema,
-        },
+        toolDefinition: GetTransaction_Tool,
         handler: (args: any) => handleGetTransaction(this.context, args),
       },
       {
-        toolDefinition: {
-          name: RuntimeCreateProfilerTraceParameters_Tool.name,
-          description: RuntimeCreateProfilerTraceParameters_Tool.description,
-          inputSchema: RuntimeCreateProfilerTraceParameters_Tool.inputSchema,
-        },
+        toolDefinition: RuntimeCreateProfilerTraceParameters_Tool,
         handler: (args: any) =>
           handleRuntimeCreateProfilerTraceParameters(this.context, args),
       },
       {
-        toolDefinition: {
-          name: RuntimeListProfilerTraceFiles_Tool.name,
-          description: RuntimeListProfilerTraceFiles_Tool.description,
-          inputSchema: RuntimeListProfilerTraceFiles_Tool.inputSchema,
-        },
+        toolDefinition: RuntimeListProfilerTraceFiles_Tool,
         handler: () => handleRuntimeListProfilerTraceFiles(this.context),
       },
       {
-        toolDefinition: {
-          name: RuntimeGetProfilerTraceData_Tool.name,
-          description: RuntimeGetProfilerTraceData_Tool.description,
-          inputSchema: RuntimeGetProfilerTraceData_Tool.inputSchema,
-        },
+        toolDefinition: RuntimeGetProfilerTraceData_Tool,
         handler: (args: any) =>
           handleRuntimeGetProfilerTraceData(this.context, args),
       },
       {
-        toolDefinition: {
-          name: RuntimeListDumps_Tool.name,
-          description: RuntimeListDumps_Tool.description,
-          inputSchema: RuntimeListDumps_Tool.inputSchema,
-        },
+        toolDefinition: RuntimeListDumps_Tool,
         handler: (args: any) => handleRuntimeListDumps(this.context, args),
       },
       {
-        toolDefinition: {
-          name: RuntimeGetDumpById_Tool.name,
-          description: RuntimeGetDumpById_Tool.description,
-          inputSchema: RuntimeGetDumpById_Tool.inputSchema,
-        },
+        toolDefinition: RuntimeGetDumpById_Tool,
         handler: (args: any) => handleRuntimeGetDumpById(this.context, args),
       },
       {
-        toolDefinition: {
-          name: RuntimeRunClassWithProfiling_Tool.name,
-          description: RuntimeRunClassWithProfiling_Tool.description,
-          inputSchema: RuntimeRunClassWithProfiling_Tool.inputSchema,
-        },
+        toolDefinition: RuntimeRunClassWithProfiling_Tool,
         handler: (args: any) =>
           handleRuntimeRunClassWithProfiling(this.context, args),
       },
       {
-        toolDefinition: {
-          name: RuntimeRunProgramWithProfiling_Tool.name,
-          description: RuntimeRunProgramWithProfiling_Tool.description,
-          inputSchema: RuntimeRunProgramWithProfiling_Tool.inputSchema,
-        },
+        toolDefinition: RuntimeRunProgramWithProfiling_Tool,
         handler: (args: any) =>
           handleRuntimeRunProgramWithProfiling(this.context, args),
       },
       {
-        toolDefinition: {
-          name: RuntimeAnalyzeProfilerTrace_Tool.name,
-          description: RuntimeAnalyzeProfilerTrace_Tool.description,
-          inputSchema: RuntimeAnalyzeProfilerTrace_Tool.inputSchema,
-        },
+        toolDefinition: RuntimeAnalyzeProfilerTrace_Tool,
         handler: (args: any) =>
           handleRuntimeAnalyzeProfilerTrace(this.context, args),
       },
       {
-        toolDefinition: {
-          name: RuntimeAnalyzeDump_Tool.name,
-          description: RuntimeAnalyzeDump_Tool.description,
-          inputSchema: RuntimeAnalyzeDump_Tool.inputSchema,
-        },
+        toolDefinition: RuntimeAnalyzeDump_Tool,
         handler: (args: any) => handleRuntimeAnalyzeDump(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetSqlQuery_Tool.name,
-          description: GetSqlQuery_Tool.description,
-          inputSchema: GetSqlQuery_Tool.inputSchema,
-        },
+        toolDefinition: GetSqlQuery_Tool,
         handler: (args: any) => handleGetSqlQuery(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetWhereUsed_Tool.name,
-          description: GetWhereUsed_Tool.description,
-          inputSchema: GetWhereUsed_Tool.inputSchema,
-        },
+        toolDefinition: GetWhereUsed_Tool,
         handler: (args: any) => handleGetWhereUsed(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetObjectInfo_Tool.name,
-          description: GetObjectInfo_Tool.description,
-          inputSchema: GetObjectInfo_Tool.inputSchema,
-        },
+        toolDefinition: GetObjectInfo_Tool,
         handler: async (args: any) => {
           if (!args || typeof args !== 'object') {
             throw new Error('Missing or invalid arguments for GetObjectInfo');
@@ -243,63 +187,35 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
         },
       },
       {
-        toolDefinition: {
-          name: GetAbapAST_Tool.name,
-          description: GetAbapAST_Tool.description,
-          inputSchema: GetAbapAST_Tool.inputSchema,
-        },
+        toolDefinition: GetAbapAST_Tool,
         handler: (args: any) => handleGetAbapAST(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetAbapSemanticAnalysis_Tool.name,
-          description: GetAbapSemanticAnalysis_Tool.description,
-          inputSchema: GetAbapSemanticAnalysis_Tool.inputSchema,
-        },
+        toolDefinition: GetAbapSemanticAnalysis_Tool,
         handler: (args: any) =>
           handleGetAbapSemanticAnalysis(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetAbapSystemSymbols_Tool.name,
-          description: GetAbapSystemSymbols_Tool.description,
-          inputSchema: GetAbapSystemSymbols_Tool.inputSchema,
-        },
+        toolDefinition: GetAbapSystemSymbols_Tool,
         handler: (args: any) => handleGetAbapSystemSymbols(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetSession_Tool.name,
-          description: GetSession_Tool.description,
-          inputSchema: GetSession_Tool.inputSchema,
-        },
+        toolDefinition: GetSession_Tool,
         handler: (args: any) => handleGetSession(this.context, args),
       },
       {
-        toolDefinition: {
-          name: GetInactiveObjects_Tool.name,
-          description: GetInactiveObjects_Tool.description,
-          inputSchema: GetInactiveObjects_Tool.inputSchema,
-        },
+        toolDefinition: GetInactiveObjects_Tool,
         handler: (args: any) => handleGetInactiveObjects(this.context, args),
       },
       // Dynamic import handlers
       {
-        toolDefinition: {
-          name: GetAdtTypes_Tool.name,
-          description: GetAdtTypes_Tool.description,
-          inputSchema: GetAdtTypes_Tool.inputSchema,
-        },
+        toolDefinition: GetAdtTypes_Tool,
         handler: (args: any) => {
           return handleGetAdtTypes(this.context, args as { type_name: string });
         },
       },
       {
-        toolDefinition: {
-          name: GetObjectStructure_Tool.name,
-          description: GetObjectStructure_Tool.description,
-          inputSchema: GetObjectStructure_Tool.inputSchema,
-        },
+        toolDefinition: GetObjectStructure_Tool,
         handler: (args: any) => {
           return handleGetObjectStructure(
             this.context,
@@ -308,11 +224,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
         },
       },
       {
-        toolDefinition: {
-          name: GetObjectNodeFromCache_Tool.name,
-          description: GetObjectNodeFromCache_Tool.description,
-          inputSchema: GetObjectNodeFromCache_Tool.inputSchema,
-        },
+        toolDefinition: GetObjectNodeFromCache_Tool,
         handler: (args: any) => {
           return handleGetObjectNodeFromCache(
             this.context,
@@ -327,11 +239,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
         },
       },
       {
-        toolDefinition: {
-          name: DescribeByList_Tool.name,
-          description: DescribeByList_Tool.description,
-          inputSchema: DescribeByList_Tool.inputSchema,
-        },
+        toolDefinition: DescribeByList_Tool,
         handler: (args: any) => {
           return handleDescribeByList(
             this.context,
@@ -347,31 +255,19 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
       },
       // Low-level handlers for virtual folders, node structure, and object structure
       {
-        toolDefinition: {
-          name: GetVirtualFoldersLow_Tool.name,
-          description: GetVirtualFoldersLow_Tool.description,
-          inputSchema: GetVirtualFoldersLow_Tool.inputSchema,
-        },
+        toolDefinition: GetVirtualFoldersLow_Tool,
         handler: (args: any) => {
           return handleGetVirtualFolders(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: GetNodeStructureLow_Tool.name,
-          description: GetNodeStructureLow_Tool.description,
-          inputSchema: GetNodeStructureLow_Tool.inputSchema,
-        },
+        toolDefinition: GetNodeStructureLow_Tool,
         handler: (args: any) => {
           return handleGetNodeStructure(this.context, args);
         },
       },
       {
-        toolDefinition: {
-          name: GetObjectStructureLow_Tool.name,
-          description: GetObjectStructureLow_Tool.description,
-          inputSchema: GetObjectStructureLow_Tool.inputSchema,
-        },
+        toolDefinition: GetObjectStructureLow_Tool,
         handler: (args: any) => {
           return handleGetObjectStructureLow(
             this.context,
@@ -390,11 +286,7 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
       },
       // High-level handler for package tree
       {
-        toolDefinition: {
-          name: GetPackageTree_Tool.name,
-          description: GetPackageTree_Tool.description,
-          inputSchema: GetPackageTree_Tool.inputSchema,
-        },
+        toolDefinition: GetPackageTree_Tool,
         handler: (args: any) => {
           return handleGetPackageTree(
             this.context,

@@ -11,6 +11,7 @@ import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetNodeStructureLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Fetch node structure from ADT repository. Used for object tree navigation and structure discovery. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {

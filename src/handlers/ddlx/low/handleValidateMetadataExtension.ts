@@ -17,14 +17,23 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'ValidateMetadataExtensionLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Validate an ABAP metadata extension name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {
-      objName: {
+      name: {
         type: 'string',
-        description: 'MetadataExtension name to validate (e.g., Z_MY_PROGRAM).',
+        description: 'MetadataExtension name to validate (e.g., ZI_MY_DDLX).',
+      },
+      description: {
+        type: 'string',
+        description: 'MetadataExtension description.',
+      },
+      package_name: {
+        type: 'string',
+        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects).',
       },
       session_id: {
         type: 'string',

@@ -5,6 +5,7 @@ import { ErrorCode, McpError } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetSqlQuery',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Execute freestyle SQL queries via SAP ADT Data Preview API.',
   inputSchema: {

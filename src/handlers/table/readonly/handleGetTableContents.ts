@@ -6,6 +6,7 @@ import { parseSqlQueryXml } from '../../system/readonly/handleGetSqlQuery';
 
 export const TOOL_DEFINITION = {
   name: 'GetTableContents',
+  available_in: ['onprem', 'cloud'] as const,
   description: '[read-only] Retrieve contents of an ABAP table.',
   inputSchema: {
     table_name: z.string().describe('Name of the ABAP table'),

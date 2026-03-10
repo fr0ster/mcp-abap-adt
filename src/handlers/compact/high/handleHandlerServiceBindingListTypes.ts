@@ -4,6 +4,7 @@ import { compactServiceBindingListTypesSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerServiceBindingListTypes',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Service binding types list. object_type: not used. Required: none. Optional: response_format(xml|json|plain). Response: XML/JSON/plain by response_format.',
   inputSchema: compactServiceBindingListTypesSchema,

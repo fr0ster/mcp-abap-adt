@@ -4,6 +4,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 // import { createAdtClient } from '../../../lib/clients';
 export const TOOL_DEFINITION = {
   name: 'GetTransaction',
+  available_in: ['onprem', 'cloud'] as const,
   description: '[read-only] Retrieve ABAP transaction details.',
   inputSchema: {
     type: 'object',

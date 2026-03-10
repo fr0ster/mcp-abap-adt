@@ -34,6 +34,7 @@
 
 export const TOOL_DEFINITION = {
   name: 'GetProgFullCode',
+  available_in: ['onprem', 'legacy'] as const,
   description:
     '[read-only] Returns the full code for a program or function group, including all includes, in tree traversal order.',
   inputSchema: {

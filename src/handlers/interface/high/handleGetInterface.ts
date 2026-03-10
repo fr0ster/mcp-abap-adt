@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetInterface',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve ABAP interface definition. Supports reading active or inactive version.',
   inputSchema: {

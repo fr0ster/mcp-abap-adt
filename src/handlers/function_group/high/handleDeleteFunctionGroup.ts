@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'DeleteFunctionGroup',
+  available_in: ['onprem', 'legacy'] as const,
   description:
     'Delete an ABAP function group from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.',
   inputSchema: {

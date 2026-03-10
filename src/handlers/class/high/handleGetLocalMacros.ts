@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetLocalMacros',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve local macros source code from a class (macros include). Supports reading active or inactive version. Note: Macros are supported in older ABAP versions but not in newer ones.',
   inputSchema: {

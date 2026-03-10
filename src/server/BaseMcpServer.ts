@@ -7,10 +7,14 @@ import {
 import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
-import type { IHandlersRegistry } from '../lib/handlers/interfaces.js';
+import type {
+  IHandlersRegistry,
+  SapEnvironment,
+} from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
 import {
+  getSystemContext,
   resetSystemContextCache,
   resolveSystemContext,
 } from '../lib/systemContext.js';
@@ -112,6 +116,45 @@ export abstract class BaseMcpServer extends McpServer {
       );
     }
 
+    // Connection type from env (http or rfc) — not stored in broker/session
+    const connectionType =
+      process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc'
+        ? ('rfc' as const)
+        : undefined;
+
+    // Resolve masterSystem/responsible early so handlers get proper context
+    // Create a temporary connection to call getSystemInformation
+    let masterSystem: string | undefined;
+    let responsible: string | undefined;
+    try {
+      const tempParams =
+        authType === 'jwt'
+          ? {
+              url: connectionConfig.serviceUrl || '',
+              authType: 'jwt' as const,
+              jwtToken: tokenToUse,
+              client: connectionConfig.sapClient || '',
+            }
+          : {
+              url: connectionConfig.serviceUrl || '',
+              authType: 'basic' as const,
+              username: connectionConfig.username || '',
+              password: connectionConfig.password || '',
+              client: connectionConfig.sapClient || '',
+            };
+      const tempConn = createAbapConnection(tempParams);
+      const systemCtx = await resolveSystemContext(tempConn);
+      masterSystem = systemCtx.masterSystem;
+      responsible = systemCtx.responsible;
+      this.logger.debug(
+        `[BaseMcpServer] Resolved systemContext: masterSystem=${masterSystem}, responsible=${responsible}`,
+      );
+    } catch (error) {
+      this.logger.debug(
+        `[BaseMcpServer] Could not resolve systemContext: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
     this.connectionContext = {
       sessionId: destination,
       connectionParams:
@@ -122,6 +165,7 @@ export abstract class BaseMcpServer extends McpServer {
               username: connectionConfig.username || '',
               password: connectionConfig.password || '',
               client: connectionConfig.sapClient || '',
+              ...(connectionType && { connectionType }),
             }
           : {
               url: connectionConfig.serviceUrl || '',
@@ -131,6 +175,8 @@ export abstract class BaseMcpServer extends McpServer {
             },
       metadata: {
         destination,
+        masterSystem,
+        responsible,
       },
     };
   }
@@ -236,9 +282,33 @@ export abstract class BaseMcpServer extends McpServer {
       resetSystemContextCache();
     }
 
+    // Create tokenRefresher from AuthBroker for automatic JWT token refresh on 401
+    let tokenRefresher: any;
+    if (
+      destination &&
+      this.authBroker &&
+      this.connectionContext.connectionParams.authType === 'jwt' &&
+      typeof (this.authBroker as any).createTokenRefresher === 'function'
+    ) {
+      tokenRefresher = (this.authBroker as any).createTokenRefresher(
+        destination,
+      );
+    }
+
     const connection = createAbapConnection(
       this.connectionContext.connectionParams,
+      undefined,
+      undefined,
+      tokenRefresher,
     );
+
+    // RFC connections require explicit connect() to open the stateful session
+    if (
+      this.connectionContext.connectionParams.connectionType === 'rfc' &&
+      typeof (connection as any).connect === 'function'
+    ) {
+      await (connection as any).connect();
+    }
 
     // Build overrides from metadata (HTTP headers)
     const metadata = this.connectionContext?.metadata || {};
@@ -380,6 +450,23 @@ export abstract class BaseMcpServer extends McpServer {
             entry.toolDefinition.inputSchema.properties
               ? jsonSchemaToZod(entry.toolDefinition.inputSchema)
               : entry.toolDefinition.inputSchema;
+
+          // Skip tools not available in the current SAP environment
+          const systemCtx = getSystemContext();
+          const availableIn = entry.toolDefinition.available_in;
+          if (availableIn && availableIn.length > 0) {
+            const currentEnv: SapEnvironment = systemCtx.isLegacy
+              ? 'legacy'
+              : this.connectionContext?.connectionParams?.authType === 'jwt'
+                ? 'cloud'
+                : 'onprem';
+            if (!availableIn.includes(currentEnv)) {
+              this.logger.debug(
+                `[BaseMcpServer] Skipping tool ${entry.toolDefinition.name}: available_in=${JSON.stringify(availableIn)}, currentEnv=${currentEnv}, isLegacy=${systemCtx.isLegacy}, authType=${this.connectionContext?.connectionParams?.authType}`,
+              );
+              continue;
+            }
+          }
 
           // Register wrapped handler via SDK registerTool
           // Note: connection is NOT part of MCP tool signature

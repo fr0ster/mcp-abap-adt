@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CheckObjectLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Perform syntax check on an ABAP object without activation. Returns syntax errors, warnings, and messages.',
   inputSchema: {

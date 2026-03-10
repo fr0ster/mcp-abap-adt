@@ -14,6 +14,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CreateCdsUnitTest',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a CDS unit test class with CDS validation. Creates the test class in initial state.',
   inputSchema: {
@@ -95,8 +96,6 @@ export async function handleCreateCdsUnitTest(
     );
 
     try {
-      await cdsUnitTest.validate({ cdsViewName });
-
       const createResult = await cdsUnitTest.create({
         className,
         packageName: package_name,
@@ -115,13 +114,21 @@ export async function handleCreateCdsUnitTest(
 
       logger?.info(`✅ CreateCdsUnitTest completed successfully: ${className}`);
 
+      // Extract safe fields — testClassState contains AxiosResponse objects
+      // with circular references that cannot be JSON.stringified
+      const safeState = {
+        testClassCode: createResult.testClassState?.testClassCode,
+        lockHandle: createResult.testClassState?.lockHandle,
+        errors: createResult.testClassState?.errors,
+      };
+
       return return_response({
         data: JSON.stringify(
           {
             success: true,
             class_name: className,
             cds_view_name: cdsViewName,
-            test_class_state: createResult.testClassState,
+            test_class_state: safeState,
             message: `CDS unit test class ${className} created successfully.`,
           },
           null,

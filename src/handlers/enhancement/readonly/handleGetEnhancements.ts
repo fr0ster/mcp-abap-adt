@@ -11,6 +11,7 @@ import {
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetEnhancements',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve a list of enhancements for a given ABAP object.',
   inputSchema: {

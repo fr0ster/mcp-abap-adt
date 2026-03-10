@@ -1,5 +1,6 @@
 export const TOOL_DEFINITION = {
   name: 'DescribeByList',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Batch description for a list of ABAP objects. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE, STRUCTURE, etc.',
   inputSchema: {

@@ -5,6 +5,7 @@ import { parseRuntimePayloadToJson } from './runtimePayloadParser';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeGetProfilerTraceData',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload.',
   inputSchema: {

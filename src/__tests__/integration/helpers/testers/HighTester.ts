@@ -9,10 +9,10 @@
 
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import { getCleanupAfter } from '../configHelpers';
-import { createHandlerContext } from '../testHelpers';
+import type { LoggerWithExtras } from '../loggerHelpers';
+import { createHandlerContext, delay } from '../testHelpers';
 import {
   callTool,
-  createHardModeClient,
   isHardModeEnabled,
   resolveEntityFromHandlerName,
   toolCandidates,
@@ -73,25 +73,26 @@ export class HighTester extends LambdaTester {
 
         logger?.info?.(`   • cleanup: delete ${objectName}`);
         try {
+          // Force-release DDIC lock if object is locked
+          try {
+            await this.forceReleaseLock(connection, objectName, logger);
+          } catch {
+            // Ignore — object may not exist or check not applicable
+          }
+
           if (isHardModeEnabled()) {
             const entity = resolveEntityFromHandlerName(
               (this as any).handlerName || '',
             );
-            const mcp = await createHardModeClient();
-            try {
-              const deleteArgs = this.buildDeleteArgs(context);
-              await callTool(
-                mcp.client,
-                mcp.toolNames,
-                toolCandidates('delete', entity, 'high', this.handlerName),
-                deleteArgs,
-              );
-              logger?.success?.(
-                `✅ cleanup: deleted ${objectName} successfully`,
-              );
-            } finally {
-              await mcp.close();
-            }
+            const mcp = await this.getHardModeClient();
+            const deleteArgs = this.buildDeleteArgs(context);
+            await callTool(
+              mcp.client,
+              mcp.toolNames,
+              toolCandidates('delete', entity, 'high', this.handlerName),
+              deleteArgs,
+            );
+            logger?.success?.(`✅ cleanup: deleted ${objectName} successfully`);
             return;
           }
 
@@ -160,7 +161,13 @@ export class HighTester extends LambdaTester {
       if (this.workflowFunctions.create) {
         logger?.info(`   • create ${this.context.objectName}`);
         const args = this.buildCreateArgs(this.context);
-        await this.workflowFunctions.create(handlerContext, args);
+        await this.retryOnConflict(
+          () => this.workflowFunctions!.create(handlerContext, args),
+          `Create ${this.context.objectName}`,
+          logger,
+          3,
+          5000,
+        );
         logger?.info(`   ✅ create completed`);
       }
 
@@ -168,7 +175,11 @@ export class HighTester extends LambdaTester {
       if (this.workflowFunctions.update) {
         logger?.info(`   • update ${this.context.objectName}`);
         const args = this.buildUpdateArgs(this.context);
-        await this.workflowFunctions.update(handlerContext, args);
+        await this.retryOnConflict(
+          () => this.workflowFunctions!.update(handlerContext, args),
+          `Update ${this.context.objectName}`,
+          logger,
+        );
         logger?.info(`   ✅ update completed`);
       }
     } catch (error: any) {
@@ -177,6 +188,20 @@ export class HighTester extends LambdaTester {
         const skipReason = error.message.replace(/^SKIP:\s*/, '');
         this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
         return;
+      }
+
+      // High handlers manage locks internally — if handler crashed mid-operation,
+      // force-release DDIC lock so cleanup can delete the object
+      try {
+        if (this.context.objectName && this.context.connection) {
+          await this.forceReleaseLock(
+            this.context.connection,
+            this.context.objectName,
+            this.context.logger,
+          );
+        }
+      } catch {
+        // Ignore — best effort
       }
 
       this.context.logger?.error(`❌ Test failed: ${error.message}`);
@@ -192,16 +217,22 @@ export class HighTester extends LambdaTester {
     const entity = resolveEntityFromHandlerName(
       (this as any).handlerName || '',
     );
-    const mcp = await createHardModeClient();
+    const mcp = await this.getHardModeClient();
+
     try {
       if (this.workflowFunctions?.create) {
         logger?.info(`   • create ${this.context.objectName} (hard mode)`);
         const args = this.buildCreateArgs(this.context);
-        await callTool(
-          mcp.client,
-          mcp.toolNames,
-          toolCandidates('create', entity, 'high', this.handlerName),
-          args,
+        await this.retryOnConflict(
+          () =>
+            callTool(
+              mcp.client,
+              mcp.toolNames,
+              toolCandidates('create', entity, 'high', this.handlerName),
+              args,
+            ),
+          `Create ${this.context.objectName} (hard mode)`,
+          logger,
         );
         logger?.info(`   ✅ create completed`);
       }
@@ -209,23 +240,81 @@ export class HighTester extends LambdaTester {
       if (this.workflowFunctions?.update) {
         logger?.info(`   • update ${this.context.objectName} (hard mode)`);
         const args = this.buildUpdateArgs(this.context);
-        await callTool(
-          mcp.client,
-          mcp.toolNames,
-          toolCandidates('update', entity, 'high', this.handlerName),
-          args,
+        await this.retryOnConflict(
+          () =>
+            callTool(
+              mcp.client,
+              mcp.toolNames,
+              toolCandidates('update', entity, 'high', this.handlerName),
+              args,
+            ),
+          `Update ${this.context.objectName} (hard mode)`,
+          logger,
         );
         logger?.info(`   ✅ update completed`);
       }
-    } finally {
-      await mcp.close();
+    } catch (error: any) {
+      if (error.message?.startsWith('SKIP:')) {
+        const skipReason = error.message.replace(/^SKIP:\s*/, '');
+        this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
+        return;
+      }
+
+      try {
+        if (this.context.objectName && this.context.connection) {
+          await this.forceReleaseLock(
+            this.context.connection,
+            this.context.objectName,
+            this.context.logger,
+          );
+        }
+      } catch {
+        // Ignore — best effort
+      }
+
+      this.context.logger?.error(`❌ Test failed: ${error.message}`);
+      throw error;
     }
+  }
+
+  /**
+   * Retry operation on HTTP 409 Conflict (TADIR stale entry).
+   * SAP BTP Cloud trial can return 409/TK754 after delete+create due to stale TADIR entries.
+   * SAP's own recommendation: "Repeat the function."
+   */
+  private async retryOnConflict<T>(
+    operation: () => Promise<T>,
+    label: string,
+    logger?: LoggerWithExtras | null,
+    maxRetries = 2,
+    delayMs = 3000,
+  ): Promise<T> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        const isTadirConflict =
+          error.response?.status === 409 ||
+          (typeof error.message === 'string' &&
+            (error.message.includes('object directory entry') ||
+              error.message.includes('already exists')));
+        if (isTadirConflict && attempt < maxRetries) {
+          logger?.warn?.(
+            `⚠️ ${label}: TADIR conflict (stale entry), retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`,
+          );
+          await delay(delayMs);
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error(`${label}: exceeded max retries`);
   }
 
   private buildCreateArgs(context: LambdaTesterContext): any {
     const { objectName, params, packageName, transportRequest, session } =
       context;
-    const nameField = this.getNameField();
+    const nameField = this.getCreateUpdateNameField();
     return {
       [nameField]: objectName,
       package_name: packageName,
@@ -233,6 +322,18 @@ export class HighTester extends LambdaTester {
       ...(params.ddl_code && { ddl_code: params.ddl_code }),
       ...(params.source_code && { source_code: params.source_code }),
       ...(params.superclass && { superclass: params.superclass }),
+      // BehaviorDefinition specific
+      ...(params.root_entity && { root_entity: params.root_entity }),
+      ...(params.implementation_type && {
+        implementation_type: params.implementation_type,
+      }),
+      // BehaviorImplementation specific
+      ...(params.behavior_definition && {
+        behavior_definition: params.behavior_definition,
+      }),
+      ...(params.implementation_code && {
+        implementation_code: params.implementation_code,
+      }),
       // Data element specific fields
       ...(params.type_kind && { type_kind: params.type_kind }),
       ...(params.data_type && { data_type: params.data_type }),
@@ -250,6 +351,21 @@ export class HighTester extends LambdaTester {
       ...(params.sign_exists !== undefined && {
         sign_exists: params.sign_exists,
       }),
+      // ServiceDefinition specific
+      ...(params.ddl_source && { ddl_source: params.ddl_source }),
+      // FunctionGroup specific
+      ...(params.function_group_name && {
+        function_group_name: params.function_group_name,
+      }),
+      ...(params.function_group_description && {
+        function_group_description: params.function_group_description,
+      }),
+      ...(params.function_module_name && {
+        function_module_name: params.function_module_name,
+      }),
+      ...(params.function_module_description && {
+        function_module_description: params.function_module_description,
+      }),
       ...(transportRequest && { transport_request: transportRequest }),
       ...(session?.session_id && { session_id: session.session_id }),
       ...(session?.session_state && { session_state: session.session_state }),
@@ -259,7 +375,7 @@ export class HighTester extends LambdaTester {
   private buildUpdateArgs(context: LambdaTesterContext): any {
     const { objectName, params, packageName, transportRequest, session } =
       context;
-    const nameField = this.getNameField();
+    const nameField = this.getCreateUpdateNameField();
     return {
       [nameField]: objectName,
       ...(packageName && { package_name: packageName }),
@@ -274,6 +390,19 @@ export class HighTester extends LambdaTester {
       ...(params.update_description && {
         description: params.update_description,
       }),
+      // BehaviorDefinition specific for update
+      ...(params.root_entity && { root_entity: params.root_entity }),
+      // BehaviorImplementation specific for update
+      ...(params.behavior_definition && {
+        behavior_definition: params.behavior_definition,
+      }),
+      ...(params.update_implementation_code && {
+        implementation_code: params.update_implementation_code,
+      }),
+      ...(params.implementation_code &&
+        !params.update_implementation_code && {
+          implementation_code: params.implementation_code,
+        }),
       // Data element specific fields for update
       ...(params.type_kind && { type_kind: params.type_kind }),
       ...(params.data_type && { data_type: params.data_type }),
@@ -287,6 +416,12 @@ export class HighTester extends LambdaTester {
       ...(params.sign_exists !== undefined && {
         sign_exists: params.sign_exists,
       }),
+      // ServiceDefinition specific for update
+      ...(params.update_ddl_source && {
+        ddl_source: params.update_ddl_source,
+      }),
+      ...(params.ddl_source &&
+        !params.update_ddl_source && { ddl_source: params.ddl_source }),
       ...(session?.session_id && { session_id: session.session_id }),
       ...(session?.session_state && { session_state: session.session_state }),
     };
@@ -303,24 +438,42 @@ export class HighTester extends LambdaTester {
     };
   }
 
+  /**
+   * Returns the name field used for DELETE operations.
+   * May differ from the create/update name field for some types.
+   */
   private getNameField(): string {
-    // Determine name field based on handler name
     const handlerName = (this as any).handlerName || '';
+    // behavior_implementation must be checked before behavior_definition (substring)
+    if (handlerName.includes('behavior_implementation')) return 'class_name';
+    if (handlerName.includes('behavior_definition'))
+      return 'behavior_definition_name';
+    if (handlerName.includes('data_element')) return 'data_element_name';
+    if (handlerName.includes('metadata_extension')) return 'ddlx_name';
+    if (handlerName.includes('service_definition'))
+      return 'service_definition_name';
     if (handlerName.includes('class')) return 'class_name';
     if (handlerName.includes('table')) return 'table_name';
     if (handlerName.includes('view')) return 'view_name';
     if (handlerName.includes('program')) return 'program_name';
     if (handlerName.includes('interface')) return 'interface_name';
     if (handlerName.includes('domain')) return 'domain_name';
-    if (handlerName.includes('data_element')) return 'data_element_name';
     if (handlerName.includes('structure')) return 'structure_name';
     if (handlerName.includes('function')) return 'function_name';
-    if (handlerName.includes('behavior_definition')) return 'bdef_name';
-    if (handlerName.includes('behavior_implementation')) return 'bimp_name';
-    if (handlerName.includes('metadata_extension')) return 'ddlx_name';
-    if (handlerName.includes('service_definition'))
-      return 'service_definition_name';
     return 'name'; // fallback
+  }
+
+  /**
+   * Returns the name field used for CREATE and UPDATE operations.
+   * For some types this differs from the delete name field.
+   */
+  private getCreateUpdateNameField(): string {
+    const handlerName = (this as any).handlerName || '';
+    // behavior_implementation: create/update use class_name (same as delete)
+    if (handlerName.includes('behavior_implementation')) return 'class_name';
+    // behavior_definition: create/update use 'name', delete uses 'behavior_definition_name'
+    if (handlerName.includes('behavior_definition')) return 'name';
+    return this.getNameField();
   }
 
   // Compatibility methods - HighTester doesn't use lambdas for lifecycle hooks
@@ -338,6 +491,14 @@ export class HighTester extends LambdaTester {
         );
         await this.cleanupAfterLambda(this.context);
         this.context.logger?.debug?.('✅ Pre-cleanup completed');
+        // Wait for SAP to propagate the deletion before starting the test
+        const cleanupDelay = this.context.getOperationDelay('cleanup');
+        if (cleanupDelay > 0) {
+          this.context.logger?.debug?.(
+            `⏳ Waiting ${cleanupDelay}ms for SAP to propagate cleanup...`,
+          );
+          await delay(cleanupDelay);
+        }
       } catch (error: any) {
         // Pre-cleanup errors are non-fatal - object might not exist
         this.context.logger?.debug?.(

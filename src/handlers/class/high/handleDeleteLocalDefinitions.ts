@@ -12,6 +12,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'DeleteLocalDefinitions',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Delete local definitions from an ABAP class by clearing the definitions include. Manages lock, update, unlock, and optional activation.',
   inputSchema: {

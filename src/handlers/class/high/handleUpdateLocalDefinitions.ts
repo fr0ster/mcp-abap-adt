@@ -13,6 +13,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdateLocalDefinitions',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Update local definitions in an ABAP class (definitions include). Manages lock, check, update, unlock, and optional activation.',
   inputSchema: {

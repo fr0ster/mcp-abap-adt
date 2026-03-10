@@ -5,6 +5,7 @@ import { parseRuntimePayloadToJson } from './runtimePayloadParser';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeAnalyzeDump',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[runtime] Read runtime dump by ID and return compact analysis summary with key fields.',
   inputSchema: {

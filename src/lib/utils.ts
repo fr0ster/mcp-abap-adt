@@ -1335,6 +1335,7 @@ SAP CONNECTION (.env file):
   SAP_CLIENT                       SAP client number (required)
                                    Example: 100
   SAP_AUTH_TYPE                    Authentication type: basic|jwt (default: basic)
+  SAP_CONNECTION_TYPE              Connection type: http|rfc (default: http)
   SAP_USERNAME                     SAP username (required for basic auth)
   SAP_PASSWORD                     SAP password (required for basic auth)
   SAP_JWT_TOKEN                    JWT token (required for jwt auth)
@@ -1885,15 +1886,28 @@ export function getConfig(): SapConfig {
     client = client.trim();
   }
 
-  // Auto-detect auth type: if JWT token is present, use JWT; otherwise check SAP_AUTH_TYPE or default to basic
+  // Auto-detect auth type: JWT token → jwt; SAP_AUTH_TYPE → explicit; default → basic
   let authType: SapConfig['authType'] = 'basic';
   if (process.env.SAP_JWT_TOKEN) {
     authType = 'jwt';
   } else if (process.env.SAP_AUTH_TYPE) {
-    const rawAuthType = process.env.SAP_AUTH_TYPE.trim();
-    authType =
-      rawAuthType === 'xsuaa' ? 'jwt' : (rawAuthType as SapConfig['authType']);
+    const rawAuthType = process.env.SAP_AUTH_TYPE.trim().toLowerCase();
+    if (rawAuthType === 'xsuaa') {
+      authType = 'jwt';
+    } else if (
+      rawAuthType === 'basic' ||
+      rawAuthType === 'jwt' ||
+      rawAuthType === 'saml'
+    ) {
+      authType = rawAuthType;
+    }
   }
+
+  // Connection type: http (default) or rfc (legacy systems)
+  const connectionType: SapConfig['connectionType'] =
+    process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc'
+      ? 'rfc'
+      : undefined;
 
   if (!url) {
     throw new Error(
@@ -1928,6 +1942,7 @@ export function getConfig(): SapConfig {
   const config: SapConfig = {
     url, // Already cleaned and validated above
     authType,
+    ...(connectionType && { connectionType }),
   };
 
   if (client) {
@@ -1954,11 +1969,12 @@ export function getConfig(): SapConfig {
     if (uaaClientId) config.uaaClientId = uaaClientId.trim();
     if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret.trim();
   } else {
+    // basic and rfc both require username/password
     const username = process.env.SAP_USERNAME;
     const password = process.env.SAP_PASSWORD;
     if (!username || !password) {
       throw new Error(
-        'Missing SAP_USERNAME or SAP_PASSWORD for basic authentication',
+        `Missing SAP_USERNAME or SAP_PASSWORD for ${authType} authentication`,
       );
     }
     config.username = username.trim();

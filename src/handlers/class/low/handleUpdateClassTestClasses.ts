@@ -17,6 +17,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdateClassTestClassesLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Upload ABAP Unit test include source code for an existing class. Requires test_classes_lock_handle from LockClassTestClassesLow.',
   inputSchema: {

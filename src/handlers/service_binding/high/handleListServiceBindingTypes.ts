@@ -8,6 +8,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'ListServiceBindingTypes',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'List available service binding types (for example ODataV2/ODataV4) from ADT Business Services endpoint.',
   inputSchema: {

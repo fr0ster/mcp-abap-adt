@@ -101,7 +101,7 @@ function createLogFn(level: string) {
         typeof data?.data === 'string'
           ? data?.data
           : data?.data
-            ? JSON.stringify(data.data)
+            ? safeStringify(data.data)
             : '';
       const responseData = data?.response?.data || '';
       const allData = dataStr + responseData;
@@ -139,7 +139,7 @@ function createLogFn(level: string) {
       const allData =
         typeof responseData === 'string'
           ? responseData
-          : JSON.stringify(responseData);
+          : safeStringify(responseData);
 
       // Check if it's an expected error type
       const isExpectedError =

@@ -16,6 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdateMetadataExtensionLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update source code of an existing ABAP metadata extension. Requires lock handle from LockObject. - use UpdateMetadataExtension (high-level) for full workflow with lock/unlock/activate.',
   inputSchema: {

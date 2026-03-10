@@ -17,6 +17,7 @@ import {
 } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'CreateFunctionGroup',
+  available_in: ['onprem', 'legacy'] as const,
   description:
     'Create a new ABAP function group in SAP system. Function groups serve as containers for function modules. Uses stateful session for proper lock management.',
   inputSchema: {

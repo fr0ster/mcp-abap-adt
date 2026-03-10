@@ -12,6 +12,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'DeleteObjectLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {

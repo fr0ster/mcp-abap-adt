@@ -16,6 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UnlockDataElementLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Unlock an ABAP data element after modification. Must use the same session_id and lock_handle from LockDataElement operation.',
   inputSchema: {

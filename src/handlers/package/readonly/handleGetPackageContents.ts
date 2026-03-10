@@ -6,6 +6,7 @@ import { writeResultToFile } from '../../../lib/writeResultToFile';
 
 export const TOOL_DEFINITION = {
   name: 'GetPackageContents',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages.',
   inputSchema: {

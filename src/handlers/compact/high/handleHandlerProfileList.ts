@@ -4,6 +4,7 @@ import { compactProfileListSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileList',
+  available_in: ['onprem'] as const,
   description:
     'Runtime profiling list. object_type: not used. Required: none. Response: JSON.',
   inputSchema: compactProfileListSchema,

@@ -17,6 +17,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'LockProgramLow',
+  available_in: ['onprem', 'legacy'] as const,
   description:
     '[low-level] Lock an ABAP program for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.',
   inputSchema: {

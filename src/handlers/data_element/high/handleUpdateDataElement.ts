@@ -22,6 +22,7 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 
 export const TOOL_DEFINITION = {
   name: 'UpdateDataElement',
+  available_in: ['onprem', 'cloud'] as const,
   description: `Update an existing ABAP data element in SAP system.
 
 Workflow:

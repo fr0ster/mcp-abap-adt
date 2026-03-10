@@ -11,6 +11,7 @@ import { ErrorCode, McpError } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetWhereUsed',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve where-used references for ABAP objects via ADT usageReferences. Returns parsed list of referencing objects with their types and packages.',
   inputSchema: {

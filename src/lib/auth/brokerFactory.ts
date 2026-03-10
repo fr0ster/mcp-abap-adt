@@ -748,8 +748,9 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       sapClient: envVars.SAP_CLIENT,
     };
 
-    // Check auth type
-    const authType = (envVars.SAP_AUTH_TYPE || 'basic') as 'basic' | 'jwt';
+    // Check auth type (only basic and jwt are valid; unknown values default to basic)
+    const rawAuthType = (envVars.SAP_AUTH_TYPE || 'basic').trim().toLowerCase();
+    const authType: 'basic' | 'jwt' = rawAuthType === 'jwt' ? 'jwt' : 'basic';
     connectionConfig.authType = authType;
 
     if (authType === 'basic') {

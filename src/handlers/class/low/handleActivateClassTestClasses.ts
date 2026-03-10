@@ -16,6 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'ActivateClassTestClassesLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Activate ABAP Unit test classes include for an existing class. Should be executed after updating and unlocking test classes.',
   inputSchema: {
@@ -89,11 +90,9 @@ export async function handleActivateClassTestClasses(
     logger?.info(`Starting test classes activation for: ${className}`);
 
     try {
-      const classClient = client.getClass() as any;
-      const activationResult = await classClient.activateTestClasses({
-        className,
-        testClassName: testClassName ?? className,
-      });
+      const classClient = client.getClass();
+      // Activate the parent class — this activates all its local includes (test classes, definitions, etc.)
+      const activationResult = await classClient.activate({ className });
 
       logger?.info(`✅ ActivateClassTestClasses completed: ${className}`);
 
@@ -103,7 +102,7 @@ export async function handleActivateClassTestClasses(
             success: true,
             class_name: className,
             session_id: session_id || null,
-            status: activationResult?.status,
+            status: activationResult?.activateResult?.status,
             session_state: null, // Session state management is now handled by auth-broker,
             message: `Test classes for ${className} activated successfully.`,
           },

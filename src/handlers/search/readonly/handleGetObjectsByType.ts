@@ -1,5 +1,6 @@
 export const TOOL_DEFINITION = {
   name: 'GetObjectsByType',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieves all ABAP objects of a specific type under a given node.',
   inputSchema: {

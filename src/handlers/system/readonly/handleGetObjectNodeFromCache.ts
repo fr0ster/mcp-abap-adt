@@ -1,5 +1,6 @@
 export const TOOL_DEFINITION = {
   name: 'GetObjectNodeFromCache',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Returns a node from the in-memory objects list cache by OBJECT_TYPE, OBJECT_NAME, TECH_NAME, and expands OBJECT_URI if present.',
   inputSchema: {

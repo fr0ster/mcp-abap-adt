@@ -357,6 +357,46 @@ export function getEnabledTestCase(
 }
 
 /**
+ * Get shared object configuration from shared_objects section.
+ * Shared objects are prerequisites used by multiple tests (e.g., BDEF for BehaviorImplementation).
+ */
+export function getSharedObject(key: string): any {
+  const config = loadTestConfig();
+  return config?.shared_objects?.[key] ?? null;
+}
+
+/**
+ * Get shared_dependencies configuration section.
+ * Shared dependencies are persistent prerequisite objects (tables, views, BDEFs)
+ * created once and reused across all tests.
+ */
+export function getSharedDependenciesConfig(): any {
+  const config = loadTestConfig();
+  return config?.shared_dependencies ?? null;
+}
+
+/**
+ * Resolve a shared dependency by type and name.
+ * @param type - 'tables' | 'views' | 'behavior_definitions'
+ * @param name - Object name (e.g., "ZMCP_SHR_TABLE01")
+ */
+export function resolveSharedDependency(
+  type: string,
+  name: string,
+): any | null {
+  const sharedConfig = getSharedDependenciesConfig();
+  if (!sharedConfig) return null;
+  const collection = sharedConfig[type];
+  if (!Array.isArray(collection)) return null;
+  return (
+    collection.find(
+      (item: any) =>
+        String(item.name).toUpperCase() === String(name).toUpperCase(),
+    ) ?? null
+  );
+}
+
+/**
  * Get test case definition
  */
 export function getTestCaseDefinition(
@@ -401,10 +441,23 @@ export function getSapConfigFromEnv(): SapConfig {
     authType = 'jwt';
   } else if (process.env.SAP_AUTH_TYPE) {
     const raw = process.env.SAP_AUTH_TYPE.trim().toLowerCase();
-    authType = raw === 'xsuaa' ? 'jwt' : (raw as SapConfig['authType']);
+    if (raw === 'xsuaa') {
+      authType = 'jwt';
+    } else if (raw === 'basic' || raw === 'jwt' || raw === 'saml') {
+      authType = raw;
+    }
   }
 
-  const config: SapConfig = { url, authType };
+  const connectionType: SapConfig['connectionType'] =
+    process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc'
+      ? 'rfc'
+      : undefined;
+
+  const config: SapConfig = {
+    url,
+    authType,
+    ...(connectionType && { connectionType }),
+  };
 
   if (authType === 'jwt') {
     config.jwtToken = process.env.SAP_JWT_TOKEN || '';
@@ -571,16 +624,55 @@ export function getCleanupAfter(testCase?: any): boolean {
 }
 
 /**
- * Check if current connection is cloud (JWT auth) or on-premise (basic auth)
- * Programs are not available on cloud, so tests should be skipped
+ * Check if current connection is cloud (JWT auth) or on-premise (basic auth).
+ * Programs/FunctionGroups are not available on cloud, so tests should be skipped.
+ *
+ * Detection order:
+ * 1. lib/utils sessionContext (when MCP server is running in-process)
+ * 2. process.env.SAP_JWT_TOKEN (set by test globalSetup from auth broker)
+ * 3. test-config.yaml auth_type field
  */
 export function isCloudConnection(): boolean {
   try {
-    const { isCloudConnection } = require('../../../lib/utils');
-    return isCloudConnection();
+    const { isCloudConnection: utilsIsCloud } = require('../../../lib/utils');
+    if (utilsIsCloud()) return true;
   } catch {
-    return false;
+    // lib/utils not available or sessionContext not set
   }
+
+  // Fallback: check env vars set by loadTestEnv / auth broker
+  if (process.env.SAP_JWT_TOKEN) {
+    return true;
+  }
+
+  // Fallback: check session file for hard mode destination (JWT = cloud)
+  try {
+    const config = loadTestConfig();
+    const destination =
+      config?.hard_mode?.mcp_destination ||
+      config?.auth_broker?.abap?.destination ||
+      config?.environment?.destination;
+    if (destination) {
+      const os = require('node:os');
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const sessionFile = path.join(
+        os.homedir(),
+        '.config',
+        'mcp-abap-adt',
+        'sessions',
+        `${destination}.env`,
+      );
+      if (fs.existsSync(sessionFile)) {
+        const content = fs.readFileSync(sessionFile, 'utf8');
+        if (content.includes('SAP_JWT_TOKEN=')) return true;
+      }
+    }
+  } catch {
+    // no config or session file
+  }
+
+  return false;
 }
 
 /**

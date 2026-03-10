@@ -17,6 +17,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UnlockBehaviorDefinitionLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Unlock an ABAP behavior definition after modification. Must use the same session_id and lock_handle from LockBehaviorDefinition operation.',
   inputSchema: {

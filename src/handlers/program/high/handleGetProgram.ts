@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetProgram',
+  available_in: ['onprem', 'legacy'] as const,
   description:
     'Retrieve ABAP program definition. Supports reading active or inactive version.',
   inputSchema: {

@@ -275,6 +275,10 @@ EXAMPLES:
   # Stdio with explicit env file
   mcp-abap-adt --env-path=.env
 
+  # RFC connection to legacy system (BASIS < 7.50)
+  # Set SAP_CONNECTION_TYPE=rfc in .env file, requires SAP NW RFC SDK
+  mcp-abap-adt --env-path=legacy.env
+
   # Limit to readonly operations only
   mcp-abap-adt --mcp=TRIAL --exposition=readonly
 

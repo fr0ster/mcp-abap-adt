@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'DeleteDomain',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Delete an ABAP domain from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.',
   inputSchema: {

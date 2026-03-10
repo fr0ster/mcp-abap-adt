@@ -24,6 +24,7 @@ type CreatePackageConfig = Partial<IPackageConfig> &
 
 export const TOOL_DEFINITION = {
   name: 'CreatePackageLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Create a new ABAP package. - use CreatePackage (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
   inputSchema: {

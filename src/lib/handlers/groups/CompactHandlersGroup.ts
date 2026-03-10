@@ -105,179 +105,91 @@ export class CompactHandlersGroup extends BaseHandlerGroup {
 
     return [
       {
-        toolDefinition: {
-          name: HandlerValidate_Tool.name,
-          description: HandlerValidate_Tool.description,
-          inputSchema: HandlerValidate_Tool.inputSchema,
-        },
+        toolDefinition: HandlerValidate_Tool,
         handler: withContext(handleHandlerValidate),
       },
       {
-        toolDefinition: {
-          name: HandlerActivate_Tool.name,
-          description: HandlerActivate_Tool.description,
-          inputSchema: HandlerActivate_Tool.inputSchema,
-        },
+        toolDefinition: HandlerActivate_Tool,
         handler: withContext(handleHandlerActivate),
       },
       {
-        toolDefinition: {
-          name: HandlerLock_Tool.name,
-          description: HandlerLock_Tool.description,
-          inputSchema: HandlerLock_Tool.inputSchema,
-        },
+        toolDefinition: HandlerLock_Tool,
         handler: withContext(handleHandlerLock),
       },
       {
-        toolDefinition: {
-          name: HandlerUnlock_Tool.name,
-          description: HandlerUnlock_Tool.description,
-          inputSchema: HandlerUnlock_Tool.inputSchema,
-        },
+        toolDefinition: HandlerUnlock_Tool,
         handler: withContext(handleHandlerUnlock),
       },
       {
-        toolDefinition: {
-          name: HandlerCheckRun_Tool.name,
-          description: HandlerCheckRun_Tool.description,
-          inputSchema: HandlerCheckRun_Tool.inputSchema,
-        },
+        toolDefinition: HandlerCheckRun_Tool,
         handler: withContext(handleHandlerCheckRun),
       },
       {
-        toolDefinition: {
-          name: HandlerUnitTestRun_Tool.name,
-          description: HandlerUnitTestRun_Tool.description,
-          inputSchema: HandlerUnitTestRun_Tool.inputSchema,
-        },
+        toolDefinition: HandlerUnitTestRun_Tool,
         handler: withContext(handleHandlerUnitTestRun),
       },
       {
-        toolDefinition: {
-          name: HandlerUnitTestStatus_Tool.name,
-          description: HandlerUnitTestStatus_Tool.description,
-          inputSchema: HandlerUnitTestStatus_Tool.inputSchema,
-        },
+        toolDefinition: HandlerUnitTestStatus_Tool,
         handler: withContext(handleHandlerUnitTestStatus),
       },
       {
-        toolDefinition: {
-          name: HandlerUnitTestResult_Tool.name,
-          description: HandlerUnitTestResult_Tool.description,
-          inputSchema: HandlerUnitTestResult_Tool.inputSchema,
-        },
+        toolDefinition: HandlerUnitTestResult_Tool,
         handler: withContext(handleHandlerUnitTestResult),
       },
       {
-        toolDefinition: {
-          name: HandlerCdsUnitTestStatus_Tool.name,
-          description: HandlerCdsUnitTestStatus_Tool.description,
-          inputSchema: HandlerCdsUnitTestStatus_Tool.inputSchema,
-        },
+        toolDefinition: HandlerCdsUnitTestStatus_Tool,
         handler: withContext(handleHandlerCdsUnitTestStatus),
       },
       {
-        toolDefinition: {
-          name: HandlerCdsUnitTestResult_Tool.name,
-          description: HandlerCdsUnitTestResult_Tool.description,
-          inputSchema: HandlerCdsUnitTestResult_Tool.inputSchema,
-        },
+        toolDefinition: HandlerCdsUnitTestResult_Tool,
         handler: withContext(handleHandlerCdsUnitTestResult),
       },
       {
-        toolDefinition: {
-          name: HandlerProfileRun_Tool.name,
-          description: HandlerProfileRun_Tool.description,
-          inputSchema: HandlerProfileRun_Tool.inputSchema,
-        },
+        toolDefinition: HandlerProfileRun_Tool,
         handler: withContext(handleHandlerProfileRun),
       },
       {
-        toolDefinition: {
-          name: HandlerProfileList_Tool.name,
-          description: HandlerProfileList_Tool.description,
-          inputSchema: HandlerProfileList_Tool.inputSchema,
-        },
+        toolDefinition: HandlerProfileList_Tool,
         handler: withContext(handleHandlerProfileList),
       },
       {
-        toolDefinition: {
-          name: HandlerProfileView_Tool.name,
-          description: HandlerProfileView_Tool.description,
-          inputSchema: HandlerProfileView_Tool.inputSchema,
-        },
+        toolDefinition: HandlerProfileView_Tool,
         handler: withContext(handleHandlerProfileView),
       },
       {
-        toolDefinition: {
-          name: HandlerDumpList_Tool.name,
-          description: HandlerDumpList_Tool.description,
-          inputSchema: HandlerDumpList_Tool.inputSchema,
-        },
+        toolDefinition: HandlerDumpList_Tool,
         handler: withContext(handleHandlerDumpList),
       },
       {
-        toolDefinition: {
-          name: HandlerDumpView_Tool.name,
-          description: HandlerDumpView_Tool.description,
-          inputSchema: HandlerDumpView_Tool.inputSchema,
-        },
+        toolDefinition: HandlerDumpView_Tool,
         handler: withContext(handleHandlerDumpView),
       },
       {
-        toolDefinition: {
-          name: HandlerServiceBindingListTypes_Tool.name,
-          description: HandlerServiceBindingListTypes_Tool.description,
-          inputSchema: HandlerServiceBindingListTypes_Tool.inputSchema,
-        },
+        toolDefinition: HandlerServiceBindingListTypes_Tool,
         handler: withContext(handleHandlerServiceBindingListTypes),
       },
       {
-        toolDefinition: {
-          name: HandlerServiceBindingValidate_Tool.name,
-          description: HandlerServiceBindingValidate_Tool.description,
-          inputSchema: HandlerServiceBindingValidate_Tool.inputSchema,
-        },
+        toolDefinition: HandlerServiceBindingValidate_Tool,
         handler: withContext(handleHandlerServiceBindingValidate),
       },
       {
-        toolDefinition: {
-          name: HandlerTransportCreate_Tool.name,
-          description: HandlerTransportCreate_Tool.description,
-          inputSchema: HandlerTransportCreate_Tool.inputSchema,
-        },
+        toolDefinition: HandlerTransportCreate_Tool,
         handler: withContext(handleHandlerTransportCreate),
       },
       {
-        toolDefinition: {
-          name: HandlerCreate_Tool.name,
-          description: HandlerCreate_Tool.description,
-          inputSchema: HandlerCreate_Tool.inputSchema,
-        },
+        toolDefinition: HandlerCreate_Tool,
         handler: withContext(handleHandlerCreate),
       },
       {
-        toolDefinition: {
-          name: HandlerGet_Tool.name,
-          description: HandlerGet_Tool.description,
-          inputSchema: HandlerGet_Tool.inputSchema,
-        },
+        toolDefinition: HandlerGet_Tool,
         handler: withContext(handleHandlerGet),
       },
       {
-        toolDefinition: {
-          name: HandlerUpdate_Tool.name,
-          description: HandlerUpdate_Tool.description,
-          inputSchema: HandlerUpdate_Tool.inputSchema,
-        },
+        toolDefinition: HandlerUpdate_Tool,
         handler: withContext(handleHandlerUpdate),
       },
       {
-        toolDefinition: {
-          name: HandlerDelete_Tool.name,
-          description: HandlerDelete_Tool.description,
-          inputSchema: HandlerDelete_Tool.inputSchema,
-        },
+        toolDefinition: HandlerDelete_Tool,
         handler: withContext(handleHandlerDelete),
       },
     ];

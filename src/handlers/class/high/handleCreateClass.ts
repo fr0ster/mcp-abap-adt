@@ -16,6 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CreateClass',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code afterwards.',
   inputSchema: {

@@ -15,6 +15,7 @@ import { writeResultToFile } from '../../../lib/writeResultToFile';
 
 export const TOOL_DEFINITION = {
   name: 'GetInclude',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve source code of a specific ABAP include file.',
   inputSchema: {

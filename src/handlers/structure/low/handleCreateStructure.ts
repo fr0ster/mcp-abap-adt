@@ -16,6 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CreateStructureLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Create a new ABAP structure. - use CreateStructure (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
   inputSchema: {

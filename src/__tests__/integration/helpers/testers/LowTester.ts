@@ -9,6 +9,7 @@
 
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import { getCleanupAfter } from '../configHelpers';
+import type { LoggerWithExtras } from '../loggerHelpers';
 import {
   createHandlerContext,
   delay,
@@ -17,7 +18,6 @@ import {
 } from '../testHelpers';
 import {
   callTool,
-  createHardModeClient,
   isHardModeEnabled,
   parseToolText,
   resolveEntityFromHandlerName,
@@ -82,28 +82,31 @@ export class LowTester extends LambdaTester {
         if (!objectName) return;
 
         try {
+          // Step 1: Force-release DDIC lock if object is locked
+          try {
+            await this.forceReleaseLock(connection, objectName, logger);
+          } catch {
+            // Ignore — object may not exist or check not applicable
+          }
+
+          // Step 2: Delete the object
           if (isHardModeEnabled()) {
             const entity = resolveEntityFromHandlerName(
               (this as any).handlerName || '',
             );
-            const mcp = await createHardModeClient();
-            try {
-              await this.ensureHardModeSession(mcp, context);
-              const deleteArgs = this.buildDeleteArgs(context);
-              await callTool(
-                mcp.client,
-                mcp.toolNames,
-                toolCandidates('delete', entity, 'low', this.handlerName),
-                deleteArgs,
-              );
-              logger?.info?.(`🗑️ Deleted ${objectName}`);
-            } finally {
-              await mcp.close();
-            }
+            const mcp = await this.getHardModeClient();
+            await this.ensureHardModeSession(mcp, context);
+            const deleteArgs = this.buildDeleteArgs(context);
+            await callTool(
+              mcp.client,
+              mcp.toolNames,
+              toolCandidates('delete', entity, 'low', this.handlerName),
+              deleteArgs,
+            );
+            logger?.info?.(`🗑️ Deleted ${objectName}`);
             return;
           }
 
-          await delay(2000); // Ensure object is ready for deletion
           const handlerContext = createHandlerContext({
             connection,
             logger: logger || undefined,
@@ -193,18 +196,34 @@ export class LowTester extends LambdaTester {
           }
         }
         logger?.info(`🔒 Locked ${this.context.objectName}`);
-      }
 
-      if (this.workflowFunctions.update) {
-        const args = this.buildUpdateArgs(this.context);
-        await this.workflowFunctions.update(handlerContext, args);
-        logger?.info(`📝 Updated ${this.context.objectName}`);
-      }
+        // Guarantee unlock even if update fails
+        try {
+          if (this.workflowFunctions.update) {
+            const updateArgs = this.buildUpdateArgs(this.context);
+            await this.retryOnConflict(
+              () => this.workflowFunctions!.update(handlerContext, updateArgs),
+              `Update ${this.context.objectName}`,
+              logger,
+            );
+            logger?.info(`📝 Updated ${this.context.objectName}`);
+          }
+        } finally {
+          await this.guaranteedUnlock(this.context, handlerContext, logger);
+        }
+      } else {
+        // No lock — run update and unlock independently (shouldn't normally happen)
+        if (this.workflowFunctions.update) {
+          const updateArgs = this.buildUpdateArgs(this.context);
+          await this.workflowFunctions.update(handlerContext, updateArgs);
+          logger?.info(`📝 Updated ${this.context.objectName}`);
+        }
 
-      if (this.workflowFunctions.unlock) {
-        const args = this.buildUnlockArgs(this.context);
-        await this.workflowFunctions.unlock(handlerContext, args);
-        logger?.info(`🔓 Unlocked ${this.context.objectName}`);
+        if (this.workflowFunctions.unlock) {
+          const unlockArgs = this.buildUnlockArgs(this.context);
+          await this.workflowFunctions.unlock(handlerContext, unlockArgs);
+          logger?.info(`🔓 Unlocked ${this.context.objectName}`);
+        }
       }
 
       if (this.workflowFunctions.activate) {
@@ -233,7 +252,7 @@ export class LowTester extends LambdaTester {
     const entity = resolveEntityFromHandlerName(
       (this as any).handlerName || '',
     );
-    const mcp = await createHardModeClient();
+    const mcp = await this.getHardModeClient();
 
     try {
       await this.ensureHardModeSession(mcp, this.context);
@@ -279,28 +298,71 @@ export class LowTester extends LambdaTester {
           }
         }
         logger?.info(`🔒 Locked ${this.context.objectName}`);
-      }
 
-      if (this.workflowFunctions?.update) {
-        const args = this.buildUpdateArgs(this.context);
-        await callTool(
-          mcp.client,
-          mcp.toolNames,
-          toolCandidates('update', entity, 'low', this.handlerName),
-          args,
-        );
-        logger?.info(`📝 Updated ${this.context.objectName}`);
-      }
+        // Guarantee unlock even if update fails
+        try {
+          const updateArgs = this.buildUpdateArgs(this.context);
+          await this.retryOnConflict(
+            () =>
+              callTool(
+                mcp.client,
+                mcp.toolNames,
+                toolCandidates('update', entity, 'low', this.handlerName),
+                updateArgs,
+              ),
+            `Update ${this.context.objectName} (hard mode)`,
+            logger,
+          );
+          logger?.info(`📝 Updated ${this.context.objectName}`);
+        } finally {
+          try {
+            const unlockArgs = this.buildUnlockArgs(this.context);
+            await callTool(
+              mcp.client,
+              mcp.toolNames,
+              toolCandidates('unlock', entity, 'low', this.handlerName),
+              unlockArgs,
+            );
+            logger?.info(`🔓 Unlocked ${this.context.objectName}`);
+          } catch (unlockError: any) {
+            logger?.warn?.(
+              `⚠️ Unlock failed, forcing DDIC lock release: ${unlockError.message}`,
+            );
+            try {
+              await this.forceReleaseLock(
+                this.context.connection,
+                this.context.objectName!,
+                logger,
+              );
+            } catch {
+              logger?.error?.(
+                `Force lock release also failed for ${this.context.objectName}`,
+              );
+            }
+          }
+        }
+      } else {
+        if (this.workflowFunctions?.update) {
+          const updateArgs = this.buildUpdateArgs(this.context);
+          await callTool(
+            mcp.client,
+            mcp.toolNames,
+            toolCandidates('update', entity, 'low', this.handlerName),
+            updateArgs,
+          );
+          logger?.info(`📝 Updated ${this.context.objectName}`);
+        }
 
-      if (this.workflowFunctions?.unlock) {
-        const args = this.buildUnlockArgs(this.context);
-        await callTool(
-          mcp.client,
-          mcp.toolNames,
-          toolCandidates('unlock', entity, 'low', this.handlerName),
-          args,
-        );
-        logger?.info(`🔓 Unlocked ${this.context.objectName}`);
+        if (this.workflowFunctions?.unlock) {
+          const unlockArgs = this.buildUnlockArgs(this.context);
+          await callTool(
+            mcp.client,
+            mcp.toolNames,
+            toolCandidates('unlock', entity, 'low', this.handlerName),
+            unlockArgs,
+          );
+          logger?.info(`🔓 Unlocked ${this.context.objectName}`);
+        }
       }
 
       if (this.workflowFunctions?.activate) {
@@ -322,8 +384,39 @@ export class LowTester extends LambdaTester {
 
       this.context.logger?.error(`❌ Test failed: ${error.message}`);
       throw error;
-    } finally {
-      await mcp.close();
+    }
+  }
+
+  /**
+   * Guaranteed unlock: tries handler unlock first, falls back to DDIC force-release.
+   * Never throws — swallows all errors to prevent masking the original test error.
+   */
+  private async guaranteedUnlock(
+    context: LambdaTesterContext,
+    handlerContext: any,
+    logger?: any,
+  ): Promise<void> {
+    if (!this.workflowFunctions?.unlock) return;
+
+    try {
+      const unlockArgs = this.buildUnlockArgs(context);
+      await this.workflowFunctions.unlock(handlerContext, unlockArgs);
+      logger?.info(`🔓 Unlocked ${context.objectName}`);
+    } catch (unlockError: any) {
+      logger?.warn?.(
+        `⚠️ Unlock failed, forcing DDIC lock release: ${unlockError.message}`,
+      );
+      try {
+        await this.forceReleaseLock(
+          context.connection,
+          context.objectName!,
+          logger,
+        );
+      } catch {
+        logger?.error?.(
+          `Force lock release also failed for ${context.objectName}`,
+        );
+      }
     }
   }
 
@@ -369,16 +462,41 @@ export class LowTester extends LambdaTester {
     }
   }
 
+  private static readonly META_PARAMS = new Set([
+    'skip_cleanup',
+    'cleanup_after',
+    'delete_after_test',
+    'delete_object_type',
+  ]);
+
+  /**
+   * Returns params suitable for create/validate steps:
+   * - excludes test-infrastructure keys
+   * - excludes update-specific keys (update_*, updated_*)
+   */
+  private filterCreateParams(params: any): any {
+    const result: any = {};
+    for (const [key, value] of Object.entries(params)) {
+      if (
+        !LowTester.META_PARAMS.has(key) &&
+        !key.startsWith('update_') &&
+        !key.startsWith('updated_')
+      ) {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
   private buildValidateArgs(context: LambdaTesterContext): any {
     const { objectName, params, packageName, transportRequest, session } =
       context;
-    // Extract object-specific name field (class_name, table_name, etc.)
     const nameField = this.getNameField();
     return {
+      ...this.filterCreateParams(params),
       [nameField]: objectName,
       package_name: packageName,
       description: params.description || objectName,
-      ...(params.superclass && { superclass: params.superclass }),
       ...(transportRequest && { transport_request: transportRequest }),
       ...(session?.session_id && { session_id: session.session_id }),
       ...(session?.session_state && { session_state: session.session_state }),
@@ -386,19 +504,7 @@ export class LowTester extends LambdaTester {
   }
 
   private buildCreateArgs(context: LambdaTesterContext): any {
-    const { objectName, params, packageName, transportRequest, session } =
-      context;
-    const nameField = this.getNameField();
-    return {
-      [nameField]: objectName,
-      package_name: packageName,
-      description: params.description || objectName,
-      ...(params.source_code && { source_code: params.source_code }),
-      ...(params.superclass && { superclass: params.superclass }),
-      ...(transportRequest && { transport_request: transportRequest }),
-      ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state }),
-    };
+    return this.buildValidateArgs(context);
   }
 
   private buildLockArgs(context: LambdaTesterContext): any {
@@ -412,15 +518,85 @@ export class LowTester extends LambdaTester {
   }
 
   private buildUpdateArgs(context: LambdaTesterContext): any {
-    const { objectName, params, lockHandle, session } = context;
+    const { objectName, params, lockHandle, packageName, session } = context;
     const nameField = this.getNameField();
-    return {
+    const handlerName = (this as any).handlerName || '';
+
+    const args: any = {
       [nameField]: objectName,
-      source_code: params.source_code || params.update_source_code || '',
       lock_handle: lockHandle || context.lockHandle,
-      ...(session?.session_id && { session_id: session.session_id }),
-      ...(session?.session_state && { session_state: session.session_state }),
     };
+
+    // Domain and DataElement handlers require a 'properties' object
+    if (
+      handlerName.includes('domain') ||
+      handlerName.includes('data_element')
+    ) {
+      args.properties = this.buildUpdateProperties(params, packageName);
+    }
+
+    // Content fields: prefer "update" variants over originals
+    const sourceCode = params.update_source_code ?? params.source_code;
+    if (sourceCode !== undefined) args.source_code = sourceCode;
+
+    const ddlCode = params.updated_ddl_code ?? params.ddl_code;
+    if (ddlCode !== undefined) args.ddl_code = ddlCode;
+
+    const ddlSource = params.update_ddl_source ?? params.ddl_source;
+    if (ddlSource !== undefined) args.ddl_source = ddlSource;
+
+    if (params.implementation_code !== undefined) {
+      args.implementation_code = params.implementation_code;
+    }
+
+    if (session?.session_id) args.session_id = session.session_id;
+    if (session?.session_state) args.session_state = session.session_state;
+
+    return args;
+  }
+
+  /**
+   * Builds the `properties` object required by UpdateDomainLow and UpdateDataElementLow.
+   * Merges YAML params.properties (if present) with top-level update fields.
+   */
+  private buildUpdateProperties(
+    params: any,
+    packageName: string,
+  ): Record<string, any> {
+    const base: Record<string, any> = params.properties ?? {};
+    const props: Record<string, any> = {
+      package_name: base.package_name || packageName,
+      description:
+        params.update_description ?? base.description ?? params.description,
+    };
+
+    const lengthVal = params.update_length ?? base.length ?? params.length;
+    if (lengthVal !== undefined) props.length = lengthVal;
+
+    if (base.datatype || params.datatype) {
+      props.datatype = base.datatype || params.datatype;
+    }
+    if (params.decimals !== undefined) props.decimals = params.decimals;
+    if (params.lowercase !== undefined) props.lowercase = params.lowercase;
+    if (params.sign_exists !== undefined)
+      props.sign_exists = params.sign_exists;
+
+    // DataElement-specific fields
+    if (params.type_kind) props.type_kind = params.type_kind;
+    if (params.type_name) {
+      props.type_name = params.type_name;
+    } else if (params.domain_name) {
+      props.type_name = params.domain_name;
+    }
+    if (params.data_type) props.data_type = params.data_type;
+    if (params.short_label) props.short_label = params.short_label;
+    if (params.medium_label) props.medium_label = params.medium_label;
+    if (params.field_label_long)
+      props.field_label_long = params.field_label_long;
+    if (params.field_label_heading)
+      props.field_label_heading = params.field_label_heading;
+
+    return props;
   }
 
   private buildUnlockArgs(context: LambdaTesterContext): any {
@@ -475,6 +651,42 @@ export class LowTester extends LambdaTester {
     return 'name'; // fallback
   }
 
+  // resolveObjectUri is inherited from LambdaTester
+
+  /**
+   * Retry operation on HTTP 409 Conflict (TADIR stale entry).
+   * SAP BTP Cloud trial can return 409/TK754 after delete+create due to stale TADIR entries.
+   * SAP's own recommendation: "Repeat the function."
+   */
+  private async retryOnConflict<T>(
+    operation: () => Promise<T>,
+    label: string,
+    logger?: LoggerWithExtras | null,
+    maxRetries = 2,
+    delayMs = 3000,
+  ): Promise<T> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        const isTadirConflict =
+          error.response?.status === 409 ||
+          (typeof error.message === 'string' &&
+            error.message.includes('object directory entry'));
+        if (isTadirConflict && attempt < maxRetries) {
+          logger?.warn?.(
+            `⚠️ ${label}: HTTP 409 Conflict (TADIR stale entry), retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`,
+          );
+          await delay(delayMs);
+          continue;
+        }
+        throw error;
+      }
+    }
+    // unreachable, but TS needs it
+    throw new Error(`${label}: exceeded max retries`);
+  }
+
   // Compatibility methods - LowTester doesn't use lambdas for lifecycle hooks
   async afterAll(): Promise<void> {
     await super.afterAll(async () => {});
@@ -490,6 +702,14 @@ export class LowTester extends LambdaTester {
         );
         await this.cleanupAfterLambda(this.context);
         this.context.logger?.debug?.('✅ Pre-cleanup completed');
+        // Wait for SAP to propagate the deletion before starting the test
+        const cleanupDelay = this.context.getOperationDelay('cleanup');
+        if (cleanupDelay > 0) {
+          this.context.logger?.debug?.(
+            `⏳ Waiting ${cleanupDelay}ms for SAP to propagate cleanup...`,
+          );
+          await delay(cleanupDelay);
+        }
       } catch (error: any) {
         // Pre-cleanup errors are non-fatal - object might not exist
         this.context.logger?.debug?.(

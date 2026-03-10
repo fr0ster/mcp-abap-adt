@@ -8,6 +8,7 @@ import { return_error, return_response } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 export const TOOL_DEFINITION = {
   name: 'CreateMetadataExtension',
+  available_in: ['onprem', 'cloud'] as const,
   description: 'Create a new ABAP Metadata Extension (DDLX) in SAP system.',
   inputSchema: {
     type: 'object',

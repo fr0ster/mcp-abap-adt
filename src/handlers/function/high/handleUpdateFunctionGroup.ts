@@ -21,6 +21,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdateFunctionGroup',
+  available_in: ['onprem', 'legacy'] as const,
   description:
     "Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don't have source code to update directly. Uses stateful session with proper lock/unlock mechanism.",
   inputSchema: {

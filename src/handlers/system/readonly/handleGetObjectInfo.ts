@@ -6,6 +6,7 @@ import { ErrorCode, McpError } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 export const TOOL_DEFINITION = {
   name: 'GetObjectInfo',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Return ABAP object tree: root, group nodes, and terminal leaves up to maxDepth. Enrich each node via SearchObject if enrich=true. Group nodes are included for hierarchy. Each node has node_type: root, point, end.',
   inputSchema: {

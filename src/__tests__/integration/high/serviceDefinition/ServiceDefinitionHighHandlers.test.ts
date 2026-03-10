@@ -19,6 +19,7 @@ import { handleUpdateServiceDefinition } from '../../../../handlers/service_defi
 import { createAdtClient } from '../../../../lib/clients';
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
 import { getTimeout } from '../../helpers/configHelpers';
+import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { HighTester } from '../../helpers/testers/HighTester';
 
 // Wrapper for delete since there's no handler for deleteServiceDefinition
@@ -61,7 +62,9 @@ describe('ServiceDefinition High-Level Handlers Integration', () => {
       },
     );
     await tester.beforeAll();
-  });
+    // Verify CDS view prerequisites (ZOK_C_CDS_TEST) exist before ServiceDefinition test
+    await ensureSharedObjects(tester.getConnection());
+  }, getTimeout('long'));
 
   afterAll(async () => {
     await tester.afterAll();

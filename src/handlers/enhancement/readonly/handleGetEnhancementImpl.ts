@@ -9,6 +9,7 @@ import {
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetEnhancementImpl',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve source code of a specific enhancement implementation by its name and enhancement spot.',
   inputSchema: {

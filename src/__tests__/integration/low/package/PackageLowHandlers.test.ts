@@ -90,6 +90,10 @@ describe('Package Low-Level Handlers Integration', () => {
     await tester.afterAll(async () => {});
   });
 
+  beforeEach(async () => {
+    await tester.beforeEach(async () => {});
+  });
+
   afterEach(async () => {
     await tester.afterEach();
   });

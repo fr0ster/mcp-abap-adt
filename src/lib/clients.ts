@@ -1,4 +1,4 @@
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient, AdtClientLegacy } from '@mcp-abap-adt/adt-clients';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { registerConnectionResetHook } from './connectionEvents';
@@ -17,6 +17,9 @@ export function createAdtClient(
     ctx.masterSystem || ctx.responsible
       ? { masterSystem: ctx.masterSystem, responsible: ctx.responsible }
       : undefined;
+  if (ctx.isLegacy) {
+    return new AdtClientLegacy(connection, logger, options);
+  }
   return new AdtClient(connection, logger, options);
 }
 

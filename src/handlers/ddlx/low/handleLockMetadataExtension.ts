@@ -16,14 +16,15 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'LockMetadataExtensionLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Lock an ABAP metadata extension for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.',
   inputSchema: {
     type: 'object',
     properties: {
-      objName: {
+      name: {
         type: 'string',
-        description: 'MetadataExtension name (e.g., Z_MY_PROGRAM).',
+        description: 'MetadataExtension name (e.g., ZI_MY_DDLX).',
       },
       session_id: {
         type: 'string',

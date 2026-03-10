@@ -4,6 +4,7 @@ import { compactCdsUnitTestResultSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerCdsUnitTestResult',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'CDS unit test result. object_type: not used. Required: run_id*. Optional: with_navigation_uris, format(abapunit|junit). Response: JSON.',
   inputSchema: compactCdsUnitTestResultSchema,

@@ -16,6 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetClassUnitTestResultLow',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id.',
   inputSchema: {

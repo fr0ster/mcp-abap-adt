@@ -18,6 +18,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdateBehaviorImplementation',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Update source code of an existing ABAP behavior implementation class. Updates both main source (with FOR BEHAVIOR OF clause) and implementations include. Uses stateful session with proper lock/unlock mechanism.',
   inputSchema: {

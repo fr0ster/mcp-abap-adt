@@ -6,6 +6,7 @@ import { handleGetFunction } from '../../function/readonly/handleGetFunction';
 import { handleGetInterface } from '../../interface/high/handleGetInterface';
 export const TOOL_DEFINITION = {
   name: 'GetAbapSystemSymbols',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Resolve ABAP symbols from semantic analysis with SAP system information including types, scopes, descriptions, and packages.',
   inputSchema: {

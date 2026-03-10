@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetLocalDefinitions',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve local definitions source code from a class (definitions include). Supports reading active or inactive version.',
   inputSchema: {

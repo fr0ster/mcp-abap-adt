@@ -14,6 +14,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestResult',
+  available_in: ['onprem', 'cloud'] as const,
   description: 'Retrieve CDS unit test run result for a run_id.',
   inputSchema: {
     type: 'object',

@@ -4,6 +4,7 @@ import { compactServiceBindingValidateSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerServiceBindingValidate',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Service binding validate before create. object_type: not used. Required: service_binding_name*, service_definition_name*. Optional: service_binding_version, package_name, description. Response: JSON.',
   inputSchema: compactServiceBindingValidateSchema,

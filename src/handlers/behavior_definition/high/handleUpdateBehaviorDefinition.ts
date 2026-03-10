@@ -12,6 +12,7 @@ import {
 } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'UpdateBehaviorDefinition',
+  available_in: ['onprem', 'cloud'] as const,
   description: 'Update source code of an ABAP Behavior Definition.',
   inputSchema: {
     type: 'object',

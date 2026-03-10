@@ -8,6 +8,7 @@ import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetInactiveObjects',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Get a list of inactive ABAP objects (objects that have been modified but not activated).',
   inputSchema: {

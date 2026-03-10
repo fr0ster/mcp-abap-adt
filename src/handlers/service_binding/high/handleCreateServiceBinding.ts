@@ -10,6 +10,7 @@ type ServiceBindingTypeInput = 'ODataV2' | 'ODataV4';
 
 export const TOOL_DEFINITION = {
   name: 'CreateServiceBinding',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Create ABAP service binding via ADT Business Services endpoint. XML is generated from high-level parameters.',
   inputSchema: {

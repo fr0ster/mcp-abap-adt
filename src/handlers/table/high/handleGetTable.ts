@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetTable',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve ABAP table definition. Supports reading active or inactive version.',
   inputSchema: {

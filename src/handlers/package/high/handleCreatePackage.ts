@@ -21,6 +21,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CreatePackage',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.',
   inputSchema: {

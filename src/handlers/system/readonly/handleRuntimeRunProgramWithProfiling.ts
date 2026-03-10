@@ -4,6 +4,7 @@ import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeRunProgramWithProfiling',
+  available_in: ['onprem'] as const,
   description:
     '[runtime] Execute ABAP program with profiler enabled and return created profilerId + traceId.',
   inputSchema: {

@@ -27,6 +27,7 @@ import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../sessionHelpers';
+import { delay } from '../testHelpers';
 import {
   createHardModeClient,
   isHardModeEnabled,
@@ -51,7 +52,7 @@ export class LambdaTester {
   protected testParams: any = null;
   protected context: LambdaTesterContext | undefined;
   protected cleanupAfterLambda: TLambda | null = null;
-  private hardModeMcp: {
+  protected hardModeMcp: {
     client: any;
     toolNames: Set<string>;
     close: () => Promise<void>;
@@ -465,6 +466,14 @@ export class LambdaTester {
         );
         await this.cleanupAfterLambda(this.context);
         this.context.logger?.debug?.('✅ Pre-cleanup completed');
+        // Wait for SAP to propagate the deletion before starting the test
+        const cleanupDelay = this.context.getOperationDelay('cleanup');
+        if (cleanupDelay > 0) {
+          this.context.logger?.debug?.(
+            `⏳ Waiting ${cleanupDelay}ms for SAP to propagate cleanup...`,
+          );
+          await delay(cleanupDelay);
+        }
       } catch (error: any) {
         // Pre-cleanup errors are non-fatal - object might not exist
         this.context.logger?.debug?.(
@@ -531,6 +540,20 @@ export class LambdaTester {
       return;
     }
 
+    // Check available_in constraint from test case config
+    const availableIn = this.context.testCase?.available_in as
+      | string[]
+      | undefined;
+    if (availableIn && availableIn.length > 0) {
+      const systemType = this.context.isCloudSystem ? 'cloud' : 'onprem';
+      if (!availableIn.includes(systemType)) {
+        this.context.logger?.testSkip(
+          `Skipping test: not available on ${systemType} (available_in: ${availableIn.join(', ')})`,
+        );
+        return;
+      }
+    }
+
     if (!this.context.connection || !this.context.session) {
       throw new Error('Connection and session not available');
     }
@@ -564,6 +587,10 @@ export class LambdaTester {
 
   isHardMode(): boolean {
     return isHardModeEnabled();
+  }
+
+  getConnection(): import('@mcp-abap-adt/interfaces').IAbapConnection | null {
+    return this.context?.connection ?? null;
   }
 
   async invokeToolOrHandler<T>(
@@ -603,14 +630,14 @@ export class LambdaTester {
     };
   }
 
-  private async getHardModeClient() {
+  protected async getHardModeClient() {
     if (!this.hardModeMcp) {
       this.hardModeMcp = await createHardModeClient();
     }
     return this.hardModeMcp;
   }
 
-  private async closeHardModeClient(): Promise<void> {
+  protected async closeHardModeClient(): Promise<void> {
     if (!this.hardModeMcp) {
       return;
     }
@@ -618,6 +645,75 @@ export class LambdaTester {
       await this.hardModeMcp.close();
     } finally {
       this.hardModeMcp = null;
+    }
+  }
+
+  /**
+   * Resolve ADT URI for an object based on handler name.
+   */
+  protected resolveObjectUri(objectName: string): string | null {
+    const name = encodeURIComponent(objectName.toLowerCase());
+    const handlerName = this.handlerName || '';
+    if (handlerName.includes('table')) return `/sap/bc/adt/ddic/tables/${name}`;
+    if (handlerName.includes('view'))
+      return `/sap/bc/adt/ddic/ddl/sources/${name}`;
+    if (handlerName.includes('structure'))
+      return `/sap/bc/adt/ddic/structures/${name}`;
+    if (handlerName.includes('data_element'))
+      return `/sap/bc/adt/ddic/dataelements/${name}`;
+    if (handlerName.includes('domain'))
+      return `/sap/bc/adt/ddic/domains/${name}`;
+    if (handlerName.includes('metadata_extension'))
+      return `/sap/bc/adt/ddic/ddlx/sources/${name}`;
+    if (handlerName.includes('interface'))
+      return `/sap/bc/adt/oo/interfaces/${name}`;
+    if (handlerName.includes('class')) return `/sap/bc/adt/oo/classes/${name}`;
+    if (handlerName.includes('behavior_definition'))
+      return `/sap/bc/adt/bo/behaviordefinitions/${name}`;
+    if (handlerName.includes('service_definition'))
+      return `/sap/bc/adt/ddic/srvd/sources/${name}`;
+    return null;
+  }
+
+  /**
+   * Force-release DDIC lock on an object if it's locked.
+   * Uses /sap/bc/adt/deletion/check to detect locks, then ddlock/locks to release.
+   */
+  protected async forceReleaseLock(
+    connection: any,
+    objectName: string,
+    logger?: any,
+  ): Promise<void> {
+    const objectUri = this.resolveObjectUri(objectName);
+    if (!objectUri) return;
+
+    const checkResponse = await connection.makeAdtRequest({
+      url: '/sap/bc/adt/deletion/check',
+      method: 'POST',
+      timeout: 30000,
+      data: `<?xml version="1.0" encoding="UTF-8"?><del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core"><del:object adtcore:uri="${objectUri}"/></del:checkRequest>`,
+      headers: {
+        Accept: 'application/vnd.sap.adt.deletion.check.response.v1+xml',
+        'Content-Type': 'application/vnd.sap.adt.deletion.check.request.v1+xml',
+      },
+    });
+    const responseText =
+      typeof checkResponse.data === 'string' ? checkResponse.data : '';
+    const isLocked =
+      responseText.includes('isDeletable="false"') &&
+      responseText.includes('lockUser');
+    if (isLocked) {
+      logger?.debug?.(
+        `🔒 Object ${objectName} is locked, releasing DDIC lock...`,
+      );
+      await connection.makeAdtRequest({
+        url: `/sap/bc/adt/ddic/ddlock/locks?lockAction=DELETE&name=${encodeURIComponent(objectName)}`,
+        method: 'POST',
+        timeout: 30000,
+        data: '',
+        headers: {},
+      });
+      logger?.debug?.(`🔓 Released DDIC lock for ${objectName}`);
     }
   }
 }

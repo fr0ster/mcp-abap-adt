@@ -11,6 +11,7 @@ import {
 } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'UpdateMetadataExtension',
+  available_in: ['onprem', 'cloud'] as const,
   description: 'Update source code of an ABAP Metadata Extension.',
   inputSchema: {
     type: 'object',

@@ -5,6 +5,7 @@ import { parseRuntimePayloadToJson } from './runtimePayloadParser';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeGetDumpById',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[runtime] Read a specific ABAP runtime dump by dump ID. Returns parsed JSON payload.',
   inputSchema: {

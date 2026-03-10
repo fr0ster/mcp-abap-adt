@@ -7,6 +7,7 @@ import { ErrorCode, McpError, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'SearchObject',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Search for ABAP objects by name pattern. Parameters: object_name (with or without mask), object_type (optional), maxResults (optional). If object_type is specified, results are filtered by type.',
   inputSchema: {

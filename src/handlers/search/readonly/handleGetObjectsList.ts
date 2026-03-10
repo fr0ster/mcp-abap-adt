@@ -3,6 +3,7 @@ import { createAdtClient } from '../../../lib/clients';
 
 export const TOOL_DEFINITION = {
   name: 'GetObjectsList',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Recursively retrieves all valid ABAP repository objects for a given parent (program, function group, etc.) including nested includes.',
   inputSchema: {

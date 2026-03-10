@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetMetadataExtension',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve ABAP metadata extension definition. Supports reading active or inactive version.',
   inputSchema: {

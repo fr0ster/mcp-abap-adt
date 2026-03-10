@@ -15,6 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'DeleteUnitTest',
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Delete an ABAP Unit test run. Note: ADT does not support deleting unit test runs and will return an error.',
   inputSchema: {

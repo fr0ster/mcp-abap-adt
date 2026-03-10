@@ -41,16 +41,16 @@ Everything else (object names, timeouts, CDS sources, unit test code) has workin
 
 ### available_in
 
-Every handler's `TOOL_DEFINITION` must have `available_in` field:
+`available_in` in `TOOL_DEFINITION` restricts tool to specific SAP environments. If omitted, the tool is available everywhere. Only set it when a tool genuinely doesn't work on some platform (e.g., Programs are onprem-only):
 
 ```typescript
-available_in: ['onprem', 'cloud'] as const,
+available_in: ['onprem', 'legacy'] as const,  // not available on cloud
 ```
 
-Values: `'onprem'` | `'cloud'` | `'legacy'`. Tools without `available_in` are NOT registered and invisible in hard mode.
+Values: `'onprem'` | `'cloud'` | `'legacy'`. If omitted, tool is available everywhere. Test-level `available_in` is controlled separately in `test-config.yaml.template`.
 
 ### Cloud vs On-Prem
 
-- Programs and Function Groups are NOT available on ABAP Cloud (`available_in: ['onprem']` or `['onprem', 'legacy']`)
+- Programs are NOT available on ABAP Cloud (`available_in: ['onprem', 'legacy']`)
 - Runtime profiling (class-based) and dumps work on both cloud and onprem
 - `RuntimeRunProgramWithProfiling` is onprem-only (no programs on cloud)

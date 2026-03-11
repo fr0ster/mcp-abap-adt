@@ -13,7 +13,7 @@ import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateFunctionModule',
-  available_in: ['onprem', 'legacy'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     'Update source code of an existing ABAP function module. Locks the function module, uploads new source code, and unlocks. Optionally activates after update. Use this to modify existing function modules without re-creating metadata.',
   inputSchema: {

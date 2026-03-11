@@ -15,7 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetFunctionModule',
-  available_in: ['onprem', 'legacy'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     'Retrieve ABAP function module definition. Supports reading active or inactive version.',
   inputSchema: {

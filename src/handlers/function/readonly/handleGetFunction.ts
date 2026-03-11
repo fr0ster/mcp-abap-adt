@@ -5,7 +5,7 @@ import { ErrorCode, McpError } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetFunction',
-  available_in: ['onprem', 'legacy'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description: '[read-only] Retrieve ABAP Function Module source code.',
   inputSchema: {
     function_name: z.string().describe('Name of the function module'),

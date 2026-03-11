@@ -15,7 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'DeleteFunctionModuleLow',
-  available_in: ['onprem', 'legacy'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     '[low-level] Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {

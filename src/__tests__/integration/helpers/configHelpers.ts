@@ -676,6 +676,45 @@ export function isCloudConnection(): boolean {
 }
 
 /**
+ * Get current system type based on connection detection.
+ *
+ * Returns 'cloud', 'onprem', or 'legacy'.
+ * Detection: JWT auth → cloud, otherwise onprem.
+ * Legacy can be set via test-config.yaml `environment.system_type: legacy`.
+ */
+export function getSystemType(): 'cloud' | 'onprem' | 'legacy' {
+  // Check explicit override in test config
+  try {
+    const config = loadTestConfig();
+    const explicitType = config?.environment?.system_type;
+    if (
+      explicitType === 'cloud' ||
+      explicitType === 'onprem' ||
+      explicitType === 'legacy'
+    ) {
+      return explicitType;
+    }
+  } catch {
+    // no config
+  }
+
+  return isCloudConnection() ? 'cloud' : 'onprem';
+}
+
+/**
+ * Check if a test case is available for the current system type.
+ * Compares test case `available_in` array against `getSystemType()`.
+ *
+ * @returns true if test should run, false if it should be skipped
+ */
+export function isTestAvailableForSystem(
+  availableIn?: string[],
+): boolean {
+  if (!availableIn || availableIn.length === 0) return true;
+  return availableIn.includes(getSystemType());
+}
+
+/**
  * Pre-check test parameters before running test
  * Verifies package existence and logs transport request if specified
  * @param client - AdtClient instance (optional, if not provided, checks are skipped)

@@ -32,8 +32,9 @@ import {
   getCleanupAfter,
   getEnabledTestCase,
   getOperationDelay,
+  getSystemType,
   getTimeout,
-  isCloudConnection,
+  isTestAvailableForSystem,
   resolvePackageName,
   resolveTransportRequest,
 } from '../../helpers/configHelpers';
@@ -118,12 +119,6 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
     it(
       'should execute full workflow: FUGR (V→C→L→U→A) then FM (V→C→L→U→U→A)',
       async () => {
-        if (isCloudConnection()) {
-          testLogger?.info(
-            '⏭️  Skipping test: Function groups are not available on cloud systems',
-          );
-          return;
-        }
         if (!hasConfig || (!isHardModeEnabled() && (!connection || !session))) {
           testLogger?.info(
             '⏭️  Skipping test: No configuration, connection or session',
@@ -134,6 +129,14 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
         const testCase = getEnabledTestCase('create_function', 'full_workflow');
         if (!testCase) {
           testLogger?.info('⏭️  Skipping test: No test case configuration');
+          return;
+        }
+
+        // Check available_in from test case config
+        if (!isTestAvailableForSystem(testCase.available_in)) {
+          testLogger?.info(
+            `⏭️  Skipping test: not available on ${getSystemType()} (available_in: ${testCase.available_in?.join(', ')})`,
+          );
           return;
         }
 

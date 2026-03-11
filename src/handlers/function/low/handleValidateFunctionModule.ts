@@ -17,7 +17,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'ValidateFunctionModuleLow',
-  available_in: ['onprem', 'legacy'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     '[low-level] Validate an ABAP function module name before creation. Checks if the name is valid and available. Requires function group name. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {

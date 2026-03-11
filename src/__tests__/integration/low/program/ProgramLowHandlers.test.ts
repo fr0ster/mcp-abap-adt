@@ -19,8 +19,7 @@ import { handleLockProgram } from '../../../../handlers/program/low/handleLockPr
 import { handleUnlockProgram } from '../../../../handlers/program/low/handleUnlockProgram';
 import { handleUpdateProgram } from '../../../../handlers/program/low/handleUpdateProgram';
 import { handleValidateProgram } from '../../../../handlers/program/low/handleValidateProgram';
-import { getTimeout, isCloudConnection } from '../../helpers/configHelpers';
-import { createTestLogger } from '../../helpers/loggerHelpers';
+import { getTimeout } from '../../helpers/configHelpers';
 import { LowTester } from '../../helpers/testers/LowTester';
 
 describe('Program Low-Level Handlers Integration', () => {
@@ -59,14 +58,6 @@ describe('Program Low-Level Handlers Integration', () => {
   it(
     'should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate',
     async () => {
-      // Skip test on cloud - programs are not available on cloud systems
-      if (isCloudConnection()) {
-        const logger = createTestLogger('program-low');
-        logger?.info(
-          '⏭️  Skipping test: Programs are not available on cloud systems',
-        );
-        return;
-      }
       await tester.run();
     },
     getTimeout('long'),

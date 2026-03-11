@@ -13,7 +13,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'ActivateObjectLow',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     '[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type.',
   inputSchema: {

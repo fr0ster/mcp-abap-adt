@@ -14,7 +14,7 @@ Many customers run older on-premise systems (BASIS 7.40 and below) where:
 
 ## Migration Steps
 
-### Step 1: Upgrade dependencies [done]
+### Step 1: Upgrade dependencies [DONE]
 
 ```
 @mcp-abap-adt/adt-clients  ^2.2.2 -> 3.0.0
@@ -23,7 +23,7 @@ Many customers run older on-premise systems (BASIS 7.40 and below) where:
 
 API is backward-compatible. Existing code compiles without changes.
 
-### Step 2: System detection at connection init
+### Step 2: System detection at connection init [DONE]
 
 Detect system type once when connection is established. Cache `isLegacy` flag.
 
@@ -39,7 +39,7 @@ const isModern = await isModernAdtSystem(connection);
 
 **Alternative:** add `isLegacy` to system context (`src/lib/systemContext.ts`).
 
-### Step 3: Switch client factory to use detection
+### Step 3: Switch client factory to use detection [DONE]
 
 **Where:** `src/lib/clients.ts`
 
@@ -66,7 +66,7 @@ export function createAdtClient(connection, logger): AdtClient {
 
 No handler changes needed — `AdtClientLegacy extends AdtClient`, same interface.
 
-### Step 4: Add RFC auth type support
+### Step 4: Add RFC auth type support [DONE]
 
 **Where:** `src/lib/config.ts`, `src/lib/utils.ts`
 
@@ -91,29 +91,27 @@ if (process.env.SAP_AUTH_TYPE === 'rfc') {
 `createAbapConnection()` from connection package already handles `authType: 'rfc'`.
 `node-rfc` is loaded dynamically — no error if not installed and not used.
 
-### Step 5: Launcher CLI support
+### Step 5: Launcher CLI support [DONE]
 
-**Where:** `src/server/launcher.ts` or CLI args
+**Where:** `src/server/launcher.ts`, `src/lib/config/ArgumentsParser.ts`
 
-Add `--auth-type=rfc` flag. Or auto-detect from env (if SAP_AUTH_TYPE is set).
+CLI flag `--connection-type=rfc` added. Also reads `SAP_CONNECTION_TYPE` env var.
+Auto-detection from env works via `.env` file hydration in launcher.
 
-### Step 6: Verify handler error handling
+### Step 6: Verify handler error handling [DONE]
 
-`AdtClientLegacy` throws on unsupported types (Domain, Table, BDEF, etc.).
-Verify all handlers propagate these as clean MCP errors, not stack traces.
+`BaseMcpServer` filters tools at registration time based on `available_in` vs
+detected system type (`isLegacy` from `systemContext`). Unsupported tools are
+simply not registered — they don't appear in the tool list for the MCP client.
 
-Affected handlers (will throw on legacy):
-- Domain, DataElement, Structure, Table, TableType
-- BehaviorDefinition, BehaviorImplementation, MetadataExtension
-- ServiceDefinition, ServiceBinding, AccessControl, Enhancement
-- Where-used, Table contents, SQL query, Runtime profiling
+`AdtClientLegacy` also throws on unsupported types as a second safety layer.
+All handlers wrap errors via `return_error()` / `McpError`, no raw stack traces.
 
-### Step 7: Tool descriptions for legacy awareness
+### Step 7: Tool descriptions for legacy awareness [DONE]
 
-Add note to unsupported tool descriptions:
-> "Not available on legacy systems (BASIS < 7.50)"
-
-Or conditionally adjust tool descriptions based on `isLegacy` flag.
+Every handler TOOL_DEFINITION has `available_in` field with supported environments.
+`BaseMcpServer` uses this + `isLegacy` to filter tools at registration time.
+Unsupported tools are hidden from the client automatically.
 
 ### Step 8: Integration tests on legacy system
 

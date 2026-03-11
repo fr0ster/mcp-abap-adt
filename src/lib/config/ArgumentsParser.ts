@@ -21,6 +21,8 @@ export interface ParsedArguments {
   useAuthBroker: boolean;
   /** Transport type */
   transport?: string;
+  /** SAP connection type: http (default) or rfc (legacy systems) */
+  connectionType?: 'http' | 'rfc';
   /** Path to YAML config file */
   config?: string;
   /** HTTP port */
@@ -177,6 +179,13 @@ export class ArgumentsParser {
     // Parse --auth-broker
     result.useAuthBroker =
       hasFlag('--auth-broker') || process.env.MCP_USE_AUTH_BROKER === 'true';
+
+    // Parse --connection-type (http or rfc)
+    const connType =
+      getArgValue('--connection-type') || process.env.SAP_CONNECTION_TYPE;
+    if (connType?.trim().toLowerCase() === 'rfc') {
+      result.connectionType = 'rfc';
+    }
 
     // Parse --conf / --config
     result.config = getArgValue('--conf') || getArgValue('--config');

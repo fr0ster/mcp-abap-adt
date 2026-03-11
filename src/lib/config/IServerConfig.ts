@@ -78,6 +78,9 @@ export interface IServerConfig {
   /** Path to YAML config file */
   configFile?: string;
 
+  /** SAP connection type: http (default) or rfc (legacy systems) */
+  connectionType?: 'http' | 'rfc';
+
   // ============================================================================
   // LEGACY FIELDS (for v1 backward compatibility)
   // ============================================================================

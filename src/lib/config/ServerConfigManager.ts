@@ -127,6 +127,7 @@ export class ServerConfigManager {
       unsafe: parsed.unsafe,
       useAuthBroker: parsed.useAuthBroker,
       browserAuthPort: parsed.browserAuthPort,
+      connectionType: parsed.connectionType,
     };
   }
 
@@ -252,6 +253,9 @@ AUTHENTICATION:
   --env-path=<path|file>           Explicit .env file path (or relative file name)
   --mcp=<destination>              Default MCP destination name (for auth-broker mode)
                                    Example: --mcp=TRIAL
+  --connection-type=<type>         SAP connection type: http (default) or rfc
+                                   RFC requires SAP NW RFC SDK + node-rfc installed
+                                   Alternative: SAP_CONNECTION_TYPE env var in .env
   --auth-broker-path=<path>        Custom path for auth-broker storage
                                    Example: --auth-broker-path=~/prj/tmp/
   --browser-auth-port=<port>       OAuth callback port for browser authentication

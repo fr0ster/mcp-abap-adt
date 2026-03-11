@@ -707,9 +707,7 @@ export function getSystemType(): 'cloud' | 'onprem' | 'legacy' {
  *
  * @returns true if test should run, false if it should be skipped
  */
-export function isTestAvailableForSystem(
-  availableIn?: string[],
-): boolean {
+export function isTestAvailableForSystem(availableIn?: string[]): boolean {
   if (!availableIn || availableIn.length === 0) return true;
   return availableIn.includes(getSystemType());
 }

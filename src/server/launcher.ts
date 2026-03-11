@@ -176,6 +176,11 @@ async function main() {
   const config = await configManager.getConfig();
   hydrateSystemContextFromEnvFile(config.envFile);
 
+  // CLI --connection-type overrides env var
+  if (config.connectionType && !process.env.SAP_CONNECTION_TYPE) {
+    process.env.SAP_CONNECTION_TYPE = config.connectionType;
+  }
+
   const baseContext = {
     connection: undefined as any,
     logger: undefined,

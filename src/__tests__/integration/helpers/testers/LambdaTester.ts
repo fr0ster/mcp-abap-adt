@@ -15,6 +15,7 @@ import {
   getCleanupAfter,
   getEnabledTestCase,
   getOperationDelay,
+  getSystemType,
   getTimeout,
   loadTestConfig,
   loadTestEnv,
@@ -545,7 +546,7 @@ export class LambdaTester {
       | string[]
       | undefined;
     if (availableIn && availableIn.length > 0) {
-      const systemType = this.context.isCloudSystem ? 'cloud' : 'onprem';
+      const systemType = getSystemType();
       if (!availableIn.includes(systemType)) {
         this.context.logger?.testSkip(
           `Skipping test: not available on ${systemType} (available_in: ${availableIn.join(', ')})`,

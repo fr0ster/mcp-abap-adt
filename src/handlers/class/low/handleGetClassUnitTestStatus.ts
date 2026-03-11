@@ -16,7 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetClassUnitTestStatusLow',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     '[low-level] Retrieve ABAP Unit run status XML for a previously started run_id.',
   inputSchema: {

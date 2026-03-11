@@ -17,7 +17,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'ValidateClassLow',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     '[low-level] Validate an ABAP class name before creation. Checks if the name is valid, available, and validates package, description, and superclass if provided. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {

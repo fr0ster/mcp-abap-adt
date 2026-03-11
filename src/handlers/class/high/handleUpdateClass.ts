@@ -16,7 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdateClass',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     'Update source code of an existing ABAP class. Locks, checks, updates, unlocks, and optionally activates.',
   inputSchema: {

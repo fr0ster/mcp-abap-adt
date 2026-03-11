@@ -14,7 +14,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTest',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     'Retrieve CDS unit test run status and result for a previously started run_id.',
   inputSchema: {

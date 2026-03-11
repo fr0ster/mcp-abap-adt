@@ -16,7 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CreateViewLow',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     '[low-level] Create a new ABAP view. - use CreateView (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
   inputSchema: {

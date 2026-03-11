@@ -16,7 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UnlockViewLow',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     '[low-level] Unlock an ABAP view after modification. Must use the same session_id and lock_handle from LockView operation.',
   inputSchema: {

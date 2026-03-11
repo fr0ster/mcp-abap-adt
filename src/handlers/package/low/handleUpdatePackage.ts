@@ -16,7 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdatePackageLow',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     '[low-level] Update description of an existing ABAP package. Requires lock handle from LockObject and superPackage. - use UpdatePackageSource for full workflow with lock/unlock.',
   inputSchema: {

@@ -16,7 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UnlockPackageLow',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     '[low-level] Unlock an ABAP package after modification. Requires lock handle from LockObject and superPackage. - must use the same session_id and lock_handle from LockObject.',
   inputSchema: {

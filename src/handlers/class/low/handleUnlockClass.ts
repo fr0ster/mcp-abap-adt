@@ -15,7 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UnlockClassLow',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     '[low-level] Unlock an ABAP class after modification. Uses session from HandlerContext. Must use the same lock_handle from LockClass operation.',
   inputSchema: {

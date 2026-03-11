@@ -15,7 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdateCdsUnitTest',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description: 'Update a CDS unit test class local test class source code.',
   inputSchema: {
     type: 'object',

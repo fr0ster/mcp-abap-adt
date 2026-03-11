@@ -14,7 +14,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'CreateCdsUnitTest',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     'Create a CDS unit test class with CDS validation. Creates the test class in initial state.',
   inputSchema: {

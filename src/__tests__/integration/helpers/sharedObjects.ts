@@ -16,6 +16,7 @@ import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import {
   getSharedDependenciesConfig,
+  getSystemType,
   loadTestConfig,
   resolveSharedDependency,
 } from './configHelpers';
@@ -143,6 +144,16 @@ export async function ensureSharedDependency(
     throw new Error(
       `Shared dependency ${type}:${name} not found in shared_dependencies config`,
     );
+  }
+
+  // Skip if not available for current system type
+  const availableIn = depConfig.available_in as string[] | undefined;
+  if (availableIn && availableIn.length > 0) {
+    const systemType = getSystemType();
+    if (!availableIn.includes(systemType)) {
+      log?.info?.(`Shared ${type} ${name} not available on ${systemType}, skipping`);
+      return { existed: false, created: false };
+    }
   }
 
   const packageName = resolvePackageName();
@@ -356,11 +367,21 @@ export async function ensureSharedObjects(
     },
   ];
 
+  const systemType = getSystemType();
+
   for (const { type, readFn } of typeOrder) {
     const items = sharedConfig[type];
     if (!Array.isArray(items) || items.length === 0) continue;
 
     for (const item of items) {
+      // Skip items not available for current system type
+      const availableIn = item.available_in as string[] | undefined;
+      if (availableIn && availableIn.length > 0 && !availableIn.includes(systemType)) {
+        logger?.info?.(`Shared ${type} "${item.name}" not available on ${systemType}, skipping`);
+        results.push({ success: true, name: item.name, action: 'skipped', reason: `Not available on ${systemType}` });
+        continue;
+      }
+
       try {
         await readFn(item.name);
         results.push({ success: true, name: item.name, action: 'verified' });

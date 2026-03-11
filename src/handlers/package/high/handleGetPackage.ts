@@ -15,7 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetPackage',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     'Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version.',
   inputSchema: {

@@ -16,7 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'LockClassTestClassesLow',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     '[low-level] Lock ABAP Unit test classes include (CLAS/OC testclasses) for the specified class. Returns a test_classes_lock_handle for subsequent update/unlock operations using the same session.',
   inputSchema: {

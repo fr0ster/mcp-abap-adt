@@ -4,7 +4,7 @@ import { ErrorCode, McpError, return_error } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetIncludesList',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     '[read-only] Recursively discover and list ALL include files within an ABAP program or include.',
   inputSchema: {

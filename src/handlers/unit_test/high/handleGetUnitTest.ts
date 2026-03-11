@@ -15,7 +15,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTest',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     'Retrieve ABAP Unit test run status and result for a previously started run_id.',
   inputSchema: {

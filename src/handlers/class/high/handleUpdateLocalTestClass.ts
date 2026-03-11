@@ -16,7 +16,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdateLocalTestClass',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     'Update a local test class in an ABAP class. Manages lock, check, update, unlock, and optional activation of parent class.',
   inputSchema: {

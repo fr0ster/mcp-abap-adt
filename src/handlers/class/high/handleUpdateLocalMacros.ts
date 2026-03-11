@@ -13,7 +13,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdateLocalMacros',
-  available_in: ['onprem', 'cloud'] as const,
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     'Update local macros in an ABAP class (macros include). Manages lock, check, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.',
   inputSchema: {

@@ -87,6 +87,9 @@ lock_config:
 environment:
   default_package: "ZMCP_TEST"              # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
+  # System type override (optional). Auto-detected from connection if omitted.
+  # Values: "cloud" (BTP ABAP Cloud), "onprem" (modern on-premise), "legacy" (BASIS < 7.50)
+  # system_type: ""
   # Cleanup configuration (applies to all tests)
   cleanup_after: true    # Clean up objects after test (default: false)
                           # Set to true to auto-delete objects after tests
@@ -112,6 +115,7 @@ shared_dependencies:
   tables:
     - name: "ZMCP_SHR_RTABL"
       description: "Shared table for root CDS entity"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared table for root CDS entity'
         @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
@@ -128,6 +132,7 @@ shared_dependencies:
 
     - name: "ZMCP_SHR_CTABL"
       description: "Shared table for child CDS entity"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared table for child CDS entity'
         @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
@@ -144,6 +149,7 @@ shared_dependencies:
     # Tables for BDEF test (separate from shared BDEF to avoid 409 conflict)
     - name: "ZMCP_SHR_BTABL"
       description: "Shared table for BDEF test root entity"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared table for BDEF test root entity'
         @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
@@ -160,6 +166,7 @@ shared_dependencies:
 
     - name: "ZMCP_SHR_BCTBL"
       description: "Shared table for BDEF test child entity"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared table for BDEF test child entity'
         @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
@@ -176,6 +183,7 @@ shared_dependencies:
     # Table for CDS unit test view dependency
     - name: "ZMCP_CDS_TBL02"
       description: "Shared table for CDS unit test view"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared table for CDS unit test view'
         @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
@@ -193,6 +201,7 @@ shared_dependencies:
     # Table for View builder test dependency
     - name: "ZMCP_VIEW_TBL02"
       description: "Shared table for View builder tests"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared table for View builder tests'
         @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
@@ -210,6 +219,7 @@ shared_dependencies:
     # Tables for BDEF LOW test (completely separate from HIGH to avoid any conflict)
     - name: "ZMCP_SHR_BLTBL"
       description: "Shared table for BDEF LOW test root entity"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared table for BDEF LOW test root entity'
         @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
@@ -226,6 +236,7 @@ shared_dependencies:
 
     - name: "ZMCP_SHR_BLCTL"
       description: "Shared table for BDEF LOW test child entity"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared table for BDEF LOW test child entity'
         @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
@@ -242,6 +253,7 @@ shared_dependencies:
   views:
     - name: "ZMCP_SHR_I_ROOT"
       description: "Shared root CDS view entity"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared root CDS view entity'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
@@ -258,6 +270,7 @@ shared_dependencies:
 
     - name: "ZMCP_SHR_I_CHLD"
       description: "Shared child CDS view entity"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared child CDS view entity'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
@@ -274,6 +287,7 @@ shared_dependencies:
 
     - name: "ZMCP_SHR_C_ROOT"
       description: "Shared consumption projection CDS view"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared consumption projection'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
@@ -290,6 +304,7 @@ shared_dependencies:
     # CDS views for BDEF HIGH test (creates/deletes its own BDEF on these views)
     - name: "ZMCP_SHR_I_BDEF"
       description: "Shared root CDS view for BDEF HIGH test"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared root CDS view for BDEF HIGH test'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
@@ -306,6 +321,7 @@ shared_dependencies:
 
     - name: "ZMCP_SHR_I_BCHD"
       description: "Shared child CDS view for BDEF HIGH test"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared child CDS view for BDEF HIGH test'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
@@ -323,6 +339,7 @@ shared_dependencies:
     # CDS views for BDEF LOW test (separate pair to avoid conflict with HIGH test)
     - name: "ZMCP_SHR_I_BDFL"
       description: "Shared root CDS view for BDEF LOW test"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared root CDS view for BDEF LOW test'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
@@ -339,6 +356,7 @@ shared_dependencies:
 
     - name: "ZMCP_SHR_I_BCHL"
       description: "Shared child CDS view for BDEF LOW test"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared child CDS view for BDEF LOW test'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
@@ -356,6 +374,7 @@ shared_dependencies:
     # CDS view for CDS unit test dependency
     - name: "ZMCP_BLD_CDSV_H1"
       description: "Shared CDS view for CDS unit test"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared CDS view for CDS unit test'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
@@ -371,6 +390,7 @@ shared_dependencies:
   behavior_definitions:
     - name: "ZMCP_SHR_I_ROOT"
       description: "Shared BDEF for BehaviorDefinition and BehaviorImplementation tests"
+      available_in: ["onprem", "cloud"]
       root_entity: "ZMCP_SHR_I_ROOT"
       implementation_type: "Managed"
       source: |
@@ -403,8 +423,10 @@ shared_dependencies:
   classes:
     - name: "ZBP_MCP_SHR_I_ROOT"
       description: "Shared BDEF implementation class for ZMCP_SHR_I_ROOT"
+      available_in: ["onprem", "cloud"]
     - name: "ZMCP_BLD_CLSUT_L1"
       description: "Shared container class for unit test integration tests"
+      available_in: ["onprem", "cloud", "legacy"]
 
 # Legacy shared_objects (kept for backward compatibility with unit_test_class)
 shared_objects:
@@ -664,7 +686,7 @@ create_class:
   test_cases:
     - name: "builder_class"
       enabled: true
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "cloud", "legacy"]
       description: "High-level test for ClassHighHandlers and ClassLocalIncludesHandlers: create → update → get → delete class with local includes"
       params:
         class_name: "ZMCP_BLD_CLSLOC_H1"
@@ -803,7 +825,7 @@ create_class_direct:
   test_cases:
     - name: "crud_direct"
       enabled: true
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "cloud", "legacy"]
       description: "Class CrudClient direct test (reference implementation)"
       params:
         class_name: "ZMCP_BLD_CLS_H1"
@@ -837,7 +859,7 @@ create_class_low:
   test_cases:
     - name: "full_workflow"
       enabled: true
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "cloud", "legacy"]
       description: "Class low-level handler full workflow test"
       params:
         class_name: "ZMCP_BLD_CLS_L1"
@@ -995,7 +1017,7 @@ create_function:
   test_cases:
     - name: "full_workflow"
       enabled: true
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "cloud", "legacy"]
       description: "Complete function group and function module workflow for high and low level tests"
       params:
         # Function Group parameters
@@ -1039,7 +1061,7 @@ create_interface:
   test_cases:
     - name: "builder_interface"
       enabled: true
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "cloud", "legacy"]
       description: "Interface reserved for InterfaceBuilder tests"
       params:
         interface_name: "ZMCP_BLD_IF_H1"
@@ -1064,7 +1086,7 @@ create_interface_low:
   test_cases:
     - name: "full_workflow"
       enabled: true
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "cloud", "legacy"]
       description: "Interface low-level handler full workflow test"
       params:
         interface_name: "ZMCP_BLD_IF_L1"
@@ -1165,7 +1187,7 @@ create_program:
   test_cases:
     - name: "builder_program"
       enabled: true
-      available_in: ["onprem"]
+      available_in: ["onprem", "legacy"]
       description: "Program reserved for ProgramBuilder tests"
       params:
         program_name: "ZMCP_BLD_PROG_H1"
@@ -1184,7 +1206,7 @@ create_program_low:
   test_cases:
     - name: "full_workflow"
       enabled: true
-      available_in: ["onprem"]
+      available_in: ["onprem", "legacy"]
       description: "Program low-level handler full workflow test"
       params:
         program_name: "ZMCP_BLD_PROG_L1"
@@ -1352,7 +1374,7 @@ create_transport:
   test_cases:
     - name: "builder_transport"
       enabled: true
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "cloud", "legacy"]
       description: "Transport reserved for TransportBuilder tests"
       params:
         description: "TransportBuilder workflow transport"
@@ -1365,7 +1387,7 @@ create_view:
   test_cases:
     - name: "builder_view"
       enabled: true
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "cloud", "legacy"]
       description: "View reserved for ViewBuilder tests"
       params:
         # package_name: "ZMCP_BLD_PKG01"
@@ -1465,7 +1487,7 @@ create_view_low:
   test_cases:
     - name: "full_workflow"
       enabled: true
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "cloud", "legacy"]
       description: "View low-level handler full workflow test"
       params:
         view_name: "ZMCP_BLD_VIEW_L1"
@@ -1527,15 +1549,15 @@ standard_objects:
   classes:
     - name: "CL_ABAP_CHAR_UTILITIES"
       description: "Character utilities helper (available everywhere)"
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "cloud", "legacy"]
     - name: "CL_ABAP_CORRESPONDING"
       description: "Corresponding-move helper for ABAP"
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "cloud", "legacy"]
 
   interfaces:
     - name: "IF_BUPA_API_MODIFY"
       description: "Interface zum BAdI: BUPA_API_MODIFY"
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "cloud", "legacy"]
 
   domains:
     - name: "MANDT"
@@ -1569,7 +1591,7 @@ standard_objects:
   packages:
     - name: "$TMP"
       description: "Local package"
-      available_in: ["onprem"]
+      available_in: ["onprem", "legacy"]
     - name: "ZLOCAL"
       description: "Placeholder for ABAP Cloud package – replace with existing package"
       available_in: ["cloud"]
@@ -1577,12 +1599,12 @@ standard_objects:
   programs:
     - name: "SAPLSETB"
       description: "Standard SAP settings program"
-      available_in: ["onprem"]
+      available_in: ["onprem", "legacy"]
 
   views:
     - name: "H_T000"
       description: "Client table help view"
-      available_in: ["onprem"]
+      available_in: ["onprem", "legacy"]
     - name: "I_SapPackage"
       description: "ABAP Cloud: replace with CDS view name existing in tenant"
       available_in: ["cloud"]
@@ -1590,13 +1612,13 @@ standard_objects:
   function_groups:
     - name: "EDIN"
       description: "System function group"
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "cloud", "legacy"]
 
   function_modules:
     - name: "IDOC_INBOUND_XML_SOAP_HTTP"
       group: "EDIN"
       description: "Returns system metadata"
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "cloud", "legacy"]
 
   standard_criteria:
     note: "Update the entries above with objects that exist in your SAP system before running read tests."
@@ -1663,7 +1685,7 @@ class_unit_test:
   test_cases:
     - name: "full_workflow"
       enabled: true
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "cloud", "legacy"]
       description: "Full workflow test for unit test handlers: Lock → Update → Unlock → Activate → Run → GetStatus → GetResult (low-level) or RunUnitTest → GetUnitTest (high-level)"
       params:
         # Container class that contains the test class (from shared_dependencies)

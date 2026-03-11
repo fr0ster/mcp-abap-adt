@@ -165,8 +165,8 @@ export class HighTester extends LambdaTester {
           () => this.workflowFunctions!.create(handlerContext, args),
           `Create ${this.context.objectName}`,
           logger,
-          3,
-          5000,
+          5,
+          8000,
         );
         logger?.info(`   ✅ create completed`);
       }

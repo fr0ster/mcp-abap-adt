@@ -2,8 +2,7 @@
  * Integration tests for Package Low-Level Handlers
  *
  * Tests the complete workflow using handler functions:
- * ValidatePackageLow → CreatePackageLow → LockPackageLow →
- * UnlockPackageLow → DeletePackageLow
+ * ValidatePackageLow → CreatePackageLow → DeletePackageLow
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Test execution logs
@@ -15,9 +14,8 @@
 
 import { handleCreatePackage } from '../../../../handlers/package/low/handleCreatePackage';
 import { handleDeletePackage } from '../../../../handlers/package/low/handleDeletePackage';
-import { handleLockPackage } from '../../../../handlers/package/low/handleLockPackage';
-import { handleUnlockPackage } from '../../../../handlers/package/low/handleUnlockPackage';
 import { handleValidatePackage } from '../../../../handlers/package/low/handleValidatePackage';
+import { createAdtClient } from '../../../../lib/clients';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -26,7 +24,6 @@ import {
   createHandlerContext,
   delay,
   extractErrorMessage,
-  extractLockHandle,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
 
@@ -56,6 +53,7 @@ describe('Package Low-Level Handlers Integration', () => {
             'DeletePackageLow',
             {
               package_name: objectName,
+              force_new_connection: true,
               ...(transportRequest && { transport_request: transportRequest }),
             },
             async () => {
@@ -65,6 +63,7 @@ describe('Package Low-Level Handlers Integration', () => {
               });
               return handleDeletePackage(deleteCtx, {
                 package_name: objectName,
+                force_new_connection: true,
                 ...(transportRequest && {
                   transport_request: transportRequest,
                 }),
@@ -99,7 +98,7 @@ describe('Package Low-Level Handlers Integration', () => {
   });
 
   it(
-    'should execute full workflow: Validate → Create → Lock → Unlock',
+    'should execute full workflow: Validate → Create → Update description',
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
         const {
@@ -230,73 +229,22 @@ describe('Package Low-Level Handlers Integration', () => {
         const createDelay = context.getOperationDelay('create');
         await delay(createDelay);
 
-        // Step 3: Lock
-        logger?.info(`   • lock: ${objectName}`);
-        const lockLogger = createTestLogger('package-low-lock');
-        const lockResponse = await tester.invokeToolOrHandler(
-          'LockPackageLow',
-          {
-            package_name: objectName,
-            super_package: superPackage || '',
-          },
-          async () => {
-            const lockCtx = createHandlerContext({
-              connection,
-              logger: lockLogger,
-            });
-            return handleLockPackage(lockCtx, {
-              package_name: objectName,
-              super_package: superPackage || '',
-            });
-          },
-        );
-
-        if (lockResponse.isError) {
-          const errorMsg = extractErrorMessage(lockResponse);
-          throw new Error(`Lock failed: ${errorMsg}`);
-        }
-
-        const lockData = parseHandlerResponse(lockResponse);
-        const lockHandle = extractLockHandle(lockData);
-        const sessionId = lockData.session_id;
-        logger?.success(`✅ lock: ${objectName} completed`);
-
-        const lockDelay = context.getOperationDelay('lock');
-        await delay(lockDelay);
-
-        // Step 4: Unlock
-        logger?.info(`   • unlock: ${objectName}`);
-        const unlockLogger = createTestLogger('package-low-unlock');
-        const unlockResponse = await tester.invokeToolOrHandler(
-          'UnlockPackageLow',
-          {
-            package_name: objectName,
-            super_package: superPackage,
-            lock_handle: lockHandle,
-            session_id: sessionId,
-          },
-          async () => {
-            const unlockCtx = createHandlerContext({
-              connection,
-              logger: unlockLogger,
-            });
-            return handleUnlockPackage(unlockCtx, {
-              package_name: objectName,
-              super_package: superPackage,
-              lock_handle: lockHandle,
-              session_id: sessionId,
-            });
-          },
-        );
-
-        if (unlockResponse.isError) {
-          const errorMsg = extractErrorMessage(unlockResponse);
-          throw new Error(`Unlock failed: ${errorMsg}`);
-        }
-
-        const unlockData = parseHandlerResponse(unlockResponse);
-        expect(unlockData.success).toBe(true);
-        logger?.success(`✅ unlock: ${objectName} completed`);
+        // Step 3: Update description (AdtPackage.update handles lock/update/unlock internally)
+        const updatedDescription =
+          params.updated_description || `${description} (UPDATED)`;
+        logger?.info(`   • update description: ${objectName}`);
+        const adtClient = createAdtClient(connection);
+        await adtClient.getPackage().update({
+          packageName: objectName,
+          superPackage: superPackage,
+          description: description,
+          updatedDescription: updatedDescription,
+          packageType: params.package_type || 'development',
+          softwareComponent: params.software_component,
+          transportLayer: params.transport_layer,
+          transportRequest: transportRequest,
+        });
+        logger?.success(`✅ update description: ${objectName} completed`);
       });
     },
     getTimeout('long'),

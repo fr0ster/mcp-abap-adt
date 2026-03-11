@@ -52,6 +52,7 @@ describe('Package High-Level Handlers Integration', () => {
             'DeletePackageLow',
             {
               package_name: objectName,
+              force_new_connection: true,
               ...(transportRequest && { transport_request: transportRequest }),
             },
             async () => {
@@ -61,6 +62,7 @@ describe('Package High-Level Handlers Integration', () => {
               });
               return handleDeletePackage(deleteCtx, {
                 package_name: objectName,
+                force_new_connection: true,
                 ...(transportRequest && {
                   transport_request: transportRequest,
                 }),

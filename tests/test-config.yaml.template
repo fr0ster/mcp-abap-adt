@@ -1757,7 +1757,7 @@ system_low_handlers:
       description: "System low-level handlers tests"
       params:
         # Test package for virtual folders and node structure
-        # test_package: ""  # Uses environment.default_package if omitted
+        test_package: "$TMP"  # Any existing package with objects
         # Test class for node structure and object structure
         test_class: "CL_ABAP_CHAR_UTILITIES"  # Standard SAP class for testing
         # Test program for node structure and object structure
@@ -1789,7 +1789,7 @@ system_high_handlers:
       description: "System high-level handlers tests"
       params:
         # Test package for package tree
-        # test_package: ""  # Uses environment.default_package if omitted
+        test_package: "$TMP"  # Any existing package with objects
         # Package tree settings
         package_tree_include_subpackages: true  # Include subpackages in tree
         package_tree_max_depth: 5  # Maximum depth for recursive package traversal

@@ -17,11 +17,16 @@ cp test-config.yaml.template test-config.yaml
 
 ```yaml
 environment:
-  default_package: "ZOK_LOCAL"  # ⚠️ Оновити на ваш пакет
-  default_transport: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ ОБОВ'ЯЗКОВО оновити!
-  default_system: "E19"  # ⚠️ Оновити на вашу систему (наприклад, "E19", "QAS")
-  default_client: "100"  # ⚠️ Оновити на ваш клієнт
+  env: "e19.env"                # ⚠️ Ім'я .env файлу зі стандартної папки sessions
+  system_type: "onprem"         # ⚠️ "onprem" | "cloud" | "legacy"
+  connection_type: "http"       # "http" | "rfc" (rfc для legacy)
+  default_package: "TEST_MCP"   # ⚠️ Оновити на ваш пакет
+  default_transport: ""         # ⚠️ Transport request або "" для локальних пакетів
 ```
+
+Файл `.env` розташовується у стандартній папці sessions:
+- **Windows**: `~/Documents/mcp-abap-adt/sessions/e19.env`
+- **Unix/macOS**: `~/.config/mcp-abap-adt/sessions/e19.env`
 
 ### 3. Оновити Transport Requests
 

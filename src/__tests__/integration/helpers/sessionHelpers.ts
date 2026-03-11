@@ -280,39 +280,24 @@ export async function createTestConnectionAndSession(): Promise<{
   }
 
   try {
-    // Try to find .env file path (same logic as loadTestEnv)
-    let envFilePath: string | undefined;
-    if (process.env.MCP_ENV_PATH) {
-      const resolvedPath = path.resolve(process.env.MCP_ENV_PATH);
-      if (fs.existsSync(resolvedPath)) {
-        envFilePath = resolvedPath;
-      }
-    }
-    if (!envFilePath) {
-      const cwdEnvPath = path.resolve(process.cwd(), '.env');
-      if (fs.existsSync(cwdEnvPath)) {
-        envFilePath = cwdEnvPath;
-      }
-    }
-    if (!envFilePath) {
-      const projectRootEnvPath = path.resolve(__dirname, '../../../../.env');
-      if (fs.existsSync(projectRootEnvPath)) {
-        envFilePath = projectRootEnvPath;
-      }
-    }
+    // Check if environment.env is explicitly configured — skip auth broker
+    const hasExplicitEnv = !!loadTestConfig()?.environment?.env;
 
-    // Try to create connection via AuthBroker first (same approach as index.ts)
     let connection: AbapConnection | null = null;
     let connectionSource: 'auth_broker' | 'env' | 'unknown' = 'unknown';
-    try {
-      connection = await createConnectionViaBroker(undefined, envFilePath);
-      if (connection) {
-        connectionSource = 'auth_broker';
+
+    // Try AuthBroker only when no explicit env file is configured
+    if (!hasExplicitEnv) {
+      try {
+        connection = await createConnectionViaBroker(undefined, undefined);
+        if (connection) {
+          connectionSource = 'auth_broker';
+        }
+      } catch (brokerError: any) {
+        sessionLogger?.debug(
+          `[createTestConnectionAndSession] AuthBroker failed: ${brokerError?.message || String(brokerError)}`,
+        );
       }
-    } catch (brokerError: any) {
-      sessionLogger?.debug(
-        `[createTestConnectionAndSession] AuthBroker failed: ${brokerError?.message || String(brokerError)}`,
-      );
     }
 
     // Fallback to getSapConfigFromEnv() if AuthBroker failed
@@ -400,10 +385,13 @@ export async function createTestConnectionAndSession(): Promise<{
     const cookies = connectionAny.getCookies?.() || '';
     const csrfToken = connectionAny.getCsrfToken?.() || '';
 
-    if (!cookies || !csrfToken) {
-      throw new Error(
-        'Failed to get session state. Connection may not be properly initialized.',
-      );
+    if (!cookies && !csrfToken) {
+      const isRfc = process.env.SAP_CONNECTION_TYPE?.toLowerCase() === 'rfc';
+      if (!isRfc) {
+        throw new Error(
+          'Failed to get session state. Connection may not be properly initialized.',
+        );
+      }
     }
 
     // Get cookie store from connection if available

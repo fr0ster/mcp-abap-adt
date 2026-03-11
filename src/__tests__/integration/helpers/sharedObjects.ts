@@ -88,6 +88,13 @@ export async function ensureSharedPackage(
     // Package doesn't exist — will create below
   }
 
+  // On legacy systems, packages can only be created via SAP GUI — fail if missing
+  if (getSystemType() === 'legacy') {
+    throw new Error(
+      `Shared package ${packageName} does not exist on legacy system. Create it manually in SAP GUI (SE80/SE21) before running shared:setup.`,
+    );
+  }
+
   // Create the package
   try {
     const transportRequest = resolveTransportRequest(
@@ -151,7 +158,9 @@ export async function ensureSharedDependency(
   if (availableIn && availableIn.length > 0) {
     const systemType = getSystemType();
     if (!availableIn.includes(systemType)) {
-      log?.info?.(`Shared ${type} ${name} not available on ${systemType}, skipping`);
+      log?.info?.(
+        `Shared ${type} ${name} not available on ${systemType}, skipping`,
+      );
       return { existed: false, created: false };
     }
   }
@@ -376,9 +385,20 @@ export async function ensureSharedObjects(
     for (const item of items) {
       // Skip items not available for current system type
       const availableIn = item.available_in as string[] | undefined;
-      if (availableIn && availableIn.length > 0 && !availableIn.includes(systemType)) {
-        logger?.info?.(`Shared ${type} "${item.name}" not available on ${systemType}, skipping`);
-        results.push({ success: true, name: item.name, action: 'skipped', reason: `Not available on ${systemType}` });
+      if (
+        availableIn &&
+        availableIn.length > 0 &&
+        !availableIn.includes(systemType)
+      ) {
+        logger?.info?.(
+          `Shared ${type} "${item.name}" not available on ${systemType}, skipping`,
+        );
+        results.push({
+          success: true,
+          name: item.name,
+          action: 'skipped',
+          reason: `Not available on ${systemType}`,
+        });
         continue;
       }
 

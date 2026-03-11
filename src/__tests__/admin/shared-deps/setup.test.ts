@@ -25,6 +25,7 @@ import { parseActivationResponse } from '../../../lib/utils';
 import {
   getSharedDependenciesConfig,
   getTimeout,
+  isTestAvailableForSystem,
   loadTestConfig,
 } from '../../integration/helpers/configHelpers';
 import { createTestLogger } from '../../integration/helpers/loggerHelpers';
@@ -115,6 +116,10 @@ describe('Admin: Setup shared dependencies', () => {
           `Creating Tables (${tables.length}) without activation...`,
         );
         for (const item of tables) {
+          if (!isTestAvailableForSystem(item.available_in)) {
+            testsLogger?.info?.(`Skipping table ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`);
+            continue;
+          }
           try {
             let exists = false;
             try {
@@ -206,6 +211,10 @@ describe('Admin: Setup shared dependencies', () => {
           `Creating Views (${views.length}) without activation...`,
         );
         for (const item of views) {
+          if (!isTestAvailableForSystem(item.available_in)) {
+            testsLogger?.info?.(`Skipping view ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`);
+            continue;
+          }
           try {
             let exists = false;
             try {
@@ -293,6 +302,10 @@ describe('Admin: Setup shared dependencies', () => {
           `Creating Behavior definitions (${bdefs.length}) without activation...`,
         );
         for (const item of bdefs) {
+          if (!isTestAvailableForSystem(item.available_in)) {
+            testsLogger?.info?.(`Skipping behavior definition ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`);
+            continue;
+          }
           try {
             let exists = false;
             try {
@@ -386,6 +399,10 @@ describe('Admin: Setup shared dependencies', () => {
           `Creating Classes (${classes.length}) without activation...`,
         );
         for (const item of classes) {
+          if (!isTestAvailableForSystem(item.available_in)) {
+            testsLogger?.info?.(`Skipping class ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`);
+            continue;
+          }
           try {
             let exists = false;
             try {

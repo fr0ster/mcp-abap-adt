@@ -187,19 +187,27 @@ node tests/test-sapmv45a-large-program-fixed.js
 ## Test Requirements
 
 All tests require:
-1. **Environment file**: `.env` file in the project root with SAP connection details
-2. **Built server**: Run `npm run build` before testing
-3. **SAP system access**: Valid SAP credentials and accessible SAP system
+1. **Session .env file**: Placed in the standard sessions folder (see below)
+2. **Test config**: `test-config.yaml` with `environment.env` pointing to the session file
+3. **Built server**: Run `npm run build` before testing
+4. **SAP system access**: Valid SAP credentials and accessible SAP system
 
 ## Environment Setup
 
-Create `.env` file in project root:
+Place your session `.env` file in the standard sessions folder:
+- **Windows**: `~/Documents/mcp-abap-adt/sessions/`
+- **Unix/macOS**: `~/.config/mcp-abap-adt/sessions/`
+
 ```env
-SAP_BASE_URL=https://your-sap-system.com:port
+# e.g., ~/Documents/mcp-abap-adt/sessions/e19.env
+SAP_URL=http://your-sap-system.com:8000
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
 SAP_CLIENT=100
+SAP_AUTH_TYPE=basic
 ```
+
+Then set `environment.env: "e19.env"` in `tests/test-config.yaml`.
 
 ## Test Results Interpretation
 

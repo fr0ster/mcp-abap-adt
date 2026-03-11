@@ -7,14 +7,15 @@
 # ┌──────────────────────────────────────────────────────────────────┐
 # │  REQUIRED CHANGES (edit these after copying):                    │
 # │                                                                  │
-# │  1. environment.default_package    — your dev package (Z*/Y*)    │
-# │  2. environment.default_transport  — transport request or ""     │
-# │  3. shared_dependencies.package    — package for shared objects  │
-# │  4. shared_dependencies.software_component — "ZLOCAL"/"HOME"    │
+# │  1. environment.env                — session .env file name      │
+# │  2. environment.system_type        — "onprem"/"cloud"/"legacy"   │
+# │  3. environment.default_package    — your dev package (Z*/Y*)    │
+# │  4. environment.default_transport  — transport request or ""     │
+# │  5. shared_dependencies.package    — package for shared objects  │
+# │  6. shared_dependencies.software_component — "ZLOCAL"/"HOME"    │
 # │                                                                  │
-# │  OPTIONAL (cloud/BTP only):                                      │
-# │  5. auth_broker.abap.destination   — auth broker destination     │
-# │  6. auth_broker.service_keys_dir   — path to service keys       │
+# │  OPTIONAL (cloud/BTP, JWT token refresh):                        │
+# │  7. auth_broker.abap.destination   — auth broker destination     │
 # └──────────────────────────────────────────────────────────────────┘
 #
 # IMPORTANT: Object Naming Convention
@@ -85,15 +86,16 @@ lock_config:
 # Environment configuration
 
 environment:
+  # Connection: .env file from standard sessions folder (~/Documents/mcp-abap-adt/sessions/)
+  # Contains SAP_URL, SAP_USERNAME, SAP_PASSWORD, SAP_CLIENT, SAP_AUTH_TYPE, etc.
+  env: ""                                    # ← CHANGE: session file name (e.g., "e19.env", "mdd.env")
+  # System and connection type (explicit, no auto-detection)
+  system_type: ""                            # ← CHANGE: "onprem" | "cloud" | "legacy"
+  connection_type: "http"                    # "http" | "rfc" (rfc for legacy, BASIS < 7.50)
+  # Test defaults
   default_package: "ZMCP_TEST"              # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
-  # System type override (optional). Auto-detected from connection if omitted.
-  # Values: "cloud" (BTP ABAP Cloud), "onprem" (modern on-premise), "legacy" (BASIS < 7.50)
-  # system_type: ""
-  # Cleanup configuration (applies to all tests)
-  cleanup_after: true    # Clean up objects after test (default: false)
-                          # Set to true to auto-delete objects after tests
-                          # Note: cleanup_before was removed - not used in code
+  cleanup_after: true                        # Clean up objects after test
   # Real MCP client mode — tests go through full MCP transport layer
   integration_hard_mode:
     enabled: false

@@ -4,18 +4,20 @@ Integration tests run against a real SAP system using Jest. All test parameters 
 
 ## Quick Start
 
-### 1. Environment file
+### 1. Session .env file
 
-Create `.env` in the project root:
+Place your SAP credentials in the standard sessions folder (`~/Documents/mcp-abap-adt/sessions/` on Windows, `~/.config/mcp-abap-adt/sessions/` on Unix):
 
 ```env
-SAP_BASE_URL=https://your-sap-system.com:port
+# e.g., ~/Documents/mcp-abap-adt/sessions/e19.env
+SAP_URL=http://your-sap-system.com:8000
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
 SAP_CLIENT=100
+SAP_AUTH_TYPE=basic
+SAP_MASTER_SYSTEM=DEV
+SAP_RESPONSIBLE=your-username
 ```
-
-For non-unicode legacy systems add `SAP_UNICODE=false`.
 
 ### 2. Test configuration
 
@@ -23,21 +25,23 @@ For non-unicode legacy systems add `SAP_UNICODE=false`.
 cp tests/test-config.yaml.template tests/test-config.yaml
 ```
 
-The template works out of the box with sensible defaults. Edit **only** the lines marked `# <- CHANGE`:
+The template works out of the box with sensible defaults. Edit **only** the lines marked `# ← CHANGE`:
 
 | Parameter | Description | Example |
 |---|---|---|
+| `environment.env` | Session .env file name from sessions folder | `"e19.env"`, `"mdd.env"` |
+| `environment.system_type` | SAP system type | `"onprem"`, `"cloud"`, `"legacy"` |
+| `environment.connection_type` | Connection protocol | `"http"` (default), `"rfc"` |
 | `environment.default_package` | Dev package for test objects | `ZMCP_TEST`, `$TMP` |
 | `environment.default_transport` | Transport request (or `""` for local) | `E19K900001` |
 | `shared_dependencies.package` | Package for shared test objects | `ZMCP_SHARED` |
 | `shared_dependencies.software_component` | Software component | `LOCAL`, `HOME` |
 
-Optional (cloud/BTP only):
+Optional (cloud/BTP, JWT token refresh):
 
 | Parameter | Description |
 |---|---|
 | `auth_broker.abap.destination` | Auth broker destination (`TRIAL`, `mcp`) |
-| `auth_broker.service_keys_dir` | Path to service keys dir |
 
 All other values (object names, timeouts, CDS sources, unit test code) have working defaults.
 

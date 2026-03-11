@@ -31,7 +31,10 @@ cp tests/test-config.yaml.template tests/test-config.yaml
 # Edit ONLY the lines marked "# ← CHANGE"
 ```
 
-**Required changes** (3-4 lines):
+**Required changes** (marked `# ← CHANGE`):
+- `environment.env` — session .env file name (`"e19.env"`, `"mdd.env"`) from standard sessions folder
+- `environment.system_type` — `"onprem"`, `"cloud"`, or `"legacy"`
+- `environment.connection_type` — `"http"` (default) or `"rfc"` (legacy)
 - `environment.default_package` — dev package (`ZMCP_TEST`, `$TMP`)
 - `environment.default_transport` — transport request or `""` for local packages
 - `shared_dependencies.package` — package for shared test objects

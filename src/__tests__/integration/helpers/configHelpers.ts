@@ -74,54 +74,70 @@ export async function loadTestEnv(): Promise<void> {
     throw envLoadError;
   }
 
-  // // Prevent index.ts env auto-load / HTTP-mode logs during tests
-  // process.env.MCP_SKIP_ENV_LOAD = 'true';
-
-  const useAuthBroker = resolveUseAuthBrokerFlag();
   const useUnsafe = resolveUnsafeFlag();
-
   if (useUnsafe) {
     process.env.MCP_UNSAFE = 'true';
   }
 
-  let brokerOk = brokerSucceeded;
+  let envPath: string | null = null;
 
-  // If auth-broker is preferred, try it first and skip .env entirely unless explicitly requested
-  if (useAuthBroker) {
-    try {
-      brokerAttempted = true;
-      await setupAuthBrokerForTests({ force: true });
-      brokerOk = !!process.env.SAP_URL;
-      brokerSucceeded = brokerOk;
-    } catch (error: any) {
-      configLogger?.warn(
-        `[DEBUG] loadTestEnv - Auth-broker refresh failed: ${error?.message || String(error)}`,
-      );
+  // Priority 0: Use environment.env from test-config.yaml (e.g., "e77.env")
+  // Path is resolved relative to project root (tests/../)
+  try {
+    const cfg = loadTestConfig();
+    const envFile = cfg?.environment?.env;
+    if (envFile) {
+      const projectRoot = path.resolve(__dirname, '../../../..');
+      const resolved = path.resolve(projectRoot, envFile);
+      if (fs.existsSync(resolved)) {
+        envPath = resolved;
+        configLogger?.debug(
+          `[loadTestEnv] Resolved environment.env="${envFile}" → ${envPath}`,
+        );
+      } else {
+        configLogger?.warn(
+          `⚠️ environment.env="${envFile}" specified but file not found at: ${resolved}`,
+        );
+      }
     }
+  } catch {
+    // no config
+  }
 
-    // If broker succeeded, we're done (no .env fallback when broker is configured)
-    if (brokerOk && process.env.SAP_URL) {
-      envLoaded = true;
-      return;
-    }
+  // If environment.env is not set, try auth broker or fallback .env chain
+  if (!envPath) {
+    const useAuthBroker = resolveUseAuthBrokerFlag();
+    let brokerOk = brokerSucceeded;
 
-    // If useAuthBroker is true (destination specified), don't fall back to .env
-    // This ensures that when destination is configured, we always use auth-broker
     if (useAuthBroker) {
-      configLogger?.warn(
-        `[DEBUG] loadTestEnv - Auth-broker failed but destination is configured. Not loading .env file.`,
-      );
-      envLoaded = true;
-      return;
+      try {
+        brokerAttempted = true;
+        await setupAuthBrokerForTests({ force: true });
+        brokerOk = !!process.env.SAP_URL;
+        brokerSucceeded = brokerOk;
+      } catch (error: any) {
+        configLogger?.warn(
+          `[loadTestEnv] Auth-broker failed: ${error?.message || String(error)}`,
+        );
+      }
+
+      if (brokerOk && process.env.SAP_URL) {
+        envLoaded = true;
+        return;
+      }
+
+      if (useAuthBroker) {
+        configLogger?.warn(
+          `[loadTestEnv] Auth-broker failed but destination is configured. Not loading .env file.`,
+        );
+        envLoaded = true;
+        return;
+      }
     }
   }
 
-  // Always try to load .env file when auth-broker is not preferred (or broker failed and no URL available)
-
-  let envPath: string | null = null;
-
   // Priority 1: Use MCP_ENV_PATH if explicitly set
-  if (process.env.MCP_ENV_PATH) {
+  if (!envPath && process.env.MCP_ENV_PATH) {
     const resolvedPath = path.resolve(process.env.MCP_ENV_PATH);
     if (fs.existsSync(resolvedPath)) {
       envPath = resolvedPath;
@@ -129,7 +145,7 @@ export async function loadTestEnv(): Promise<void> {
   }
 
   // Priority 2: Try current working directory (where test was run from)
-  if (!envPath && !useAuthBroker) {
+  if (!envPath) {
     const cwdEnvPath = path.resolve(process.cwd(), '.env');
     if (fs.existsSync(cwdEnvPath)) {
       envPath = cwdEnvPath;
@@ -137,7 +153,7 @@ export async function loadTestEnv(): Promise<void> {
   }
 
   // Priority 3: Fallback to project root (for tests run from project root)
-  if (!envPath && !useAuthBroker) {
+  if (!envPath) {
     const projectRootEnvPath = path.resolve(__dirname, '../../../../.env');
     if (fs.existsSync(projectRootEnvPath)) {
       envPath = projectRootEnvPath;
@@ -146,9 +162,6 @@ export async function loadTestEnv(): Promise<void> {
 
   // Load .env file if found
   if (envPath) {
-    // CRITICAL: Use override: true for tests to ensure .env values always take precedence
-    // This is necessary because tests may run in environments where process.env already has
-    // empty or stale values that would prevent .env from being loaded with override: false
     const result = dotenv.config({
       path: envPath,
       quiet: true,
@@ -158,77 +171,32 @@ export async function loadTestEnv(): Promise<void> {
       configLogger?.warn(`⚠️ Failed to load .env file: ${result.error.message}`);
     } else {
       logEnvLoaded(envPath);
-
-      // Apply auth-broker preference from test-config.yaml (if set)
-      try {
-        const useAuthBroker = resolveUseAuthBrokerFlag();
-        if (useAuthBroker) {
-          process.env.MCP_USE_AUTH_BROKER = 'true';
-          if (useUnsafe) {
-            process.env.MCP_UNSAFE = 'true';
-          }
-          configLogger?.debug(
-            '[DEBUG] loadTestEnv - Using auth-broker as primary token source (MCP_USE_AUTH_BROKER=true)',
-          );
-          if (useUnsafe) {
-            configLogger?.debug(
-              '[DEBUG] loadTestEnv - Using unsafe session store for auth-broker (MCP_UNSAFE=true)',
-            );
-          }
-        }
-      } catch {
-        // ignore config load issues here; tests will proceed with existing env
-      }
-      // CRITICAL: Invalidate connection cache after loading .env
-      // This ensures getManagedConnection() will recreate connection with new config
-      // (including refresh token that might have been missing before)
       try {
         invalidateConnectionCache();
-        configLogger?.debug(
-          `[DEBUG] loadTestEnv - Invalidated connection cache to force recreation with updated .env values`,
-        );
-      } catch (error: any) {
-        // If invalidateConnectionCache fails, log but don't fail
-        configLogger?.warn(
-          `[DEBUG] loadTestEnv - Failed to invalidate connection cache: ${error?.message || String(error)}`,
-        );
-      }
-
-      // If auth-broker is enabled as a fallback, attempt refresh after .env load
-      if (useAuthBroker && !brokerAttempted && !process.env.SAP_URL) {
-        try {
-          brokerAttempted = true;
-          await setupAuthBrokerForTests({ force: true });
-          brokerOk = !!process.env.SAP_URL;
-          brokerSucceeded = brokerOk;
-        } catch (error: any) {
-          configLogger?.warn(
-            `[DEBUG] loadTestEnv - Failed to refresh tokens via auth-broker: ${error?.message || String(error)}`,
-          );
-        }
+      } catch {
+        // ignore
       }
     }
   } else {
-    // No .env file found
-    if (!useAuthBroker) {
-      const cwdEnvPath = path.resolve(process.cwd(), '.env');
-      const projectRootEnvPath = path.resolve(__dirname, '../../../../.env');
-      configLogger?.warn(
-        `⚠️ .env file not found. Tried: ${JSON.stringify({
-          MCP_ENV_PATH: process.env.MCP_ENV_PATH || '(not set)',
-          cwd: cwdEnvPath,
-          projectRoot: projectRootEnvPath,
-        })}`,
-      );
-    }
+    configLogger?.warn(
+      '⚠️ No .env file found. Set environment.env in test-config.yaml.',
+    );
   }
 
-  // Final guard: require SAP_URL from either auth-broker or .env
+  // Apply explicit overrides from test-config.yaml
+  try {
+    const cfg = loadTestConfig();
+    if (cfg?.environment?.connection_type) {
+      process.env.SAP_CONNECTION_TYPE = cfg.environment.connection_type;
+    }
+  } catch {
+    // ignore
+  }
+
+  // Final guard: require SAP_URL
   if (!process.env.SAP_URL) {
     envLoadError = new Error(
-      useAuthBroker
-        ? 'No SAP credentials available for tests via auth-broker. Ensure service key/session exist for configured destination.'
-        : 'No SAP credentials available for tests. Provide a .env file or enable auth-broker.',
+      'SAP_URL is not set. Set environment.env in test-config.yaml pointing to a valid .env file.',
     );
     throw envLoadError;
   }

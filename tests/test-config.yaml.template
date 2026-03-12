@@ -1014,25 +1014,23 @@ create_domain_low:
 
 # Create Data Element (Low-Level Handler)
 
-# Function Group & Function Module (High & Low Level Tests)
+# Function Group & Function Module (High-Level Tests)
 create_function:
   test_cases:
-    - name: "full_workflow"
+    - name: "full_workflow_high"
       enabled: true
       available_in: ["onprem", "cloud", "legacy"]
-      description: "Complete function group and function module workflow for high and low level tests"
+      description: "Complete function group and function module workflow for high level tests"
       params:
         # Function Group parameters
-        function_group_name: "ZMCP_BLD_FGR_EMPTY"
-        function_group_description: "Function group for workflow tests"
-        # ⚠️ DISABLED: update_description causes lock conflict after create
-        # update_function_group_description: "Function group for workflow tests (updated)"
+        function_group_name: "ZMCP_BLD_FGR_H1"
+        function_group_description: "Function group for high-level workflow tests"
 
         # Function Module parameters
-        function_module_name: "Z_MCP_BLD_FM01"
-        function_module_description: "Function module for workflow tests"
+        function_module_name: "Z_MCP_BLD_FM_H1"
+        function_module_description: "Function module for high-level workflow tests"
         source_code: |
-          FUNCTION Z_MCP_BLD_FM01
+          FUNCTION Z_MCP_BLD_FM_H1
               IMPORTING
                  VALUE(IV_PARAM) TYPE  STRING
               EXPORTING
@@ -1041,7 +1039,7 @@ create_function:
             ev_result = |Additional processing|.
           ENDFUNCTION.
         update_source_code: |
-          FUNCTION Z_MCP_BLD_FM01
+          FUNCTION Z_MCP_BLD_FM_H1
               IMPORTING
                  VALUE(IV_PARAM) TYPE  STRING
               EXPORTING
@@ -1050,9 +1048,37 @@ create_function:
             ev_result = |Additional processing|.
           ENDFUNCTION.
 
-        # Common parameters
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
+    # Function Group & Function Module (Low-Level Tests)
+    - name: "full_workflow_low"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      description: "Complete function group and function module workflow for low level tests"
+      params:
+        # Function Group parameters
+        function_group_name: "ZMCP_BLD_FGR_L1"
+        function_group_description: "Function group for low-level workflow tests"
+
+        # Function Module parameters
+        function_module_name: "Z_MCP_BLD_FM_L1"
+        function_module_description: "Function module for low-level workflow tests"
+        source_code: |
+          FUNCTION Z_MCP_BLD_FM_L1
+              IMPORTING
+                 VALUE(IV_PARAM) TYPE  STRING
+              EXPORTING
+                 VALUE(EV_RESULT) TYPE  STRING.
+            ev_result = |Result: { iv_param }|.
+            ev_result = |Additional processing|.
+          ENDFUNCTION.
+        update_source_code: |
+          FUNCTION Z_MCP_BLD_FM_L1
+              IMPORTING
+                 VALUE(IV_PARAM) TYPE  STRING
+              EXPORTING
+                 VALUE(EV_RESULT) TYPE  STRING.
+            ev_result = |Updated Result: { iv_param }|.
+            ev_result = |Additional processing|.
+          ENDFUNCTION.
 
 # Create Transport
 

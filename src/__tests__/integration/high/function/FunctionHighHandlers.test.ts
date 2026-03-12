@@ -152,30 +152,30 @@ describe('Function High-Level Handlers Integration', () => {
         .filter((line: string) => !line.trim().startsWith('*"'))
         .join('\n');
 
-      try {
-        const invoke = async (
-          toolName: string,
-          args: Record<string, unknown>,
-          directCall: () => Promise<any>,
-        ) => {
-          if (!isHardModeEnabled()) {
-            return directCall();
-          }
-          if (!mcp) {
-            throw new Error('Hard mode MCP client is not initialized');
-          }
-          try {
-            return await callTool(mcp.client, mcp.toolNames, [toolName], args);
-          } catch (error: any) {
-            return {
-              isError: true,
-              content: [
-                { type: 'text', text: error?.message || String(error) },
-              ],
-            };
-          }
-        };
+      const invoke = async (
+        toolName: string,
+        args: Record<string, unknown>,
+        directCall: () => Promise<any>,
+      ) => {
+        if (!isHardModeEnabled()) {
+          return directCall();
+        }
+        if (!mcp) {
+          throw new Error('Hard mode MCP client is not initialized');
+        }
+        try {
+          return await callTool(mcp.client, mcp.toolNames, [toolName], args);
+        } catch (error: any) {
+          return {
+            isError: true,
+            content: [
+              { type: 'text', text: error?.message || String(error) },
+            ],
+          };
+        }
+      };
 
+      try {
         // Step 1: CreateFunctionGroup (High-Level)
         // High-level handler does validation internally, but we check the result
         testLogger?.info(

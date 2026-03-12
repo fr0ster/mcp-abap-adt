@@ -827,7 +827,7 @@ create_class_direct:
   test_cases:
     - name: "crud_direct"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
+      available_in: ["onprem", "cloud"]
       description: "Class CrudClient direct test (reference implementation)"
       params:
         class_name: "ZMCP_BLD_CLS_H1"

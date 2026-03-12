@@ -8,7 +8,7 @@
  */
 
 import type { HandlerContext } from '../../../../lib/handlers/interfaces';
-import { getCleanupAfter } from '../configHelpers';
+import { getCleanupAfter, getSystemType } from '../configHelpers';
 import type { LoggerWithExtras } from '../loggerHelpers';
 import { createHandlerContext, delay } from '../testHelpers';
 import {
@@ -139,6 +139,20 @@ export class HighTester extends LambdaTester {
     if (!this.context.hasConfig) {
       this.context.logger?.testSkip(`Skipping test: No configuration found`);
       return;
+    }
+
+    // Check available_in constraint from test case config
+    const availableIn = this.context.testCase?.available_in as
+      | string[]
+      | undefined;
+    if (availableIn && availableIn.length > 0) {
+      const systemType = getSystemType();
+      if (!availableIn.includes(systemType)) {
+        this.context.logger?.testSkip(
+          `Skipping test: not available on ${systemType} (available_in: ${availableIn.join(', ')})`,
+        );
+        return;
+      }
     }
 
     if (!this.workflowFunctions) {

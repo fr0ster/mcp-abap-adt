@@ -24,6 +24,7 @@ import {
   getOperationDelay,
   getSapConfigFromEnv,
   getTimeout,
+  isTestAvailableForSystem,
   loadTestEnv,
   preCheckTestParameters,
   resolvePackageName,
@@ -59,6 +60,11 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
       const testCase = getEnabledTestCase('create_class_direct', 'crud_direct');
       if (!testCase) {
         testLogger?.info('⏭️  Skipping test: Test case not enabled');
+        return;
+      }
+
+      if (!isTestAvailableForSystem(testCase.available_in)) {
+        testLogger?.info('⏭️  Skipping test: not available on current system type');
         return;
       }
 

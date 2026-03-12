@@ -1024,11 +1024,11 @@ create_function:
       params:
         # Function Group parameters
         function_group_name: "ZMCP_BLD_FGR_H1"
-        function_group_description: "Function group for high-level workflow tests"
+        function_group_description: "FG for high-level tests"
 
         # Function Module parameters
         function_module_name: "Z_MCP_BLD_FM_H1"
-        function_module_description: "Function module for high-level workflow tests"
+        function_module_description: "FM for high-level tests"
         source_code: |
           FUNCTION Z_MCP_BLD_FM_H1
               IMPORTING
@@ -1056,11 +1056,11 @@ create_function:
       params:
         # Function Group parameters
         function_group_name: "ZMCP_BLD_FGR_L1"
-        function_group_description: "Function group for low-level workflow tests"
+        function_group_description: "FG for low-level tests"
 
         # Function Module parameters
         function_module_name: "Z_MCP_BLD_FM_L1"
-        function_module_description: "Function module for low-level workflow tests"
+        function_module_description: "FM for low-level tests"
         source_code: |
           FUNCTION Z_MCP_BLD_FM_L1
               IMPORTING

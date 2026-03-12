@@ -9,19 +9,23 @@ permissions:
   contents: write  # Required for creating releases
 
 jobs:
-  build-and-release:
+  test:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20, 22, 24, 25]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: recursive  # Clone with submodules
+          submodules: recursive
 
-      - name: Setup Node.js
+      - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
       - name: Install dependencies
@@ -35,7 +39,16 @@ jobs:
 
       - name: Run tests
         run: npm test
-        continue-on-error: true  # Don't fail release if tests fail
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Extract version from tag
         id: version

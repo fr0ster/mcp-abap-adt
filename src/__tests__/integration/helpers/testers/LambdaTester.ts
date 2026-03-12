@@ -392,6 +392,8 @@ export class LambdaTester {
     }
 
     // Execute cleanup lambda (errors are caught and logged, but don't fail the cleanup process)
+    // TODO: Legacy systems may report a delete error (false negative) even though the object
+    // is actually deleted successfully. Do not treat cleanup errors on legacy as real failures.
     try {
       this.context.logger?.info?.('🧹 Running cleanup...');
       await this.cleanupAfterLambda(this.context);

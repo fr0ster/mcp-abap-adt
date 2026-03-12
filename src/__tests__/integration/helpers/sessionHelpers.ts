@@ -20,6 +20,7 @@ import {
 import type { IServiceKeyStore, ISessionStore } from '@mcp-abap-adt/interfaces';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { getPlatformStoresAsync } from '../../../lib/stores';
+import { resolveSystemContext } from '../../../lib/systemContext';
 import {
   createBrokerLogger,
   createConnectionLogger,
@@ -376,6 +377,9 @@ export async function createTestConnectionAndSession(): Promise<{
     if (connectionAny.connect) {
       await connectionAny.connect();
     }
+
+    // Resolve system context (legacy detection) so createAdtClient() picks the correct client
+    await resolveSystemContext(connection);
 
     // Generate session ID
     const sessionId = generateSessionId();

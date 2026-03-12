@@ -263,6 +263,14 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         },
       );
 
+      // Pre-cleanup: delete leftover object from previous test run if it exists
+      try {
+        await client.getClass().delete({ className, transportRequest });
+        testLogger?.info(`🧹 Pre-cleanup: deleted leftover ${className}`);
+      } catch {
+        // Object doesn't exist — expected on clean runs
+      }
+
       // Track creation state for cleanup
       let classCreated = false;
 

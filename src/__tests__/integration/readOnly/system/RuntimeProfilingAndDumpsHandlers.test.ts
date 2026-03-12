@@ -269,6 +269,7 @@ async function createRunnableProgram(
     programName,
     transportRequest: context.transportRequest,
     sourceCode,
+    activateOnUpdate: true,
   });
 }
 
@@ -528,6 +529,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             },
           );
 
+          // TODO: adt-clients issue - traceId lookup may fail on some systems; needs retry/delay after runWithProfilerId
           expect(profiledRun.isError).toBe(false);
           const runData = parseTextPayload(profiledRun);
           expect(runData.success).toBe(true);

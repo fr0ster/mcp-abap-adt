@@ -12,8 +12,9 @@
  *   npm run shared:check    — validate config consistency (offline)
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import { createAdtClient } from '../../../lib/clients';
 import {
   getSharedDependenciesConfig,
   getSystemType,
@@ -88,11 +89,13 @@ export async function ensureSharedPackage(
     // Package doesn't exist — will create below
   }
 
-  // On legacy systems, packages can only be created via SAP GUI — fail if missing
+  // On legacy systems, package read/create not available via ADT — trust the user
   if (getSystemType() === 'legacy') {
-    throw new Error(
-      `Shared package ${packageName} does not exist on legacy system. Create it manually in SAP GUI (SE80/SE21) before running shared:setup.`,
+    log?.info?.(
+      `Legacy system: assuming package ${packageName} exists (create via SE80/SE21 if missing)`,
     );
+    _sharedPackageReady = true;
+    return;
   }
 
   // Create the package
@@ -350,7 +353,7 @@ export async function ensureSharedObjects(
     }
   }
 
-  const client = new AdtClient(conn!, adtLogger);
+  const client = createAdtClient(conn!, adtLogger);
   const results: SharedObjectResult[] = [];
 
   // Verify all shared deps exist (read-only check)

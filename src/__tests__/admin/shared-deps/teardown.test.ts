@@ -7,8 +7,9 @@
  * Run:  npm run shared:teardown
  */
 
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { createAdtClient } from '../../../lib/clients';
 import {
   getSystemContext,
   resolveSystemContext,
@@ -38,10 +39,7 @@ describe('Admin: Teardown shared dependencies', () => {
       connection = result.connection;
       await resolveSystemContext(connection);
       const systemCtx = getSystemContext();
-      client = new AdtClient(connection, undefined, {
-        masterSystem: systemCtx.masterSystem,
-        responsible: systemCtx.responsible,
-      });
+      client = createAdtClient(connection);
       hasConfig = true;
     } catch (error: any) {
       testsLogger?.warn?.(

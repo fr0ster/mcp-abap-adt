@@ -111,7 +111,10 @@ describe('Function High-Level Handlers Integration', () => {
       }
 
       // Get test case configuration (single config for both FUGR and FM)
-      const testCase = getEnabledTestCase('create_function', 'full_workflow_high');
+      const testCase = getEnabledTestCase(
+        'create_function',
+        'full_workflow_high',
+      );
 
       if (!testCase) {
         testLogger?.info('⏭️  Skipping test: No test case configuration');
@@ -168,9 +171,7 @@ describe('Function High-Level Handlers Integration', () => {
         } catch (error: any) {
           return {
             isError: true,
-            content: [
-              { type: 'text', text: error?.message || String(error) },
-            ],
+            content: [{ type: 'text', text: error?.message || String(error) }],
           };
         }
       };

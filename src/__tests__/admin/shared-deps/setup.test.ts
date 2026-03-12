@@ -115,7 +115,9 @@ describe('Admin: Setup shared dependencies', () => {
         );
         for (const item of tables) {
           if (!isTestAvailableForSystem(item.available_in)) {
-            testsLogger?.info?.(`Skipping table ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`);
+            testsLogger?.info?.(
+              `Skipping table ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            );
             continue;
           }
           try {
@@ -210,7 +212,9 @@ describe('Admin: Setup shared dependencies', () => {
         );
         for (const item of views) {
           if (!isTestAvailableForSystem(item.available_in)) {
-            testsLogger?.info?.(`Skipping view ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`);
+            testsLogger?.info?.(
+              `Skipping view ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            );
             continue;
           }
           try {
@@ -301,7 +305,9 @@ describe('Admin: Setup shared dependencies', () => {
         );
         for (const item of bdefs) {
           if (!isTestAvailableForSystem(item.available_in)) {
-            testsLogger?.info?.(`Skipping behavior definition ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`);
+            testsLogger?.info?.(
+              `Skipping behavior definition ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            );
             continue;
           }
           try {
@@ -398,7 +404,9 @@ describe('Admin: Setup shared dependencies', () => {
         );
         for (const item of classes) {
           if (!isTestAvailableForSystem(item.available_in)) {
-            testsLogger?.info?.(`Skipping class ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`);
+            testsLogger?.info?.(
+              `Skipping class ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            );
             continue;
           }
           try {

@@ -555,17 +555,23 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
               const listData = parseTextPayload(listResponse);
               const traces: any[] = listData.traces ?? listData.items ?? [];
               const found = traces.find(
-                (t: any) => t.profiler_id === runData.profiler_id || t.profilerId === runData.profiler_id,
+                (t: any) =>
+                  t.profiler_id === runData.profiler_id ||
+                  t.profilerId === runData.profiler_id,
               );
               if (found) {
-                traceId = String(found.trace_id ?? found.traceId ?? found.id ?? '').toUpperCase();
+                traceId = String(
+                  found.trace_id ?? found.traceId ?? found.id ?? '',
+                ).toUpperCase();
                 break;
               }
             }
           }
 
           if (!traceId) {
-            logger?.warn('Program profiling trace not found after polling — skipping trace read');
+            logger?.warn(
+              'Program profiling trace not found after polling — skipping trace read',
+            );
           } else {
             createdTraceIds.add(traceId);
             const traceData = await invoke(

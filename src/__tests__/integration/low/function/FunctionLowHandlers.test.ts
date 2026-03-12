@@ -126,7 +126,10 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
           return;
         }
 
-        const testCase = getEnabledTestCase('create_function', 'full_workflow_low');
+        const testCase = getEnabledTestCase(
+          'create_function',
+          'full_workflow_low',
+        );
         if (!testCase) {
           testLogger?.info('⏭️  Skipping test: No test case configuration');
           return;

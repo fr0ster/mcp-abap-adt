@@ -930,6 +930,8 @@ create_data_element:
         medium_label: "Builder Data"
         long_label: "Builder Data Element"
         heading_label: "Builder Data Element"
+      operation_delays:
+        cleanup: 5000  # Extra delay after pre-test cleanup (TADIR race on cloud trial)
 
 # Create Interface
 
@@ -987,6 +989,8 @@ create_domain:
         decimals: 0
         lowercase: false
         sign_exists: false
+      operation_delays:
+        cleanup: 5000  # Extra delay after pre-test cleanup (TADIR race on cloud trial)
 
 # Create Data Element
 
@@ -1127,6 +1131,36 @@ create_interface_low:
           ENDINTERFACE.
 
 # Create Structure (Low-Level Handler)
+
+# Metadata Extension (Metadata Extension - High-Level)
+create_metadata_extension:
+  test_cases:
+    - name: "full_workflow"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Metadata Extension high-level handler full workflow test"
+      params:
+        name: "ZMCP_SHR_C_ROOT_0001"
+        description: "Metadata Extension high-level handler test"
+        # package_name: "ZMCP_BLD_PKG01"
+        # transport_request: ""
+        source_code: |
+          @Metadata.layer: #CORE
+          annotate entity ZMCP_SHR_C_ROOT
+            with
+          {
+              @EndUserText.label: 'Root Field 1'
+              @UI.lineItem: [{ position: 10 }]
+              Fld1;
+
+              @EndUserText.label: 'Root Field 2'
+              @UI.lineItem: [{ position: 20 }]
+              Fld2;
+
+              @EndUserText.label: 'Root Field 3'
+              @UI.selectionField: [{ position: 10 }]
+              Fld3;
+          }
 
 # Metadata Extension (Metadata Extension - Low-Level)
 create_metadata_extension_low:

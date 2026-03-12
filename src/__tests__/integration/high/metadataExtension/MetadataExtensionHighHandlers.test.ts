@@ -33,7 +33,7 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
 
   beforeAll(async () => {
     tester = new LambdaTester(
-      'create_metadata_extension_low',
+      'create_metadata_extension',
       'full_workflow',
       'metadata-extension-high',
     );

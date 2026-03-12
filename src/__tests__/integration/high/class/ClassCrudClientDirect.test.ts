@@ -64,7 +64,9 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
       }
 
       if (!isTestAvailableForSystem(testCase.available_in)) {
-        testLogger?.info('⏭️  Skipping test: not available on current system type');
+        testLogger?.info(
+          '⏭️  Skipping test: not available on current system type',
+        );
         return;
       }
 

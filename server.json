@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.fr0ster/mcp-abap-adt",
-  "description": "ABAP ADT MCP for BTP ABAP Cloud and on-prem: full CRUD and deep repository analysis",
+  "description": "MCP server for ABAP ADT in SAP ECC/S/4HANA (on-premise) and SAP BTP ABAP Cloud systems: deep repository analysis and high-level CRUD for RAP and classic ABAP artifacts",
   "repository": {
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"
   },
-  "version": "3.2.0",
+  "version": "4.0.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@mcp-abap-adt/core",
-      "version": "3.2.0",
+      "version": "4.0.0",
       "transport": {
         "type": "stdio"
       }

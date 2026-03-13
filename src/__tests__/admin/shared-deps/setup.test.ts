@@ -49,10 +49,9 @@ async function forceSaveViewSource(
 ): Promise<void> {
   const lockHandle = await client.getView().lock({ viewName });
   try {
-    await client.getView().update(
-      { viewName, ddlSource, transportRequest },
-      { lockHandle },
-    );
+    await client
+      .getView()
+      .update({ viewName, ddlSource, transportRequest }, { lockHandle });
   } finally {
     try {
       await client.getView().unlock({ viewName }, lockHandle);
@@ -282,8 +281,15 @@ describe('Admin: Setup shared dependencies', () => {
                   `Update view ${item.name} source failed (${updateError.message}), trying force-save...`,
                 );
                 try {
-                  await forceSaveViewSource(client, item.name, item.source, transportRequest);
-                  testsLogger?.info?.(`Force-saved source for view ${item.name}`);
+                  await forceSaveViewSource(
+                    client,
+                    item.name,
+                    item.source,
+                    transportRequest,
+                  );
+                  testsLogger?.info?.(
+                    `Force-saved source for view ${item.name}`,
+                  );
                 } catch (forceSaveError: any) {
                   testsLogger?.warn?.(
                     `Force-save view ${item.name} also failed: ${forceSaveError.message}`,

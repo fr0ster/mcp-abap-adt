@@ -136,6 +136,21 @@ Domain, DataElement, Structure, Table, TableType, BDEF, BIMP, DDLX,
 ServiceDefinition, ServiceBinding, AccessControl, Enhancement,
 Where-used, Table contents, SQL query, Runtime profiling/dumps
 
+## Alternative: HTTP Stateful Sessions via SAP Note
+
+For systems where installing the SAP NW RFC SDK is not feasible, there is an alternative approach: enabling HTTP stateful sessions on older systems.
+
+On modern systems (BASIS >= 7.51), class `CL_ADT_WB_RES_APP` method `CONFIGURE_SESSION_STATE` handles stateful HTTP session management automatically. On older systems (BASIS < 7.51), this method does not exist, causing lock/unlock and other stateful operations to fail over HTTP.
+
+The [abapfs_extensions](https://github.com/marcellourbani/abapfs_extensions) project by @marcellourbani provides an ABAP implementation that backports this mechanism to older systems. Once installed, it enables HTTP-based stateful sessions without requiring RFC transport.
+
+**When to use RFC vs HTTP fix:**
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| RFC transport (recommended) | No SAP-side changes needed, works out of the box | Requires SAP NW RFC SDK on the machine running MCP server |
+| HTTP stateful session fix | No client-side SDK needed | Requires ABAP transport import into SAP system, needs BASIS admin involvement |
+
 ## Risks
 
 | Risk | Mitigation |

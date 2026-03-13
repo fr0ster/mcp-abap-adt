@@ -257,9 +257,9 @@ AUTHENTICATION:
   --connection-type=<type>         SAP connection type: http (default) or rfc
                                    RFC requires SAP NW RFC SDK + node-rfc installed
                                    Alternative: SAP_CONNECTION_TYPE env var in .env
-  --system-type=<type>             SAP system type: onprem (default) | cloud | legacy
-                                   Overrides auto-detection via /sap/bc/adt/core/discovery
-                                   Use when auto-detection fails (e.g. bash vs PowerShell env)
+  --system-type=<type>             SAP system type: cloud (default) | onprem | legacy
+                                   Controls which tools are available
+                                   Set to 'onprem' for on-premise systems (enables Programs etc.)
                                    Alternative: SAP_SYSTEM_TYPE env var in .env
   --auth-broker-path=<path>        Custom path for auth-broker storage
                                    Example: --auth-broker-path=~/prj/tmp/

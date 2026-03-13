@@ -122,9 +122,9 @@ SAP CONNECTION (.env file):
     SAP_CLIENT                     SAP client number (required)
     SAP_AUTH_TYPE                  Authentication type: basic|jwt (default: basic)
     SAP_CONNECTION_TYPE            Connection type: http|rfc (default: http)
-    SAP_SYSTEM_TYPE                System type override: onprem|cloud|legacy
-                                   Bypasses auto-detection via /sap/bc/adt/core/discovery
-                                   Use when detection fails (e.g. bash vs PowerShell)
+    SAP_SYSTEM_TYPE                SAP system type: cloud (default) | onprem | legacy
+                                   Controls tool availability (e.g. Programs need onprem)
+                                   Set to 'onprem' for on-premise systems
     SAP_USERNAME                   SAP username (required for basic auth)
     SAP_PASSWORD                   SAP password (required for basic auth)
     SAP_LANGUAGE                   SAP language (optional, e.g., EN, DE)

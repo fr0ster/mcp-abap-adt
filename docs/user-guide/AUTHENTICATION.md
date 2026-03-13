@@ -36,6 +36,8 @@ You can also provide credentials via `.env`:
 
 This is useful for quick local testing or when you do not want to store service keys.
 
+**Important:** For on-premise systems, add `SAP_SYSTEM_TYPE=onprem` to your `.env` file to enable on-premise-only tools (e.g., Programs). The default is `cloud`.
+
 **.env comments rule:** only full-line comments are supported (lines that start with `#`).  
 Inline comments are not parsed, so keep comments on separate lines.
 

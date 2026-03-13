@@ -97,9 +97,9 @@ export async function handleRuntimeRunProgramWithProfiling(
           success: true,
           program_name: programName,
           profiler_id: result.profilerId,
-          trace_id: result.traceId,
           run_status: result.response?.status,
-          trace_requests_status: result.traceRequestsResponse?.status,
+          // trace_id is not returned — program execution is fire-and-forget.
+          // Use RuntimeListProfilerTraceFiles to find the trace after execution.
         },
         null,
         2,

@@ -94,6 +94,11 @@ export async function handleDeletePackage(
             connectionConfig,
             logger || null,
           );
+          // RFC connections require explicit connect() — createAbapConnection does not connect automatically
+          const deleteConnectionAny = deleteConnection as any;
+          if (typeof deleteConnectionAny.connect === 'function') {
+            await deleteConnectionAny.connect();
+          }
           logger?.info(
             `DeletePackage using fresh connection for ${packageName} (force_new_connection=true)`,
           );
@@ -103,6 +108,7 @@ export async function handleDeletePackage(
               createError?.message || createError
             }`,
           );
+          deleteConnection = connection;
         }
       }
     }

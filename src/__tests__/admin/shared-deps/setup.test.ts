@@ -16,7 +16,6 @@
  */
 
 import type { AdtClient } from '@mcp-abap-adt/adt-clients';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../../../lib/clients';
 import {
   getSystemContext,
@@ -34,6 +33,34 @@ import { createTestConnectionAndSession } from '../../integration/helpers/sessio
 import { ensureSharedPackage } from '../../integration/helpers/sharedObjects';
 
 const testsLogger = createTestLogger('shared-setup');
+
+/**
+ * Force-save DDL source for a CDS view by bypassing syntax check.
+ * Uses AdtClient.getView().lock() / update(lockHandle) / unlock() — public IAdtObject API.
+ * Needed for views with circular dependencies (RAP root/child composition)
+ * that cannot pass checkView before the counterpart view is active.
+ * Group activation handles the mutual refs once both have stored source.
+ */
+async function forceSaveViewSource(
+  client: AdtClient,
+  viewName: string,
+  ddlSource: string,
+  transportRequest?: string,
+): Promise<void> {
+  const lockHandle = await client.getView().lock({ viewName });
+  try {
+    await client.getView().update(
+      { viewName, ddlSource, transportRequest },
+      { lockHandle },
+    );
+  } finally {
+    try {
+      await client.getView().unlock({ viewName }, lockHandle);
+    } catch {
+      // ignore unlock errors
+    }
+  }
+}
 
 /** Map shared_dependencies section name to ADT object type code */
 const TYPE_CODES: Record<string, string> = {
@@ -252,8 +279,16 @@ describe('Admin: Setup shared dependencies', () => {
                 testsLogger?.info?.(`Updated view ${item.name} source`);
               } catch (updateError: any) {
                 testsLogger?.warn?.(
-                  `Update view ${item.name} source failed: ${updateError.message}`,
+                  `Update view ${item.name} source failed (${updateError.message}), trying force-save...`,
                 );
+                try {
+                  await forceSaveViewSource(client, item.name, item.source, transportRequest);
+                  testsLogger?.info?.(`Force-saved source for view ${item.name}`);
+                } catch (forceSaveError: any) {
+                  testsLogger?.warn?.(
+                    `Force-save view ${item.name} also failed: ${forceSaveError.message}`,
+                  );
+                }
               }
             }
 

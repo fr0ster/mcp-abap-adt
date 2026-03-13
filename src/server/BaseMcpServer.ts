@@ -14,7 +14,6 @@ import type {
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
 import {
-  getSystemContext,
   resetSystemContextCache,
   resolveSystemContext,
 } from '../lib/systemContext.js';
@@ -302,11 +301,10 @@ export abstract class BaseMcpServer extends McpServer {
       tokenRefresher,
     );
 
-    // RFC connections require explicit connect() to open the stateful session
-    if (
-      this.connectionContext.connectionParams.connectionType === 'rfc' &&
-      typeof (connection as any).connect === 'function'
-    ) {
+    // Establish session (CSRF token + cookies) before first request.
+    // RFC needs this for the stateful session; HTTP needs it because some SAP systems
+    // reject the very first request (403) when no session cookie is present.
+    if (typeof (connection as any).connect === 'function') {
       await (connection as any).connect();
     }
 
@@ -452,17 +450,18 @@ export abstract class BaseMcpServer extends McpServer {
               : entry.toolDefinition.inputSchema;
 
           // Skip tools not available in the current SAP environment
-          const systemCtx = getSystemContext();
           const availableIn = entry.toolDefinition.available_in;
           if (availableIn && availableIn.length > 0) {
-            const currentEnv: SapEnvironment = systemCtx.isLegacy
-              ? 'legacy'
-              : this.connectionContext?.connectionParams?.authType === 'jwt'
-                ? 'cloud'
-                : 'onprem';
+            const envType = process.env.SAP_SYSTEM_TYPE?.toLowerCase();
+            const currentEnv: SapEnvironment =
+              envType === 'legacy'
+                ? 'legacy'
+                : envType === 'onprem'
+                  ? 'onprem'
+                  : 'cloud';
             if (!availableIn.includes(currentEnv)) {
               this.logger.debug(
-                `[BaseMcpServer] Skipping tool ${entry.toolDefinition.name}: available_in=${JSON.stringify(availableIn)}, currentEnv=${currentEnv}, isLegacy=${systemCtx.isLegacy}, authType=${this.connectionContext?.connectionParams?.authType}`,
+                `[BaseMcpServer] Skipping tool ${entry.toolDefinition.name}: available_in=${JSON.stringify(availableIn)}, currentEnv=${currentEnv}, SAP_SYSTEM_TYPE=${envType || '(not set, default: cloud)'}`,
               );
               continue;
             }

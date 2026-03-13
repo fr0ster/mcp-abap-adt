@@ -496,11 +496,28 @@ SAP_AUTH_TYPE=basic
 SAP_USERNAME=your_username
 SAP_PASSWORD=your_password
 SAP_CLIENT=100
+SAP_SYSTEM_TYPE=onprem
 
 # System context (required for on-prem create/update operations)
 SAP_MASTER_SYSTEM=DEV
 # SAP_RESPONSIBLE is optional — falls back to SAP_USERNAME
 ```
+
+### SAP System Type
+
+The `SAP_SYSTEM_TYPE` environment variable controls which tools are available and how the server interacts with the SAP system:
+
+| Value | Description | Default |
+|-------|-------------|---------|
+| `cloud` | ABAP Cloud / BTP systems | **Yes** (default) |
+| `onprem` | On-premise systems (BASIS ≥ 7.50) | No |
+| `legacy` | Legacy on-premise systems (BASIS < 7.50) | No |
+
+**Why this matters:** Different SAP environments support different ADT endpoints. For example, Programs are only available on `onprem` and `legacy` systems. The server uses `SAP_SYSTEM_TYPE` to filter tools accordingly.
+
+**Default is `cloud`** — this covers most modern scenarios. On-premise users must set `SAP_SYSTEM_TYPE=onprem` to access on-premise-only tools (e.g., Programs).
+
+You can also set this via CLI: `--system-type=onprem`
 
 ### System Context for On-Premise Systems
 
@@ -524,6 +541,7 @@ SAP_AUTH_TYPE=basic
 SAP_USERNAME=JSMITH
 SAP_PASSWORD=secret
 SAP_CLIENT=100
+SAP_SYSTEM_TYPE=onprem
 SAP_MASTER_SYSTEM=DEV
 ```
 
@@ -540,6 +558,7 @@ In Claude Code (`claude_desktop_config.json` or `mcp.json`):
         "SAP_USERNAME": "JSMITH",
         "SAP_PASSWORD": "secret",
         "SAP_CLIENT": "100",
+        "SAP_SYSTEM_TYPE": "onprem",
         "SAP_MASTER_SYSTEM": "DEV"
       }
     }

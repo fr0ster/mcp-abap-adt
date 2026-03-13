@@ -23,6 +23,8 @@ export interface ParsedArguments {
   transport?: string;
   /** SAP connection type: http (default) or rfc (legacy systems) */
   connectionType?: 'http' | 'rfc';
+  /** SAP system type override: onprem | cloud | legacy */
+  systemType?: 'onprem' | 'cloud' | 'legacy';
   /** Path to YAML config file */
   config?: string;
   /** HTTP port */
@@ -185,6 +187,18 @@ export class ArgumentsParser {
       getArgValue('--connection-type') || process.env.SAP_CONNECTION_TYPE;
     if (connType?.trim().toLowerCase() === 'rfc') {
       result.connectionType = 'rfc';
+    }
+
+    // Parse --system-type (onprem | cloud | legacy)
+    const sysType = (
+      getArgValue('--system-type') || process.env.SAP_SYSTEM_TYPE
+    )
+      ?.trim()
+      .toLowerCase();
+    if (sysType === 'onprem' || sysType === 'cloud' || sysType === 'legacy') {
+      result.systemType = sysType;
+      // Propagate to env so systemContext.ts detectLegacy() picks it up
+      process.env.SAP_SYSTEM_TYPE = sysType;
     }
 
     // Parse --conf / --config

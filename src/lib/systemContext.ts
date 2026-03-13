@@ -18,8 +18,16 @@ let cached: IAdtSystemContext | undefined;
 /**
  * Detect whether the connected system is legacy (BASIS < 7.50).
  * Modern systems expose /sap/bc/adt/core/discovery; legacy ones do not.
+ *
+ * SAP_SYSTEM_TYPE env var overrides auto-detection:
+ *   SAP_SYSTEM_TYPE=legacy  → always legacy
+ *   SAP_SYSTEM_TYPE=onprem  → always modern onprem
+ *   SAP_SYSTEM_TYPE=cloud   → always modern cloud
  */
 async function detectLegacy(connection: IAbapConnection): Promise<boolean> {
+  const systemType = process.env.SAP_SYSTEM_TYPE?.toLowerCase();
+  if (systemType === 'legacy') return true;
+  if (systemType === 'onprem' || systemType === 'cloud') return false;
   try {
     return !(await isModernAdtSystem(connection));
   } catch {

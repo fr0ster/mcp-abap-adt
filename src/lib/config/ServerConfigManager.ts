@@ -128,6 +128,7 @@ export class ServerConfigManager {
       useAuthBroker: parsed.useAuthBroker,
       browserAuthPort: parsed.browserAuthPort,
       connectionType: parsed.connectionType,
+      systemType: parsed.systemType,
     };
   }
 
@@ -256,6 +257,10 @@ AUTHENTICATION:
   --connection-type=<type>         SAP connection type: http (default) or rfc
                                    RFC requires SAP NW RFC SDK + node-rfc installed
                                    Alternative: SAP_CONNECTION_TYPE env var in .env
+  --system-type=<type>             SAP system type: onprem (default) | cloud | legacy
+                                   Overrides auto-detection via /sap/bc/adt/core/discovery
+                                   Use when auto-detection fails (e.g. bash vs PowerShell env)
+                                   Alternative: SAP_SYSTEM_TYPE env var in .env
   --auth-broker-path=<path>        Custom path for auth-broker storage
                                    Example: --auth-broker-path=~/prj/tmp/
   --browser-auth-port=<port>       OAuth callback port for browser authentication
@@ -282,6 +287,10 @@ EXAMPLES:
   # RFC connection to legacy system (BASIS < 7.50)
   # Set SAP_CONNECTION_TYPE=rfc in .env file, requires SAP NW RFC SDK
   mcp-abap-adt --env-path=legacy.env
+
+  # Explicit system type (bypass auto-detection)
+  mcp-abap-adt --env-path=e96.env --system-type=onprem
+  # Or set SAP_SYSTEM_TYPE=onprem in .env file
 
   # Limit to readonly operations only
   mcp-abap-adt --mcp=TRIAL --exposition=readonly

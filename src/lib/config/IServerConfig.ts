@@ -81,6 +81,9 @@ export interface IServerConfig {
   /** SAP connection type: http (default) or rfc (legacy systems) */
   connectionType?: 'http' | 'rfc';
 
+  /** SAP system type override: onprem | cloud | legacy (overrides auto-detection) */
+  systemType?: 'onprem' | 'cloud' | 'legacy';
+
   // ============================================================================
   // LEGACY FIELDS (for v1 backward compatibility)
   // ============================================================================

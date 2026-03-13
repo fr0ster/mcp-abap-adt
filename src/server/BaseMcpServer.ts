@@ -302,11 +302,10 @@ export abstract class BaseMcpServer extends McpServer {
       tokenRefresher,
     );
 
-    // RFC connections require explicit connect() to open the stateful session
-    if (
-      this.connectionContext.connectionParams.connectionType === 'rfc' &&
-      typeof (connection as any).connect === 'function'
-    ) {
+    // Establish session (CSRF token + cookies) before first request.
+    // RFC needs this for the stateful session; HTTP needs it because some SAP systems
+    // reject the very first request (403) when no session cookie is present.
+    if (typeof (connection as any).connect === 'function') {
       await (connection as any).connect();
     }
 

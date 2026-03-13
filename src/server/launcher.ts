@@ -64,6 +64,7 @@ function hydrateSystemContextFromEnvFile(envFilePath?: string): void {
       'SAP_RESPONSIBLE',
       'SAP_USERNAME',
       'SAP_CONNECTION_TYPE',
+      'SAP_SYSTEM_TYPE',
     ];
 
     for (const key of keys) {
@@ -121,6 +122,9 @@ SAP CONNECTION (.env file):
     SAP_CLIENT                     SAP client number (required)
     SAP_AUTH_TYPE                  Authentication type: basic|jwt (default: basic)
     SAP_CONNECTION_TYPE            Connection type: http|rfc (default: http)
+    SAP_SYSTEM_TYPE                System type override: onprem|cloud|legacy
+                                   Bypasses auto-detection via /sap/bc/adt/core/discovery
+                                   Use when detection fails (e.g. bash vs PowerShell)
     SAP_USERNAME                   SAP username (required for basic auth)
     SAP_PASSWORD                   SAP password (required for basic auth)
     SAP_LANGUAGE                   SAP language (optional, e.g., EN, DE)

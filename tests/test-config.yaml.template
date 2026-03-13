@@ -434,7 +434,7 @@ shared_dependencies:
 shared_objects:
   unit_test_class:
     class_name: "ZMCP_BLD_CLSUT_L1"
-    package_name: "ZMCP_SHR_PKG"
+    # package_name: "ZMCP_SHR_PKG"  # Uses environment.default_package if omitted
     transport_request: ""
     description: "Shared container class for unit test integration tests"
 
@@ -1704,7 +1704,7 @@ cds_unit_test:
       params:
         class_name: "ZMCP_BLD_CDSUT_H1"
         test_class_name: "LTC_ZMCP_BLD_CDSV_H1"
-        package_name: "ZMCP_SHR_PKG"  # Package for CDS unit test class (must exist)
+        # package_name: "ZMCP_SHR_PKG"  # Uses environment.default_package if omitted
         cds_view_name: "ZMCP_BLD_CDSV_H1"
         description: "CDS unit test class"
         transport_request: ""

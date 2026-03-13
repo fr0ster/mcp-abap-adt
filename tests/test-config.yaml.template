@@ -931,7 +931,7 @@ create_data_element:
         long_label: "Builder Data Element"
         heading_label: "Builder Data Element"
       operation_delays:
-        cleanup: 5000  # Extra delay after pre-test cleanup (TADIR race on cloud trial)
+        cleanup: 10000  # Extra delay after pre-test cleanup (TADIR race on cloud trial)
 
 # Create Interface
 
@@ -990,7 +990,7 @@ create_domain:
         lowercase: false
         sign_exists: false
       operation_delays:
-        cleanup: 5000  # Extra delay after pre-test cleanup (TADIR race on cloud trial)
+        cleanup: 10000  # Extra delay after pre-test cleanup (TADIR race on cloud trial)
         create: 5000
         update: 3000
 

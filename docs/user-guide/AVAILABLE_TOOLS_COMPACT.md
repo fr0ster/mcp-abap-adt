@@ -52,10 +52,10 @@ Facade dispatch is deterministic by `object_type` and CRUD operation.
 | `FUNCTION_GROUP` | `create`, `get`, `update`, `delete` |
 | `FUNCTION_MODULE` | `create`, `get`, `update`, `delete` |
 | `INTERFACE` | `create`, `get`, `update`, `delete` |
-| `LOCAL_DEFINITIONS` | `create`, `get`, `update`, `delete` |
-| `LOCAL_MACROS` | `create`, `get`, `update`, `delete` |
-| `LOCAL_TEST_CLASS` | `create`, `get`, `update`, `delete` |
-| `LOCAL_TYPES` | `create`, `get`, `update`, `delete` |
+| `LOCAL_DEFINITIONS` | `get`, `update`, `delete` |
+| `LOCAL_MACROS` | `get`, `update`, `delete` |
+| `LOCAL_TEST_CLASS` | `get`, `update`, `delete` |
+| `LOCAL_TYPES` | `get`, `update`, `delete` |
 | `METADATA_EXTENSION` | `create`, `get`, `update`, `delete` |
 | `PACKAGE` | `create`, `get` |
 | `PROGRAM` | `create`, `get`, `update`, `delete` |
@@ -238,7 +238,7 @@ Preferred dedicated compact tools and minimal payloads:
 
 <a id="handlercreate-compact"></a>
 #### HandlerCreate (Compact)
-**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerCreate.ts`
 
@@ -261,7 +261,6 @@ Preferred dedicated compact tools and minimal payloads:
 - `program_name` (string, optional) - ABAP program name.
 - `program_type` (string, optional) - ABAP program type.
 - `sign_exists` (boolean, optional) - Allow signed values (domain setting).
-- `source_code` (string, optional) - ABAP source code payload.
 - `transport_request` (string, optional) - Transport request id (if required by system).
 - `value_table` (string, optional) - Foreign key value table.
 
@@ -552,4 +551,4 @@ Preferred dedicated compact tools and minimal payloads:
 
 ---
 
-*Last updated: 2026-02-27*
+*Last updated: 2026-03-13*

@@ -45,6 +45,7 @@ Each handler (for example, `src/handlers/program/handleGetProgram.ts`) contains:
 export const TOOL_DEFINITION = {
   name: "GetProgram",
   description: "Retrieve ABAP program source code. Returns only the main program source code without includes or enhancements.",
+  available_in: ['onprem', 'legacy'] as const,
   inputSchema: {
     type: "object",
     properties: {
@@ -59,7 +60,62 @@ export async function handleGetProgram(args: any) {
 }
 ```
 
-### 3. Central registry
+### 3. Environment-based tool filtering (`available_in`)
+
+Each handler's `TOOL_DEFINITION` includes an `available_in` field that declares which SAP environments the tool supports:
+
+```typescript
+export const TOOL_DEFINITION = {
+  name: "CreateClass",
+  description: "Create a new ABAP class",
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  inputSchema: { ... }
+} as const;
+```
+
+**Values:**
+- `'onprem'` — On-premise systems (ECC, S/4HANA)
+- `'cloud'` — ABAP Cloud (SAP BTP)
+- `'legacy'` — Legacy on-premise systems (BASIS < 7.50, connected via RFC)
+
+**How filtering works:**
+
+At server startup, `BaseMcpServer.registerHandlers()` determines the current environment and skips tools that don't match:
+
+```typescript
+const currentEnv = systemCtx.isLegacy
+  ? 'legacy'
+  : authType === 'jwt' ? 'cloud' : 'onprem';
+
+// For each tool:
+const availableIn = entry.toolDefinition.available_in;
+if (availableIn?.length > 0 && !availableIn.includes(currentEnv)) {
+  // Tool is not registered — hidden from the client
+  continue;
+}
+```
+
+**Rules:**
+- If `available_in` is omitted or empty, the tool is registered everywhere (backward compatibility)
+- Tools are filtered at registration time — clients never see unsupported tools
+- Environment detection: `isLegacy` flag → `'legacy'`, JWT auth → `'cloud'`, otherwise → `'onprem'`
+
+**Common patterns:**
+
+| Pattern | Meaning |
+|---------|---------|
+| `['onprem', 'cloud', 'legacy']` | Available everywhere |
+| `['onprem', 'cloud']` | Modern systems only (e.g., Domain, DataElement, Table, Structure, CDS, BDEF) |
+| `['onprem', 'legacy']` | On-premise only, no cloud (e.g., Programs) |
+| `['onprem']` | Modern on-premise only (e.g., runtime profiling with programs) |
+
+**Tool availability by level:**
+
+See generated documentation:
+- [All Tools](../user-guide/AVAILABLE_TOOLS.md)
+- [Legacy-Available Tools](../user-guide/AVAILABLE_TOOLS_LEGACY.md)
+
+### 4. Central registry
 
 The `src/lib/toolsRegistry.ts` file:
 - Defines the `ToolDefinition` interface for type safety
@@ -121,7 +177,7 @@ export function getToolByName(name: string): ToolDefinition | undefined {
 - Some tools (like `GetAdtTypes`, `GetObjectStructure`) use dynamic imports in `index.ts` but are placed in the main `ALL_TOOLS` array, not in `DYNAMIC_IMPORT_TOOLS`
 - The `getToolByName()` helper function allows finding tools by name programmatically
 
-### 4. Usage in index.ts
+### 5. Usage in index.ts
 
 `index.ts` now relies on the dynamic registry instead of a hard-coded list:
 
@@ -170,18 +226,19 @@ this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
    export const TOOL_DEFINITION = {
      name: "YourToolName",
      description: "Description of what your tool does",
+     available_in: ['onprem', 'cloud'] as const,  // specify supported environments
      inputSchema: {
        type: "object",
        properties: {
-         param_name: { 
-           type: "string", 
-           description: "Description of the parameter" 
+         param_name: {
+           type: "string",
+           description: "Description of the parameter"
          }
        },
        required: ["param_name"]
      }
    } as const;
-   
+
    export async function handleYourTool(args: any) {
      // Handler implementation
    }

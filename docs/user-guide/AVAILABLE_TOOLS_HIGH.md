@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: High-Level
-- Total tools: 117
+- Total tools: 113
 
 ## Navigation
 
@@ -20,10 +20,6 @@ Generated from code in `src/handlers/**` (not from docs).
     - [UpdateBehaviorImplementation](#updatebehaviorimplementation-high-level-behavior-implementation)
   - [Class](#high-level-class)
     - [CreateClass](#createclass-high-level-class)
-    - [CreateLocalDefinitions](#createlocaldefinitions-high-level-class)
-    - [CreateLocalMacros](#createlocalmacros-high-level-class)
-    - [CreateLocalTestClass](#createlocaltestclass-high-level-class)
-    - [CreateLocalTypes](#createlocaltypes-high-level-class)
     - [DeleteClass](#deleteclass-high-level-class)
     - [DeleteLocalDefinitions](#deletelocaldefinitions-high-level-class)
     - [DeleteLocalMacros](#deletelocalmacros-high-level-class)
@@ -217,16 +213,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createbehaviorimplementation-high-level-behavior-implementation"></a>
 #### CreateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Create a new ABAP behavior implementation class for a behavior definition. Behavior implementations contain the business logic for RAP entities. Uses stateful session for proper lock management.
+**Description:** Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state. Use UpdateBehaviorImplementation to set implementation code afterwards.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
 
 **Parameters:**
-- `activate` (boolean, optional) - Activate behavior implementation after creation. Default: true.
 - `behavior_definition` (string, required) - Behavior Definition name (e.g., ZI_MY_ENTITY). The behavior definition must exist.
 - `class_name` (string, required) - Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must follow SAP naming conventions (typically starts with ZBP_ for behavior implementations).
 - `description` (string, optional) - Class description. If not provided, class_name will be used.
-- `implementation_code` (string, optional) - Implementation code for the implementations include (optional). Contains the actual behavior implementation methods.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
@@ -276,78 +270,19 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Create a new ABAP class with optional activation. Manages validation, lock, check, update, unlock, and optional activation.
+**Description:** Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code afterwards.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
 **Parameters:**
 - `abstract` (boolean, optional) - Mark class as abstract. Default: false
-- `activate` (boolean, optional) - Activate after creation. Default: true.
 - `class_name` (string, required) - Class name (e.g., ZCL_TEST_CLASS_001).
 - `create_protected` (boolean, optional) - Protected constructor. Default: false
 - `description` (string, optional) - Class description (defaults to class_name).
 - `final` (boolean, optional) - Mark class as final. Default: false
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP).
-- `source_code` (string, optional) - Full ABAP class source code. If omitted, a minimal template is generated.
 - `superclass` (string, optional) - Optional superclass name.
 - `transport_request` (string, optional) - Transport request number (required for transportable packages).
-
----
-
-<a id="createlocaldefinitions-high-level-class"></a>
-#### CreateLocalDefinitions (High-Level / Class)
-**Description:** Create local definitions in an ABAP class (definitions include). Manages lock, check, update, unlock, and optional activation.
-
-**Source:** `src/handlers/class/high/handleCreateLocalDefinitions.ts`
-
-**Parameters:**
-- `activate_on_create` (boolean, optional (default: false)) - Activate parent class after creating. Default: false
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `definitions_code` (string, required) - Source code for local definitions.
-- `transport_request` (string, optional) - Transport request number.
-
----
-
-<a id="createlocalmacros-high-level-class"></a>
-#### CreateLocalMacros (High-Level / Class)
-**Description:** Create local macros in an ABAP class (macros include). Manages lock, check, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.
-
-**Source:** `src/handlers/class/high/handleCreateLocalMacros.ts`
-
-**Parameters:**
-- `activate_on_create` (boolean, optional (default: false)) - Activate parent class after creating. Default: false
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `macros_code` (string, required) - Source code for local macros.
-- `transport_request` (string, optional) - Transport request number.
-
----
-
-<a id="createlocaltestclass-high-level-class"></a>
-#### CreateLocalTestClass (High-Level / Class)
-**Description:** Create a local test class in an ABAP class. Manages lock, check, update, unlock, and optional activation of parent class.
-
-**Source:** `src/handlers/class/high/handleCreateLocalTestClass.ts`
-
-**Parameters:**
-- `activate_on_create` (boolean, optional (default: false)) - Activate parent class after creating test class. Default: false
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `test_class_code` (string, required) - Source code for the local test class.
-- `test_class_name` (string, optional) - Optional test class name (e.g., lcl_test).
-- `transport_request` (string, optional) - Transport request number (required for transportable objects).
-
----
-
-<a id="createlocaltypes-high-level-class"></a>
-#### CreateLocalTypes (High-Level / Class)
-**Description:** Create local types in an ABAP class (implementations include). Manages lock, check, update, unlock, and optional activation.
-
-**Source:** `src/handlers/class/high/handleCreateLocalTypes.ts`
-
-**Parameters:**
-- `activate_on_create` (boolean, optional (default: false)) - Activate parent class after creating. Default: false
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `local_types_code` (string, required) - Source code for local types.
-- `transport_request` (string, optional) - Transport request number.
 
 ---
 
@@ -632,7 +567,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlercreate-high-level-compact"></a>
 #### HandlerCreate (High-Level / Compact)
-**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerCreate.ts`
 
@@ -655,7 +590,6 @@ Generated from code in `src/handlers/**` (not from docs).
 - `program_name` (string, optional) - ABAP program name.
 - `program_type` (string, optional) - ABAP program type.
 - `sign_exists` (boolean, optional) - Allow signed values (domain setting).
-- `source_code` (string, optional) - ABAP source code payload.
 - `transport_request` (string, optional) - Transport request id (if required by system).
 - `value_table` (string, optional) - Foreign key value table.
 
@@ -1151,16 +1085,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createfunctionmodule-high-level-function"></a>
 #### CreateFunctionModule (High-Level / Function)
-**Description:** Create a new ABAP function module within an existing function group. Uses stateful session with LOCK/UNLOCK workflow for source code upload.
+**Description:** Create a new ABAP function module within an existing function group. Creates the function module in initial state. Use UpdateFunctionModule to set source code afterwards.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionModule.ts`
 
 **Parameters:**
-- `activate` (boolean, optional (default: true))) - Whether to activate the function module after creation (default: true)
 - `description` (string, optional) - Optional description for the function module
 - `function_group_name` (string, required) - Parent function group name (e.g., ZTEST_FG_001)
 - `function_module_name` (string, required) - Function module name (e.g., Z_TEST_FUNCTION_001). Must follow SAP naming conventions (start with Z or Y, max 30 chars).
-- `source_code` (string, required) - ABAP source code for the function module including signature (FUNCTION name IMPORTING/EXPORTING ... ENDFUNCTION).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
 ---
@@ -1254,16 +1186,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createinterface-high-level-interface"></a>
 #### CreateInterface (High-Level / Interface)
-**Description:** Create a new ABAP interface in SAP system with source code. Interfaces define method signatures, events, and types for implementation by classes. Uses stateful session for proper lock management.
+**Description:** Create a new ABAP interface in SAP system. Creates the interface object in initial state. Use UpdateInterface to set source code afterwards.
 
 **Source:** `src/handlers/interface/high/handleCreateInterface.ts`
 
 **Parameters:**
-- `activate` (boolean, optional) - Activate interface after creation. Default: true. Set to false for batch operations (activate multiple objects later).
 - `description` (string, optional) - Interface description. If not provided, interface_name will be used.
 - `interface_name` (string, required) - Interface name (e.g., ZIF_TEST_INTERFACE_001). Must follow SAP naming conventions (start with Z or Y).
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
-- `source_code` (string, optional) - Complete ABAP interface source code with INTERFACE...ENDINTERFACE section. If not provided, generates minimal template.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
 ---
@@ -1364,18 +1294,16 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createprogram-high-level-program"></a>
 #### CreateProgram (High-Level / Program)
-**Description:** Create a new ABAP program (report) in SAP system with source code. Supports executable programs, includes, module pools. Uses stateful session for proper lock management.
+**Description:** Create a new ABAP program (report) in SAP system. Creates the program object in initial state. Use UpdateProgram to set source code afterwards.
 
 **Source:** `src/handlers/program/high/handleCreateProgram.ts`
 
 **Parameters:**
-- `activate` (boolean, optional) - Activate program after creation. Default: true. Set to false for batch operations (activate multiple objects later).
 - `application` (string, optional) - Application area (e.g., 
 - `description` (string, optional) - Program description. If not provided, program_name will be used.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `program_name` (string, required) - Program name (e.g., Z_TEST_PROGRAM_001). Must follow SAP naming conventions (start with Z or Y).
 - `program_type` (string, optional) - Program type: 
-- `source_code` (string, optional) - Complete ABAP program source code. If not provided, generates minimal template based on program_type.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
 ---
@@ -1647,13 +1575,11 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createtable-high-level-table"></a>
 #### CreateTable (High-Level / Table)
-**Description:** Create a new ABAP table via the ADT API using provided DDL. Mirrors Eclipse ADT behaviour with status/check runs, lock handling, activation and verification.
+**Description:** Create a new ABAP table via the ADT API. Creates the table object in initial state. Use UpdateTable to set DDL code afterwards.
 
 **Source:** `src/handlers/table/high/handleCreateTable.ts`
 
 **Parameters:**
-- `activate` (boolean, optional) - Activate table after creation. Default: true. Set to false for batch operations (activate multiple objects later).
-- `ddl_code` (string, required) - Complete DDL code for table creation. Example: 
 - `description` (string, optional) - Table description for validation and creation.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `table_name` (string, required) - Table name (e.g., ZZ_TEST_TABLE_001). Must follow SAP naming conventions.
@@ -1721,17 +1647,15 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Create a CDS unit test class with CDS validation, class template, and local test class source.
+**Description:** Create a CDS unit test class with CDS validation. Creates the test class in initial state.
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
 **Parameters:**
 - `cds_view_name` (string, required) - CDS view name to validate for unit test doubles.
 - `class_name` (string, required) - Global test class name (e.g., ZCL_CDS_TEST).
-- `class_template` (string, required) - ABAP class template used for CDS unit tests.
 - `description` (string, optional) - Optional description for the global test class.
 - `package_name` (string, required) - Package name (e.g., ZOK_TEST_PKG_01, $TMP).
-- `test_class_source` (string, required) - Local test class ABAP source code.
 - `transport_request` (string, optional) - Transport request number (required for transportable packages).
 
 ---
@@ -1892,13 +1816,11 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createview-high-level-view"></a>
 #### CreateView (High-Level / View)
-**Description:** Create CDS View or Classic View in SAP using DDL syntax. Both types use the same API workflow, differing only in DDL content (CDS has @AbapCatalog.sqlViewName and other annotations).
+**Description:** Create CDS View or Classic View in SAP. Creates the view object in initial state. Use UpdateView to set DDL source code afterwards.
 
 **Source:** `src/handlers/view/high/handleCreateView.ts`
 
 **Parameters:**
-- `activate` (boolean, optional) - Activate after creation. Default: true.
-- `ddl_source` (string, required) - Complete DDL source code.
 - `description` (string, optional) - Optional description (defaults to view_name).
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (required for transportable packages).
@@ -1944,4 +1866,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-02-27*
+*Last updated: 2026-03-13*

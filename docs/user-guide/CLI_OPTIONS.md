@@ -128,6 +128,28 @@ mcp-abap-adt --transport=sse
 
 **Note:** You can use shortcuts `--http` or `--sse` instead of `--transport=http` or `--transport=sse`.
 
+## SAP Connection Type
+
+**--connection-type=\<type\>**
+
+SAP connection transport layer. Determines how the server communicates with the SAP system.
+
+Valid values:
+- `http` - HTTP/HTTPS (default, for modern on-premise and cloud systems)
+- `rfc` - RFC via SAP NW RFC SDK (for legacy systems with BASIS < 7.50)
+
+```bash
+# Default HTTP connection (modern systems)
+mcp-abap-adt --env-path=.env
+
+# RFC connection (legacy systems)
+mcp-abap-adt --connection-type=rfc --env-path=legacy.env
+```
+
+**Note:** RFC requires the SAP NW RFC SDK installed and configured. See [RFC Setup Guide](../installation/RFC_SETUP.md) for prerequisites.
+
+The same option can be set via environment variable `SAP_CONNECTION_TYPE=rfc` in `.env` file. CLI flag takes precedence.
+
 ## Auth-Broker Options
 
 **--mcp=\<destination\>**
@@ -396,6 +418,7 @@ These are typically set in `.env` file:
 - `SAP_AUTH_TYPE` - Authentication type: `basic` or `jwt` (default: basic)
 - `SAP_USERNAME` - SAP username (for basic auth)
 - `SAP_PASSWORD` - SAP password (for basic auth)
+- `SAP_CONNECTION_TYPE` - Connection transport: `http` (default) or `rfc` (legacy systems)
 - `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
 
 **JWT/OAuth2 Authentication:**
@@ -471,6 +494,26 @@ EOF
 
 # Run with auto-discovery
 mcp-abap-adt
+```
+
+### Legacy System Setup (RFC)
+
+```bash
+# Create legacy environment
+cat > legacy.env << EOF
+SAP_URL=https://legacy.sap.company.com
+SAP_CLIENT=100
+SAP_AUTH_TYPE=basic
+SAP_USERNAME=developer
+SAP_PASSWORD=dev-password
+SAP_CONNECTION_TYPE=rfc
+EOF
+
+# Run with RFC connection
+mcp-abap-adt --env-path=legacy.env
+
+# Or use CLI flag instead of env var
+mcp-abap-adt --connection-type=rfc --env-path=.env
 ```
 
 ### Production Setup

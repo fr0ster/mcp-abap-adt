@@ -28,6 +28,7 @@ const OUTPUT_PATHS = {
     __dirname,
     '../docs/user-guide/AVAILABLE_TOOLS_COMPACT.md',
   ),
+  legacy: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_LEGACY.md'),
 };
 const LEVELS = ['readonly', 'high', 'low'];
 
@@ -41,6 +42,7 @@ Scans src/handlers/**/(readonly|high|low)/*.ts and generates:
   docs/user-guide/AVAILABLE_TOOLS_HIGH.md
   docs/user-guide/AVAILABLE_TOOLS_LOW.md
   docs/user-guide/AVAILABLE_TOOLS_COMPACT.md
+  docs/user-guide/AVAILABLE_TOOLS_LEGACY.md
 
 Output hierarchy:
   1) Group (level)
@@ -359,11 +361,24 @@ function extractToolDefinition(filePath) {
     }
   }
 
+  // Extract available_in array
+  const availableInMatch = block.match(
+    /available_in\s*:\s*\[([^\]]*)\]/,
+  );
+  let availableIn = [];
+  if (availableInMatch) {
+    availableIn = availableInMatch[1]
+      .split(',')
+      .map((s) => s.trim().replace(/['"]/g, ''))
+      .filter(Boolean);
+  }
+
   return {
     name: nameMatch[1],
     description: descMatch ? descMatch[1] : '',
     inputSchema,
     inputSchemaRef,
+    availableIn,
   };
 }
 
@@ -764,6 +779,76 @@ function generateCompactMarkdown(tools) {
   return md;
 }
 
+function generateEnvironmentMarkdown(tools, envName, envLabel, envDescription) {
+  const envTools = tools.filter(
+    (t) => t.availableIn && t.availableIn.includes(envName),
+  );
+  const grouped = groupByLevelAndObject(envTools);
+
+  let md = `# ${envLabel} Tools - MCP ABAP ADT Server\n\n`;
+  md += `Generated from code in \`src/handlers/**\` (not from docs).\n\n`;
+  md += `${envDescription}\n\n`;
+  md += `- Total tools: ${envTools.length}\n`;
+  for (const level of LEVELS) {
+    const count = envTools.filter((t) => t.level === level).length;
+    if (count > 0) md += `- ${levelTitle(level)}: ${count}\n`;
+  }
+  md += `\n`;
+
+  md += `## Navigation\n\n`;
+  for (const level of LEVELS) {
+    const objects = Object.values(grouped[level]).sort((a, b) =>
+      a.objectTitle.localeCompare(b.objectTitle),
+    );
+    if (objects.length === 0) continue;
+
+    const levelHeading = `${levelTitle(level)} Group`;
+    md += `- [${levelTitle(level)} Group](#${anchorFromHeading(levelHeading)})\n`;
+    for (const obj of objects) {
+      const objectHeading = `${levelTitle(level)} / ${obj.objectTitle}`;
+      md += `  - [${obj.objectTitle}](#${anchorFromHeading(objectHeading)})\n`;
+      for (const tool of obj.tools) {
+        const toolHeading = `${tool.name} (${levelTitle(level)} / ${obj.objectTitle})`;
+        md += `    - [${tool.name}](#${anchorFromHeading(toolHeading)})\n`;
+      }
+    }
+  }
+
+  md += `\n---\n\n`;
+
+  for (const level of LEVELS) {
+    const objects = Object.values(grouped[level]).sort((a, b) =>
+      a.objectTitle.localeCompare(b.objectTitle),
+    );
+    if (objects.length === 0) continue;
+
+    const levelHeading = `${levelTitle(level)} Group`;
+    md += `<a id="${anchorFromHeading(levelHeading)}"></a>\n`;
+    md += `## ${levelHeading}\n\n`;
+
+    for (const obj of objects) {
+      const objectHeading = `${levelTitle(level)} / ${obj.objectTitle}`;
+      md += `<a id="${anchorFromHeading(objectHeading)}"></a>\n`;
+      md += `### ${objectHeading}\n\n`;
+
+      for (const tool of obj.tools) {
+        const toolHeading = `${tool.name} (${levelTitle(level)} / ${obj.objectTitle})`;
+        md += `<a id="${anchorFromHeading(toolHeading)}"></a>\n`;
+        md += `#### ${toolHeading}\n`;
+        md += `**Description:** ${tool.description || 'No description'}\n\n`;
+        md += `**Source:** \`${tool.filePath}\`\n\n`;
+        md += `**Available in:** \`${tool.availableIn.join('`, `')}\`\n\n`;
+        md += `**Parameters:**\n`;
+        md += renderParams(tool);
+        md += `\n---\n\n`;
+      }
+    }
+  }
+
+  md += `*Last updated: ${new Date().toISOString().slice(0, 10)}*\n`;
+  return md;
+}
+
 function main() {
   console.log('🔍 Scanning handler code in src/handlers...');
   const tools = loadToolsFromHandlers();
@@ -796,11 +881,22 @@ function main() {
     generateCompactMarkdown(tools),
     'utf8',
   );
+  fs.writeFileSync(
+    OUTPUT_PATHS.legacy,
+    generateEnvironmentMarkdown(
+      tools,
+      'legacy',
+      'Legacy System',
+      'Tools available on legacy SAP systems (BASIS < 7.50) connected via RFC.\nLegacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.',
+    ),
+    'utf8',
+  );
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.all}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.readonly}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.high}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.low}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.compact}`);
+  console.log(`✅ Documentation generated: ${OUTPUT_PATHS.legacy}`);
 }
 
 if (require.main === module) {

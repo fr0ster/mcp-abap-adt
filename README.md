@@ -8,8 +8,8 @@
 
 **Why teams use it:**
 - **Full CRUD** (not read-only): create, read, update, and delete ABAP artifacts
-- Works with **On-Premise (ECC/S/4HANA)** and **ABAP Cloud (BTP)** systems
-- **JWT/XSUAA** and **service key** (destination-based) authorization
+- Works with **On-Premise (ECC/S/4HANA)**, **ABAP Cloud (BTP)**, and **Legacy** systems (BASIS < 7.50 via RFC)
+- **JWT/XSUAA**, **service key** (destination-based), and **RFC** authorization
 - Multiple transports: **stdio**, **HTTP**, **SSE**
 - Rich tool surface for ABAP objects, metadata, transports, and search
 
@@ -104,6 +104,7 @@ await server.connect(transport);
    - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
    - [High-Level Tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md)
    - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
+   - [Legacy System Tools](docs/user-guide/AVAILABLE_TOOLS_LEGACY.md)
 
 ## Use Cases
 
@@ -178,6 +179,7 @@ Published in the official MCP Registry and listed on Glama.ai.
   - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
   - [High-Level Tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md)
   - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
+  - [Legacy System Tools](docs/user-guide/AVAILABLE_TOOLS_LEGACY.md)
 
 ### For Administrators
 - **[Deployment Docs](docs/deployment/README.md)** - MCP Registry, Docker, release notes
@@ -278,6 +280,18 @@ SAP_AUTH_TYPE=jwt
 SAP_JWT_TOKEN=your-jwt-token
 ```
 
+For legacy systems (RFC):
+```bash
+SAP_URL=https://your-legacy-system.com
+SAP_CLIENT=100
+SAP_AUTH_TYPE=basic
+SAP_USERNAME=your-username
+SAP_PASSWORD=your-password
+SAP_CONNECTION_TYPE=rfc
+```
+
+See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK).
+
 **Generate .env from Service Key (JWT):**
 ```bash
 # Install the connection package globally (one-time setup)
@@ -300,6 +314,7 @@ Inline comments are not parsed, so keep comments on separate lines.
 - `--auth-broker` - Force use of auth-broker (service keys), ignore .env file
 - `--auth-broker-path=<path>` - Custom path for auth-broker service keys and sessions
 - `--browser-auth-port=<port>` - Override OAuth browser callback port (default: 5000 for HTTP, 4000 for SSE, 4001 for stdio)
+- `--connection-type=<http|rfc>` - SAP connection transport: `http` (default) or `rfc` (legacy systems)
 - `--unsafe` - Enable file-based session storage (persists tokens to disk). By default, sessions are stored in-memory (secure, lost on restart)
 
 When `--mcp=<destination>` is specified, automatic fallback loading of `./.env` is skipped.

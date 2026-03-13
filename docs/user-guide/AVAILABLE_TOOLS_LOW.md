@@ -195,7 +195,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `root_entity` (string, required) - Root entity name (e.g., ZI_MY_ENTITY).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, required) - Transport request number (e.g., E19K905635). Required.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required.
 
 ---
 
@@ -815,7 +815,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddlx/low/handleLockMetadataExtension.ts`
 
 **Parameters:**
-- `objName` (string, optional) - MetadataExtension name (e.g., Z_MY_PROGRAM).
+- `name` (string, required) - MetadataExtension name (e.g., ZI_MY_DDLX).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -829,7 +829,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `lock_handle` (string, required) - Lock handle from LockMetadataExtension operation.
-- `objName` (string, optional) - MetadataExtension name (e.g., Z_MY_PROGRAM).
+- `name` (string, required) - MetadataExtension name (e.g., ZI_MY_DDLX).
 - `session_id` (string, required) - Session ID from LockMetadataExtension operation. Must be the same as used in LockMetadataExtension.
 - `session_state` (object, optional) - Session state from LockMetadataExtension (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -857,7 +857,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddlx/low/handleValidateMetadataExtension.ts`
 
 **Parameters:**
-- `objName` (string, optional) - MetadataExtension name to validate (e.g., Z_MY_PROGRAM).
+- `description` (string, required) - MetadataExtension description.
+- `name` (string, required) - MetadataExtension name to validate (e.g., ZI_MY_DDLX).
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1416,6 +1418,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name to validate (e.g., Z_MY_PROGRAM).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `super_package` (string, required) - Parent (super) package name. The new package will be created under this package.
 
 ---
 
@@ -1951,4 +1954,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-02-27*
+*Last updated: 2026-03-13*

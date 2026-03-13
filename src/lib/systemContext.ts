@@ -1,7 +1,4 @@
-import {
-  getSystemInformation,
-  isModernAdtSystem,
-} from '@mcp-abap-adt/adt-clients';
+import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { registerConnectionResetHook } from './connectionEvents';
 
@@ -17,22 +14,18 @@ let cached: IAdtSystemContext | undefined;
 
 /**
  * Detect whether the connected system is legacy (BASIS < 7.50).
- * Modern systems expose /sap/bc/adt/core/discovery; legacy ones do not.
  *
- * SAP_SYSTEM_TYPE env var overrides auto-detection:
- *   SAP_SYSTEM_TYPE=legacy  → always legacy
- *   SAP_SYSTEM_TYPE=onprem  → always modern onprem
- *   SAP_SYSTEM_TYPE=cloud   → always modern cloud
+ * Uses SAP_SYSTEM_TYPE env var (default: cloud).
+ * Auto-detection via /sap/bc/adt/core/discovery was removed because it is
+ * unreliable — the result depends on shell environment, proxy config, and
+ * whether the ICM port requires a pre-established session.
+ *
+ *   SAP_SYSTEM_TYPE=legacy  → legacy (BASIS < 7.50)
+ *   SAP_SYSTEM_TYPE=onprem  → modern on-premise
+ *   SAP_SYSTEM_TYPE=cloud   → modern cloud (default)
  */
-async function detectLegacy(connection: IAbapConnection): Promise<boolean> {
-  const systemType = process.env.SAP_SYSTEM_TYPE?.toLowerCase();
-  if (systemType === 'legacy') return true;
-  if (systemType === 'onprem' || systemType === 'cloud') return false;
-  try {
-    return !(await isModernAdtSystem(connection));
-  } catch {
-    return false;
-  }
+function detectLegacy(): boolean {
+  return process.env.SAP_SYSTEM_TYPE?.toLowerCase() === 'legacy';
 }
 
 export async function resolveSystemContext(
@@ -44,15 +37,15 @@ export async function resolveSystemContext(
     cached = {
       masterSystem: overrides.masterSystem,
       responsible: overrides.responsible,
-      isLegacy: cached?.isLegacy ?? (await detectLegacy(connection)),
+      isLegacy: cached?.isLegacy ?? detectLegacy(),
     };
     return cached;
   }
 
   if (cached) return cached;
 
-  // Detect legacy once per connection
-  const isLegacy = await detectLegacy(connection);
+  // Detect legacy from SAP_SYSTEM_TYPE (default: cloud → not legacy)
+  const isLegacy = detectLegacy();
 
   // Priority 2: env vars (on-prem or explicitly configured)
   const masterSystem = process.env.SAP_MASTER_SYSTEM;

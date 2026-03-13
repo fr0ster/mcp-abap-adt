@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-03-13
+
+### Added
+- **Legacy system support (BASIS < 7.50)**: automatic detection of legacy systems, `AdtClientLegacy` factory, RFC connection transport via `SADT_REST_RFC_ENDPOINT`.
+- **RFC connection type**: `--connection-type=rfc` CLI flag and `SAP_CONNECTION_TYPE=rfc` env var for legacy systems requiring SAP NW RFC SDK.
+- **`available_in` mechanism**: each handler's `TOOL_DEFINITION` declares supported environments (`onprem`, `cloud`, `legacy`). Unsupported tools are hidden from clients at registration time.
+- **Legacy `available_in` on 102 handlers**: Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.
+- **FunctionGroup/FunctionModule on cloud**: previously restricted to on-premise only.
+- **Runtime profiling and dumps on cloud**: class-based profiling now works on ABAP Cloud.
+- **Shared dependencies management**: `npm run shared:setup` / `shared:teardown` / `shared:check` for test objects.
+- **Test infrastructure**: `test:init` / `test:reinit` scripts, explicit connection config (`env`, `system_type`, `connection_type`) in `test-config.yaml`, `available_in` support in test cases for system-aware skipping.
+- **AVAILABLE_TOOLS_LEGACY.md**: generated documentation listing 115 legacy-compatible tools.
+
+### Changed
+- **BREAKING: Node 18 dropped** — minimum Node.js version is now 20.0.0.
+- **BREAKING: `@mcp-abap-adt/adt-clients` upgraded** from 2.x to 3.11.2 (major API changes).
+- **BREAKING: `@mcp-abap-adt/connection` upgraded** to 1.5.3.
+- **CI matrix**: Node 20 + 25 on 3 OS for push/PR; Node 20/22/24/25 for release.
+- **Guaranteed unlock**: force-release DDIC locks, unlock-on-error in CreateDataElement/CreateDomain.
+- **TADIR conflict retry**: automatic retry on 409 TADIR conflict during create operations.
+
+### Fixed
+- Circular reference in CDS unit test handlers.
+- i18n check handling (adt-clients 3.8.7).
+- MetadataExtension high/low test object conflicts (separate config keys).
+- Function test lock conflicts (separate high/low test objects).
+- Package tests use `update()` for lock/unlock.
+- Jest 30 deprecated `--testPathPattern` migrated to `--testPathPatterns`.
+- `SAP_USER` → `SAP_USERNAME` in configuration examples.
+
+## [3.2.1] - 2026-03-07
+
+### Fixed
+- **Integration test cleanup**: close MCP connections, reuse auth session, random ports.
+
 ## [3.2.0] - 2026-03-05
 
 ### Added

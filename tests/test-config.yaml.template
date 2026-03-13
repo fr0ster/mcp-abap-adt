@@ -991,6 +991,8 @@ create_domain:
         sign_exists: false
       operation_delays:
         cleanup: 5000  # Extra delay after pre-test cleanup (TADIR race on cloud trial)
+        create: 5000
+        update: 3000
 
 # Create Data Element
 

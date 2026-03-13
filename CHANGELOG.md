@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [4.1.1] - 2026-03-13
+
+### Fixed
+- Unit test `systemContext.test.ts` updated to match `SAP_SYSTEM_TYPE` env var approach (removed obsolete `isModernAdtSystem` mock).
+
 ## [4.1.0] - 2026-03-13
 
 ### Added

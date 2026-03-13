@@ -6,13 +6,9 @@ import {
 
 // Mock @mcp-abap-adt/adt-clients — covers both static import and dynamic import()
 const mockGetSystemInformation = jest.fn().mockResolvedValue(undefined);
-const mockIsModernAdtSystem = jest.fn().mockResolvedValue(true);
 jest.mock('@mcp-abap-adt/adt-clients', () => ({
   get getSystemInformation() {
     return mockGetSystemInformation;
-  },
-  get isModernAdtSystem() {
-    return mockIsModernAdtSystem;
   },
 }));
 
@@ -26,11 +22,11 @@ describe('resolveSystemContext', () => {
 
   beforeEach(() => {
     resetSystemContextCache();
-    mockIsModernAdtSystem.mockResolvedValue(true);
     process.env = { ...originalEnv };
     delete process.env.SAP_MASTER_SYSTEM;
     delete process.env.SAP_RESPONSIBLE;
     delete process.env.SAP_USERNAME;
+    delete process.env.SAP_SYSTEM_TYPE;
   });
 
   afterAll(() => {
@@ -140,8 +136,7 @@ describe('resolveSystemContext', () => {
     expect(result.masterSystem).toBe('OVERRIDE');
   });
 
-  it('should detect modern system as not legacy', async () => {
-    mockIsModernAdtSystem.mockResolvedValue(true);
+  it('should detect cloud system as not legacy (default)', async () => {
     process.env.SAP_MASTER_SYSTEM = 'SYS';
 
     const result = await resolveSystemContext(mockConnection);
@@ -149,8 +144,8 @@ describe('resolveSystemContext', () => {
     expect(result.isLegacy).toBe(false);
   });
 
-  it('should detect legacy system when core/discovery is absent', async () => {
-    mockIsModernAdtSystem.mockResolvedValue(false);
+  it('should detect legacy system when SAP_SYSTEM_TYPE=legacy', async () => {
+    process.env.SAP_SYSTEM_TYPE = 'legacy';
     process.env.SAP_MASTER_SYSTEM = 'OLD_SYS';
 
     const result = await resolveSystemContext(mockConnection);
@@ -159,7 +154,7 @@ describe('resolveSystemContext', () => {
   });
 
   it('should preserve isLegacy when overrides are applied', async () => {
-    mockIsModernAdtSystem.mockResolvedValue(false);
+    process.env.SAP_SYSTEM_TYPE = 'legacy';
     process.env.SAP_MASTER_SYSTEM = 'OLD_SYS';
     await resolveSystemContext(mockConnection);
 
@@ -173,7 +168,7 @@ describe('resolveSystemContext', () => {
   });
 
   it('should expose isLegacy via getSystemContext()', async () => {
-    mockIsModernAdtSystem.mockResolvedValue(false);
+    process.env.SAP_SYSTEM_TYPE = 'legacy';
     process.env.SAP_MASTER_SYSTEM = 'SYS';
     await resolveSystemContext(mockConnection);
 

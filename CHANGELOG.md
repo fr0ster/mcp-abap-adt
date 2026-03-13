@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-03-13
+
+### Added
+- `SAP_SYSTEM_TYPE` environment variable (`cloud` | `onprem` | `legacy`) to explicitly control SAP system type. Default: `cloud`.
+- `--system-type` CLI argument as alternative to the env var.
+- Eager HTTP session initialization — `connect()` is now called for all connection types (not just RFC), establishing CSRF token and cookies before the first request.
+
+### Changed
+- Removed unreliable auto-detection via `/sap/bc/adt/core/discovery`. System type is now determined solely by `SAP_SYSTEM_TYPE`.
+- **Migration note:** on-premise users must set `SAP_SYSTEM_TYPE=onprem` in `.env` to access on-premise-only tools (e.g., Programs).
+
+### Fixed
+- 403 errors on first request to SAP systems (e.g., E96) that require pre-established session cookies.
+- Inconsistent legacy detection across different shell environments, proxy configs, and ICM sessions.
+
 ## [4.0.0] - 2026-03-13
 
 ### Added

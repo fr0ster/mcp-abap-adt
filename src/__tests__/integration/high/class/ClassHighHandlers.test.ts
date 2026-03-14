@@ -223,6 +223,7 @@ describe('Class High-Level Handlers Integration', () => {
             class_name: className,
             source_code: updatedSourceCode,
             activate: true,
+            ...(transportRequest && { transport_request: transportRequest }),
           },
           async () => {
             const updateCtx = createHandlerContext({
@@ -233,6 +234,7 @@ describe('Class High-Level Handlers Integration', () => {
               class_name: className,
               source_code: updatedSourceCode,
               activate: true,
+              ...(transportRequest && { transport_request: transportRequest }),
             });
           },
         );

@@ -190,6 +190,7 @@ ENDCLASS.`;
             class_name: className,
             test_class_code: testClassCode,
             activate_on_update: false,
+            ...(transportRequest && { transport_request: transportRequest }),
           },
           async () => {
             const setTestClassCtx = createHandlerContext({
@@ -200,6 +201,7 @@ ENDCLASS.`;
               class_name: className,
               test_class_code: testClassCode,
               activate_on_update: false,
+              ...(transportRequest && { transport_request: transportRequest }),
             });
           },
         );
@@ -232,6 +234,7 @@ ENDCLASS.`;
             class_name: className,
             local_types_code: localTypesCode,
             activate_on_update: false,
+            ...(transportRequest && { transport_request: transportRequest }),
           },
           async () => {
             const setLocalTypesCtx = createHandlerContext({
@@ -242,6 +245,7 @@ ENDCLASS.`;
               class_name: className,
               local_types_code: localTypesCode,
               activate_on_update: false,
+              ...(transportRequest && { transport_request: transportRequest }),
             });
           },
         );
@@ -267,6 +271,7 @@ ENDCLASS.`;
             class_name: className,
             definitions_code: localDefinitionsCode,
             activate_on_update: false,
+            ...(transportRequest && { transport_request: transportRequest }),
           },
           async () => {
             const setLocalDefsCtx = createHandlerContext({
@@ -277,6 +282,7 @@ ENDCLASS.`;
               class_name: className,
               definitions_code: localDefinitionsCode,
               activate_on_update: false,
+              ...(transportRequest && { transport_request: transportRequest }),
             });
           },
         );
@@ -345,6 +351,7 @@ END-OF-DEFINITION.`;
             class_name: className,
             test_class_code: updatedTestClassCode,
             activate_on_update: false,
+            ...(transportRequest && { transport_request: transportRequest }),
           },
           async () => {
             const updateTestClassCtx = createHandlerContext({
@@ -355,6 +362,7 @@ END-OF-DEFINITION.`;
               class_name: className,
               test_class_code: updatedTestClassCode,
               activate_on_update: false,
+              ...(transportRequest && { transport_request: transportRequest }),
             });
           },
         );
@@ -369,6 +377,7 @@ END-OF-DEFINITION.`;
             class_name: className,
             local_types_code: updatedLocalTypesCode,
             activate_on_update: false,
+            ...(transportRequest && { transport_request: transportRequest }),
           },
           async () => {
             const updateLocalTypesCtx = createHandlerContext({
@@ -379,6 +388,7 @@ END-OF-DEFINITION.`;
               class_name: className,
               local_types_code: updatedLocalTypesCode,
               activate_on_update: false,
+              ...(transportRequest && { transport_request: transportRequest }),
             });
           },
         );

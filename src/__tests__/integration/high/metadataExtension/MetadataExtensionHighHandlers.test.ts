@@ -237,6 +237,7 @@ annotate view ZI_TEST_ENTITY with {
             return handleUpdateMetadataExtension(updateCtx, {
               name: ddlxName,
               source_code: updatedSourceCode,
+              ...(transportRequest && { transport_request: transportRequest }),
               activate: true,
             });
           },

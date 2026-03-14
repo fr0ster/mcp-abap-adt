@@ -11,10 +11,6 @@ import {
   handleGetEnhancements,
 } from '../../../handlers/enhancement/readonly/handleGetEnhancements';
 import {
-  TOOL_DEFINITION as GetFunction_Tool,
-  handleGetFunction,
-} from '../../../handlers/function/readonly/handleGetFunction';
-import {
   TOOL_DEFINITION as GetInclude_Tool,
   handleGetInclude,
 } from '../../../handlers/include/readonly/handleGetInclude';
@@ -59,10 +55,6 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
    */
   getHandlers(): HandlerEntry[] {
     return [
-      {
-        toolDefinition: GetFunction_Tool,
-        handler: (args: any) => handleGetFunction(this.context, args),
-      },
       {
         toolDefinition: GetTableContents_Tool,
         handler: (args: any) => handleGetTableContents(this.context, args),

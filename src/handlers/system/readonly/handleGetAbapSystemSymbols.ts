@@ -2,7 +2,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError } from '../../../lib/utils';
 import { writeResultToFile } from '../../../lib/writeResultToFile';
 import { handleGetClass } from '../../class/high/handleGetClass';
-import { handleGetFunction } from '../../function/readonly/handleGetFunction';
+import { handleGetFunctionModule } from '../../function_module/high/handleGetFunctionModule';
 import { handleGetInterface } from '../../interface/high/handleGetInterface';
 export const TOOL_DEFINITION = {
   name: 'GetAbapSystemSymbols',
@@ -592,8 +592,9 @@ class AbapSystemSymbolResolver {
     symbol: AbapSymbolInfo,
   ): Promise<AbapSymbolInfo> {
     try {
-      const functionInfo = await handleGetFunction(context, {
-        function_name: symbol.name,
+      const functionInfo = await handleGetFunctionModule(context, {
+        function_module_name: symbol.name,
+        function_group_name: '',
       });
       if (
         !functionInfo ||

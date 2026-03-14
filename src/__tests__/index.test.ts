@@ -12,7 +12,7 @@ describe('MCP ABAP ADT Server', () => {
         require('../handlers/class/high/handleGetClass'),
       ).not.toThrow();
       expect(() =>
-        require('../handlers/function/readonly/handleGetFunction'),
+        require('../handlers/function_module/high/handleGetFunctionModule'),
       ).not.toThrow();
     });
 

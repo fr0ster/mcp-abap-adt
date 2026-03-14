@@ -67,6 +67,8 @@ const TYPE_CODES: Record<string, string> = {
   views: 'DDLS/DF',
   behavior_definitions: 'BDEF/BDO',
   classes: 'CLAS/OC',
+  function_groups: 'FUGR/F',
+  function_modules: 'FUGR/FF',
 };
 
 function resolveTransportRequest(sharedConfig: any): string | undefined {
@@ -512,6 +514,201 @@ describe('Admin: Setup shared dependencies', () => {
               );
               results.push({
                 type: 'classes',
+                name: item.name,
+                status: `FAILED: ${msg}`,
+              });
+            }
+          }
+        }
+      }
+
+      // --- Function Groups ---
+      const functionGroups = sharedConfig.function_groups || [];
+      if (functionGroups.length > 0) {
+        testsLogger?.info?.(
+          `Creating Function Groups (${functionGroups.length}) without activation...`,
+        );
+        for (const item of functionGroups) {
+          if (!isTestAvailableForSystem(item.available_in)) {
+            testsLogger?.info?.(
+              `Skipping function group ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            );
+            continue;
+          }
+          try {
+            let exists = false;
+            try {
+              const readResult = await client
+                .getFunctionGroup()
+                .read({ functionGroupName: item.name });
+              exists = readResult?.readResult !== undefined;
+            } catch {
+              exists = false;
+            }
+
+            if (!exists) {
+              await client.getFunctionGroup().create({
+                functionGroupName: item.name,
+                description: item.description || 'Shared test function group',
+                packageName,
+                transportRequest,
+              });
+              testsLogger?.info?.(`Created function group ${item.name}`);
+            }
+
+            results.push({
+              type: 'function_groups',
+              name: item.name,
+              status: exists ? 'existed' : 'created',
+            });
+            toActivate.push({
+              name: item.name.toUpperCase(),
+              type: TYPE_CODES.function_groups,
+            });
+          } catch (error: any) {
+            const msg = error instanceof Error ? error.message : String(error);
+            if (
+              msg.includes('409') ||
+              msg.includes('already exist') ||
+              msg.includes('NoAccess')
+            ) {
+              testsLogger?.warn?.(
+                `Function group ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
+              );
+              results.push({
+                type: 'function_groups',
+                name: item.name,
+                status: 'existed',
+              });
+              toActivate.push({
+                name: item.name.toUpperCase(),
+                type: TYPE_CODES.function_groups,
+              });
+            } else {
+              testsLogger?.error?.(
+                `Failed to setup function group ${item.name}: ${msg}`,
+              );
+              results.push({
+                type: 'function_groups',
+                name: item.name,
+                status: `FAILED: ${msg}`,
+              });
+            }
+          }
+        }
+      }
+
+      // --- Function Modules ---
+      const functionModules = sharedConfig.function_modules || [];
+      if (functionModules.length > 0) {
+        testsLogger?.info?.(
+          `Creating Function Modules (${functionModules.length}) without activation...`,
+        );
+        for (const item of functionModules) {
+          if (!isTestAvailableForSystem(item.available_in)) {
+            testsLogger?.info?.(
+              `Skipping function module ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            );
+            continue;
+          }
+          try {
+            let exists = false;
+            try {
+              const readResult = await client.getFunctionModule().read({
+                functionModuleName: item.name,
+                functionGroupName: item.group,
+              });
+              exists = readResult?.readResult !== undefined;
+            } catch {
+              exists = false;
+            }
+
+            if (!exists) {
+              await client.getFunctionModule().create({
+                functionModuleName: item.name,
+                functionGroupName: item.group,
+                description: item.description || 'Shared test function module',
+                packageName: '',
+                sourceCode: '',
+                transportRequest,
+              });
+              testsLogger?.info?.(`Created function module ${item.name}`);
+            }
+
+            // Update source code if provided
+            if (item.source) {
+              try {
+                const lockHandle = await client.getFunctionModule().lock({
+                  functionModuleName: item.name,
+                  functionGroupName: item.group,
+                });
+                try {
+                  await client.getFunctionModule().update(
+                    {
+                      functionModuleName: item.name,
+                      functionGroupName: item.group,
+                      sourceCode: item.source,
+                      transportRequest,
+                    },
+                    { lockHandle },
+                  );
+                  testsLogger?.info?.(
+                    `Updated function module ${item.name} source`,
+                  );
+                } finally {
+                  try {
+                    await client.getFunctionModule().unlock(
+                      {
+                        functionModuleName: item.name,
+                        functionGroupName: item.group,
+                      },
+                      lockHandle,
+                    );
+                  } catch {
+                    // ignore unlock errors
+                  }
+                }
+              } catch (updateError: any) {
+                testsLogger?.warn?.(
+                  `Update function module ${item.name} source failed: ${updateError.message}`,
+                );
+              }
+            }
+
+            results.push({
+              type: 'function_modules',
+              name: item.name,
+              status: exists ? 'existed' : 'created',
+            });
+            toActivate.push({
+              name: item.name.toUpperCase(),
+              type: TYPE_CODES.function_modules,
+            });
+          } catch (error: any) {
+            const msg = error instanceof Error ? error.message : String(error);
+            if (
+              msg.includes('409') ||
+              msg.includes('already exist') ||
+              msg.includes('NoAccess')
+            ) {
+              testsLogger?.warn?.(
+                `Function module ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
+              );
+              results.push({
+                type: 'function_modules',
+                name: item.name,
+                status: 'existed',
+              });
+              toActivate.push({
+                name: item.name.toUpperCase(),
+                type: TYPE_CODES.function_modules,
+              });
+            } else {
+              testsLogger?.error?.(
+                `Failed to setup function module ${item.name}: ${msg}`,
+              );
+              results.push({
+                type: 'function_modules',
                 name: item.name,
                 status: `FAILED: ${msg}`,
               });

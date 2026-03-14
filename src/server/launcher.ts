@@ -63,6 +63,7 @@ function hydrateSystemContextFromEnvFile(envFilePath?: string): void {
       'SAP_MASTER_SYSTEM',
       'SAP_RESPONSIBLE',
       'SAP_USERNAME',
+      'SAP_CLIENT',
       'SAP_CONNECTION_TYPE',
       'SAP_SYSTEM_TYPE',
     ];
@@ -117,9 +118,9 @@ ENVIRONMENT VARIABLES:
 
 SAP CONNECTION (.env file):
 
-  Basic Authentication:
+  Basic Authentication (on-premise):
     SAP_URL                        SAP system URL (required)
-    SAP_CLIENT                     SAP client number (required)
+    SAP_CLIENT                     SAP client number (required for basic auth)
     SAP_AUTH_TYPE                  Authentication type: basic|jwt (default: basic)
     SAP_CONNECTION_TYPE            Connection type: http|rfc (default: http)
     SAP_SYSTEM_TYPE                SAP system type: cloud (default) | onprem | legacy

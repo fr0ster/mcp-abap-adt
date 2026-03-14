@@ -145,8 +145,12 @@ export abstract class BaseMcpServer extends McpServer {
       const systemCtx = await resolveSystemContext(tempConn);
       masterSystem = systemCtx.masterSystem;
       responsible = systemCtx.responsible;
+      // Use client from system info as fallback when not in .env (cloud systems)
+      if (!connectionConfig.sapClient && systemCtx.client) {
+        connectionConfig.sapClient = systemCtx.client;
+      }
       this.logger.debug(
-        `[BaseMcpServer] Resolved systemContext: masterSystem=${masterSystem}, responsible=${responsible}`,
+        `[BaseMcpServer] Resolved systemContext: masterSystem=${masterSystem}, responsible=${responsible}, client=${systemCtx.client || '(none)'}`,
       );
     } catch (error) {
       this.logger.debug(

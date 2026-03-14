@@ -75,7 +75,48 @@ describe('Admin: Teardown shared dependencies', () => {
         status: string;
       }> = [];
 
-      // Reverse dependency order: classes → bdefs → views → tables → package
+      // Reverse dependency order: FM → FG → classes → bdefs → views → tables → package
+
+      // 0a. Function Modules (delete before Function Groups)
+      const functionModules = sharedConfig.function_modules || [];
+      for (const item of functionModules) {
+        const status = await safeDelete(
+          `function_module ${item.name}`,
+          async () => {
+            await client.getFunctionModule().delete({
+              functionModuleName: item.name,
+              functionGroupName: item.group,
+              transportRequest,
+            });
+          },
+          testsLogger,
+        );
+        results.push({
+          type: 'function_modules',
+          name: item.name,
+          status,
+        });
+      }
+
+      // 0b. Function Groups (delete after Function Modules)
+      const functionGroups = sharedConfig.function_groups || [];
+      for (const item of functionGroups) {
+        const status = await safeDelete(
+          `function_group ${item.name}`,
+          async () => {
+            await client.getFunctionGroup().delete({
+              functionGroupName: item.name,
+              transportRequest,
+            });
+          },
+          testsLogger,
+        );
+        results.push({
+          type: 'function_groups',
+          name: item.name,
+          status,
+        });
+      }
 
       // 1. Classes (implementation classes for BDEFs — delete before BDEFs)
       const classes = sharedConfig.classes || [];

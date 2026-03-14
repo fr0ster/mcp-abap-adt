@@ -430,6 +430,25 @@ shared_dependencies:
       description: "Shared container class for unit test integration tests"
       available_in: ["onprem", "cloud", "legacy"]
 
+  function_groups:
+    - name: "ZMCP_BLD_SHR_FGR"
+      description: "Shared function group for read tests"
+      available_in: ["onprem", "cloud", "legacy"]
+
+  function_modules:
+    - name: "Z_MCP_BLD_SHR_FM"
+      group: "ZMCP_BLD_SHR_FGR"
+      description: "Shared function module for read tests"
+      available_in: ["onprem", "cloud", "legacy"]
+      source: |
+        FUNCTION Z_MCP_BLD_SHR_FM
+            IMPORTING
+               VALUE(IV_INPUT) TYPE  STRING
+            EXPORTING
+               VALUE(EV_OUTPUT) TYPE  STRING.
+          ev_output = |Echo: { iv_input }|.
+        ENDFUNCTION.
+
 # Legacy shared_objects (kept for backward compatibility with unit_test_class)
 shared_objects:
   unit_test_class:
@@ -1672,20 +1691,6 @@ standard_objects:
     - name: "I_SapPackage"
       description: "ABAP Cloud: replace with CDS view name existing in tenant"
       available_in: ["cloud"]
-
-  function_groups:
-    - name: "EDIN"
-      description: "System function group"
-      available_in: ["onprem", "cloud", "legacy"]
-
-  function_modules:
-    - name: "IDOC_INBOUND_XML_SOAP_HTTP"
-      group: "EDIN"
-      description: "Returns system metadata"
-      available_in: ["onprem", "cloud", "legacy"]
-
-  standard_criteria:
-    note: "Update the entries above with objects that exist in your SAP system before running read tests."
 
 # ============================================================================
 # CLASS UNIT TEST - Low-Level and High-Level Handlers

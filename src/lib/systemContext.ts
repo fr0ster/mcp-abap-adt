@@ -5,6 +5,7 @@ import { registerConnectionResetHook } from './connectionEvents';
 export interface IAdtSystemContext {
   masterSystem?: string;
   responsible?: string;
+  client?: string;
   isLegacy?: boolean;
 }
 
@@ -62,6 +63,7 @@ export async function resolveSystemContext(
     cached = {
       masterSystem: info?.systemID,
       responsible: info?.userName,
+      client: info?.client,
       isLegacy,
     };
   } catch {

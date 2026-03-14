@@ -1332,7 +1332,7 @@ ENVIRONMENT VARIABLES:
 SAP CONNECTION (.env file):
   SAP_URL                          SAP system URL (required)
                                    Example: https://your-system.sap.com
-  SAP_CLIENT                       SAP client number (required)
+  SAP_CLIENT                       SAP client number (required for basic auth)
                                    Example: 100
   SAP_AUTH_TYPE                    Authentication type: basic|jwt (default: basic)
   SAP_CONNECTION_TYPE              Connection type: http|rfc (default: http)

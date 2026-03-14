@@ -136,7 +136,7 @@
     "@mcp-abap-adt/adt-clients": "^3.10.2",
     "@mcp-abap-adt/auth-broker": "^1.0.5",
     "@mcp-abap-adt/auth-providers": "^1.0.5",
-    "@mcp-abap-adt/auth-stores": "^1.0.2",
+    "@mcp-abap-adt/auth-stores": "^1.0.4",
     "@mcp-abap-adt/connection": "^1.5.0",
     "@mcp-abap-adt/header-validator": "^0.1.8",
     "@mcp-abap-adt/interfaces": "^3.1.0",

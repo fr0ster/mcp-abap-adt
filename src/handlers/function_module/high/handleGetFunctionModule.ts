@@ -93,10 +93,17 @@ export async function handleGetFunctionModule(
       }
 
       // Extract data from read result
-      const functionModuleData =
-        typeof readResult.readResult.data === 'string'
-          ? readResult.readResult.data
-          : JSON.stringify(readResult.readResult.data);
+      let functionModuleData: string;
+      if (typeof readResult.readResult.data === 'string') {
+        functionModuleData = readResult.readResult.data;
+      } else {
+        try {
+          functionModuleData = JSON.stringify(readResult.readResult.data);
+        } catch {
+          // Fallback for circular references (e.g. raw Axios response objects)
+          functionModuleData = String(readResult.readResult.data);
+        }
+      }
 
       logger?.info(
         `✅ GetFunctionModule completed successfully: ${functionModuleName}`,

@@ -64,6 +64,11 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
+      record_changes: {
+        type: 'boolean',
+        description:
+          'Enable change recording for the package. Required for transportable packages (non-$TMP). Default: false.',
+      },
       application_component: {
         type: 'string',
         description: 'Application component (e.g., BC-ABA).',
@@ -96,6 +101,7 @@ interface CreatePackageArgs {
   software_component?: string;
   transport_layer?: string;
   transport_request?: string;
+  record_changes?: boolean;
   application_component?: string;
   session_id?: string;
   session_state?: {
@@ -124,6 +130,7 @@ export async function handleCreatePackage(
       software_component,
       transport_layer,
       transport_request,
+      record_changes,
       application_component,
       session_id,
       session_state,
@@ -165,6 +172,9 @@ export async function handleCreatePackage(
       }
       if (transport_request) {
         createConfig.transportRequest = transport_request;
+      }
+      if (record_changes !== undefined) {
+        createConfig.recordChanges = record_changes;
       }
       if (application_component) {
         createConfig.applicationComponent = application_component;

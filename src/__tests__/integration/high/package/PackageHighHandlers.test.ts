@@ -139,6 +139,9 @@ describe('Package High-Level Handlers Integration', () => {
             ...(params.application_component && {
               application_component: params.application_component,
             }),
+            ...(params.record_changes !== undefined && {
+              record_changes: params.record_changes,
+            }),
           },
           async () => {
             const createCtx = createHandlerContext({
@@ -155,6 +158,7 @@ describe('Package High-Level Handlers Integration', () => {
               transport_layer: params.transport_layer,
               transport_request: transportRequest,
               application_component: params.application_component,
+              record_changes: params.record_changes,
             });
           },
         );

@@ -199,6 +199,11 @@ export async function handleCreateBehaviorDefinition(
       logger?.error(
         `Error creating behavior definition ${bdefName}: ${error?.message || error}`,
       );
+      if (error.response?.data) {
+        logger?.error(
+          `Response body: ${typeof error.response.data === 'string' ? error.response.data.substring(0, 500) : JSON.stringify(error.response.data).substring(0, 500)}`,
+        );
+      }
 
       // Parse error message
       let errorMessage = `Failed to create behavior definition: ${error.message || String(error)}`;

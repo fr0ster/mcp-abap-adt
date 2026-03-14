@@ -63,6 +63,12 @@ export const TOOL_DEFINITION = {
       .describe(
         'Transport request number (e.g., E19K905635). Required if package is transportable.',
       ),
+    record_changes: z
+      .boolean()
+      .optional()
+      .describe(
+        'Enable change recording for the package. Required for transportable packages. Default: false.',
+      ),
     application_component: z
       .string()
       .optional()
@@ -78,6 +84,7 @@ interface CreatePackageArgs {
   software_component?: string;
   transport_layer?: string;
   transport_request?: string;
+  record_changes?: boolean;
   application_component?: string;
 }
 
@@ -145,6 +152,9 @@ export async function handleCreatePackage(
       }
       if (typedArgs.transport_request) {
         createConfig.transportRequest = typedArgs.transport_request;
+      }
+      if (typedArgs.record_changes !== undefined) {
+        createConfig.recordChanges = typedArgs.record_changes;
       }
       if (typedArgs.application_component) {
         createConfig.applicationComponent = typedArgs.application_component;

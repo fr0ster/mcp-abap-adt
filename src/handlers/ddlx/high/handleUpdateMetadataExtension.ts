@@ -29,6 +29,11 @@ export const TOOL_DEFINITION = {
         description:
           'Lock handle from LockObject. If not provided, will attempt to lock internally.',
       },
+      transport_request: {
+        type: 'string',
+        description:
+          'Transport request number (required for transportable packages).',
+      },
       activate: {
         type: 'boolean',
         description: 'Activate after update. Default: true',
@@ -42,6 +47,7 @@ interface UpdateMetadataExtensionArgs {
   name: string;
   source_code: string;
   lock_handle?: string;
+  transport_request?: string;
   activate?: boolean;
 }
 
@@ -72,6 +78,7 @@ export async function handleUpdateMetadataExtension(
       {
         name,
         sourceCode: args.source_code,
+        transportRequest: args.transport_request,
       },
       { lockHandle },
     );

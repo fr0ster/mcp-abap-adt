@@ -193,6 +193,9 @@ describe('Package Low-Level Handlers Integration', () => {
         if (params.transport_layer) {
           createArgs.transport_layer = params.transport_layer;
         }
+        if (params.record_changes !== undefined) {
+          createArgs.record_changes = params.record_changes;
+        }
 
         const createResponse = await tester.invokeToolOrHandler(
           'CreatePackageLow',

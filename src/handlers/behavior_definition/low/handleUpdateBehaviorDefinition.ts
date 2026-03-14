@@ -37,6 +37,11 @@ export const TOOL_DEFINITION = {
         description:
           'Lock handle from LockObject. Required for update operation.',
       },
+      transport_request: {
+        type: 'string',
+        description:
+          'Transport request number (required for transportable packages).',
+      },
       session_id: {
         type: 'string',
         description:
@@ -61,6 +66,7 @@ interface UpdateBehaviorDefinitionArgs {
   name: string;
   source_code: string;
   lock_handle: string;
+  transport_request?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -80,7 +86,7 @@ export async function handleUpdateBehaviorDefinition(
 ) {
   const { connection, logger } = context;
   try {
-    const { name, source_code, lock_handle, session_id, session_state } =
+    const { name, source_code, lock_handle, transport_request, session_id, session_state } =
       args as UpdateBehaviorDefinitionArgs;
 
     // Validation
@@ -110,9 +116,10 @@ export async function handleUpdateBehaviorDefinition(
       const updateConfig: Pick<
         IBehaviorDefinitionConfig,
         'name' | 'sourceCode'
-      > = {
+      > & { transportRequest?: string } = {
         name: behaviorDefinitionName,
         sourceCode: source_code,
+        transportRequest: transport_request,
       };
       const updateState = await client
         .getBehaviorDefinition()

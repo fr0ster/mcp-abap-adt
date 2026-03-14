@@ -253,6 +253,7 @@ export async function handleUpdateDataElement(
           {
             dataElementName,
             packageName: typedArgs.package_name,
+            transportRequest: typedArgs.transport_request,
             description: typedArgs.description || dataElementName,
             ...properties,
           },

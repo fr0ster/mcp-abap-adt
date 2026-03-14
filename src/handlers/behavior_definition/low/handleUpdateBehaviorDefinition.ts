@@ -86,8 +86,14 @@ export async function handleUpdateBehaviorDefinition(
 ) {
   const { connection, logger } = context;
   try {
-    const { name, source_code, lock_handle, transport_request, session_id, session_state } =
-      args as UpdateBehaviorDefinitionArgs;
+    const {
+      name,
+      source_code,
+      lock_handle,
+      transport_request,
+      session_id,
+      session_state,
+    } = args as UpdateBehaviorDefinitionArgs;
 
     // Validation
     if (!name || !source_code || !lock_handle) {

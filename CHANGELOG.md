@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-03-15
+
+### Added
+- **16 new Read\* tools** — read source code and metadata for all object types with CRUD handlers:
+  ReadClass, ReadInterface, ReadProgram, ReadTable, ReadStructure, ReadView, ReadDomain,
+  ReadDataElement, ReadFunctionModule, ReadFunctionGroup, ReadPackage, ReadServiceDefinition,
+  ReadServiceBinding, ReadMetadataExtension, ReadBehaviorDefinition, ReadBehaviorImplementation.
+- `transport_request` parameter for UpdateBehaviorDefinition (low), UpdateMetadataExtension (high).
+- `record_changes` parameter for CreatePackage (high + low).
+- Transported Object CRUD integration test reproducing GitHub #11 (transport lock issue on legacy systems).
+
+### Fixed
+- `SAP_SYSTEM_TYPE` now propagated from test config to `process.env`, so `createAdtClient` correctly selects `AdtClientLegacy` on legacy systems.
+- `transport_request` passed in class update tests for transportable packages.
+- UpdateDataElement now passes `transportRequest` to adt-clients.
+- BDEF low test resilience: guaranteed BIMPL unlock via try/finally, delay after delete in cleanup, skip create if BDEF already exists (transport re-create limitation).
+- Removed duplicate GetFunction handler (delegates to GetFunctionModule).
+- Auto-detect JWT auth for `--env-path`, SAP_CLIENT auto-resolve.
+
 ## [4.1.1] - 2026-03-13
 
 ### Fixed

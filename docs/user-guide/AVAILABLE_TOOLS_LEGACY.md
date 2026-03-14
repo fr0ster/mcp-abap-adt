@@ -5,23 +5,33 @@ Generated from code in `src/handlers/**` (not from docs).
 Tools available on legacy SAP systems (BASIS < 7.50) connected via RFC.
 Legacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.
 
-- Total tools: 115
-- Read-Only: 5
+- Total tools: 121
+- Read-Only: 11
 - High-Level: 50
 - Low-Level: 60
 
 ## Navigation
 
 - [Read-Only Group](#read-only-group)
-  - [Function](#read-only-function)
-    - [GetFunction](#getfunction-read-only-function)
+  - [Class](#read-only-class)
+    - [ReadClass](#readclass-read-only-class)
+  - [Function Group](#read-only-function-group)
+    - [ReadFunctionGroup](#readfunctiongroup-read-only-function-group)
+  - [Function Module](#read-only-function-module)
+    - [ReadFunctionModule](#readfunctionmodule-read-only-function-module)
   - [Include](#read-only-include)
     - [GetInclude](#getinclude-read-only-include)
     - [GetIncludesList](#getincludeslist-read-only-include)
+  - [Interface](#read-only-interface)
+    - [ReadInterface](#readinterface-read-only-interface)
   - [Package](#read-only-package)
     - [GetPackageContents](#getpackagecontents-read-only-package)
+    - [ReadPackage](#readpackage-read-only-package)
   - [Program](#read-only-program)
     - [GetProgFullCode](#getprogfullcode-read-only-program)
+    - [ReadProgram](#readprogram-read-only-program)
+  - [View](#read-only-view)
+    - [ReadView](#readview-read-only-view)
 - [High-Level Group](#high-level-group)
   - [Class](#high-level-class)
     - [CreateClass](#createclass-high-level-class)
@@ -156,19 +166,55 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 <a id="read-only-group"></a>
 ## Read-Only Group
 
-<a id="read-only-function"></a>
-### Read-Only / Function
+<a id="read-only-class"></a>
+### Read-Only / Class
 
-<a id="getfunction-read-only-function"></a>
-#### GetFunction (Read-Only / Function)
-**Description:** [read-only] Retrieve ABAP Function Module source code.
+<a id="readclass-read-only-class"></a>
+#### ReadClass (Read-Only / Class)
+**Description:** [read-only] Read ABAP class source code and metadata (package, responsible, description, etc.).
 
-**Source:** `src/handlers/function/readonly/handleGetFunction.ts`
+**Source:** `src/handlers/class/readonly/handleReadClass.ts`
 
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- None
+- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `version` (string, optional (default: active)) - Version to read: 
+
+---
+
+<a id="read-only-function-group"></a>
+### Read-Only / Function Group
+
+<a id="readfunctiongroup-read-only-function-group"></a>
+#### ReadFunctionGroup (Read-Only / Function Group)
+**Description:** [read-only] Read ABAP function group source code and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/function_group/readonly/handleReadFunctionGroup.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
+- `version` (string, optional (default: active)) - Version to read: 
+
+---
+
+<a id="read-only-function-module"></a>
+### Read-Only / Function Module
+
+<a id="readfunctionmodule-read-only-function-module"></a>
+#### ReadFunctionModule (Read-Only / Function Module)
+**Description:** [read-only] Read ABAP function module source code and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/function_module/readonly/handleReadFunctionModule.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name containing the function module (e.g., Z_MY_FG).
+- `function_module_name` (string, required) - Function module name (e.g., Z_MY_FM).
+- `version` (string, optional (default: active)) - Version to read: 
 
 ---
 
@@ -204,6 +250,23 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
+<a id="read-only-interface"></a>
+### Read-Only / Interface
+
+<a id="readinterface-read-only-interface"></a>
+#### ReadInterface (Read-Only / Interface)
+**Description:** [read-only] Read ABAP interface source code and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/interface/readonly/handleReadInterface.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `interface_name` (string, required) - Interface name (e.g., ZIF_MY_INTERFACE).
+- `version` (string, optional (default: active)) - Version to read: 
+
+---
+
 <a id="read-only-package"></a>
 ### Read-Only / Package
 
@@ -217,6 +280,20 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - None
+
+---
+
+<a id="readpackage-read-only-package"></a>
+#### ReadPackage (Read-Only / Package)
+**Description:** [read-only] Read ABAP package definition and metadata (super-package, responsible, description, etc.).
+
+**Source:** `src/handlers/package/readonly/handleReadPackage.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `package_name` (string, required) - Package name (e.g., Z_MY_PACKAGE).
+- `version` (string, optional (default: active)) - Version to read: 
 
 ---
 
@@ -234,6 +311,37 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `name` (string, required) - [read-only] Technical name of the program or function group (e.g., 
 - `type` (string, required) - [read-only] 
+
+---
+
+<a id="readprogram-read-only-program"></a>
+#### ReadProgram (Read-Only / Program)
+**Description:** [read-only] Read ABAP program source code and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/program/readonly/handleReadProgram.ts`
+
+**Available in:** `onprem`, `legacy`
+
+**Parameters:**
+- `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
+- `version` (string, optional (default: active)) - Version to read: 
+
+---
+
+<a id="read-only-view"></a>
+### Read-Only / View
+
+<a id="readview-read-only-view"></a>
+#### ReadView (Read-Only / View)
+**Description:** [read-only] Read ABAP view (CDS view) source code and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/view/readonly/handleReadView.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `version` (string, optional (default: active)) - Version to read: 
+- `view_name` (string, required) - View name (e.g., Z_MY_VIEW).
 
 ---
 
@@ -2021,4 +2129,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-03-13*
+*Last updated: 2026-03-14*

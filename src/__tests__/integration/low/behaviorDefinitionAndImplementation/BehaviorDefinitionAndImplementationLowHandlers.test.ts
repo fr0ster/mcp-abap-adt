@@ -125,7 +125,9 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
               },
             );
             if (deleteResponse.isError) {
-              testLogger?.warn?.(`Delete BDEF returned error: ${JSON.stringify(deleteResponse.content)?.substring(0, 300)}`);
+              testLogger?.warn?.(
+                `Delete BDEF returned error: ${JSON.stringify(deleteResponse.content)?.substring(0, 300)}`,
+              );
             } else {
               testLogger?.info?.(`Deleted BDEF ${objectName}`);
             }
@@ -233,7 +235,9 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
             errorLower.includes('does already exist') ||
             errorLower.includes('status code 400')
           ) {
-            testLogger?.info?.(`   ~ BDEF ${objectName} already exists (or 400), skipping create`);
+            testLogger?.info?.(
+              `   ~ BDEF ${objectName} already exists (or 400), skipping create`,
+            );
           } else {
             throw new Error(`Create BDEF failed: ${createErrorMsg}`);
           }
@@ -278,7 +282,9 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
                 name: objectName,
                 lock_handle: bdefLockHandle,
                 source_code: params.update_source_code || params.source_code,
-                ...(transportRequest && { transport_request: transportRequest }),
+                ...(transportRequest && {
+                  transport_request: transportRequest,
+                }),
               }),
           );
           if (updateBdefResponse.isError) {
@@ -469,7 +475,9 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
                 }),
             );
             if (unlockResponse.isError) {
-              testLogger?.warn?.(`Unlock failed: ${extractErrorMessage(unlockResponse)}`);
+              testLogger?.warn?.(
+                `Unlock failed: ${extractErrorMessage(unlockResponse)}`,
+              );
             } else {
               testLogger?.info?.(`   + class unlocked`);
             }

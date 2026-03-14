@@ -250,6 +250,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, required) - Complete behavior definition source code.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages).
 
 ---
 
@@ -1340,6 +1341,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `description` (string, required) - Package description.
 - `package_name` (string, required) - Package name (e.g., ZOK_TEST_0002). Must follow SAP naming conventions.
 - `package_type` (string, optional) - Package type (development/structure). Defaults to development.
+- `record_changes` (boolean, optional) - Enable change recording for the package. Required for transportable packages (non-$TMP). Default: false.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `software_component` (string, optional) - Software component (e.g., HOME, ZLOCAL). If not provided, SAP will set a default (typically ZLOCAL for local packages).
@@ -1954,4 +1956,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-03-13*
+*Last updated: 2026-03-14*

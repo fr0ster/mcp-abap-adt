@@ -989,6 +989,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lock_handle` (string, optional) - Lock handle from LockObject. If not provided, will attempt to lock internally.
 - `name` (string, required) - Metadata Extension name
 - `source_code` (string, required) - New source code
+- `transport_request` (string, optional) - Transport request number (required for transportable packages).
 
 ---
 
@@ -1866,4 +1867,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-03-13*
+*Last updated: 2026-03-14*

@@ -3,28 +3,52 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: Read-Only
-- Total tools: 37
+- Total tools: 52
 
 ## Navigation
 
 - [Read-Only Group](#read-only-group)
+  - [Behavior Definition](#read-only-behavior-definition)
+    - [ReadBehaviorDefinition](#readbehaviordefinition-read-only-behavior-definition)
+  - [Behavior Implementation](#read-only-behavior-implementation)
+    - [ReadBehaviorImplementation](#readbehaviorimplementation-read-only-behavior-implementation)
+  - [Class](#read-only-class)
+    - [ReadClass](#readclass-read-only-class)
+  - [Data Element](#read-only-data-element)
+    - [ReadDataElement](#readdataelement-read-only-data-element)
+  - [Domain](#read-only-domain)
+    - [ReadDomain](#readdomain-read-only-domain)
   - [Enhancement](#read-only-enhancement)
     - [GetEnhancementImpl](#getenhancementimpl-read-only-enhancement)
     - [GetEnhancements](#getenhancements-read-only-enhancement)
     - [GetEnhancementSpot](#getenhancementspot-read-only-enhancement)
-  - [Function](#read-only-function)
-    - [GetFunction](#getfunction-read-only-function)
+  - [Function Group](#read-only-function-group)
+    - [ReadFunctionGroup](#readfunctiongroup-read-only-function-group)
+  - [Function Module](#read-only-function-module)
+    - [ReadFunctionModule](#readfunctionmodule-read-only-function-module)
   - [Include](#read-only-include)
     - [GetInclude](#getinclude-read-only-include)
     - [GetIncludesList](#getincludeslist-read-only-include)
+  - [Interface](#read-only-interface)
+    - [ReadInterface](#readinterface-read-only-interface)
+  - [Metadata Extension](#read-only-metadata-extension)
+    - [ReadMetadataExtension](#readmetadataextension-read-only-metadata-extension)
   - [Package](#read-only-package)
     - [GetPackageContents](#getpackagecontents-read-only-package)
+    - [ReadPackage](#readpackage-read-only-package)
   - [Program](#read-only-program)
     - [GetProgFullCode](#getprogfullcode-read-only-program)
+    - [ReadProgram](#readprogram-read-only-program)
   - [Search](#read-only-search)
     - [GetObjectsByType](#getobjectsbytype-read-only-search)
     - [GetObjectsList](#getobjectslist-read-only-search)
     - [SearchObject](#searchobject-read-only-search)
+  - [Service Binding](#read-only-service-binding)
+    - [ReadServiceBinding](#readservicebinding-read-only-service-binding)
+  - [Service Definition](#read-only-service-definition)
+    - [ReadServiceDefinition](#readservicedefinition-read-only-service-definition)
+  - [Structure](#read-only-structure)
+    - [ReadStructure](#readstructure-read-only-structure)
   - [System](#read-only-system)
     - [DescribeByList](#describebylist-read-only-system)
     - [GetAbapAST](#getabapast-read-only-system)
@@ -51,14 +75,92 @@ Generated from code in `src/handlers/**` (not from docs).
     - [RuntimeRunProgramWithProfiling](#runtimerunprogramwithprofiling-read-only-system)
   - [Table](#read-only-table)
     - [GetTableContents](#gettablecontents-read-only-table)
+    - [ReadTable](#readtable-read-only-table)
   - [Transport](#read-only-transport)
     - [GetTransport](#gettransport-read-only-transport)
     - [ListTransports](#listtransports-read-only-transport)
+  - [View](#read-only-view)
+    - [ReadView](#readview-read-only-view)
 
 ---
 
 <a id="read-only-group"></a>
 ## Read-Only Group
+
+<a id="read-only-behavior-definition"></a>
+### Read-Only / Behavior Definition
+
+<a id="readbehaviordefinition-read-only-behavior-definition"></a>
+#### ReadBehaviorDefinition (Read-Only / Behavior Definition)
+**Description:** [read-only] Read ABAP behavior definition source code and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/behavior_definition/readonly/handleReadBehaviorDefinition.ts`
+
+**Parameters:**
+- `behavior_definition_name` (string, required) - Behavior definition name (e.g., Z_MY_BDEF).
+- `version` (string, optional (default: active)) - Version to read: 
+
+---
+
+<a id="read-only-behavior-implementation"></a>
+### Read-Only / Behavior Implementation
+
+<a id="readbehaviorimplementation-read-only-behavior-implementation"></a>
+#### ReadBehaviorImplementation (Read-Only / Behavior Implementation)
+**Description:** [read-only] Read ABAP behavior implementation source code and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/behavior_implementation/readonly/handleReadBehaviorImplementation.ts`
+
+**Parameters:**
+- `behavior_implementation_name` (string, required) - Behavior implementation name (e.g., ZBP_MY_CLASS).
+- `version` (string, optional (default: active)) - Version to read: 
+
+---
+
+<a id="read-only-class"></a>
+### Read-Only / Class
+
+<a id="readclass-read-only-class"></a>
+#### ReadClass (Read-Only / Class)
+**Description:** [read-only] Read ABAP class source code and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/class/readonly/handleReadClass.ts`
+
+**Parameters:**
+- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `version` (string, optional (default: active)) - Version to read: 
+
+---
+
+<a id="read-only-data-element"></a>
+### Read-Only / Data Element
+
+<a id="readdataelement-read-only-data-element"></a>
+#### ReadDataElement (Read-Only / Data Element)
+**Description:** [read-only] Read ABAP data element definition and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/data_element/readonly/handleReadDataElement.ts`
+
+**Parameters:**
+- `data_element_name` (string, required) - Data element name (e.g., Z_MY_DATA_ELEMENT).
+- `version` (string, optional (default: active)) - Version to read: 
+
+---
+
+<a id="read-only-domain"></a>
+### Read-Only / Domain
+
+<a id="readdomain-read-only-domain"></a>
+#### ReadDomain (Read-Only / Domain)
+**Description:** [read-only] Read ABAP domain definition and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/domain/readonly/handleReadDomain.ts`
+
+**Parameters:**
+- `domain_name` (string, required) - Domain name (e.g., Z_MY_DOMAIN).
+- `version` (string, optional (default: active)) - Version to read: 
+
+---
 
 <a id="read-only-enhancement"></a>
 ### Read-Only / Enhancement
@@ -98,17 +200,34 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="read-only-function"></a>
-### Read-Only / Function
+<a id="read-only-function-group"></a>
+### Read-Only / Function Group
 
-<a id="getfunction-read-only-function"></a>
-#### GetFunction (Read-Only / Function)
-**Description:** [read-only] Retrieve ABAP Function Module source code.
+<a id="readfunctiongroup-read-only-function-group"></a>
+#### ReadFunctionGroup (Read-Only / Function Group)
+**Description:** [read-only] Read ABAP function group source code and metadata (package, responsible, description, etc.).
 
-**Source:** `src/handlers/function/readonly/handleGetFunction.ts`
+**Source:** `src/handlers/function_group/readonly/handleReadFunctionGroup.ts`
 
 **Parameters:**
-- None
+- `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
+- `version` (string, optional (default: active)) - Version to read: 
+
+---
+
+<a id="read-only-function-module"></a>
+### Read-Only / Function Module
+
+<a id="readfunctionmodule-read-only-function-module"></a>
+#### ReadFunctionModule (Read-Only / Function Module)
+**Description:** [read-only] Read ABAP function module source code and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/function_module/readonly/handleReadFunctionModule.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name containing the function module (e.g., Z_MY_FG).
+- `function_module_name` (string, required) - Function module name (e.g., Z_MY_FM).
+- `version` (string, optional (default: active)) - Version to read: 
 
 ---
 
@@ -140,6 +259,36 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="read-only-interface"></a>
+### Read-Only / Interface
+
+<a id="readinterface-read-only-interface"></a>
+#### ReadInterface (Read-Only / Interface)
+**Description:** [read-only] Read ABAP interface source code and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/interface/readonly/handleReadInterface.ts`
+
+**Parameters:**
+- `interface_name` (string, required) - Interface name (e.g., ZIF_MY_INTERFACE).
+- `version` (string, optional (default: active)) - Version to read: 
+
+---
+
+<a id="read-only-metadata-extension"></a>
+### Read-Only / Metadata Extension
+
+<a id="readmetadataextension-read-only-metadata-extension"></a>
+#### ReadMetadataExtension (Read-Only / Metadata Extension)
+**Description:** [read-only] Read ABAP metadata extension (DDLX) source code and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/metadata_extension/readonly/handleReadMetadataExtension.ts`
+
+**Parameters:**
+- `metadata_extension_name` (string, required) - Metadata extension name (e.g., Z_MY_DDLX).
+- `version` (string, optional (default: active)) - Version to read: 
+
+---
+
 <a id="read-only-package"></a>
 ### Read-Only / Package
 
@@ -151,6 +300,18 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - None
+
+---
+
+<a id="readpackage-read-only-package"></a>
+#### ReadPackage (Read-Only / Package)
+**Description:** [read-only] Read ABAP package definition and metadata (super-package, responsible, description, etc.).
+
+**Source:** `src/handlers/package/readonly/handleReadPackage.ts`
+
+**Parameters:**
+- `package_name` (string, required) - Package name (e.g., Z_MY_PACKAGE).
+- `version` (string, optional (default: active)) - Version to read: 
 
 ---
 
@@ -166,6 +327,18 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `name` (string, required) - [read-only] Technical name of the program or function group (e.g., 
 - `type` (string, required) - [read-only] 
+
+---
+
+<a id="readprogram-read-only-program"></a>
+#### ReadProgram (Read-Only / Program)
+**Description:** [read-only] Read ABAP program source code and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/program/readonly/handleReadProgram.ts`
+
+**Parameters:**
+- `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
+- `version` (string, optional (default: active)) - Version to read: 
 
 ---
 
@@ -212,6 +385,50 @@ Generated from code in `src/handlers/**` (not from docs).
 - `maxResults` (number, optional (default: 100)) - [read-only] Maximum number of results to return
 - `object_name` (string, required) - [read-only] Object name or mask (e.g. 
 - `object_type` (string, optional) - [read-only] Optional ABAP object type (e.g. 
+
+---
+
+<a id="read-only-service-binding"></a>
+### Read-Only / Service Binding
+
+<a id="readservicebinding-read-only-service-binding"></a>
+#### ReadServiceBinding (Read-Only / Service Binding)
+**Description:** [read-only] Read ABAP service binding source/payload and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/service_binding/readonly/handleReadServiceBinding.ts`
+
+**Parameters:**
+- `service_binding_name` (string, required) - Service binding name (e.g., ZUI_MY_BINDING).
+
+---
+
+<a id="read-only-service-definition"></a>
+### Read-Only / Service Definition
+
+<a id="readservicedefinition-read-only-service-definition"></a>
+#### ReadServiceDefinition (Read-Only / Service Definition)
+**Description:** [read-only] Read ABAP service definition source code and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/service_definition/readonly/handleReadServiceDefinition.ts`
+
+**Parameters:**
+- `service_definition_name` (string, required) - Service definition name (e.g., Z_MY_SRVD).
+- `version` (string, optional (default: active)) - Version to read: 
+
+---
+
+<a id="read-only-structure"></a>
+### Read-Only / Structure
+
+<a id="readstructure-read-only-structure"></a>
+#### ReadStructure (Read-Only / Structure)
+**Description:** [read-only] Read ABAP structure definition and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/structure/readonly/handleReadStructure.ts`
+
+**Parameters:**
+- `structure_name` (string, required) - Structure name (e.g., Z_MY_STRUCTURE).
+- `version` (string, optional (default: active)) - Version to read: 
 
 ---
 
@@ -554,6 +771,18 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="readtable-read-only-table"></a>
+#### ReadTable (Read-Only / Table)
+**Description:** [read-only] Read ABAP table definition and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/table/readonly/handleReadTable.ts`
+
+**Parameters:**
+- `table_name` (string, required) - Table name (e.g., Z_MY_TABLE).
+- `version` (string, optional (default: active)) - Version to read: 
+
+---
+
 <a id="read-only-transport"></a>
 ### Read-Only / Transport
 
@@ -582,4 +811,19 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-03-13*
+<a id="read-only-view"></a>
+### Read-Only / View
+
+<a id="readview-read-only-view"></a>
+#### ReadView (Read-Only / View)
+**Description:** [read-only] Read ABAP view (CDS view) source code and metadata (package, responsible, description, etc.).
+
+**Source:** `src/handlers/view/readonly/handleReadView.ts`
+
+**Parameters:**
+- `version` (string, optional (default: active)) - Version to read: 
+- `view_name` (string, required) - View name (e.g., Z_MY_VIEW).
+
+---
+
+*Last updated: 2026-03-14*

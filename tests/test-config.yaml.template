@@ -1463,6 +1463,20 @@ create_transport:
         description: "TransportBuilder workflow transport"
         # package_name: "ZMCP_BLD_PKG01"
 
+# Transported Object CRUD (GitHub #11)
+# Tests full lifecycle of an object in a transportable package:
+# create class → read → update → delete, all recorded to a dedicated transport.
+# Reproduces the issue where editing objects in unreleased transports
+# fails on legacy/onprem systems.
+# IMPORTANT: transport_request and package_name must be set to a REAL
+# unreleased transport and a transportable package (not $TMP).
+create_transported_object:
+  enabled: false                                 # ← CHANGE: set true when transport is ready
+  available_in: ["onprem", "legacy"]
+  transport_request: "TRLK900201"                # ← CHANGE: dedicated unreleased transport
+  package_name: "ZMC_REQUEST_TEST"                # ← CHANGE: transportable package recorded to that transport
+  class_name: "ZMCP_BLD_TRCLS"
+
 # Standard SAP objects registry for read-only tests
 
 # View (View)

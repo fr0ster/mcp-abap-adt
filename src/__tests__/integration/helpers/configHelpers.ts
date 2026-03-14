@@ -189,6 +189,9 @@ export async function loadTestEnv(): Promise<void> {
     if (cfg?.environment?.connection_type) {
       process.env.SAP_CONNECTION_TYPE = cfg.environment.connection_type;
     }
+    if (cfg?.environment?.system_type) {
+      process.env.SAP_SYSTEM_TYPE = cfg.environment.system_type;
+    }
   } catch {
     // ignore
   }

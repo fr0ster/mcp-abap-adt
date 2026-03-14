@@ -133,6 +133,9 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
             const msg = e?.message || String(e);
             testLogger?.warn?.(`Delete BDEF exception: ${msg}`);
           }
+
+          // Wait after delete — SAP needs time to finalize deletion in transport
+          await delay(context.getOperationDelay('delete') || 5000);
         }
       },
     );

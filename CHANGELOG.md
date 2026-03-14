@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [4.2.1] - 2026-03-15
+
+### Fixed
+- Shorten `server.json` description to fit MCP registry 100-character limit.
+
 ## [4.2.0] - 2026-03-15
 
 ### Added

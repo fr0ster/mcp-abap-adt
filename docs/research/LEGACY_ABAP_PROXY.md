@@ -26,12 +26,41 @@ allowing the MCP server to call them the same way it calls ADT endpoints.
 | Package Create         | CreatePackage, CreatePackageLow, Validate |
 | Service Def/Binding    | 10 tools (OData infra not available)      |
 
+## OData on Legacy (SEGW instead of RAP)
+
+Legacy systems don't have RAP but do have OData V2 via SEGW (Transaction SEGW).
+The proxy could support SEGW-based service creation/management:
+
+| Operation              | ABAP API / Approach                          |
+|------------------------|----------------------------------------------|
+| Create SEGW project    | `/IWBEP/CL_MGW_MED_PROVIDER` + workbench API |
+| Generate runtime       | `/IWBEP/CL_SB_GEN_*` classes                 |
+| Register service       | `/IWFND/CL_MED_*` (Gateway hub registration) |
+| Read model metadata    | `/IWBEP/IF_MGW_MED_PROVIDER~GET_*` methods   |
+
+### SEGW vs RAP/Service Binding mapping
+
+| Cloud/Modern tool         | Legacy equivalent           |
+|---------------------------|-----------------------------|
+| Service Definition (SRVD) | SEGW project (MPC/DPC)      |
+| Service Binding (SRVB)    | /IWFND/MAINT_SERVICE (reg)  |
+| Behavior Definition       | DPC_EXT redefinitions       |
+| Metadata Extension        | MPC_EXT annotations         |
+| CDS View Entity           | DDIC view + SEGW entity     |
+
+### Phase 4 scope (if needed)
+- `create_segw_project` — scaffold MPC/DPC classes
+- `register_odata_service` — activate on Gateway hub
+- `get_service_metadata` — read $metadata from registered service
+
+> **Note:** SEGW generation APIs are complex and version-dependent.
+> This is a stretch goal, not PoC scope.
+
 ## Operations NOT Feasible via Proxy
 
-- Behavior Definition/Implementation (RAP — not on legacy at all)
-- Metadata Extension (RAP — not on legacy)
-- Service Definition/Binding (OData V4 — not on legacy)
-- ABAP AST/Semantic Analysis (compiler-level APIs)
+- Behavior Definition/Implementation (RAP framework — requires ABAP Cloud kernel)
+- Metadata Extension (CDS annotation extension — requires CDS infrastructure)
+- ABAP AST/Semantic Analysis (compiler-level APIs, not exposed as FMs)
 
 ## Proposed Architecture
 
@@ -95,6 +124,11 @@ MCP Server  --HTTP/JSON-->  /sap/zmcp/proxy  (ICF handler)
 ### Phase 3: Extended
 - `where_used` (via WBCROSSGT/environment analysis)
 - `search_object` (via TADIR queries)
+
+### Phase 4: OData/SEGW (stretch goal)
+- `create_segw_project` — scaffold MPC/DPC classes
+- `register_odata_service` — activate on Gateway hub
+- `get_service_metadata` — read $metadata
 
 ## ABAP Implementation Notes
 

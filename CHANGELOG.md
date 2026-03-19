@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [4.3.1] - 2026-03-20
+
+### Improved
+- StreamableHttpServer request logging now includes MCP method, tool name, destination, and completion status. Helps diagnose issues like #19 where health polls generate excessive `tools/list` noise.
+
 ## [4.3.0] - 2026-03-19
 
 ### Added

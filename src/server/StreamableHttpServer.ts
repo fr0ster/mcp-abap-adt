@@ -104,8 +104,17 @@ export class StreamableHttpServer extends BaseMcpServer {
   ) => Promise<void> {
     return async (req: Request, res: Response) => {
       const clientId = `${req.socket.remoteAddress}:${req.socket.remotePort}`;
+      const mcpMethod = req.body?.method as string | undefined;
+      const mcpId = req.body?.id;
+      const toolName =
+        mcpMethod === 'tools/call'
+          ? (req.body?.params?.name as string | undefined)
+          : undefined;
+      const methodInfo = toolName
+        ? `${mcpMethod} -> ${toolName}`
+        : (mcpMethod ?? 'unknown');
       console.error(
-        `[StreamableHttpServer] ${req.method} ${req.path} from ${clientId}`,
+        `[StreamableHttpServer] ${req.method} ${req.path} from ${clientId} | ${methodInfo} (id=${mcpId ?? '-'})`,
       );
 
       try {
@@ -160,6 +169,15 @@ export class StreamableHttpServer extends BaseMcpServer {
           await server.setConnectionContextPublic(destination, broker);
         }
 
+        const authSource = destination
+          ? `destination=${destination}`
+          : this.hasSapConnectionHeaders(req.headers)
+            ? 'x-sap-* headers'
+            : 'none';
+        console.error(
+          `[StreamableHttpServer] ${methodInfo} | auth: ${authSource}`,
+        );
+
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: undefined, // stateless mode to avoid ID collisions
           enableJsonResponse: this.enableJsonResponse,
@@ -171,8 +189,14 @@ export class StreamableHttpServer extends BaseMcpServer {
 
         await server.connect(transport);
         await transport.handleRequest(req, res, req.body);
+        console.error(
+          `[StreamableHttpServer] ${methodInfo} (id=${mcpId ?? '-'}) completed`,
+        );
       } catch (err) {
-        console.error('[StreamableHttpServer] Error handling request:', err);
+        console.error(
+          `[StreamableHttpServer] ${methodInfo} (id=${mcpId ?? '-'}) FAILED:`,
+          err,
+        );
         if (!res.headersSent) {
           res.status(500).send('Internal Server Error');
         }

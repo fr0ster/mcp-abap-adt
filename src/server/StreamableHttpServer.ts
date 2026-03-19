@@ -193,6 +193,16 @@ export class StreamableHttpServer extends BaseMcpServer {
   ): void {
     const handler = this.createRequestHandler();
 
+    // Health check endpoint — lightweight, no MCP protocol logic
+    app.get('/mcp/health', (_req: Request, res: Response) => {
+      res.json({
+        status: 'ok',
+        uptime: Math.floor(process.uptime()),
+        version: this.version,
+        transport: 'http',
+      });
+    });
+
     // Only handle POST requests - GET SSE streams cause abort errors on disconnect
     app.post(this.path, handler);
 

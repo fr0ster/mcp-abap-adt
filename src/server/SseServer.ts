@@ -104,6 +104,17 @@ export class SseServer {
     app: IHttpApplication,
     _options?: RouteRegistrationOptions,
   ): void {
+    // Health check endpoint — lightweight, no MCP protocol logic
+    app.get('/mcp/health', ((_req: any, res: any) => {
+      res.json({
+        status: 'ok',
+        uptime: Math.floor(process.uptime()),
+        version: this.version,
+        transport: 'sse',
+        activeSessions: this.sessions.size,
+      });
+    }) as any);
+
     app.get(this.ssePath, (async (req: any, res: any) => {
       await this.handleGet(req, res);
     }) as any);

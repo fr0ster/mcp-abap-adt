@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-03-19
+
+### Added
+- `GET /mcp/health` endpoint for HTTP and SSE transports — lightweight health check without MCP protocol overhead. Returns `status`, `uptime`, `version`, `transport`, and `activeSessions` (SSE only). Resolves #18.
+- Unit tests for health endpoint (both transports).
+
 ## [4.2.1] - 2026-03-15
 
 ### Fixed

@@ -294,9 +294,14 @@ export class SseServer {
       req.headers['x-session-id'] ||
       '') as string;
 
-    console.error(
-      `[SSE POST] sessionId=${sessionId}, activeSessions=${this.sessions.size}, keys=[${Array.from(this.sessions.keys()).join(', ')}]`,
-    );
+    const mcpMethod = req.body?.method as string | undefined;
+    const isPing = mcpMethod === 'ping';
+
+    if (!isPing) {
+      console.error(
+        `[SSE POST] sessionId=${sessionId}, activeSessions=${this.sessions.size}, keys=[${Array.from(this.sessions.keys()).join(', ')}]`,
+      );
+    }
 
     const entry = this.sessions.get(sessionId);
     if (!entry) {
@@ -309,15 +314,19 @@ export class SseServer {
 
     // Pass pre-parsed body from express.json() middleware (like reference implementation)
     // express.json() already read and parsed the body into req.body
-    console.error(
-      `[SSE POST] Calling handlePostMessage with req.body for session ${sessionId}`,
-    );
+    if (!isPing) {
+      console.error(
+        `[SSE POST] Calling handlePostMessage with req.body for session ${sessionId}`,
+      );
+    }
 
     try {
       await entry.transport.handlePostMessage(req, res, req.body);
-      console.error(
-        `[SSE POST] Successfully processed for session ${sessionId}`,
-      );
+      if (!isPing) {
+        console.error(
+          `[SSE POST] Successfully processed for session ${sessionId}`,
+        );
+      }
     } catch (error) {
       console.error(
         `[SSE POST] FAILED for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`,

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [4.3.2] - 2026-03-20
+
+### Improved
+- Suppress `ping` request logging in StreamableHttpServer and SseServer — ping is now silent unless debug logging is enabled, reducing log noise.
+
 ## [4.3.1] - 2026-03-20
 
 ### Improved

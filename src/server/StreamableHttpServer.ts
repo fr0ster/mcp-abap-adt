@@ -113,9 +113,12 @@ export class StreamableHttpServer extends BaseMcpServer {
       const methodInfo = toolName
         ? `${mcpMethod} -> ${toolName}`
         : (mcpMethod ?? 'unknown');
-      console.error(
-        `[StreamableHttpServer] ${req.method} ${req.path} from ${clientId} | ${methodInfo} (id=${mcpId ?? '-'})`,
-      );
+      const isPing = mcpMethod === 'ping';
+      if (!isPing) {
+        console.error(
+          `[StreamableHttpServer] ${req.method} ${req.path} from ${clientId} | ${methodInfo} (id=${mcpId ?? '-'})`,
+        );
+      }
 
       try {
         const server = this.createPerRequestServer();
@@ -174,9 +177,11 @@ export class StreamableHttpServer extends BaseMcpServer {
           : this.hasSapConnectionHeaders(req.headers)
             ? 'x-sap-* headers'
             : 'none';
-        console.error(
-          `[StreamableHttpServer] ${methodInfo} | auth: ${authSource}`,
-        );
+        if (!isPing) {
+          console.error(
+            `[StreamableHttpServer] ${methodInfo} | auth: ${authSource}`,
+          );
+        }
 
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: undefined, // stateless mode to avoid ID collisions
@@ -189,9 +194,11 @@ export class StreamableHttpServer extends BaseMcpServer {
 
         await server.connect(transport);
         await transport.handleRequest(req, res, req.body);
-        console.error(
-          `[StreamableHttpServer] ${methodInfo} (id=${mcpId ?? '-'}) completed`,
-        );
+        if (!isPing) {
+          console.error(
+            `[StreamableHttpServer] ${methodInfo} (id=${mcpId ?? '-'}) completed`,
+          );
+        }
       } catch (err) {
         console.error(
           `[StreamableHttpServer] ${methodInfo} (id=${mcpId ?? '-'}) FAILED:`,

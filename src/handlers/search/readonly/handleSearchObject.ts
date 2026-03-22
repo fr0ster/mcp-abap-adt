@@ -9,7 +9,7 @@ export const TOOL_DEFINITION = {
   name: 'SearchObject',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Search for ABAP objects by name pattern. Parameters: object_name (with or without mask), object_type (optional), maxResults (optional). If object_type is specified, results are filtered by type.',
+    '[read-only] Search for ABAP objects by name pattern. Searches across all object types: packages (DEVC), classes (CLAS), interfaces (INTF), tables (TABL), structures, CDS views (DDLS), data elements (DTEL), domains (DOMA), programs (PROG), function groups (FUGR), function modules, service definitions (SRVD), service bindings (SRVB), behavior definitions (BDEF), metadata extensions (DDLX), and more. Use this to find any repository object when you know part of its name.',
   inputSchema: {
     type: 'object',
     properties: {

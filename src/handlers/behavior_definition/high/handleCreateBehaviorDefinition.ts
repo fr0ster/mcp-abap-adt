@@ -14,7 +14,8 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 export const TOOL_DEFINITION = {
   name: 'CreateBehaviorDefinition',
   available_in: ['onprem', 'cloud'] as const,
-  description: 'Create a new ABAP Behavior Definition (BDEF) in SAP system.',
+  description:
+    'Create a new ABAP Behavior Definition (BDEF) in SAP system. Defines RAP business object behavior: CRUD operations, validations, determinations, actions, and draft handling.',
   inputSchema: {
     type: 'object',
     properties: {

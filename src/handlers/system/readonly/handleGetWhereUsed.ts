@@ -13,7 +13,7 @@ export const TOOL_DEFINITION = {
   name: 'GetWhereUsed',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieve where-used references for ABAP objects via ADT usageReferences. Returns parsed list of referencing objects with their types and packages.',
+    '[read-only] Find where-used references (cross-references, usages, dependencies) for ABAP objects — classes, interfaces, tables, data elements, programs, function modules, etc. Returns list of all referencing objects with their types and packages.',
   inputSchema: {
     type: 'object',
     properties: {

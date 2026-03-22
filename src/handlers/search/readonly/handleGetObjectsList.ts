@@ -5,7 +5,7 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectsList',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Recursively retrieves all valid ABAP repository objects for a given parent (program, function group, etc.) including nested includes.',
+    '[read-only] Recursively retrieves all child ABAP repository objects for a given parent — programs (PROG), function groups (FUGR), classes (CLAS), packages (DEVC), and other composite objects — including nested includes and subcomponents.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -9,7 +9,8 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 export const TOOL_DEFINITION = {
   name: 'CreateMetadataExtension',
   available_in: ['onprem', 'cloud'] as const,
-  description: 'Create a new ABAP Metadata Extension (DDLX) in SAP system.',
+  description:
+    'Create a new ABAP Metadata Extension (DDLX) in SAP system. Defines Fiori UI annotations, field labels, search help, and list/object page layout for CDS views.',
   inputSchema: {
     type: 'object',
     properties: {

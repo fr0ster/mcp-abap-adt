@@ -7,7 +7,7 @@ export const TOOL_DEFINITION = {
   name: 'GetSqlQuery',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Execute freestyle SQL queries via SAP ADT Data Preview API.',
+    '[read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries.',
   inputSchema: {
     type: 'object',
     properties: {

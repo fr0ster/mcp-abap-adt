@@ -12,7 +12,8 @@ import {
 export const TOOL_DEFINITION = {
   name: 'UpdateMetadataExtension',
   available_in: ['onprem', 'cloud'] as const,
-  description: 'Update source code of an ABAP Metadata Extension.',
+  description:
+    'Update source code of an ABAP Metadata Extension (DDLX). Modifies Fiori UI annotations, field labels, search help, and list/object page layout for CDS views.',
   inputSchema: {
     type: 'object',
     properties: {

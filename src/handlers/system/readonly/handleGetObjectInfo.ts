@@ -8,7 +8,7 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectInfo',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Return ABAP object tree: root, group nodes, and terminal leaves up to maxDepth. Enrich each node via SearchObject if enrich=true. Group nodes are included for hierarchy. Each node has node_type: root, point, end.',
+    '[read-only] Return ABAP object tree structure for packages (DEVC), classes (CLAS), programs (PROG), function groups (FUGR), and other objects. Shows root, group nodes, and terminal leaves up to maxDepth. Enrich each node with description and package via SearchObject if enrich=true.',
   inputSchema: {
     type: 'object',
     properties: {

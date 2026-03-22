@@ -21,7 +21,8 @@ import {
 export const TOOL_DEFINITION = {
   name: 'GetTypeInfo',
   available_in: ['onprem', 'cloud'] as const,
-  description: '[read-only] Retrieve ABAP type information.',
+  description:
+    '[read-only] Retrieve ABAP type information for domains (DOMA), data elements (DTEL), table types, and structures. Returns field definitions, value ranges, fixed values, and DDIC metadata.',
   inputSchema: {
     type: 'object',
     properties: {

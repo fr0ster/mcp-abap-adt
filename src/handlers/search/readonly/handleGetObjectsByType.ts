@@ -2,7 +2,7 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectsByType',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieves all ABAP objects of a specific type under a given node.',
+    '[read-only] Retrieves all ABAP objects of a specific type (classes, tables, programs, interfaces, etc.) under a given parent node. Useful for listing all objects of one type within a package or composite object.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -5,7 +5,8 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   name: 'GetTransaction',
   available_in: ['onprem', 'cloud'] as const,
-  description: '[read-only] Retrieve ABAP transaction details.',
+  description:
+    '[read-only] Retrieve ABAP transaction (t-code) details — program, screen, authorization object, and transaction type (dialog, report, OO).',
   inputSchema: {
     type: 'object',
     properties: {

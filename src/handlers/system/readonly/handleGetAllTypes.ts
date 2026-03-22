@@ -8,7 +8,8 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 export const TOOL_DEFINITION = {
   name: 'GetAdtTypes',
   available_in: ['onprem', 'cloud'] as const,
-  description: '[read-only] Retrieve all valid ADT object types.',
+  description:
+    '[read-only] Retrieve all valid ADT object types (CLAS, TABL, PROG, DEVC, FUGR, INTF, DDLS, DTEL, DOMA, SRVD, SRVB, BDEF, DDLX, etc.) or validate a specific type name.',
   inputSchema: {
     type: 'object',
     properties: {

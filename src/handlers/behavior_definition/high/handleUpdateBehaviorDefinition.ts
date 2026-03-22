@@ -13,7 +13,8 @@ import {
 export const TOOL_DEFINITION = {
   name: 'UpdateBehaviorDefinition',
   available_in: ['onprem', 'cloud'] as const,
-  description: 'Update source code of an ABAP Behavior Definition.',
+  description:
+    'Update source code of an ABAP Behavior Definition (BDEF). Modifies RAP business object behavior: CRUD operations, validations, determinations, actions, and draft handling.',
   inputSchema: {
     type: 'object',
     properties: {

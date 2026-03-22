@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'GetInactiveObjects',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Get a list of inactive ABAP objects (objects that have been modified but not activated).',
+    '[read-only] Get a list of inactive ABAP objects — modified but not yet activated, pending activation. Shows classes, tables, CDS views, and other objects awaiting activation.',
   inputSchema: {
     type: 'object',
     properties: {},

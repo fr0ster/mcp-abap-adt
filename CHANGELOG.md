@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-03-22
+
+### Improved
+- Enrich 15 tool descriptions with domain-specific keywords for better vector RAG discoverability (#20). Tools like `SearchObject`, `GetTypeInfo`, `GetTransaction`, `GetTableContents`, and others now include ABAP object type names (DEVC, CLAS, TABL, DDLS, BDEF, DDLX, etc.) so embedding-based tool discovery returns correct results.
+
 ## [4.3.2] - 2026-03-20
 
 ### Improved

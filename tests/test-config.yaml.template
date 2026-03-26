@@ -1797,6 +1797,17 @@ class_unit_test:
 # READ-ONLY HANDLER TESTS (for mcp-abap-adt integration tests)
 # ============================================================================
 
+# ListTransports Read-Only Handler
+list_transports_readonly:
+  test_cases:
+    - name: "test_list_transports"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      description: "ListTransports handler read-only tests"
+      params:
+        # user: "DEVELOPER"              # Optional: SAP user name (defaults to current session user)
+        # modifiable_only: true           # Optional: only modifiable transports (default: true)
+
 # WhereUsed Read-Only Handler
 whereused_readonly:
   test_cases:

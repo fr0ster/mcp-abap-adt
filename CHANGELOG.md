@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [4.5.1] - 2026-03-26
+
+### Changed
+- Rewrite `ListTransports` handler to use `AdtClient.getRequest().list()` with proper Accept negotiation instead of direct `connection.makeAdtRequest()`. Update `@mcp-abap-adt/adt-clients` to 3.13.0.
+- Add integration tests for `ListTransports` handler.
+
 ## [4.5.0] - 2026-03-26
 
 ### Fixed

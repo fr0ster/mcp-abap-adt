@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [4.5.0] - 2026-03-26
+
+### Fixed
+- Give `SAP_AUTH_TYPE` priority over `SAP_JWT_TOKEN` in test helpers — fixes onprem basic-auth tests failing when OS has stale BTP JWT token (#24).
+
+### Changed
+- Update `@mcp-abap-adt/adt-clients` to 3.12.0 — adds 415 Content-Type negotiation with auto-retry and caching. Accept correction enabled by default (#22, #23).
+
 ## [4.4.2] - 2026-03-26
 
 ### Fixed

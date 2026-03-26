@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Guarantee unlock via `try-finally` in all update handlers — prevents locked objects when errors occur between lock and unlock (#22). Affected: UpdateProgram, UpdateClass, UpdateInterface, UpdateView, UpdateTable, UpdateStructure, UpdateDomain, UpdateServiceDefinition, UpdateDataElement.
+
 ## [4.4.1] - 2026-03-26
 
 ### Improved

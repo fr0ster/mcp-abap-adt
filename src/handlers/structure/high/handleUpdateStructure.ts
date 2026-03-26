@@ -116,11 +116,12 @@ export async function handleUpdateStructure(
       // Note: No validation needed for update - structure must already exist
       const shouldActivate = activate !== false; // Default to true if not specified
       let activateResponse: any | undefined;
-
-      // Lock
-      const lockHandle = await client.getStructure().lock({ structureName });
+      let lockHandle: string | undefined;
 
       try {
+        // Lock
+        lockHandle = await client.getStructure().lock({ structureName });
+
         // Step 1: Check new code BEFORE update (with ddlCode and version='inactive')
         logger?.info(
           `[UpdateStructure] Checking new DDL code before update: ${structureName}`,
@@ -187,64 +188,61 @@ export async function handleUpdateStructure(
             `[UpdateStructure] Skipping update - new code check failed: ${structureName}`,
           );
         }
-
-        // Step 3: Unlock (MANDATORY after lock)
-        await client.getStructure().unlock({ structureName }, lockHandle);
-        logger?.info(`[UpdateStructure] Structure unlocked: ${structureName}`);
-
-        // Step 4: Check inactive version (after unlock)
-        logger?.info(
-          `[UpdateStructure] Checking inactive version: ${structureName}`,
-        );
-        try {
-          await safeCheckOperation(
-            () => client.getStructure().check({ structureName }, 'inactive'),
-            structureName,
-            {
-              debug: (message: string) =>
-                logger?.debug(`[UpdateStructure] ${message}`),
-            },
-          );
-          logger?.info(
-            `[UpdateStructure] Inactive version check completed: ${structureName}`,
-          );
-        } catch (checkError: any) {
-          // If error was marked as "already checked", continue silently
-          if ((checkError as any).isAlreadyChecked) {
-            logger?.info(
-              `[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`,
-            );
-          } else {
-            // Log warning but don't fail - inactive check is informational
+      } finally {
+        if (lockHandle) {
+          try {
+            await client.getStructure().unlock({ structureName }, lockHandle);
+            logger?.info(`[UpdateStructure] Structure unlocked: ${structureName}`);
+          } catch (unlockError: any) {
             logger?.warn(
-              `[UpdateStructure] Inactive version check had issues: ${structureName}`,
-              {
-                error:
-                  checkError instanceof Error
-                    ? checkError.message
-                    : String(checkError),
-              },
+              `Failed to unlock structure ${structureName}: ${unlockError?.message || unlockError}`,
             );
           }
         }
+      }
 
-        // Activate if requested
-        if (shouldActivate) {
-          const activateState = await client
-            .getStructure()
-            .activate({ structureName });
-          activateResponse = activateState.activateResult;
+      // Step 4: Check inactive version (after unlock)
+      logger?.info(
+        `[UpdateStructure] Checking inactive version: ${structureName}`,
+      );
+      try {
+        await safeCheckOperation(
+          () => client.getStructure().check({ structureName }, 'inactive'),
+          structureName,
+          {
+            debug: (message: string) =>
+              logger?.debug(`[UpdateStructure] ${message}`),
+          },
+        );
+        logger?.info(
+          `[UpdateStructure] Inactive version check completed: ${structureName}`,
+        );
+      } catch (checkError: any) {
+        // If error was marked as "already checked", continue silently
+        if ((checkError as any).isAlreadyChecked) {
+          logger?.info(
+            `[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`,
+          );
+        } else {
+          // Log warning but don't fail - inactive check is informational
+          logger?.warn(
+            `[UpdateStructure] Inactive version check had issues: ${structureName}`,
+            {
+              error:
+                checkError instanceof Error
+                  ? checkError.message
+                  : String(checkError),
+            },
+          );
         }
-      } catch (error) {
-        // Try to unlock on error
-        try {
-          await client
-            .getStructure()
-            .unlock({ structureName: structureName }, lockHandle);
-        } catch (unlockError) {
-          logger?.error('Failed to unlock structure after error:', unlockError);
-        }
-        throw error;
+      }
+
+      // Activate if requested
+      if (shouldActivate) {
+        const activateState = await client
+          .getStructure()
+          .activate({ structureName });
+        activateResponse = activateState.activateResult;
       }
 
       // Parse activation warnings if activation was performed

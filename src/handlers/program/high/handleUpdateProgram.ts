@@ -106,14 +106,14 @@ export async function handleUpdateProgram(
     let lockHandle: string | undefined;
     let activateResponse: any | undefined;
 
-    // Lock
-    logger?.debug(`Locking program: ${programName}`);
-    lockHandle = await client.getProgram().lock({ programName });
-    logger?.debug(
-      `Program locked: ${programName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
-    );
-
     try {
+      // Lock
+      logger?.debug(`Locking program: ${programName}`);
+      lockHandle = await client.getProgram().lock({ programName });
+      logger?.debug(
+        `Program locked: ${programName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
+      );
+
       // Check new code BEFORE update
       logger?.debug(`Checking new source code before update: ${programName}`);
       let checkNewCodePassed = false;
@@ -161,155 +161,142 @@ export async function handleUpdateProgram(
       } else {
         logger?.warn(`Skipping update - new code check failed: ${programName}`);
       }
-
-      // Unlock (MANDATORY)
-      logger?.debug(`Unlocking program: ${programName}`);
-      await client.getProgram().unlock({ programName }, lockHandle);
-      logger?.info(`Program unlocked: ${programName}`);
-
-      // Check inactive version (after unlock)
-      logger?.debug(`Checking inactive version: ${programName}`);
-      try {
-        await safeCheckOperation(
-          () => client.getProgram().check({ programName }, 'inactive'),
-          programName,
-          {
-            debug: (message: string) => logger?.debug(message),
-          },
-        );
-        logger?.debug(`Inactive version check completed: ${programName}`);
-      } catch (checkError: any) {
-        if ((checkError as any).isAlreadyChecked) {
-          logger?.debug(
-            `Program ${programName} was already checked - continuing`,
-          );
-        } else {
-          logger?.warn(
-            `Inactive version check had issues: ${programName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-          );
-        }
-      }
-
-      // Activate if requested
-      if (shouldActivate) {
-        logger?.debug(`Activating program: ${programName}`);
+    } finally {
+      if (lockHandle) {
         try {
-          const activateState = await client.getProgram().activate({
-            programName,
-          });
-          activateResponse = activateState.activateResult;
-          logger?.info(`Program activated: ${programName}`);
-        } catch (activationError: any) {
-          logger?.error(
-            `Activation failed: ${programName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`,
-          );
-          throw new Error(
-            `Activation failed: ${activationError instanceof Error ? activationError.message : String(activationError)}`,
-          );
-        }
-      } else {
-        logger?.debug(`Skipping activation for: ${programName}`);
-      }
-
-      // Parse activation warnings if activation was performed
-      let activationWarnings: string[] = [];
-      if (
-        shouldActivate &&
-        activateResponse &&
-        typeof activateResponse.data === 'string' &&
-        activateResponse.data.includes('<chkl:messages')
-      ) {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@_',
-        });
-        const result = parser.parse(activateResponse.data);
-        const messages = result?.['chkl:messages']?.msg;
-        if (messages) {
-          const msgArray = Array.isArray(messages) ? messages : [messages];
-          activationWarnings = msgArray.map(
-            (msg: any) =>
-              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-          );
-        }
-      }
-
-      logger?.info(`UpdateProgram completed successfully: ${programName}`);
-
-      const result = {
-        success: true,
-        program_name: programName,
-        type: 'PROG/P',
-        activated: shouldActivate,
-        message: shouldActivate
-          ? `Program ${programName} source updated and activated successfully`
-          : `Program ${programName} source updated successfully (not activated)`,
-        uri: `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`,
-        steps_completed: [
-          'lock',
-          'check_new_code',
-          'update',
-          'unlock',
-          'check_inactive',
-          ...(shouldActivate ? ['activate'] : []),
-        ],
-        activation_warnings:
-          activationWarnings.length > 0 ? activationWarnings : undefined,
-        source_size_bytes: args.source_code.length,
-      };
-
-      return return_response({
-        data: JSON.stringify(result, null, 2),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: {} as any,
-      });
-    } catch (workflowError: any) {
-      // On error, ensure we attempt unlock
-      try {
-        if (lockHandle) {
-          logger?.warn(
-            `Attempting unlock after error for program ${programName}`,
-          );
+          logger?.debug(`Unlocking program: ${programName}`);
           await client.getProgram().unlock({ programName }, lockHandle);
-          logger?.warn(`Unlocked program after error: ${programName}`);
+          logger?.info(`Program unlocked: ${programName}`);
+        } catch (unlockError: any) {
+          logger?.warn(
+            `Failed to unlock program ${programName}: ${unlockError?.message || unlockError}`,
+          );
         }
-      } catch (unlockError: any) {
-        logger?.error(
-          `Failed to unlock program after error: ${programName} - ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
+      }
+    }
+
+    // Check inactive version (after unlock)
+    logger?.debug(`Checking inactive version: ${programName}`);
+    try {
+      await safeCheckOperation(
+        () => client.getProgram().check({ programName }, 'inactive'),
+        programName,
+        {
+          debug: (message: string) => logger?.debug(message),
+        },
+      );
+      logger?.debug(`Inactive version check completed: ${programName}`);
+    } catch (checkError: any) {
+      if ((checkError as any).isAlreadyChecked) {
+        logger?.debug(
+          `Program ${programName} was already checked - continuing`,
+        );
+      } else {
+        logger?.warn(
+          `Inactive version check had issues: ${programName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
         );
       }
-
-      // Parse error message
-      let errorMessage =
-        workflowError instanceof Error
-          ? workflowError.message
-          : String(workflowError);
-
-      // Attempt to parse ADT XML error
-      try {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@_',
-        });
-        const errorData = workflowError?.response?.data
-          ? parser.parse(workflowError.response.data)
-          : null;
-        const errorMsg =
-          errorData?.['exc:exception']?.message?.['#text'] ||
-          errorData?.['exc:exception']?.message;
-        if (errorMsg) {
-          errorMessage = `SAP Error: ${errorMsg}`;
-        }
-      } catch {
-        // ignore parse errors
-      }
-
-      return return_error(new Error(errorMessage));
     }
+
+    // Activate if requested
+    if (shouldActivate) {
+      logger?.debug(`Activating program: ${programName}`);
+      try {
+        const activateState = await client.getProgram().activate({
+          programName,
+        });
+        activateResponse = activateState.activateResult;
+        logger?.info(`Program activated: ${programName}`);
+      } catch (activationError: any) {
+        logger?.error(
+          `Activation failed: ${programName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`,
+        );
+        throw new Error(
+          `Activation failed: ${activationError instanceof Error ? activationError.message : String(activationError)}`,
+        );
+      }
+    } else {
+      logger?.debug(`Skipping activation for: ${programName}`);
+    }
+
+    // Parse activation warnings if activation was performed
+    let activationWarnings: string[] = [];
+    if (
+      shouldActivate &&
+      activateResponse &&
+      typeof activateResponse.data === 'string' &&
+      activateResponse.data.includes('<chkl:messages')
+    ) {
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '@_',
+      });
+      const result = parser.parse(activateResponse.data);
+      const messages = result?.['chkl:messages']?.msg;
+      if (messages) {
+        const msgArray = Array.isArray(messages) ? messages : [messages];
+        activationWarnings = msgArray.map(
+          (msg: any) =>
+            `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
+        );
+      }
+    }
+
+    logger?.info(`UpdateProgram completed successfully: ${programName}`);
+
+    const result = {
+      success: true,
+      program_name: programName,
+      type: 'PROG/P',
+      activated: shouldActivate,
+      message: shouldActivate
+        ? `Program ${programName} source updated and activated successfully`
+        : `Program ${programName} source updated successfully (not activated)`,
+      uri: `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`,
+      steps_completed: [
+        'lock',
+        'check_new_code',
+        'update',
+        'unlock',
+        'check_inactive',
+        ...(shouldActivate ? ['activate'] : []),
+      ],
+      activation_warnings:
+        activationWarnings.length > 0 ? activationWarnings : undefined,
+      source_size_bytes: args.source_code.length,
+    };
+
+    return return_response({
+      data: JSON.stringify(result, null, 2),
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config: {} as any,
+    });
   } catch (error: any) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    // Parse error message
+    let errorMessage =
+      error instanceof Error ? error.message : String(error);
+
+    // Attempt to parse ADT XML error
+    try {
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '@_',
+      });
+      const errorData = error?.response?.data
+        ? parser.parse(error.response.data)
+        : null;
+      const errorMsg =
+        errorData?.['exc:exception']?.message?.['#text'] ||
+        errorData?.['exc:exception']?.message;
+      if (errorMsg) {
+        errorMessage = `SAP Error: ${errorMsg}`;
+      }
+    } catch {
+      // ignore parse errors
+    }
+
     logger?.error(
       `Error updating program source ${programName}: ${errorMessage}`,
     );

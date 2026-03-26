@@ -74,14 +74,14 @@ export async function handleUpdateClass(
     const shouldActivate = args.activate === true;
     let lockHandle: string | undefined;
 
-    // Lock
-    logger?.debug(`Locking class: ${className}`);
-    lockHandle = await client.getClass().lock({ className: className });
-    logger?.debug(
-      `Class locked: ${className} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
-    );
-
     try {
+      // Lock
+      logger?.debug(`Locking class: ${className}`);
+      lockHandle = await client.getClass().lock({ className: className });
+      logger?.debug(
+        `Class locked: ${className} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
+      );
+
       // Check new code before update
       logger?.debug(`Checking new code before update: ${className}`);
       let checkNewCodePassed = false;
@@ -128,98 +128,86 @@ export async function handleUpdateClass(
       } else {
         logger?.warn(`Skipping update - new code check failed: ${className}`);
       }
-
-      // Unlock
-      logger?.debug(`Unlocking class: ${className}`);
+    } finally {
       if (lockHandle) {
-        await client.getClass().unlock({ className: className }, lockHandle);
-        logger?.info(`Class unlocked: ${className}`);
-      }
-
-      // Check inactive after unlock
-      logger?.debug(`Checking inactive version: ${className}`);
-      try {
-        await safeCheckOperation(
-          () => client.getClass().check({ className: className }, 'inactive'),
-          className,
-          { debug: (message: string) => logger?.debug(message) },
-        );
-        logger?.debug(`Inactive version check completed: ${className}`);
-      } catch (checkError: any) {
-        if ((checkError as any).isAlreadyChecked) {
-          logger?.debug(`Class ${className} was already checked - continuing`);
-        } else {
+        try {
+          logger?.debug(`Unlocking class: ${className}`);
+          await client.getClass().unlock({ className: className }, lockHandle);
+          logger?.info(`Class unlocked: ${className}`);
+        } catch (unlockError: any) {
           logger?.warn(
-            `Inactive version check had issues: ${className} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+            `Failed to unlock class ${className}: ${unlockError?.message || unlockError}`,
           );
         }
       }
+    }
 
-      // Activate if requested
-      if (shouldActivate) {
-        logger?.debug(`Activating class: ${className}`);
-        await client.getClass().activate({ className: className });
-        logger?.info(`Class activated: ${className}`);
+    // Check inactive after unlock
+    logger?.debug(`Checking inactive version: ${className}`);
+    try {
+      await safeCheckOperation(
+        () => client.getClass().check({ className: className }, 'inactive'),
+        className,
+        { debug: (message: string) => logger?.debug(message) },
+      );
+      logger?.debug(`Inactive version check completed: ${className}`);
+    } catch (checkError: any) {
+      if ((checkError as any).isAlreadyChecked) {
+        logger?.debug(`Class ${className} was already checked - continuing`);
       } else {
-        logger?.debug(`Skipping activation for: ${className}`);
-      }
-
-      logger?.info(`UpdateClass completed successfully: ${className}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            activated: shouldActivate,
-            message: `Class ${className} updated${shouldActivate ? ' and activated' : ''} successfully`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (workflowError: any) {
-      // Try to unlock on error
-      try {
-        if (lockHandle) {
-          logger?.warn(`Attempting to unlock class after error: ${className}`);
-          await client.getClass().unlock({ className: className }, lockHandle);
-          logger?.warn(`Unlocked class after error: ${className}`);
-        }
-      } catch (unlockError: any) {
-        logger?.error(
-          `Failed to unlock class after error: ${className} - ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
+        logger?.warn(
+          `Inactive version check had issues: ${className} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
         );
       }
-
-      // Parse error message (XML)
-      let errorMessage =
-        workflowError instanceof Error
-          ? workflowError.message
-          : String(workflowError);
-      try {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@_',
-        });
-        const errorData = workflowError?.response?.data
-          ? parser.parse(workflowError.response.data)
-          : null;
-        const errorMsg =
-          errorData?.['exc:exception']?.message?.['#text'] ||
-          errorData?.['exc:exception']?.message;
-        if (errorMsg) {
-          errorMessage = `SAP Error: ${errorMsg}`;
-        }
-      } catch {
-        // ignore parse errors
-      }
-
-      return return_error(new Error(errorMessage));
     }
+
+    // Activate if requested
+    if (shouldActivate) {
+      logger?.debug(`Activating class: ${className}`);
+      await client.getClass().activate({ className: className });
+      logger?.info(`Class activated: ${className}`);
+    } else {
+      logger?.debug(`Skipping activation for: ${className}`);
+    }
+
+    logger?.info(`UpdateClass completed successfully: ${className}`);
+
+    return return_response({
+      data: JSON.stringify(
+        {
+          success: true,
+          class_name: className,
+          activated: shouldActivate,
+          message: `Class ${className} updated${shouldActivate ? ' and activated' : ''} successfully`,
+        },
+        null,
+        2,
+      ),
+    } as AxiosResponse);
   } catch (error: any) {
-    // Generic outer catch for unexpected errors (e.g., connection issues)
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    // Parse error message
+    let errorMessage =
+      error instanceof Error ? error.message : String(error);
+
+    // Attempt to parse ADT XML error
+    try {
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '@_',
+      });
+      const errorData = error?.response?.data
+        ? parser.parse(error.response.data)
+        : null;
+      const errorMsg =
+        errorData?.['exc:exception']?.message?.['#text'] ||
+        errorData?.['exc:exception']?.message;
+      if (errorMsg) {
+        errorMessage = `SAP Error: ${errorMsg}`;
+      }
+    } catch {
+      // ignore parse errors
+    }
+
     logger?.error(
       `Unexpected error in UpdateClass handler: ${className} - ${errorMessage}`,
     );

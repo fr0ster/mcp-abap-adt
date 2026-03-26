@@ -98,12 +98,14 @@ export async function handleUpdateServiceDefinition(
       const shouldActivate = activate !== false; // Default to true if not specified
 
       // Lock
-      const lockHandle = await client
-        .getServiceDefinition()
-        .lock({ serviceDefinitionName });
+      let lockHandle: string | undefined;
       let activateResponse: any | undefined;
 
       try {
+        lockHandle = await client
+          .getServiceDefinition()
+          .lock({ serviceDefinitionName });
+
         // Update source code
         await client.getServiceDefinition().update(
           {
@@ -132,35 +134,27 @@ export async function handleUpdateServiceDefinition(
             throw checkError;
           }
         }
-
-        // Unlock
-        await client
-          .getServiceDefinition()
-          .unlock({ serviceDefinitionName }, lockHandle);
-
-        // Activate if requested
-        if (shouldActivate) {
-          const activateState = await client
-            .getServiceDefinition()
-            .activate({ serviceDefinitionName });
-          activateResponse = activateState.activateResult;
-        }
-      } catch (error) {
-        // Try to unlock on error
-        try {
-          await client
-            .getServiceDefinition()
-            .unlock(
-              { serviceDefinitionName: serviceDefinitionName },
-              lockHandle,
+      } finally {
+        if (lockHandle) {
+          try {
+            await client
+              .getServiceDefinition()
+              .unlock({ serviceDefinitionName }, lockHandle);
+            logger?.info(`[UpdateServiceDefinition] Service definition unlocked: ${serviceDefinitionName}`);
+          } catch (unlockError: any) {
+            logger?.warn(
+              `Failed to unlock service definition ${serviceDefinitionName}: ${unlockError?.message || unlockError}`,
             );
-        } catch (unlockError) {
-          logger?.error(
-            'Failed to unlock service definition after error:',
-            unlockError,
-          );
+          }
         }
-        throw error;
+      }
+
+      // Activate if requested
+      if (shouldActivate) {
+        const activateState = await client
+          .getServiceDefinition()
+          .activate({ serviceDefinitionName });
+        activateResponse = activateState.activateResult;
       }
 
       // Parse activation warnings if activation was performed

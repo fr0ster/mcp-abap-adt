@@ -162,14 +162,15 @@ export async function handleUpdateDomain(
 
       // Lock domain (will fail if domain doesn't exist)
       // Pass packageName to lockDomain so builder is created with correct config from the start
-      const lockHandle = await client.getDomain().lock({
-        domainName,
-        packageName: typedArgs.package_name,
-      } as any);
-
+      let lockHandle: string | undefined;
       let updateState: any;
 
       try {
+        lockHandle = await client.getDomain().lock({
+          domainName,
+          packageName: typedArgs.package_name,
+        } as any);
+
         // Update with properties (packageName and description are required)
         const properties = {
           domainName: domainName,
@@ -205,24 +206,22 @@ export async function handleUpdateDomain(
             throw checkError;
           }
         }
-
-        // Unlock
-        await client.getDomain().unlock({ domainName }, lockHandle);
-
-        // Activate if requested
-        if (shouldActivate) {
-          await client.getDomain().activate({ domainName });
+      } finally {
+        if (lockHandle) {
+          try {
+            await client.getDomain().unlock({ domainName }, lockHandle);
+            logger?.info(`Domain unlocked: ${domainName}`);
+          } catch (unlockError: any) {
+            logger?.warn(
+              `Failed to unlock domain ${domainName}: ${unlockError?.message || unlockError}`,
+            );
+          }
         }
-      } catch (error) {
-        // Try to unlock on error
-        try {
-          await client.getDomain().unlock({ domainName }, lockHandle);
-        } catch (unlockError) {
-          logger?.error(
-            `Failed to unlock domain after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
-          );
-        }
-        throw error;
+      }
+
+      // Activate if requested
+      if (shouldActivate) {
+        await client.getDomain().activate({ domainName });
       }
 
       // Get domain details from update result

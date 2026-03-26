@@ -115,11 +115,12 @@ export async function handleUpdateInterface(
       // Note: No validation needed for update - interface must already exist
       const shouldActivate = activate !== false; // Default to true if not specified
       let activateResponse: any | undefined;
-
-      // Lock
-      const lockHandle = await client.getInterface().lock({ interfaceName });
+      let lockHandle: string | undefined;
 
       try {
+        // Lock
+        lockHandle = await client.getInterface().lock({ interfaceName });
+
         // Step 1: Check new code BEFORE update (with sourceCode and version='inactive')
         logger?.info(
           `[UpdateInterface] Checking new code before update: ${interfaceName}`,
@@ -175,60 +176,55 @@ export async function handleUpdateInterface(
             `[UpdateInterface] Skipping update - new code check failed: ${interfaceName}`,
           );
         }
-
-        // Step 3: Unlock (MANDATORY after lock)
-        await client.getInterface().unlock({ interfaceName }, lockHandle);
-        logger?.info(`[UpdateInterface] Interface unlocked: ${interfaceName}`);
-
-        // Step 4: Check inactive version (after unlock)
-        logger?.info(
-          `[UpdateInterface] Checking inactive version: ${interfaceName}`,
-        );
-        try {
-          await safeCheckOperation(
-            () => client.getInterface().check({ interfaceName }, 'inactive'),
-            interfaceName,
-            {
-              debug: (message: string) =>
-                logger?.debug(`[UpdateInterface] ${message}`),
-            },
-          );
-          logger?.info(
-            `[UpdateInterface] Inactive version check completed: ${interfaceName}`,
-          );
-        } catch (checkError: any) {
-          // If error was marked as "already checked", continue silently
-          if ((checkError as any).isAlreadyChecked) {
-            logger?.info(
-              `[UpdateInterface] Interface ${interfaceName} was already checked - continuing`,
-            );
-          } else {
-            // Log warning but don't fail - inactive check is informational
+      } finally {
+        if (lockHandle) {
+          try {
+            await client.getInterface().unlock({ interfaceName }, lockHandle);
+            logger?.info(`[UpdateInterface] Interface unlocked: ${interfaceName}`);
+          } catch (unlockError: any) {
             logger?.warn(
-              `[UpdateInterface] Inactive version check had issues: ${interfaceName} | ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+              `Failed to unlock interface ${interfaceName}: ${unlockError?.message || unlockError}`,
             );
           }
         }
+      }
 
-        // Activate if requested
-        if (shouldActivate) {
-          const activateState = await client
-            .getInterface()
-            .activate({ interfaceName });
-          activateResponse = activateState.activateResult;
-        }
-      } catch (error) {
-        // Try to unlock on error
-        try {
-          await client
-            .getInterface()
-            .unlock({ interfaceName: interfaceName }, lockHandle);
-        } catch (unlockError) {
-          logger?.error(
-            `Failed to unlock interface after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
+      // Step 4: Check inactive version (after unlock)
+      logger?.info(
+        `[UpdateInterface] Checking inactive version: ${interfaceName}`,
+      );
+      try {
+        await safeCheckOperation(
+          () => client.getInterface().check({ interfaceName }, 'inactive'),
+          interfaceName,
+          {
+            debug: (message: string) =>
+              logger?.debug(`[UpdateInterface] ${message}`),
+          },
+        );
+        logger?.info(
+          `[UpdateInterface] Inactive version check completed: ${interfaceName}`,
+        );
+      } catch (checkError: any) {
+        // If error was marked as "already checked", continue silently
+        if ((checkError as any).isAlreadyChecked) {
+          logger?.info(
+            `[UpdateInterface] Interface ${interfaceName} was already checked - continuing`,
+          );
+        } else {
+          // Log warning but don't fail - inactive check is informational
+          logger?.warn(
+            `[UpdateInterface] Inactive version check had issues: ${interfaceName} | ${checkError instanceof Error ? checkError.message : String(checkError)}`,
           );
         }
-        throw error;
+      }
+
+      // Activate if requested
+      if (shouldActivate) {
+        const activateState = await client
+          .getInterface()
+          .activate({ interfaceName });
+        activateResponse = activateState.activateResult;
       }
 
       // Parse activation warnings if activation was performed

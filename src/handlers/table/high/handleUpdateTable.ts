@@ -114,11 +114,12 @@ export async function handleUpdateTable(
       // Note: No validation needed for update - table must already exist
       const shouldActivate = activate !== false; // Default to true if not specified
       let activateResponse: any | undefined;
-
-      // Lock
-      const lockHandle = await client.getTable().lock({ tableName });
+      let lockHandle: string | undefined;
 
       try {
+        // Lock
+        lockHandle = await client.getTable().lock({ tableName });
+
         // Step 1: Check new code BEFORE update (with ddlCode and version='inactive')
         logger?.info(
           `[UpdateTable] Checking new DDL code before update: ${tableName}`,
@@ -178,58 +179,57 @@ export async function handleUpdateTable(
             `[UpdateTable] Skipping update - new code check failed: ${tableName}`,
           );
         }
-
-        // Step 3: Unlock (MANDATORY after lock)
-        await client.getTable().unlock({ tableName }, lockHandle);
-        logger?.info(`[UpdateTable] Table unlocked: ${tableName}`);
-
-        // Step 4: Check inactive version (after unlock)
-        logger?.info(`[UpdateTable] Checking inactive version: ${tableName}`);
-        try {
-          await safeCheckOperation(
-            () => client.getTable().check({ tableName }, 'inactive'),
-            tableName,
-            {
-              debug: (message: string) =>
-                logger?.debug(`[UpdateTable] ${message}`),
-            },
-          );
-          logger?.info(
-            `[UpdateTable] Inactive version check completed: ${tableName}`,
-          );
-        } catch (checkError: any) {
-          // If error was marked as "already checked", continue silently
-          if ((checkError as any).isAlreadyChecked) {
-            logger?.info(
-              `[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`,
-            );
-          } else {
-            // Log warning but don't fail - inactive check is informational
+      } finally {
+        if (lockHandle) {
+          try {
+            await client.getTable().unlock({ tableName }, lockHandle);
+            logger?.info(`[UpdateTable] Table unlocked: ${tableName}`);
+          } catch (unlockError: any) {
             logger?.warn(
-              `[UpdateTable] Inactive version check had issues: ${tableName}`,
-              {
-                error:
-                  checkError instanceof Error
-                    ? checkError.message
-                    : String(checkError),
-              },
+              `Failed to unlock table ${tableName}: ${unlockError?.message || unlockError}`,
             );
           }
         }
+      }
 
-        // Activate if requested
-        if (shouldActivate) {
-          const activateState = await client.getTable().activate({ tableName });
-          activateResponse = activateState.activateResult;
+      // Step 4: Check inactive version (after unlock)
+      logger?.info(`[UpdateTable] Checking inactive version: ${tableName}`);
+      try {
+        await safeCheckOperation(
+          () => client.getTable().check({ tableName }, 'inactive'),
+          tableName,
+          {
+            debug: (message: string) =>
+              logger?.debug(`[UpdateTable] ${message}`),
+          },
+        );
+        logger?.info(
+          `[UpdateTable] Inactive version check completed: ${tableName}`,
+        );
+      } catch (checkError: any) {
+        // If error was marked as "already checked", continue silently
+        if ((checkError as any).isAlreadyChecked) {
+          logger?.info(
+            `[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`,
+          );
+        } else {
+          // Log warning but don't fail - inactive check is informational
+          logger?.warn(
+            `[UpdateTable] Inactive version check had issues: ${tableName}`,
+            {
+              error:
+                checkError instanceof Error
+                  ? checkError.message
+                  : String(checkError),
+            },
+          );
         }
-      } catch (error) {
-        // Try to unlock on error
-        try {
-          await client.getTable().unlock({ tableName: tableName }, lockHandle);
-        } catch (unlockError) {
-          logger?.error('Failed to unlock table after error:', unlockError);
-        }
-        throw error;
+      }
+
+      // Activate if requested
+      if (shouldActivate) {
+        const activateState = await client.getTable().activate({ tableName });
+        activateResponse = activateState.activateResult;
       }
 
       // Parse activation warnings if activation was performed

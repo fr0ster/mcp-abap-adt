@@ -229,11 +229,13 @@ export async function handleUpdateDataElement(
       }
 
       // Lock
-      const lockHandle = await client
-        .getDataElement()
-        .lock({ dataElementName: dataElementName });
+      let lockHandle: string | undefined;
 
       try {
+        lockHandle = await client
+          .getDataElement()
+          .lock({ dataElementName: dataElementName });
+
         // Update with properties
         const properties = {
           dataType: typedArgs.data_type,
@@ -276,26 +278,22 @@ export async function handleUpdateDataElement(
             throw checkError;
           }
         }
-
-        // Unlock
-        await client.getDataElement().unlock({ dataElementName }, lockHandle);
-
-        // Activate if requested
-        if (shouldActivate) {
-          await client.getDataElement().activate({ dataElementName });
+      } finally {
+        if (lockHandle) {
+          try {
+            await client.getDataElement().unlock({ dataElementName }, lockHandle);
+            logger?.info(`Data element unlocked: ${dataElementName}`);
+          } catch (unlockError: any) {
+            logger?.warn(
+              `Failed to unlock data element ${dataElementName}: ${unlockError?.message || unlockError}`,
+            );
+          }
         }
-      } catch (error) {
-        // Try to unlock on error
-        try {
-          await client
-            .getDataElement()
-            .unlock({ dataElementName: dataElementName }, lockHandle);
-        } catch (unlockError) {
-          logger?.error(
-            `Failed to unlock data element after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
-          );
-        }
-        throw error;
+      }
+
+      // Activate if requested
+      if (shouldActivate) {
+        await client.getDataElement().activate({ dataElementName });
       }
 
       // Get data element details from update result

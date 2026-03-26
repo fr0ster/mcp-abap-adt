@@ -85,14 +85,14 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
     const shouldActivate = args.activate === true;
     let lockHandle: string | undefined;
 
-    // Lock
-    logger?.debug(`Locking view: ${viewName}`);
-    lockHandle = await client.getView().lock({ viewName });
-    logger?.debug(
-      `View locked: ${viewName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
-    );
-
     try {
+      // Lock
+      logger?.debug(`Locking view: ${viewName}`);
+      lockHandle = await client.getView().lock({ viewName });
+      logger?.debug(
+        `View locked: ${viewName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
+      );
+
       // Check new code BEFORE update
       logger?.debug(`Checking new DDL code before update: ${viewName}`);
       let checkNewCodePassed = false;
@@ -138,150 +138,139 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
       } else {
         logger?.warn(`Skipping update - new code check failed: ${viewName}`);
       }
-
-      // Unlock (MANDATORY)
-      logger?.debug(`Unlocking view: ${viewName}`);
-      await client.getView().unlock({ viewName }, lockHandle);
-      logger?.info(`View unlocked: ${viewName}`);
-
-      // Check inactive version (after unlock)
-      logger?.debug(`Checking inactive version: ${viewName}`);
-      try {
-        await safeCheckOperation(
-          () =>
-            client
-              .getView()
-              .check({ viewName, ddlSource: args.ddl_source }, 'inactive'),
-          viewName,
-          {
-            debug: (message: string) => logger?.debug(message),
-          },
-        );
-        logger?.debug(`Inactive version check completed: ${viewName}`);
-      } catch (checkError: any) {
-        if ((checkError as any).isAlreadyChecked) {
-          logger?.debug(`View ${viewName} was already checked - continuing`);
-        } else {
-          logger?.warn(
-            `Inactive version check had issues: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-          );
-        }
-      }
-
-      // Activate if requested
-      let activateResponse: any | undefined;
-      if (shouldActivate) {
-        logger?.debug(`Activating view: ${viewName}`);
+    } finally {
+      if (lockHandle) {
         try {
-          const activateState = await client.getView().activate({ viewName });
-          activateResponse = activateState.activateResult;
-          logger?.info(`View activated: ${viewName}`);
-        } catch (activationError: any) {
-          logger?.error(
-            `Activation failed: ${viewName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`,
-          );
-          throw new Error(
-            `Activation failed: ${activationError instanceof Error ? activationError.message : String(activationError)}`,
-          );
-        }
-      } else {
-        logger?.debug(`Skipping activation for: ${viewName}`);
-      }
-
-      // Parse activation warnings if activation was performed
-      let activationWarnings: string[] = [];
-      if (shouldActivate && activateResponse) {
-        if (
-          typeof activateResponse.data === 'string' &&
-          activateResponse.data.includes('<chkl:messages')
-        ) {
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const result = parser.parse(activateResponse.data);
-          const messages = result?.['chkl:messages']?.msg;
-          if (messages) {
-            const msgArray = Array.isArray(messages) ? messages : [messages];
-            activationWarnings = msgArray.map(
-              (msg: any) =>
-                `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-            );
-          }
-        }
-      }
-
-      logger?.info(`UpdateView completed successfully: ${viewName}`);
-
-      const result = {
-        success: true,
-        view_name: viewName,
-        type: 'DDLS',
-        activated: shouldActivate,
-        message: `View ${viewName} updated${shouldActivate ? ' and activated' : ''} successfully`,
-        uri: `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}`,
-        steps_completed: [
-          'lock',
-          'check_new_code',
-          'update',
-          'unlock',
-          'check_inactive',
-          ...(shouldActivate ? ['activate'] : []),
-        ],
-        activation_warnings:
-          activationWarnings.length > 0 ? activationWarnings : undefined,
-      };
-
-      return return_response({
-        data: JSON.stringify(result, null, 2),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: {} as any,
-      } as AxiosResponse);
-    } catch (workflowError: any) {
-      // On error, ensure we attempt unlock
-      try {
-        if (lockHandle) {
-          logger?.warn(`Attempting unlock after error for view ${viewName}`);
+          logger?.debug(`Unlocking view: ${viewName}`);
           await client.getView().unlock({ viewName }, lockHandle);
-          logger?.warn(`Unlocked view after error: ${viewName}`);
+          logger?.info(`View unlocked: ${viewName}`);
+        } catch (unlockError: any) {
+          logger?.warn(
+            `Failed to unlock view ${viewName}: ${unlockError?.message || unlockError}`,
+          );
         }
-      } catch (unlockError: any) {
-        logger?.error(
-          `Failed to unlock view after error: ${viewName} - ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
+      }
+    }
+
+    // Check inactive version (after unlock)
+    logger?.debug(`Checking inactive version: ${viewName}`);
+    try {
+      await safeCheckOperation(
+        () =>
+          client
+            .getView()
+            .check({ viewName, ddlSource: args.ddl_source }, 'inactive'),
+        viewName,
+        {
+          debug: (message: string) => logger?.debug(message),
+        },
+      );
+      logger?.debug(`Inactive version check completed: ${viewName}`);
+    } catch (checkError: any) {
+      if ((checkError as any).isAlreadyChecked) {
+        logger?.debug(`View ${viewName} was already checked - continuing`);
+      } else {
+        logger?.warn(
+          `Inactive version check had issues: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
         );
       }
+    }
 
-      // Parse error message
-      let errorMessage =
-        workflowError instanceof Error
-          ? workflowError.message
-          : String(workflowError);
-
-      // Attempt to parse ADT XML error
+    // Activate if requested
+    let activateResponse: any | undefined;
+    if (shouldActivate) {
+      logger?.debug(`Activating view: ${viewName}`);
       try {
+        const activateState = await client.getView().activate({ viewName });
+        activateResponse = activateState.activateResult;
+        logger?.info(`View activated: ${viewName}`);
+      } catch (activationError: any) {
+        logger?.error(
+          `Activation failed: ${viewName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`,
+        );
+        throw new Error(
+          `Activation failed: ${activationError instanceof Error ? activationError.message : String(activationError)}`,
+        );
+      }
+    } else {
+      logger?.debug(`Skipping activation for: ${viewName}`);
+    }
+
+    // Parse activation warnings if activation was performed
+    let activationWarnings: string[] = [];
+    if (shouldActivate && activateResponse) {
+      if (
+        typeof activateResponse.data === 'string' &&
+        activateResponse.data.includes('<chkl:messages')
+      ) {
         const parser = new XMLParser({
           ignoreAttributes: false,
           attributeNamePrefix: '@_',
         });
-        const errorData = workflowError?.response?.data
-          ? parser.parse(workflowError.response.data)
-          : null;
-        const errorMsg =
-          errorData?.['exc:exception']?.message?.['#text'] ||
-          errorData?.['exc:exception']?.message;
-        if (errorMsg) {
-          errorMessage = `SAP Error: ${errorMsg}`;
+        const result = parser.parse(activateResponse.data);
+        const messages = result?.['chkl:messages']?.msg;
+        if (messages) {
+          const msgArray = Array.isArray(messages) ? messages : [messages];
+          activationWarnings = msgArray.map(
+            (msg: any) =>
+              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
+          );
         }
-      } catch {
-        // ignore parse errors
       }
-
-      return return_error(new Error(errorMessage));
     }
+
+    logger?.info(`UpdateView completed successfully: ${viewName}`);
+
+    const result = {
+      success: true,
+      view_name: viewName,
+      type: 'DDLS',
+      activated: shouldActivate,
+      message: `View ${viewName} updated${shouldActivate ? ' and activated' : ''} successfully`,
+      uri: `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}`,
+      steps_completed: [
+        'lock',
+        'check_new_code',
+        'update',
+        'unlock',
+        'check_inactive',
+        ...(shouldActivate ? ['activate'] : []),
+      ],
+      activation_warnings:
+        activationWarnings.length > 0 ? activationWarnings : undefined,
+    };
+
+    return return_response({
+      data: JSON.stringify(result, null, 2),
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config: {} as any,
+    } as AxiosResponse);
   } catch (error: any) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    // Parse error message
+    let errorMessage =
+      error instanceof Error ? error.message : String(error);
+
+    // Attempt to parse ADT XML error
+    try {
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '@_',
+      });
+      const errorData = error?.response?.data
+        ? parser.parse(error.response.data)
+        : null;
+      const errorMsg =
+        errorData?.['exc:exception']?.message?.['#text'] ||
+        errorData?.['exc:exception']?.message;
+      if (errorMsg) {
+        errorMessage = `SAP Error: ${errorMsg}`;
+      }
+    } catch {
+      // ignore parse errors
+    }
+
     logger?.error(`Error updating view ${viewName}: ${errorMessage}`);
     return return_error(new Error(errorMessage));
   }

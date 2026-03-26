@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [4.4.1] - 2026-03-26
+
+### Improved
+- Rewrite `SearchObject` tool description with operation-first approach for better RAG discoverability (#21). Description now leads with action verbs (find, search, locate, check exists) instead of object type lists, so embedding vectors match user intent queries like "is there a program named X?".
+
 ## [4.4.0] - 2026-03-22
 
 ### Improved

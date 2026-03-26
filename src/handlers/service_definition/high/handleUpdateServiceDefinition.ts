@@ -140,7 +140,9 @@ export async function handleUpdateServiceDefinition(
             await client
               .getServiceDefinition()
               .unlock({ serviceDefinitionName }, lockHandle);
-            logger?.info(`[UpdateServiceDefinition] Service definition unlocked: ${serviceDefinitionName}`);
+            logger?.info(
+              `[UpdateServiceDefinition] Service definition unlocked: ${serviceDefinitionName}`,
+            );
           } catch (unlockError: any) {
             logger?.warn(
               `Failed to unlock service definition ${serviceDefinitionName}: ${unlockError?.message || unlockError}`,

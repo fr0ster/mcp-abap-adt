@@ -192,7 +192,9 @@ export async function handleUpdateStructure(
         if (lockHandle) {
           try {
             await client.getStructure().unlock({ structureName }, lockHandle);
-            logger?.info(`[UpdateStructure] Structure unlocked: ${structureName}`);
+            logger?.info(
+              `[UpdateStructure] Structure unlocked: ${structureName}`,
+            );
           } catch (unlockError: any) {
             logger?.warn(
               `Failed to unlock structure ${structureName}: ${unlockError?.message || unlockError}`,

@@ -281,7 +281,9 @@ export async function handleUpdateDataElement(
       } finally {
         if (lockHandle) {
           try {
-            await client.getDataElement().unlock({ dataElementName }, lockHandle);
+            await client
+              .getDataElement()
+              .unlock({ dataElementName }, lockHandle);
             logger?.info(`Data element unlocked: ${dataElementName}`);
           } catch (unlockError: any) {
             logger?.warn(

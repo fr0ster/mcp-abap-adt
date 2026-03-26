@@ -236,8 +236,7 @@ export async function handleUpdateProgram(
       if (messages) {
         const msgArray = Array.isArray(messages) ? messages : [messages];
         activationWarnings = msgArray.map(
-          (msg: any) =>
-            `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
+          (msg: any) => `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
         );
       }
     }
@@ -275,8 +274,7 @@ export async function handleUpdateProgram(
     });
   } catch (error: any) {
     // Parse error message
-    let errorMessage =
-      error instanceof Error ? error.message : String(error);
+    let errorMessage = error instanceof Error ? error.message : String(error);
 
     // Attempt to parse ADT XML error
     try {

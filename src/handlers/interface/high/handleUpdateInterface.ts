@@ -180,7 +180,9 @@ export async function handleUpdateInterface(
         if (lockHandle) {
           try {
             await client.getInterface().unlock({ interfaceName }, lockHandle);
-            logger?.info(`[UpdateInterface] Interface unlocked: ${interfaceName}`);
+            logger?.info(
+              `[UpdateInterface] Interface unlocked: ${interfaceName}`,
+            );
           } catch (unlockError: any) {
             logger?.warn(
               `Failed to unlock interface ${interfaceName}: ${unlockError?.message || unlockError}`,

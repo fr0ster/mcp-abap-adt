@@ -249,8 +249,7 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
     } as AxiosResponse);
   } catch (error: any) {
     // Parse error message
-    let errorMessage =
-      error instanceof Error ? error.message : String(error);
+    let errorMessage = error instanceof Error ? error.message : String(error);
 
     // Attempt to parse ADT XML error
     try {

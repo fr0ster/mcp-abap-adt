@@ -9,7 +9,7 @@ export const TOOL_DEFINITION = {
   name: 'SearchObject',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Search for ABAP objects by name pattern. Searches across all object types: packages (DEVC), classes (CLAS), interfaces (INTF), tables (TABL), structures, CDS views (DDLS), data elements (DTEL), domains (DOMA), programs (PROG), function groups (FUGR), function modules, service definitions (SRVD), service bindings (SRVB), behavior definitions (BDEF), metadata extensions (DDLX), and more. Use this to find any repository object when you know part of its name.',
+    "[read-only] Find, search, locate, or check if an ABAP repository object exists by name or wildcard pattern (e.g. 'ZOK*'). Use this tool to answer questions like 'is there a program named...', 'find all objects starting with...', 'does this class exist?', 'list objects matching...'. Supports all repository object types — optionally filter by type (PROG, CLAS, INTF, DEVC, TABL, DDLS, DTEL, FUGR, SRVD, SRVB, BDEF, DDLX, etc.).",
   inputSchema: {
     type: 'object',
     properties: {

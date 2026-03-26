@@ -2,12 +2,14 @@
  * ListTransports Handler - List user's transport requests via ADT API
  *
  * Retrieves transport requests for the current user or specified user.
- * Uses /sap/bc/adt/cts/transportrequests endpoint with search filters.
+ * Uses AdtClient.getRequest().list() with proper Accept negotiation.
  */
 
 import { XMLParser } from 'fast-xml-parser';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { makeAdtRequestWithTimeout, return_error } from '../../../lib/utils';
+import { getSystemContext } from '../../../lib/systemContext';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ListTransports',
@@ -87,33 +89,23 @@ export async function handleListTransports(
   const { connection, logger } = context;
   try {
     const modifiableOnly = args?.modifiable_only !== false;
+    const user =
+      args?.user ||
+      getSystemContext().responsible ||
+      process.env.SAP_USERNAME ||
+      '';
 
-    // Build URL with query params
-    const params: string[] = [];
-    if (args?.user) {
-      params.push(`user=${encodeURIComponent(args.user)}`);
-    }
-    if (modifiableOnly) {
-      params.push('status=D'); // D = modifiable
-    }
-
-    const url = `/sap/bc/adt/cts/transportrequests${params.length > 0 ? `?${params.join('&')}` : ''}`;
-
-    logger?.debug(`ListTransports: ${url}`);
-
-    const response = await makeAdtRequestWithTimeout(
-      connection,
-      url,
-      'GET',
-      'default',
-      undefined,
-      undefined,
-      {
-        Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
-      },
+    logger?.debug(
+      `ListTransports: user=${user}, modifiable_only=${modifiableOnly}`,
     );
 
-    const transports = parseTransportListXml(response.data);
+    const client = createAdtClient(connection, logger);
+    const state = await client.getRequest().list({
+      user,
+      status: modifiableOnly ? 'D' : undefined,
+    });
+
+    const transports = parseTransportListXml(state.listResult?.data || '');
 
     logger?.info(`ListTransports: found ${transports.length} transport(s)`);
 

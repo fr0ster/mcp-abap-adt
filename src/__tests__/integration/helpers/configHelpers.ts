@@ -408,15 +408,15 @@ export function getSapConfigFromEnv(): SapConfig {
   }
 
   let authType: SapConfig['authType'] = 'basic';
-  if (process.env.SAP_JWT_TOKEN) {
-    authType = 'jwt';
-  } else if (process.env.SAP_AUTH_TYPE) {
+  if (process.env.SAP_AUTH_TYPE) {
     const raw = process.env.SAP_AUTH_TYPE.trim().toLowerCase();
     if (raw === 'xsuaa') {
       authType = 'jwt';
     } else if (raw === 'basic' || raw === 'jwt' || raw === 'saml') {
       authType = raw;
     }
+  } else if (process.env.SAP_JWT_TOKEN) {
+    authType = 'jwt';
   }
 
   const connectionType: SapConfig['connectionType'] =

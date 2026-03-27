@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [4.5.2] - 2026-03-27
+
+### Added
+- Pre-commit hook via husky + lint-staged — auto-fixes formatting and lint issues before commit so CI stays green.
+
 ## [4.5.1] - 2026-03-26
 
 ### Changed

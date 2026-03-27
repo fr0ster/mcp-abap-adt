@@ -79,9 +79,7 @@ describe('ListTransports Handler Integration', () => {
           expect(first.number).toBeTruthy();
         }
 
-        logger?.info(
-          `Found ${data.count} modifiable transport(s)`,
-        );
+        logger?.info(`Found ${data.count} modifiable transport(s)`);
       });
     },
     getTimeout('long'),
@@ -111,9 +109,7 @@ describe('ListTransports Handler Integration', () => {
         expect(data.count).toBeGreaterThanOrEqual(0);
         expect(Array.isArray(data.transports)).toBe(true);
 
-        logger?.info(
-          `Found ${data.count} total transport(s)`,
-        );
+        logger?.info(`Found ${data.count} total transport(s)`);
       });
     },
     getTimeout('long'),

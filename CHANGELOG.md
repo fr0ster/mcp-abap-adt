@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [4.6.0] - 2026-03-31
+
+### Added
+- HTTPS/TLS support for HTTP and SSE server transports. Configure via CLI (`--tls-cert`, `--tls-key`, `--tls-ca`), environment variables (`MCP_TLS_CERT`, `MCP_TLS_KEY`, `MCP_TLS_CA`), or YAML config (`tls:` section). Protocol is auto-detected from cert + key presence.
+
 ## [4.5.2] - 2026-03-27
 
 ### Added

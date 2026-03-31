@@ -5,6 +5,16 @@
 
 import type { TransportConfig } from '../utils.js';
 
+/** TLS configuration for HTTPS server */
+export interface TlsConfig {
+  /** Path to TLS certificate file (PEM) */
+  cert: string;
+  /** Path to TLS private key file (PEM) */
+  key: string;
+  /** Path to CA certificate file (PEM), optional */
+  ca?: string;
+}
+
 /** Transport type (simple string for v2) */
 export type Transport = 'stdio' | 'sse' | 'http';
 
@@ -63,6 +73,8 @@ export interface IServerConfig {
   ssePath?: string;
   /** SSE message post path */
   postPath?: string;
+  /** TLS configuration for HTTPS (cert + key enables HTTPS automatically) */
+  tls?: TlsConfig;
 
   // ============================================================================
   // HANDLER EXPOSITION (v2)

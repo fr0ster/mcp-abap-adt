@@ -51,6 +51,12 @@ export interface ParsedArguments {
   sseEnableDnsProtection?: boolean;
   /** Port for browser auth callback server */
   browserAuthPort?: number;
+  /** TLS certificate file path */
+  tlsCert?: string;
+  /** TLS private key file path */
+  tlsKey?: string;
+  /** TLS CA certificate file path */
+  tlsCa?: string;
 }
 
 export class ArgumentsParser {
@@ -255,6 +261,11 @@ export class ArgumentsParser {
       'MCP_SSE_ENABLE_DNS_PROTECTION',
       false,
     );
+
+    // Parse TLS options
+    result.tlsCert = getArgValue('--tls-cert') || process.env.MCP_TLS_CERT;
+    result.tlsKey = getArgValue('--tls-key') || process.env.MCP_TLS_KEY;
+    result.tlsCa = getArgValue('--tls-ca') || process.env.MCP_TLS_CA;
 
     return result;
   }

@@ -102,6 +102,9 @@ ENVIRONMENT VARIABLES:
     MCP_UNSAFE                     Disable connection validation (true|false)
     MCP_USE_AUTH_BROKER            Force auth-broker usage (true|false)
     MCP_BROWSER                    Browser for OAuth2 flow (e.g., chrome, firefox)
+    MCP_TLS_CERT                   Path to TLS certificate file (PEM)
+    MCP_TLS_KEY                    Path to TLS private key file (PEM)
+    MCP_TLS_CA                     Path to TLS CA certificate file (PEM, optional)
 
   Auth-Broker:
     DEBUG_AUTH_LOG                 Enable debug logging for auth-broker (true|false)
@@ -340,6 +343,7 @@ async function main() {
       defaultDestination:
         config.mcpDestination ?? (config.envFile ? 'default' : undefined),
       logger: loggerForTransport,
+      tls: config.tls,
     });
     activeServer = server;
     await server.start();
@@ -355,6 +359,7 @@ async function main() {
     defaultDestination:
       config.mcpDestination ?? (config.envFile ? 'default' : undefined),
     logger: loggerForTransport,
+    tls: config.tls,
   });
   activeServer = server;
   await server.start();

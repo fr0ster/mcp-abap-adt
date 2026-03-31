@@ -23,6 +23,11 @@ export interface YamlConfig {
     'allowed-origins'?: string[];
     'allowed-hosts'?: string[];
     'enable-dns-protection'?: boolean;
+    tls?: {
+      cert?: string;
+      key?: string;
+      ca?: string;
+    };
   };
   sse?: {
     port?: number;
@@ -30,6 +35,11 @@ export interface YamlConfig {
     'allowed-origins'?: string[];
     'allowed-hosts'?: string[];
     'enable-dns-protection'?: boolean;
+    tls?: {
+      cert?: string;
+      key?: string;
+      ca?: string;
+    };
   };
 }
 
@@ -145,6 +155,28 @@ export function validateYamlConfig(config: YamlConfig): {
     }
   }
 
+  // Validate TLS configuration (http)
+  if (config.http?.tls) {
+    const tls = config.http.tls;
+    if (tls.cert && !tls.key) {
+      errors.push('HTTP TLS: cert requires key to be specified');
+    }
+    if (tls.key && !tls.cert) {
+      errors.push('HTTP TLS: key requires cert to be specified');
+    }
+  }
+
+  // Validate TLS configuration (sse)
+  if (config.sse?.tls) {
+    const tls = config.sse.tls;
+    if (tls.cert && !tls.key) {
+      errors.push('SSE TLS: cert requires key to be specified');
+    }
+    if (tls.key && !tls.cert) {
+      errors.push('SSE TLS: key requires cert to be specified');
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,
@@ -248,6 +280,14 @@ http:
   # Enable DNS rebinding protection
   enable-dns-protection: false
 
+  # TLS configuration for HTTPS (both cert and key required)
+  # When configured, server starts in HTTPS mode automatically
+  # Note: only the active transport's TLS config is used
+  # tls:
+  #   cert: /path/to/server.crt
+  #   key: /path/to/server.key
+  #   ca: /path/to/ca.crt  # optional, for custom CA
+
 # SSE (Server-Sent Events) transport options
 sse:
   # Server port
@@ -266,6 +306,14 @@ sse:
 
   # Enable DNS rebinding protection
   enable-dns-protection: false
+
+  # TLS configuration for HTTPS (both cert and key required)
+  # When configured, server starts in HTTPS mode automatically
+  # Note: only the active transport's TLS config is used
+  # tls:
+  #   cert: /path/to/server.crt
+  #   key: /path/to/server.key
+  #   ca: /path/to/ca.crt  # optional, for custom CA
 
 # Examples:
 #
@@ -406,6 +454,15 @@ export function applyYamlConfigToArgs(config: YamlConfig): void {
     ) {
       addArg('--http-enable-dns-protection', true);
     }
+    if (config.http.tls?.cert && !hasArg('--tls-cert')) {
+      addArg('--tls-cert', config.http.tls.cert);
+    }
+    if (config.http.tls?.key && !hasArg('--tls-key')) {
+      addArg('--tls-key', config.http.tls.key);
+    }
+    if (config.http.tls?.ca && !hasArg('--tls-ca')) {
+      addArg('--tls-ca', config.http.tls.ca);
+    }
   }
 
   // Apply SSE options
@@ -433,6 +490,15 @@ export function applyYamlConfigToArgs(config: YamlConfig): void {
       !hasArg('--sse-enable-dns-protection')
     ) {
       addArg('--sse-enable-dns-protection', true);
+    }
+    if (config.sse.tls?.cert && !hasArg('--tls-cert')) {
+      addArg('--tls-cert', config.sse.tls.cert);
+    }
+    if (config.sse.tls?.key && !hasArg('--tls-key')) {
+      addArg('--tls-key', config.sse.tls.key);
+    }
+    if (config.sse.tls?.ca && !hasArg('--tls-ca')) {
+      addArg('--tls-ca', config.sse.tls.ca);
     }
   }
 }

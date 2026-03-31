@@ -129,6 +129,14 @@ export class ServerConfigManager {
       browserAuthPort: parsed.browserAuthPort,
       connectionType: parsed.connectionType,
       systemType: parsed.systemType,
+      tls:
+        parsed.tlsCert && parsed.tlsKey
+          ? {
+              cert: parsed.tlsCert,
+              key: parsed.tlsKey,
+              ca: parsed.tlsCa,
+            }
+          : undefined,
     };
   }
 
@@ -269,6 +277,12 @@ AUTHENTICATION:
 ${ServerConfigManager.getHandlerSetsDescription()}
 HTTP OPTIONS:
   --http-json-response             Enable JSON response format
+
+TLS/HTTPS:
+  --tls-cert=<path>                Path to TLS certificate file (PEM)
+  --tls-key=<path>                 Path to TLS private key file (PEM)
+  --tls-ca=<path>                  Path to CA certificate file (PEM, optional)
+                                   When cert and key are provided, server starts in HTTPS mode
 
 YAML CONFIG FILE:
   Use --conf to specify YAML config file with all settings.

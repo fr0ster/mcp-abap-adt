@@ -1,8 +1,10 @@
 import type { Server as HttpServer } from 'node:http';
+import type { Server as HttpsServer } from 'node:https';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
 import type { AuthBrokerFactory } from '../lib/auth/index.js';
+import type { TlsConfig } from '../lib/config/IServerConfig.js';
 import { noopLogger } from '../lib/handlerLogger.js';
 import type { IHandlersRegistry } from '../lib/handlers/interfaces.js';
 import { BaseMcpServer } from './BaseMcpServer.js';
@@ -10,6 +12,7 @@ import type {
   IHttpApplication,
   RouteRegistrationOptions,
 } from './IHttpApplication.js';
+import { createServerListener, getProtocol } from './tlsUtils.js';
 
 const DEFAULT_VERSION = process.env.npm_package_version ?? '1.0.0';
 
@@ -52,6 +55,10 @@ export interface StreamableHttpServerOptions {
    * This enables integration with existing Express/CDS/CAP servers
    */
   app?: IHttpApplication;
+  /**
+   * TLS configuration for HTTPS support
+   */
+  tls?: TlsConfig;
 }
 
 /**
@@ -71,7 +78,8 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly path: string;
   private readonly externalApp?: IHttpApplication;
   private readonly version: string;
-  private standaloneServer?: HttpServer;
+  private standaloneServer?: HttpServer | HttpsServer;
+  private readonly tls?: TlsConfig;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -90,6 +98,7 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.defaultDestination = opts?.defaultDestination;
     this.path = opts?.path ?? '/mcp/stream/http';
     this.externalApp = opts?.app;
+    this.tls = opts?.tls;
     // Register handlers once for shared MCP server
     this.registerHandlers(this.handlersRegistry);
   }
@@ -282,15 +291,17 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.registerRoutes(app as unknown as IHttpApplication);
 
     await new Promise<void>((resolve, reject) => {
-      const server = app.listen(this.port, this.host);
+      const protocol = getProtocol(this.tls);
+      const server = createServerListener(app as any, this.tls);
       this.standaloneServer = server;
 
+      server.listen(this.port, this.host);
       server.once('listening', () => {
         console.error(
           `[StreamableHttpServer] Server started on ${this.host}:${this.port}`,
         );
         console.error(
-          `[StreamableHttpServer] Endpoint: http://${this.host}:${this.port}${this.path}`,
+          `[StreamableHttpServer] Endpoint: ${protocol}://${this.host}:${this.port}${this.path}`,
         );
         resolve();
       });

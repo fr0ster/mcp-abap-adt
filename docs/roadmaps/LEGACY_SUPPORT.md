@@ -89,7 +89,7 @@ if (process.env.SAP_AUTH_TYPE === 'rfc') {
 ```
 
 `createAbapConnection()` from connection package already handles `authType: 'rfc'`.
-`node-rfc` is loaded dynamically — no error if not installed and not used.
+`@mcp-abap-adt/sap-rfc-lite` is loaded dynamically — no error if not installed and not used.
 
 ### Step 5: Launcher CLI support [DONE]
 
@@ -155,7 +155,7 @@ The [abapfs_extensions](https://github.com/marcellourbani/abapfs_extensions) pro
 
 | Risk | Mitigation |
 |------|-----------|
-| node-rfc needs SAP NW RFC SDK native lib | Dynamic import; graceful error if not installed; only loaded for `authType: 'rfc'` |
+| @mcp-abap-adt/sap-rfc-lite needs SAP NW RFC SDK native lib | Dynamic import; graceful error if not installed; only loaded for `connectionType: 'rfc'` |
 | Docker images need SDK | Document; provide Dockerfile with SDK layer |
 | Legacy endpoint differences between versions | Discovery-based detection, not hardcoded |
 | One extra HTTP call at startup (core/discovery) | Cached, happens once |

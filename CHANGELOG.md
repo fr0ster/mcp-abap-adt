@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [4.7.0] - 2026-04-01
+
+### Changed
+- Replace archived `node-rfc` with `@mcp-abap-adt/sap-rfc-lite` — a lightweight maintained fork with the same API surface. This change only affects RFC connections to legacy SAP systems (BASIS < 7.50). HTTP connections are not affected. If you experience issues with legacy RFC connections, please open an issue and downgrade to v4.6.0.
+
 ## [4.6.0] - 2026-03-31
 
 ### Added

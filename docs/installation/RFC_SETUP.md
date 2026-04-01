@@ -40,18 +40,18 @@ export PATH=$SAPNWRFC_HOME/lib:$PATH
 export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:${LD_LIBRARY_PATH:-}
 ```
 
-### 3. node-rfc Package
+### 3. @mcp-abap-adt/sap-rfc-lite Package
 
 ```bash
-npm install node-rfc
+npm install @mcp-abap-adt/sap-rfc-lite
 ```
 
-`node-rfc` is loaded dynamically at runtime — it is not a declared dependency.
+`@mcp-abap-adt/sap-rfc-lite` is a lightweight fork of the archived `node-rfc` package, containing only the API surface needed for ADT RFC connections. It is loaded dynamically at runtime — it is not a declared dependency.
 
 Verify installation:
 
 ```bash
-node -e "try { require('node-rfc'); console.log('OK'); } catch(e) { console.log(e.message); }"
+node -e "try { require('@mcp-abap-adt/sap-rfc-lite'); console.log('OK'); } catch(e) { console.log(e.message); }"
 ```
 
 ### 4. SAP Authorization
@@ -83,13 +83,13 @@ SAP_CONNECTION_TYPE=rfc
 
 ## Troubleshooting
 
-### "node-rfc is not available"
+### "@mcp-abap-adt/sap-rfc-lite is not available"
 
 SAP NW RFC SDK is not installed or not in PATH. Check:
 
 ```bash
 echo $SAPNWRFC_HOME
-node -e "require('node-rfc')"
+node -e "require('@mcp-abap-adt/sap-rfc-lite')"
 ```
 
 ### "The specified module could not be found: sapnwrfc.node"

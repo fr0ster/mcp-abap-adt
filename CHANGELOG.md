@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [4.7.1] - 2026-04-01
+
+### Fixed
+- Update server.json version to match package version
+
 ## [4.7.0] - 2026-04-01
 
 ### Changed

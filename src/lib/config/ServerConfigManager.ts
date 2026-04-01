@@ -263,7 +263,7 @@ AUTHENTICATION:
   --mcp=<destination>              Default MCP destination name (for auth-broker mode)
                                    Example: --mcp=TRIAL
   --connection-type=<type>         SAP connection type: http (default) or rfc
-                                   RFC requires SAP NW RFC SDK + node-rfc installed
+                                   RFC requires SAP NW RFC SDK + @mcp-abap-adt/sap-rfc-lite installed
                                    Alternative: SAP_CONNECTION_TYPE env var in .env
   --system-type=<type>             SAP system type: cloud (default) | onprem | legacy
                                    Controls which tools are available

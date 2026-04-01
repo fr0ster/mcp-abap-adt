@@ -146,7 +146,7 @@ SAP CONNECTION (.env file):
     SAP_USERNAME                   SAP username
     SAP_PASSWORD                   SAP password
     SAP_CLIENT                     SAP client number
-    Requires: SAP NW RFC SDK + node-rfc package installed
+    Requires: SAP NW RFC SDK + @mcp-abap-adt/sap-rfc-lite package installed
 
   System Context (on-premise):
     SAP_MASTER_SYSTEM              SAP system ID (e.g., DEV, QAS). Required for on-prem

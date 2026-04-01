@@ -154,7 +154,7 @@
     "zod": "^4.3.6"
   },
   "optionalDependencies": {
-    "node-rfc": "^3.3.1"
+    "@mcp-abap-adt/sap-rfc-lite": "^0.1.0"
   },
   "engines": {
     "node": ">=20.0.0",

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [4.8.0] - 2026-04-02
+
+### Added
+- `RuntimeListDumps`: new `from` / `to` parameters (YYYYMMDDHHMMSS system local time) for server-side time-range filtering. Response is now a structured `dumps` array with `dump_id`, `datetime`, `error`, `title`, and `user` fields — replaces the raw atom feed payload.
+- `RuntimeGetDumpById`: dump lookup by `datetime` + `user` without knowing the dump ID. Pass `datetime` (ISO or `"YYYY-MM-DD HH:MM:SS"`) and `user` to resolve the dump automatically using a ±2-minute server-side window and ±60-second client-side match. `dump_id` is now optional.
+
+### Changed
+- `RuntimeGetDumpById`: `dump_id` parameter is no longer required — provide either `dump_id` or `datetime` + `user`.
+
 ## [4.7.1] - 2026-04-01
 
 ### Fixed

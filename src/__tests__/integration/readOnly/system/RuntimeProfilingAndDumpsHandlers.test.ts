@@ -84,18 +84,6 @@ function extractTraceIdsFromPayload(payload: unknown): string[] {
   return [...ids];
 }
 
-function extractDumpIdsFromPayload(payload: unknown): string[] {
-  const ids = new Set<string>();
-  const raw = typeof payload === 'string' ? payload : JSON.stringify(payload);
-  const regex = /\/sap\/bc\/adt\/runtime\/dump(?:s)?\/([^"'?&<\s]+)/g;
-  let match: RegExpExecArray | null = regex.exec(raw);
-  while (match) {
-    ids.add(match[1]);
-    match = regex.exec(raw);
-  }
-  return [...ids];
-}
-
 function buildRunnableClassSource(className: string): string {
   return `CLASS ${className} DEFINITION PUBLIC FINAL CREATE PUBLIC.
   PUBLIC SECTION.
@@ -761,7 +749,8 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             );
             expect(listResult.isError).toBe(false);
             const listData = parseTextPayload(listResult);
-            let dumpIds = extractDumpIdsFromPayload(listData.payload);
+            let dumpIds: string[] =
+              (listData.dumps as any[])?.map((d: any) => d.dump_id) ?? [];
             if (dumpIds.length === 0 && dumpsUser) {
               // Fallback to unfiltered feed if user filter returns empty on this system.
               const unfilteredResult = await invoke(
@@ -783,7 +772,9 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
               );
               expect(unfilteredResult.isError).toBe(false);
               const unfilteredData = parseTextPayload(unfilteredResult);
-              dumpIds = extractDumpIdsFromPayload(unfilteredData.payload);
+              dumpIds =
+                (unfilteredData.dumps as any[])?.map((d: any) => d.dump_id) ??
+                [];
             }
             if (dumpIds.length > 0) {
               dumpIdFromGeneratedFailure = dumpIds[0];
@@ -872,6 +863,75 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             tester.isHardMode() ? invoke : undefined,
           );
         }
+      });
+    },
+    getTimeout('long'),
+  );
+
+  it(
+    'should list dumps and look up a dump by datetime and user',
+    async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const dumpsUser = context.params?.dumps_user || undefined;
+        if (!dumpsUser) {
+          throw new Error(
+            'SKIP: dumps_user not configured in test params (set params.dumps_user)',
+          );
+        }
+
+        const invoke = async (
+          toolName: string,
+          args: Record<string, unknown>,
+          directCall: () => Promise<any>,
+        ) => tester.invokeToolOrHandler(toolName, args, directCall);
+
+        // Step 1: list dumps by user to get a known datetime
+        const listResult = await invoke(
+          'RuntimeListDumps',
+          { user: dumpsUser, top: 5 },
+          async () => {
+            const handlerContext = createHandlerContext({
+              connection: context.connection,
+              logger,
+            });
+            return handleRuntimeListDumps(handlerContext, {
+              user: dumpsUser,
+              top: 5,
+            });
+          },
+        );
+        expect(listResult.isError).toBe(false);
+        const listData = parseTextPayload(listResult);
+        expect(listData.dumps).toBeDefined();
+        const dumps: any[] = listData.dumps ?? [];
+        if (dumps.length === 0) {
+          throw new Error(`SKIP: no dumps found for user "${dumpsUser}"`);
+        }
+
+        const firstDump = dumps[0];
+        const expectedDumpId: string = firstDump.dump_id;
+        const datetime: string = firstDump.datetime;
+
+        // Step 2: look up the same dump via datetime + user
+        const lookupResult = await invoke(
+          'RuntimeGetDumpById',
+          { datetime, user: dumpsUser },
+          async () => {
+            const handlerContext = createHandlerContext({
+              connection: context.connection,
+              logger,
+            });
+            return handleRuntimeGetDumpById(handlerContext, {
+              datetime,
+              user: dumpsUser,
+            });
+          },
+        );
+        expect(lookupResult.isError).toBe(false);
+        const lookupData = parseTextPayload(lookupResult);
+        expect(lookupData.success).toBe(true);
+        expect(lookupData.dump_id).toBe(expectedDumpId);
+        expect(lookupData.payload).toBeDefined();
       });
     },
     getTimeout('long'),

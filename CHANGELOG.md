@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [4.8.1] - 2026-04-02
+
+### Changed
+- Add build (tsc) step to pre-commit hook to catch type errors before commit
+
 ## [4.8.0] - 2026-04-02
 
 ### Added

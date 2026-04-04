@@ -199,7 +199,7 @@ export class LowTester extends LambdaTester {
 
         // Guarantee unlock even if update fails
         try {
-          if (this.workflowFunctions.update) {
+          {
             const updateArgs = this.buildUpdateArgs(this.context);
             await this.retryOnConflict(
               () => this.workflowFunctions!.update(handlerContext, updateArgs),

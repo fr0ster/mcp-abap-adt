@@ -80,7 +80,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
           ['GetSession'],
           {},
         );
-        const sessionData = parseHandlerResponse(sessionResponse);
+        const sessionData = parseHandlerResponse(sessionResponse as any);
         session = {
           session_id:
             sessionData.session_id || sessionData.data?.session_id || '',
@@ -202,7 +202,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
                 },
                 () =>
                   handleDeleteFunctionModule(
-                    { connection, logger: testLogger },
+                    { connection: connection!, logger: testLogger },
                     {
                       function_module_name: functionModuleName,
                       function_group_name: functionGroupName,
@@ -230,7 +230,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
                 },
                 () =>
                   handleDeleteFunctionGroup(
-                    { connection, logger: testLogger },
+                    { connection: connection!, logger: testLogger },
                     {
                       function_group_name: functionGroupName,
                       transport_request: transportRequest,
@@ -301,7 +301,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             },
             () =>
               handleValidateFunctionGroup(
-                { connection, logger: testLogger },
+                { connection: connection!, logger: testLogger },
                 {
                   function_group_name: functionGroupName,
                   package_name: packageName,
@@ -343,7 +343,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             },
             () =>
               handleCreateFunctionGroup(
-                { connection, logger: testLogger },
+                { connection: connection!, logger: testLogger },
                 {
                   function_group_name: functionGroupName,
                   description: functionGroupDescription,
@@ -377,7 +377,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             },
             () =>
               handleLockFunctionGroup(
-                { connection, logger: testLogger },
+                { connection: connection!, logger: testLogger },
                 {
                   function_group_name: functionGroupName,
                   session_id: session!.session_id,
@@ -418,10 +418,10 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             },
             () =>
               handleUnlockFunctionGroup(
-                { connection, logger: testLogger },
+                { connection: connection!, logger: testLogger },
                 {
                   function_group_name: functionGroupName,
-                  lock_handle: fgLockHandle,
+                  lock_handle: fgLockHandle!,
                   session_id: fgLockSession!.session_id!,
                   session_state: fgLockSession!.session_state,
                 },
@@ -451,7 +451,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             },
             () =>
               handleActivateFunctionGroup(
-                { connection, logger: testLogger },
+                { connection: connection!, logger: testLogger },
                 {
                   function_group_name: functionGroupName,
                   session_id: session!.session_id,
@@ -492,7 +492,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             },
             () =>
               handleValidateFunctionModule(
-                { connection, logger: testLogger },
+                { connection: connection!, logger: testLogger },
                 {
                   function_module_name: functionModuleName,
                   function_group_name: functionGroupName,
@@ -547,7 +547,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             },
             () =>
               handleCreateFunctionModule(
-                { connection, logger: testLogger },
+                { connection: connection!, logger: testLogger },
                 {
                   function_module_name: functionModuleName,
                   function_group_name: functionGroupName,
@@ -583,7 +583,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             },
             () =>
               handleLockFunctionModule(
-                { connection, logger: testLogger },
+                { connection: connection!, logger: testLogger },
                 {
                   function_module_name: functionModuleName,
                   function_group_name: functionGroupName,
@@ -631,13 +631,13 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             },
             () =>
               handleUpdateFunctionModule(
-                { connection, logger: testLogger },
+                { connection: connection!, logger: testLogger },
                 {
                   function_module_name: functionModuleName,
                   function_group_name: functionGroupName,
                   source_code: sourceCode,
                   transport_request: transportRequest,
-                  lock_handle: fmLockHandle,
+                  lock_handle: fmLockHandle!,
                   session_id: fmLockSession!.session_id!,
                   session_state: fmLockSession!.session_state,
                 },
@@ -668,11 +668,11 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             },
             () =>
               handleUnlockFunctionModule(
-                { connection, logger: testLogger },
+                { connection: connection!, logger: testLogger },
                 {
                   function_module_name: functionModuleName,
                   function_group_name: functionGroupName,
-                  lock_handle: fmLockHandle,
+                  lock_handle: fmLockHandle!,
                   session_id: fmLockSession!.session_id!,
                   session_state: fmLockSession!.session_state,
                 },
@@ -703,7 +703,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             },
             () =>
               handleActivateFunctionModule(
-                { connection, logger: testLogger },
+                { connection: connection!, logger: testLogger },
                 {
                   function_module_name: functionModuleName,
                   function_group_name: functionGroupName,
@@ -768,7 +768,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
                   },
                   () =>
                     handleUnlockFunctionModule(
-                      { connection, logger: testLogger },
+                      { connection: connection!, logger: testLogger },
                       {
                         function_module_name: functionModuleName,
                         function_group_name: functionGroupName,
@@ -795,7 +795,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
                 },
                 () =>
                   handleDeleteFunctionModule(
-                    { connection, logger: testLogger },
+                    { connection: connection!, logger: testLogger },
                     {
                       function_module_name: functionModuleName,
                       function_group_name: functionGroupName,
@@ -834,7 +834,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
                   },
                   () =>
                     handleUnlockFunctionGroup(
-                      { connection, logger: testLogger },
+                      { connection: connection!, logger: testLogger },
                       {
                         function_group_name: functionGroupName,
                         lock_handle: fgLockHandle!,
@@ -859,7 +859,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
                 },
                 () =>
                   handleDeleteFunctionGroup(
-                    { connection, logger: testLogger },
+                    { connection: connection!, logger: testLogger },
                     {
                       function_group_name: functionGroupName,
                       transport_request: transportRequest,

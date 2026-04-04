@@ -54,7 +54,7 @@ describe('Health endpoint — StreamableHttpServer', () => {
     const res = await fetch(`${baseUrl}/mcp/health`);
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = (await res.json()) as any;
     expect(body.status).toBe('ok');
     expect(body.transport).toBe('http');
     expect(body.version).toBe('1.2.3');
@@ -91,7 +91,7 @@ describe('Health endpoint — SseServer', () => {
     const res = await fetch(`${baseUrl}/mcp/health`);
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = (await res.json()) as any;
     expect(body.status).toBe('ok');
     expect(body.transport).toBe('sse');
     expect(body.version).toBe('1.2.3');

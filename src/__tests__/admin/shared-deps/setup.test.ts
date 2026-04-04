@@ -16,6 +16,7 @@
  */
 
 import type { AdtClient } from '@mcp-abap-adt/adt-clients';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../../../lib/clients';
 import {
   getSystemContext,
@@ -735,7 +736,7 @@ describe('Admin: Setup shared dependencies', () => {
 
           if (errors.length > 0) {
             testsLogger?.error?.(
-              `Group activation errors:\n${errors.map((e) => `  ${e.shortText || e.text}`).join('\n')}`,
+              `Group activation errors:\n${errors.map((e: any) => `  ${e.shortText || e.text}`).join('\n')}`,
             );
             results.push({
               type: 'activation',
@@ -747,7 +748,7 @@ describe('Admin: Setup shared dependencies', () => {
           }
           if (warnings.length > 0) {
             testsLogger?.warn?.(
-              `Group activation warnings:\n${warnings.map((w) => `  ${w.shortText || w.text}`).join('\n')}`,
+              `Group activation warnings:\n${warnings.map((w: any) => `  ${w.shortText || w.text}`).join('\n')}`,
             );
           }
         } catch (error: any) {

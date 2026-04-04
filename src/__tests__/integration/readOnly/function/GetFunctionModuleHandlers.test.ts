@@ -133,7 +133,10 @@ describe('GetFunctionModule Handler Integration (read-only)', () => {
           version: 'active',
         },
         () => {
-          const ctx = createHandlerContext({ connection, logger: testLogger });
+          const ctx = createHandlerContext({
+            connection: connection!,
+            logger: testLogger,
+          });
           return handleGetFunctionModule(ctx, {
             function_module_name: functionModuleName,
             function_group_name: functionGroupName,

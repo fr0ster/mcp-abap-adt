@@ -21,6 +21,7 @@
     "types": [
       "node"
     ],
+    "rootDir": "./src",
     "outDir": "./dist",
     "noImplicitAny": false
   },

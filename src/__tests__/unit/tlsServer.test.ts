@@ -70,7 +70,7 @@ describe('createServerListener', () => {
     const res = await fetch(`http://127.0.0.1:${port}/test`);
     expect(res.status).toBe(200);
 
-    const json = await res.json();
+    const json = (await res.json()) as any;
     expect(json.ok).toBe(true);
 
     await new Promise<void>((resolve) => server.close(() => resolve()));

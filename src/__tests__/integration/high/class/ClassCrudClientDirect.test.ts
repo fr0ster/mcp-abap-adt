@@ -12,6 +12,7 @@
  * Run: npm test -- --testPathPattern=integration/class/ClassAdtClientDirect
  */
 
+import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import {
   type AbapConnection,
   createAbapConnection,

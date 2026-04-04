@@ -161,13 +161,11 @@ export function logTestStep(step: string): void {
  * Check if error message indicates object was already checked
  * Re-exports from lib/utils for use in tests
  */
-export { isAlreadyCheckedError };
-
 /**
  * Check if error message indicates object already exists
  * Re-exports from lib/utils for use in tests
  */
-export { isAlreadyExistsError };
+export { isAlreadyCheckedError, isAlreadyExistsError };
 
 /**
  * Safely handle check operation response - ignores "already checked" errors

@@ -85,7 +85,7 @@ describe('Transported Object CRUD (GitHub #11)', () => {
       `Transport: ${transportRequest}, Package: ${packageName}, Class: ${className}`,
     );
 
-    const result = await createTestConnectionAndSession('transport-crud');
+    const result = await createTestConnectionAndSession();
     connection = result.connection;
     session = result.session;
     testEnabled = true;

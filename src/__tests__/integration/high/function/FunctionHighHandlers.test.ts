@@ -196,7 +196,7 @@ describe('Function High-Level Handlers Integration', () => {
           },
           () =>
             handleCreateFunctionGroup(
-              { connection, logger: testLogger },
+              { connection: connection!, logger: testLogger },
               {
                 function_group_name: functionGroupName,
                 description: functionGroupDescription,
@@ -234,7 +234,7 @@ describe('Function High-Level Handlers Integration', () => {
             },
             () =>
               handleUpdateFunctionGroup(
-                { connection, logger: testLogger },
+                { connection: connection!, logger: testLogger },
                 {
                   function_group_name: functionGroupName,
                   description: updateFunctionGroupDescription,
@@ -270,7 +270,7 @@ describe('Function High-Level Handlers Integration', () => {
           },
           () =>
             handleCreateFunctionModule(
-              { connection, logger: testLogger },
+              { connection: connection!, logger: testLogger },
               {
                 function_group_name: functionGroupName,
                 function_module_name: functionModuleName,
@@ -319,7 +319,7 @@ describe('Function High-Level Handlers Integration', () => {
           },
           () =>
             handleUpdateFunctionModule(
-              { connection, logger: testLogger },
+              { connection: connection!, logger: testLogger },
               {
                 function_group_name: functionGroupName,
                 function_module_name: functionModuleName,
@@ -360,7 +360,7 @@ describe('Function High-Level Handlers Integration', () => {
                 },
                 () =>
                   handleDeleteFunctionModule(
-                    { connection, logger: testLogger },
+                    { connection: connection!, logger: testLogger },
                     {
                       function_module_name: functionModuleName,
                       function_group_name: functionGroupName,
@@ -405,7 +405,7 @@ describe('Function High-Level Handlers Integration', () => {
                 },
                 () =>
                   handleDeleteFunctionGroup(
-                    { connection, logger: testLogger },
+                    { connection: connection!, logger: testLogger },
                     {
                       function_group_name: functionGroupName,
                       transport_request: transportRequest,

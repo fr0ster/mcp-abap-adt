@@ -183,7 +183,7 @@ export async function callTool(
   }
   const result = await client.callTool({ name: selected, arguments: args });
   if (result?.isError) {
-    const text = (result.content || [])
+    const text = ((result.content || []) as any[])
       .map((c: any) => (typeof c?.text === 'string' ? c.text : ''))
       .join('\n');
     throw new Error(text || `${selected} returned MCP error`);

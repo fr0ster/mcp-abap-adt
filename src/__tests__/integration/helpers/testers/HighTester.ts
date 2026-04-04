@@ -172,7 +172,7 @@ export class HighTester extends LambdaTester {
 
     try {
       // Execute create workflow
-      if (this.workflowFunctions.create) {
+      {
         logger?.info(`   • create ${this.context.objectName}`);
         const args = this.buildCreateArgs(this.context);
         await this.retryOnConflict(
@@ -186,7 +186,7 @@ export class HighTester extends LambdaTester {
       }
 
       // Execute update workflow
-      if (this.workflowFunctions.update) {
+      {
         logger?.info(`   • update ${this.context.objectName}`);
         const args = this.buildUpdateArgs(this.context);
         await this.retryOnConflict(

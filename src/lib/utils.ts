@@ -79,8 +79,8 @@ export function getAuthBroker(destination: string): any | undefined {
   return authBrokerRegistry.get(destination);
 }
 
-export { McpError, ErrorCode, getTimeout, getTimeoutConfig, logger };
 export type { AxiosResponse };
+export { ErrorCode, getTimeout, getTimeoutConfig, logger, McpError };
 
 /**
  * Encodes SAP object names for use in URLs.

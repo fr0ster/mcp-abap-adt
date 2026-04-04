@@ -253,12 +253,14 @@ async function createRunnableProgram(
     transportRequest: context.transportRequest,
     description: `MCP runtime test ${programName}`.slice(0, 60),
   });
-  await client.getProgram().update({
-    programName,
-    transportRequest: context.transportRequest,
-    sourceCode,
-    activateOnUpdate: true,
-  });
+  await client.getProgram().update(
+    {
+      programName,
+      transportRequest: context.transportRequest,
+      sourceCode,
+    },
+    { activateOnUpdate: true },
+  );
 }
 
 async function deleteProgramIfExists(

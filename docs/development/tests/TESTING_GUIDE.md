@@ -45,7 +45,17 @@ Optional (cloud/BTP, JWT token refresh):
 
 All other values (object names, timeouts, CDS sources, unit test code) have working defaults.
 
-### 3. Run tests
+### 3. Create shared objects (first run only)
+
+Some tests depend on shared SAP objects (tables, CDS views, classes). Create them before running tests for the first time:
+
+```bash
+npm run shared:setup
+```
+
+Verify with `npm run shared:check`. These objects persist across test runs — no need to re-create unless deleted via `npm run shared:teardown`.
+
+### 4. Run tests
 
 ```bash
 # Build first

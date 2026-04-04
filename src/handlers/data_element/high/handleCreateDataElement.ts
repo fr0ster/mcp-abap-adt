@@ -177,11 +177,11 @@ export async function handleCreateDataElement(
 
     logger?.info(`Starting data element creation: ${dataElementName}`);
 
-    let lockHandle: string | undefined;
     const client = createAdtClient(connection);
+    const shouldActivate = typedArgs.activate !== false;
+    const typeKind = typedArgs.type_kind || 'domain';
+    let lockHandle: string | undefined;
     try {
-      const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
-
       // Validate
       await client.getDataElement().validate({
         dataElementName,
@@ -189,11 +189,8 @@ export async function handleCreateDataElement(
         description: typedArgs.description || dataElementName,
       });
 
-      // Determine typeKind - default to 'domain' if not specified
-      const typeKind = typedArgs.type_kind || 'domain';
-
-      // Create
-      const createState = await client.getDataElement().create({
+      // Create (registers bare object in SAP)
+      await client.getDataElement().create({
         dataElementName,
         description: typedArgs.description || dataElementName,
         packageName: typedArgs.package_name,
@@ -208,29 +205,32 @@ export async function handleCreateDataElement(
       // Lock
       lockHandle = await client.getDataElement().lock({ dataElementName });
 
-      // Update with properties
-      const updateConfig: any = {
-        dataElementName,
-        packageName: typedArgs.package_name,
-        description: typedArgs.description || dataElementName,
-        dataType: typedArgs.data_type || 'CHAR',
-        length: typedArgs.length || 100,
-        decimals: typedArgs.decimals || 0,
-        shortLabel: typedArgs.short_label,
-        mediumLabel: typedArgs.medium_label,
-        longLabel: typedArgs.long_label,
-        headingLabel: typedArgs.heading_label,
-        typeKind: typeKind,
-        typeName: typedArgs.type_name,
-        searchHelp: typedArgs.search_help,
-        searchHelpParameter: typedArgs.search_help_parameter,
-        setGetParameter: typedArgs.set_get_parameter,
-        transportRequest: typedArgs.transport_request,
-      };
+      // Update with read-modify-write: reads current XML from SAP, patches with properties, PUTs back
+      await client.getDataElement().update(
+        {
+          dataElementName,
+          packageName: typedArgs.package_name,
+          description: typedArgs.description || dataElementName,
+          dataType: typedArgs.data_type || 'CHAR',
+          length: typedArgs.length || 100,
+          decimals: typedArgs.decimals || 0,
+          shortLabel: typedArgs.short_label,
+          mediumLabel: typedArgs.medium_label,
+          longLabel: typedArgs.long_label,
+          headingLabel: typedArgs.heading_label,
+          typeKind: typeKind,
+          typeName: typedArgs.type_name,
+          searchHelp: typedArgs.search_help,
+          searchHelpParameter: typedArgs.search_help_parameter,
+          setGetParameter: typedArgs.set_get_parameter,
+          transportRequest: typedArgs.transport_request,
+        },
+        { lockHandle },
+      );
 
-      await client
-        .getDataElement()
-        .update(updateConfig, { lockHandle: lockHandle });
+      // Unlock
+      await client.getDataElement().unlock({ dataElementName }, lockHandle);
+      lockHandle = undefined;
 
       // Check
       try {
@@ -242,39 +242,17 @@ export async function handleCreateDataElement(
           },
         );
       } catch (checkError: any) {
-        // If error was marked as "already checked", continue silently
         if (!(checkError as any).isAlreadyChecked) {
-          // Real check error - rethrow
           throw checkError;
         }
       }
-
-      // Unlock
-      await client.getDataElement().unlock({ dataElementName }, lockHandle);
 
       // Activate if requested
       if (shouldActivate) {
         await client.getDataElement().activate({ dataElementName });
       }
 
-      // Get data element details from create result (createDataElement already does verification)
-      const createResult = createState.createResult;
-      let dataElementDetails = null;
-      if (
-        createResult?.data &&
-        typeof createResult.data === 'object' &&
-        'data_element_details' in createResult.data
-      ) {
-        dataElementDetails = (createResult.data as any).data_element_details;
-      }
-
-      // Extract version and other details from response
-      const version =
-        createResult?.data &&
-        typeof createResult.data === 'object' &&
-        'version' in createResult.data
-          ? (createResult.data as any).version
-          : 'unknown';
+      logger?.info(`✅ CreateDataElement completed: ${dataElementName}`);
 
       return return_response({
         data: JSON.stringify(
@@ -284,27 +262,19 @@ export async function handleCreateDataElement(
             package: typedArgs.package_name,
             transport_request: typedArgs.transport_request,
             data_type: typedArgs.data_type || null,
-            status: 'active',
-            version: version,
-            message: `Data element ${dataElementName} created and activated successfully`,
-            data_element_details: dataElementDetails,
+            status: shouldActivate ? 'active' : 'inactive',
+            message: `Data element ${dataElementName} created${shouldActivate ? ' and activated' : ''} successfully`,
           },
           null,
           2,
         ),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: {} as any,
       } as AxiosResponse);
     } catch (error: any) {
-      // Try to unlock if lock was acquired
       if (lockHandle) {
         try {
           await client.getDataElement().unlock({ dataElementName }, lockHandle);
-          logger?.debug(`Unlocked data element ${dataElementName} after error`);
         } catch (_unlockError) {
-          // Ignore unlock errors
+          // Ignore unlock errors during cleanup
         }
       }
 
@@ -312,7 +282,6 @@ export async function handleCreateDataElement(
         `Error creating data element ${dataElementName}: ${error?.message || error}`,
       );
 
-      // Check if data element already exists
       if (
         error.message?.includes('already exists') ||
         error.response?.data?.includes('ExceptionResourceAlreadyExists')
@@ -326,7 +295,7 @@ export async function handleCreateDataElement(
       const errorMessage = error.response?.data
         ? typeof error.response.data === 'string'
           ? error.response.data
-          : JSON.stringify(error.response.data)
+          : String(error.response.data).substring(0, 500)
         : error.message || String(error);
 
       throw new McpError(

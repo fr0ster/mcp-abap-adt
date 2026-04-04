@@ -11,6 +11,12 @@ Integration tests run against a real SAP system. Two modes:
 
 **Strategy**: Run soft mode for mass regression testing. Use hard mode only for targeted verification of recent changes.
 
+**Shared objects**: Before the first test run, create shared SAP objects (tables, CDS views, classes) that some tests depend on:
+```bash
+npm run shared:setup     # first run only, persists across test runs
+npm run shared:check     # verify they exist
+```
+
 **Running integration tests**: Always save full output to a log file — do NOT truncate with `tail`. Tests take 15-25 minutes; use `timeout 1800` (30 min) or `run_in_background` with no timeout truncation. This avoids re-running long tests just to see errors.
 
 ```bash

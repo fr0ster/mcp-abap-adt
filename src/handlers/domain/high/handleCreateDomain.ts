@@ -160,11 +160,10 @@ export async function handleCreateDomain(
 
     logger?.info(`Starting domain creation: ${domainName}`);
 
-    let lockHandle: string | undefined;
     const client = createAdtClient(connection);
+    const shouldActivate = typedArgs.activate !== false;
+    let lockHandle: string | undefined;
     try {
-      const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
-
       // Validate
       await client.getDomain().validate({
         domainName,
@@ -172,8 +171,8 @@ export async function handleCreateDomain(
         description: typedArgs.description || domainName,
       });
 
-      // Create
-      const createState = await client.getDomain().create({
+      // Create (registers bare object in SAP)
+      await client.getDomain().create({
         domainName,
         description: typedArgs.description || domainName,
         packageName: typedArgs.package_name,
@@ -183,7 +182,7 @@ export async function handleCreateDomain(
       // Lock
       lockHandle = await client.getDomain().lock({ domainName });
 
-      // Update with properties
+      // Update with read-modify-write: reads current XML from SAP, patches with properties, PUTs back
       await client.getDomain().update(
         {
           domainName,
@@ -202,6 +201,10 @@ export async function handleCreateDomain(
         { lockHandle },
       );
 
+      // Unlock
+      await client.getDomain().unlock({ domainName }, lockHandle);
+      lockHandle = undefined;
+
       // Check
       try {
         await safeCheckOperation(
@@ -212,36 +215,14 @@ export async function handleCreateDomain(
           },
         );
       } catch (checkError: any) {
-        // If error was marked as "already checked", continue silently
-        if ((checkError as any).isAlreadyChecked) {
-          logger?.debug(
-            `Domain ${domainName} was already checked - continuing`,
-          );
-        } else {
-          // Real check error - rethrow
+        if (!(checkError as any).isAlreadyChecked) {
           throw checkError;
         }
       }
 
-      // Unlock
-      await client.getDomain().unlock({ domainName }, lockHandle);
-
       // Activate if requested
       if (shouldActivate) {
         await client.getDomain().activate({ domainName });
-      } else {
-        logger?.debug(`Skipping activation for: ${domainName}`);
-      }
-
-      // Get domain details from create result (createDomain already does verification)
-      const createResult = createState.createResult;
-      let domainDetails = null;
-      if (
-        createResult?.data &&
-        typeof createResult.data === 'object' &&
-        'domain_details' in createResult.data
-      ) {
-        domainDetails = (createResult.data as any).domain_details;
       }
 
       logger?.info(`✅ CreateDomain completed: ${domainName}`);
@@ -254,17 +235,14 @@ export async function handleCreateDomain(
           transport_request: typedArgs.transport_request,
           status: shouldActivate ? 'active' : 'inactive',
           message: `Domain ${domainName} created${shouldActivate ? ' and activated' : ''} successfully`,
-          domain_details: domainDetails,
         }),
       } as AxiosResponse);
     } catch (error: any) {
-      // Try to unlock if lock was acquired
       if (lockHandle) {
         try {
           await client.getDomain().unlock({ domainName }, lockHandle);
-          logger?.debug(`Unlocked domain ${domainName} after error`);
         } catch (_unlockError) {
-          // Ignore unlock errors
+          // Ignore unlock errors during cleanup
         }
       }
 
@@ -272,7 +250,6 @@ export async function handleCreateDomain(
         `Error creating domain ${domainName}: ${error?.message || error}`,
       );
 
-      // Check if domain already exists
       if (
         error.message?.includes('already exists') ||
         error.response?.data?.includes('ExceptionResourceAlreadyExists')
@@ -283,18 +260,12 @@ export async function handleCreateDomain(
         );
       }
 
-      // Safely extract error message
       let errorMessage: string;
       if (error.response?.data) {
-        if (typeof error.response.data === 'string') {
-          errorMessage = error.response.data;
-        } else {
-          try {
-            errorMessage = JSON.stringify(error.response.data);
-          } catch (_e) {
-            errorMessage = String(error.response.data).substring(0, 500);
-          }
-        }
+        errorMessage =
+          typeof error.response.data === 'string'
+            ? error.response.data
+            : String(error.response.data).substring(0, 500);
       } else {
         errorMessage = error.message || String(error);
       }

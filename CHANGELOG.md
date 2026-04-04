@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [4.8.2] - 2026-04-04
+
+### Changed
+- Update all dependencies to latest versions (except express)
+- Migrate to TypeScript 6, add `rootDir` to tsconfig.json
+- Fix test type errors for TypeScript 6 compatibility
+
 ## [4.8.1] - 2026-04-02
 
 ### Changed

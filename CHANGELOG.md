@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [4.8.3] - 2026-04-04
+
+### Fixed
+- Domain/DataElement create handlers: use lock + read-modify-write update pattern instead of full chain (fixes intermittent "description is missing" errors)
+- Update `@mcp-abap-adt/adt-clients` to 3.14.4 (fixes DataElement create XML)
+
+### Changed
+- Add `shared:setup` prerequisite step to testing documentation
+
 ## [4.8.2] - 2026-04-04
 
 ### Changed

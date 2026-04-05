@@ -133,7 +133,7 @@ export async function handleCreateClass(
       logger?.debug(`Connection can refresh token: ${canRefresh}`);
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     const className = class_name.toUpperCase();
 

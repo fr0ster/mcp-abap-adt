@@ -163,7 +163,7 @@ export async function handleValidateObject(
       );
     }
 
-    const validationClient = createAdtClient(connection);
+    const validationClient = createAdtClient(connection, logger);
 
     // Restore session state if provided
     if (session_id && session_state) {

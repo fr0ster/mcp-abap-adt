@@ -92,7 +92,7 @@ export async function handleUnlockProgram(
       );
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     // Restore session state if provided
     if (session_state) {

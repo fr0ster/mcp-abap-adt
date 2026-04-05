@@ -70,7 +70,7 @@ export async function handleUpdateBehaviorDefinition(
   logger?.info(`Starting BDEF update: ${name}`);
 
   try {
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const shouldActivate = args.activate !== false;
     let lockHandle = args.lock_handle;
 

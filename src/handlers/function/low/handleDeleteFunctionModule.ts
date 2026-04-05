@@ -66,7 +66,7 @@ export async function handleDeleteFunctionModule(
       );
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const functionModuleName = function_module_name.toUpperCase();
     const functionGroupName = function_group_name.toUpperCase();
     logger?.info(

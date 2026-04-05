@@ -71,7 +71,7 @@ export async function handleCreateView(context: HandlerContext, params: any) {
   logger?.info(`Starting view creation: ${viewName}`);
 
   try {
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     // Validate
     logger?.debug(`Validating view: ${viewName}`);

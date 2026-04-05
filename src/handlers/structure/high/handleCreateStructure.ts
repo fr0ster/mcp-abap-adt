@@ -214,7 +214,7 @@ export async function handleCreateStructure(
 
     try {
       // Create client
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
       const shouldActivate = createStructureArgs.activate !== false; // Default to true if not specified
 
       // Validate

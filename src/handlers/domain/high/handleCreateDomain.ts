@@ -160,7 +160,7 @@ export async function handleCreateDomain(
 
     logger?.info(`Starting domain creation: ${domainName}`);
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const shouldActivate = typedArgs.activate !== false;
     let lockHandle: string | undefined;
     try {

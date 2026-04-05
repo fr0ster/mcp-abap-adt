@@ -82,7 +82,7 @@ export async function handleUnlockMetadataExtension(
       );
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     // Restore session state if provided
     if (session_state) {

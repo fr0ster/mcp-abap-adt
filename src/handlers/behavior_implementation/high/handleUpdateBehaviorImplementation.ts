@@ -101,7 +101,7 @@ export async function handleUpdateBehaviorImplementation(
 
     try {
       // Create client
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
 
       // Update behavior implementation using AdtClient chain
       const shouldActivate = activate !== false; // Default to true if not specified

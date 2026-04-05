@@ -105,7 +105,7 @@ export async function handleValidateFunctionModule(
     );
 
     try {
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
 
       const validationState = await client.getFunctionModule().validate({
         functionModuleName: functionModuleName,

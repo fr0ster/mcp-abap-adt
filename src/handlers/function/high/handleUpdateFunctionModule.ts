@@ -98,7 +98,7 @@ export async function handleUpdateFunctionModule(
     );
 
     try {
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
       const shouldActivate = args.activate === true;
 
       // Execute operation chain: lock -> update -> check -> unlock -> (activate)

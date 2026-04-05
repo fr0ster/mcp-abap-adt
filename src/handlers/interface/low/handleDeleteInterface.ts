@@ -58,7 +58,7 @@ export async function handleDeleteInterface(
       return return_error(new Error('interface_name is required'));
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const interfaceName = interface_name.toUpperCase();
 
     logger?.info(`Starting interface deletion: ${interfaceName}`);

@@ -58,7 +58,7 @@ export async function handleCreateTransport(
       return return_error(new Error('description is required'));
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     // Ensure connection is established
     logger?.info(`Starting transport creation: ${description}`);

@@ -68,7 +68,7 @@ export async function handleDeleteProgram(
       );
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const programName = program_name.toUpperCase();
 
     logger?.info(`Starting program deletion: ${programName}`);

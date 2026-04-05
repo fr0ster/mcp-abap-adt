@@ -76,7 +76,7 @@ export async function handleLockBehaviorImplementation(
       return return_error(new Error('class_name is required'));
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     // Restore session state if provided
     if (session_id && session_state) {

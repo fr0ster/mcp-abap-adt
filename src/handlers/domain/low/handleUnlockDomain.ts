@@ -82,7 +82,7 @@ export async function handleUnlockDomain(
       );
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     const domainName = domain_name.toUpperCase();
 

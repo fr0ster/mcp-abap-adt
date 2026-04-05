@@ -157,7 +157,7 @@ export async function handleUpdateDomain(
 
     try {
       // Create client
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Lock domain (will fail if domain doesn't exist)

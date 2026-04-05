@@ -74,7 +74,7 @@ export async function handleUnlockClassTestClasses(
       return return_error(new Error('class_name and lock_handle are required'));
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);

@@ -123,7 +123,7 @@ export async function handleCreateProgram(
       );
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     // Restore session state if provided
     if (session_id && session_state) {

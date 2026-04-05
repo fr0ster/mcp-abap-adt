@@ -126,7 +126,7 @@ export async function handleCheckTable(
     );
 
     try {
-      const builder = createAdtClient(connection);
+      const builder = createAdtClient(connection, logger);
 
       // Check table with optional source code (for validating new/unsaved code)
       // If ddl_code is provided, it will be base64 encoded in the request body

@@ -97,7 +97,7 @@ export async function handleValidateTable(
     logger?.info(`Starting table validation: ${tableName}`);
 
     try {
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
 
       const validationState = await client.getTable().validate({
         tableName: tableName,

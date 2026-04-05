@@ -110,7 +110,7 @@ export async function handleUpdateStructure(
 
     try {
       // Create client
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
 
       // Build operation chain: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
       // Note: No validation needed for update - structure must already exist

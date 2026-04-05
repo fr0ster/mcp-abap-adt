@@ -75,7 +75,7 @@ export async function handleUnlockTable(
     const { table_name, lock_handle, session_id, session_state } =
       args as UnlockTableArgs;
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     // Restore session state if provided
     if (session_state) {

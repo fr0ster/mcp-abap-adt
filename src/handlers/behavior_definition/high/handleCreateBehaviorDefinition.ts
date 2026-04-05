@@ -93,7 +93,7 @@ export async function handleCreateBehaviorDefinition(
   logger?.info(`Starting BDEF creation: ${name}`);
 
   try {
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const shouldActivate = args.activate !== false;
 
     // Create - using types from adt-clients

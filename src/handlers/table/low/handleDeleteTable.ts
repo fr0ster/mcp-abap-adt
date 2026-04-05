@@ -58,7 +58,7 @@ export async function handleDeleteTable(
       return return_error(new Error('table_name is required'));
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     const tableName = table_name.toUpperCase();
 

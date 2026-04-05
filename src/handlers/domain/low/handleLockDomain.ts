@@ -74,7 +74,7 @@ export async function handleLockDomain(
       return return_error(new Error('domain_name is required'));
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     const domainName = domain_name.toUpperCase();
 

@@ -54,7 +54,7 @@ export async function handleGetTransaction(
   //         throw new McpError(ErrorCode.InvalidParams, 'Transaction name is required');
   //     }
   //     logger?.info(`Fetching transaction info for ${args.transaction_name}`);
-  //     const client = createAdtClient(connection);
+  //     const client = createAdtClient(connection, logger);
   //     const result = await client.readTransaction(args.transaction_name);
   //     return result;
   // } catch (error) {

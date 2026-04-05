@@ -91,7 +91,7 @@ export async function handleUpdateServiceDefinition(
 
     try {
       // Create client
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
 
       // Build operation chain: lock -> update -> check -> unlock -> (activate)
       // Note: No validation needed for update - service definition must already exist

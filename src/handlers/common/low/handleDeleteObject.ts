@@ -62,7 +62,7 @@ export async function handleDeleteObject(
       );
     }
 
-    const crudClient = createAdtClient(connection);
+    const crudClient = createAdtClient(connection, logger);
     const objectName = object_name.toUpperCase();
     const objectType = object_type.toLowerCase();
 

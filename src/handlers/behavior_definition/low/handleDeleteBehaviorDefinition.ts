@@ -59,7 +59,7 @@ export async function handleDeleteBehaviorDefinition(
       return return_error(new Error('name is required'));
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const bdefName = name.toUpperCase();
 
     logger?.info(`Starting behavior definition deletion: ${bdefName}`);

@@ -85,7 +85,7 @@ export async function handleCreateTable(
 
     try {
       // Create client
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
 
       // Validate
       await client.getTable().validate({

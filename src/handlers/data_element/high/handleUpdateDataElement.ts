@@ -205,7 +205,7 @@ export async function handleUpdateDataElement(
       const typeKind = typeKindMap[rawTypeKind] || 'domain';
 
       // Create client
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
 
       // Validate (for update, "already exists" is expected - object must exist)

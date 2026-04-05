@@ -100,7 +100,7 @@ export async function handleCreateBehaviorImplementation(
 
     try {
       // Create client
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
       // Create behavior implementation (full workflow)
       const createConfig: Partial<IBehaviorImplementationConfig> &
         Pick<

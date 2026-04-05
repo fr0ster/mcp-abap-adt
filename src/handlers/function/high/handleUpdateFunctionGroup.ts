@@ -83,7 +83,7 @@ export async function handleUpdateFunctionGroup(
 
     try {
       // Use AdtClient for lock/unlock
-      const crudClient = createAdtClient(connection);
+      const crudClient = createAdtClient(connection, logger);
 
       let lockHandle: string | undefined;
       try {

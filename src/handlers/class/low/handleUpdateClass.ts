@@ -67,7 +67,7 @@ export async function handleUpdateClass(
       );
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     const className = class_name.toUpperCase();
 

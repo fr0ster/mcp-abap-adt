@@ -57,7 +57,7 @@ export async function handleUnlockClass(
       return return_error(new Error('class_name and lock_handle are required'));
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     const className = class_name.toUpperCase();
 

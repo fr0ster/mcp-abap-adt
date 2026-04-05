@@ -177,7 +177,7 @@ export async function handleCreateDataElement(
 
     logger?.info(`Starting data element creation: ${dataElementName}`);
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const shouldActivate = typedArgs.activate !== false;
     const typeKind = typedArgs.type_kind || 'domain';
     let lockHandle: string | undefined;

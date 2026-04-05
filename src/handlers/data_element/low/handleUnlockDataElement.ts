@@ -84,7 +84,7 @@ export async function handleUnlockDataElement(
       );
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     // Restore session state if provided
     if (session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);

@@ -68,7 +68,7 @@ export async function handleCreateMetadataExtension(
   logger?.info(`Starting DDLX creation: ${name}`);
 
   try {
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const shouldActivate = args.activate !== false;
 
     // Create

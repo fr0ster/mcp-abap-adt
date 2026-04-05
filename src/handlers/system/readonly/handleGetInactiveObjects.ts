@@ -24,7 +24,7 @@ export async function handleGetInactiveObjects(
 ) {
   const { connection, logger } = context;
   try {
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const utils = client.getUtils();
 
     logger?.info('Retrieving inactive objects...');

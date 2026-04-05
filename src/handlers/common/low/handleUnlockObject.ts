@@ -123,7 +123,7 @@ export async function handleUnlockObject(
       );
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     if (session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);

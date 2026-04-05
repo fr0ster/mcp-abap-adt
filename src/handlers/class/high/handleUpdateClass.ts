@@ -70,7 +70,7 @@ export async function handleUpdateClass(
   );
 
   try {
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const shouldActivate = args.activate === true;
     let lockHandle: string | undefined;
 

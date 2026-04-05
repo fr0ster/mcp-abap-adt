@@ -59,7 +59,7 @@ export async function handleDeleteFunctionGroup(
       return return_error(new Error('function_group_name is required'));
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const functionGroupName = function_group_name.toUpperCase();
     logger?.info(`Starting function group deletion: ${functionGroupName}`);
 

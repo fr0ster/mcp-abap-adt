@@ -107,7 +107,7 @@ export async function handleValidateClass(
     logger?.info(`Starting class validation: ${className}`);
 
     try {
-      const builder = createAdtClient(connection);
+      const builder = createAdtClient(connection, logger);
 
       // validateClass may throw for non-400 errors, but returns response for 400
       let validationResponse: AxiosResponse | undefined;

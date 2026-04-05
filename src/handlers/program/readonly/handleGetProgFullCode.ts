@@ -68,7 +68,7 @@ export async function handleGetProgFullCode(
   context: HandlerContext,
   args: { name: string; type: string },
 ) {
-  const { connection } = context;
+  const { connection, logger } = context;
   const { name, type } = args;
   const typeUpper = type.toUpperCase();
 
@@ -117,7 +117,7 @@ export async function handleGetProgFullCode(
     let codeObjects: any[] = [];
     if (typeUpper === 'PROG/P') {
       // Get main program code
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
       const progState = await client.getProgram().read({
         programName: name,
       });
@@ -205,7 +205,7 @@ export async function handleGetProgFullCode(
       }
     } else if (typeUpper === 'FUGR') {
       // Get function group main code
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
       const fgState = await client.getFunctionGroup().read({
         functionGroupName: name,
       });

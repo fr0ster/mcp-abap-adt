@@ -119,7 +119,7 @@ export async function handleCreatePackage(
 
     logger?.info(`Starting package creation: ${packageName}`);
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     try {
       // Validate

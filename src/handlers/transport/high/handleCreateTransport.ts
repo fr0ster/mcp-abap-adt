@@ -83,7 +83,7 @@ export async function handleCreateTransport(
 
     try {
       // Create client
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
 
       // Create transport
       const createState = await client.getRequest().create({

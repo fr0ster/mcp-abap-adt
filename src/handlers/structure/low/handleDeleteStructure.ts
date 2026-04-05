@@ -58,7 +58,7 @@ export async function handleDeleteStructure(
       return return_error(new Error('structure_name is required'));
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const structureName = structure_name.toUpperCase();
 
     logger?.info(`Starting structure deletion: ${structureName}`);

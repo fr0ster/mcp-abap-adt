@@ -127,7 +127,7 @@ export async function handleCheckObject(
       ? (version.toLowerCase() as 'active' | 'inactive')
       : 'active';
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);

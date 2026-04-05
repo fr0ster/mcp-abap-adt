@@ -82,7 +82,7 @@ export async function handleCreateInterface(
     logger?.info(`Starting interface creation: ${interfaceName}`);
 
     try {
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
 
       // Create
       await client.getInterface().create({

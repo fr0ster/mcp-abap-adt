@@ -76,7 +76,7 @@ export async function handleActivateObject(
     }
 
     const preaudit = args.preaudit !== false; // default true
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     logger?.info(`Starting activation of ${args.objects.length} object(s)`);
 

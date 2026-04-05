@@ -75,7 +75,7 @@ export async function handleCheckDomain(
       return return_error(new Error('domain_name is required'));
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     // Restore session state if provided
     if (session_id && session_state) {

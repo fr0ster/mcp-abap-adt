@@ -110,7 +110,7 @@ export async function handleCreateProgram(
   logger?.info(`Starting program creation: ${programName}`);
 
   try {
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     // Validate
     logger?.debug(`Validating program: ${programName}`);

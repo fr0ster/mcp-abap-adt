@@ -57,7 +57,7 @@ export async function handleDeleteClass(
       return return_error(new Error('class_name is required'));
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const className = class_name.toUpperCase();
 
     logger?.info(`Starting class deletion: ${className}`);

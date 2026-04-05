@@ -76,7 +76,7 @@ export async function handleActivateMetadataExtension(
       return return_error(new Error('name is required'));
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     // Restore session state if provided
     if (session_id && session_state) {

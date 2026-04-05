@@ -107,7 +107,7 @@ export async function handleCreateServiceDefinition(
 
     try {
       // Create client
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
       const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
       let activateResponse: any | undefined;
 

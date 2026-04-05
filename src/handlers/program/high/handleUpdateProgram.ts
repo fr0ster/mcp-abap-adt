@@ -101,7 +101,7 @@ export async function handleUpdateProgram(
   }
 
   try {
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const shouldActivate = args.activate === true; // Default to false if not specified
     let lockHandle: string | undefined;
     let activateResponse: any | undefined;

@@ -110,7 +110,7 @@ export async function handleCheckClass(
     );
 
     try {
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
       const checkState = await client
         .getClass()
         .check({ className, sourceCode: source_code }, checkVersion);

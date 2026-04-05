@@ -112,7 +112,7 @@ export async function handleCheckFunctionModule(
     );
 
     try {
-      const client = createAdtClient(connection);
+      const client = createAdtClient(connection, logger);
       const checkState = await client.getFunctionModule().check(
         {
           functionModuleName: functionModuleName,

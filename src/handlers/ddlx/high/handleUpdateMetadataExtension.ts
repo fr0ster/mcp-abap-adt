@@ -65,7 +65,7 @@ export async function handleUpdateMetadataExtension(
   const name = args.name.toUpperCase();
 
   try {
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const shouldActivate = args.activate !== false;
     let lockHandle = args.lock_handle;
 

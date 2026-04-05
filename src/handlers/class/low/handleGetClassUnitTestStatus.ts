@@ -77,7 +77,7 @@ export async function handleGetClassUnitTestStatus(
     if (!run_id) {
       return return_error(new Error('run_id is required'));
     }
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);

@@ -58,7 +58,7 @@ export async function handleDeleteMetadataExtension(
       return return_error(new Error('name is required'));
     }
 
-    const client = createAdtClient(connection);
+    const client = createAdtClient(connection, logger);
     const ddlxName = name.toUpperCase();
 
     logger?.info(`Starting metadata extension deletion: ${ddlxName}`);

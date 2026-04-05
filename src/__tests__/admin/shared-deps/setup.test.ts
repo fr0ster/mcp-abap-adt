@@ -718,46 +718,64 @@ describe('Admin: Setup shared dependencies', () => {
         }
       }
 
-      // 3. Group-activate all objects at once
+      // 3. Group-activate all objects (retry to resolve circular dependencies)
       if (toActivate.length > 0) {
-        testsLogger?.info?.(`Group-activating ${toActivate.length} objects...`);
-        try {
-          const response = await client
-            .getUtils()
-            .activateObjectsGroup(toActivate, true);
-          const activationResult = parseActivationResponse(response.data);
-
-          const errors = activationResult.messages.filter(
-            (m) => m.type === 'error' || m.type === 'E',
+        const maxActivationAttempts = 3;
+        for (let attempt = 1; attempt <= maxActivationAttempts; attempt++) {
+          testsLogger?.info?.(
+            `Group-activating ${toActivate.length} objects (attempt ${attempt}/${maxActivationAttempts})...`,
           );
-          const warnings = activationResult.messages.filter(
-            (m) => m.type === 'warning' || m.type === 'W',
-          );
+          try {
+            const response = await client
+              .getUtils()
+              .activateObjectsGroup(toActivate, true);
+            const activationResult = parseActivationResponse(response.data);
 
-          if (errors.length > 0) {
-            testsLogger?.error?.(
-              `Group activation errors:\n${errors.map((e: any) => `  ${e.shortText || e.text}`).join('\n')}`,
+            const errors = activationResult.messages.filter(
+              (m) => m.type === 'error' || m.type === 'E',
             );
+            const warnings = activationResult.messages.filter(
+              (m) => m.type === 'warning' || m.type === 'W',
+            );
+
+            if (errors.length > 0) {
+              if (attempt < maxActivationAttempts) {
+                testsLogger?.warn?.(
+                  `Activation attempt ${attempt} had ${errors.length} error(s), retrying...`,
+                );
+                continue;
+              }
+              testsLogger?.error?.(
+                `Group activation errors:\n${errors.map((e: any) => `  ${e.shortText || e.text}`).join('\n')}`,
+              );
+              results.push({
+                type: 'activation',
+                name: 'GROUP',
+                status: `FAILED: ${errors.length} activation error(s)`,
+              });
+            } else if (activationResult.activated && activationResult.checked) {
+              testsLogger?.info?.('Group activation completed successfully');
+            }
+            if (warnings.length > 0) {
+              testsLogger?.warn?.(
+                `Group activation warnings:\n${warnings.map((w: any) => `  ${w.shortText || w.text}`).join('\n')}`,
+              );
+            }
+            break; // Success or final attempt — stop retrying
+          } catch (error: any) {
+            if (attempt < maxActivationAttempts) {
+              testsLogger?.warn?.(
+                `Activation attempt ${attempt} failed: ${error.message}, retrying...`,
+              );
+              continue;
+            }
+            testsLogger?.error?.(`Group activation failed: ${error.message}`);
             results.push({
               type: 'activation',
               name: 'GROUP',
-              status: `FAILED: ${errors.length} activation error(s)`,
+              status: `FAILED: ${error.message}`,
             });
-          } else if (activationResult.activated && activationResult.checked) {
-            testsLogger?.info?.('Group activation completed successfully');
           }
-          if (warnings.length > 0) {
-            testsLogger?.warn?.(
-              `Group activation warnings:\n${warnings.map((w: any) => `  ${w.shortText || w.text}`).join('\n')}`,
-            );
-          }
-        } catch (error: any) {
-          testsLogger?.error?.(`Group activation failed: ${error.message}`);
-          results.push({
-            type: 'activation',
-            name: 'GROUP',
-            status: `FAILED: ${error.message}`,
-          });
         }
       }
 

@@ -294,22 +294,34 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
           }
           testLogger?.info?.(`   + BDEF updated`);
         } finally {
-          testLogger?.info?.(`   * unlock BDEF: ${objectName}`);
-          await tester.invokeToolOrHandler(
-            'UnlockBehaviorDefinitionLow',
-            {
-              name: objectName,
-              lock_handle: bdefLockHandle,
-              session_id: '',
-            },
-            async () =>
-              handleUnlockBehaviorDefinition(handlerCtx, {
+          try {
+            testLogger?.info?.(`   * unlock BDEF: ${objectName}`);
+            const unlockResponse = await tester.invokeToolOrHandler(
+              'UnlockBehaviorDefinitionLow',
+              {
                 name: objectName,
                 lock_handle: bdefLockHandle,
                 session_id: '',
-              }),
-          );
-          testLogger?.info?.(`   + BDEF unlocked`);
+              },
+              async () =>
+                handleUnlockBehaviorDefinition(handlerCtx, {
+                  name: objectName,
+                  lock_handle: bdefLockHandle,
+                  session_id: '',
+                }),
+            );
+            if (unlockResponse.isError) {
+              testLogger?.warn?.(
+                `Unlock BDEF failed: ${extractErrorMessage(unlockResponse)}`,
+              );
+            } else {
+              testLogger?.info?.(`   + BDEF unlocked`);
+            }
+          } catch (unlockError: any) {
+            testLogger?.warn?.(
+              `Unlock BDEF exception: ${unlockError?.message}`,
+            );
+          }
         }
 
         await delay(context.getOperationDelay('unlock'));

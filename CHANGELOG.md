@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [4.8.4] - 2026-04-05
+
+### Fixed
+- BDEF low-level test: wrap unlock in try-catch to prevent lock leak on failure
+- shared:setup: retry group activation up to 3 times to resolve circular dependencies
+
 ## [4.8.3] - 2026-04-04
 
 ### Fixed

@@ -127,6 +127,7 @@ export class ServerConfigManager {
       unsafe: parsed.unsafe,
       useAuthBroker: parsed.useAuthBroker,
       browserAuthPort: parsed.browserAuthPort,
+      allowDestinationHeader: parsed.allowDestinationHeader,
       connectionType: parsed.connectionType,
       systemType: parsed.systemType,
       tls:
@@ -273,6 +274,8 @@ AUTHENTICATION:
                                    Example: --auth-broker-path=~/prj/tmp/
   --browser-auth-port=<port>       OAuth callback port for browser authentication
                                    (default: 5000 http, 4000 sse, 4001 stdio)
+  --allow-destination-header       Allow x-mcp-destination header to override
+                                   default destination (HTTP/SSE only, disabled by default)
 
 ${ServerConfigManager.getHandlerSetsDescription()}
 HTTP OPTIONS:

@@ -59,6 +59,11 @@ export interface StreamableHttpServerOptions {
    * TLS configuration for HTTPS support
    */
   tls?: TlsConfig;
+  /**
+   * Allow x-mcp-destination header to override default destination
+   * @default false
+   */
+  allowDestinationHeader?: boolean;
 }
 
 /**
@@ -80,6 +85,9 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly version: string;
   private standaloneServer?: HttpServer | HttpsServer;
   private readonly tls?: TlsConfig;
+  private readonly allowDestinationHeader: boolean;
+  /** Per-destination lock to serialize token acquisition (prevents concurrent OAuth flows) */
+  private readonly authLocks = new Map<string, Promise<void>>();
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -99,6 +107,7 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.path = opts?.path ?? '/mcp/stream/http';
     this.externalApp = opts?.app;
     this.tls = opts?.tls;
+    this.allowDestinationHeader = opts?.allowDestinationHeader ?? false;
     // Register handlers once for shared MCP server
     this.registerHandlers(this.handlersRegistry);
   }
@@ -136,10 +145,11 @@ export class StreamableHttpServer extends BaseMcpServer {
           ReturnType<AuthBrokerFactory['getOrCreateAuthBroker']>
         >;
 
-        // Priority 1: Check x-mcp-destination header
-        const destinationHeader =
-          (req.headers['x-mcp-destination'] as string | undefined) ??
-          (req.headers['X-MCP-Destination'] as string | undefined);
+        // Priority 1: Check x-mcp-destination header (only when --allow-destination-header)
+        const destinationHeader = this.allowDestinationHeader
+          ? ((req.headers['x-mcp-destination'] as string | undefined) ??
+            (req.headers['X-MCP-Destination'] as string | undefined))
+          : undefined;
 
         if (destinationHeader) {
           destination = destinationHeader;
@@ -152,7 +162,9 @@ export class StreamableHttpServer extends BaseMcpServer {
           // No destination, no broker - create connection directly from headers
           destination = undefined;
           broker = undefined;
-          server.setConnectionContextFromHeadersPublic(req.headers);
+          if (!isPing) {
+            server.setConnectionContextFromHeadersPublic(req.headers);
+          }
         }
         // Priority 3: Use default destination
         else if (this.defaultDestination) {
@@ -177,8 +189,24 @@ export class StreamableHttpServer extends BaseMcpServer {
           );
         }
 
-        if (destination && broker) {
-          await server.setConnectionContextPublic(destination, broker);
+        // Skip SAP connection setup for ping — it's a protocol-level check,
+        // no need to acquire JWT tokens or contact the SAP system
+        if (!isPing && destination && broker) {
+          // Serialize token acquisition per destination to prevent concurrent
+          // OAuth flows from racing for the same callback port
+          const existingLock = this.authLocks.get(destination);
+          if (existingLock) {
+            await existingLock;
+          }
+          const authPromise = server
+            .setConnectionContextPublic(destination, broker)
+            .finally(() => {
+              if (this.authLocks.get(destination) === authPromise) {
+                this.authLocks.delete(destination);
+              }
+            });
+          this.authLocks.set(destination, authPromise);
+          await authPromise;
         }
 
         const authSource = destination

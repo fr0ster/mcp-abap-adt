@@ -344,6 +344,7 @@ async function main() {
         config.mcpDestination ?? (config.envFile ? 'default' : undefined),
       logger: loggerForTransport,
       tls: config.tls,
+      allowDestinationHeader: config.allowDestinationHeader,
     });
     activeServer = server;
     await server.start();
@@ -360,6 +361,7 @@ async function main() {
       config.mcpDestination ?? (config.envFile ? 'default' : undefined),
     logger: loggerForTransport,
     tls: config.tls,
+    allowDestinationHeader: config.allowDestinationHeader,
   });
   activeServer = server;
   await server.start();

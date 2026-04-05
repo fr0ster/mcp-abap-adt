@@ -47,6 +47,8 @@ export interface IServerConfig {
   browser?: string;
   /** Port for browser auth callback server */
   browserAuthPort?: number;
+  /** Allow x-mcp-destination header to override default destination (--allow-destination-header) */
+  allowDestinationHeader?: boolean;
 
   // ============================================================================
   // TRANSPORT CONFIGURATION

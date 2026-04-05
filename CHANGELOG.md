@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [4.8.6] - 2026-04-05
+
+### Fixed
+- Skip SAP auth flow for MCP ping requests (protocol-level check, no SAP connection needed)
+- Serialize concurrent OAuth token acquisition per destination to prevent port conflicts
+
+### Changed
+- Disable `x-mcp-destination` header processing by default; opt-in via `--allow-destination-header` flag (HTTP/SSE)
+
 ## [4.8.5] - 2026-04-05
 
 ### Fixed

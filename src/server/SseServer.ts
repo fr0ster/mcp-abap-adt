@@ -59,6 +59,11 @@ export interface SseServerOptions {
    * TLS configuration for HTTPS support
    */
   tls?: TlsConfig;
+  /**
+   * Allow x-mcp-destination header to override default destination
+   * @default false
+   */
+  allowDestinationHeader?: boolean;
 }
 
 type SessionEntry = {
@@ -85,6 +90,7 @@ export class SseServer {
   private readonly externalApp?: IHttpApplication;
   private standaloneServer?: HttpServer | HttpsServer;
   private readonly tls?: TlsConfig;
+  private readonly allowDestinationHeader: boolean;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -100,6 +106,7 @@ export class SseServer {
     this.version = opts?.version ?? DEFAULT_VERSION;
     this.externalApp = opts?.app;
     this.tls = opts?.tls;
+    this.allowDestinationHeader = opts?.allowDestinationHeader ?? false;
   }
 
   /**
@@ -202,10 +209,11 @@ export class SseServer {
     let destination: string | undefined;
     let broker: any;
 
-    // Priority 1: Check x-mcp-destination header
-    const destinationHeader =
-      (req.headers['x-mcp-destination'] as string | undefined) ??
-      (req.headers['X-MCP-Destination'] as string | undefined);
+    // Priority 1: Check x-mcp-destination header (only when --allow-destination-header)
+    const destinationHeader = this.allowDestinationHeader
+      ? ((req.headers['x-mcp-destination'] as string | undefined) ??
+        (req.headers['X-MCP-Destination'] as string | undefined))
+      : undefined;
 
     if (destinationHeader) {
       destination = destinationHeader;

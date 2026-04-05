@@ -51,6 +51,8 @@ export interface ParsedArguments {
   sseEnableDnsProtection?: boolean;
   /** Port for browser auth callback server */
   browserAuthPort?: number;
+  /** Allow x-mcp-destination header to override default destination */
+  allowDestinationHeader?: boolean;
   /** TLS certificate file path */
   tlsCert?: string;
   /** TLS private key file path */
@@ -157,6 +159,9 @@ export class ArgumentsParser {
         }
       }
     }
+
+    // Parse --allow-destination-header
+    result.allowDestinationHeader = hasFlag('--allow-destination-header');
 
     // Parse --env and --env-path
     // --env: destination name (resolved to sessions/<name>.env in platform path)

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [4.8.5] - 2026-04-05
+
+### Fixed
+- Pass logger to `createAdtClient()` in all 150 handlers for proper adt-clients logging
+- Retry on transient SAP errors (SWB_TOOL019) in HighTester after delete+create
+- Update `@mcp-abap-adt/adt-clients` to 3.14.5
+
 ## [4.8.4] - 2026-04-05
 
 ### Fixed

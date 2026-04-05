@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [4.8.7] - 2026-04-06
+
+### Fixed
+- `GetPackageTree` now returns an error for non-existent packages instead of an empty tree (fixes #38)
+
 ## [4.8.6] - 2026-04-05
 
 ### Fixed

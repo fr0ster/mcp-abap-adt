@@ -83,6 +83,19 @@ export async function handleGetPackageTree(
     const client = createAdtClient(connection, logger);
     const utils = client.getUtils();
 
+    // Verify package exists before building tree (fixes #38)
+    try {
+      const readResult = await client.getPackage().read({ packageName });
+      if (!readResult || !readResult.readResult) {
+        return return_error(new Error(`Package ${packageName} not found`));
+      }
+    } catch (readError: any) {
+      if (readError.response?.status === 404) {
+        return return_error(new Error(`Package ${packageName} not found`));
+      }
+      throw readError;
+    }
+
     // Use the optimized and fixed hierarchy builder from adt-clients
     const packageTree = await utils.getPackageHierarchy(packageName, {
       includeSubpackages,

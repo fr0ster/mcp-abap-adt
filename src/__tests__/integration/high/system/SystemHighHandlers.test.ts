@@ -294,20 +294,10 @@ describe('System High-Level Handlers Integration', () => {
             },
           );
 
-          // Should either return error or empty tree
-          if (result.isError) {
-            expect(result.content).toBeDefined();
-            logger?.info('✅ Error returned for invalid package (expected)');
-          } else {
-            // If no error, tree should exist but might be empty
-            const textContent = result.content.find(
-              (c: any) => c.type === 'text',
-            ) as any;
-            expect(textContent).toBeDefined();
-            logger?.info(
-              '✅ Empty tree returned for invalid package (expected)',
-            );
-          }
+          // Should return error for non-existent package (#38)
+          expect(result.isError).toBe(true);
+          expect(result.content).toBeDefined();
+          logger?.info('✅ Error returned for invalid package (expected)');
         });
       },
       getTimeout('long'),

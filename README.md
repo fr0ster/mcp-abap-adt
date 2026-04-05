@@ -47,7 +47,7 @@ npm install -g @mcp-abap-adt/configurator
 mcp-conf --client cline --name abap --mcp TRIAL
 
 # HTTP (streamable HTTP)
-mcp-conf --client copilot --name abap --transport http --url http://localhost:3000/mcp/stream/http --header x-mcp-destination=trial
+mcp-conf --client copilot --name abap --transport http --url http://localhost:3000/mcp/stream/http --mcp trial
 ```
 
 Full configurator usage (separate repo): [CLIENT_INSTALLERS.md](https://github.com/fr0ster/mcp-abap-adt-conf/tree/main/docs/CLIENT_INSTALLERS.md).

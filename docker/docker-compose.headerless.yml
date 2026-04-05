@@ -7,7 +7,7 @@ version: '3.8'
 # via HTTP headers in each request. No service keys or sessions needed.
 #
 # Required headers for each request:
-# - x-mcp-destination: Destination name (uses AuthBroker with service keys)
+# - x-mcp-destination: Destination name (requires --allow-destination-header flag)
 # OR
 # - x-sap-url: SAP system URL
 # - x-sap-auth-type: jwt, basic, or xsuaa

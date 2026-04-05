@@ -118,9 +118,9 @@ For on-premise systems using basic authentication:
 ## Destination-Based Authentication
 
 > **Note:** Destination-based authentication (auth-broker) is available for all transport types:
-> - **HTTP/streamable-http**: Use `x-sap-destination` or `x-mcp-destination` headers (default behavior)
+> - **HTTP/streamable-http**: Use `--mcp=<destination>` parameter. To allow per-request destination override via `x-mcp-destination` header, add `--allow-destination-header`
 > - **stdio**: Use `--mcp=<destination>` command-line parameter
-> - **SSE**: Use `x-mcp-destination` header or `--mcp=<destination>` command-line parameter
+> - **SSE**: Use `--mcp=<destination>` parameter. To allow per-request destination override via `x-mcp-destination` header, add `--allow-destination-header`
 > 
 > For **stdio** and **SSE** transports without `--mcp` parameter, use `.env` file configuration instead.
 > 
@@ -352,10 +352,7 @@ The server will:
 mcp-abap-adt --transport=sse --mcp=TRIAL
 ```
 
-The server will:
-1. Use the specified destination when `x-mcp-destination` header is not provided in requests
-2. Allow clients to override by providing `x-mcp-destination` header
-3. Fall back to the `--mcp` destination if header is missing
+The server will use the specified destination for all requests. To allow clients to override via `x-mcp-destination` header, add `--allow-destination-header`.
 
 **Example Cline configuration with stdio:**
 ```json

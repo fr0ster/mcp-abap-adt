@@ -154,7 +154,7 @@ The same option can be set via environment variable `SAP_CONNECTION_TYPE=rfc` in
 
 **--mcp=\<destination\>**
 
-Default MCP destination name. When specified, this destination is used when `x-mcp-destination` header is not provided.
+Default MCP destination name. Used for all HTTP/SSE requests unless `--allow-destination-header` is enabled and `x-mcp-destination` header is provided.
 
 ```bash
 # Use stdio with auth-broker (--mcp parameter)
@@ -169,9 +169,10 @@ mcp-abap-adt --transport=http --mcp=TRIAL
 
 **Important:** The `--mcp` parameter enables auth-broker usage with stdio and SSE transports, which previously required `.env` file configuration. When `--mcp` is specified:
 - For **stdio transport**: The server initializes auth-broker with the specified destination at startup
-- For **SSE transport**: The server uses the specified destination when `x-mcp-destination` header is not provided
-- For **HTTP transport**: The server uses the specified destination as a fallback when `x-mcp-destination` header is not provided
-- If neither header nor default destination is provided, HTTP/SSE requests are rejected with `400` (missing SAP connection context)
+- For **SSE transport**: The server uses the specified destination for all requests
+- For **HTTP transport**: The server uses the specified destination for all requests
+- To allow clients to override destination via `x-mcp-destination` header, add `--allow-destination-header`
+- If no default destination is configured, HTTP/SSE requests are rejected with `400` (missing SAP connection context)
 - **`.env` file is not loaded automatically** when `--mcp` is specified (even if it exists in current directory)
 - **`.env` file is not considered mandatory** for stdio and SSE transports when `--mcp` is specified
 
@@ -209,6 +210,15 @@ Defaults by transport:
 ```bash
 # Avoid callback port collision in HTTP mode
 mcp-abap-adt --transport=http --mcp=TRIAL --browser-auth-port=5100
+```
+
+**--allow-destination-header**
+
+Enable processing of `x-mcp-destination` header in HTTP/SSE requests. When enabled, clients can override the default destination by sending this header. Disabled by default for security.
+
+```bash
+# Allow clients to specify destination via header
+mcp-abap-adt --transport=http --mcp=TRIAL --allow-destination-header
 ```
 
 ## HTTP Server Options

@@ -183,6 +183,15 @@ export class HighTester extends LambdaTester {
           8000,
         );
         logger?.info(`   ✅ create completed`);
+
+        // Wait for SAP to propagate creation before update
+        const createDelay = this.context.getOperationDelay('create');
+        if (createDelay > 0) {
+          logger?.debug?.(
+            `⏳ Waiting ${createDelay}ms for SAP to propagate create...`,
+          );
+          await delay(createDelay);
+        }
       }
 
       // Execute update workflow
@@ -292,9 +301,9 @@ export class HighTester extends LambdaTester {
   }
 
   /**
-   * Retry operation on HTTP 409 Conflict (TADIR stale entry).
-   * SAP BTP Cloud trial can return 409/TK754 after delete+create due to stale TADIR entries.
-   * SAP's own recommendation: "Repeat the function."
+   * Retry operation on transient SAP errors after delete+create:
+   * - HTTP 409 Conflict (TADIR stale entry) — SAP's recommendation: "Repeat the function."
+   * - SWB_TOOL019 "description is missing" — SAP hasn't propagated prior deletion yet
    */
   private async retryOnConflict<T>(
     operation: () => Promise<T>,
@@ -307,14 +316,18 @@ export class HighTester extends LambdaTester {
       try {
         return await operation();
       } catch (error: any) {
-        const isTadirConflict =
+        const errorMsg = typeof error.message === 'string' ? error.message : '';
+        const responseData =
+          typeof error.response?.data === 'string' ? error.response.data : '';
+        const isTransientConflict =
           error.response?.status === 409 ||
-          (typeof error.message === 'string' &&
-            (error.message.includes('object directory entry') ||
-              error.message.includes('already exists')));
-        if (isTadirConflict && attempt < maxRetries) {
+          errorMsg.includes('object directory entry') ||
+          errorMsg.includes('already exists') ||
+          responseData.includes('SWB_TOOL') ||
+          responseData.includes('description is missing');
+        if (isTransientConflict && attempt < maxRetries) {
           logger?.warn?.(
-            `⚠️ ${label}: TADIR conflict (stale entry), retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`,
+            `⚠️ ${label}: transient SAP error, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`,
           );
           await delay(delayMs);
           continue;

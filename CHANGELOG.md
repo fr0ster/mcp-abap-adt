@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [4.8.8] - 2026-04-07
+
+### Fixed
+- `SearchObject` now returns compact JSON instead of raw XML, reducing payload size significantly (fixes #39)
+
 ## [4.8.7] - 2026-04-06
 
 ### Fixed

@@ -1,7 +1,6 @@
 import type { SearchObjectsParams } from '@mcp-abap-adt/adt-clients';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../../../lib/clients';
-import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError, return_response } from '../../../lib/utils';
 
@@ -136,13 +135,12 @@ export async function handleSearchObject(context: HandlerContext, args: any) {
       resultsArr.push({ name, type, description, packageName: pkgName });
     }
 
-    objectsListCache.setCache(result);
     return {
       isError: false,
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ results: resultsArr, rawXML: xmlText }),
+          text: JSON.stringify(resultsArr),
         },
       ],
     };

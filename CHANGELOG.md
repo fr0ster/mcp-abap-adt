@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [4.8.9] - 2026-04-07
+
+### Changed
+- `SearchObject` now returns compact TSV (tab-separated) format instead of JSON, further reducing payload size
+
 ## [4.8.8] - 2026-04-07
 
 ### Fixed

@@ -107,12 +107,7 @@ export async function handleSearchObject(context: HandlerContext, args: any) {
       };
     }
 
-    const resultsArr: Array<{
-      name: string;
-      type: string;
-      description: string;
-      packageName: string;
-    }> = [];
+    const lines: string[] = ['name\ttype\tdescription\tpackage'];
     for (const m of matches as Array<RegExpMatchArray>) {
       const attrs = m[1];
       function extract(attr: string, def = ''): string {
@@ -123,7 +118,6 @@ export async function handleSearchObject(context: HandlerContext, args: any) {
       const type = extract('adtcore:type');
       const description = extract('adtcore:description');
       let pkgName = extract('adtcore:packageName');
-      // If packageName is missing, attempt to pull it from the raw XML via <adtcore:packageName>
       if (!pkgName) {
         const pkgMatch = xmlText.match(
           /<adtcore:packageName>([^<]*)<\/adtcore:packageName>/,
@@ -132,7 +126,7 @@ export async function handleSearchObject(context: HandlerContext, args: any) {
           pkgName = pkgMatch[1];
         }
       }
-      resultsArr.push({ name, type, description, packageName: pkgName });
+      lines.push(`${name}\t${type}\t${description}\t${pkgName}`);
     }
 
     return {
@@ -140,7 +134,7 @@ export async function handleSearchObject(context: HandlerContext, args: any) {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(resultsArr),
+          text: lines.join('\n'),
         },
       ],
     };

@@ -223,7 +223,7 @@ runtime_readonly_handlers:
         dump_feed_retry_delay_ms: 1500
         # How many recent dumps to request per poll when looking for generated dump
         dump_feed_top: 50
-        # Dump read view for RuntimeGetDumpById/RuntimeAnalyzeDump: default|summary|formatted
+        # Dump read view for RuntimeGetDumpById: default|summary|formatted
         dump_view: "default"
         # Recommended fallback dump ID to avoid skip when feed is empty
         dump_id: ""

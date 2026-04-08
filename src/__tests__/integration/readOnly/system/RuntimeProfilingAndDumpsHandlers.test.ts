@@ -8,7 +8,6 @@
  */
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
-import { handleRuntimeAnalyzeDump } from '../../../../handlers/system/readonly/handleRuntimeAnalyzeDump';
 import { handleRuntimeAnalyzeProfilerTrace } from '../../../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace';
 import { handleRuntimeGetDumpById } from '../../../../handlers/system/readonly/handleRuntimeGetDumpById';
 import { handleRuntimeGetProfilerTraceData } from '../../../../handlers/system/readonly/handleRuntimeGetProfilerTraceData';
@@ -830,27 +829,27 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           expect(dumpData.view).toBe(dumpView);
 
           const analyze = await invoke(
-            'RuntimeAnalyzeDump',
+            'RuntimeGetDumpById',
             {
               dump_id: dumpId,
               view: dumpView,
-              include_payload: false,
+              response_mode: 'summary',
             },
             async () => {
               const handlerContext = createHandlerContext({
                 connection: context.connection,
                 logger,
               });
-              return handleRuntimeAnalyzeDump(handlerContext, {
+              return handleRuntimeGetDumpById(handlerContext, {
                 dump_id: dumpId,
                 view: dumpView,
-                include_payload: false,
+                response_mode: 'summary',
               });
             },
           );
           if (analyze.isError) {
             throw new Error(
-              `RuntimeAnalyzeDump failed: ${extractHandlerErrorText(analyze)}`,
+              `RuntimeGetDumpById (summary) failed: ${extractHandlerErrorText(analyze)}`,
             );
           }
           expect(analyze.isError).toBe(false);
@@ -858,6 +857,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           expect(analyzeData.success).toBe(true);
           expect(analyzeData.view).toBe(dumpView);
           expect(analyzeData.summary).toBeDefined();
+          expect(analyzeData.payload).toBeUndefined();
         } finally {
           await deleteClassIfExists(
             context,

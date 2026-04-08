@@ -67,10 +67,6 @@ import {
   handleGetWhereUsed,
 } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import {
-  handleRuntimeAnalyzeDump,
-  TOOL_DEFINITION as RuntimeAnalyzeDump_Tool,
-} from '../../../handlers/system/readonly/handleRuntimeAnalyzeDump';
-import {
   handleRuntimeAnalyzeProfilerTrace,
   TOOL_DEFINITION as RuntimeAnalyzeProfilerTrace_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace';
@@ -161,10 +157,6 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
         toolDefinition: RuntimeAnalyzeProfilerTrace_Tool,
         handler: (args: any) =>
           handleRuntimeAnalyzeProfilerTrace(this.context, args),
-      },
-      {
-        toolDefinition: RuntimeAnalyzeDump_Tool,
-        handler: (args: any) => handleRuntimeAnalyzeDump(this.context, args),
       },
       {
         toolDefinition: GetSqlQuery_Tool,

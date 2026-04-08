@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [4.9.0] - 2026-04-08
+
+### Changed
+- Merged `RuntimeAnalyzeDump` into `RuntimeGetDumpById` — one tool with `response_mode` parameter (`payload`, `summary`, `both`) instead of two overlapping tools
+
+### Removed
+- `RuntimeAnalyzeDump` tool (use `RuntimeGetDumpById` with `response_mode: "summary"` instead)
+
 ## [4.8.9] - 2026-04-07
 
 ### Changed

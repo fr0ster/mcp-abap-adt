@@ -78,7 +78,6 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetTransaction](#gettransaction-read-only-system)
     - [GetTypeInfo](#gettypeinfo-read-only-system)
     - [GetWhereUsed](#getwhereused-read-only-system)
-    - [RuntimeAnalyzeDump](#runtimeanalyzedump-read-only-system)
     - [RuntimeAnalyzeProfilerTrace](#runtimeanalyzeprofilertrace-read-only-system)
     - [RuntimeCreateProfilerTraceParameters](#runtimecreateprofilertraceparameters-read-only-system)
     - [RuntimeGetDumpById](#runtimegetdumpbyid-read-only-system)
@@ -891,19 +890,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="runtimeanalyzedump-read-only-system"></a>
-#### RuntimeAnalyzeDump (Read-Only / System)
-**Description:** [runtime] Read runtime dump by ID and return compact analysis summary with key fields.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeAnalyzeDump.ts`
-
-**Parameters:**
-- `dump_id` (string, required) - Runtime dump ID.
-- `include_payload` (boolean, optional (default: true)) - Include full parsed payload in response.
-- `view` (string, optional (default: default)) - Dump view mode to analyze: default payload, summary section, or formatted long text.
-
----
-
 <a id="runtimeanalyzeprofilertrace-read-only-system"></a>
 #### RuntimeAnalyzeProfilerTrace (Read-Only / System)
 **Description:** [runtime] Read profiler trace view and return compact analysis summary (totals + top entries).
@@ -944,13 +930,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimegetdumpbyid-read-only-system"></a>
 #### RuntimeGetDumpById (Read-Only / System)
-**Description:** [runtime] Read a specific ABAP runtime dump. Identify the dump by datetime + user (preferred, e.g. from a CALM event), or pass dump_id directly if already known.
+**Description:** [runtime] Read a specific ABAP runtime dump. Identify the dump by datetime + user (preferred, e.g. from a CALM event), or pass dump_id directly if already known. Use response_mode to control output detail level.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetDumpById.ts`
 
 **Parameters:**
 - `datetime` (string, optional) - Dump datetime (ISO or "YYYY-MM-DD HH:MM:SS"). Combined with user, uniquely identifies the dump. Preferred over dump_id.
 - `dump_id` (string, optional) - Full runtime dump ID. Use only when already known; prefer datetime + user otherwise.
+- `response_mode` (string, optional (default: both)) - Controls what is returned: "payload" — full parsed dump data, "summary" — compact key facts only (title, exception, program, line, user, date…), "both" — summary + full payload.
 - `user` (string, optional) - SAP username whose dump to read. Required when using datetime lookup.
 - `view` (string, optional (default: default)) - Dump view mode: default payload, summary section, or formatted long text.
 

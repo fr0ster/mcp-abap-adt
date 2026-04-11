@@ -31,6 +31,14 @@ import {
   handleHandlerDumpView,
 } from '../../../handlers/compact/high/handleHandlerDumpView';
 import {
+  TOOL_DEFINITION as HandlerFeedList_Tool,
+  handleHandlerFeedList,
+} from '../../../handlers/compact/high/handleHandlerFeedList';
+import {
+  TOOL_DEFINITION as HandlerGatewayErrorList_Tool,
+  handleHandlerGatewayErrorList,
+} from '../../../handlers/compact/high/handleHandlerGatewayErrorList';
+import {
   TOOL_DEFINITION as HandlerGet_Tool,
   handleHandlerGet,
 } from '../../../handlers/compact/high/handleHandlerGet';
@@ -58,6 +66,10 @@ import {
   TOOL_DEFINITION as HandlerServiceBindingValidate_Tool,
   handleHandlerServiceBindingValidate,
 } from '../../../handlers/compact/high/handleHandlerServiceBindingValidate';
+import {
+  TOOL_DEFINITION as HandlerSystemMessageList_Tool,
+  handleHandlerSystemMessageList,
+} from '../../../handlers/compact/high/handleHandlerSystemMessageList';
 import {
   TOOL_DEFINITION as HandlerTransportCreate_Tool,
   handleHandlerTransportCreate,
@@ -163,6 +175,18 @@ export class CompactHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: HandlerDumpView_Tool,
         handler: withContext(handleHandlerDumpView),
+      },
+      {
+        toolDefinition: HandlerFeedList_Tool,
+        handler: withContext(handleHandlerFeedList),
+      },
+      {
+        toolDefinition: HandlerSystemMessageList_Tool,
+        handler: withContext(handleHandlerSystemMessageList),
+      },
+      {
+        toolDefinition: HandlerGatewayErrorList_Tool,
+        handler: withContext(handleHandlerGatewayErrorList),
       },
       {
         toolDefinition: HandlerServiceBindingListTypes_Tool,

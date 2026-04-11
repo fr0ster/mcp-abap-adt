@@ -1,4 +1,4 @@
-import { AdtRuntimeClient, buildDumpIdPrefix } from '@mcp-abap-adt/adt-clients';
+import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 import { handleRuntimeListDumps } from './handleRuntimeListDumps';
@@ -214,7 +214,7 @@ export async function handleRuntimeGetDumpById(
     const view = args.view ?? 'default';
     const responseMode = args.response_mode ?? 'both';
     const runtimeClient = new AdtRuntimeClient(connection, logger);
-    const response = await runtimeClient.getRuntimeDumpById(dumpId, { view });
+    const response = await runtimeClient.getDumps().getById(dumpId, { view });
     const parsedPayload = parseRuntimePayloadToJson(response.data);
 
     const result: Record<string, unknown> = {

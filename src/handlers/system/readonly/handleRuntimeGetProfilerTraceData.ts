@@ -62,27 +62,22 @@ export async function handleRuntimeGetProfilerTraceData(
     }
 
     const runtimeClient = new AdtRuntimeClient(connection, logger);
+    const profiler = runtimeClient.getProfiler();
     const response =
       args.view === 'hitlist'
-        ? await runtimeClient.getProfilerTraceHitList(args.trace_id_or_uri, {
+        ? await profiler.getHitList(args.trace_id_or_uri, {
             withSystemEvents: args.with_system_events,
           })
         : args.view === 'statements'
-          ? await runtimeClient.getProfilerTraceStatements(
-              args.trace_id_or_uri,
-              {
-                id: args.id,
-                withDetails: args.with_details,
-                autoDrillDownThreshold: args.auto_drill_down_threshold,
-                withSystemEvents: args.with_system_events,
-              },
-            )
-          : await runtimeClient.getProfilerTraceDbAccesses(
-              args.trace_id_or_uri,
-              {
-                withSystemEvents: args.with_system_events,
-              },
-            );
+          ? await profiler.getStatements(args.trace_id_or_uri, {
+              id: args.id,
+              withDetails: args.with_details,
+              autoDrillDownThreshold: args.auto_drill_down_threshold,
+              withSystemEvents: args.with_system_events,
+            })
+          : await profiler.getDbAccesses(args.trace_id_or_uri, {
+              withSystemEvents: args.with_system_events,
+            });
 
     return return_response({
       data: JSON.stringify(

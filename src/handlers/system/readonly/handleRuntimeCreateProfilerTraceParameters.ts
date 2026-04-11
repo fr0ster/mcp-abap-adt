@@ -1,4 +1,4 @@
-import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { AdtRuntimeClient, type Profiler } from '@mcp-abap-adt/adt-clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 
@@ -61,7 +61,8 @@ export async function handleRuntimeCreateProfilerTraceParameters(
     }
 
     const runtimeClient = new AdtRuntimeClient(connection, logger);
-    const response = await runtimeClient.createProfilerTraceParameters({
+    const profiler = runtimeClient.getProfiler();
+    const response = await profiler.createParameters({
       description: args.description,
       allMiscAbapStatements: args.all_misc_abap_statements,
       allProceduralUnits: args.all_procedural_units,
@@ -78,7 +79,7 @@ export async function handleRuntimeCreateProfilerTraceParameters(
       maxTimeForTracing: args.max_time_for_tracing,
     });
 
-    const profilerId = runtimeClient.extractProfilerIdFromResponse(response);
+    const profilerId = (profiler as Profiler).extractIdFromResponse(response);
 
     return return_response({
       data: JSON.stringify(

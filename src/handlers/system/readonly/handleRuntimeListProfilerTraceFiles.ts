@@ -22,7 +22,7 @@ export async function handleRuntimeListProfilerTraceFiles(
 
   try {
     const runtimeClient = new AdtRuntimeClient(connection, logger);
-    const response = await runtimeClient.listProfilerTraceFiles();
+    const response = await runtimeClient.getProfiler().list();
 
     return return_response({
       data: JSON.stringify(

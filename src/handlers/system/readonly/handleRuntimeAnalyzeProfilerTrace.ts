@@ -133,24 +133,19 @@ export async function handleRuntimeAnalyzeProfilerTrace(
 
     const view = args.view ?? 'hitlist';
     const runtimeClient = new AdtRuntimeClient(connection, logger);
+    const profiler = runtimeClient.getProfiler();
     const response =
       view === 'hitlist'
-        ? await runtimeClient.getProfilerTraceHitList(args.trace_id_or_uri, {
+        ? await profiler.getHitList(args.trace_id_or_uri, {
             withSystemEvents: args.with_system_events,
           })
         : view === 'statements'
-          ? await runtimeClient.getProfilerTraceStatements(
-              args.trace_id_or_uri,
-              {
-                withSystemEvents: args.with_system_events,
-              },
-            )
-          : await runtimeClient.getProfilerTraceDbAccesses(
-              args.trace_id_or_uri,
-              {
-                withSystemEvents: args.with_system_events,
-              },
-            );
+          ? await profiler.getStatements(args.trace_id_or_uri, {
+              withSystemEvents: args.with_system_events,
+            })
+          : await profiler.getDbAccesses(args.trace_id_or_uri, {
+              withSystemEvents: args.with_system_events,
+            });
 
     const parsedPayload = parseRuntimePayloadToJson(response.data);
     const summary = pickTopEntries(parsedPayload, args.top ?? 10);

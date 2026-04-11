@@ -1860,6 +1860,19 @@ runtime_readonly_handlers:
         # Optional fallback dump ID when feed parsing does not provide one
         dump_id: ""
 
+# Runtime Feed Handlers (Feeds, System Messages, Gateway Error Log)
+runtime_feed_handlers:
+  test_cases:
+    - name: "test_runtime_feeds"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Runtime feed handlers integration tests (feeds, system messages, gateway errors)"
+      params:
+        # Maximum entries to request per feed query
+        max_results: 10
+        # Optional user filter for feeds
+        feed_user: ""
+
 # ============================================================================
 # SYSTEM LOW-LEVEL HANDLERS
 # ============================================================================

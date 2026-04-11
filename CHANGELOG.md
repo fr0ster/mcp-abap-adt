@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-04-11
+
+### Changed
+- Migrated to `@mcp-abap-adt/adt-clients` 4.0.0 factory API (`getProfiler()`, `getDumps()`, `getFeeds()`)
+
+### Added
+- `RuntimeListFeeds` — unified ADT feed reader (descriptors, variants, dumps, system messages, gateway errors)
+- `RuntimeListSystemMessages` — SM02 system messages
+- `RuntimeGetGatewayErrorLog` — SAP Gateway error log (/IWFND/ERROR_LOG) with detail view
+- Compact wrappers: `HandlerFeedList`, `HandlerSystemMessageList`, `HandlerGatewayErrorList`
+
 ## [4.9.0] - 2026-04-08
 
 ### Changed

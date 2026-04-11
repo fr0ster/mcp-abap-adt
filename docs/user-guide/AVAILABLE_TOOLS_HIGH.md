@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: High-Level
-- Total tools: 113
+- Total tools: 116
 
 ## Navigation
 
@@ -44,6 +44,8 @@ Generated from code in `src/handlers/**` (not from docs).
     - [HandlerDelete](#handlerdelete-high-level-compact)
     - [HandlerDumpList](#handlerdumplist-high-level-compact)
     - [HandlerDumpView](#handlerdumpview-high-level-compact)
+    - [HandlerFeedList](#handlerfeedlist-high-level-compact)
+    - [HandlerGatewayErrorList](#handlergatewayerrorlist-high-level-compact)
     - [HandlerGet](#handlerget-high-level-compact)
     - [HandlerLock](#handlerlock-high-level-compact)
     - [HandlerProfileList](#handlerprofilelist-high-level-compact)
@@ -51,6 +53,7 @@ Generated from code in `src/handlers/**` (not from docs).
     - [HandlerProfileView](#handlerprofileview-high-level-compact)
     - [HandlerServiceBindingListTypes](#handlerservicebindinglisttypes-high-level-compact)
     - [HandlerServiceBindingValidate](#handlerservicebindingvalidate-high-level-compact)
+    - [HandlerSystemMessageList](#handlersystemmessagelist-high-level-compact)
     - [HandlerTransportCreate](#handlertransportcreate-high-level-compact)
     - [HandlerUnitTestResult](#handlerunittestresult-high-level-compact)
     - [HandlerUnitTestRun](#handlerunittestrun-high-level-compact)
@@ -154,7 +157,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createbehaviordefinition-high-level-behavior-definition"></a>
 #### CreateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Create a new ABAP Behavior Definition (BDEF) in SAP system.
+**Description:** Create a new ABAP Behavior Definition (BDEF) in SAP system. Defines RAP business object behavior: CRUD operations, validations, determinations, actions, and draft handling.
 
 **Source:** `src/handlers/behavior_definition/high/handleCreateBehaviorDefinition.ts`
 
@@ -195,7 +198,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatebehaviordefinition-high-level-behavior-definition"></a>
 #### UpdateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Update source code of an ABAP Behavior Definition.
+**Description:** Update source code of an ABAP Behavior Definition (BDEF). Modifies RAP business object behavior: CRUD operations, validations, determinations, actions, and draft handling.
 
 **Source:** `src/handlers/behavior_definition/high/handleUpdateBehaviorDefinition.ts`
 
@@ -639,6 +642,36 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="handlerfeedlist-high-level-compact"></a>
+#### HandlerFeedList (High-Level / Compact)
+**Description:** Runtime feed list. object_type: not used. Required: none. Optional: feed_type, user, max_results, from, to. Response: JSON.
+
+**Source:** `src/handlers/compact/high/handleHandlerFeedList.ts`
+
+**Parameters:**
+- `feed_type` (string, optional (default: descriptors)) - Feed type to read.
+- `from` (string, optional) - Start datetime YYYYMMDDHHMMSS.
+- `max_results` (number, optional) - Limit entries returned.
+- `to` (string, optional) - End datetime YYYYMMDDHHMMSS.
+- `user` (string, optional) - Filter by username.
+
+---
+
+<a id="handlergatewayerrorlist-high-level-compact"></a>
+#### HandlerGatewayErrorList (High-Level / Compact)
+**Description:** Gateway error log list/detail. object_type: not used. Required: none. Optional: error_url, user, max_results, from, to. Response: JSON.
+
+**Source:** `src/handlers/compact/high/handleHandlerGatewayErrorList.ts`
+
+**Parameters:**
+- `error_url` (string, optional) - Error feed URL for detail view.
+- `from` (string, optional) - Start datetime YYYYMMDDHHMMSS.
+- `max_results` (number, optional) - Limit errors returned.
+- `to` (string, optional) - End datetime YYYYMMDDHHMMSS.
+- `user` (string, optional) - Filter by username.
+
+---
+
 <a id="handlerget-high-level-compact"></a>
 #### HandlerGet (High-Level / Compact)
 **Description:** Read operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
@@ -759,6 +792,20 @@ Generated from code in `src/handlers/**` (not from docs).
 - `service_binding_name` (string, required) - Service binding name to validate.
 - `service_binding_version` (string, optional) - Service binding version.
 - `service_definition_name` (string, required) - Service definition name to pair with binding.
+
+---
+
+<a id="handlersystemmessagelist-high-level-compact"></a>
+#### HandlerSystemMessageList (High-Level / Compact)
+**Description:** SM02 system messages list. object_type: not used. Required: none. Optional: user, max_results, from, to. Response: JSON.
+
+**Source:** `src/handlers/compact/high/handleHandlerSystemMessageList.ts`
+
+**Parameters:**
+- `from` (string, optional) - Start datetime YYYYMMDDHHMMSS.
+- `max_results` (number, optional) - Limit messages returned.
+- `to` (string, optional) - End datetime YYYYMMDDHHMMSS.
+- `user` (string, optional) - Filter by author username.
 
 ---
 
@@ -965,7 +1012,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createmetadataextension-high-level-ddlx"></a>
 #### CreateMetadataExtension (High-Level / Ddlx)
-**Description:** Create a new ABAP Metadata Extension (DDLX) in SAP system.
+**Description:** Create a new ABAP Metadata Extension (DDLX) in SAP system. Defines Fiori UI annotations, field labels, search help, and list/object page layout for CDS views.
 
 **Source:** `src/handlers/ddlx/high/handleCreateMetadataExtension.ts`
 
@@ -980,7 +1027,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatemetadataextension-high-level-ddlx"></a>
 #### UpdateMetadataExtension (High-Level / Ddlx)
-**Description:** Update source code of an ABAP Metadata Extension.
+**Description:** Update source code of an ABAP Metadata Extension (DDLX). Modifies Fiori UI annotations, field labels, search help, and list/object page layout for CDS views.
 
 **Source:** `src/handlers/ddlx/high/handleUpdateMetadataExtension.ts`
 
@@ -1867,4 +1914,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-03-14*
+*Last updated: 2026-04-11*

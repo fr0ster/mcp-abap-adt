@@ -162,6 +162,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **📋 Include Management**: `GetIncludesList` - Recursive include discovery
 - **🔍 System Tools**: `GetInactiveObjects` - Monitor inactive objects waiting for activation
 - **🧪 Runtime Diagnostics**: `RuntimeCreateProfilerTraceParameters`, `RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`, `RuntimeListDumps`, `RuntimeGetDumpById` - Profiling and dump analysis with JSON payloads
+- **📡 Runtime Feeds**: `RuntimeListFeeds`, `RuntimeListSystemMessages`, `RuntimeGetGatewayErrorLog` - Feed reader, SM02 system messages, Gateway error log
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
 - **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication))
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API

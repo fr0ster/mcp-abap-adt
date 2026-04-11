@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/compact/high` (not from docs).
 
 - Group: Compact
-- Total tools: 22
+- Total tools: 25
 
 ## How It Works
 
@@ -131,6 +131,8 @@ Preferred dedicated compact tools and minimal payloads:
   - [HandlerDelete](#handlerdelete-compact)
   - [HandlerDumpList](#handlerdumplist-compact)
   - [HandlerDumpView](#handlerdumpview-compact)
+  - [HandlerFeedList](#handlerfeedlist-compact)
+  - [HandlerGatewayErrorList](#handlergatewayerrorlist-compact)
   - [HandlerGet](#handlerget-compact)
   - [HandlerLock](#handlerlock-compact)
   - [HandlerProfileList](#handlerprofilelist-compact)
@@ -138,6 +140,7 @@ Preferred dedicated compact tools and minimal payloads:
   - [HandlerProfileView](#handlerprofileview-compact)
   - [HandlerServiceBindingListTypes](#handlerservicebindinglisttypes-compact)
   - [HandlerServiceBindingValidate](#handlerservicebindingvalidate-compact)
+  - [HandlerSystemMessageList](#handlersystemmessagelist-compact)
   - [HandlerTransportCreate](#handlertransportcreate-compact)
   - [HandlerUnitTestResult](#handlerunittestresult-compact)
   - [HandlerUnitTestRun](#handlerunittestrun-compact)
@@ -310,6 +313,36 @@ Preferred dedicated compact tools and minimal payloads:
 
 ---
 
+<a id="handlerfeedlist-compact"></a>
+#### HandlerFeedList (Compact)
+**Description:** Runtime feed list. object_type: not used. Required: none. Optional: feed_type, user, max_results, from, to. Response: JSON.
+
+**Source:** `src/handlers/compact/high/handleHandlerFeedList.ts`
+
+**Parameters:**
+- `feed_type` (string, optional (default: descriptors)) - Feed type to read.
+- `from` (string, optional) - Start datetime YYYYMMDDHHMMSS.
+- `max_results` (number, optional) - Limit entries returned.
+- `to` (string, optional) - End datetime YYYYMMDDHHMMSS.
+- `user` (string, optional) - Filter by username.
+
+---
+
+<a id="handlergatewayerrorlist-compact"></a>
+#### HandlerGatewayErrorList (Compact)
+**Description:** Gateway error log list/detail. object_type: not used. Required: none. Optional: error_url, user, max_results, from, to. Response: JSON.
+
+**Source:** `src/handlers/compact/high/handleHandlerGatewayErrorList.ts`
+
+**Parameters:**
+- `error_url` (string, optional) - Error feed URL for detail view.
+- `from` (string, optional) - Start datetime YYYYMMDDHHMMSS.
+- `max_results` (number, optional) - Limit errors returned.
+- `to` (string, optional) - End datetime YYYYMMDDHHMMSS.
+- `user` (string, optional) - Filter by username.
+
+---
+
 <a id="handlerget-compact"></a>
 #### HandlerGet (Compact)
 **Description:** Read operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
@@ -433,6 +466,20 @@ Preferred dedicated compact tools and minimal payloads:
 
 ---
 
+<a id="handlersystemmessagelist-compact"></a>
+#### HandlerSystemMessageList (Compact)
+**Description:** SM02 system messages list. object_type: not used. Required: none. Optional: user, max_results, from, to. Response: JSON.
+
+**Source:** `src/handlers/compact/high/handleHandlerSystemMessageList.ts`
+
+**Parameters:**
+- `from` (string, optional) - Start datetime YYYYMMDDHHMMSS.
+- `max_results` (number, optional) - Limit messages returned.
+- `to` (string, optional) - End datetime YYYYMMDDHHMMSS.
+- `user` (string, optional) - Filter by author username.
+
+---
+
 <a id="handlertransportcreate-compact"></a>
 #### HandlerTransportCreate (Compact)
 **Description:** Transport create. object_type: not used. Required: description*. Optional: transport_type(workbench|customizing), target_system, owner. Response: JSON.
@@ -551,4 +598,4 @@ Preferred dedicated compact tools and minimal payloads:
 
 ---
 
-*Last updated: 2026-03-14*
+*Last updated: 2026-04-11*

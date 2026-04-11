@@ -109,10 +109,11 @@ export async function handleRuntimeListDumps(
 
   try {
     const runtimeClient = new AdtRuntimeClient(connection, logger);
+    const dumpsClient = runtimeClient.getDumps();
     const { user, from, to, inlinecount, top, skip, orderby } = args || {};
 
     const response = user
-      ? await runtimeClient.listRuntimeDumpsByUser(user, {
+      ? await dumpsClient.listByUser(user, {
           from,
           to,
           inlinecount,
@@ -120,7 +121,7 @@ export async function handleRuntimeListDumps(
           skip,
           orderby,
         })
-      : await runtimeClient.listRuntimeDumps({
+      : await dumpsClient.list({
           from,
           to,
           inlinecount,

@@ -695,3 +695,52 @@ export const compactActivateSchema = {
     },
   },
 } as const;
+
+export const compactFeedListSchema = {
+  type: 'object',
+  properties: {
+    feed_type: {
+      type: 'string',
+      enum: [
+        'descriptors',
+        'variants',
+        'dumps',
+        'system_messages',
+        'gateway_errors',
+      ],
+      default: 'descriptors',
+      description: 'Feed type to read.',
+    },
+    user: { type: 'string', description: 'Filter by username.' },
+    max_results: { type: 'number', description: 'Limit entries returned.' },
+    from: { type: 'string', description: 'Start datetime YYYYMMDDHHMMSS.' },
+    to: { type: 'string', description: 'End datetime YYYYMMDDHHMMSS.' },
+  },
+  required: [],
+} as const;
+
+export const compactSystemMessageListSchema = {
+  type: 'object',
+  properties: {
+    user: { type: 'string', description: 'Filter by author username.' },
+    max_results: { type: 'number', description: 'Limit messages returned.' },
+    from: { type: 'string', description: 'Start datetime YYYYMMDDHHMMSS.' },
+    to: { type: 'string', description: 'End datetime YYYYMMDDHHMMSS.' },
+  },
+  required: [],
+} as const;
+
+export const compactGatewayErrorListSchema = {
+  type: 'object',
+  properties: {
+    error_url: {
+      type: 'string',
+      description: 'Error feed URL for detail view.',
+    },
+    user: { type: 'string', description: 'Filter by username.' },
+    max_results: { type: 'number', description: 'Limit errors returned.' },
+    from: { type: 'string', description: 'Start datetime YYYYMMDDHHMMSS.' },
+    to: { type: 'string', description: 'End datetime YYYYMMDDHHMMSS.' },
+  },
+  required: [],
+} as const;

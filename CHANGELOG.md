@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [5.0.1] - 2026-04-11
+
+### Removed
+- Compact wrappers `HandlerFeedList`, `HandlerSystemMessageList`, `HandlerGatewayErrorList` — duplicated system-level tools, causing LLM tool selection confusion
+
 ## [5.0.0] - 2026-04-11
 
 ### Changed

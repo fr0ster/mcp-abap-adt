@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadProgram',
   available_in: ['onprem', 'legacy'] as const,
   description:
-    '[read-only] Read ABAP program source code and metadata (package, responsible, description, etc.).',
+    '[read-only] Read ABAP program (report) source code and metadata. Answers: "show program code", "display report source", "view program X", "get program source". Returns source code, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadInterface',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[read-only] Read ABAP interface source code and metadata (package, responsible, description, etc.).',
+    '[read-only] Read ABAP interface source code and metadata. Answers: "show interface code", "display interface definition", "view interface X", "get interface source". Returns source code, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadFunctionGroup',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[read-only] Read ABAP function group source code and metadata (package, responsible, description, etc.).',
+    '[read-only] Read ABAP function group source code and metadata. Answers: "show function group code", "display FUGR source", "view function group X", "get function group includes". Returns source code, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {

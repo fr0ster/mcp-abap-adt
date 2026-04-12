@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadPackage',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[read-only] Read ABAP package definition and metadata (super-package, responsible, description, etc.).',
+    '[read-only] Read ABAP package definition and metadata. Answers: "show package X", "display package properties", "view package contents", "get package info". Returns definition, super-package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {

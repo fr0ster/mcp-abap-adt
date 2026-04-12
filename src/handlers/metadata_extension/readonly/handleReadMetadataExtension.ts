@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadMetadataExtension',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Read ABAP metadata extension (DDLX) source code and metadata (package, responsible, description, etc.).',
+    '[read-only] Read ABAP metadata extension (DDLX) source code and metadata. Answers: "show metadata extension", "display DDLX source", "view UI annotations", "get metadata extension X". Returns source code, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {

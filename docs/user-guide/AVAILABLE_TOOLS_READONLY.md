@@ -94,7 +94,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readbehaviordefinition-read-only-behavior-definition"></a>
 #### ReadBehaviorDefinition (Read-Only / Behavior Definition)
-**Description:** [read-only] Read ABAP behavior definition source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP RAP behavior definition (BDEF) source code and metadata. Answers: 
 
 **Source:** `src/handlers/behavior_definition/readonly/handleReadBehaviorDefinition.ts`
 
@@ -109,7 +109,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readbehaviorimplementation-read-only-behavior-implementation"></a>
 #### ReadBehaviorImplementation (Read-Only / Behavior Implementation)
-**Description:** [read-only] Read ABAP behavior implementation source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP RAP behavior implementation source code and metadata. Answers: 
 
 **Source:** `src/handlers/behavior_implementation/readonly/handleReadBehaviorImplementation.ts`
 
@@ -124,7 +124,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readclass-read-only-class"></a>
 #### ReadClass (Read-Only / Class)
-**Description:** [read-only] Read ABAP class source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP class source code and metadata. Answers: 
 
 **Source:** `src/handlers/class/readonly/handleReadClass.ts`
 
@@ -139,7 +139,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readdataelement-read-only-data-element"></a>
 #### ReadDataElement (Read-Only / Data Element)
-**Description:** [read-only] Read ABAP data element definition and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP data element definition and metadata. Answers: 
 
 **Source:** `src/handlers/data_element/readonly/handleReadDataElement.ts`
 
@@ -154,7 +154,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readdomain-read-only-domain"></a>
 #### ReadDomain (Read-Only / Domain)
-**Description:** [read-only] Read ABAP domain definition and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP domain definition and metadata. Answers: 
 
 **Source:** `src/handlers/domain/readonly/handleReadDomain.ts`
 
@@ -207,7 +207,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readfunctiongroup-read-only-function-group"></a>
 #### ReadFunctionGroup (Read-Only / Function Group)
-**Description:** [read-only] Read ABAP function group source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP function group source code and metadata. Answers: 
 
 **Source:** `src/handlers/function_group/readonly/handleReadFunctionGroup.ts`
 
@@ -222,7 +222,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readfunctionmodule-read-only-function-module"></a>
 #### ReadFunctionModule (Read-Only / Function Module)
-**Description:** [read-only] Read ABAP function module source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP function module source code and metadata. Answers: 
 
 **Source:** `src/handlers/function_module/readonly/handleReadFunctionModule.ts`
 
@@ -266,7 +266,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readinterface-read-only-interface"></a>
 #### ReadInterface (Read-Only / Interface)
-**Description:** [read-only] Read ABAP interface source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP interface source code and metadata. Answers: 
 
 **Source:** `src/handlers/interface/readonly/handleReadInterface.ts`
 
@@ -281,7 +281,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readmetadataextension-read-only-metadata-extension"></a>
 #### ReadMetadataExtension (Read-Only / Metadata Extension)
-**Description:** [read-only] Read ABAP metadata extension (DDLX) source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP metadata extension (DDLX) source code and metadata. Answers: 
 
 **Source:** `src/handlers/metadata_extension/readonly/handleReadMetadataExtension.ts`
 
@@ -307,7 +307,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readpackage-read-only-package"></a>
 #### ReadPackage (Read-Only / Package)
-**Description:** [read-only] Read ABAP package definition and metadata (super-package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP package definition and metadata. Answers: 
 
 **Source:** `src/handlers/package/readonly/handleReadPackage.ts`
 
@@ -334,7 +334,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readprogram-read-only-program"></a>
 #### ReadProgram (Read-Only / Program)
-**Description:** [read-only] Read ABAP program source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP program (report) source code and metadata. Answers: 
 
 **Source:** `src/handlers/program/readonly/handleReadProgram.ts`
 
@@ -379,7 +379,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="searchobject-read-only-search"></a>
 #### SearchObject (Read-Only / Search)
-**Description:** [read-only] Find, search, locate, or check if an ABAP repository object exists by name or wildcard pattern (e.g. 
+**Description:** [read-only] Search ABAP repository by object name or wildcard pattern (e.g. 
 
 **Source:** `src/handlers/search/readonly/handleSearchObject.ts`
 
@@ -395,7 +395,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readservicebinding-read-only-service-binding"></a>
 #### ReadServiceBinding (Read-Only / Service Binding)
-**Description:** [read-only] Read ABAP service binding source/payload and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP service binding (SRVB) payload and metadata. Answers: 
 
 **Source:** `src/handlers/service_binding/readonly/handleReadServiceBinding.ts`
 
@@ -409,7 +409,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readservicedefinition-read-only-service-definition"></a>
 #### ReadServiceDefinition (Read-Only / Service Definition)
-**Description:** [read-only] Read ABAP service definition source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP service definition (SRVD) source code and metadata. Answers: 
 
 **Source:** `src/handlers/service_definition/readonly/handleReadServiceDefinition.ts`
 
@@ -424,7 +424,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readstructure-read-only-structure"></a>
 #### ReadStructure (Read-Only / Structure)
-**Description:** [read-only] Read ABAP structure definition and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP structure definition and metadata. Answers: 
 
 **Source:** `src/handlers/structure/readonly/handleReadStructure.ts`
 
@@ -593,7 +593,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getwhereused-read-only-system"></a>
 #### GetWhereUsed (Read-Only / System)
-**Description:** [read-only] Find where-used references (cross-references, usages, dependencies) for ABAP objects — classes, interfaces, tables, data elements, programs, function modules, etc. Returns list of all referencing objects with their types and packages.
+**Description:** [read-only] Search where-used references — find all objects that reference or depend on a given ABAP object. Answers: 
 
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
 
@@ -811,7 +811,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readtable-read-only-table"></a>
 #### ReadTable (Read-Only / Table)
-**Description:** [read-only] Read ABAP table definition and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP table definition and metadata. Answers: 
 
 **Source:** `src/handlers/table/readonly/handleReadTable.ts`
 
@@ -854,7 +854,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readview-read-only-view"></a>
 #### ReadView (Read-Only / View)
-**Description:** [read-only] Read ABAP view (CDS view) source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP CDS view source code and metadata. Answers: 
 
 **Source:** `src/handlers/view/readonly/handleReadView.ts`
 
@@ -864,4 +864,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-04-11*
+*Last updated: 2026-04-12*

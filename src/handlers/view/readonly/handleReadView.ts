@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadView',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[read-only] Read ABAP view (CDS view) source code and metadata (package, responsible, description, etc.).',
+    '[read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {

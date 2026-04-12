@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadBehaviorImplementation',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Read ABAP behavior implementation source code and metadata (package, responsible, description, etc.).',
+    '[read-only] Read ABAP RAP behavior implementation source code and metadata. Answers: "show behavior implementation", "display behavior pool code", "view RAP implementation X". Returns source code, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {

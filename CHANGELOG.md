@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [5.0.2] - 2026-04-11
+
+### Changed
+- Improved tool descriptions for RAG search quality — front-loaded action verbs, added "Answers:" trigger phrases for GetWhereUsed, SearchObject, and all Read* handlers (closes #42)
+
 ## [5.0.1] - 2026-04-11
 
 ### Removed

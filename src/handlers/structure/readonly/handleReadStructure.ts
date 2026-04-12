@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadStructure',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Read ABAP structure definition and metadata (package, responsible, description, etc.).',
+    '[read-only] Read ABAP structure definition and metadata. Answers: "show structure fields", "display structure X", "view structure definition", "get structure components". Returns field list, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {

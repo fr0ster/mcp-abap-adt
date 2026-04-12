@@ -13,7 +13,7 @@ export const TOOL_DEFINITION = {
   name: 'GetWhereUsed',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Find where-used references (cross-references, usages, dependencies) for ABAP objects — classes, interfaces, tables, data elements, programs, function modules, etc. Returns list of all referencing objects with their types and packages.',
+    '[read-only] Search where-used references — find all objects that reference or depend on a given ABAP object. Answers: "where is X used", "who calls X", "what depends on X", "show usages of X". Supports classes, interfaces, tables, data elements, programs, function modules, etc. Returns referencing objects with types and packages.',
   inputSchema: {
     type: 'object',
     properties: {

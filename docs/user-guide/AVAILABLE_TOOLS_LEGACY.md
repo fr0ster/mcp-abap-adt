@@ -171,7 +171,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readclass-read-only-class"></a>
 #### ReadClass (Read-Only / Class)
-**Description:** [read-only] Read ABAP class source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP class source code and metadata. Answers: 
 
 **Source:** `src/handlers/class/readonly/handleReadClass.ts`
 
@@ -188,7 +188,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readfunctiongroup-read-only-function-group"></a>
 #### ReadFunctionGroup (Read-Only / Function Group)
-**Description:** [read-only] Read ABAP function group source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP function group source code and metadata. Answers: 
 
 **Source:** `src/handlers/function_group/readonly/handleReadFunctionGroup.ts`
 
@@ -205,7 +205,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readfunctionmodule-read-only-function-module"></a>
 #### ReadFunctionModule (Read-Only / Function Module)
-**Description:** [read-only] Read ABAP function module source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP function module source code and metadata. Answers: 
 
 **Source:** `src/handlers/function_module/readonly/handleReadFunctionModule.ts`
 
@@ -255,7 +255,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readinterface-read-only-interface"></a>
 #### ReadInterface (Read-Only / Interface)
-**Description:** [read-only] Read ABAP interface source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP interface source code and metadata. Answers: 
 
 **Source:** `src/handlers/interface/readonly/handleReadInterface.ts`
 
@@ -285,7 +285,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readpackage-read-only-package"></a>
 #### ReadPackage (Read-Only / Package)
-**Description:** [read-only] Read ABAP package definition and metadata (super-package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP package definition and metadata. Answers: 
 
 **Source:** `src/handlers/package/readonly/handleReadPackage.ts`
 
@@ -316,7 +316,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readprogram-read-only-program"></a>
 #### ReadProgram (Read-Only / Program)
-**Description:** [read-only] Read ABAP program source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP program (report) source code and metadata. Answers: 
 
 **Source:** `src/handlers/program/readonly/handleReadProgram.ts`
 
@@ -333,7 +333,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readview-read-only-view"></a>
 #### ReadView (Read-Only / View)
-**Description:** [read-only] Read ABAP view (CDS view) source code and metadata (package, responsible, description, etc.).
+**Description:** [read-only] Read ABAP CDS view source code and metadata. Answers: 
 
 **Source:** `src/handlers/view/readonly/handleReadView.ts`
 
@@ -2129,4 +2129,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-04-11*
+*Last updated: 2026-04-12*

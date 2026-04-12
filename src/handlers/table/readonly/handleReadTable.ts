@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadTable',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Read ABAP table definition and metadata (package, responsible, description, etc.).',
+    '[read-only] Read ABAP table definition and metadata. Answers: "show table fields", "display table structure", "view table X", "get table definition". Returns field list, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {

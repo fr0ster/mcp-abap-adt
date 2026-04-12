@@ -379,7 +379,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="searchobject-read-only-search"></a>
 #### SearchObject (Read-Only / Search)
-**Description:** [read-only] Search ABAP repository by object name or wildcard pattern (e.g. 
+**Description:** [read-only] Search ABAP repository by object name or wildcard pattern (e.g. \
 
 **Source:** `src/handlers/search/readonly/handleSearchObject.ts`
 

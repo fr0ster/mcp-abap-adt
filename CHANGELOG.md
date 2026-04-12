@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [5.0.3] - 2026-04-12
+
+### Changed
+- Updated `@mcp-abap-adt/adt-clients` to 4.0.3 — fixes `$TMP` and similar local package handling
+
 ## [5.0.2] - 2026-04-11
 
 ### Changed

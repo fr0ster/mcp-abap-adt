@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [5.0.4] - 2026-04-13
+
+### Added
+- Export `resolveSystemContext`, `getSystemContext`, `resetSystemContextCache` and `IAdtSystemContext` from `@mcp-abap-adt/core/utils` for consumers that bypass `BaseMcpServer` (closes #44)
+
+### Changed
+- Updated `@mcp-abap-adt/adt-clients` to 4.0.4 — validates responsible person before create to prevent cryptic SAP error
+
 ## [5.0.3] - 2026-04-12
 
 ### Changed

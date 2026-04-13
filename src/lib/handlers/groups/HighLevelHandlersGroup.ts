@@ -1,3 +1,8 @@
+// Per-type activate handlers (reused from low-level)
+import {
+  TOOL_DEFINITION as CheckBehaviorDefinition_Tool,
+  handleCheckBehaviorDefinition,
+} from '../../../handlers/behavior_definition/high/handleCheckBehaviorDefinition';
 import {
   TOOL_DEFINITION as CreateBdef_Tool,
   handleCreateBehaviorDefinition,
@@ -14,7 +19,6 @@ import {
   handleUpdateBehaviorDefinition as handleUpdateBehaviorDefinitionHigh,
   TOOL_DEFINITION as UpdateBdef_Tool,
 } from '../../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
-// Per-type activate handlers (reused from low-level)
 import {
   TOOL_DEFINITION as ActivateBehaviorDefinition_Tool,
   handleActivateBehaviorDefinition,
@@ -35,6 +39,10 @@ import {
   handleUpdateBehaviorImplementation,
   TOOL_DEFINITION as UpdateBehaviorImplementation_Tool,
 } from '../../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
+import {
+  TOOL_DEFINITION as CheckClass_Tool,
+  handleCheckClass,
+} from '../../../handlers/class/high/handleCheckClass';
 import {
   TOOL_DEFINITION as CreateClass_Tool,
   handleCreateClass,
@@ -108,6 +116,10 @@ import {
   handleActivateObjects,
 } from '../../../handlers/common/high/handleActivateObjects';
 import {
+  TOOL_DEFINITION as CheckDataElement_Tool,
+  handleCheckDataElement,
+} from '../../../handlers/data_element/high/handleCheckDataElement';
+import {
   TOOL_DEFINITION as CreateDataElement_Tool,
   handleCreateDataElement,
 } from '../../../handlers/data_element/high/handleCreateDataElement';
@@ -128,6 +140,10 @@ import {
   handleActivateDataElement,
 } from '../../../handlers/data_element/low/handleActivateDataElement';
 import {
+  TOOL_DEFINITION as CheckMetadataExtension_Tool,
+  handleCheckMetadataExtension,
+} from '../../../handlers/ddlx/high/handleCheckMetadataExtension';
+import {
   TOOL_DEFINITION as CreateDdlx_Tool,
   handleCreateMetadataExtension,
 } from '../../../handlers/ddlx/high/handleCreateMetadataExtension';
@@ -139,6 +155,10 @@ import {
   TOOL_DEFINITION as ActivateMetadataExtension_Tool,
   handleActivateMetadataExtension,
 } from '../../../handlers/ddlx/low/handleActivateMetadataExtension';
+import {
+  TOOL_DEFINITION as CheckDomain_Tool,
+  handleCheckDomain,
+} from '../../../handlers/domain/high/handleCheckDomain';
 import {
   TOOL_DEFINITION as CreateDomain_Tool,
   handleCreateDomain,
@@ -159,6 +179,14 @@ import {
   TOOL_DEFINITION as ActivateDomain_Tool,
   handleActivateDomain,
 } from '../../../handlers/domain/low/handleActivateDomain';
+import {
+  TOOL_DEFINITION as CheckFunctionGroup_Tool,
+  handleCheckFunctionGroup,
+} from '../../../handlers/function/high/handleCheckFunctionGroup';
+import {
+  TOOL_DEFINITION as CheckFunctionModule_Tool,
+  handleCheckFunctionModule,
+} from '../../../handlers/function/high/handleCheckFunctionModule';
 import {
   TOOL_DEFINITION as CreateFunctionGroup_Tool,
   handleCreateFunctionGroup,
@@ -200,6 +228,10 @@ import {
   handleGetFunctionModule,
 } from '../../../handlers/function_module/high/handleGetFunctionModule';
 import {
+  TOOL_DEFINITION as CheckInterface_Tool,
+  handleCheckInterface,
+} from '../../../handlers/interface/high/handleCheckInterface';
+import {
   TOOL_DEFINITION as CreateInterface_Tool,
   handleCreateInterface,
 } from '../../../handlers/interface/high/handleCreateInterface';
@@ -230,6 +262,10 @@ import {
 // Import high-level handlers
 // Import TOOL_DEFINITION from handlers
 import {
+  TOOL_DEFINITION as CheckPackage_Tool,
+  handleCheckPackage,
+} from '../../../handlers/package/high/handleCheckPackage';
+import {
   TOOL_DEFINITION as CreatePackage_Tool,
   handleCreatePackage,
 } from '../../../handlers/package/high/handleCreatePackage';
@@ -237,6 +273,10 @@ import {
   TOOL_DEFINITION as GetPackage_Tool,
   handleGetPackage,
 } from '../../../handlers/package/high/handleGetPackage';
+import {
+  TOOL_DEFINITION as CheckProgram_Tool,
+  handleCheckProgram,
+} from '../../../handlers/program/high/handleCheckProgram';
 import {
   TOOL_DEFINITION as CreateProgram_Tool,
   handleCreateProgram,
@@ -298,6 +338,10 @@ import {
   TOOL_DEFINITION as UpdateServiceDefinition_Tool,
 } from '../../../handlers/service_definition/high/handleUpdateServiceDefinition';
 import {
+  TOOL_DEFINITION as CheckStructure_Tool,
+  handleCheckStructure,
+} from '../../../handlers/structure/high/handleCheckStructure';
+import {
   TOOL_DEFINITION as CreateStructure_Tool,
   handleCreateStructure,
 } from '../../../handlers/structure/high/handleCreateStructure';
@@ -317,6 +361,10 @@ import {
   TOOL_DEFINITION as ActivateStructure_Tool,
   handleActivateStructure,
 } from '../../../handlers/structure/low/handleActivateStructure';
+import {
+  TOOL_DEFINITION as CheckTable_Tool,
+  handleCheckTable,
+} from '../../../handlers/table/high/handleCheckTable';
 import {
   TOOL_DEFINITION as CreateTable_Tool,
   handleCreateTable,
@@ -393,6 +441,10 @@ import {
   handleUpdateUnitTest,
   TOOL_DEFINITION as UpdateUnitTest_Tool,
 } from '../../../handlers/unit_test/high/handleUpdateUnitTest';
+import {
+  TOOL_DEFINITION as CheckView_Tool,
+  handleCheckView,
+} from '../../../handlers/view/high/handleCheckView';
 import {
   TOOL_DEFINITION as CreateView_Tool,
   handleCreateView,
@@ -907,6 +959,59 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: DeleteMetadataExtension_Tool,
         handler: withContext(handleDeleteMetadataExtension),
+      },
+      // Per-type Check handlers (high-level)
+      {
+        toolDefinition: CheckBehaviorDefinition_Tool,
+        handler: withContext(handleCheckBehaviorDefinition),
+      },
+      {
+        toolDefinition: CheckClass_Tool,
+        handler: withContext(handleCheckClass),
+      },
+      {
+        toolDefinition: CheckDataElement_Tool,
+        handler: withContext(handleCheckDataElement),
+      },
+      {
+        toolDefinition: CheckDomain_Tool,
+        handler: withContext(handleCheckDomain),
+      },
+      {
+        toolDefinition: CheckFunctionGroup_Tool,
+        handler: withContext(handleCheckFunctionGroup),
+      },
+      {
+        toolDefinition: CheckFunctionModule_Tool,
+        handler: withContext(handleCheckFunctionModule),
+      },
+      {
+        toolDefinition: CheckInterface_Tool,
+        handler: withContext(handleCheckInterface),
+      },
+      {
+        toolDefinition: CheckMetadataExtension_Tool,
+        handler: withContext(handleCheckMetadataExtension),
+      },
+      {
+        toolDefinition: CheckPackage_Tool,
+        handler: withContext(handleCheckPackage),
+      },
+      {
+        toolDefinition: CheckProgram_Tool,
+        handler: withContext(handleCheckProgram),
+      },
+      {
+        toolDefinition: CheckStructure_Tool,
+        handler: withContext(handleCheckStructure),
+      },
+      {
+        toolDefinition: CheckTable_Tool,
+        handler: withContext(handleCheckTable),
+      },
+      {
+        toolDefinition: CheckView_Tool,
+        handler: withContext(handleCheckView),
       },
     ];
   }

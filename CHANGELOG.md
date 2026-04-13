@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [5.0.11] - 2026-04-13
+
+### Fixed
+- `IAbapConnection.connect()` is now part of the interface contract — CSRF token and session cookies are established before any ADT requests, removing unsafe `as any` cast (relates to #53)
+
+### Changed
+- Upgraded `@mcp-abap-adt/interfaces` to ^6.1.0, `@mcp-abap-adt/connection` to ^1.6.0
+
 ## [5.0.10] - 2026-04-13
 
 ### Changed

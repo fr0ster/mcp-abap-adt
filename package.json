@@ -157,7 +157,7 @@
     "@mcp-abap-adt/sap-rfc-lite": "^0.1.0"
   },
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=22.0.0",
     "npm": ">=9.0.0"
   },
   "files": [

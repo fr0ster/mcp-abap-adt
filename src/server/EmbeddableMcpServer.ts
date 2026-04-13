@@ -1,7 +1,7 @@
-import { createRequire } from 'node:module';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import { noopLogger } from '../lib/handlerLogger.js';
 import { CompactHandlersGroup } from '../lib/handlers/groups/CompactHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../lib/handlers/groups/HighLevelHandlersGroup.js';
 import { LowLevelHandlersGroup } from '../lib/handlers/groups/LowLevelHandlersGroup.js';
@@ -145,7 +145,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     // creates wrapper lambdas that call getConnection() for fresh context
     const dummyContext: HandlerContext = {
       connection: null as unknown as AbapConnection,
-      logger: logger ?? getDefaultLogger(),
+      logger: logger ?? noopLogger,
     };
 
     const groups: IHandlerGroup[] = [];
@@ -171,10 +171,4 @@ export class EmbeddableMcpServer extends BaseMcpServer {
 
     return new CompositeHandlersRegistry(groups);
   }
-}
-
-function getDefaultLogger(): Logger {
-  const require = createRequire(__filename);
-  const mod = require('@mcp-abap-adt/logger');
-  return mod.defaultLogger ?? new mod.DefaultLogger();
 }

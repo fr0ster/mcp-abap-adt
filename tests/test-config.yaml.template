@@ -1965,6 +1965,143 @@ get_sql_query:
         test_row_number: 10
 
 # ============================================================================
+# Check Handlers (High-Level) — syntax/semantic validation
+# Uses existing shared objects, no CRUD needed
+# ============================================================================
+
+# CheckClass
+check_class_high:
+  test_cases:
+    - name: "check_existing"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      description: "Check an existing ABAP class for syntax errors"
+      params:
+        class_name: "ZCL_MCP_SHARED_CLS"
+
+# CheckBehaviorDefinition
+check_bdef_high:
+  test_cases:
+    - name: "check_existing"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Check an existing behavior definition for syntax errors"
+      params:
+        name: "ZI_MCP_SHR_ROOT"
+
+# CheckView
+check_view_high:
+  test_cases:
+    - name: "check_existing"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      description: "Check an existing CDS view for syntax errors"
+      params:
+        view_name: "ZI_MCP_SHR_ROOT"
+
+# CheckDomain
+check_domain_high:
+  test_cases:
+    - name: "check_existing"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Check an existing domain for syntax errors"
+      params:
+        domain_name: "ZMCP_SHR_DOMAIN"
+
+# CheckDataElement
+check_data_element_high:
+  test_cases:
+    - name: "check_existing"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Check an existing data element for syntax errors"
+      params:
+        data_element_name: "ZMCP_SHR_DTEL"
+
+# CheckTable
+check_table_high:
+  test_cases:
+    - name: "check_existing"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Check an existing table for syntax errors"
+      params:
+        table_name: "ZMCP_SHR_RTABL"
+
+# CheckStructure
+check_structure_high:
+  test_cases:
+    - name: "check_existing"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Check an existing structure for syntax errors"
+      params:
+        structure_name: "ZMCP_SHR_STRUCT"
+
+# CheckInterface
+check_interface_high:
+  test_cases:
+    - name: "check_existing"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      description: "Check an existing interface for syntax errors"
+      params:
+        interface_name: "ZIF_MCP_SHARED"
+
+# CheckPackage
+check_package_high:
+  test_cases:
+    - name: "check_existing"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      description: "Check an existing package for syntax errors"
+      params:
+        package_name: "ZMCP_SHARED"
+        super_package: ""
+
+# CheckProgram
+check_program_high:
+  test_cases:
+    - name: "check_existing"
+      enabled: true
+      available_in: ["onprem", "legacy"]
+      description: "Check an existing program for syntax errors (not available on cloud)"
+      params:
+        program_name: "ZMCP_SHR_PROG"
+
+# CheckFunctionGroup
+check_function_group_high:
+  test_cases:
+    - name: "check_existing"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      description: "Check an existing function group for syntax errors"
+      params:
+        function_group_name: "ZMCP_SHR_FGRP"
+
+# CheckFunctionModule
+check_function_module_high:
+  test_cases:
+    - name: "check_existing"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      description: "Check an existing function module for syntax errors"
+      params:
+        function_group_name: "ZMCP_SHR_FGRP"
+        function_module_name: "Z_MCP_SHR_FM"
+
+# CheckMetadataExtension
+check_metadata_extension_high:
+  test_cases:
+    - name: "check_existing"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Check an existing metadata extension for syntax errors"
+      params:
+        name: "ZC_MCP_SHR_DDLX"
+
+# ============================================================================
 # LOW-LEVEL HANDLER TESTS (for mcp-abap-adt integration tests)
 # ============================================================================
 

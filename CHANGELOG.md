@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [5.1.1] - 2026-04-13
+
+### Fixed
+- Update handlers must unlock objects in finally block on failure — `UpdateBehaviorDefinition` and `UpdateMetadataExtension` now wrap lock/update/unlock in try/finally to prevent stale locks when update fails (closes #57)
+
+### Changed
+- Upgraded `@mcp-abap-adt/adt-clients` to 4.0.5
+
 ## [5.1.0] - 2026-04-13
 
 ### Added

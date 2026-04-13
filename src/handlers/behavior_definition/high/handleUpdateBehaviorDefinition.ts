@@ -82,25 +82,33 @@ export async function handleUpdateBehaviorDefinition(
       lockHandle = await client.getBehaviorDefinition().lock(lockConfig);
     }
 
-    // Update - using types from adt-clients
-    const updateConfig: Pick<
-      IBehaviorDefinitionConfig,
-      'name' | 'sourceCode'
-    > & { transportRequest?: string } = {
-      name,
-      sourceCode: args.source_code,
-      transportRequest: args.transport_request,
-    };
-    await client
-      .getBehaviorDefinition()
-      .update(updateConfig, { lockHandle: lockHandle });
-
-    // Unlock if we locked it internally - using types from adt-clients
-    if (!args.lock_handle) {
-      const unlockConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
+    try {
+      // Update - using types from adt-clients
+      const updateConfig: Pick<
+        IBehaviorDefinitionConfig,
+        'name' | 'sourceCode'
+      > & { transportRequest?: string } = {
         name,
+        sourceCode: args.source_code,
+        transportRequest: args.transport_request,
       };
-      await client.getBehaviorDefinition().unlock(unlockConfig, lockHandle);
+      await client
+        .getBehaviorDefinition()
+        .update(updateConfig, { lockHandle: lockHandle });
+    } finally {
+      // Always unlock if we locked it internally - using types from adt-clients
+      if (!args.lock_handle && lockHandle) {
+        try {
+          const unlockConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
+            name,
+          };
+          await client.getBehaviorDefinition().unlock(unlockConfig, lockHandle);
+        } catch (unlockError: any) {
+          logger?.warn(
+            `Failed to unlock BDEF ${name}: ${unlockError?.message || unlockError}`,
+          );
+        }
+      }
     }
 
     // Wait for object to be ready after update (long polling)

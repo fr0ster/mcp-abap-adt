@@ -74,19 +74,29 @@ export async function handleUpdateMetadataExtension(
       lockHandle = await client.getMetadataExtension().lock({ name: name });
     }
 
-    // Update
-    await client.getMetadataExtension().update(
-      {
-        name,
-        sourceCode: args.source_code,
-        transportRequest: args.transport_request,
-      },
-      { lockHandle },
-    );
-
-    // Unlock if we locked it internally
-    if (!args.lock_handle) {
-      await client.getMetadataExtension().unlock({ name: name }, lockHandle);
+    try {
+      // Update
+      await client.getMetadataExtension().update(
+        {
+          name,
+          sourceCode: args.source_code,
+          transportRequest: args.transport_request,
+        },
+        { lockHandle },
+      );
+    } finally {
+      // Always unlock if we locked it internally
+      if (!args.lock_handle && lockHandle) {
+        try {
+          await client
+            .getMetadataExtension()
+            .unlock({ name: name }, lockHandle);
+        } catch (unlockError: any) {
+          logger?.warn(
+            `Failed to unlock DDLX ${name}: ${unlockError?.message || unlockError}`,
+          );
+        }
+      }
     }
 
     // Wait for object to be ready after update (long polling)

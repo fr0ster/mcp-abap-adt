@@ -1,8 +1,7 @@
+// Import common low-level handlers
+import { handleActivateObject } from '../../../handlers/common/low/handleActivateObject';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';
-
-// // Import common low-level handlers
-// import { handleActivateObject } from "../../../handlers/common/low/handleActivateObject";
 // import { handleDeleteObject } from "../../../handlers/common/low/handleDeleteObject";
 // import { handleCheckObject } from "../../../handlers/common/low/handleCheckObject";
 // import { handleValidateObject } from "../../../handlers/common/low/handleValidateObject";
@@ -38,6 +37,8 @@ import { handleUnlockClassTestClasses } from '../../../handlers/class/low/handle
 import { handleUpdateClass as handleUpdateClassLow } from '../../../handlers/class/low/handleUpdateClass';
 import { handleUpdateClassTestClasses } from '../../../handlers/class/low/handleUpdateClassTestClasses';
 import { handleValidateClass } from '../../../handlers/class/low/handleValidateClass';
+// Import TOOL_DEFINITION from common low handlers
+import { TOOL_DEFINITION as ActivateObject_Tool } from '../../../handlers/common/low/handleActivateObject';
 import { handleActivateDataElement } from '../../../handlers/data_element/low/handleActivateDataElement';
 import { handleCheckDataElement } from '../../../handlers/data_element/low/handleCheckDataElement';
 import { handleCreateDataElement as handleCreateDataElementLow } from '../../../handlers/data_element/low/handleCreateDataElement';
@@ -136,9 +137,6 @@ import { handleUnlockView } from '../../../handlers/view/low/handleUnlockView';
 // Import low-level handlers - View
 import { handleUpdateView as handleUpdateViewLow } from '../../../handlers/view/low/handleUpdateView';
 import { handleValidateView } from '../../../handlers/view/low/handleValidateView';
-
-// // Import TOOL_DEFINITION from common low handlers
-// import { TOOL_DEFINITION as ActivateObject_Tool } from "../../../handlers/common/low/handleActivateObject";
 // import { TOOL_DEFINITION as DeleteObject_Tool } from "../../../handlers/common/low/handleDeleteObject";
 // import { TOOL_DEFINITION as CheckObject_Tool } from "../../../handlers/common/low/handleCheckObject";
 // import { TOOL_DEFINITION as ValidateObject_Tool } from "../../../handlers/common/low/handleValidateObject";
@@ -285,15 +283,18 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
    */
   getHandlers(): HandlerEntry[] {
     return [
-      // // Common low-level handlers
-      // {
-      //   toolDefinition: {
-      //     name: ActivateObject_Tool.name,
-      //     description: ActivateObject_Tool.description,
-      //     inputSchema: ActivateObject_Tool.inputSchema,
-      //   },
-      //   handler: (args: any) => { return handleActivateObject(this.context, args) },
-      // },
+      // Common low-level handlers
+      {
+        toolDefinition: {
+          name: ActivateObject_Tool.name,
+          description: ActivateObject_Tool.description,
+          inputSchema: ActivateObject_Tool.inputSchema,
+          available_in: ActivateObject_Tool.available_in,
+        },
+        handler: (args: any) => {
+          return handleActivateObject(this.context, args);
+        },
+      },
       // {
       //   toolDefinition: {
       //     name: CheckObject_Tool.name,

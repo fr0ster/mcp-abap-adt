@@ -2,9 +2,10 @@
 
 ## [Unreleased]
 
-## [5.0.5] - 2026-04-13
+## [5.0.6] - 2026-04-13
 
 ### Fixed
+- Stdio mode: log output no longer leaks into stdout (reserved for JSON-RPC protocol) — all logger fallbacks now use stderr or noop (closes #46)
 - CSRF token errors on write operations — `resolveSystemContext` was making HTTP requests on the handler connection, invalidating cookies/CSRF token (closes #45)
 
 ### Changed

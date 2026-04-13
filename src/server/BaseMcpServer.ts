@@ -297,9 +297,7 @@ export abstract class BaseMcpServer extends McpServer {
     // Establish session (CSRF token + cookies) before first request.
     // RFC needs this for the stateful session; HTTP needs it because some SAP systems
     // reject the very first request (403) when no session cookie is present.
-    if (typeof (connection as any).connect === 'function') {
-      await (connection as any).connect();
-    }
+    await connection.connect();
 
     // Cache connection for stdio mode (when sessionId === destination, it's stdio)
     // SSE/HTTP modes use different sessionId per request, so caching won't interfere

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-04-13
+
+### Added
+- 13 high-level Check tools for standalone syntax/semantic validation of ABAP objects (closes #54): CheckBehaviorDefinition, CheckClass, CheckDataElement, CheckDomain, CheckFunctionGroup, CheckFunctionModule, CheckInterface, CheckMetadataExtension, CheckPackage, CheckProgram, CheckStructure, CheckTable, CheckView
+- Normalized response contract for Check tools: shared `object_name` field, `session_id`/`session_state` stripped from output
+- `normalizeCheckResponse` utility for consistent Check tool response normalization
+- Integration tests for all 13 Check handlers with step-by-step logging
+
 ## [5.0.11] - 2026-04-13
 
 ### Fixed

@@ -3,12 +3,13 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: High-Level
-- Total tools: 113
+- Total tools: 127
 
 ## Navigation
 
 - [High-Level Group](#high-level-group)
   - [Behavior Definition](#high-level-behavior-definition)
+    - [CheckBehaviorDefinition](#checkbehaviordefinition-high-level-behavior-definition)
     - [CreateBehaviorDefinition](#createbehaviordefinition-high-level-behavior-definition)
     - [DeleteBehaviorDefinition](#deletebehaviordefinition-high-level-behavior-definition)
     - [GetBehaviorDefinition](#getbehaviordefinition-high-level-behavior-definition)
@@ -19,6 +20,7 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetBehaviorImplementation](#getbehaviorimplementation-high-level-behavior-implementation)
     - [UpdateBehaviorImplementation](#updatebehaviorimplementation-high-level-behavior-implementation)
   - [Class](#high-level-class)
+    - [CheckClass](#checkclass-high-level-class)
     - [CreateClass](#createclass-high-level-class)
     - [DeleteClass](#deleteclass-high-level-class)
     - [DeleteLocalDefinitions](#deletelocaldefinitions-high-level-class)
@@ -35,6 +37,8 @@ Generated from code in `src/handlers/**` (not from docs).
     - [UpdateLocalMacros](#updatelocalmacros-high-level-class)
     - [UpdateLocalTestClass](#updatelocaltestclass-high-level-class)
     - [UpdateLocalTypes](#updatelocaltypes-high-level-class)
+  - [Common](#high-level-common)
+    - [ActivateObjects](#activateobjects-high-level-common)
   - [Compact](#high-level-compact)
     - [HandlerActivate](#handleractivate-high-level-compact)
     - [HandlerCdsUnitTestResult](#handlercdsunittestresult-high-level-compact)
@@ -59,19 +63,24 @@ Generated from code in `src/handlers/**` (not from docs).
     - [HandlerUpdate](#handlerupdate-high-level-compact)
     - [HandlerValidate](#handlervalidate-high-level-compact)
   - [Data Element](#high-level-data-element)
+    - [CheckDataElement](#checkdataelement-high-level-data-element)
     - [CreateDataElement](#createdataelement-high-level-data-element)
     - [DeleteDataElement](#deletedataelement-high-level-data-element)
     - [GetDataElement](#getdataelement-high-level-data-element)
     - [UpdateDataElement](#updatedataelement-high-level-data-element)
   - [Ddlx](#high-level-ddlx)
+    - [CheckMetadataExtension](#checkmetadataextension-high-level-ddlx)
     - [CreateMetadataExtension](#createmetadataextension-high-level-ddlx)
     - [UpdateMetadataExtension](#updatemetadataextension-high-level-ddlx)
   - [Domain](#high-level-domain)
+    - [CheckDomain](#checkdomain-high-level-domain)
     - [CreateDomain](#createdomain-high-level-domain)
     - [DeleteDomain](#deletedomain-high-level-domain)
     - [GetDomain](#getdomain-high-level-domain)
     - [UpdateDomain](#updatedomain-high-level-domain)
   - [Function](#high-level-function)
+    - [CheckFunctionGroup](#checkfunctiongroup-high-level-function)
+    - [CheckFunctionModule](#checkfunctionmodule-high-level-function)
     - [CreateFunctionGroup](#createfunctiongroup-high-level-function)
     - [CreateFunctionModule](#createfunctionmodule-high-level-function)
     - [UpdateFunctionGroup](#updatefunctiongroup-high-level-function)
@@ -83,6 +92,7 @@ Generated from code in `src/handlers/**` (not from docs).
     - [DeleteFunctionModule](#deletefunctionmodule-high-level-function-module)
     - [GetFunctionModule](#getfunctionmodule-high-level-function-module)
   - [Interface](#high-level-interface)
+    - [CheckInterface](#checkinterface-high-level-interface)
     - [CreateInterface](#createinterface-high-level-interface)
     - [DeleteInterface](#deleteinterface-high-level-interface)
     - [GetInterface](#getinterface-high-level-interface)
@@ -91,9 +101,11 @@ Generated from code in `src/handlers/**` (not from docs).
     - [DeleteMetadataExtension](#deletemetadataextension-high-level-metadata-extension)
     - [GetMetadataExtension](#getmetadataextension-high-level-metadata-extension)
   - [Package](#high-level-package)
+    - [CheckPackage](#checkpackage-high-level-package)
     - [CreatePackage](#createpackage-high-level-package)
     - [GetPackage](#getpackage-high-level-package)
   - [Program](#high-level-program)
+    - [CheckProgram](#checkprogram-high-level-program)
     - [CreateProgram](#createprogram-high-level-program)
     - [DeleteProgram](#deleteprogram-high-level-program)
     - [GetProgram](#getprogram-high-level-program)
@@ -111,6 +123,7 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetServiceDefinition](#getservicedefinition-high-level-service-definition)
     - [UpdateServiceDefinition](#updateservicedefinition-high-level-service-definition)
   - [Structure](#high-level-structure)
+    - [CheckStructure](#checkstructure-high-level-structure)
     - [CreateStructure](#createstructure-high-level-structure)
     - [DeleteStructure](#deletestructure-high-level-structure)
     - [GetStructure](#getstructure-high-level-structure)
@@ -118,6 +131,7 @@ Generated from code in `src/handlers/**` (not from docs).
   - [System](#high-level-system)
     - [GetPackageTree](#getpackagetree-high-level-system)
   - [Table](#high-level-table)
+    - [CheckTable](#checktable-high-level-table)
     - [CreateTable](#createtable-high-level-table)
     - [DeleteTable](#deletetable-high-level-table)
     - [GetTable](#gettable-high-level-table)
@@ -139,6 +153,7 @@ Generated from code in `src/handlers/**` (not from docs).
     - [UpdateCdsUnitTest](#updatecdsunittest-high-level-unit-test)
     - [UpdateUnitTest](#updateunittest-high-level-unit-test)
   - [View](#high-level-view)
+    - [CheckView](#checkview-high-level-view)
     - [CreateView](#createview-high-level-view)
     - [DeleteView](#deleteview-high-level-view)
     - [GetView](#getview-high-level-view)
@@ -151,6 +166,17 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="high-level-behavior-definition"></a>
 ### High-Level / Behavior Definition
+
+<a id="checkbehaviordefinition-high-level-behavior-definition"></a>
+#### CheckBehaviorDefinition (High-Level / Behavior Definition)
+**Description:** Perform syntax check on an ABAP behavior definition (BDEF). Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/behavior_definition/high/handleCheckBehaviorDefinition.ts`
+
+**Parameters:**
+- `name` (string, required) - BehaviorDefinition name (e.g., ZI_MY_BDEF).
+
+---
 
 <a id="createbehaviordefinition-high-level-behavior-definition"></a>
 #### CreateBehaviorDefinition (High-Level / Behavior Definition)
@@ -267,6 +293,19 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="high-level-class"></a>
 ### High-Level / Class
+
+<a id="checkclass-high-level-class"></a>
+#### CheckClass (High-Level / Class)
+**Description:** Perform syntax check on an ABAP class. Can check existing class (active/inactive) or validate hypothetical source code. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/class/high/handleCheckClass.ts`
+
+**Parameters:**
+- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `source_code` (string, optional) - Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.
+- `version` (string, optional) - Version to check: 
+
+---
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
@@ -477,6 +516,21 @@ Generated from code in `src/handlers/**` (not from docs).
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
 - `local_types_code` (string, required) - Updated source code for local types.
 - `transport_request` (string, optional) - Transport request number.
+
+---
+
+<a id="high-level-common"></a>
+### High-Level / Common
+
+<a id="activateobjects-high-level-common"></a>
+#### ActivateObjects (High-Level / Common)
+**Description:** Activate one or multiple ABAP repository objects. Use after Create/Update when objects remain inactive, or for group activation of related objects (e.g., domains + data elements + tables together). Works with any object type.
+
+**Source:** `src/handlers/common/high/handleActivateObjects.ts`
+
+**Parameters:**
+- `objects` (array, required) - Array of objects to activate. Each object must have 
+- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true
 
 ---
 
@@ -883,6 +937,17 @@ Generated from code in `src/handlers/**` (not from docs).
 <a id="high-level-data-element"></a>
 ### High-Level / Data Element
 
+<a id="checkdataelement-high-level-data-element"></a>
+#### CheckDataElement (High-Level / Data Element)
+**Description:** Perform syntax check on an ABAP data element. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/data_element/high/handleCheckDataElement.ts`
+
+**Parameters:**
+- `data_element_name` (string, required) - Data element name (e.g., ZDE_MY_ELEMENT).
+
+---
+
 <a id="createdataelement-high-level-data-element"></a>
 #### CreateDataElement (High-Level / Data Element)
 **Description:** Create a new ABAP data element in SAP system with all required steps: create, activate, and verify.
@@ -963,6 +1028,17 @@ Generated from code in `src/handlers/**` (not from docs).
 <a id="high-level-ddlx"></a>
 ### High-Level / Ddlx
 
+<a id="checkmetadataextension-high-level-ddlx"></a>
+#### CheckMetadataExtension (High-Level / Ddlx)
+**Description:** Perform syntax check on an ABAP metadata extension (DDLX). Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/ddlx/high/handleCheckMetadataExtension.ts`
+
+**Parameters:**
+- `name` (string, required) - Metadata extension name (e.g., ZC_MY_DDLX).
+
+---
+
 <a id="createmetadataextension-high-level-ddlx"></a>
 #### CreateMetadataExtension (High-Level / Ddlx)
 **Description:** Create a new ABAP Metadata Extension (DDLX) in SAP system. Defines Fiori UI annotations, field labels, search help, and list/object page layout for CDS views.
@@ -995,6 +1071,17 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="high-level-domain"></a>
 ### High-Level / Domain
+
+<a id="checkdomain-high-level-domain"></a>
+#### CheckDomain (High-Level / Domain)
+**Description:** Perform syntax check on an ABAP domain. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/domain/high/handleCheckDomain.ts`
+
+**Parameters:**
+- `domain_name` (string, required) - Domain name (e.g., ZDM_MY_DOMAIN).
+
+---
 
 <a id="createdomain-high-level-domain"></a>
 #### CreateDomain (High-Level / Domain)
@@ -1068,6 +1155,30 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="high-level-function"></a>
 ### High-Level / Function
+
+<a id="checkfunctiongroup-high-level-function"></a>
+#### CheckFunctionGroup (High-Level / Function)
+**Description:** Perform syntax check on an ABAP function group. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/function/high/handleCheckFunctionGroup.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name (e.g., ZFGRP_MY_GROUP).
+
+---
+
+<a id="checkfunctionmodule-high-level-function"></a>
+#### CheckFunctionModule (High-Level / Function)
+**Description:** Perform syntax check on an ABAP function module. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/function/high/handleCheckFunctionModule.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name containing the function module.
+- `function_module_name` (string, required) - Function module name (e.g., Z_MY_FUNCTION).
+- `version` (string, optional) - Version to check: 
+
+---
 
 <a id="createfunctiongroup-high-level-function"></a>
 #### CreateFunctionGroup (High-Level / Function)
@@ -1185,6 +1296,17 @@ Generated from code in `src/handlers/**` (not from docs).
 <a id="high-level-interface"></a>
 ### High-Level / Interface
 
+<a id="checkinterface-high-level-interface"></a>
+#### CheckInterface (High-Level / Interface)
+**Description:** Perform syntax check on an ABAP interface. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/interface/high/handleCheckInterface.ts`
+
+**Parameters:**
+- `interface_name` (string, required) - Interface name (e.g., ZIF_MY_INTERFACE).
+
+---
+
 <a id="createinterface-high-level-interface"></a>
 #### CreateInterface (High-Level / Interface)
 **Description:** Create a new ABAP interface in SAP system. Creates the interface object in initial state. Use UpdateInterface to set source code afterwards.
@@ -1267,6 +1389,18 @@ Generated from code in `src/handlers/**` (not from docs).
 <a id="high-level-package"></a>
 ### High-Level / Package
 
+<a id="checkpackage-high-level-package"></a>
+#### CheckPackage (High-Level / Package)
+**Description:** Perform syntax check on an ABAP package. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/package/high/handleCheckPackage.ts`
+
+**Parameters:**
+- `package_name` (string, required) - Package name (e.g., ZMY_PACKAGE).
+- `super_package` (string, required) - Super package name (parent package).
+
+---
+
 <a id="createpackage-high-level-package"></a>
 #### CreatePackage (High-Level / Package)
 **Description:** Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.
@@ -1292,6 +1426,17 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="high-level-program"></a>
 ### High-Level / Program
+
+<a id="checkprogram-high-level-program"></a>
+#### CheckProgram (High-Level / Program)
+**Description:** Perform syntax check on an ABAP program. Returns syntax errors, warnings, and messages. Not available on cloud.
+
+**Source:** `src/handlers/program/high/handleCheckProgram.ts`
+
+**Parameters:**
+- `program_name` (string, required) - Program name (e.g., ZMCP_MY_PROGRAM).
+
+---
 
 <a id="createprogram-high-level-program"></a>
 #### CreateProgram (High-Level / Program)
@@ -1498,6 +1643,19 @@ Generated from code in `src/handlers/**` (not from docs).
 <a id="high-level-structure"></a>
 ### High-Level / Structure
 
+<a id="checkstructure-high-level-structure"></a>
+#### CheckStructure (High-Level / Structure)
+**Description:** Perform syntax check on an ABAP structure. Can check existing structure (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/structure/high/handleCheckStructure.ts`
+
+**Parameters:**
+- `ddl_code` (string, optional) - Optional: DDL source code to validate instead of the saved version.
+- `structure_name` (string, required) - Structure name (e.g., ZST_MY_STRUCTURE).
+- `version` (string, optional) - Version to check: 
+
+---
+
 <a id="createstructure-high-level-structure"></a>
 #### CreateStructure (High-Level / Structure)
 **Description:** Create a new ABAP structure in SAP system with fields and type references. Includes create, activate, and verify steps.
@@ -1573,6 +1731,19 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="high-level-table"></a>
 ### High-Level / Table
+
+<a id="checktable-high-level-table"></a>
+#### CheckTable (High-Level / Table)
+**Description:** Perform syntax check on an ABAP table. Can check existing table (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/table/high/handleCheckTable.ts`
+
+**Parameters:**
+- `ddl_code` (string, optional) - Optional: DDL source code to validate instead of the saved version.
+- `table_name` (string, required) - Table name (e.g., ZMCP_MY_TABLE).
+- `version` (string, optional) - Version to check: 
+
+---
 
 <a id="createtable-high-level-table"></a>
 #### CreateTable (High-Level / Table)
@@ -1815,6 +1986,19 @@ Generated from code in `src/handlers/**` (not from docs).
 <a id="high-level-view"></a>
 ### High-Level / View
 
+<a id="checkview-high-level-view"></a>
+#### CheckView (High-Level / View)
+**Description:** Perform syntax check on an ABAP CDS view. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/view/high/handleCheckView.ts`
+
+**Parameters:**
+- `ddl_source` (string, optional) - Optional: DDL source code to validate instead of the saved version.
+- `version` (string, optional) - Version to check: 
+- `view_name` (string, required) - CDS view name (e.g., ZI_MY_VIEW).
+
+---
+
 <a id="createview-high-level-view"></a>
 #### CreateView (High-Level / View)
 **Description:** Create CDS View or Classic View in SAP. Creates the view object in initial state. Use UpdateView to set DDL source code afterwards.
@@ -1867,4 +2051,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-04-12*
+*Last updated: 2026-04-13*

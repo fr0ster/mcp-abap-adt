@@ -5,9 +5,9 @@ Generated from code in `src/handlers/**` (not from docs).
 Tools available on legacy SAP systems (BASIS < 7.50) connected via RFC.
 Legacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.
 
-- Total tools: 121
+- Total tools: 129
 - Read-Only: 11
-- High-Level: 50
+- High-Level: 58
 - Low-Level: 60
 
 ## Navigation
@@ -34,6 +34,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [ReadView](#readview-read-only-view)
 - [High-Level Group](#high-level-group)
   - [Class](#high-level-class)
+    - [CheckClass](#checkclass-high-level-class)
     - [CreateClass](#createclass-high-level-class)
     - [DeleteClass](#deleteclass-high-level-class)
     - [DeleteLocalDefinitions](#deletelocaldefinitions-high-level-class)
@@ -50,7 +51,11 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [UpdateLocalMacros](#updatelocalmacros-high-level-class)
     - [UpdateLocalTestClass](#updatelocaltestclass-high-level-class)
     - [UpdateLocalTypes](#updatelocaltypes-high-level-class)
+  - [Common](#high-level-common)
+    - [ActivateObjects](#activateobjects-high-level-common)
   - [Function](#high-level-function)
+    - [CheckFunctionGroup](#checkfunctiongroup-high-level-function)
+    - [CheckFunctionModule](#checkfunctionmodule-high-level-function)
     - [CreateFunctionGroup](#createfunctiongroup-high-level-function)
     - [CreateFunctionModule](#createfunctionmodule-high-level-function)
     - [UpdateFunctionGroup](#updatefunctiongroup-high-level-function)
@@ -62,13 +67,16 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [DeleteFunctionModule](#deletefunctionmodule-high-level-function-module)
     - [GetFunctionModule](#getfunctionmodule-high-level-function-module)
   - [Interface](#high-level-interface)
+    - [CheckInterface](#checkinterface-high-level-interface)
     - [CreateInterface](#createinterface-high-level-interface)
     - [DeleteInterface](#deleteinterface-high-level-interface)
     - [GetInterface](#getinterface-high-level-interface)
     - [UpdateInterface](#updateinterface-high-level-interface)
   - [Package](#high-level-package)
+    - [CheckPackage](#checkpackage-high-level-package)
     - [GetPackage](#getpackage-high-level-package)
   - [Program](#high-level-program)
+    - [CheckProgram](#checkprogram-high-level-program)
     - [CreateProgram](#createprogram-high-level-program)
     - [DeleteProgram](#deleteprogram-high-level-program)
     - [GetProgram](#getprogram-high-level-program)
@@ -88,6 +96,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [UpdateCdsUnitTest](#updatecdsunittest-high-level-unit-test)
     - [UpdateUnitTest](#updateunittest-high-level-unit-test)
   - [View](#high-level-view)
+    - [CheckView](#checkview-high-level-view)
     - [CreateView](#createview-high-level-view)
     - [DeleteView](#deleteview-high-level-view)
     - [GetView](#getview-high-level-view)
@@ -351,6 +360,21 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 <a id="high-level-class"></a>
 ### High-Level / Class
 
+<a id="checkclass-high-level-class"></a>
+#### CheckClass (High-Level / Class)
+**Description:** Perform syntax check on an ABAP class. Can check existing class (active/inactive) or validate hypothetical source code. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/class/high/handleCheckClass.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `source_code` (string, optional) - Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.
+- `version` (string, optional) - Version to check: 
+
+---
+
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
 **Description:** Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code afterwards.
@@ -595,8 +619,53 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
+<a id="high-level-common"></a>
+### High-Level / Common
+
+<a id="activateobjects-high-level-common"></a>
+#### ActivateObjects (High-Level / Common)
+**Description:** Activate one or multiple ABAP repository objects. Use after Create/Update when objects remain inactive, or for group activation of related objects (e.g., domains + data elements + tables together). Works with any object type.
+
+**Source:** `src/handlers/common/high/handleActivateObjects.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `objects` (array, required) - Array of objects to activate. Each object must have 
+- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true
+
+---
+
 <a id="high-level-function"></a>
 ### High-Level / Function
+
+<a id="checkfunctiongroup-high-level-function"></a>
+#### CheckFunctionGroup (High-Level / Function)
+**Description:** Perform syntax check on an ABAP function group. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/function/high/handleCheckFunctionGroup.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name (e.g., ZFGRP_MY_GROUP).
+
+---
+
+<a id="checkfunctionmodule-high-level-function"></a>
+#### CheckFunctionModule (High-Level / Function)
+**Description:** Perform syntax check on an ABAP function module. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/function/high/handleCheckFunctionModule.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name containing the function module.
+- `function_module_name` (string, required) - Function module name (e.g., Z_MY_FUNCTION).
+- `version` (string, optional) - Version to check: 
+
+---
 
 <a id="createfunctiongroup-high-level-function"></a>
 #### CreateFunctionGroup (High-Level / Function)
@@ -730,6 +799,19 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 <a id="high-level-interface"></a>
 ### High-Level / Interface
 
+<a id="checkinterface-high-level-interface"></a>
+#### CheckInterface (High-Level / Interface)
+**Description:** Perform syntax check on an ABAP interface. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/interface/high/handleCheckInterface.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `interface_name` (string, required) - Interface name (e.g., ZIF_MY_INTERFACE).
+
+---
+
 <a id="createinterface-high-level-interface"></a>
 #### CreateInterface (High-Level / Interface)
 **Description:** Create a new ABAP interface in SAP system. Creates the interface object in initial state. Use UpdateInterface to set source code afterwards.
@@ -793,6 +875,20 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 <a id="high-level-package"></a>
 ### High-Level / Package
 
+<a id="checkpackage-high-level-package"></a>
+#### CheckPackage (High-Level / Package)
+**Description:** Perform syntax check on an ABAP package. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/package/high/handleCheckPackage.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `package_name` (string, required) - Package name (e.g., ZMY_PACKAGE).
+- `super_package` (string, required) - Super package name (parent package).
+
+---
+
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
 **Description:** Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version.
@@ -809,6 +905,19 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="high-level-program"></a>
 ### High-Level / Program
+
+<a id="checkprogram-high-level-program"></a>
+#### CheckProgram (High-Level / Program)
+**Description:** Perform syntax check on an ABAP program. Returns syntax errors, warnings, and messages. Not available on cloud.
+
+**Source:** `src/handlers/program/high/handleCheckProgram.ts`
+
+**Available in:** `onprem`, `legacy`
+
+**Parameters:**
+- `program_name` (string, required) - Program name (e.g., ZMCP_MY_PROGRAM).
+
+---
 
 <a id="createprogram-high-level-program"></a>
 #### CreateProgram (High-Level / Program)
@@ -1069,6 +1178,21 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="high-level-view"></a>
 ### High-Level / View
+
+<a id="checkview-high-level-view"></a>
+#### CheckView (High-Level / View)
+**Description:** Perform syntax check on an ABAP CDS view. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/view/high/handleCheckView.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_source` (string, optional) - Optional: DDL source code to validate instead of the saved version.
+- `version` (string, optional) - Version to check: 
+- `view_name` (string, required) - CDS view name (e.g., ZI_MY_VIEW).
+
+---
 
 <a id="createview-high-level-view"></a>
 #### CreateView (High-Level / View)
@@ -2129,4 +2253,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-04-12*
+*Last updated: 2026-04-13*

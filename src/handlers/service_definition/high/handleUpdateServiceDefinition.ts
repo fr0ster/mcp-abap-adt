@@ -151,6 +151,17 @@ export async function handleUpdateServiceDefinition(
         }
       }
 
+      // Wait for object to be ready after update (long polling)
+      try {
+        await client
+          .getServiceDefinition()
+          .read({ serviceDefinitionName }, 'inactive', {
+            withLongPolling: true,
+          });
+      } catch {
+        // Continue anyway — activation will fail explicitly if object isn't ready
+      }
+
       // Activate if requested
       if (shouldActivate) {
         const activateState = await client

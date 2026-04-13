@@ -205,6 +205,15 @@ export async function handleCreateDomain(
       await client.getDomain().unlock({ domainName }, lockHandle);
       lockHandle = undefined;
 
+      // Wait for object to be ready after update (long polling)
+      try {
+        await client
+          .getDomain()
+          .read({ domainName }, 'inactive', { withLongPolling: true });
+      } catch {
+        // Continue anyway — activation will fail explicitly if object isn't ready
+      }
+
       // Check
       try {
         await safeCheckOperation(

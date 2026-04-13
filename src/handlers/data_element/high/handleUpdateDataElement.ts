@@ -293,6 +293,15 @@ export async function handleUpdateDataElement(
         }
       }
 
+      // Wait for object to be ready after update (long polling)
+      try {
+        await client
+          .getDataElement()
+          .read({ dataElementName }, 'inactive', { withLongPolling: true });
+      } catch {
+        // Continue anyway — activation will fail explicitly if object isn't ready
+      }
+
       // Activate if requested
       if (shouldActivate) {
         await client.getDataElement().activate({ dataElementName });

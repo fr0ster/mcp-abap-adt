@@ -136,6 +136,17 @@ export async function handleUpdateFunctionModule(
         }
       }
 
+      // Wait for object to be ready after update (long polling)
+      try {
+        await client
+          .getFunctionModule()
+          .read({ functionModuleName, functionGroupName }, 'inactive', {
+            withLongPolling: true,
+          });
+      } catch {
+        // Continue anyway — activation will fail explicitly if object isn't ready
+      }
+
       // Activate if requested (after unlock)
       if (shouldActivate) {
         await client.getFunctionModule().activate({

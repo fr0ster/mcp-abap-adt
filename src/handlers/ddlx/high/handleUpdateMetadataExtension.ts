@@ -89,6 +89,15 @@ export async function handleUpdateMetadataExtension(
       await client.getMetadataExtension().unlock({ name: name }, lockHandle);
     }
 
+    // Wait for object to be ready after update (long polling)
+    try {
+      await client
+        .getMetadataExtension()
+        .read({ name }, 'inactive', { withLongPolling: true });
+    } catch {
+      // Continue anyway — activation will fail explicitly if object isn't ready
+    }
+
     // Activate if requested
     if (shouldActivate) {
       await client.getMetadataExtension().activate({ name: name });

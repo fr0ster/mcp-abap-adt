@@ -132,6 +132,15 @@ export async function handleCreateBehaviorDefinition(
       };
       await client.getBehaviorDefinition().unlock(unlockConfig, lockHandle);
 
+      // Wait for object to be ready after update (long polling)
+      try {
+        await client
+          .getBehaviorDefinition()
+          .read({ name }, 'inactive', { withLongPolling: true });
+      } catch {
+        // Continue anyway — activation will fail explicitly if object isn't ready
+      }
+
       // Activate if requested - using types from adt-clients
       if (shouldActivate) {
         const activateConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {

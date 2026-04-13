@@ -77,6 +77,18 @@ export function getSystemContext(): IAdtSystemContext {
   return cached || {};
 }
 
+/**
+ * Set system context explicitly (safe, no HTTP requests).
+ * Use this when system info is known upfront (e.g., from BTP destination metadata).
+ */
+export function setSystemContext(context: Partial<IAdtSystemContext>): void {
+  cached = {
+    ...cached,
+    ...context,
+    isLegacy: context.isLegacy ?? cached?.isLegacy ?? detectLegacy(),
+  };
+}
+
 export function resetSystemContextCache() {
   cached = undefined;
 }

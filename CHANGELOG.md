@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [5.0.5] - 2026-04-13
+
+### Fixed
+- CSRF token errors on write operations — `resolveSystemContext` was making HTTP requests on the handler connection, invalidating cookies/CSRF token (closes #45)
+
+### Changed
+- **Breaking:** Removed `resolveSystemContext` and `resetSystemContextCache` from public API — these were internal functions that mutated connection state. Use `getSystemContext()` (read-only) and `setSystemContext()` instead.
+- `EmbeddableMcpServer` now accepts `systemContext` option to set system info without HTTP calls
+- `BaseMcpServer` no longer calls `resolveSystemContext` on the handler connection — system context is resolved once at startup on a temporary connection
+
 ## [5.0.4] - 2026-04-13
 
 ### Added

@@ -13,6 +13,8 @@ import type {
   IHandlersRegistry,
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
+import type { IAdtSystemContext } from '../lib/systemContext.js';
+import { setSystemContext } from '../lib/systemContext.js';
 import { BaseMcpServer } from './BaseMcpServer.js';
 
 const DEFAULT_VERSION = process.env.npm_package_version ?? '1.0.0';
@@ -57,6 +59,13 @@ export interface EmbeddableMcpServerOptions {
    * @default from package.json or '1.0.0'
    */
   version?: string;
+
+  /**
+   * System context (masterSystem, responsible, client, isLegacy).
+   * Set this to avoid HTTP calls that resolve system info at runtime.
+   * If not provided, handlers will use whatever is available from env vars.
+   */
+  systemContext?: Partial<IAdtSystemContext>;
 }
 
 /**
@@ -94,6 +103,10 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     });
 
     this.injectedConnection = options.connection;
+
+    if (options.systemContext) {
+      setSystemContext(options.systemContext);
+    }
 
     // Use provided registry or create default based on exposition
     const registry =

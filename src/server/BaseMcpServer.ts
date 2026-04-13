@@ -13,10 +13,7 @@ import type {
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
-import {
-  resetSystemContextCache,
-  resolveSystemContext,
-} from '../lib/systemContext.js';
+import { resolveSystemContext } from '../lib/systemContext.js';
 import { registerAuthBroker } from '../lib/utils.js';
 import type { ConnectionContext } from './ConnectionContext.js';
 
@@ -278,13 +275,6 @@ export abstract class BaseMcpServer extends McpServer {
       return this.cachedConnection;
     }
 
-    // For non-stdio connections, reset system context cache so each request
-    // resolves fresh (different requests may target different systems)
-    const isStdio = destination && sessionId === destination;
-    if (!isStdio) {
-      resetSystemContextCache();
-    }
-
     // Create tokenRefresher from AuthBroker for automatic JWT token refresh on 401
     let tokenRefresher: any;
     if (
@@ -311,16 +301,6 @@ export abstract class BaseMcpServer extends McpServer {
     if (typeof (connection as any).connect === 'function') {
       await (connection as any).connect();
     }
-
-    // Build overrides from metadata (HTTP headers)
-    const metadata = this.connectionContext?.metadata || {};
-    const masterSystem = metadata.masterSystem as string | undefined;
-    const responsible = metadata.responsible as string | undefined;
-    const overrides =
-      masterSystem || responsible ? { masterSystem, responsible } : undefined;
-
-    // Resolve system context (masterSystem/responsible) once per connection
-    await resolveSystemContext(connection, overrides);
 
     // Cache connection for stdio mode (when sessionId === destination, it's stdio)
     // SSE/HTTP modes use different sessionId per request, so caching won't interfere

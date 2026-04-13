@@ -1852,12 +1852,8 @@ function debugLog(message: string): void {
 // Re-export header constants from interfaces package
 export * from '@mcp-abap-adt/interfaces';
 export type { IAdtSystemContext } from './systemContext.js';
-// Re-export system context for consumers that bypass BaseMcpServer
-export {
-  getSystemContext,
-  resetSystemContextCache,
-  resolveSystemContext,
-} from './systemContext.js';
+// Re-export safe system context accessors for consumers (no HTTP, no connection mutation)
+export { getSystemContext, setSystemContext } from './systemContext.js';
 
 export function getConfig(): SapConfig {
   debugLog(`[MCP-CONFIG] getConfig() called\n`);

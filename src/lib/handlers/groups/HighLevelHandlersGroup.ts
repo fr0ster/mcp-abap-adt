@@ -14,6 +14,11 @@ import {
   handleUpdateBehaviorDefinition as handleUpdateBehaviorDefinitionHigh,
   TOOL_DEFINITION as UpdateBdef_Tool,
 } from '../../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
+// Per-type activate handlers (reused from low-level)
+import {
+  TOOL_DEFINITION as ActivateBehaviorDefinition_Tool,
+  handleActivateBehaviorDefinition,
+} from '../../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
 import {
   TOOL_DEFINITION as CreateBehaviorImplementation_Tool,
   handleCreateBehaviorImplementation,
@@ -95,6 +100,10 @@ import {
   TOOL_DEFINITION as UpdateLocalTypes_Tool,
 } from '../../../handlers/class/high/handleUpdateLocalTypes';
 import {
+  TOOL_DEFINITION as ActivateClass_Tool,
+  handleActivateClass,
+} from '../../../handlers/class/low/handleActivateClass';
+import {
   TOOL_DEFINITION as ActivateObjects_Tool,
   handleActivateObjects,
 } from '../../../handlers/common/high/handleActivateObjects';
@@ -115,6 +124,10 @@ import {
   TOOL_DEFINITION as UpdateDataElementHigh_Tool,
 } from '../../../handlers/data_element/high/handleUpdateDataElement';
 import {
+  TOOL_DEFINITION as ActivateDataElement_Tool,
+  handleActivateDataElement,
+} from '../../../handlers/data_element/low/handleActivateDataElement';
+import {
   TOOL_DEFINITION as CreateDdlx_Tool,
   handleCreateMetadataExtension,
 } from '../../../handlers/ddlx/high/handleCreateMetadataExtension';
@@ -122,6 +135,10 @@ import {
   handleUpdateMetadataExtension as handleUpdateMetadataExtensionHigh,
   TOOL_DEFINITION as UpdateDdlx_Tool,
 } from '../../../handlers/ddlx/high/handleUpdateMetadataExtension';
+import {
+  TOOL_DEFINITION as ActivateMetadataExtension_Tool,
+  handleActivateMetadataExtension,
+} from '../../../handlers/ddlx/low/handleActivateMetadataExtension';
 import {
   TOOL_DEFINITION as CreateDomain_Tool,
   handleCreateDomain,
@@ -139,6 +156,10 @@ import {
   TOOL_DEFINITION as UpdateDomainHigh_Tool,
 } from '../../../handlers/domain/high/handleUpdateDomain';
 import {
+  TOOL_DEFINITION as ActivateDomain_Tool,
+  handleActivateDomain,
+} from '../../../handlers/domain/low/handleActivateDomain';
+import {
   TOOL_DEFINITION as CreateFunctionGroup_Tool,
   handleCreateFunctionGroup,
 } from '../../../handlers/function/high/handleCreateFunctionGroup';
@@ -154,6 +175,14 @@ import {
   handleUpdateFunctionModule as handleUpdateFunctionModuleHigh,
   TOOL_DEFINITION as UpdateFunctionModuleHigh_Tool,
 } from '../../../handlers/function/high/handleUpdateFunctionModule';
+import {
+  TOOL_DEFINITION as ActivateFunctionGroup_Tool,
+  handleActivateFunctionGroup,
+} from '../../../handlers/function/low/handleActivateFunctionGroup';
+import {
+  TOOL_DEFINITION as ActivateFunctionModule_Tool,
+  handleActivateFunctionModule,
+} from '../../../handlers/function/low/handleActivateFunctionModule';
 import {
   TOOL_DEFINITION as DeleteFunctionGroup_Tool,
   handleDeleteFunctionGroup,
@@ -186,6 +215,10 @@ import {
   handleUpdateInterface as handleUpdateInterfaceHigh,
   TOOL_DEFINITION as UpdateInterfaceHigh_Tool,
 } from '../../../handlers/interface/high/handleUpdateInterface';
+import {
+  TOOL_DEFINITION as ActivateInterface_Tool,
+  handleActivateInterface,
+} from '../../../handlers/interface/low/handleActivateInterface';
 import {
   TOOL_DEFINITION as DeleteMetadataExtension_Tool,
   handleDeleteMetadataExtension,
@@ -220,6 +253,10 @@ import {
   handleUpdateProgram as handleUpdateProgramHigh,
   TOOL_DEFINITION as UpdateProgramHigh_Tool,
 } from '../../../handlers/program/high/handleUpdateProgram';
+import {
+  TOOL_DEFINITION as ActivateProgram_Tool,
+  handleActivateProgram,
+} from '../../../handlers/program/low/handleActivateProgram';
 import {
   TOOL_DEFINITION as CreateServiceBinding_Tool,
   handleCreateServiceBinding,
@@ -277,6 +314,10 @@ import {
   TOOL_DEFINITION as UpdateStructureHigh_Tool,
 } from '../../../handlers/structure/high/handleUpdateStructure';
 import {
+  TOOL_DEFINITION as ActivateStructure_Tool,
+  handleActivateStructure,
+} from '../../../handlers/structure/low/handleActivateStructure';
+import {
   TOOL_DEFINITION as CreateTable_Tool,
   handleCreateTable,
 } from '../../../handlers/table/high/handleCreateTable';
@@ -292,6 +333,10 @@ import {
   handleUpdateTable as handleUpdateTableHigh,
   TOOL_DEFINITION as UpdateTableHigh_Tool,
 } from '../../../handlers/table/high/handleUpdateTable';
+import {
+  TOOL_DEFINITION as ActivateTable_Tool,
+  handleActivateTable,
+} from '../../../handlers/table/low/handleActivateTable';
 import {
   TOOL_DEFINITION as CreateTransport_Tool,
   handleCreateTransport,
@@ -364,6 +409,10 @@ import {
   handleUpdateView as handleUpdateViewHigh,
   TOOL_DEFINITION as UpdateViewHigh_Tool,
 } from '../../../handlers/view/high/handleUpdateView';
+import {
+  TOOL_DEFINITION as ActivateView_Tool,
+  handleActivateView,
+} from '../../../handlers/view/low/handleActivateView';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';
 
@@ -385,10 +434,59 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
     };
 
     return [
-      // Common
+      // Common — group activation
       {
         toolDefinition: ActivateObjects_Tool,
         handler: withContext(handleActivateObjects),
+      },
+      // Per-type activation
+      {
+        toolDefinition: ActivateDomain_Tool,
+        handler: withContext(handleActivateDomain),
+      },
+      {
+        toolDefinition: ActivateDataElement_Tool,
+        handler: withContext(handleActivateDataElement),
+      },
+      {
+        toolDefinition: ActivateTable_Tool,
+        handler: withContext(handleActivateTable),
+      },
+      {
+        toolDefinition: ActivateStructure_Tool,
+        handler: withContext(handleActivateStructure),
+      },
+      {
+        toolDefinition: ActivateView_Tool,
+        handler: withContext(handleActivateView),
+      },
+      {
+        toolDefinition: ActivateClass_Tool,
+        handler: withContext(handleActivateClass),
+      },
+      {
+        toolDefinition: ActivateInterface_Tool,
+        handler: withContext(handleActivateInterface),
+      },
+      {
+        toolDefinition: ActivateProgram_Tool,
+        handler: withContext(handleActivateProgram),
+      },
+      {
+        toolDefinition: ActivateFunctionModule_Tool,
+        handler: withContext(handleActivateFunctionModule),
+      },
+      {
+        toolDefinition: ActivateFunctionGroup_Tool,
+        handler: withContext(handleActivateFunctionGroup),
+      },
+      {
+        toolDefinition: ActivateBehaviorDefinition_Tool,
+        handler: withContext(handleActivateBehaviorDefinition),
+      },
+      {
+        toolDefinition: ActivateMetadataExtension_Tool,
+        handler: withContext(handleActivateMetadataExtension),
       },
       {
         toolDefinition: CreatePackage_Tool,

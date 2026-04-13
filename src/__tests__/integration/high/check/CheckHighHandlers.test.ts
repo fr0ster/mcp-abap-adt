@@ -74,24 +74,32 @@ describe('Check High-Level Handlers Integration', () => {
       'should check existing class and return normalized response',
       async () => {
         await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params } = context;
+          const { connection, params, logger } = context;
+          const objectName = params.class_name;
+
+          logger?.info(`   • check: ${objectName}`);
           const checkLogger = createTestLogger('check-class');
           const response = await tester.invokeToolOrHandler(
             'CheckClass',
-            { class_name: params.class_name },
+            { class_name: objectName },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckClass(ctx, { class_name: params.class_name });
+              return handleCheckClass(ctx, { class_name: objectName });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, params.class_name);
-          expect(data.class_name).toBe(params.class_name.toUpperCase());
+          assertNormalizedCheckResponse(data, objectName);
+          expect(data.class_name).toBe(objectName.toUpperCase());
+
+          const cr = data.check_result;
+          logger?.success(
+            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+          );
         });
       },
       getTimeout('medium'),
@@ -128,24 +136,32 @@ describe('Check High-Level Handlers Integration', () => {
       'should check existing behavior definition and return normalized response',
       async () => {
         await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params } = context;
+          const { connection, params, logger } = context;
+          const objectName = params.name;
+
+          logger?.info(`   • check: ${objectName}`);
           const checkLogger = createTestLogger('check-bdef');
           const response = await tester.invokeToolOrHandler(
             'CheckBehaviorDefinition',
-            { name: params.name },
+            { name: objectName },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckBehaviorDefinition(ctx, { name: params.name });
+              return handleCheckBehaviorDefinition(ctx, { name: objectName });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, params.name);
-          expect(data.name).toBe(params.name.toUpperCase());
+          assertNormalizedCheckResponse(data, objectName);
+          expect(data.name).toBe(objectName.toUpperCase());
+
+          const cr = data.check_result;
+          logger?.success(
+            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+          );
         });
       },
       getTimeout('medium'),
@@ -182,24 +198,32 @@ describe('Check High-Level Handlers Integration', () => {
       'should check existing view and return normalized response',
       async () => {
         await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params } = context;
+          const { connection, params, logger } = context;
+          const objectName = params.view_name;
+
+          logger?.info(`   • check: ${objectName}`);
           const checkLogger = createTestLogger('check-view');
           const response = await tester.invokeToolOrHandler(
             'CheckView',
-            { view_name: params.view_name },
+            { view_name: objectName },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckView(ctx, { view_name: params.view_name });
+              return handleCheckView(ctx, { view_name: objectName });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, params.view_name);
-          expect(data.view_name).toBe(params.view_name.toUpperCase());
+          assertNormalizedCheckResponse(data, objectName);
+          expect(data.view_name).toBe(objectName.toUpperCase());
+
+          const cr = data.check_result;
+          logger?.success(
+            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+          );
         });
       },
       getTimeout('medium'),
@@ -236,26 +260,32 @@ describe('Check High-Level Handlers Integration', () => {
       'should check existing domain and return normalized response',
       async () => {
         await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params } = context;
+          const { connection, params, logger } = context;
+          const objectName = params.domain_name;
+
+          logger?.info(`   • check: ${objectName}`);
           const checkLogger = createTestLogger('check-domain');
           const response = await tester.invokeToolOrHandler(
             'CheckDomain',
-            { domain_name: params.domain_name },
+            { domain_name: objectName },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckDomain(ctx, {
-                domain_name: params.domain_name,
-              });
+              return handleCheckDomain(ctx, { domain_name: objectName });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, params.domain_name);
-          expect(data.domain_name).toBe(params.domain_name.toUpperCase());
+          assertNormalizedCheckResponse(data, objectName);
+          expect(data.domain_name).toBe(objectName.toUpperCase());
+
+          const cr = data.check_result;
+          logger?.success(
+            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+          );
         });
       },
       getTimeout('medium'),
@@ -292,27 +322,33 @@ describe('Check High-Level Handlers Integration', () => {
       'should check existing data element and return normalized response',
       async () => {
         await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params } = context;
+          const { connection, params, logger } = context;
+          const objectName = params.data_element_name;
+
+          logger?.info(`   • check: ${objectName}`);
           const checkLogger = createTestLogger('check-dtel');
           const response = await tester.invokeToolOrHandler(
             'CheckDataElement',
-            { data_element_name: params.data_element_name },
+            { data_element_name: objectName },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
               return handleCheckDataElement(ctx, {
-                data_element_name: params.data_element_name,
+                data_element_name: objectName,
               });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, params.data_element_name);
-          expect(data.data_element_name).toBe(
-            params.data_element_name.toUpperCase(),
+          assertNormalizedCheckResponse(data, objectName);
+          expect(data.data_element_name).toBe(objectName.toUpperCase());
+
+          const cr = data.check_result;
+          logger?.success(
+            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
           );
         });
       },
@@ -350,24 +386,32 @@ describe('Check High-Level Handlers Integration', () => {
       'should check existing table and return normalized response',
       async () => {
         await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params } = context;
+          const { connection, params, logger } = context;
+          const objectName = params.table_name;
+
+          logger?.info(`   • check: ${objectName}`);
           const checkLogger = createTestLogger('check-table');
           const response = await tester.invokeToolOrHandler(
             'CheckTable',
-            { table_name: params.table_name },
+            { table_name: objectName },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckTable(ctx, { table_name: params.table_name });
+              return handleCheckTable(ctx, { table_name: objectName });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, params.table_name);
-          expect(data.table_name).toBe(params.table_name.toUpperCase());
+          assertNormalizedCheckResponse(data, objectName);
+          expect(data.table_name).toBe(objectName.toUpperCase());
+
+          const cr = data.check_result;
+          logger?.success(
+            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+          );
         });
       },
       getTimeout('medium'),
@@ -404,26 +448,32 @@ describe('Check High-Level Handlers Integration', () => {
       'should check existing structure and return normalized response',
       async () => {
         await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params } = context;
+          const { connection, params, logger } = context;
+          const objectName = params.structure_name;
+
+          logger?.info(`   • check: ${objectName}`);
           const checkLogger = createTestLogger('check-structure');
           const response = await tester.invokeToolOrHandler(
             'CheckStructure',
-            { structure_name: params.structure_name },
+            { structure_name: objectName },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckStructure(ctx, {
-                structure_name: params.structure_name,
-              });
+              return handleCheckStructure(ctx, { structure_name: objectName });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, params.structure_name);
-          expect(data.structure_name).toBe(params.structure_name.toUpperCase());
+          assertNormalizedCheckResponse(data, objectName);
+          expect(data.structure_name).toBe(objectName.toUpperCase());
+
+          const cr = data.check_result;
+          logger?.success(
+            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+          );
         });
       },
       getTimeout('medium'),
@@ -460,26 +510,32 @@ describe('Check High-Level Handlers Integration', () => {
       'should check existing interface and return normalized response',
       async () => {
         await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params } = context;
+          const { connection, params, logger } = context;
+          const objectName = params.interface_name;
+
+          logger?.info(`   • check: ${objectName}`);
           const checkLogger = createTestLogger('check-interface');
           const response = await tester.invokeToolOrHandler(
             'CheckInterface',
-            { interface_name: params.interface_name },
+            { interface_name: objectName },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckInterface(ctx, {
-                interface_name: params.interface_name,
-              });
+              return handleCheckInterface(ctx, { interface_name: objectName });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, params.interface_name);
-          expect(data.interface_name).toBe(params.interface_name.toUpperCase());
+          assertNormalizedCheckResponse(data, objectName);
+          expect(data.interface_name).toBe(objectName.toUpperCase());
+
+          const cr = data.check_result;
+          logger?.success(
+            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+          );
         });
       },
       getTimeout('medium'),
@@ -516,12 +572,15 @@ describe('Check High-Level Handlers Integration', () => {
       'should check existing package and return normalized response',
       async () => {
         await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params } = context;
+          const { connection, params, logger } = context;
+          const objectName = params.package_name;
+
+          logger?.info(`   • check: ${objectName}`);
           const checkLogger = createTestLogger('check-package');
           const response = await tester.invokeToolOrHandler(
             'CheckPackage',
             {
-              package_name: params.package_name,
+              package_name: objectName,
               super_package: params.super_package,
             },
             async () => {
@@ -530,7 +589,7 @@ describe('Check High-Level Handlers Integration', () => {
                 logger: checkLogger,
               });
               return handleCheckPackage(ctx, {
-                package_name: params.package_name,
+                package_name: objectName,
                 super_package: params.super_package,
               });
             },
@@ -538,8 +597,13 @@ describe('Check High-Level Handlers Integration', () => {
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, params.package_name);
-          expect(data.package_name).toBe(params.package_name.toUpperCase());
+          assertNormalizedCheckResponse(data, objectName);
+          expect(data.package_name).toBe(objectName.toUpperCase());
+
+          const cr = data.check_result;
+          logger?.success(
+            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+          );
         });
       },
       getTimeout('medium'),
@@ -576,26 +640,32 @@ describe('Check High-Level Handlers Integration', () => {
       'should check existing program and return normalized response',
       async () => {
         await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params } = context;
+          const { connection, params, logger } = context;
+          const objectName = params.program_name;
+
+          logger?.info(`   • check: ${objectName}`);
           const checkLogger = createTestLogger('check-program');
           const response = await tester.invokeToolOrHandler(
             'CheckProgram',
-            { program_name: params.program_name },
+            { program_name: objectName },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckProgram(ctx, {
-                program_name: params.program_name,
-              });
+              return handleCheckProgram(ctx, { program_name: objectName });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, params.program_name);
-          expect(data.program_name).toBe(params.program_name.toUpperCase());
+          assertNormalizedCheckResponse(data, objectName);
+          expect(data.program_name).toBe(objectName.toUpperCase());
+
+          const cr = data.check_result;
+          logger?.success(
+            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+          );
         });
       },
       getTimeout('medium'),
@@ -632,27 +702,33 @@ describe('Check High-Level Handlers Integration', () => {
       'should check existing function group and return normalized response',
       async () => {
         await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params } = context;
+          const { connection, params, logger } = context;
+          const objectName = params.function_group_name;
+
+          logger?.info(`   • check: ${objectName}`);
           const checkLogger = createTestLogger('check-fgrp');
           const response = await tester.invokeToolOrHandler(
             'CheckFunctionGroup',
-            { function_group_name: params.function_group_name },
+            { function_group_name: objectName },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
               return handleCheckFunctionGroup(ctx, {
-                function_group_name: params.function_group_name,
+                function_group_name: objectName,
               });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, params.function_group_name);
-          expect(data.function_group_name).toBe(
-            params.function_group_name.toUpperCase(),
+          assertNormalizedCheckResponse(data, objectName);
+          expect(data.function_group_name).toBe(objectName.toUpperCase());
+
+          const cr = data.check_result;
+          logger?.success(
+            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
           );
         });
       },
@@ -690,13 +766,18 @@ describe('Check High-Level Handlers Integration', () => {
       'should check existing function module and return normalized response',
       async () => {
         await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params } = context;
+          const { connection, params, logger } = context;
+          const objectName = params.function_module_name;
+
+          logger?.info(
+            `   • check: ${objectName} (group: ${params.function_group_name})`,
+          );
           const checkLogger = createTestLogger('check-fm');
           const response = await tester.invokeToolOrHandler(
             'CheckFunctionModule',
             {
               function_group_name: params.function_group_name,
-              function_module_name: params.function_module_name,
+              function_module_name: objectName,
             },
             async () => {
               const ctx = createHandlerContext({
@@ -705,16 +786,19 @@ describe('Check High-Level Handlers Integration', () => {
               });
               return handleCheckFunctionModule(ctx, {
                 function_group_name: params.function_group_name,
-                function_module_name: params.function_module_name,
+                function_module_name: objectName,
               });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, params.function_module_name);
-          expect(data.function_module_name).toBe(
-            params.function_module_name.toUpperCase(),
+          assertNormalizedCheckResponse(data, objectName);
+          expect(data.function_module_name).toBe(objectName.toUpperCase());
+
+          const cr = data.check_result;
+          logger?.success(
+            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
           );
         });
       },
@@ -752,24 +836,32 @@ describe('Check High-Level Handlers Integration', () => {
       'should check existing metadata extension and return normalized response',
       async () => {
         await tester.run(async (context: LambdaTesterContext) => {
-          const { connection, params } = context;
+          const { connection, params, logger } = context;
+          const objectName = params.name;
+
+          logger?.info(`   • check: ${objectName}`);
           const checkLogger = createTestLogger('check-ddlx');
           const response = await tester.invokeToolOrHandler(
             'CheckMetadataExtension',
-            { name: params.name },
+            { name: objectName },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckMetadataExtension(ctx, { name: params.name });
+              return handleCheckMetadataExtension(ctx, { name: objectName });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, params.name);
-          expect(data.name).toBe(params.name.toUpperCase());
+          assertNormalizedCheckResponse(data, objectName);
+          expect(data.name).toBe(objectName.toUpperCase());
+
+          const cr = data.check_result;
+          logger?.success(
+            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+          );
         });
       },
       getTimeout('medium'),

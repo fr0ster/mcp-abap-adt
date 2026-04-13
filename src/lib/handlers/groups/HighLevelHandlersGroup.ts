@@ -95,6 +95,10 @@ import {
   TOOL_DEFINITION as UpdateLocalTypes_Tool,
 } from '../../../handlers/class/high/handleUpdateLocalTypes';
 import {
+  TOOL_DEFINITION as ActivateObjects_Tool,
+  handleActivateObjects,
+} from '../../../handlers/common/high/handleActivateObjects';
+import {
   TOOL_DEFINITION as CreateDataElement_Tool,
   handleCreateDataElement,
 } from '../../../handlers/data_element/high/handleCreateDataElement';
@@ -381,6 +385,11 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
     };
 
     return [
+      // Common
+      {
+        toolDefinition: ActivateObjects_Tool,
+        handler: withContext(handleActivateObjects),
+      },
       {
         toolDefinition: CreatePackage_Tool,
         handler: withContext(handleCreatePackage),

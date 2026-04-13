@@ -439,53 +439,113 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         toolDefinition: ActivateObjects_Tool,
         handler: withContext(handleActivateObjects),
       },
-      // Per-type activation
+      // Per-type activation (reused from low-level, with high-level names/descriptions)
       {
-        toolDefinition: ActivateDomain_Tool,
+        toolDefinition: {
+          ...ActivateDomain_Tool,
+          name: 'ActivateDomain',
+          description:
+            'Activate an ABAP domain. Use after CreateDomain or UpdateDomain if the object remains inactive.',
+        },
         handler: withContext(handleActivateDomain),
       },
       {
-        toolDefinition: ActivateDataElement_Tool,
+        toolDefinition: {
+          ...ActivateDataElement_Tool,
+          name: 'ActivateDataElement',
+          description:
+            'Activate an ABAP data element. Use after CreateDataElement or UpdateDataElement if the object remains inactive.',
+        },
         handler: withContext(handleActivateDataElement),
       },
       {
-        toolDefinition: ActivateTable_Tool,
+        toolDefinition: {
+          ...ActivateTable_Tool,
+          name: 'ActivateTable',
+          description:
+            'Activate an ABAP table. Use after CreateTable or UpdateTable if the object remains inactive.',
+        },
         handler: withContext(handleActivateTable),
       },
       {
-        toolDefinition: ActivateStructure_Tool,
+        toolDefinition: {
+          ...ActivateStructure_Tool,
+          name: 'ActivateStructure',
+          description:
+            'Activate an ABAP structure. Use after CreateStructure or UpdateStructure if the object remains inactive.',
+        },
         handler: withContext(handleActivateStructure),
       },
       {
-        toolDefinition: ActivateView_Tool,
+        toolDefinition: {
+          ...ActivateView_Tool,
+          name: 'ActivateView',
+          description:
+            'Activate a CDS view. Use after CreateView or UpdateView if the object remains inactive.',
+        },
         handler: withContext(handleActivateView),
       },
       {
-        toolDefinition: ActivateClass_Tool,
+        toolDefinition: {
+          ...ActivateClass_Tool,
+          name: 'ActivateClass',
+          description:
+            'Activate an ABAP class. Use after CreateClass or UpdateClass if the object remains inactive.',
+        },
         handler: withContext(handleActivateClass),
       },
       {
-        toolDefinition: ActivateInterface_Tool,
+        toolDefinition: {
+          ...ActivateInterface_Tool,
+          name: 'ActivateInterface',
+          description:
+            'Activate an ABAP interface. Use after CreateInterface or UpdateInterface if the object remains inactive.',
+        },
         handler: withContext(handleActivateInterface),
       },
       {
-        toolDefinition: ActivateProgram_Tool,
+        toolDefinition: {
+          ...ActivateProgram_Tool,
+          name: 'ActivateProgram',
+          description:
+            'Activate an ABAP program. Use after CreateProgram or UpdateProgram if the object remains inactive.',
+        },
         handler: withContext(handleActivateProgram),
       },
       {
-        toolDefinition: ActivateFunctionModule_Tool,
+        toolDefinition: {
+          ...ActivateFunctionModule_Tool,
+          name: 'ActivateFunctionModule',
+          description:
+            'Activate an ABAP function module. Use after UpdateFunctionModule if the object remains inactive.',
+        },
         handler: withContext(handleActivateFunctionModule),
       },
       {
-        toolDefinition: ActivateFunctionGroup_Tool,
+        toolDefinition: {
+          ...ActivateFunctionGroup_Tool,
+          name: 'ActivateFunctionGroup',
+          description:
+            'Activate an ABAP function group. Use after CreateFunctionGroup or UpdateFunctionGroup if the object remains inactive.',
+        },
         handler: withContext(handleActivateFunctionGroup),
       },
       {
-        toolDefinition: ActivateBehaviorDefinition_Tool,
+        toolDefinition: {
+          ...ActivateBehaviorDefinition_Tool,
+          name: 'ActivateBehaviorDefinition',
+          description:
+            'Activate a RAP behavior definition. Use after CreateBehaviorDefinition or UpdateBehaviorDefinition if the object remains inactive.',
+        },
         handler: withContext(handleActivateBehaviorDefinition),
       },
       {
-        toolDefinition: ActivateMetadataExtension_Tool,
+        toolDefinition: {
+          ...ActivateMetadataExtension_Tool,
+          name: 'ActivateMetadataExtension',
+          description:
+            'Activate a CDS metadata extension. Use after CreateMetadataExtension or UpdateMetadataExtension if the object remains inactive.',
+        },
         handler: withContext(handleActivateMetadataExtension),
       },
       {

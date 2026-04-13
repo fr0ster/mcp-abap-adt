@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [5.0.10] - 2026-04-13
+
+### Changed
+- Dropped Node 20 support, minimum is now Node 22
+
 ## [5.0.9] - 2026-04-13
 
 ### Fixed

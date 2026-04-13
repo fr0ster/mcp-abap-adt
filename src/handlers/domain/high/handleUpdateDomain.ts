@@ -219,6 +219,15 @@ export async function handleUpdateDomain(
         }
       }
 
+      // Wait for object to be ready after update (long polling)
+      try {
+        await client
+          .getDomain()
+          .read({ domainName }, 'inactive', { withLongPolling: true });
+      } catch {
+        // Continue anyway — activation will fail explicitly if object isn't ready
+      }
+
       // Activate if requested
       if (shouldActivate) {
         await client.getDomain().activate({ domainName });

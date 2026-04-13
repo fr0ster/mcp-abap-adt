@@ -706,3 +706,19 @@ For troubleshooting:
 
 @mcp-abap-adt/configurator (independent auxiliary -- no runtime deps on other packages)
 ```
+
+---
+
+## Known Limitations
+
+### Parallel Tool Calls
+
+MCP tool calls that modify SAP objects (Create, Update, Delete) must be executed **sequentially**, not in parallel. Each MCP server instance uses a single ABAP connection with one CSRF token and one HTTP session. Parallel write operations cause:
+
+- **CSRF token conflicts** -- SAP ties CSRF tokens to HTTP sessions; concurrent requests invalidate each other's tokens.
+- **Session type race conditions** -- lock/unlock operations toggle the connection between stateful and stateless modes; concurrent toggles corrupt session state.
+- **Lock conflicts** -- SAP DDIC objects support only one lock per object; parallel locks on the same object will fail.
+
+Read-only operations (Read*, Search*, Get*) are safe to call in any order since they don't require CSRF tokens or session state changes.
+
+**For LLM clients**: configure the MCP client to send write tool calls one at a time. If the client batches multiple Create/Update calls in a single message, they must be serialized before reaching the server.

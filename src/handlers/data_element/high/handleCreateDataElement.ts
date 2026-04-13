@@ -232,6 +232,15 @@ export async function handleCreateDataElement(
       await client.getDataElement().unlock({ dataElementName }, lockHandle);
       lockHandle = undefined;
 
+      // Wait for object to be ready after update (long polling)
+      try {
+        await client
+          .getDataElement()
+          .read({ dataElementName }, 'inactive', { withLongPolling: true });
+      } catch {
+        // Continue anyway — activation will fail explicitly if object isn't ready
+      }
+
       // Check
       try {
         await safeCheckOperation(

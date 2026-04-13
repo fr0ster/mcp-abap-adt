@@ -1,6 +1,6 @@
 import type { Logger } from '@mcp-abap-adt/logger';
-import { defaultLogger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../../handlers/interfaces.js';
+import { noopLogger } from '../handlerLogger.js';
 import { CompactHandlersGroup } from './groups/CompactHandlersGroup.js';
 import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
 import { LowLevelHandlersGroup } from './groups/LowLevelHandlersGroup.js';
@@ -90,7 +90,7 @@ export class HandlerExporter {
   private readonly handlerGroups: IHandlerGroup[];
 
   constructor(options?: HandlerExporterOptions) {
-    this.logger = options?.logger ?? defaultLogger;
+    this.logger = options?.logger ?? noopLogger;
 
     // Create dummy context for group instantiation
     // Real context is provided by BaseMcpServer.registerHandlers() via getConnection()

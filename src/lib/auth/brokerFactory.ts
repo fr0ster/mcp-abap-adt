@@ -30,7 +30,6 @@ import type {
   ITokenProvider,
   ITokenResult,
 } from '@mcp-abap-adt/interfaces';
-import { defaultLogger } from '@mcp-abap-adt/logger';
 import { detectStoreType } from '../stores';
 import { getPlatformPaths } from '../stores/platformPaths';
 import type { IAuthBrokerFactory } from './IAuthBrokerFactory.js';

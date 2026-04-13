@@ -1,4 +1,3 @@
-import { createRequire } from 'node:module';
 import type { AuthBroker } from '@mcp-abap-adt/auth-broker';
 import {
   type AbapConnection,
@@ -472,7 +471,16 @@ export abstract class BaseMcpServer extends McpServer {
 }
 
 function getDefaultLogger(): Logger {
-  const require = createRequire(__filename);
-  const mod = require('@mcp-abap-adt/logger');
-  return mod.defaultLogger ?? new mod.DefaultLogger();
+  return stderrLogger;
 }
+
+/**
+ * Logger that writes all levels to stderr.
+ * Safe for stdio mode — never writes to stdout (reserved for JSON-RPC protocol).
+ */
+const stderrLogger: Logger = {
+  info: (msg: string) => process.stderr.write(`[INFO] ${msg}\n`),
+  debug: (msg: string) => process.stderr.write(`[DEBUG] ${msg}\n`),
+  warn: (msg: string) => process.stderr.write(`[WARN] ${msg}\n`),
+  error: (msg: string) => process.stderr.write(`[ERROR] ${msg}\n`),
+};

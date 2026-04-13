@@ -1,4 +1,3 @@
-import { createRequire } from 'node:module';
 import type { Logger } from '@mcp-abap-adt/logger';
 
 /**
@@ -13,7 +12,7 @@ export function getHandlerLogger(
   if (process.env.HANDLER_LOG_SILENT === 'true') {
     return noopLogger;
   }
-  const resolvedLogger = baseLogger ?? getDefaultLogger();
+  const resolvedLogger = baseLogger ?? noopLogger;
   const prefix = `[${category}]`;
   const wrap = (fn: (msg: string) => void) => (msg: string) =>
     fn(`${prefix} ${msg}`);
@@ -33,9 +32,3 @@ export const noopLogger: Logger = {
   warn: noopFn,
   error: noopFn,
 };
-
-function getDefaultLogger(): Logger {
-  const require = createRequire(__filename);
-  const mod = require('@mcp-abap-adt/logger');
-  return mod.defaultLogger ?? new mod.DefaultLogger();
-}

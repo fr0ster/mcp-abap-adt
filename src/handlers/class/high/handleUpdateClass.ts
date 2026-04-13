@@ -82,52 +82,51 @@ export async function handleUpdateClass(
         `Class locked: ${className} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
       );
 
-      // Check new code before update
-      logger?.debug(`Checking new code before update: ${className}`);
-      let checkNewCodePassed = false;
-      try {
-        await safeCheckOperation(
-          () =>
-            client
-              .getClass()
-              .check(
-                { className: className, sourceCode: args.source_code },
-                'inactive',
-              ),
-          className,
-          { debug: (message: string) => logger?.debug(message) },
-        );
-        checkNewCodePassed = true;
-        logger?.debug(`New code check passed: ${className}`);
-      } catch (checkError: any) {
-        if ((checkError as any).isAlreadyChecked) {
-          logger?.debug(`Class ${className} was already checked - continuing`);
-          checkNewCodePassed = true;
-        } else {
-          logger?.error(
-            `New code check failed: ${className} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+      // Check new code before update (only when activating)
+      if (shouldActivate) {
+        logger?.debug(`Checking new code before update: ${className}`);
+        try {
+          await safeCheckOperation(
+            () =>
+              client
+                .getClass()
+                .check(
+                  { className: className, sourceCode: args.source_code },
+                  'inactive',
+                ),
+            className,
+            { debug: (message: string) => logger?.debug(message) },
           );
-          throw new Error(
-            `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-          );
+          logger?.debug(`New code check passed: ${className}`);
+        } catch (checkError: any) {
+          if ((checkError as any).isAlreadyChecked) {
+            logger?.debug(
+              `Class ${className} was already checked - continuing`,
+            );
+          } else {
+            logger?.error(
+              `New code check failed: ${className} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+            );
+            throw new Error(
+              `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+            );
+          }
         }
+      } else {
+        logger?.debug(`Skipping syntax check (activate=false): ${className}`);
       }
 
-      // Update (if check passed)
-      if (checkNewCodePassed) {
-        logger?.debug(`Updating class source code: ${className}`);
-        await client.getClass().update(
-          {
-            className: className,
-            sourceCode: args.source_code,
-            transportRequest: args.transport_request,
-          },
-          { lockHandle },
-        );
-        logger?.info(`Class source code updated: ${className}`);
-      } else {
-        logger?.warn(`Skipping update - new code check failed: ${className}`);
-      }
+      // Update
+      logger?.debug(`Updating class source code: ${className}`);
+      await client.getClass().update(
+        {
+          className: className,
+          sourceCode: args.source_code,
+          transportRequest: args.transport_request,
+        },
+        { lockHandle },
+      );
+      logger?.info(`Class source code updated: ${className}`);
     } finally {
       if (lockHandle) {
         try {
@@ -142,22 +141,24 @@ export async function handleUpdateClass(
       }
     }
 
-    // Check inactive after unlock
-    logger?.debug(`Checking inactive version: ${className}`);
-    try {
-      await safeCheckOperation(
-        () => client.getClass().check({ className: className }, 'inactive'),
-        className,
-        { debug: (message: string) => logger?.debug(message) },
-      );
-      logger?.debug(`Inactive version check completed: ${className}`);
-    } catch (checkError: any) {
-      if ((checkError as any).isAlreadyChecked) {
-        logger?.debug(`Class ${className} was already checked - continuing`);
-      } else {
-        logger?.warn(
-          `Inactive version check had issues: ${className} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+    // Check inactive after unlock (only when activating)
+    if (shouldActivate) {
+      logger?.debug(`Checking inactive version: ${className}`);
+      try {
+        await safeCheckOperation(
+          () => client.getClass().check({ className: className }, 'inactive'),
+          className,
+          { debug: (message: string) => logger?.debug(message) },
         );
+        logger?.debug(`Inactive version check completed: ${className}`);
+      } catch (checkError: any) {
+        if ((checkError as any).isAlreadyChecked) {
+          logger?.debug(`Class ${className} was already checked - continuing`);
+        } else {
+          logger?.warn(
+            `Inactive version check had issues: ${className} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+          );
+        }
       }
     }
 

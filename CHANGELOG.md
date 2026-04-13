@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [5.0.9] - 2026-04-13
+
+### Fixed
+- Skip syntax check when saving without activation (`activate=false`) — allows uploading source code with unresolved dependencies (e.g., CDS views with circular references) for later mass activation via `ActivateObjects` (closes #52)
+
 ## [5.0.8] - 2026-04-13
 
 ### Added

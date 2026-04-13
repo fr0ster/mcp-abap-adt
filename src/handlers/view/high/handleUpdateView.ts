@@ -93,51 +93,48 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
         `View locked: ${viewName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
       );
 
-      // Check new code BEFORE update
-      logger?.debug(`Checking new DDL code before update: ${viewName}`);
-      let checkNewCodePassed = false;
-      try {
-        await safeCheckOperation(
-          () =>
-            client
-              .getView()
-              .check({ viewName, ddlSource: args.ddl_source }, 'inactive'),
-          viewName,
-          {
-            debug: (message: string) => logger?.debug(message),
-          },
-        );
-        checkNewCodePassed = true;
-        logger?.debug(`New code check passed: ${viewName}`);
-      } catch (checkError: any) {
-        if ((checkError as any).isAlreadyChecked) {
-          logger?.debug(`View ${viewName} was already checked - continuing`);
-          checkNewCodePassed = true;
-        } else {
-          logger?.error(
-            `New code check failed: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+      // Check new code BEFORE update (only when activating)
+      if (shouldActivate) {
+        logger?.debug(`Checking new DDL code before update: ${viewName}`);
+        try {
+          await safeCheckOperation(
+            () =>
+              client
+                .getView()
+                .check({ viewName, ddlSource: args.ddl_source }, 'inactive'),
+            viewName,
+            {
+              debug: (message: string) => logger?.debug(message),
+            },
           );
-          throw new Error(
-            `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-          );
+          logger?.debug(`New code check passed: ${viewName}`);
+        } catch (checkError: any) {
+          if ((checkError as any).isAlreadyChecked) {
+            logger?.debug(`View ${viewName} was already checked - continuing`);
+          } else {
+            logger?.error(
+              `New code check failed: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+            );
+            throw new Error(
+              `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+            );
+          }
         }
+      } else {
+        logger?.debug(`Skipping syntax check (activate=false): ${viewName}`);
       }
 
-      // Update (only if check passed)
-      if (checkNewCodePassed) {
-        logger?.debug(`Updating view DDL source: ${viewName}`);
-        await client.getView().update(
-          {
-            viewName,
-            ddlSource: args.ddl_source,
-            transportRequest: args.transport_request,
-          },
-          { lockHandle },
-        );
-        logger?.info(`View DDL source updated: ${viewName}`);
-      } else {
-        logger?.warn(`Skipping update - new code check failed: ${viewName}`);
-      }
+      // Update
+      logger?.debug(`Updating view DDL source: ${viewName}`);
+      await client.getView().update(
+        {
+          viewName,
+          ddlSource: args.ddl_source,
+          transportRequest: args.transport_request,
+        },
+        { lockHandle },
+      );
+      logger?.info(`View DDL source updated: ${viewName}`);
     } finally {
       if (lockHandle) {
         try {
@@ -152,27 +149,29 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
       }
     }
 
-    // Check inactive version (after unlock)
-    logger?.debug(`Checking inactive version: ${viewName}`);
-    try {
-      await safeCheckOperation(
-        () =>
-          client
-            .getView()
-            .check({ viewName, ddlSource: args.ddl_source }, 'inactive'),
-        viewName,
-        {
-          debug: (message: string) => logger?.debug(message),
-        },
-      );
-      logger?.debug(`Inactive version check completed: ${viewName}`);
-    } catch (checkError: any) {
-      if ((checkError as any).isAlreadyChecked) {
-        logger?.debug(`View ${viewName} was already checked - continuing`);
-      } else {
-        logger?.warn(
-          `Inactive version check had issues: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+    // Check inactive version (after unlock, only when activating)
+    if (shouldActivate) {
+      logger?.debug(`Checking inactive version: ${viewName}`);
+      try {
+        await safeCheckOperation(
+          () =>
+            client
+              .getView()
+              .check({ viewName, ddlSource: args.ddl_source }, 'inactive'),
+          viewName,
+          {
+            debug: (message: string) => logger?.debug(message),
+          },
         );
+        logger?.debug(`Inactive version check completed: ${viewName}`);
+      } catch (checkError: any) {
+        if ((checkError as any).isAlreadyChecked) {
+          logger?.debug(`View ${viewName} was already checked - continuing`);
+        } else {
+          logger?.warn(
+            `Inactive version check had issues: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+          );
+        }
       }
     }
 

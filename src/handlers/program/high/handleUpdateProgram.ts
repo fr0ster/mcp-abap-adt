@@ -114,53 +114,53 @@ export async function handleUpdateProgram(
         `Program locked: ${programName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
       );
 
-      // Check new code BEFORE update
-      logger?.debug(`Checking new source code before update: ${programName}`);
-      let checkNewCodePassed = false;
-      try {
-        await safeCheckOperation(
-          () =>
-            client
-              .getProgram()
-              .check({ programName, sourceCode: args.source_code }, 'inactive'),
-          programName,
-          {
-            debug: (message: string) => logger?.debug(message),
-          },
-        );
-        checkNewCodePassed = true;
-        logger?.debug(`New code check passed: ${programName}`);
-      } catch (checkError: any) {
-        if ((checkError as any).isAlreadyChecked) {
-          logger?.debug(
-            `Program ${programName} was already checked - continuing`,
+      // Check new code BEFORE update (only when activating)
+      if (shouldActivate) {
+        logger?.debug(`Checking new source code before update: ${programName}`);
+        try {
+          await safeCheckOperation(
+            () =>
+              client
+                .getProgram()
+                .check(
+                  { programName, sourceCode: args.source_code },
+                  'inactive',
+                ),
+            programName,
+            {
+              debug: (message: string) => logger?.debug(message),
+            },
           );
-          checkNewCodePassed = true;
-        } else {
-          logger?.error(
-            `New code check failed: ${programName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-          );
-          throw new Error(
-            `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-          );
+          logger?.debug(`New code check passed: ${programName}`);
+        } catch (checkError: any) {
+          if ((checkError as any).isAlreadyChecked) {
+            logger?.debug(
+              `Program ${programName} was already checked - continuing`,
+            );
+          } else {
+            logger?.error(
+              `New code check failed: ${programName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+            );
+            throw new Error(
+              `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+            );
+          }
         }
+      } else {
+        logger?.debug(`Skipping syntax check (activate=false): ${programName}`);
       }
 
-      // Update (only if check passed)
-      if (checkNewCodePassed) {
-        logger?.debug(`Updating program source code: ${programName}`);
-        await client.getProgram().update(
-          {
-            programName,
-            sourceCode: args.source_code,
-            transportRequest: args.transport_request,
-          },
-          { lockHandle },
-        );
-        logger?.info(`Program source code updated: ${programName}`);
-      } else {
-        logger?.warn(`Skipping update - new code check failed: ${programName}`);
-      }
+      // Update
+      logger?.debug(`Updating program source code: ${programName}`);
+      await client.getProgram().update(
+        {
+          programName,
+          sourceCode: args.source_code,
+          transportRequest: args.transport_request,
+        },
+        { lockHandle },
+      );
+      logger?.info(`Program source code updated: ${programName}`);
     } finally {
       if (lockHandle) {
         try {
@@ -175,26 +175,28 @@ export async function handleUpdateProgram(
       }
     }
 
-    // Check inactive version (after unlock)
-    logger?.debug(`Checking inactive version: ${programName}`);
-    try {
-      await safeCheckOperation(
-        () => client.getProgram().check({ programName }, 'inactive'),
-        programName,
-        {
-          debug: (message: string) => logger?.debug(message),
-        },
-      );
-      logger?.debug(`Inactive version check completed: ${programName}`);
-    } catch (checkError: any) {
-      if ((checkError as any).isAlreadyChecked) {
-        logger?.debug(
-          `Program ${programName} was already checked - continuing`,
+    // Check inactive version (after unlock, only when activating)
+    if (shouldActivate) {
+      logger?.debug(`Checking inactive version: ${programName}`);
+      try {
+        await safeCheckOperation(
+          () => client.getProgram().check({ programName }, 'inactive'),
+          programName,
+          {
+            debug: (message: string) => logger?.debug(message),
+          },
         );
-      } else {
-        logger?.warn(
-          `Inactive version check had issues: ${programName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-        );
+        logger?.debug(`Inactive version check completed: ${programName}`);
+      } catch (checkError: any) {
+        if ((checkError as any).isAlreadyChecked) {
+          logger?.debug(
+            `Program ${programName} was already checked - continuing`,
+          );
+        } else {
+          logger?.warn(
+            `Inactive version check had issues: ${programName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+          );
+        }
       }
     }
 

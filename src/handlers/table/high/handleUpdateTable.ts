@@ -120,65 +120,63 @@ export async function handleUpdateTable(
         // Lock
         lockHandle = await client.getTable().lock({ tableName });
 
-        // Step 1: Check new code BEFORE update (with ddlCode and version='inactive')
-        logger?.info(
-          `[UpdateTable] Checking new DDL code before update: ${tableName}`,
-        );
-        let checkNewCodePassed = false;
-        try {
-          await safeCheckOperation(
-            () =>
-              client
-                .getTable()
-                .check({ tableName, ddlCode: ddl_code }, 'inactive'),
-            tableName,
-            {
-              debug: (message: string) =>
-                logger?.debug(`[UpdateTable] ${message}`),
-            },
-          );
-          checkNewCodePassed = true;
-          logger?.info(`[UpdateTable] New code check passed: ${tableName}`);
-        } catch (checkError: any) {
-          // If error was marked as "already checked", continue silently
-          if ((checkError as any).isAlreadyChecked) {
-            logger?.info(
-              `[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`,
-            );
-            checkNewCodePassed = true;
-          } else {
-            // Real check error - don't update if check failed
-            logger?.error(`[UpdateTable] New code check failed: ${tableName}`, {
-              error:
-                checkError instanceof Error
-                  ? checkError.message
-                  : String(checkError),
-            });
-            throw new Error(
-              `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-            );
-          }
-        }
-
-        // Step 2: Update (only if check passed)
-        if (checkNewCodePassed) {
+        // Step 1: Check new code BEFORE update (only when activating)
+        if (shouldActivate) {
           logger?.info(
-            `[UpdateTable] Updating table with DDL code: ${tableName}`,
+            `[UpdateTable] Checking new DDL code before update: ${tableName}`,
           );
-          await client.getTable().update(
-            {
+          try {
+            await safeCheckOperation(
+              () =>
+                client
+                  .getTable()
+                  .check({ tableName, ddlCode: ddl_code }, 'inactive'),
               tableName,
-              ddlCode: ddl_code,
-              transportRequest: transport_request,
-            },
-            { lockHandle },
-          );
-          logger?.info(`[UpdateTable] Table source code updated: ${tableName}`);
+              {
+                debug: (message: string) =>
+                  logger?.debug(`[UpdateTable] ${message}`),
+              },
+            );
+            logger?.info(`[UpdateTable] New code check passed: ${tableName}`);
+          } catch (checkError: any) {
+            if ((checkError as any).isAlreadyChecked) {
+              logger?.info(
+                `[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`,
+              );
+            } else {
+              logger?.error(
+                `[UpdateTable] New code check failed: ${tableName}`,
+                {
+                  error:
+                    checkError instanceof Error
+                      ? checkError.message
+                      : String(checkError),
+                },
+              );
+              throw new Error(
+                `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+              );
+            }
+          }
         } else {
           logger?.info(
-            `[UpdateTable] Skipping update - new code check failed: ${tableName}`,
+            `[UpdateTable] Skipping syntax check (activate=false): ${tableName}`,
           );
         }
+
+        // Step 2: Update
+        logger?.info(
+          `[UpdateTable] Updating table with DDL code: ${tableName}`,
+        );
+        await client.getTable().update(
+          {
+            tableName,
+            ddlCode: ddl_code,
+            transportRequest: transport_request,
+          },
+          { lockHandle },
+        );
+        logger?.info(`[UpdateTable] Table source code updated: ${tableName}`);
       } finally {
         if (lockHandle) {
           try {
@@ -192,37 +190,37 @@ export async function handleUpdateTable(
         }
       }
 
-      // Step 4: Check inactive version (after unlock)
-      logger?.info(`[UpdateTable] Checking inactive version: ${tableName}`);
-      try {
-        await safeCheckOperation(
-          () => client.getTable().check({ tableName }, 'inactive'),
-          tableName,
-          {
-            debug: (message: string) =>
-              logger?.debug(`[UpdateTable] ${message}`),
-          },
-        );
-        logger?.info(
-          `[UpdateTable] Inactive version check completed: ${tableName}`,
-        );
-      } catch (checkError: any) {
-        // If error was marked as "already checked", continue silently
-        if ((checkError as any).isAlreadyChecked) {
-          logger?.info(
-            `[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`,
-          );
-        } else {
-          // Log warning but don't fail - inactive check is informational
-          logger?.warn(
-            `[UpdateTable] Inactive version check had issues: ${tableName}`,
+      // Step 4: Check inactive version (after unlock, only when activating)
+      if (shouldActivate) {
+        logger?.info(`[UpdateTable] Checking inactive version: ${tableName}`);
+        try {
+          await safeCheckOperation(
+            () => client.getTable().check({ tableName }, 'inactive'),
+            tableName,
             {
-              error:
-                checkError instanceof Error
-                  ? checkError.message
-                  : String(checkError),
+              debug: (message: string) =>
+                logger?.debug(`[UpdateTable] ${message}`),
             },
           );
+          logger?.info(
+            `[UpdateTable] Inactive version check completed: ${tableName}`,
+          );
+        } catch (checkError: any) {
+          if ((checkError as any).isAlreadyChecked) {
+            logger?.info(
+              `[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`,
+            );
+          } else {
+            logger?.warn(
+              `[UpdateTable] Inactive version check had issues: ${tableName}`,
+              {
+                error:
+                  checkError instanceof Error
+                    ? checkError.message
+                    : String(checkError),
+              },
+            );
+          }
         }
       }
 

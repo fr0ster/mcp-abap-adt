@@ -122,72 +122,67 @@ export async function handleUpdateStructure(
         // Lock
         lockHandle = await client.getStructure().lock({ structureName });
 
-        // Step 1: Check new code BEFORE update (with ddlCode and version='inactive')
-        logger?.info(
-          `[UpdateStructure] Checking new DDL code before update: ${structureName}`,
-        );
-        let checkNewCodePassed = false;
-        try {
-          await safeCheckOperation(
-            () =>
-              client
-                .getStructure()
-                .check({ structureName, ddlCode: ddl_code }, 'inactive'),
-            structureName,
-            {
-              debug: (message: string) =>
-                logger?.debug(`[UpdateStructure] ${message}`),
-            },
-          );
-          checkNewCodePassed = true;
+        // Step 1: Check new code BEFORE update (only when activating)
+        if (shouldActivate) {
           logger?.info(
-            `[UpdateStructure] New code check passed: ${structureName}`,
+            `[UpdateStructure] Checking new DDL code before update: ${structureName}`,
           );
-        } catch (checkError: any) {
-          // If error was marked as "already checked", continue silently
-          if ((checkError as any).isAlreadyChecked) {
-            logger?.info(
-              `[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`,
-            );
-            checkNewCodePassed = true;
-          } else {
-            // Real check error - don't update if check failed
-            logger?.error(
-              `[UpdateStructure] New code check failed: ${structureName}`,
+          try {
+            await safeCheckOperation(
+              () =>
+                client
+                  .getStructure()
+                  .check({ structureName, ddlCode: ddl_code }, 'inactive'),
+              structureName,
               {
-                error:
-                  checkError instanceof Error
-                    ? checkError.message
-                    : String(checkError),
+                debug: (message: string) =>
+                  logger?.debug(`[UpdateStructure] ${message}`),
               },
             );
-            throw new Error(
-              `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+            logger?.info(
+              `[UpdateStructure] New code check passed: ${structureName}`,
             );
+          } catch (checkError: any) {
+            if ((checkError as any).isAlreadyChecked) {
+              logger?.info(
+                `[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`,
+              );
+            } else {
+              logger?.error(
+                `[UpdateStructure] New code check failed: ${structureName}`,
+                {
+                  error:
+                    checkError instanceof Error
+                      ? checkError.message
+                      : String(checkError),
+                },
+              );
+              throw new Error(
+                `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+              );
+            }
           }
-        }
-
-        // Step 2: Update (only if check passed)
-        if (checkNewCodePassed) {
-          logger?.info(
-            `[UpdateStructure] Updating structure with DDL code: ${structureName}`,
-          );
-          await client.getStructure().update(
-            {
-              structureName,
-              ddlCode: ddl_code,
-              transportRequest: args.transport_request,
-            },
-            { lockHandle },
-          );
-          logger?.info(
-            `[UpdateStructure] Structure source code updated: ${structureName}`,
-          );
         } else {
           logger?.info(
-            `[UpdateStructure] Skipping update - new code check failed: ${structureName}`,
+            `[UpdateStructure] Skipping syntax check (activate=false): ${structureName}`,
           );
         }
+
+        // Step 2: Update
+        logger?.info(
+          `[UpdateStructure] Updating structure with DDL code: ${structureName}`,
+        );
+        await client.getStructure().update(
+          {
+            structureName,
+            ddlCode: ddl_code,
+            transportRequest: args.transport_request,
+          },
+          { lockHandle },
+        );
+        logger?.info(
+          `[UpdateStructure] Structure source code updated: ${structureName}`,
+        );
       } finally {
         if (lockHandle) {
           try {
@@ -203,39 +198,39 @@ export async function handleUpdateStructure(
         }
       }
 
-      // Step 4: Check inactive version (after unlock)
-      logger?.info(
-        `[UpdateStructure] Checking inactive version: ${structureName}`,
-      );
-      try {
-        await safeCheckOperation(
-          () => client.getStructure().check({ structureName }, 'inactive'),
-          structureName,
-          {
-            debug: (message: string) =>
-              logger?.debug(`[UpdateStructure] ${message}`),
-          },
-        );
+      // Step 4: Check inactive version (after unlock, only when activating)
+      if (shouldActivate) {
         logger?.info(
-          `[UpdateStructure] Inactive version check completed: ${structureName}`,
+          `[UpdateStructure] Checking inactive version: ${structureName}`,
         );
-      } catch (checkError: any) {
-        // If error was marked as "already checked", continue silently
-        if ((checkError as any).isAlreadyChecked) {
-          logger?.info(
-            `[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`,
-          );
-        } else {
-          // Log warning but don't fail - inactive check is informational
-          logger?.warn(
-            `[UpdateStructure] Inactive version check had issues: ${structureName}`,
+        try {
+          await safeCheckOperation(
+            () => client.getStructure().check({ structureName }, 'inactive'),
+            structureName,
             {
-              error:
-                checkError instanceof Error
-                  ? checkError.message
-                  : String(checkError),
+              debug: (message: string) =>
+                logger?.debug(`[UpdateStructure] ${message}`),
             },
           );
+          logger?.info(
+            `[UpdateStructure] Inactive version check completed: ${structureName}`,
+          );
+        } catch (checkError: any) {
+          if ((checkError as any).isAlreadyChecked) {
+            logger?.info(
+              `[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`,
+            );
+          } else {
+            logger?.warn(
+              `[UpdateStructure] Inactive version check had issues: ${structureName}`,
+              {
+                error:
+                  checkError instanceof Error
+                    ? checkError.message
+                    : String(checkError),
+              },
+            );
+          }
         }
       }
 

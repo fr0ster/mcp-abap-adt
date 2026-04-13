@@ -2,13 +2,16 @@
 
 ## [Unreleased]
 
-## [5.0.7] - 2026-04-13
+## [5.0.8] - 2026-04-13
+
+### Added
+- `ActivateObjects` tool for group/mass activation of any ABAP object types (closes #49)
+- Per-type Activate tools in high-level group: ActivateDomain, ActivateDataElement, ActivateTable, ActivateStructure, ActivateView, ActivateClass, ActivateInterface, ActivateProgram, ActivateFunctionModule, ActivateFunctionGroup, ActivateBehaviorDefinition, ActivateMetadataExtension
+- Uncommented `ActivateObjectLow` in low-level group
+- Known Limitations section in architecture docs — parallel write tool calls are not supported
 
 ### Fixed
 - Objects not activating after creation — added long polling wait between unlock and activate in 10 high-level handlers (closes #47)
-
-### Added
-- Known Limitations section in architecture docs — parallel write tool calls are not supported
 
 ## [5.0.6] - 2026-04-13
 

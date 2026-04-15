@@ -322,6 +322,10 @@ import {
   TOOL_DEFINITION as ValidateServiceBinding_Tool,
 } from '../../../handlers/service_binding/high/handleValidateServiceBinding';
 import {
+  TOOL_DEFINITION as ActivateServiceBinding_Tool,
+  handleActivateServiceBinding,
+} from '../../../handlers/service_binding/low/handleActivateServiceBinding';
+import {
   TOOL_DEFINITION as CreateServiceDefinition_Tool,
   handleCreateServiceDefinition,
 } from '../../../handlers/service_definition/high/handleCreateServiceDefinition';
@@ -337,6 +341,10 @@ import {
   handleUpdateServiceDefinition,
   TOOL_DEFINITION as UpdateServiceDefinition_Tool,
 } from '../../../handlers/service_definition/high/handleUpdateServiceDefinition';
+import {
+  TOOL_DEFINITION as ActivateServiceDefinition_Tool,
+  handleActivateServiceDefinition,
+} from '../../../handlers/service_definition/low/handleActivateServiceDefinition';
 import {
   TOOL_DEFINITION as CheckStructure_Tool,
   handleCheckStructure,
@@ -599,6 +607,24 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
             'Activate a CDS metadata extension. Use after CreateMetadataExtension or UpdateMetadataExtension if the object remains inactive.',
         },
         handler: withContext(handleActivateMetadataExtension),
+      },
+      {
+        toolDefinition: {
+          ...ActivateServiceDefinition_Tool,
+          name: 'ActivateServiceDefinition',
+          description:
+            'Activate an ABAP service definition. Use after CreateServiceDefinition or UpdateServiceDefinition if the object remains inactive.',
+        },
+        handler: withContext(handleActivateServiceDefinition),
+      },
+      {
+        toolDefinition: {
+          ...ActivateServiceBinding_Tool,
+          name: 'ActivateServiceBinding',
+          description:
+            'Activate an ABAP service binding. Use after CreateServiceBinding or UpdateServiceBinding if the object remains inactive.',
+        },
+        handler: withContext(handleActivateServiceBinding),
       },
       {
         toolDefinition: CreatePackage_Tool,

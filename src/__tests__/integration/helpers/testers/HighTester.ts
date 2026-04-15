@@ -379,6 +379,17 @@ export class HighTester extends LambdaTester {
       ...(params.sign_exists !== undefined && {
         sign_exists: params.sign_exists,
       }),
+      // ServiceBinding specific
+      ...(params.service_definition_name && {
+        service_definition_name: params.service_definition_name,
+      }),
+      ...(params.binding_variant && {
+        binding_variant: params.binding_variant,
+      }),
+      ...(params.service_name && { service_name: params.service_name }),
+      ...(params.service_version && {
+        service_version: params.service_version,
+      }),
       // ServiceDefinition specific
       ...(params.ddl_source && { ddl_source: params.ddl_source }),
       // FunctionGroup specific
@@ -479,6 +490,7 @@ export class HighTester extends LambdaTester {
       return 'behavior_definition_name';
     if (handlerName.includes('data_element')) return 'data_element_name';
     if (handlerName.includes('metadata_extension')) return 'ddlx_name';
+    if (handlerName.includes('service_binding')) return 'service_binding_name';
     if (handlerName.includes('service_definition'))
       return 'service_definition_name';
     if (handlerName.includes('class')) return 'class_name';

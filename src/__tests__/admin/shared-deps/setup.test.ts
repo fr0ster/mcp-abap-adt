@@ -70,6 +70,7 @@ const TYPE_CODES: Record<string, string> = {
   classes: 'CLAS/OC',
   function_groups: 'FUGR/F',
   function_modules: 'FUGR/FF',
+  service_definitions: 'SRVD/SRV',
 };
 
 function resolveTransportRequest(sharedConfig: any): string | undefined {
@@ -710,6 +711,104 @@ describe('Admin: Setup shared dependencies', () => {
               );
               results.push({
                 type: 'function_modules',
+                name: item.name,
+                status: `FAILED: ${msg}`,
+              });
+            }
+          }
+        }
+      }
+
+      // --- Service Definitions ---
+      const serviceDefinitions = sharedConfig.service_definitions || [];
+      if (serviceDefinitions.length > 0) {
+        testsLogger?.info?.(
+          `Creating Service Definitions (${serviceDefinitions.length}) without activation...`,
+        );
+        for (const item of serviceDefinitions) {
+          if (!isTestAvailableForSystem(item.available_in)) {
+            testsLogger?.info?.(
+              `Skipping service definition ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            );
+            continue;
+          }
+          try {
+            let exists = false;
+            try {
+              const readResult = await client
+                .getServiceDefinition()
+                .read({ serviceDefinitionName: item.name });
+              exists = readResult !== undefined;
+            } catch {
+              exists = false;
+            }
+
+            if (!exists) {
+              await client.getServiceDefinition().create({
+                serviceDefinitionName: item.name,
+                packageName,
+                description:
+                  item.description || 'Shared test service definition',
+                sourceCode: item.source,
+                transportRequest,
+              });
+              testsLogger?.info?.(`Created service definition ${item.name}`);
+            }
+
+            if (item.source) {
+              try {
+                await client.getServiceDefinition().update(
+                  {
+                    serviceDefinitionName: item.name,
+                    sourceCode: item.source,
+                    transportRequest,
+                  },
+                  { sourceCode: item.source },
+                );
+                testsLogger?.info?.(
+                  `Updated service definition ${item.name} source`,
+                );
+              } catch (updateError: any) {
+                testsLogger?.warn?.(
+                  `Update service definition ${item.name} source failed: ${updateError.message}`,
+                );
+              }
+            }
+
+            results.push({
+              type: 'service_definitions',
+              name: item.name,
+              status: exists ? 'existed' : 'created',
+            });
+            toActivate.push({
+              name: item.name.toUpperCase(),
+              type: TYPE_CODES.service_definitions,
+            });
+          } catch (error: any) {
+            const msg = error instanceof Error ? error.message : String(error);
+            if (
+              msg.includes('409') ||
+              msg.includes('already exist') ||
+              msg.includes('NoAccess')
+            ) {
+              testsLogger?.warn?.(
+                `Service definition ${item.name} create issue (may already exist): ${msg.substring(0, 120)}`,
+              );
+              results.push({
+                type: 'service_definitions',
+                name: item.name,
+                status: 'existed',
+              });
+              toActivate.push({
+                name: item.name.toUpperCase(),
+                type: TYPE_CODES.service_definitions,
+              });
+            } else {
+              testsLogger?.error?.(
+                `Failed to setup service definition ${item.name}: ${msg}`,
+              );
+              results.push({
+                type: 'service_definitions',
                 name: item.name,
                 status: `FAILED: ${msg}`,
               });

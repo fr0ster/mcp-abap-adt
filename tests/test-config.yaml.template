@@ -49,7 +49,7 @@ test_settings:
   # Timeouts for different operations (in milliseconds)
   timeouts:
     default: 120000
-    long: 400000  # Long timeout for complex operations (group deletion, etc.)
+    long: 600000  # Long timeout for complex operations (group activation, shared setup, etc.)
     create: 120000
     test: 120000
     delay: 3000  # Delay after delete/create operations
@@ -448,6 +448,16 @@ shared_dependencies:
                VALUE(EV_OUTPUT) TYPE  STRING.
           ev_output = |Echo: { iv_input }|.
         ENDFUNCTION.
+
+  service_definitions:
+    - name: "ZMCP_SHR_SRVD01"
+      description: "Shared service definition for binding tests"
+      available_in: ["onprem", "cloud"]
+      source: |
+        @EndUserText.label: 'Shared service definition for binding tests'
+        define service ZMCP_SHR_SRVD01 {
+          expose ZMCP_SHR_C_ROOT as View1;
+        }
 
 # Legacy shared_objects (kept for backward compatibility with unit_test_class)
 shared_objects:
@@ -1628,15 +1638,30 @@ create_service_definition:
         source_code: |
           @EndUserText.label: 'ServiceDefinitionBuilder workflow service definition'
           define service ZMCP_BLD_SRVD01 {
-            expose ZMCP_SHR_C_ROOT as _View;
+            expose ZMCP_SHR_C_ROOT as View1;
           }
         # ⚠️ REQUIRED for UpdateServiceDefinition high-level test: update_source_code is mandatory for update step
         update_source_code: |
           @EndUserText.label: 'ServiceDefinitionBuilder workflow service definition (updated)'
           define service ZMCP_BLD_SRVD01 {
-            expose ZMCP_SHR_C_ROOT as _View;
+            expose ZMCP_SHR_C_ROOT as View1;
             expose ZMCP_SHR_C_ROOT as _View2;
           }
+
+# Service Binding (Service Binding - High-Level)
+create_service_binding:
+  test_cases:
+    - name: "builder_service_binding"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Service binding CRUD + activate test"
+      params:
+        service_binding_name: "ZMCP_BLD_SRVB01"
+        description: "ServiceBinding workflow test binding"
+        service_definition_name: "ZMCP_SHR_SRVD01"
+        binding_variant: "ODATA_V4_UI"
+        service_name: "ZMCP_BLD_SRVB01"
+        service_version: "0001"
 
 # ============================================================================
 # STANDARD SAP OBJECTS REGISTRY

@@ -1,3 +1,4 @@
+import type { ServiceBindingVariant } from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
@@ -5,8 +6,6 @@ import {
   parseServiceBindingPayload,
   type ServiceBindingResponseFormat,
 } from './serviceBindingPayloadUtils';
-
-type ServiceBindingTypeInput = 'ODataV2' | 'ODataV4';
 
 export const TOOL_DEFINITION = {
   name: 'CreateServiceBinding',
@@ -33,15 +32,17 @@ export const TOOL_DEFINITION = {
         description:
           'Optional description. Defaults to service_binding_name when omitted.',
       },
-      binding_type: {
+      binding_variant: {
         type: 'string',
-        enum: ['ODataV2', 'ODataV4'],
-        description: 'OData binding type.',
-        default: 'ODataV4',
-      },
-      service_binding_version: {
-        type: 'string',
-        description: 'Service binding ADT version. Default inferred from type.',
+        enum: [
+          'ODATA_V2_UI',
+          'ODATA_V2_WEB_API',
+          'ODATA_V4_UI',
+          'ODATA_V4_WEB_API',
+        ],
+        description:
+          'Service binding variant. ODATA_V4_UI = OData V4 for Fiori Elements, ODATA_V4_WEB_API = OData V4 Web API, ODATA_V2_UI = OData V2 for Fiori Elements, ODATA_V2_WEB_API = OData V2 Web API.',
+        default: 'ODATA_V4_UI',
       },
       service_name: {
         type: 'string',
@@ -80,8 +81,7 @@ interface CreateServiceBindingArgs {
   service_definition_name: string;
   package_name: string;
   description?: string;
-  binding_type?: ServiceBindingTypeInput;
-  service_binding_version?: string;
+  binding_variant?: ServiceBindingVariant;
   service_name?: string;
   service_version?: string;
   transport_request?: string;
@@ -112,11 +112,8 @@ export async function handleCreateServiceBinding(
       .toUpperCase();
     const packageName = args.package_name.trim().toUpperCase();
     const responseFormat = args.response_format ?? 'xml';
-    const bindingType = args.binding_type === 'ODataV2' ? 'ODATA' : 'ODATA';
-    const bindingVersion =
-      args.service_binding_version ??
-      (args.binding_type === 'ODataV2' ? 'V2' : 'V4');
-    const serviceType = args.binding_type === 'ODataV2' ? 'odatav2' : 'odatav4';
+    const bindingVariant: ServiceBindingVariant =
+      args.binding_variant ?? 'ODATA_V4_UI';
     const serviceName = (args.service_name || serviceBindingName)
       .trim()
       .toUpperCase();
@@ -131,10 +128,8 @@ export async function handleCreateServiceBinding(
         serviceDefinitionName,
         serviceName,
         serviceVersion,
-        bindingType,
-        bindingVersion,
+        bindingVariant,
         transportRequest: args.transport_request,
-        serviceType,
       },
       { activateOnCreate: args.activate !== false },
     );
@@ -161,8 +156,7 @@ export async function handleCreateServiceBinding(
           service_binding_name: serviceBindingName,
           service_definition_name: serviceDefinitionName,
           package_name: packageName,
-          binding_type: args.binding_type ?? 'ODataV4',
-          service_binding_version: bindingVersion,
+          binding_variant: bindingVariant,
           service_name: serviceName,
           service_version: serviceVersion,
           activated: args.activate !== false,

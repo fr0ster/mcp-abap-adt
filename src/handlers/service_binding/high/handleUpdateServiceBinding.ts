@@ -1,3 +1,7 @@
+import {
+  SERVICE_BINDING_VARIANT_MAP,
+  type ServiceBindingVariant,
+} from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
@@ -7,7 +11,6 @@ import {
 } from './serviceBindingPayloadUtils';
 
 type DesiredPublicationStateInput = 'published' | 'unpublished' | 'unchanged';
-type ServiceTypeInput = 'ODataV2' | 'ODataV4';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateServiceBinding',
@@ -26,11 +29,17 @@ export const TOOL_DEFINITION = {
         enum: ['published', 'unpublished', 'unchanged'],
         description: 'Target publication state.',
       },
-      service_type: {
+      binding_variant: {
         type: 'string',
-        enum: ['ODataV2', 'ODataV4'],
-        description: 'OData service type for publish/unpublish action routing.',
-        default: 'ODataV4',
+        enum: [
+          'ODATA_V2_UI',
+          'ODATA_V2_WEB_API',
+          'ODATA_V4_UI',
+          'ODATA_V4_WEB_API',
+        ],
+        description:
+          'Service binding variant. Determines OData version for publish/unpublish routing.',
+        default: 'ODATA_V4_UI',
       },
       service_name: {
         type: 'string',
@@ -49,7 +58,7 @@ export const TOOL_DEFINITION = {
     required: [
       'service_binding_name',
       'desired_publication_state',
-      'service_type',
+      'binding_variant',
       'service_name',
     ],
   },
@@ -58,7 +67,7 @@ export const TOOL_DEFINITION = {
 interface UpdateServiceBindingArgs {
   service_binding_name: string;
   desired_publication_state: DesiredPublicationStateInput;
-  service_type: ServiceTypeInput;
+  binding_variant?: ServiceBindingVariant;
   service_name: string;
   service_version?: string;
   response_format?: ServiceBindingResponseFormat;
@@ -83,7 +92,9 @@ export async function handleUpdateServiceBinding(
 
     const serviceBindingName = args.service_binding_name.trim().toUpperCase();
     const responseFormat = args.response_format ?? 'xml';
-    const serviceType = args.service_type === 'ODataV2' ? 'odatav2' : 'odatav4';
+    const bindingVariant: ServiceBindingVariant =
+      args.binding_variant ?? 'ODATA_V4_UI';
+    const { serviceType } = SERVICE_BINDING_VARIANT_MAP[bindingVariant];
     const serviceName = args.service_name.trim().toUpperCase();
 
     const client = createAdtClient(connection, logger);
@@ -101,7 +112,7 @@ export async function handleUpdateServiceBinding(
           success: true,
           service_binding_name: serviceBindingName,
           desired_publication_state: args.desired_publication_state,
-          service_type: args.service_type,
+          binding_variant: bindingVariant,
           service_name: serviceName,
           service_version: args.service_version || null,
           response_format: responseFormat,

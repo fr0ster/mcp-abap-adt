@@ -168,6 +168,7 @@ export class LambdaTester {
           testParams.ddlx_name ||
           testParams.bimp_name ||
           testParams.metadata_extension_name ||
+          testParams.service_binding_name ||
           testParams.service_definition_name ||
           testParams.test_package ||
           null;
@@ -191,6 +192,8 @@ export class LambdaTester {
           if (testParams.data_element_name)
             testParams.data_element_name = objectName;
           if (testParams.structure_name) testParams.structure_name = objectName;
+          if (testParams.service_binding_name)
+            testParams.service_binding_name = objectName;
           if (testParams.test_package) testParams.test_package = objectName;
           if (testParams.name) testParams.name = objectName;
 
@@ -288,6 +291,7 @@ export class LambdaTester {
         testParams.ddlx_name ||
         testParams.bimp_name ||
         testParams.metadata_extension_name ||
+        testParams.service_binding_name ||
         testParams.service_definition_name ||
         testParams.test_package ||
         null;

@@ -134,6 +134,26 @@ describe('Admin: Teardown shared dependencies', () => {
         results.push({ type: 'classes', name: item.name, status });
       }
 
+      // 1b. Service definitions (delete before views they depend on)
+      const serviceDefinitions = sharedConfig.service_definitions || [];
+      for (const item of serviceDefinitions) {
+        const status = await safeDelete(
+          `service_definition ${item.name}`,
+          async () => {
+            await client.getServiceDefinition().delete({
+              serviceDefinitionName: item.name,
+              transportRequest,
+            });
+          },
+          testsLogger,
+        );
+        results.push({
+          type: 'service_definitions',
+          name: item.name,
+          status,
+        });
+      }
+
       // 2. Behavior definitions
       const bdefs = sharedConfig.behavior_definitions || [];
       for (const item of bdefs) {

@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [5.2.0] - 2026-04-15
+
+### Added
+- `ActivateServiceDefinition` handler (high + low level) for standalone activation of ABAP service definitions (closes #60)
+- `ActivateServiceBinding` handler (high + low level) for standalone activation of ABAP service bindings (closes #60)
+- Integration test for ServiceBinding high-level handlers (create with variant, activate, delete)
+- Shared service definition `ZMCP_SHR_SRVD01` in shared_dependencies for binding tests
+- Service definitions support in shared:setup and shared:teardown
+
+### Changed
+- `CreateServiceBinding`: replaced `binding_type` (ODataV2/ODataV4) with `binding_variant` using `ServiceBindingVariant` type — supports ODATA_V2_UI, ODATA_V2_WEB_API, ODATA_V4_UI, ODATA_V4_WEB_API; default changed to ODATA_V4_UI (Fiori Elements) (closes #59, #60)
+- `UpdateServiceBinding`: replaced `service_type` with `binding_variant` for consistent API
+- Upgraded `@mcp-abap-adt/interfaces` to ^7.0.0, `@mcp-abap-adt/adt-clients` to ^5.0.0
+- Long test timeout increased from 400s to 600s
+
 ## [5.1.1] - 2026-04-13
 
 ### Fixed

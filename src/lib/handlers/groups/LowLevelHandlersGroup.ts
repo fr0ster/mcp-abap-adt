@@ -108,6 +108,8 @@ import { handleUnlockProgram } from '../../../handlers/program/low/handleUnlockP
 // Import low-level handlers - Program
 import { handleUpdateProgram as handleUpdateProgramLow } from '../../../handlers/program/low/handleUpdateProgram';
 import { handleValidateProgram } from '../../../handlers/program/low/handleValidateProgram';
+import { handleActivateServiceBinding } from '../../../handlers/service_binding/low/handleActivateServiceBinding';
+import { handleActivateServiceDefinition } from '../../../handlers/service_definition/low/handleActivateServiceDefinition';
 import { handleActivateStructure } from '../../../handlers/structure/low/handleActivateStructure';
 import { handleCheckStructure } from '../../../handlers/structure/low/handleCheckStructure';
 import { handleCreateStructure as handleCreateStructureLow } from '../../../handlers/structure/low/handleCreateStructure';
@@ -241,6 +243,8 @@ import { TOOL_DEFINITION as UnlockProgram_Tool } from '../../../handlers/program
 // Import TOOL_DEFINITION from program low handlers
 import { TOOL_DEFINITION as UpdateProgram_Tool } from '../../../handlers/program/low/handleUpdateProgram';
 import { TOOL_DEFINITION as ValidateProgram_Tool } from '../../../handlers/program/low/handleValidateProgram';
+import { TOOL_DEFINITION as ActivateServiceBinding_Tool } from '../../../handlers/service_binding/low/handleActivateServiceBinding';
+import { TOOL_DEFINITION as ActivateServiceDefinition_Tool } from '../../../handlers/service_definition/low/handleActivateServiceDefinition';
 import { TOOL_DEFINITION as ActivateStructure_Tool } from '../../../handlers/structure/low/handleActivateStructure';
 import { TOOL_DEFINITION as CheckStructure_Tool } from '../../../handlers/structure/low/handleCheckStructure';
 import { TOOL_DEFINITION as CreateStructureLow_Tool } from '../../../handlers/structure/low/handleCreateStructure';
@@ -1017,6 +1021,18 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
         toolDefinition: ActivateMetadataExtension_Tool,
         handler: (args: any) => {
           return handleActivateMetadataExtension(this.context, args);
+        },
+      },
+      {
+        toolDefinition: ActivateServiceDefinition_Tool,
+        handler: (args: any) => {
+          return handleActivateServiceDefinition(this.context, args);
+        },
+      },
+      {
+        toolDefinition: ActivateServiceBinding_Tool,
+        handler: (args: any) => {
+          return handleActivateServiceBinding(this.context, args);
         },
       },
     ];

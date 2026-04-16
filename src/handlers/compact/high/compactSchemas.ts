@@ -381,14 +381,12 @@ export const compactDumpListSchema = {
   type: 'object',
   properties: {
     user: { type: 'string', description: 'Filter dumps by user.' },
-    inlinecount: {
-      type: 'string',
-      enum: ['allpages', 'none'],
-      description: 'Include total count in response.',
-    },
     top: { type: 'number', description: 'Limit number of returned dumps.' },
-    skip: { type: 'number', description: 'Offset for pagination.' },
-    orderby: { type: 'string', description: 'Sort expression.' },
+    from: {
+      type: 'string',
+      description: 'Start of time range (YYYYMMDDHHMMSS).',
+    },
+    to: { type: 'string', description: 'End of time range (YYYYMMDDHHMMSS).' },
   },
   required: [],
 } as const;

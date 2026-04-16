@@ -87,10 +87,6 @@ import {
   TOOL_DEFINITION as RuntimeGetProfilerTraceData_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeGetProfilerTraceData';
 import {
-  handleRuntimeListDumps,
-  TOOL_DEFINITION as RuntimeListDumps_Tool,
-} from '../../../handlers/system/readonly/handleRuntimeListDumps';
-import {
   handleRuntimeListFeeds,
   TOOL_DEFINITION as RuntimeListFeeds_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeListFeeds';
@@ -146,10 +142,6 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
         toolDefinition: RuntimeGetProfilerTraceData_Tool,
         handler: (args: any) =>
           handleRuntimeGetProfilerTraceData(this.context, args),
-      },
-      {
-        toolDefinition: RuntimeListDumps_Tool,
-        handler: (args: any) => handleRuntimeListDumps(this.context, args),
       },
       {
         toolDefinition: RuntimeGetDumpById_Tool,

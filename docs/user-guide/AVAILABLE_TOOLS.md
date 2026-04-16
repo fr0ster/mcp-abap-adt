@@ -83,7 +83,6 @@ Generated from code in `src/handlers/**` (not from docs).
     - [RuntimeGetDumpById](#runtimegetdumpbyid-read-only-system)
     - [RuntimeGetGatewayErrorLog](#runtimegetgatewayerrorlog-read-only-system)
     - [RuntimeGetProfilerTraceData](#runtimegetprofilertracedata-read-only-system)
-    - [RuntimeListDumps](#runtimelistdumps-read-only-system)
     - [RuntimeListFeeds](#runtimelistfeeds-read-only-system)
     - [RuntimeListProfilerTraceFiles](#runtimelistprofilertracefiles-read-only-system)
     - [RuntimeListSystemMessages](#runtimelistsystemmessages-read-only-system)
@@ -989,23 +988,6 @@ Generated from code in `src/handlers/**` (not from docs).
 - `view` (string, required) - Trace view to retrieve.
 - `with_details` (boolean, optional) - Include statement details (for statements view).
 - `with_system_events` (boolean, optional) - Include system events.
-
----
-
-<a id="runtimelistdumps-read-only-system"></a>
-#### RuntimeListDumps (Read-Only / System)
-**Description:** [runtime] List ABAP runtime dumps with optional user filter and paging. Returns structured list with dump_id, datetime, error type, title, and user.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeListDumps.ts`
-
-**Parameters:**
-- `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format (system local time). Narrows results to dumps on or after this datetime.
-- `inlinecount` (string, optional) - Include total count metadata.
-- `orderby` (string, optional) - ADT order by expression.
-- `skip` (number, optional) - Number of records to skip.
-- `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format (system local time). Narrows results to dumps on or before this datetime.
-- `top` (number, optional) - Maximum number of records to return.
-- `user` (string, optional) - Optional username filter. If omitted, dumps for all users are returned.
 
 ---
 

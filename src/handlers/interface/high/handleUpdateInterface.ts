@@ -168,9 +168,14 @@ export async function handleUpdateInterface(
         logger?.info(
           `[UpdateInterface] Updating interface source code: ${interfaceName}`,
         );
-        await client
-          .getInterface()
-          .update({ interfaceName, sourceCode: source_code }, { lockHandle });
+        await client.getInterface().update(
+          {
+            interfaceName,
+            sourceCode: source_code,
+            transportRequest: transport_request,
+          },
+          { lockHandle },
+        );
         logger?.info(
           `[UpdateInterface] Interface source code updated: ${interfaceName}`,
         );

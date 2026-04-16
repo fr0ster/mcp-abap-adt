@@ -11,7 +11,7 @@ import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { handleRuntimeAnalyzeProfilerTrace } from '../../../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace';
 import { handleRuntimeGetDumpById } from '../../../../handlers/system/readonly/handleRuntimeGetDumpById';
 import { handleRuntimeGetProfilerTraceData } from '../../../../handlers/system/readonly/handleRuntimeGetProfilerTraceData';
-import { handleRuntimeListDumps } from '../../../../handlers/system/readonly/handleRuntimeListDumps';
+import { handleRuntimeListFeeds } from '../../../../handlers/system/readonly/handleRuntimeListFeeds';
 import { handleRuntimeListProfilerTraceFiles } from '../../../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles';
 import { handleRuntimeRunClassWithProfiling } from '../../../../handlers/system/readonly/handleRuntimeRunClassWithProfiling';
 import { handleRuntimeRunProgramWithProfiling } from '../../../../handlers/system/readonly/handleRuntimeRunProgramWithProfiling';
@@ -32,6 +32,17 @@ function parseTextPayload(result: any): any {
     throw new Error('Missing text payload in handler response');
   }
   return JSON.parse(textContent.text);
+}
+
+function extractDumpIdFromLink(link: string): string {
+  const match = link.match(/\/runtime\/dump\/(.+)$/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+function extractDumpIdsFromFeedEntries(entries: any[]): string[] {
+  return entries
+    .map((e: any) => extractDumpIdFromLink(e.link ?? ''))
+    .filter(Boolean);
 }
 
 function extractHandlerErrorText(result: any): string {
@@ -730,52 +741,51 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
 
           for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
             const listResult = await invoke(
-              'RuntimeListDumps',
+              'RuntimeListFeeds',
               {
+                feed_type: 'dumps',
                 user: dumpsUser,
-                inlinecount: 'allpages',
-                top: dumpFeedTop,
+                max_results: dumpFeedTop,
               },
               async () => {
                 const handlerContext = createHandlerContext({
                   connection: context.connection,
                   logger,
                 });
-                return handleRuntimeListDumps(handlerContext, {
+                return handleRuntimeListFeeds(handlerContext, {
+                  feed_type: 'dumps',
                   user: dumpsUser,
-                  inlinecount: 'allpages',
-                  top: dumpFeedTop,
+                  max_results: dumpFeedTop,
                 });
               },
             );
             expect(listResult.isError).toBe(false);
             const listData = parseTextPayload(listResult);
-            let dumpIds: string[] =
-              (listData.dumps as any[])?.map((d: any) => d.dump_id) ?? [];
+            let dumpIds = extractDumpIdsFromFeedEntries(listData.entries ?? []);
             if (dumpIds.length === 0 && dumpsUser) {
               // Fallback to unfiltered feed if user filter returns empty on this system.
               const unfilteredResult = await invoke(
-                'RuntimeListDumps',
+                'RuntimeListFeeds',
                 {
-                  inlinecount: 'allpages',
-                  top: dumpFeedTop,
+                  feed_type: 'dumps',
+                  max_results: dumpFeedTop,
                 },
                 async () => {
                   const handlerContext = createHandlerContext({
                     connection: context.connection,
                     logger,
                   });
-                  return handleRuntimeListDumps(handlerContext, {
-                    inlinecount: 'allpages',
-                    top: dumpFeedTop,
+                  return handleRuntimeListFeeds(handlerContext, {
+                    feed_type: 'dumps',
+                    max_results: dumpFeedTop,
                   });
                 },
               );
               expect(unfilteredResult.isError).toBe(false);
               const unfilteredData = parseTextPayload(unfilteredResult);
-              dumpIds =
-                (unfilteredData.dumps as any[])?.map((d: any) => d.dump_id) ??
-                [];
+              dumpIds = extractDumpIdsFromFeedEntries(
+                unfilteredData.entries ?? [],
+              );
             }
             if (dumpIds.length > 0) {
               dumpIdFromGeneratedFailure = dumpIds[0];
@@ -871,7 +881,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
   );
 
   it(
-    'should list dumps and look up a dump by datetime and user',
+    'should list dumps and read a dump by ID',
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
         const dumpsUser = context.params?.dumps_user || undefined;
@@ -887,45 +897,43 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           directCall: () => Promise<any>,
         ) => tester.invokeToolOrHandler(toolName, args, directCall);
 
-        // Step 1: list dumps by user to get a known datetime
+        // Step 1: list dumps via feeds to get a known dump_id
         const listResult = await invoke(
-          'RuntimeListDumps',
-          { user: dumpsUser, top: 5 },
+          'RuntimeListFeeds',
+          { feed_type: 'dumps', user: dumpsUser, max_results: 5 },
           async () => {
             const handlerContext = createHandlerContext({
               connection: context.connection,
               logger,
             });
-            return handleRuntimeListDumps(handlerContext, {
+            return handleRuntimeListFeeds(handlerContext, {
+              feed_type: 'dumps',
               user: dumpsUser,
-              top: 5,
+              max_results: 5,
             });
           },
         );
         expect(listResult.isError).toBe(false);
         const listData = parseTextPayload(listResult);
-        expect(listData.dumps).toBeDefined();
-        const dumps: any[] = listData.dumps ?? [];
-        if (dumps.length === 0) {
+        expect(listData.entries).toBeDefined();
+        const dumpIds = extractDumpIdsFromFeedEntries(listData.entries ?? []);
+        if (dumpIds.length === 0) {
           throw new Error(`SKIP: no dumps found for user "${dumpsUser}"`);
         }
 
-        const firstDump = dumps[0];
-        const expectedDumpId: string = firstDump.dump_id;
-        const datetime: string = firstDump.datetime;
+        const expectedDumpId = dumpIds[0];
 
-        // Step 2: look up the same dump via datetime + user
+        // Step 2: read the dump by ID
         const lookupResult = await invoke(
           'RuntimeGetDumpById',
-          { datetime, user: dumpsUser },
+          { dump_id: expectedDumpId },
           async () => {
             const handlerContext = createHandlerContext({
               connection: context.connection,
               logger,
             });
             return handleRuntimeGetDumpById(handlerContext, {
-              datetime,
-              user: dumpsUser,
+              dump_id: expectedDumpId,
             });
           },
         );

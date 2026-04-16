@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-04-16
+
+### Breaking Changes
+- **Removed** `RuntimeListDumps` tool — use `RuntimeListFeeds(feed_type='dumps')` instead, which uses the same ADT feed API as Eclipse and avoids timezone issues
+- **Removed** `datetime` and `user` parameters from `RuntimeGetDumpById` — `dump_id` is now the only required parameter; get dump IDs from `RuntimeListFeeds` first
+
+### Fixed
+- `UpdateInterface` fails with "Parameter corrNr could not be found" on SAP BTP ABAP Cloud — added missing `transportRequest` parameter to interface update call (closes #61)
+
+### Changed
+- `RuntimeGetDumpById` simplified: only accepts `dump_id` (from `RuntimeListFeeds`), no more datetime+user search with ±60s window (closes #62)
+- Compact `HandlerDumpList` now delegates to `RuntimeListFeeds` instead of removed `RuntimeListDumps`
+
 ## [5.2.0] - 2026-04-15
 
 ### Added

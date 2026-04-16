@@ -76,7 +76,7 @@ export const TOOL_DEFINITION = {
 **Values:**
 - `'onprem'` — On-premise systems (ECC, S/4HANA)
 - `'cloud'` — ABAP Cloud (SAP BTP)
-- `'legacy'` — Legacy on-premise systems (BASIS < 7.50, connected via RFC)
+- `'legacy'` — Legacy on-premise systems (BASIS < 7.50)
 
 **How filtering works:**
 

@@ -42,7 +42,7 @@ cp tests/test-config.yaml.template tests/test-config.yaml
 **Required changes** (marked `# ← CHANGE`):
 - `environment.env` — session .env file name (`"e19.env"`, `"mdd.env"`) from standard sessions folder
 - `environment.system_type` — `"onprem"`, `"cloud"`, or `"legacy"`
-- `environment.connection_type` — `"http"` (default) or `"rfc"` (legacy)
+- `environment.connection_type` — `"http"` (default) or `"rfc"`
 - `environment.default_package` — dev package (`ZMCP_TEST`, `$TMP`)
 - `environment.default_transport` — transport request or `""` for local packages
 - `shared_dependencies.package` — package for shared test objects
@@ -65,3 +65,7 @@ Values: `'onprem'` | `'cloud'` | `'legacy'`. If omitted, tool is available every
 - Programs are NOT available on ABAP Cloud (`available_in: ['onprem', 'legacy']`)
 - Runtime profiling (class-based) and dumps work on both cloud and onprem
 - `RuntimeRunProgramWithProfiling` is onprem-only (no programs on cloud)
+
+## npm Package Verification
+
+When checking whether an installed npm package contains specific code, always search inside `node_modules/` directly (e.g., `grep -r "pattern" node_modules/@scope/package/`). VS Code search and ripgrep skip `node_modules` by default due to `.gitignore`, which leads to false "not found" conclusions. The code may be there — you're just not looking in the right place.

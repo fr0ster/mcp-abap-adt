@@ -36,11 +36,10 @@ is bound to the original ABAP session.
 Eclipse ADT avoids this by using `JCoEnqueueSystemSession` (RFC-based locking) — no
 `x-sap-adt-sessiontype` header on the LOCK call.
 
-### 3. SAP_CONNECTION_TYPE=rfc should imply legacy
+### 3. SAP_CONNECTION_TYPE=rfc no longer implies legacy
 
-Currently `SAP_CONNECTION_TYPE=rfc` does not auto-set `SAP_SYSTEM_TYPE=legacy`.
-This could be an improvement: if a user connects via RFC, they're almost certainly
-on a legacy system.
+RFC is now a general-purpose connection transport, not tied to legacy systems.
+`SAP_SYSTEM_TYPE` must be set explicitly regardless of connection type.
 
 ## Reproduction Plan
 
@@ -76,7 +75,7 @@ Cannot run on trial/cloud systems — requires on-prem or legacy with transports
 1. **Skip `x-sap-adt-sessiontype: stateful`** on LOCK for legacy systems
 2. **Use stateless session** for lock/update/unlock cycle on legacy
 3. **Bundle lock + update + unlock** in a single stateful session (CSRF token reuse)
-4. **Auto-detect legacy** from `SAP_CONNECTION_TYPE=rfc`
+4. **Require explicit `SAP_SYSTEM_TYPE`** — RFC no longer implies legacy
 
 ## Status
 
@@ -86,4 +85,4 @@ Cannot run on trial/cloud systems — requires on-prem or legacy with transports
 - [ ] Create package `ZMC_REQUEST_TEST` on SAP (manual)
 - [ ] Run test on legacy system to confirm the 423 error
 - [ ] Implement fix based on test results
-- [ ] Auto-detect `SAP_SYSTEM_TYPE=legacy` from `SAP_CONNECTION_TYPE=rfc`
+- [x] Decouple RFC from legacy — RFC is now a general-purpose connection type (#63)

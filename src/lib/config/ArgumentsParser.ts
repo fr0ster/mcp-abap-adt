@@ -21,7 +21,7 @@ export interface ParsedArguments {
   useAuthBroker: boolean;
   /** Transport type */
   transport?: string;
-  /** SAP connection type: http (default) or rfc (legacy systems) */
+  /** SAP connection type: http (default) or rfc */
   connectionType?: 'http' | 'rfc';
   /** SAP system type override: onprem | cloud | legacy */
   systemType?: 'onprem' | 'cloud' | 'legacy';

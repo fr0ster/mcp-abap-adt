@@ -301,9 +301,9 @@ EXAMPLES:
   # Stdio with explicit env file
   mcp-abap-adt --env-path=.env
 
-  # RFC connection to legacy system (BASIS < 7.50)
-  # Set SAP_CONNECTION_TYPE=rfc in .env file, requires SAP NW RFC SDK
-  mcp-abap-adt --env-path=legacy.env
+  # RFC connection (any system with SAP NW RFC SDK)
+  # Set SAP_CONNECTION_TYPE=rfc in .env file
+  mcp-abap-adt --env-path=my-system.env --connection-type=rfc
 
   # Explicit system type (bypass auto-detection)
   mcp-abap-adt --env-path=e96.env --system-type=onprem

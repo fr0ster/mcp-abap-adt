@@ -74,7 +74,7 @@ export function getConfig(): SapConfig {
     }
   }
 
-  // Connection type: http (default) or rfc (legacy systems)
+  // Connection type: http (default) or rfc
   const connectionType: SapConfig['connectionType'] =
     process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc'
       ? 'rfc'

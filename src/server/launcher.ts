@@ -140,7 +140,7 @@ SAP CONNECTION (.env file):
     SAP_UAA_CLIENT_ID              UAA Client ID (or UAA_CLIENT_ID)
     SAP_UAA_CLIENT_SECRET          UAA Client Secret (or UAA_CLIENT_SECRET)
 
-  RFC Connection (legacy systems, BASIS < 7.50):
+  RFC Connection (any system with SAP NW RFC SDK):
     SAP_CONNECTION_TYPE=rfc        Enables RFC transport via SADT_REST_RFC_ENDPOINT
     SAP_URL                        SAP system URL (host:port used to derive RFC params)
     SAP_USERNAME                   SAP username

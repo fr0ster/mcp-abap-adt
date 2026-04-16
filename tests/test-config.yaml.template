@@ -91,7 +91,7 @@ environment:
   env: ""                                    # ← CHANGE: session file name (e.g., "e19.env", "mdd.env")
   # System and connection type (explicit, no auto-detection)
   system_type: ""                            # ← CHANGE: "onprem" | "cloud" | "legacy"
-  connection_type: "http"                    # "http" | "rfc" (rfc for legacy, BASIS < 7.50)
+  connection_type: "http"                    # "http" | "rfc"
   # Test defaults
   default_package: "ZMCP_TEST"              # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)

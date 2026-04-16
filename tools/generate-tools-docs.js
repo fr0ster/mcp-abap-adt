@@ -887,7 +887,7 @@ function main() {
       tools,
       'legacy',
       'Legacy System',
-      'Tools available on legacy SAP systems (BASIS < 7.50) connected via RFC.\nLegacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.',
+      'Tools available on legacy SAP systems (BASIS < 7.50).\nLegacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.',
     ),
     'utf8',
   );

@@ -19,7 +19,7 @@ cp test-config.yaml.template test-config.yaml
 environment:
   env: "e19.env"                # ⚠️ Ім'я .env файлу зі стандартної папки sessions
   system_type: "onprem"         # ⚠️ "onprem" | "cloud" | "legacy"
-  connection_type: "http"       # "http" | "rfc" (rfc для legacy)
+  connection_type: "http"       # "http" | "rfc"
   default_package: "TEST_MCP"   # ⚠️ Оновити на ваш пакет
   default_transport: ""         # ⚠️ Transport request або "" для локальних пакетів
 ```

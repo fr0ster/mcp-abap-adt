@@ -2,7 +2,7 @@
 
 Generated from code in `src/handlers/**` (not from docs).
 
-Tools available on legacy SAP systems (BASIS < 7.50) connected via RFC.
+Tools available on legacy SAP systems (BASIS < 7.50).
 Legacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.
 
 - Total tools: 129

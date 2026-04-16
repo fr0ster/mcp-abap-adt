@@ -47,7 +47,7 @@ env: trial
 # Explicit path to .env file (recommended for file-based config)
 env-path: .env
 
-# SAP connection type: http (default) or rfc (legacy systems with BASIS < 7.50)
+# SAP connection type: http (default) or rfc
 connection-type: http
 
 # Use unsafe mode (file-based session store)
@@ -91,7 +91,7 @@ sse:
 | `mcp` | string | - | Default MCP destination name (uses auth-broker) |
 | `env` | string | - | Destination name resolved from sessions store (`sessions/<name>.env`) |
 | `env-path` | string | - | Explicit path to `.env` file |
-| `connection-type` | string | `http` | SAP connection transport: `http` (default) or `rfc` (legacy systems) |
+| `connection-type` | string | `http` | SAP connection transport: `http` (default) or `rfc` |
 | `unsafe` | boolean | `false` | Use file-based session store (persists to disk) |
 | `auth-broker` | boolean | `false` | Force use of auth-broker (service keys) instead of `.env` |
 | `auth-broker-path` | string | - | Custom path for auth-broker storage |
@@ -189,11 +189,11 @@ Usage:
 mcp-abap-adt --conf=config.yaml
 ```
 
-### Example 6: Legacy System via RFC
+### Example 6: RFC Connection
 
 ```yaml
 transport: stdio
-env-path: legacy.env
+env-path: my-system.env
 connection-type: rfc
 ```
 

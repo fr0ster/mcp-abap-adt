@@ -1,6 +1,6 @@
-# RFC Connection Setup (Legacy Systems)
+# RFC Connection Setup
 
-RFC connections are required for legacy SAP systems (BASIS < 7.50) where HTTP stateful sessions are not supported. Without RFC, lock handles are lost between requests, causing update/unlock operations to fail.
+RFC is an alternative connection transport to HTTP. It works with any SAP system supported by the SAP NW RFC SDK. The RFC session is inherently stateful, so lock handles persist across calls without requiring HTTP stateful sessions.
 
 ## Prerequisites
 
@@ -72,7 +72,7 @@ SAP_CONNECTION_TYPE=rfc
 ```
 
 - `SAP_AUTH_TYPE` — authentication method (`basic` or `jwt`). RFC uses basic auth with username/password.
-- `SAP_CONNECTION_TYPE` — transport layer (`http` or `rfc`). Set to `rfc` for legacy systems.
+- `SAP_CONNECTION_TYPE` — transport layer (`http` or `rfc`).
 
 ## How It Works
 

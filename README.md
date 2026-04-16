@@ -9,7 +9,7 @@
 
 **Why teams use it:**
 - **Full CRUD** (not read-only): create, read, update, and delete ABAP artifacts
-- Works with **On-Premise (ECC/S/4HANA)**, **ABAP Cloud (BTP)**, and **Legacy** systems (BASIS < 7.50 via RFC)
+- Works with **On-Premise (ECC/S/4HANA)**, **ABAP Cloud (BTP)**, and **Legacy** systems (BASIS < 7.50)
 - **JWT/XSUAA**, **service key** (destination-based), and **RFC** authorization
 - Multiple transports: **stdio**, **HTTP**, **SSE**
 - Rich tool surface for ABAP objects, metadata, transports, and search
@@ -282,7 +282,7 @@ SAP_AUTH_TYPE=jwt
 SAP_JWT_TOKEN=your-jwt-token
 ```
 
-For legacy systems (RFC):
+For RFC connection:
 ```bash
 SAP_URL=https://your-legacy-system.com
 SAP_CLIENT=100
@@ -316,7 +316,7 @@ Inline comments are not parsed, so keep comments on separate lines.
 - `--auth-broker` - Force use of auth-broker (service keys), ignore .env file
 - `--auth-broker-path=<path>` - Custom path for auth-broker service keys and sessions
 - `--browser-auth-port=<port>` - Override OAuth browser callback port (default: 5000 for HTTP, 4000 for SSE, 4001 for stdio)
-- `--connection-type=<http|rfc>` - SAP connection transport: `http` (default) or `rfc` (legacy systems)
+- `--connection-type=<http|rfc>` - SAP connection transport: `http` (default) or `rfc`
 - `--unsafe` - Enable file-based session storage (persists tokens to disk). By default, sessions are stored in-memory (secure, lost on restart)
 
 When `--mcp=<destination>` is specified, automatic fallback loading of `./.env` is skipped.

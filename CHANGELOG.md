@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [6.1.0] - 2026-04-16
+
+### Changed
+- RFC connection is no longer tied to legacy systems — it is now a general-purpose connection transport for any on-prem system with SAP NW RFC SDK (closes #63)
+
 ## [6.0.0] - 2026-04-16
 
 ### Breaking Changes

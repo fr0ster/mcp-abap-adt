@@ -426,6 +426,7 @@ These are typically set in `.env` file:
 - `SAP_URL` - SAP system URL (required)
 - `SAP_CLIENT` - SAP client number (required)
 - `SAP_AUTH_TYPE` - Authentication type: `basic` or `jwt` (default: basic)
+- `SAP_SYSTEM_TYPE` - SAP system type: `cloud` (default), `onprem`, or `legacy`. Controls which tools are available — e.g., Programs require `onprem`. **Must be set explicitly for on-premise systems.**
 - `SAP_USERNAME` - SAP username (for basic auth)
 - `SAP_PASSWORD` - SAP password (for basic auth)
 - `SAP_CONNECTION_TYPE` - Connection transport: `http` (default) or `rfc`
@@ -498,6 +499,7 @@ cat > .env << EOF
 SAP_URL=https://dev.sap.company.com
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
+SAP_SYSTEM_TYPE=onprem
 SAP_USERNAME=developer
 SAP_PASSWORD=dev-password
 EOF
@@ -514,6 +516,7 @@ cat > rfc-system.env << EOF
 SAP_URL=https://sap.company.com
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
+SAP_SYSTEM_TYPE=onprem
 SAP_USERNAME=developer
 SAP_PASSWORD=dev-password
 SAP_CONNECTION_TYPE=rfc

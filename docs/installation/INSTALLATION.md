@@ -71,6 +71,9 @@ SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
+# System type: cloud (default), onprem, or legacy
+# Controls tool availability (e.g. Programs require onprem)
+SAP_SYSTEM_TYPE=onprem
 EOF
 ```
 
@@ -364,6 +367,8 @@ SAP_URL=https://your-sap-system.com
 SAP_CLIENT=100
 SAP_AUTH_TYPE=jwt
 SAP_JWT_TOKEN=your-jwt-token
+# System type: cloud (default), onprem, or legacy
+SAP_SYSTEM_TYPE=cloud
 EOF
 ```
 
@@ -465,6 +470,7 @@ You can also configure the server using environment variables.
 - `SAP_URL` - SAP system URL (required)
 - `SAP_CLIENT` - SAP client number (required)
 - `SAP_AUTH_TYPE` - Authentication type: basic|jwt (default: basic)
+- `SAP_SYSTEM_TYPE` - System type: `cloud` (default), `onprem`, or `legacy`. Controls tool availability (e.g. Programs require `onprem`)
 - `SAP_USERNAME` - SAP username (for basic auth)
 - `SAP_PASSWORD` - SAP password (for basic auth)
 - `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)

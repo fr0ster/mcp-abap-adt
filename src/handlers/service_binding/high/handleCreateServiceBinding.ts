@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create ABAP service binding via ADT Business Services endpoint. XML is generated from high-level parameters.',
+    'Operation: Create. Subject: ServiceBinding. Will be useful for creating service binding. Create a new ABAP service binding in SAP system. Creates the service binding object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

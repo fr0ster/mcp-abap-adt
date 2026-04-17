@@ -19,7 +19,7 @@ export const TOOL_DEFINITION = {
   name: 'ActivateServiceBindingLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Activate an ABAP service binding. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
+    'Operation: Activate, Create, Update. Subject: ServiceBinding. Will be useful for activating, creating, or updating service binding. [low-level] Activate an ABAP service binding. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -19,7 +19,7 @@ export const TOOL_DEFINITION = {
   name: 'ActivateMetadataExtensionLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
+    'Operation: Activate, Create, Update. Subject: MetadataExtension. Will be useful for activating, creating, or updating metadata extension. [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {

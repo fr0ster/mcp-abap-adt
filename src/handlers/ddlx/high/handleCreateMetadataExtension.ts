@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateMetadataExtension',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create a new ABAP Metadata Extension (DDLX) in SAP system. Defines Fiori UI annotations, field labels, search help, and list/object page layout for CDS views.',
+    'Operation: Create. Subject: MetadataExtension. Will be useful for creating metadata extension. Create a new ABAP Metadata Extension (DDLX) in SAP system. Creates the metadata extension object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

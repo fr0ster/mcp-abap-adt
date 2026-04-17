@@ -20,7 +20,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateTable',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create a new ABAP table via the ADT API. Creates the table object in initial state. Use UpdateTable to set DDL code afterwards.',
+    'Operation: Create. Subject: Table. Will be useful for creating table. Create a new ABAP table in SAP system. Creates the table object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

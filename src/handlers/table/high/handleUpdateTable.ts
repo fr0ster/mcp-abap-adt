@@ -21,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateTable',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Update DDL source code of an existing ABAP table. Locks the table, uploads new DDL source, and unlocks. Optionally activates after update. Use this to modify existing tables without re-creating metadata.',
+    'Operation: Update, Create. Subject: Table. Will be useful for updating or creating table. Update DDL source code of an existing ABAP table. Locks, updates, unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {

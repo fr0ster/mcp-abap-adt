@@ -21,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateServiceDefinition',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create a new ABAP service definition for OData services. Service definitions define the structure and behavior of OData services. Uses stateful session for proper lock management.',
+    'Operation: Create. Subject: ServiceDefinition. Will be useful for creating service definition. Create a new ABAP service definition in SAP system. Creates the service definition object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -1,17 +1,38 @@
 /**
  * Quick script to read a specific dump by ID via handleRuntimeGetDumpById.
- * Usage: npx tsx scripts/get-dump.ts <dump_id> [view]
- *   view: default | summary | formatted  (default: "default")
  */
 import { handleRuntimeGetDumpById } from '../src/handlers/system/readonly/handleRuntimeGetDumpById';
 import { loadTestEnv, getSapConfigFromEnv } from '../src/__tests__/integration/helpers/configHelpers';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 
+function printHelp() {
+  console.log(`Usage:
+  npx tsx scripts/get-dump.ts --id <dump_id> [--view default|summary|formatted]
+  npx tsx scripts/get-dump.ts --datetime "YYYY-MM-DD HH:MM:SS" --user <USER> [--view ...]
+
+Read a specific ABAP runtime dump.
+
+Options:
+  --id <dump_id>           Dump ID (required, unless --datetime + --user)
+  --datetime <timestamp>   Dump timestamp, e.g. "2026-03-31 18:53:47"
+  --user <name>            SAP user name
+  --view <type>            Output view: default | summary | formatted (default: "default")
+  --help                   Show this help message
+
+Examples:
+  npx tsx scripts/get-dump.ts --id 12345
+  npx tsx scripts/get-dump.ts --id 12345 --view formatted
+  npx tsx scripts/get-dump.ts --datetime "2026-03-31 18:53:47" --user DEVELOPER`);
+}
+
 async function main() {
-  // Usage:
-  //   npx tsx scripts/get-dump.ts --id <dump_id> [--view default|summary|formatted]
-  //   npx tsx scripts/get-dump.ts --datetime "2026-03-31 18:53:47" --user RSEMENOV [--view ...]
   const args = process.argv.slice(2);
+
+  if (args.includes('--help')) {
+    printHelp();
+    process.exit(0);
+  }
+
   const get = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
   const dumpId = get('--id');
   const datetime = get('--datetime');
@@ -19,16 +40,13 @@ async function main() {
   const view = (get('--view') as 'default' | 'summary' | 'formatted') || 'default';
 
   if (!dumpId && !(datetime && user)) {
-    console.error('Usage:');
-    console.error('  npx tsx scripts/get-dump.ts --id <dump_id> [--view default|summary|formatted]');
-    console.error('  npx tsx scripts/get-dump.ts --datetime "YYYY-MM-DD HH:MM:SS" --user <USER> [--view ...]');
+    console.error('Error: --id or (--datetime + --user) is required.\n');
+    printHelp();
     process.exit(1);
   }
 
   await loadTestEnv();
-  const config = getSapConfigFromEnv();
-  const connection = createAbapConnection(config);
-
+  const connection = createAbapConnection(getSapConfigFromEnv());
   const context = { connection };
 
   if (dumpId) {

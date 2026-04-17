@@ -1,21 +1,46 @@
 /**
  * Debug script: run class with profiling then read trace data.
- * Usage: npx tsx scripts/debug-profiling.ts <CLASS_NAME>
  */
-import { handleRuntimeRunClassWithProfiling } from '../src/handlers/system/readonly/handleRuntimeRunClassWithProfiling';
 import { handleRuntimeGetProfilerTraceData } from '../src/handlers/system/readonly/handleRuntimeGetProfilerTraceData';
 import { loadTestEnv, getSapConfigFromEnv } from '../src/__tests__/integration/helpers/configHelpers';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 
+function printHelp() {
+  console.log(`Usage: npx tsx scripts/debug-profiling.ts --class <CLASS_NAME>
+
+Run an ABAP class with profiling and read the resulting trace data.
+
+Options:
+  --class <name>   ABAP class name to run (required)
+  --help           Show this help message
+
+Examples:
+  npx tsx scripts/debug-profiling.ts --class ZCL_MY_CLASS
+  npx tsx scripts/debug-profiling.ts --class zcl_my_class`);
+}
+
 async function main() {
-  const className = process.argv[2] ?? 'ZMCP_BLD_CLSLOC_H1';
+  const args = process.argv.slice(2);
+
+  if (args.includes('--help')) {
+    printHelp();
+    process.exit(0);
+  }
+
+  const get = (flag: string) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : undefined; };
+  const className = get('--class');
+
+  if (!className) {
+    console.error('Error: --class is required.\n');
+    printHelp();
+    process.exit(1);
+  }
 
   await loadTestEnv();
   const connection = createAbapConnection(getSapConfigFromEnv());
   const context = { connection };
 
   console.log(`\n1. Running class "${className}" with profiling...`);
-  // Use executor directly to see raw traceRequestsResponse
   const { AdtExecutor } = await import('@mcp-abap-adt/adt-clients');
   const executor = new AdtExecutor(connection);
   const result = await executor.getClassExecutor().runWithProfiling(
@@ -30,10 +55,7 @@ async function main() {
   const bodyStr = typeof body === 'string' ? body : JSON.stringify(body);
   console.log('traceRequestsResponse body (first 800):', bodyStr?.slice(0, 800));
 
-  const runResult = { isError: false, content: [{ text: JSON.stringify({ trace_id: result.traceId }) }] };
-  const runData = { trace_id: result.traceId };
-
-  const traceId = String(runData.trace_id ?? '').toUpperCase();
+  const traceId = String(result.traceId ?? '').toUpperCase();
   if (!traceId) {
     console.error('No trace_id returned!');
     process.exit(1);

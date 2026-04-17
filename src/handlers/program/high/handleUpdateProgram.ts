@@ -19,7 +19,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateProgram',
   available_in: ['onprem', 'legacy'] as const,
   description:
-    'Update source code of an existing ABAP program. Locks the program, checks new code, uploads new source code, and unlocks. Optionally activates after update. Use this to modify existing programs without re-creating metadata.',
+    'Operation: Update, Create. Subject: Program. Will be useful for updating or creating program. Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {

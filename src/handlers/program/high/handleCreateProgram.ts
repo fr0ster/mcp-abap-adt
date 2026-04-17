@@ -21,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateProgram',
   available_in: ['onprem', 'legacy'] as const,
   description:
-    'Create a new ABAP program (report) in SAP system. Creates the program object in initial state. Use UpdateProgram to set source code afterwards.',
+    'Operation: Create. Subject: Program. Will be useful for creating program. Create a new ABAP program (report) in SAP system. Creates the program object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

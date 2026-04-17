@@ -23,24 +23,8 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 export const TOOL_DEFINITION = {
   name: 'UpdateDataElement',
   available_in: ['onprem', 'cloud'] as const,
-  description: `Update an existing ABAP data element in SAP system.
-
-Workflow:
-1. Gets domain info (if type_kind is 'domain') to extract dataType/length/decimals
-2. Acquires lock on the data element
-3. Updates data element with provided parameters (complete replacement)
-4. Unlocks data element
-5. Optionally activates data element (default: true)
-6. Returns updated data element details
-
-Supported type_kind values:
-- domain: Based on ABAP domain (requires type_name = domain name)
-- predefinedAbapType: Direct ABAP type (requires data_type, length, decimals)
-- refToPredefinedAbapType: Reference to ABAP type (requires data_type, length, decimals)
-- refToDictionaryType: Reference to another data element (requires type_name = data element name)
-- refToClifType: Reference to class (requires type_name = class name)
-
-Note: All provided parameters completely replace existing values. Field labels are truncated to max lengths (10/20/40/55).`,
+  description:
+    'Operation: Update, Create. Subject: DataElement. Will be useful for updating or creating data element. Update an existing ABAP data element. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {

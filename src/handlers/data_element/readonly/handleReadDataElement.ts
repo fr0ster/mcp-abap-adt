@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadDataElement',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Read ABAP data element definition and metadata. Answers: "show data element X", "display data element properties", "view DTEL definition", "get data element type". Returns definition, domain, package, responsible, description.',
+    'Operation: Read, Create, Update. Subject: DataElement. Will be useful for reading, creating, or updating data element. [read-only] Read ABAP data element definition and metadata. Answers: "show data element X", "display data element properties", "view DTEL definition", "get data element type". Returns definition, domain, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {

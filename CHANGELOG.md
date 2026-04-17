@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [6.2.2] - 2026-04-17
+
+### Added
+- Debug and tracing scripts: `debug-profiling`, `get-dump`, `list-dumps`, `list-traces`
+- All scripts accept CLI parameters (`--class`, `--user`, `--id`, etc.) and support `--help`
+
 ## [6.2.1] - 2026-04-17
 
 ### Fixed

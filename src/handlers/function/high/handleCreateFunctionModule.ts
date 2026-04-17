@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateFunctionModule',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Create a new ABAP function module within an existing function group. Creates the function module in initial state. Use UpdateFunctionModule to set source code afterwards.',
+    'Operation: Create. Subject: FunctionModule. Will be useful for creating function module. Create a new ABAP function module within an existing function group. Creates the function module in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

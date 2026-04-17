@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadFunctionModule',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[read-only] Read ABAP function module source code and metadata. Answers: "show function module code", "display FM source", "view function X", "get function module implementation". Returns source code, package, responsible, description.',
+    'Operation: Read, Create, Update. Subject: FunctionModule. Will be useful for reading, creating, or updating function module. [read-only] Read ABAP function module source code and metadata. Answers: "show function module code", "display FM source", "view function X", "get function module implementation". Returns source code, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -15,7 +15,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateFunctionModule',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Update source code of an existing ABAP function module. Locks the function module, uploads new source code, and unlocks. Optionally activates after update. Use this to modify existing function modules without re-creating metadata.',
+    'Operation: Update, Create. Subject: FunctionModule. Will be useful for updating or creating function module. Update source code of an existing ABAP function module. Locks, updates, unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {

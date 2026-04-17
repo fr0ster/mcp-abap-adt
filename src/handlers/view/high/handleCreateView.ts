@@ -18,7 +18,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateView',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Create CDS View or Classic View in SAP. Creates the view object in initial state. Use UpdateView to set DDL source code afterwards.',
+    'Operation: Create. Subject: View. Will be useful for creating view. Create a new CDS View or Classic View in SAP system. Creates the view object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -18,7 +18,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateClass',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Update source code of an existing ABAP class. Locks, checks, updates, unlocks, and optionally activates.',
+    'Operation: Update, Create. Subject: Class. Will be useful for updating or creating class. Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {

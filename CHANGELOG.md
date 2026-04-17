@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [6.2.1] - 2026-04-17
+
+### Fixed
+- `SAP_SYSTEM_TYPE` was commented out in `.env.example` — users on on-premise systems silently lost access to Program tools because the default is `cloud`
+
+### Documentation
+- Added `SAP_SYSTEM_TYPE` to all `.env` examples in installation and CLI docs
+- Added `SAP_SYSTEM_TYPE` to SAP Connection environment variables reference
+
+## [6.2.0] - 2026-04-16
+
+### Changed
+- Updated `@mcp-abap-adt/connection` to ^1.8.0
+- Updated `@mcp-abap-adt/adt-clients` to ^5.1.0
+
 ## [6.1.0] - 2026-04-16
 
 ### Changed

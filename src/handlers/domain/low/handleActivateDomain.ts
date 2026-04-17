@@ -19,7 +19,7 @@ export const TOOL_DEFINITION = {
   name: 'ActivateDomainLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Activate an ABAP domain. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
+    'Operation: Activate, Create, Update. Subject: Domain. Will be useful for activating, creating, or updating domain. [low-level] Activate an ABAP domain. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {

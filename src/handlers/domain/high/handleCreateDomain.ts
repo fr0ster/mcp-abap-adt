@@ -23,7 +23,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateDomain',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create a new ABAP domain in SAP system with all required steps: lock, create, check, unlock, activate, and verify.',
+    'Operation: Create. Subject: Domain. Will be useful for creating domain. Create a new ABAP domain in SAP system. Creates the domain object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

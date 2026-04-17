@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadDomain',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Read ABAP domain definition and metadata. Answers: "show domain X", "display domain fixed values", "view domain definition", "get domain properties". Returns definition, fixed values, package, responsible, description.',
+    'Operation: Read, Create, Update. Subject: Domain. Will be useful for reading, creating, or updating domain. [read-only] Read ABAP domain definition and metadata. Answers: "show domain X", "display domain fixed values", "view domain definition", "get domain properties". Returns definition, fixed values, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {

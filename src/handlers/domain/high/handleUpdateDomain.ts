@@ -23,17 +23,8 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 export const TOOL_DEFINITION = {
   name: 'UpdateDomain',
   available_in: ['onprem', 'cloud'] as const,
-  description: `Update an existing ABAP domain in SAP system.
-
-Workflow:
-1. Acquires lock on the domain
-2. Updates domain with provided parameters (complete replacement)
-3. Performs syntax check
-4. Unlocks domain
-5. Optionally activates domain (default: true)
-6. Returns updated domain details
-
-Note: All provided parameters completely replace existing values. Use GetDomain first to see current values if needed.`,
+  description:
+    'Operation: Update, Create. Subject: Domain. Will be useful for updating or creating domain. Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {

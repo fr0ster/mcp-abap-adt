@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [6.3.0] - 2026-04-18
+
+### Changed
+- Enriched all CRUD tool descriptions (Create, Read, Update, Activate) with structured Operation/Subject context for improved RAG-based tool selection (#66)
+- Unified description format across all 13 object types: Class, Program, Table, View, Domain, DataElement, Interface, FunctionModule, BehaviorDefinition, MetadataExtension, ServiceDefinition, ServiceBinding, Structure
+
 ## [6.2.2] - 2026-04-17
 
 ### Added

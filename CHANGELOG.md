@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [6.3.1] - 2026-04-19
+
+### Changed
+- Bumped `@mcp-abap-adt/adt-clients` to ^5.2.1 to drop transitive `node-rfc` dependency in favor of `@mcp-abap-adt/sap-rfc-lite`
+
 ## [6.3.0] - 2026-04-18
 
 ### Changed

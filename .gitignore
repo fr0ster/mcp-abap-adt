@@ -88,6 +88,3 @@ desktop.ini
 .vscode/mcp.json
 .claude/settings.local.json
 .codex
-
-# Superpowers plans (local development artifacts)
-docs/superpowers/

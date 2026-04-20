@@ -11,6 +11,7 @@ import { SystemHandlersGroup } from '../lib/handlers/groups/SystemHandlersGroup.
 import type {
   IHandlerGroup,
   IHandlersRegistry,
+  SapEnvironment,
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import type { IAdtSystemContext } from '../lib/systemContext.js';
@@ -66,6 +67,18 @@ export interface EmbeddableMcpServerOptions {
    * If not provided, handlers will use whatever is available from env vars.
    */
   systemContext?: Partial<IAdtSystemContext>;
+
+  /**
+   * SAP system type for this server instance. Governs which tools are
+   * registered via the `available_in` filter. Overrides the process-global
+   * `SAP_SYSTEM_TYPE` env var. If omitted, falls back to the env var,
+   * then to `'cloud'`.
+   *
+   * Use this when a single host serves multiple SAP systems (e.g., a proxy
+   * that handles both OnPremise and cloud destinations per request) —
+   * mutating `process.env.SAP_SYSTEM_TYPE` per instance is not safe.
+   */
+  systemType?: SapEnvironment;
 }
 
 /**
@@ -100,6 +113,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       name: 'mcp-abap-adt',
       version: options.version ?? DEFAULT_VERSION,
       logger: options.logger,
+      systemType: options.systemType,
     });
 
     this.injectedConnection = options.connection;

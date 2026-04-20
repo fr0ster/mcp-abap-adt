@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [6.4.0] - 2026-04-20
+
+### Added
+- `EmbeddableMcpServer` accepts a new optional `systemType: 'onprem' | 'cloud' | 'legacy'` option. When set, it overrides the process-global `SAP_SYSTEM_TYPE` env var for the `available_in` tool filter of that server instance only. Enables hosts that serve multiple SAP systems per request (e.g., proxies routing to a mix of on-premise Cloud Connector and cloud-hosted destinations) to register the correct tool set per instance without mutating `process.env`. (#69)
+- `BaseMcpServer` constructor accepts the same `systemType` option for subclasses.
+
+### Changed
+- Filter-skip debug log now reports whether the resolved system type came from the per-instance option or the env var (`source=option` / `source=env`).
+
+### Backward compatibility
+- `systemType` is optional; omitting it preserves the previous behavior (env var fallback, default `cloud`). No consumer changes required.
+
 ## [6.3.1] - 2026-04-19
 
 ### Changed

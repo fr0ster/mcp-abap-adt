@@ -516,6 +516,22 @@ The `SAP_SYSTEM_TYPE` environment variable controls which tools are available an
 
 You can also set this via CLI: `--system-type=onprem`
 
+#### Per-Instance Override (embedders)
+
+When embedding the server via `EmbeddableMcpServer`, pass `systemType` in the constructor options to bind one server instance to a specific SAP system type, independent of the process-global `SAP_SYSTEM_TYPE` env var:
+
+```ts
+new EmbeddableMcpServer({
+  connection,
+  exposition: ['readonly', 'high'],
+  systemType: 'onprem', // or 'cloud' / 'legacy'
+});
+```
+
+Use this when one host serves multiple SAP systems per request — for example, a proxy that resolves a BTP destination at request time and decides whether it is OnPremise (Cloud Connector) or an internet-facing cloud endpoint. Mutating `process.env.SAP_SYSTEM_TYPE` per request is not safe and is not required.
+
+**Resolution order:** `options.systemType` → `process.env.SAP_SYSTEM_TYPE` → default `cloud`.
+
 ### System Context for On-Premise Systems
 
 When creating or updating ABAP objects on on-premise systems, SAP ADT requires `masterSystem` and `responsible` attributes in the XML request body. These ensure that objects are correctly bound to transport requests.

@@ -41,9 +41,21 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private cachedConnection: AbapConnection | null = null;
 
-  constructor(options: { name: string; version?: string; logger?: Logger }) {
+  /**
+   * Per-instance SAP system type. Overrides process.env.SAP_SYSTEM_TYPE
+   * for `available_in` filtering at handler registration time.
+   */
+  protected readonly systemType?: SapEnvironment;
+
+  constructor(options: {
+    name: string;
+    version?: string;
+    logger?: Logger;
+    systemType?: SapEnvironment;
+  }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
     this.logger = options.logger ?? getDefaultLogger();
+    this.systemType = options.systemType;
   }
 
   /**
@@ -433,16 +445,17 @@ export abstract class BaseMcpServer extends McpServer {
           // Skip tools not available in the current SAP environment
           const availableIn = entry.toolDefinition.available_in;
           if (availableIn && availableIn.length > 0) {
-            const envType = process.env.SAP_SYSTEM_TYPE?.toLowerCase();
+            const resolvedType =
+              this.systemType ?? process.env.SAP_SYSTEM_TYPE?.toLowerCase();
             const currentEnv: SapEnvironment =
-              envType === 'legacy'
+              resolvedType === 'legacy'
                 ? 'legacy'
-                : envType === 'onprem'
+                : resolvedType === 'onprem'
                   ? 'onprem'
                   : 'cloud';
             if (!availableIn.includes(currentEnv)) {
               this.logger.debug(
-                `[BaseMcpServer] Skipping tool ${entry.toolDefinition.name}: available_in=${JSON.stringify(availableIn)}, currentEnv=${currentEnv}, SAP_SYSTEM_TYPE=${envType || '(not set, default: cloud)'}`,
+                `[BaseMcpServer] Skipping tool ${entry.toolDefinition.name}: available_in=${JSON.stringify(availableIn)}, currentEnv=${currentEnv}, source=${this.systemType ? 'option' : 'env'}, SAP_SYSTEM_TYPE=${process.env.SAP_SYSTEM_TYPE || '(not set)'}`,
               );
               continue;
             }

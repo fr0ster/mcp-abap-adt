@@ -43,9 +43,9 @@
     "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' — edit lines marked CHANGE')}\"",
     "test:reinit": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';fs.copyFileSync(t,s);console.log('Recreated '+s+' from template')\"",
     "test": "jest --passWithNoTests",
-    "test:integration": "jest --testPathPatterns=integration --runInBand --passWithNoTests --forceExit",
-    "test:high": "jest --testPathPatterns='integration.*High' --runInBand --passWithNoTests --forceExit",
-    "test:low": "jest --testPathPatterns='integration.*Low' --runInBand --passWithNoTests --forceExit",
+    "test:integration": "jest --testPathPatterns=integration --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
+    "test:high": "jest --testPathPatterns='integration.*High' --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
+    "test:low": "jest --testPathPatterns='integration.*Low' --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
     "test:check": "npx tsc --noEmit -p tsconfig.test.json",
     "shared:setup": "jest --testPathPatterns='admin/shared-deps/setup' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
     "shared:teardown": "jest --testPathPatterns='admin/shared-deps/teardown' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
@@ -204,7 +204,8 @@
       "!src/**/index.ts"
     ],
     "testPathIgnorePatterns": [
-      "__tests__/admin/"
+      "__tests__/admin/",
+      "__tests__/integration/"
     ],
     "maxWorkers": 1,
     "testTimeout": 600000,

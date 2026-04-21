@@ -19,7 +19,7 @@ RUN npm ci
 COPY . .
 
 # Build TypeScript to JavaScript
-RUN npm run build
+RUN npm run build:fast
 
 # Remove dev dependencies
 RUN npm prune --omit=dev
@@ -36,7 +36,7 @@ WORKDIR /app
 ENV NODE_ENV=production \
     MCP_HTTP_PORT=3000 \
     MCP_HTTP_HOST=0.0.0.0 \
-    MCP_TRANSPORT=stdio
+    MCP_TRANSPORT=http
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
@@ -51,8 +51,8 @@ EXPOSE 3000 9229
 
 # Healthcheck - only relevant for sse/http transports
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD if [ "$MCP_TRANSPORT" = "stdio" ]; then exit 0; else node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1; fi
+  CMD if [ "$MCP_TRANSPORT" = "stdio" ]; then exit 0; else node -e "require('http').get('http://localhost:3000/mcp/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1; fi
 
 # Start server with v2 launcher
 # Transport will be taken from MCP_TRANSPORT env var (defaults to stdio)
-CMD ["node", "--inspect=0.0.0.0:9229", "./dist/server/v2/launcher.js"]
+CMD ["node", "--inspect=0.0.0.0:9229", "./dist/server/launcher.js", "--allow-destination-header"]

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [6.4.1] - 2026-04-21
+
+### Fixed
+- `docker/Dockerfile`: switch default `MCP_TRANSPORT` from `stdio` to `http` so the image runs as an HTTP MCP server out of the box
+- `docker/Dockerfile`: correct launcher path (`dist/server/v2/launcher.js` → `dist/server/launcher.js`) — previous path did not exist and prevented the container from starting
+- `docker/Dockerfile`: pass `--allow-destination-header` so callers can supply SAP connection parameters via request headers (no default SAP connection baked into the image)
+- `docker/Dockerfile`: fix healthcheck endpoint (`/health` → `/mcp/health`) to match the actual route exposed by `StreamableHttpServer`
+- `docker/Dockerfile`: use `npm run build:fast` in the builder stage — the full `build` runs Biome which requires `.gitignore`, but `.dockerignore` excludes it
+
 ## [6.4.0] - 2026-04-20
 
 ### Added

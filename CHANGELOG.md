@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Documentation
+- README: mention optional `readOnlyDedupStrategy` in the `EmbeddableMcpServer` example and link to the dedup strategies section in `HANDLERS_MANAGEMENT.md`.
+
 ## [6.5.0] - 2026-04-24
 
 ### Added

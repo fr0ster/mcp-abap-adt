@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [6.5.0] - 2026-04-24
+
+### Added
+- `EmbeddableMcpServer` accepts optional `readOnlyDedupStrategy: IReadOnlyDedupStrategy` to hide duplicate `Read<X>` readonly handlers when another group (HighLevel / LowLevel / Compact) contributes an equivalent. Ships two implementations: `NoDedupStrategy` (default — no behavior change for existing consumers) and `ReadVsGetDedupStrategy` (hides `Read<X>` when `Get<X>` is exposed). Consumers can also plug custom strategies for role-based rules. Exported from `@mcp-abap-adt/core/handlers` and `@mcp-abap-adt/core/server`.
+- CLI launcher validates `--exposition` — `compact` must be exposed alone, `high` and `low` are mutually exclusive. Fails fast at startup with a clear error on misconfiguration.
+- Diagnostic scripts `scripts/read-fm.ts` and `scripts/probe-fm.ts` for reproducing function-module endpoint quirks against an arbitrary env file.
+
+### Changed
+- CLI launcher opts into `ReadVsGetDedupStrategy` by default, so running the shipped server no longer exposes duplicate pairs like `ReadFunctionModule` + `GetFunctionModule` when both `readonly` and `high` are enabled.
+
+### Fixed
+- `ReadFunctionModule` / `GetFunctionModule`: ADT resolves function modules by name regardless of the group segment in the URL, so passing a wrong group silently returned the correct FM's source and echoed the wrong group back in the response. Both handlers now read metadata first, verify the owning group via `<adtcore:containerRef/>`, and reject mismatches with an explicit error (`Function module X belongs to group Y, not Z.`). The response now echoes the real group from metadata rather than the input.
+
+### Backward compatibility
+- `EmbeddableMcpServer` default dedup is `NoDedupStrategy` — existing consumers see no change in exposed tool sets until they explicitly pass a strategy.
+- Invalid `--exposition` combinations previously silently produced duplicate-tool errors at runtime or exposed overlapping handlers; they now fail at startup with an explicit message.
+
 ## [6.4.1] - 2026-04-21
 
 ### Fixed

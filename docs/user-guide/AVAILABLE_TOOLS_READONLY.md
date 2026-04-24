@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: Read-Only
-- Total tools: 54
+- Total tools: 53
 
 ## Navigation
 
@@ -93,7 +93,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readbehaviordefinition-read-only-behavior-definition"></a>
 #### ReadBehaviorDefinition (Read-Only / Behavior Definition)
-**Description:** [read-only] Read ABAP RAP behavior definition (BDEF) source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: BehaviorDefinition. Will be useful for reading, creating, or updating behavior definition. [read-only] Read ABAP RAP behavior definition (BDEF) source code and metadata. Answers: 
 
 **Source:** `src/handlers/behavior_definition/readonly/handleReadBehaviorDefinition.ts`
 
@@ -123,7 +123,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readclass-read-only-class"></a>
 #### ReadClass (Read-Only / Class)
-**Description:** [read-only] Read ABAP class source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: Class. Will be useful for reading, creating, or updating class. [read-only] Read ABAP class source code and metadata. Answers: 
 
 **Source:** `src/handlers/class/readonly/handleReadClass.ts`
 
@@ -138,7 +138,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readdataelement-read-only-data-element"></a>
 #### ReadDataElement (Read-Only / Data Element)
-**Description:** [read-only] Read ABAP data element definition and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: DataElement. Will be useful for reading, creating, or updating data element. [read-only] Read ABAP data element definition and metadata. Answers: 
 
 **Source:** `src/handlers/data_element/readonly/handleReadDataElement.ts`
 
@@ -153,7 +153,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readdomain-read-only-domain"></a>
 #### ReadDomain (Read-Only / Domain)
-**Description:** [read-only] Read ABAP domain definition and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: Domain. Will be useful for reading, creating, or updating domain. [read-only] Read ABAP domain definition and metadata. Answers: 
 
 **Source:** `src/handlers/domain/readonly/handleReadDomain.ts`
 
@@ -221,7 +221,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readfunctionmodule-read-only-function-module"></a>
 #### ReadFunctionModule (Read-Only / Function Module)
-**Description:** [read-only] Read ABAP function module source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: FunctionModule. Will be useful for reading, creating, or updating function module. [read-only] Read ABAP function module source code and metadata. Answers: 
 
 **Source:** `src/handlers/function_module/readonly/handleReadFunctionModule.ts`
 
@@ -265,7 +265,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readinterface-read-only-interface"></a>
 #### ReadInterface (Read-Only / Interface)
-**Description:** [read-only] Read ABAP interface source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: Interface. Will be useful for reading, creating, or updating interface. [read-only] Read ABAP interface source code and metadata. Answers: 
 
 **Source:** `src/handlers/interface/readonly/handleReadInterface.ts`
 
@@ -280,7 +280,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readmetadataextension-read-only-metadata-extension"></a>
 #### ReadMetadataExtension (Read-Only / Metadata Extension)
-**Description:** [read-only] Read ABAP metadata extension (DDLX) source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: MetadataExtension. Will be useful for reading, creating, or updating metadata extension. [read-only] Read ABAP metadata extension (DDLX) source code and metadata. Answers: 
 
 **Source:** `src/handlers/metadata_extension/readonly/handleReadMetadataExtension.ts`
 
@@ -333,7 +333,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readprogram-read-only-program"></a>
 #### ReadProgram (Read-Only / Program)
-**Description:** [read-only] Read ABAP program (report) source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: Program. Will be useful for reading, creating, or updating program. [read-only] Read ABAP program (report) source code and metadata. Answers: 
 
 **Source:** `src/handlers/program/readonly/handleReadProgram.ts`
 
@@ -394,7 +394,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readservicebinding-read-only-service-binding"></a>
 #### ReadServiceBinding (Read-Only / Service Binding)
-**Description:** [read-only] Read ABAP service binding (SRVB) payload and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: ServiceBinding. Will be useful for reading, creating, or updating service binding. [read-only] Read ABAP service binding (SRVB) payload and metadata. Answers: 
 
 **Source:** `src/handlers/service_binding/readonly/handleReadServiceBinding.ts`
 
@@ -408,7 +408,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readservicedefinition-read-only-service-definition"></a>
 #### ReadServiceDefinition (Read-Only / Service Definition)
-**Description:** [read-only] Read ABAP service definition (SRVD) source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: ServiceDefinition. Will be useful for reading, creating, or updating service definition. [read-only] Read ABAP service definition (SRVD) source code and metadata. Answers: 
 
 **Source:** `src/handlers/service_definition/readonly/handleReadServiceDefinition.ts`
 
@@ -423,7 +423,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readstructure-read-only-structure"></a>
 #### ReadStructure (Read-Only / Structure)
-**Description:** [read-only] Read ABAP structure definition and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: Structure. Will be useful for reading, creating, or updating structure. [read-only] Read ABAP structure definition and metadata. Answers: 
 
 **Source:** `src/handlers/structure/readonly/handleReadStructure.ts`
 
@@ -643,15 +643,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimegetdumpbyid-read-only-system"></a>
 #### RuntimeGetDumpById (Read-Only / System)
-**Description:** [runtime] Read a specific ABAP runtime dump. Identify the dump by datetime + user (preferred, e.g. from a CALM event), or pass dump_id directly if already known. Use response_mode to control output detail level.
+**Description:** [runtime] Read a specific ABAP runtime dump by its ID. First use RuntimeListFeeds to find dumps and get their IDs, then pass dump_id here to read the full dump content.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetDumpById.ts`
 
 **Parameters:**
-- `datetime` (string, optional) - Dump datetime (ISO or 
-- `dump_id` (string, optional) - Full runtime dump ID. Use only when already known; prefer datetime + user otherwise.
+- `dump_id` (string, required) - Full runtime dump ID (e.g. from RuntimeListFeeds).
 - `response_mode` (string, optional (default: both)) - Controls what is returned: 
-- `user` (string, optional) - SAP username whose dump to read. Required when using datetime lookup.
 - `view` (string, optional (default: default)) - Dump view mode: default payload, summary section, or formatted long text.
 
 ---
@@ -793,7 +791,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readtable-read-only-table"></a>
 #### ReadTable (Read-Only / Table)
-**Description:** [read-only] Read ABAP table definition and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: Table. Will be useful for reading, creating, or updating table. [read-only] Read ABAP table definition and metadata. Answers: 
 
 **Source:** `src/handlers/table/readonly/handleReadTable.ts`
 
@@ -836,7 +834,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readview-read-only-view"></a>
 #### ReadView (Read-Only / View)
-**Description:** [read-only] Read ABAP CDS view source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: View. Will be useful for reading, creating, or updating view. [read-only] Read ABAP CDS view source code and metadata. Answers: 
 
 **Source:** `src/handlers/view/readonly/handleReadView.ts`
 
@@ -846,4 +844,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-04-13*
+*Last updated: 2026-04-24*

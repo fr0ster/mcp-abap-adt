@@ -285,14 +285,13 @@ Preferred dedicated compact tools and minimal payloads:
 
 <a id="handlerdumplist-compact"></a>
 #### HandlerDumpList (Compact)
-**Description:** Runtime dump list. object_type: not used. Required: none. Optional: user, inlinecount, top, skip, orderby. Response: JSON.
+**Description:** Runtime dump list. object_type: not used. Required: none. Optional: user, top, from, to. Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerDumpList.ts`
 
 **Parameters:**
-- `inlinecount` (string, optional) - Include total count in response.
-- `orderby` (string, optional) - Sort expression.
-- `skip` (number, optional) - Offset for pagination.
+- `from` (string, optional) - Start of time range (YYYYMMDDHHMMSS).
+- `to` (string, optional) - End of time range (YYYYMMDDHHMMSS).
 - `top` (number, optional) - Limit number of returned dumps.
 - `user` (string, optional) - Filter dumps by user.
 
@@ -551,4 +550,4 @@ Preferred dedicated compact tools and minimal payloads:
 
 ---
 
-*Last updated: 2026-04-13*
+*Last updated: 2026-04-24*

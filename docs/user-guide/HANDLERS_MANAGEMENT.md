@@ -92,9 +92,24 @@ node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=reado
 # Compact facade only
 node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=compact
 
-# All operations (dangerous, for development only)
-node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=readonly,high,low,compact
+# Low-level writes (use instead of `high`, not together)
+node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=readonly,low
 ```
+
+#### Validation rules
+
+The launcher rejects invalid `--exposition` combinations at startup:
+
+- `compact` must be exposed alone — it replaces both `high` and `low`. Combining it with anything else errors out.
+- `high` and `low` are mutually exclusive.
+
+Valid combinations: `[readonly]`, `[readonly, high]`, `[readonly, low]`, `[high]`, `[low]`, `[compact]`.
+
+#### Readonly / high-level dedup
+
+When both `readonly` and `high` are exposed, `Read<X>` readonly handlers duplicate the corresponding `Get<X>` from the high-level group (e.g. `ReadFunctionModule` vs `GetFunctionModule`). The launcher hides the readonly `Read<X>` variants in this case so that only one tool per operation is visible to the client.
+
+Embedder consumers of `EmbeddableMcpServer` keep the previous behavior (both variants exposed) unless they opt in by passing a `readOnlyDedupStrategy`. See [EmbeddableMcpServer dedup strategies](#embeddablemcpserver-dedup-strategies) below.
 
 ### Config File
 
@@ -106,7 +121,6 @@ envFile: .env
 exposition:
   - readonly
   - high
-  - compact
 ```
 
 ### Environment Variable
@@ -252,3 +266,49 @@ To add handlers to a specific set:
    ```bash
    npm run docs:tools
    ```
+
+## EmbeddableMcpServer dedup strategies
+
+`EmbeddableMcpServer` exposes an optional `readOnlyDedupStrategy` option to let consumers decide how readonly handlers are deduped against other groups (e.g. HighLevel, LowLevel, Compact) when multiple are exposed at the same time.
+
+```ts
+import {
+  EmbeddableMcpServer,
+  ReadVsGetDedupStrategy,
+} from '@mcp-abap-adt/core/server';
+
+const server = new EmbeddableMcpServer({
+  connection,
+  exposition: ['readonly', 'high'],
+  // Opt in to dedup — hide ReadFunctionModule when GetFunctionModule is exposed, etc.
+  readOnlyDedupStrategy: new ReadVsGetDedupStrategy(),
+});
+```
+
+**Shipped implementations** (importable from `@mcp-abap-adt/core/handlers` or `@mcp-abap-adt/core/server`):
+
+| Strategy | Behavior |
+|---|---|
+| `NoDedupStrategy` (default) | Never excludes anything — readonly group is exposed as-is. |
+| `ReadVsGetDedupStrategy` | Hides a `Read<X>` entry when a corresponding `Get<X>` is contributed by another group. |
+
+**Custom strategies**: implement `IReadOnlyDedupStrategy` for role-based or domain-specific rules:
+
+```ts
+import type {
+  HandlerEntry,
+  IReadOnlyDedupStrategy,
+} from '@mcp-abap-adt/core/handlers';
+
+class RoleAwareDedup implements IReadOnlyDedupStrategy {
+  constructor(private readonly role: 'viewer' | 'editor') {}
+  shouldExclude(entry: HandlerEntry, overriding: ReadonlySet<string>): boolean {
+    if (this.role === 'viewer') return false; // expose readonly as-is
+    // editor: dedup against whatever other groups contribute
+    const n = entry.toolDefinition.name;
+    return n.startsWith('Read') && overriding.has('Get' + n.slice(4));
+  }
+}
+```
+
+The default (no dedup) preserves behavior for existing consumers — upgrading the package does not change exposed tool sets unless the consumer explicitly passes a strategy.

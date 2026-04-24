@@ -180,7 +180,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readclass-read-only-class"></a>
 #### ReadClass (Read-Only / Class)
-**Description:** [read-only] Read ABAP class source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: Class. Will be useful for reading, creating, or updating class. [read-only] Read ABAP class source code and metadata. Answers: 
 
 **Source:** `src/handlers/class/readonly/handleReadClass.ts`
 
@@ -214,7 +214,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readfunctionmodule-read-only-function-module"></a>
 #### ReadFunctionModule (Read-Only / Function Module)
-**Description:** [read-only] Read ABAP function module source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: FunctionModule. Will be useful for reading, creating, or updating function module. [read-only] Read ABAP function module source code and metadata. Answers: 
 
 **Source:** `src/handlers/function_module/readonly/handleReadFunctionModule.ts`
 
@@ -264,7 +264,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readinterface-read-only-interface"></a>
 #### ReadInterface (Read-Only / Interface)
-**Description:** [read-only] Read ABAP interface source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: Interface. Will be useful for reading, creating, or updating interface. [read-only] Read ABAP interface source code and metadata. Answers: 
 
 **Source:** `src/handlers/interface/readonly/handleReadInterface.ts`
 
@@ -325,7 +325,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readprogram-read-only-program"></a>
 #### ReadProgram (Read-Only / Program)
-**Description:** [read-only] Read ABAP program (report) source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: Program. Will be useful for reading, creating, or updating program. [read-only] Read ABAP program (report) source code and metadata. Answers: 
 
 **Source:** `src/handlers/program/readonly/handleReadProgram.ts`
 
@@ -342,7 +342,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readview-read-only-view"></a>
 #### ReadView (Read-Only / View)
-**Description:** [read-only] Read ABAP CDS view source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: View. Will be useful for reading, creating, or updating view. [read-only] Read ABAP CDS view source code and metadata. Answers: 
 
 **Source:** `src/handlers/view/readonly/handleReadView.ts`
 
@@ -377,7 +377,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code afterwards.
+**Description:** Operation: Create. Subject: Class. Will be useful for creating class. Create a new ABAP class in SAP system. Creates the class object in initial state.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
@@ -541,7 +541,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="updateclass-high-level-class"></a>
 #### UpdateClass (High-Level / Class)
-**Description:** Update source code of an existing ABAP class. Locks, checks, updates, unlocks, and optionally activates.
+**Description:** Operation: Update, Create. Subject: Class. Will be useful for updating or creating class. Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/class/high/handleUpdateClass.ts`
 
@@ -686,7 +686,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="createfunctionmodule-high-level-function"></a>
 #### CreateFunctionModule (High-Level / Function)
-**Description:** Create a new ABAP function module within an existing function group. Creates the function module in initial state. Use UpdateFunctionModule to set source code afterwards.
+**Description:** Operation: Create. Subject: FunctionModule. Will be useful for creating function module. Create a new ABAP function module within an existing function group. Creates the function module in initial state.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionModule.ts`
 
@@ -717,7 +717,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="updatefunctionmodule-high-level-function"></a>
 #### UpdateFunctionModule (High-Level / Function)
-**Description:** Update source code of an existing ABAP function module. Locks the function module, uploads new source code, and unlocks. Optionally activates after update. Use this to modify existing function modules without re-creating metadata.
+**Description:** Operation: Update, Create. Subject: FunctionModule. Will be useful for updating or creating function module. Update source code of an existing ABAP function module. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionModule.ts`
 
@@ -814,7 +814,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="createinterface-high-level-interface"></a>
 #### CreateInterface (High-Level / Interface)
-**Description:** Create a new ABAP interface in SAP system. Creates the interface object in initial state. Use UpdateInterface to set source code afterwards.
+**Description:** Operation: Create. Subject: Interface. Will be useful for creating interface. Create a new ABAP interface in SAP system. Creates the interface object in initial state.
 
 **Source:** `src/handlers/interface/high/handleCreateInterface.ts`
 
@@ -858,7 +858,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="updateinterface-high-level-interface"></a>
 #### UpdateInterface (High-Level / Interface)
-**Description:** Update source code of an existing ABAP interface. Uses stateful session with proper lock/unlock mechanism. Lock handle and transport number are passed in URL parameters.
+**Description:** Operation: Update, Create. Subject: Interface. Will be useful for updating or creating interface. Update source code of an existing ABAP interface. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/interface/high/handleUpdateInterface.ts`
 
@@ -921,7 +921,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="createprogram-high-level-program"></a>
 #### CreateProgram (High-Level / Program)
-**Description:** Create a new ABAP program (report) in SAP system. Creates the program object in initial state. Use UpdateProgram to set source code afterwards.
+**Description:** Operation: Create. Subject: Program. Will be useful for creating program. Create a new ABAP program (report) in SAP system. Creates the program object in initial state.
 
 **Source:** `src/handlers/program/high/handleCreateProgram.ts`
 
@@ -967,7 +967,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="updateprogram-high-level-program"></a>
 #### UpdateProgram (High-Level / Program)
-**Description:** Update source code of an existing ABAP program. Locks the program, checks new code, uploads new source code, and unlocks. Optionally activates after update. Use this to modify existing programs without re-creating metadata.
+**Description:** Operation: Update, Create. Subject: Program. Will be useful for updating or creating program. Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/program/high/handleUpdateProgram.ts`
 
@@ -1196,7 +1196,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="createview-high-level-view"></a>
 #### CreateView (High-Level / View)
-**Description:** Create CDS View or Classic View in SAP. Creates the view object in initial state. Use UpdateView to set DDL source code afterwards.
+**Description:** Operation: Create. Subject: View. Will be useful for creating view. Create a new CDS View or Classic View in SAP system. Creates the view object in initial state.
 
 **Source:** `src/handlers/view/high/handleCreateView.ts`
 
@@ -1240,7 +1240,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="updateview-high-level-view"></a>
 #### UpdateView (High-Level / View)
-**Description:** Update DDL source code of an existing CDS View or Classic View. Locks the view, checks new code, uploads new DDL source, unlocks, and optionally activates.
+**Description:** Operation: Update, Create. Subject: View. Will be useful for updating or creating view. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/view/high/handleUpdateView.ts`
 
@@ -1262,7 +1262,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="activateclasslow-low-level-class"></a>
 #### ActivateClassLow (Low-Level / Class)
-**Description:** [low-level] Activate an ABAP class. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** Operation: Activate, Create, Update. Subject: Class. Will be useful for activating, creating, or updating class. [low-level] Activate an ABAP class. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/class/low/handleActivateClass.ts`
 
@@ -1542,7 +1542,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="activatefunctionmodulelow-low-level-function"></a>
 #### ActivateFunctionModuleLow (Low-Level / Function)
-**Description:** [low-level] Activate an ABAP function module. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** Operation: Activate, Create, Update. Subject: FunctionModule. Will be useful for activating, creating, or updating function module. [low-level] Activate an ABAP function module. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionModule.ts`
 
@@ -1776,7 +1776,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="activateinterfacelow-low-level-interface"></a>
 #### ActivateInterfaceLow (Low-Level / Interface)
-**Description:** [low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** Operation: Activate, Create, Update. Subject: Interface. Will be useful for activating, creating, or updating interface. [low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/interface/low/handleActivateInterface.ts`
 
@@ -1992,7 +1992,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="activateprogramlow-low-level-program"></a>
 #### ActivateProgramLow (Low-Level / Program)
-**Description:** [low-level] Activate an ABAP program. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** Operation: Activate, Create, Update. Subject: Program. Will be useful for activating, creating, or updating program. [low-level] Activate an ABAP program. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/program/low/handleActivateProgram.ts`
 
@@ -2124,7 +2124,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="activateviewlow-low-level-view"></a>
 #### ActivateViewLow (Low-Level / View)
-**Description:** [low-level] Activate an ABAP view (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** Operation: Activate, Create, Update. Subject: View. Will be useful for activating, creating, or updating view. [low-level] Activate an ABAP view (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/view/low/handleActivateView.ts`
 
@@ -2253,4 +2253,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-04-13*
+*Last updated: 2026-04-24*

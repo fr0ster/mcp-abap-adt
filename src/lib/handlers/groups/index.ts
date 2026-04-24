@@ -12,3 +12,8 @@ export { LowLevelHandlersGroup } from './LowLevelHandlersGroup.js';
 export { ReadOnlyHandlersGroup } from './ReadOnlyHandlersGroup.js';
 export { SearchHandlersGroup } from './SearchHandlersGroup.js';
 export { SystemHandlersGroup } from './SystemHandlersGroup.js';
+export {
+  type IReadOnlyDedupStrategy,
+  NoDedupStrategy,
+  ReadVsGetDedupStrategy,
+} from './strategies/index.js';

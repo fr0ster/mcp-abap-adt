@@ -12,6 +12,7 @@ import {
   return_error,
   return_response,
 } from '../../../lib/utils';
+import { assertFunctionGroupMatches } from '../shared/parseContainerGroup';
 
 export const TOOL_DEFINITION = {
   name: 'GetFunctionModule',
@@ -81,10 +82,26 @@ export async function handleGetFunctionModule(
     );
 
     try {
-      // Read function module using AdtClient
       const functionModuleObject = client.getFunctionModule();
+
+      // Verify ownership first — ADT resolves FM by name regardless of group
+      // segment in URL, so we reject mismatches before returning source.
+      const metaResult = await functionModuleObject.readMetadata({
+        functionModuleName,
+        functionGroupName,
+      });
+      const metadataXml =
+        typeof metaResult?.metadataResult?.data === 'string'
+          ? metaResult.metadataResult.data
+          : null;
+      const realGroup = assertFunctionGroupMatches(
+        metadataXml,
+        functionGroupName,
+        functionModuleName,
+      );
+
       const readResult = await functionModuleObject.read(
-        { functionModuleName, functionGroupName },
+        { functionModuleName, functionGroupName: realGroup },
         version as 'active' | 'inactive',
       );
 
@@ -106,7 +123,7 @@ export async function handleGetFunctionModule(
       }
 
       logger?.info(
-        `✅ GetFunctionModule completed successfully: ${functionModuleName}`,
+        `GetFunctionModule completed successfully: ${functionModuleName} in ${realGroup}`,
       );
 
       return return_response({
@@ -114,7 +131,7 @@ export async function handleGetFunctionModule(
           {
             success: true,
             function_module_name: functionModuleName,
-            function_group_name: functionGroupName,
+            function_group_name: realGroup,
             version,
             function_module_data: functionModuleData,
             status: readResult.readResult.status,

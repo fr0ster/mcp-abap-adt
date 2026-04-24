@@ -103,19 +103,47 @@ import {
   TOOL_DEFINITION as ReadView_Tool,
 } from '../../../handlers/view/readonly/handleReadView';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
-import type { HandlerEntry } from '../interfaces.js';
+import type { HandlerContext, HandlerEntry } from '../interfaces.js';
+import {
+  type IReadOnlyDedupStrategy,
+  NoDedupStrategy,
+} from './strategies/index.js';
 
 /**
  * Handler group for all readonly (read-only) handlers.
  * Contains handlers that only read data without modifying the ABAP system.
+ *
+ * When other groups (HighLevel / LowLevel / Compact) are also exposed, some
+ * readonly handlers semantically duplicate tools from those groups
+ * (e.g. ReadFunctionModule vs GetFunctionModule). The group hides such
+ * duplicates based on the injected override strategy and the set of tool
+ * names contributed by the other groups.
  */
 export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'ReadOnlyHandlers';
+  private readonly overridingToolNames: ReadonlySet<string>;
+  private readonly dedupStrategy: IReadOnlyDedupStrategy;
+
+  constructor(
+    context: HandlerContext,
+    overridingToolNames: ReadonlySet<string> = new Set(),
+    dedupStrategy: IReadOnlyDedupStrategy = new NoDedupStrategy(),
+  ) {
+    super(context);
+    this.overridingToolNames = overridingToolNames;
+    this.dedupStrategy = dedupStrategy;
+  }
 
   /**
-   * Gets all readonly handler entries
+   * Gets all readonly handler entries, filtered by the dedup strategy.
    */
   getHandlers(): HandlerEntry[] {
+    return this.getAllEntries().filter(
+      (e) => !this.dedupStrategy.shouldExclude(e, this.overridingToolNames),
+    );
+  }
+
+  private getAllEntries(): HandlerEntry[] {
     return [
       // Existing readonly handlers
       {

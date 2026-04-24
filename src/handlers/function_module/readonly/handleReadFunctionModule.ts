@@ -5,6 +5,7 @@ import {
   return_error,
   return_response,
 } from '../../../lib/utils';
+import { assertFunctionGroupMatches } from '../shared/parseContainerGroup';
 
 export const TOOL_DEFINITION = {
   name: 'ReadFunctionModule',
@@ -59,10 +60,39 @@ export async function handleReadFunctionModule(
     const functionGroupName = function_group_name.toUpperCase();
     const obj = client.getFunctionModule();
 
+    // Read metadata FIRST — the ADT backend resolves FM by name regardless of
+    // the group segment in the URL, so we must verify ownership from metadata
+    // (<adtcore:containerRef/>) before trusting any source payload.
+    let metadata: string | null = null;
+    try {
+      const metaResult = await obj.readMetadata({
+        functionModuleName,
+        functionGroupName,
+      });
+      if (metaResult?.metadataResult?.data) {
+        metadata =
+          typeof metaResult.metadataResult.data === 'string'
+            ? metaResult.metadataResult.data
+            : safeStringify(metaResult.metadataResult.data);
+      }
+    } catch (e: any) {
+      return return_error(
+        new Error(
+          `Could not read metadata for ${functionModuleName} in group ${functionGroupName}: ${e?.message ?? e}`,
+        ),
+      );
+    }
+
+    const realGroup = assertFunctionGroupMatches(
+      metadata,
+      functionGroupName,
+      functionModuleName,
+    );
+
     let source_code: string | null = null;
     try {
       const readResult = await obj.read(
-        { functionModuleName, functionGroupName },
+        { functionModuleName, functionGroupName: realGroup },
         version as 'active' | 'inactive',
       );
       if (readResult?.readResult?.data) {
@@ -77,30 +107,12 @@ export async function handleReadFunctionModule(
       );
     }
 
-    let metadata: string | null = null;
-    try {
-      const metaResult = await obj.readMetadata({
-        functionModuleName,
-        functionGroupName,
-      });
-      if (metaResult?.metadataResult?.data) {
-        metadata =
-          typeof metaResult.metadataResult.data === 'string'
-            ? metaResult.metadataResult.data
-            : safeStringify(metaResult.metadataResult.data);
-      }
-    } catch (e: any) {
-      logger?.warn(
-        `Could not read metadata for ${functionModuleName}: ${e?.message}`,
-      );
-    }
-
     return return_response({
       data: JSON.stringify(
         {
           success: true,
           function_module_name: functionModuleName,
-          function_group_name: functionGroupName,
+          function_group_name: realGroup,
           version,
           source_code,
           metadata,

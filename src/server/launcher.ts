@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 import { AuthBrokerFactory } from '../lib/auth/index.js';
 import { ServerConfigManager } from '../lib/config/index.js';
+import { validateExposition } from '../lib/config/validateExposition.js';
 import {
   CompactHandlersGroup,
   HighLevelHandlersGroup,
@@ -11,7 +12,11 @@ import {
   SearchHandlersGroup,
   SystemHandlersGroup,
 } from '../lib/handlers/groups/index.js';
-import type { HandlerContext } from '../lib/handlers/interfaces.js';
+import { ReadVsGetDedupStrategy } from '../lib/handlers/groups/strategies/index.js';
+import type {
+  HandlerContext,
+  IHandlerGroup,
+} from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import {
   type AuthDisplayConfig,
@@ -196,20 +201,41 @@ async function main() {
 
   // Build handlers based on exposition config (default to readonly,high)
   const exposition = config.exposition || ['readonly', 'high'];
-  const handlerGroups: any[] = [];
-  if (exposition.includes('readonly')) {
-    handlerGroups.push(new ReadOnlyHandlersGroup(baseContext));
-    handlerGroups.push(new SystemHandlersGroup(baseContext));
-  }
+  validateExposition(exposition);
+
+  // Non-readonly groups are built first so that their tool names can be fed
+  // into ReadOnlyHandlersGroup for duplicate suppression (e.g. hide
+  // ReadFunctionModule when GetFunctionModule is also exposed).
+  const overridingGroups: IHandlerGroup[] = [];
   if (exposition.includes('high')) {
-    handlerGroups.push(new HighLevelHandlersGroup(baseContext));
-  }
-  if (exposition.includes('compact')) {
-    handlerGroups.push(new CompactHandlersGroup(baseContext));
+    overridingGroups.push(new HighLevelHandlersGroup(baseContext));
   }
   if (exposition.includes('low')) {
-    handlerGroups.push(new LowLevelHandlersGroup(baseContext));
+    overridingGroups.push(new LowLevelHandlersGroup(baseContext));
   }
+  if (exposition.includes('compact')) {
+    overridingGroups.push(new CompactHandlersGroup(baseContext));
+  }
+
+  const overridingToolNames = new Set<string>();
+  for (const g of overridingGroups) {
+    for (const e of g.getHandlers()) {
+      overridingToolNames.add(e.toolDefinition.name);
+    }
+  }
+
+  const handlerGroups: IHandlerGroup[] = [];
+  if (exposition.includes('readonly')) {
+    handlerGroups.push(
+      new ReadOnlyHandlersGroup(
+        baseContext,
+        overridingToolNames,
+        new ReadVsGetDedupStrategy(),
+      ),
+    );
+    handlerGroups.push(new SystemHandlersGroup(baseContext));
+  }
+  handlerGroups.push(...overridingGroups);
   // SearchHandlersGroup is always included
   handlerGroups.push(new SearchHandlersGroup(baseContext));
 

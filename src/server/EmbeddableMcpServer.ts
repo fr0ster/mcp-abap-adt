@@ -8,6 +8,7 @@ import { LowLevelHandlersGroup } from '../lib/handlers/groups/LowLevelHandlersGr
 import { ReadOnlyHandlersGroup } from '../lib/handlers/groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from '../lib/handlers/groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from '../lib/handlers/groups/SystemHandlersGroup.js';
+import type { IReadOnlyDedupStrategy } from '../lib/handlers/groups/strategies/index.js';
 import type {
   IHandlerGroup,
   IHandlersRegistry,
@@ -79,6 +80,18 @@ export interface EmbeddableMcpServerOptions {
    * mutating `process.env.SAP_SYSTEM_TYPE` per instance is not safe.
    */
   systemType?: SapEnvironment;
+
+  /**
+   * Optional strategy that decides which readonly handlers to dedup (hide)
+   * when overriding groups (high / low / compact) are also exposed.
+   *
+   * Default: no dedup — readonly handlers are exposed verbatim, preserving
+   * prior behavior for existing consumers. Pass `new ReadVsGetDedupStrategy()`
+   * (exported from this package) to hide `Read<X>` when a corresponding
+   * `Get<X>` is contributed by another group, or supply a custom
+   * implementation for bespoke role-based rules.
+   */
+  readOnlyDedupStrategy?: IReadOnlyDedupStrategy;
 }
 
 /**
@@ -128,6 +141,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       this.createDefaultRegistry(
         options.exposition ?? ['readonly', 'high'],
         options.logger,
+        options.readOnlyDedupStrategy,
       );
 
     this.registerHandlers(registry);
@@ -154,6 +168,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       | 'search'
     )[],
     logger?: Logger,
+    readOnlyDedupStrategy?: IReadOnlyDedupStrategy,
   ): IHandlersRegistry {
     // Dummy context - not actually used because BaseMcpServer.registerHandlers()
     // creates wrapper lambdas that call getConnection() for fresh context
@@ -162,20 +177,39 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       logger: logger ?? noopLogger,
     };
 
-    const groups: IHandlerGroup[] = [];
-
-    if (exposition.includes('readonly')) {
-      groups.push(new ReadOnlyHandlersGroup(dummyContext));
-    }
+    // Build non-readonly groups first so their tool names can feed the
+    // readonly dedup strategy (when one is provided by the consumer).
+    const overridingGroups: IHandlerGroup[] = [];
     if (exposition.includes('high')) {
-      groups.push(new HighLevelHandlersGroup(dummyContext));
-    }
-    if (exposition.includes('compact')) {
-      groups.push(new CompactHandlersGroup(dummyContext));
+      overridingGroups.push(new HighLevelHandlersGroup(dummyContext));
     }
     if (exposition.includes('low')) {
-      groups.push(new LowLevelHandlersGroup(dummyContext));
+      overridingGroups.push(new LowLevelHandlersGroup(dummyContext));
     }
+    if (exposition.includes('compact')) {
+      overridingGroups.push(new CompactHandlersGroup(dummyContext));
+    }
+
+    const overridingToolNames = new Set<string>();
+    if (readOnlyDedupStrategy) {
+      for (const g of overridingGroups) {
+        for (const e of g.getHandlers()) {
+          overridingToolNames.add(e.toolDefinition.name);
+        }
+      }
+    }
+
+    const groups: IHandlerGroup[] = [];
+    if (exposition.includes('readonly')) {
+      groups.push(
+        new ReadOnlyHandlersGroup(
+          dummyContext,
+          overridingToolNames,
+          readOnlyDedupStrategy,
+        ),
+      );
+    }
+    groups.push(...overridingGroups);
     if (exposition.includes('system')) {
       groups.push(new SystemHandlersGroup(dummyContext));
     }

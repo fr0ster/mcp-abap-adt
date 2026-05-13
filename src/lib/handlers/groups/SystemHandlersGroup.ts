@@ -99,9 +99,17 @@ import {
   TOOL_DEFINITION as RuntimeListSystemMessages_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeListSystemMessages';
 import {
+  handleRuntimeRunClass,
+  TOOL_DEFINITION as RuntimeRunClass_Tool,
+} from '../../../handlers/system/readonly/handleRuntimeRunClass';
+import {
   handleRuntimeRunClassWithProfiling,
   TOOL_DEFINITION as RuntimeRunClassWithProfiling_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeRunClassWithProfiling';
+import {
+  handleRuntimeRunProgram,
+  TOOL_DEFINITION as RuntimeRunProgram_Tool,
+} from '../../../handlers/system/readonly/handleRuntimeRunProgram';
 import {
   handleRuntimeRunProgramWithProfiling,
   TOOL_DEFINITION as RuntimeRunProgramWithProfiling_Tool,
@@ -146,6 +154,14 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: RuntimeGetDumpById_Tool,
         handler: (args: any) => handleRuntimeGetDumpById(this.context, args),
+      },
+      {
+        toolDefinition: RuntimeRunClass_Tool,
+        handler: (args: any) => handleRuntimeRunClass(this.context, args),
+      },
+      {
+        toolDefinition: RuntimeRunProgram_Tool,
+        handler: (args: any) => handleRuntimeRunProgram(this.context, args),
       },
       {
         toolDefinition: RuntimeRunClassWithProfiling_Tool,

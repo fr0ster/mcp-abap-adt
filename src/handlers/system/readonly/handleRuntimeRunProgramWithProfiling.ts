@@ -6,7 +6,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeRunProgramWithProfiling',
   available_in: ['onprem'] as const,
   description:
-    '[runtime] Execute ABAP program with profiler enabled and return created profilerId + traceId.',
+    '[runtime][deprecated] Execute ABAP program with profiler enabled and return created profilerId. Prefer RuntimeRunProgram with profile=true; this tool is kept for backward compatibility and will be removed in a future major release.',
   inputSchema: {
     type: 'object',
     properties: {

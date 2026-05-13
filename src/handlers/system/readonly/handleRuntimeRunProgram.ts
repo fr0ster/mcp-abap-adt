@@ -3,20 +3,26 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'RuntimeRunClassWithProfiling',
-  available_in: ['onprem', 'cloud'] as const,
+  name: 'RuntimeRunProgram',
+  available_in: ['onprem'] as const,
   description:
-    '[runtime][deprecated] Execute ABAP class with profiler enabled and return created profilerId + traceId. Prefer RuntimeRunClass with profile=true; this tool is kept for backward compatibility and will be removed in a future major release.',
+    '[runtime] Execute an ABAP program (report) and return its output. Set profile=true to also start a profiler trace; use RuntimeListProfilerTraceFiles afterwards to locate the trace (program execution is fire-and-forget, so traceId is not returned synchronously).',
   inputSchema: {
     type: 'object',
     properties: {
-      class_name: {
+      program_name: {
         type: 'string',
-        description: 'ABAP class name to execute.',
+        description: 'ABAP program name to execute.',
+      },
+      profile: {
+        type: 'boolean',
+        description:
+          'When true, run with the profiler. Default false. Trace must be located afterwards via RuntimeListProfilerTraceFiles — program execution does not return traceId synchronously.',
       },
       description: {
         type: 'string',
-        description: 'Profiler trace description.',
+        description:
+          'Profiler trace description (only used when profile=true).',
       },
       all_procedural_units: { type: 'boolean' },
       all_misc_abap_statements: { type: 'boolean' },
@@ -31,31 +37,14 @@ export const TOOL_DEFINITION = {
       max_size_for_trace_file: { type: 'number' },
       amdp_trace: { type: 'boolean' },
       max_time_for_tracing: { type: 'number' },
-      max_trace_attempts: {
-        type: 'integer',
-        minimum: 1,
-        description:
-          'Max polling attempts to resolve traceId after execution (default 5). Increase for slow systems (e.g. SAP trial cloud).',
-      },
-      trace_retry_delay_ms: {
-        type: 'integer',
-        minimum: 0,
-        description:
-          'Delay in ms between trace polling attempts (default 2000).',
-      },
-      trace_lookup_uris: {
-        type: 'array',
-        items: { type: 'string', minLength: 1 },
-        description:
-          'Additional URIs to consult when resolving the trace (advanced).',
-      },
     },
-    required: ['class_name'],
+    required: ['program_name'],
   },
 } as const;
 
-interface RuntimeRunClassWithProfilingArgs {
-  class_name: string;
+interface RuntimeRunProgramArgs {
+  program_name: string;
+  profile?: boolean;
   description?: string;
   all_procedural_units?: boolean;
   all_misc_abap_statements?: boolean;
@@ -70,50 +59,46 @@ interface RuntimeRunClassWithProfilingArgs {
   max_size_for_trace_file?: number;
   amdp_trace?: boolean;
   max_time_for_tracing?: number;
-  max_trace_attempts?: number;
-  trace_retry_delay_ms?: number;
-  trace_lookup_uris?: string[];
 }
 
-export async function handleRuntimeRunClassWithProfiling(
+export async function handleRuntimeRunProgram(
   context: HandlerContext,
-  args: RuntimeRunClassWithProfilingArgs,
+  args: RuntimeRunProgramArgs,
 ) {
   const { connection, logger } = context;
 
   try {
-    if (!args?.class_name) {
-      throw new Error('Parameter "class_name" is required');
+    if (!args?.program_name) {
+      throw new Error('Parameter "program_name" is required');
     }
 
-    const className = args.class_name.trim().toUpperCase();
+    const programName = args.program_name.trim().toUpperCase();
     const executor = new AdtExecutor(connection, logger);
-    const classExecutor = executor.getClassExecutor();
+    const programExecutor = executor.getProgramExecutor();
 
-    const maxTraceAttempts =
-      typeof args.max_trace_attempts === 'number' &&
-      Number.isFinite(args.max_trace_attempts) &&
-      args.max_trace_attempts >= 1
-        ? Math.trunc(args.max_trace_attempts)
-        : undefined;
-    const traceRetryDelayMs =
-      typeof args.trace_retry_delay_ms === 'number' &&
-      Number.isFinite(args.trace_retry_delay_ms) &&
-      args.trace_retry_delay_ms >= 0
-        ? Math.trunc(args.trace_retry_delay_ms)
-        : undefined;
-    const traceLookupUris = Array.isArray(args.trace_lookup_uris)
-      ? args.trace_lookup_uris.filter(
-          (uri): uri is string => typeof uri === 'string' && uri.length > 0,
-        )
-      : undefined;
+    if (!args.profile) {
+      const response = await programExecutor.run({ programName });
+      return return_response({
+        data: JSON.stringify(
+          {
+            success: true,
+            program_name: programName,
+            output: typeof response.data === 'string' ? response.data : '',
+            run_status: response.status,
+          },
+          null,
+          2,
+        ),
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+        config: response.config,
+      });
+    }
 
-    const result = await classExecutor.runWithProfiling(
-      { className },
+    const result = await programExecutor.runWithProfiling(
+      { programName },
       {
-        maxTraceAttempts,
-        traceRetryDelayMs,
-        traceLookupUris,
         profilerParameters: {
           description: args.description,
           allProceduralUnits: args.all_procedural_units,
@@ -137,11 +122,16 @@ export async function handleRuntimeRunClassWithProfiling(
       data: JSON.stringify(
         {
           success: true,
-          class_name: className,
-          profiler_id: result.profilerId,
-          trace_id: result.traceId,
+          program_name: programName,
+          output:
+            typeof result.response?.data === 'string'
+              ? result.response.data
+              : '',
           run_status: result.response?.status,
-          trace_requests_status: result.traceRequestsResponse?.status,
+          profile: {
+            profiler_id: result.profilerId,
+            // traceId is not returned for programs — use RuntimeListProfilerTraceFiles to find it.
+          },
         },
         null,
         2,
@@ -152,7 +142,7 @@ export async function handleRuntimeRunClassWithProfiling(
       config: result.response?.config,
     });
   } catch (error: any) {
-    logger?.error('Error running class with profiling:', error);
+    logger?.error('Error running program:', error);
     return return_error(error);
   }
 }

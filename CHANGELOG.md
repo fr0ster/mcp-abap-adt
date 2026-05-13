@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [6.6.0] - 2026-05-14
+
+### Added
+- `RuntimeRunClass` (onprem + cloud) — execute an ABAP class implementing `if_oo_adt_classrun` and return its stdout text. Optional `profile=true` runs through the profiler and additionally surfaces `profile.profiler_id` / `profile.trace_id` (same retry tunables as the previous tool).
+- `RuntimeRunProgram` (onprem only) — execute an ABAP report and return its stdout text. Optional `profile=true` starts a profiler trace; trace must be located afterwards via `RuntimeListProfilerTraceFiles` (program execution is fire-and-forget).
+
+### Deprecated
+- `RuntimeRunClassWithProfiling` and `RuntimeRunProgramWithProfiling` are now marked deprecated in their tool descriptions. They remain functional. Prefer the unified `RuntimeRunClass` / `RuntimeRunProgram` with `profile=true`. Scheduled for removal in a future major release.
+
 ## [6.5.3] - 2026-05-13
 
 ### Added

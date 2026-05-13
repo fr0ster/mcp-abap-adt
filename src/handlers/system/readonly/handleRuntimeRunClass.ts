@@ -3,10 +3,10 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'RuntimeRunClassWithProfiling',
+  name: 'RuntimeRunClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[runtime][deprecated] Execute ABAP class with profiler enabled and return created profilerId + traceId. Prefer RuntimeRunClass with profile=true; this tool is kept for backward compatibility and will be removed in a future major release.',
+    '[runtime] Execute an ABAP class implementing if_oo_adt_classrun and return its output. Set profile=true to also capture a profiler trace (returns profilerId/traceId alongside output).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -14,9 +14,15 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'ABAP class name to execute.',
       },
+      profile: {
+        type: 'boolean',
+        description:
+          'When true, run with the profiler and resolve the resulting traceId. Default false.',
+      },
       description: {
         type: 'string',
-        description: 'Profiler trace description.',
+        description:
+          'Profiler trace description (only used when profile=true).',
       },
       all_procedural_units: { type: 'boolean' },
       all_misc_abap_statements: { type: 'boolean' },
@@ -35,27 +41,28 @@ export const TOOL_DEFINITION = {
         type: 'integer',
         minimum: 1,
         description:
-          'Max polling attempts to resolve traceId after execution (default 5). Increase for slow systems (e.g. SAP trial cloud).',
+          'Max polling attempts to resolve traceId after execution (default 5). Only used when profile=true.',
       },
       trace_retry_delay_ms: {
         type: 'integer',
         minimum: 0,
         description:
-          'Delay in ms between trace polling attempts (default 2000).',
+          'Delay in ms between trace polling attempts (default 2000). Only used when profile=true.',
       },
       trace_lookup_uris: {
         type: 'array',
         items: { type: 'string', minLength: 1 },
         description:
-          'Additional URIs to consult when resolving the trace (advanced).',
+          'Additional URIs to consult when resolving the trace (advanced, profile=true).',
       },
     },
     required: ['class_name'],
   },
 } as const;
 
-interface RuntimeRunClassWithProfilingArgs {
+interface RuntimeRunClassArgs {
   class_name: string;
+  profile?: boolean;
   description?: string;
   all_procedural_units?: boolean;
   all_misc_abap_statements?: boolean;
@@ -75,9 +82,9 @@ interface RuntimeRunClassWithProfilingArgs {
   trace_lookup_uris?: string[];
 }
 
-export async function handleRuntimeRunClassWithProfiling(
+export async function handleRuntimeRunClass(
   context: HandlerContext,
-  args: RuntimeRunClassWithProfilingArgs,
+  args: RuntimeRunClassArgs,
 ) {
   const { connection, logger } = context;
 
@@ -89,6 +96,26 @@ export async function handleRuntimeRunClassWithProfiling(
     const className = args.class_name.trim().toUpperCase();
     const executor = new AdtExecutor(connection, logger);
     const classExecutor = executor.getClassExecutor();
+
+    if (!args.profile) {
+      const response = await classExecutor.run({ className });
+      return return_response({
+        data: JSON.stringify(
+          {
+            success: true,
+            class_name: className,
+            output: typeof response.data === 'string' ? response.data : '',
+            run_status: response.status,
+          },
+          null,
+          2,
+        ),
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+        config: response.config,
+      });
+    }
 
     const maxTraceAttempts =
       typeof args.max_trace_attempts === 'number' &&
@@ -138,10 +165,16 @@ export async function handleRuntimeRunClassWithProfiling(
         {
           success: true,
           class_name: className,
-          profiler_id: result.profilerId,
-          trace_id: result.traceId,
+          output:
+            typeof result.response?.data === 'string'
+              ? result.response.data
+              : '',
           run_status: result.response?.status,
-          trace_requests_status: result.traceRequestsResponse?.status,
+          profile: {
+            profiler_id: result.profilerId,
+            trace_id: result.traceId,
+            trace_requests_status: result.traceRequestsResponse?.status,
+          },
         },
         null,
         2,
@@ -152,7 +185,7 @@ export async function handleRuntimeRunClassWithProfiling(
       config: result.response?.config,
     });
   } catch (error: any) {
-    logger?.error('Error running class with profiling:', error);
+    logger?.error('Error running class:', error);
     return return_error(error);
   }
 }

@@ -375,29 +375,36 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             tester.isHardMode() ? invoke : undefined,
           );
 
+          const profiledRunArgs = {
+            class_name: className,
+            description: `MCP_RUNTIME_CLASS_${Date.now()}`,
+            all_procedural_units: true,
+            sql_trace: true,
+            all_db_events: true,
+            max_time_for_tracing: 1800,
+            max_trace_attempts:
+              toPositiveInt(
+                context.params?.profiled_run_max_trace_attempts,
+                0,
+              ) || undefined,
+            trace_retry_delay_ms:
+              toPositiveInt(
+                context.params?.profiled_run_trace_retry_delay_ms,
+                0,
+              ) || undefined,
+          };
           const profiledRun = await invoke(
             'RuntimeRunClassWithProfiling',
-            {
-              class_name: className,
-              description: `MCP_RUNTIME_CLASS_${Date.now()}`,
-              all_procedural_units: true,
-              sql_trace: true,
-              all_db_events: true,
-              max_time_for_tracing: 1800,
-            },
+            profiledRunArgs,
             async () => {
               const handlerContext = createHandlerContext({
                 connection: context.connection,
                 logger,
               });
-              return handleRuntimeRunClassWithProfiling(handlerContext, {
-                class_name: className,
-                description: `MCP_RUNTIME_CLASS_${Date.now()}`,
-                all_procedural_units: true,
-                sql_trace: true,
-                all_db_events: true,
-                max_time_for_tracing: 1800,
-              });
+              return handleRuntimeRunClassWithProfiling(
+                handlerContext,
+                profiledRunArgs,
+              );
             },
           );
 

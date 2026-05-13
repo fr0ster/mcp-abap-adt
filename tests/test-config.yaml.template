@@ -1866,6 +1866,10 @@ runtime_readonly_handlers:
         # Retries for trace files feed lookup (trace can appear with delay)
         trace_feed_retries: 6
         trace_feed_retry_delay_ms: 1000
+        # Executor-level trace polling (passed to RuntimeRunClassWithProfiling).
+        # Increase for slow systems (e.g. SAP trial cloud) — default in client is 5×2000ms.
+        profiled_run_max_trace_attempts: 15
+        profiled_run_trace_retry_delay_ms: 2000
         # Retries for reading profiler trace data (trace can appear with delay)
         trace_read_retries: 6
         trace_read_retry_delay_ms: 1500

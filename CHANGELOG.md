@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [6.5.2] - 2026-05-13
+
+### Fixed
+- Bump `@mcp-abap-adt/adt-clients` to `^5.4.2` and `@mcp-abap-adt/connection` to `^1.8.1` to pick up the stale-CSRF 401 recovery fix (fr0ster/mcp-abap-connection#7, originally reported as #78). On on-prem SAP with basic auth, a cached-but-stale CSRF token caused POST/PUT/DELETE to fail permanently with `401 + login HTML`; the connection layer now detects this case, clears the token/cookies, and retries.
+
 ## [6.5.1] - 2026-04-24
 
 ### Documentation

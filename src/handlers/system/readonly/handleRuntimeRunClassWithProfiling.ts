@@ -31,6 +31,22 @@ export const TOOL_DEFINITION = {
       max_size_for_trace_file: { type: 'number' },
       amdp_trace: { type: 'boolean' },
       max_time_for_tracing: { type: 'number' },
+      max_trace_attempts: {
+        type: 'number',
+        description:
+          'Max polling attempts to resolve traceId after execution (default 5). Increase for slow systems (e.g. SAP trial cloud).',
+      },
+      trace_retry_delay_ms: {
+        type: 'number',
+        description:
+          'Delay in ms between trace polling attempts (default 2000).',
+      },
+      trace_lookup_uris: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          'Additional URIs to consult when resolving the trace (advanced).',
+      },
     },
     required: ['class_name'],
   },
@@ -52,6 +68,9 @@ interface RuntimeRunClassWithProfilingArgs {
   max_size_for_trace_file?: number;
   amdp_trace?: boolean;
   max_time_for_tracing?: number;
+  max_trace_attempts?: number;
+  trace_retry_delay_ms?: number;
+  trace_lookup_uris?: string[];
 }
 
 export async function handleRuntimeRunClassWithProfiling(
@@ -72,6 +91,9 @@ export async function handleRuntimeRunClassWithProfiling(
     const result = await classExecutor.runWithProfiling(
       { className },
       {
+        maxTraceAttempts: args.max_trace_attempts,
+        traceRetryDelayMs: args.trace_retry_delay_ms,
+        traceLookupUris: args.trace_lookup_uris,
         profilerParameters: {
           description: args.description,
           allProceduralUnits: args.all_procedural_units,

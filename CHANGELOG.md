@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [6.5.3] - 2026-05-13
+
+### Added
+- `RuntimeRunClassWithProfiling` now accepts optional `max_trace_attempts`, `trace_retry_delay_ms`, and `trace_lookup_uris` so callers can tune trace-resolution polling. Defaults remain 5 attempts × 2000 ms; raise on slow systems (e.g. SAP trial cloud) where the trace file is written with extra delay. Closes #82.
+
 ## [6.5.2] - 2026-05-13
 
 ### Fixed

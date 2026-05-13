@@ -32,18 +32,20 @@ export const TOOL_DEFINITION = {
       amdp_trace: { type: 'boolean' },
       max_time_for_tracing: { type: 'number' },
       max_trace_attempts: {
-        type: 'number',
+        type: 'integer',
+        minimum: 1,
         description:
           'Max polling attempts to resolve traceId after execution (default 5). Increase for slow systems (e.g. SAP trial cloud).',
       },
       trace_retry_delay_ms: {
-        type: 'number',
+        type: 'integer',
+        minimum: 0,
         description:
           'Delay in ms between trace polling attempts (default 2000).',
       },
       trace_lookup_uris: {
         type: 'array',
-        items: { type: 'string' },
+        items: { type: 'string', minLength: 1 },
         description:
           'Additional URIs to consult when resolving the trace (advanced).',
       },
@@ -88,12 +90,30 @@ export async function handleRuntimeRunClassWithProfiling(
     const executor = new AdtExecutor(connection, logger);
     const classExecutor = executor.getClassExecutor();
 
+    const maxTraceAttempts =
+      typeof args.max_trace_attempts === 'number' &&
+      Number.isFinite(args.max_trace_attempts) &&
+      args.max_trace_attempts >= 1
+        ? Math.trunc(args.max_trace_attempts)
+        : undefined;
+    const traceRetryDelayMs =
+      typeof args.trace_retry_delay_ms === 'number' &&
+      Number.isFinite(args.trace_retry_delay_ms) &&
+      args.trace_retry_delay_ms >= 0
+        ? Math.trunc(args.trace_retry_delay_ms)
+        : undefined;
+    const traceLookupUris = Array.isArray(args.trace_lookup_uris)
+      ? args.trace_lookup_uris.filter(
+          (uri): uri is string => typeof uri === 'string' && uri.length > 0,
+        )
+      : undefined;
+
     const result = await classExecutor.runWithProfiling(
       { className },
       {
-        maxTraceAttempts: args.max_trace_attempts,
-        traceRetryDelayMs: args.trace_retry_delay_ms,
-        traceLookupUris: args.trace_lookup_uris,
+        maxTraceAttempts,
+        traceRetryDelayMs,
+        traceLookupUris,
         profilerParameters: {
           description: args.description,
           allProceduralUnits: args.all_procedural_units,

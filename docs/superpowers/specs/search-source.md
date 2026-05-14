@@ -8,7 +8,7 @@ Source analysis: `/tmp/afx-research/ANALYSIS.md` (AFX_CODE_SCANNER reverse-engin
 
 ## Goal
 
-Provide MCP-level source-text search across ABAP repository objects without invoking `SUBMIT AFX_CODE_SCANNER`. The implementation is a coordination layer on top of ADT primitives that already exist in `@mcp-abap-adt/adt-clients` — no new wire endpoint needed.
+Provide MCP-level source-text search across ABAP repository objects without invoking `SUBMIT AFX_CODE_SCANNER`. The implementation is a coordination layer on top of package enumeration and source-read primitives that already exist in `@mcp-abap-adt/adt-clients` / current MCP handlers — no new SAP-side report or indexed search endpoint needed.
 
 The tool must support the same scan semantics as `AFX_CODE_SCANNER` (package-scoped, object-type-filtered, AND/NOT substring matching, optional comment exclusion) and produce machine-readable provenance: each match carries the object, include, line number, and snippet text, plus an explicit `truncated` signal when limits cap the result.
 
@@ -18,7 +18,7 @@ The tool must support the same scan semantics as `AFX_CODE_SCANNER` (package-sco
 - Scans across the three object families that AFX covers: programs (`PROG`), function groups (`FUGR`), classes (`CLAS`). Behaviour parity with `p_prog` / `p_fugr` / `p_cinc` flags.
 - Optional recursive subpackage expansion (parity with `p_conpck`).
 - AND-pair substring query (`p_strg1` mandatory, `p_strg2` optional), up to three exclusion strings (parity with `p_excl1..3`).
-- Optional comment-line skip (parity with `p_excomm`).
+- Optional comment-line skip. Strict AFX parity means `*` in column 1 only; the MCP default also skips whitespace-prefixed `*` and full-line `"` comments because both are normal ABAP comment forms.
 - Per-object hit cap (parity with `p_lrng`).
 - Optional emit-no-hits row (parity with `p_nohits`) — surfaced as a separate result type, not as a fake match.
 - `available_in: ['onprem', 'legacy']` — cloud is explicitly out of scope (see fr0ster/mcp-abap-adt-clients#36 — `informationsystem/textsearch` on cloud requires active TREX/Enterprise Search infrastructure that we cannot rely on, and the read-side fallback is impractical at scale).
@@ -69,7 +69,7 @@ SearchSource({
 
 - All substring matches are case-insensitive (ABAP `CS` semantic).
 - Exclusion logic: a line is **dropped** if it contains any `exclude` entry. (Matches AFX where `p_excl1..3` are independent negatives.)
-- Comment skip: when `exclude_comments=true`, drop lines whose first non-whitespace character is `*` (classic ABAP) or whose trimmed start is `"` (modern comment). AFX only checked `*` at col 1; we extend to `"` since both are first-class.
+- Comment skip: when `exclude_comments=true`, drop lines whose first non-whitespace character is `*` (classic ABAP) or whose trimmed start is `"` (modern comment). This is an intentional MCP divergence from strict AFX behaviour, where `p_excomm` only checked `*` in column 1.
 - Per-object cap counts matched lines, not scanned lines. After the cap, scanning the rest of the source is skipped to save work.
 - `max_objects` is the total budget across all packages and object types. When exhausted, scanning stops and `truncated.by_max_objects = true`. Callers can narrow scope and re-invoke.
 - `no_hits` is only populated when `emit_no_hits=true`. It is **not** mixed into `results` (unlike AFX which emitted a "Keine Treffer" pseudo-row).
@@ -79,13 +79,20 @@ SearchSource({
 
 | AFX primitive | Replacement on MCP/ADT side |
 |---|---|
-| `SELECT * FROM TADIR ... object='DEVC'/'PROG'/'FUGR'/'CLAS'` | `searchObjects()` from `@mcp-abap-adt/adt-clients/core/shared/search.js` (`informationsystem/search?operation=quickSearch&objectType=...`) |
-| `cl_pak_package_queries=>get_all_subpackages` | `GetPackageTree` handler (recursive) |
-| `READ REPORT <name> STATE 'I'` | `GetProgFullCode` (programs) / `GetInclude` / `GetClass` source endpoints |
-| `STOR_RESOLVE_FUGR` | ADT FUGR children — list FMs via `/sap/bc/adt/functions/groups/<fg>/fmodules`, list includes via package object structure (or `GetProgFullCode` for FUGR which returns the whole bundle) |
+| `SELECT * FROM TADIR ... object='DEVC'/'PROG'/'FUGR'/'CLAS' AND devclass IN ...` | `getPackageContentsList()` / `GetPackageContents` with `includeSubpackages`, then client-side filter to `PROG/P`, `FUGR`, `CLAS/OC` and `object_filter`. Do **not** use `searchObjects()` for package enumeration: it is name-search only and has no package/devclass constraint. |
+| `cl_pak_package_queries=>get_all_subpackages` | `getPackageContentsList(..., { includeSubpackages: true })` for the flat scan list. `GetPackageTree` is useful for diagnostics, but the implementation should consume the flat package contents list to avoid tree-walk ambiguity. |
+| `READ REPORT <name> STATE 'I'` | Raw source reads per source unit. Programs use the direct program read only for the root `PROG/P`, not `GetProgFullCode`, because AFX `p_prog` does not recursively scan includes. Includes use `GetInclude` / include source endpoint. Classes use `GetClass` or class include source endpoints with explicit version handling. |
+| `STOR_RESOLVE_FUGR` | ADT FUGR children — list FMs via `/sap/bc/adt/functions/groups/<fg>/fmodules` and/or package object structure, then read the generated function include sources. `GetProgFullCode` may be used only if it returns raw, unmodified code and complete include metadata; current code-normalizing behaviour is not acceptable for exact search provenance. |
 | `SELECT * FROM TRDIR WHERE name IN { <class>* }` (class includes enumeration) | `GetIncludesList` for the class |
 
 No new endpoint required.
+
+### Source fidelity requirements
+
+- Source text used for matching and snippets must be raw source text as returned by ADT. The search layer must not collapse spaces, trim before matching, reformat JSON payloads, or otherwise mutate source lines before line-number calculation and substring checks.
+- `GetProgFullCode` is not the default scan primitive for this tool. It currently normalizes repeated spaces and aggregates includes, which conflicts with exact snippet provenance and AFX `PROG` scan scope.
+- `include` in a result identifies the actual source unit that produced the hit. For a root program match it is the program name. For FUGR/class child source matches it is the generated include/source-unit name.
+- Object-level `max_hits_per_object` applies to the root repository object (`PROG`, `FUGR`, or `CLAS`) across all source units scanned for that object.
 
 ## Cloud compatibility
 
@@ -112,4 +119,4 @@ The unit tests do not touch the network; the integration tests do, and live alon
 ## Open questions
 
 1. Should `object_filter` accept a true ABAP range pattern (e.g. `Z*`, `Y*` with multiple lows) or just a single glob? AFX uses `s_rest` (full range); for MCP the simplest contract is a single pattern. Decided: **single glob** for now, range support can come later behind a separate input field.
-2. Inactive-source preference. AFX does `STATE 'I'` first, falls back to active. Our ADT reads always return the active version (the only one ADT exposes via the documented endpoints). Document the divergence — MCP scans the *active* version, AFX scans whichever exists. A separate tool / flag for inactive scanning would require a different endpoint.
+2. Inactive-source preference. AFX does `STATE 'I'` first, falls back to active. ADT support is object-family dependent: `GetClass` already exposes `version: 'inactive'`, while some program/include reads may only expose the active source through the current handlers. V1 should prefer inactive where the source primitive supports it and fall back to active; when inactive cannot be requested, document that per object family in the implementation notes and tests.

@@ -4,8 +4,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 304
-- Read-only tools: 53
+- Total tools: 307
+- Read-only tools: 56
 - High-level tools: 127
 - Low-level tools: 124
 
@@ -86,8 +86,11 @@ Generated from code in `src/handlers/**` (not from docs).
     - [RuntimeListFeeds](#runtimelistfeeds-read-only-system)
     - [RuntimeListProfilerTraceFiles](#runtimelistprofilertracefiles-read-only-system)
     - [RuntimeListSystemMessages](#runtimelistsystemmessages-read-only-system)
+    - [RuntimeRunClass](#runtimerunclass-read-only-system)
     - [RuntimeRunClassWithProfiling](#runtimerunclasswithprofiling-read-only-system)
+    - [RuntimeRunProgram](#runtimerunprogram-read-only-system)
     - [RuntimeRunProgramWithProfiling](#runtimerunprogramwithprofiling-read-only-system)
+    - [SearchSource](#searchsource-read-only-system)
   - [Table](#read-only-table)
     - [GetTableContents](#gettablecontents-read-only-table)
     - [ReadTable](#readtable-read-only-table)
@@ -1033,9 +1036,38 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="runtimerunclass-read-only-system"></a>
+#### RuntimeRunClass (Read-Only / System)
+**Description:** [runtime] Execute an ABAP class implementing if_oo_adt_classrun and return its output. Set profile=true to also capture a profiler trace (returns profilerId/traceId alongside output).
+
+**Source:** `src/handlers/system/readonly/handleRuntimeRunClass.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `class_name` (string, required) - ABAP class name to execute.
+- `description` (string, optional) - Profiler trace description (only used when profile=true).
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `max_trace_attempts` (integer, optional) - Max polling attempts to resolve traceId after execution (default 5). Only used when profile=true.
+- `profile` (boolean, optional) - When true, run with the profiler and resolve the resulting traceId. Default false.
+- `sql_trace` (boolean, optional) - 
+- `trace_lookup_uris` (array, optional) - Additional URIs to consult when resolving the trace (advanced, profile=true).
+- `trace_retry_delay_ms` (integer, optional) - Delay in ms between trace polling attempts (default 2000). Only used when profile=true.
+- `with_rfc_tracing` (boolean, optional) - 
+
+---
+
 <a id="runtimerunclasswithprofiling-read-only-system"></a>
 #### RuntimeRunClassWithProfiling (Read-Only / System)
-**Description:** [runtime] Execute ABAP class with profiler enabled and return created profilerId + traceId.
+**Description:** [runtime][deprecated] Execute ABAP class with profiler enabled and return created profilerId + traceId. Prefer RuntimeRunClass with profile=true; this tool is kept for backward compatibility and will be removed in a future major release.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeRunClassWithProfiling.ts`
 
@@ -1053,6 +1085,35 @@ Generated from code in `src/handlers/**` (not from docs).
 - `explicit_on_off` (boolean, optional) - 
 - `max_size_for_trace_file` (number, optional) - 
 - `max_time_for_tracing` (number, optional) - 
+- `max_trace_attempts` (integer, optional) - Max polling attempts to resolve traceId after execution (default 5). Increase for slow systems (e.g. SAP trial cloud).
+- `sql_trace` (boolean, optional) - 
+- `trace_lookup_uris` (array, optional) - Additional URIs to consult when resolving the trace (advanced).
+- `trace_retry_delay_ms` (integer, optional) - Delay in ms between trace polling attempts (default 2000).
+- `with_rfc_tracing` (boolean, optional) - 
+
+---
+
+<a id="runtimerunprogram-read-only-system"></a>
+#### RuntimeRunProgram (Read-Only / System)
+**Description:** [runtime] Execute an ABAP program (report) and return its output. Set profile=true to also start a profiler trace; use RuntimeListProfilerTraceFiles afterwards to locate the trace (program execution is fire-and-forget, so traceId is not returned synchronously).
+
+**Source:** `src/handlers/system/readonly/handleRuntimeRunProgram.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `description` (string, optional) - Profiler trace description (only used when profile=true).
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `profile` (boolean, optional) - When true, run with the profiler. Default false. Trace must be located afterwards via RuntimeListProfilerTraceFiles — program execution does not return traceId synchronously.
+- `program_name` (string, required) - ABAP program name to execute.
 - `sql_trace` (boolean, optional) - 
 - `with_rfc_tracing` (boolean, optional) - 
 
@@ -1060,7 +1121,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimerunprogramwithprofiling-read-only-system"></a>
 #### RuntimeRunProgramWithProfiling (Read-Only / System)
-**Description:** [runtime] Execute ABAP program with profiler enabled and return created profilerId + traceId.
+**Description:** [runtime][deprecated] Execute ABAP program with profiler enabled and return created profilerId. Prefer RuntimeRunProgram with profile=true; this tool is kept for backward compatibility and will be removed in a future major release.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeRunProgramWithProfiling.ts`
 
@@ -1080,6 +1141,17 @@ Generated from code in `src/handlers/**` (not from docs).
 - `program_name` (string, required) - ABAP program name to execute.
 - `sql_trace` (boolean, optional) - 
 - `with_rfc_tracing` (boolean, optional) - 
+
+---
+
+<a id="searchsource-read-only-system"></a>
+#### SearchSource (Read-Only / System)
+**Description:** [read-only] Search ABAP source text inside one or more packages (programs, function groups, classes). Onprem-only (cloud lacks an indexed source-search endpoint). Comments are searched by default; set exclude_comments=true to drop col-1 `*` and full-line `
+
+**Source:** `src/handlers/system/readonly/handleSearchSource.ts`
+
+**Parameters:**
+- None
 
 ---
 
@@ -4879,4 +4951,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-04-24*
+*Last updated: 2026-05-14*

@@ -5,8 +5,8 @@ Generated from code in `src/handlers/**` (not from docs).
 Tools available on legacy SAP systems (BASIS < 7.50).
 Legacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.
 
-- Total tools: 129
-- Read-Only: 11
+- Total tools: 130
+- Read-Only: 12
 - High-Level: 58
 - Low-Level: 60
 
@@ -30,6 +30,8 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
   - [Program](#read-only-program)
     - [GetProgFullCode](#getprogfullcode-read-only-program)
     - [ReadProgram](#readprogram-read-only-program)
+  - [System](#read-only-system)
+    - [SearchSource](#searchsource-read-only-system)
   - [View](#read-only-view)
     - [ReadView](#readview-read-only-view)
 - [High-Level Group](#high-level-group)
@@ -334,6 +336,22 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
 - `version` (string, optional (default: active)) - Version to read: 
+
+---
+
+<a id="read-only-system"></a>
+### Read-Only / System
+
+<a id="searchsource-read-only-system"></a>
+#### SearchSource (Read-Only / System)
+**Description:** [read-only] Search ABAP source text inside one or more packages (programs, function groups, classes). Onprem-only (cloud lacks an indexed source-search endpoint). Comments are searched by default; set exclude_comments=true to drop col-1 `*` and full-line `
+
+**Source:** `src/handlers/system/readonly/handleSearchSource.ts`
+
+**Available in:** `onprem`, `legacy`
+
+**Parameters:**
+- None
 
 ---
 
@@ -2253,4 +2271,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-04-24*
+*Last updated: 2026-05-14*

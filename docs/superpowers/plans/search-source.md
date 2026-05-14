@@ -52,7 +52,7 @@ Rules:
 - Stop appending hits after `max_hits` is reached; set `capped = true`.
 - No I/O, no fetches — this module is fully synchronous and pure.
 
-Unit tests in `src/lib/search-source/__tests__/lineScanner.test.ts`:
+Unit tests in `src/__tests__/lib/search-source/lineScanner.test.ts`:
 
 1. Single-query match.
 2. AND with `query2`.
@@ -63,7 +63,7 @@ Unit tests in `src/lib/search-source/__tests__/lineScanner.test.ts`:
 7. Case-insensitive matching.
 8. Snippet truncated to 255 chars.
 
-Verification: `npm run build` clean, `npx jest src/lib/search-source` green.
+Verification: `npm run build` clean, `npx jest --testPathPatterns=search-source` green.
 
 Commit: `feat(search): pure line-scan core for SearchSource`.
 

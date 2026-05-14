@@ -83,6 +83,10 @@ import {
   TOOL_DEFINITION as ReadStructure_Tool,
 } from '../../../handlers/structure/readonly/handleReadStructure';
 import {
+  handleSearchSource,
+  TOOL_DEFINITION as SearchSource_Tool,
+} from '../../../handlers/system/readonly/handleSearchSource';
+import {
   TOOL_DEFINITION as GetTableContents_Tool,
   handleGetTableContents,
 } from '../../../handlers/table/readonly/handleGetTableContents';
@@ -153,6 +157,10 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: GetPackageContents_Tool,
         handler: (args: any) => handleGetPackageContents(this.context, args),
+      },
+      {
+        toolDefinition: SearchSource_Tool,
+        handler: (args: any) => handleSearchSource(this.context, args),
       },
       {
         toolDefinition: GetInclude_Tool,

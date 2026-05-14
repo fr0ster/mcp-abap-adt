@@ -57,10 +57,11 @@ Unit tests in `src/lib/search-source/__tests__/lineScanner.test.ts`:
 1. Single-query match.
 2. AND with `query2`.
 3. Exclusion drops the only candidate match.
-4. Comment skip — col-1 `*`, full-line `"`, whitespace-prefixed `*` (must NOT skip), inline `" comment` on code line (must NOT skip).
-5. `max_hits = 1` caps and reports `capped: true`.
-6. Case-insensitive matching.
-7. Snippet truncated to 255 chars.
+4. Comments searched by default — matches inside col-1 `*` and full-line `"` comments are returned when `exclude_comments` is omitted or `false`.
+5. Comment skip when `exclude_comments=true` — col-1 `*` and full-line `"` are skipped; whitespace-prefixed `*` is not skipped; inline `" comment` on a code line is not skipped.
+6. `max_hits = 1` caps and reports `capped: true`.
+7. Case-insensitive matching.
+8. Snippet truncated to 255 chars.
 
 Verification: `npm run build` clean, `npx jest src/lib/search-source` green.
 
@@ -118,22 +119,24 @@ export interface SourceUnit {
   lines: string[];          // raw lines, no normalization
 }
 
-export async function readSourceUnits(
+export async function* readSourceUnits(
   ctx: HandlerContext,
   target: EnumeratedObject,
-): Promise<SourceUnit[]>;
+): AsyncGenerator<SourceUnit>;
 ```
 
 Per object type:
 
-- **`PROG`**: read the root program source only (no include traversal). Use the program read client (whichever returns raw source — verified in Phase 0). Returns one `SourceUnit` with `include = object_name`.
+- **`PROG`**: read the root program source only (no include traversal). Use the program read client (whichever returns raw source — verified in Phase 0). Yields one `SourceUnit` with `include = object_name`.
 - **`FUGR`**:
   - Enumerate child source units via `/sap/bc/adt/functions/groups/<fg>/fmodules` + the FUGR package object structure (to capture top includes and FMs).
   - Read each unit's source individually. Skip names matching `VIEW*` (AFX behaviour — generated dialog includes).
-  - One `SourceUnit` per child read.
-- **`CLAS`**: call `GetIncludesList` for the class, then read each include source individually. One `SourceUnit` per include.
+  - Yield one `SourceUnit` per child read, in deterministic order. Do not fetch a later unit until the caller asks for it.
+- **`CLAS`**: call `GetIncludesList` for the class, then read each include source individually. Yield one `SourceUnit` per include, in deterministic order. Do not fetch a later include until the caller asks for it.
 
-Errors on individual reads are caught and logged at debug; the offending unit is dropped from the returned array. `readSourceUnits` never throws unless the **whole target** is unreadable (e.g. target name resolution fails).
+Errors on individual reads are caught and logged at debug; the offending unit is skipped. `readSourceUnits` never throws unless the **whole target** is unreadable (e.g. target name resolution fails).
+
+`readSourceUnits` is an async generator so the orchestrator can stop requesting more FUGR/CLAS units as soon as `max_hits_per_object` is reached. This preserves the spec's "skip the rest of the source to save work" requirement and avoids unnecessary ADT HTTP calls.
 
 Crucially: **do not call `GetProgFullCode`**. Spec rationale: it normalizes whitespace and aggregates includes.
 
@@ -142,7 +145,8 @@ Unit tests with each underlying client stubbed:
 1. PROG → one SourceUnit with `include === object_name`.
 2. FUGR with two FMs and one top-include → three SourceUnits in deterministic order; `VIEW*` dropped.
 3. CLAS with two includes → two SourceUnits.
-4. Read failure on one of three units → two returned, error logged.
+4. Read failure on one of three units → two yielded, error logged.
+5. Lazy iteration → if the consumer stops after the first yielded FUGR/CLAS unit, later source reads are not invoked.
 
 Verification: `npm run build` clean, `npx jest src/lib/search-source/sourceReader` green.
 
@@ -167,9 +171,9 @@ Behaviour:
 1. Validate caps (`max_objects ≥ 1`, `concurrency 1..16`, `exclude.length ≤ 3`, `query.length ≥ 1`). Treat post-validation; the schema in the tool definition catches most of this.
 2. `enumerateScanTargets(...)` → list. Cap to `max_objects`. If capped, set `truncated.by_max_objects = true`.
 3. Process targets in order with bounded parallelism (`concurrency`). For each target:
-   - `readSourceUnits(...)` → array of `SourceUnit`.
+   - Iterate `for await (const unit of readSourceUnits(...))`.
    - For each unit, run `scanLines(...)` with remaining budget (per-object cap counts across units of the **same** target).
-   - Aggregate hits; if cap reached, set `truncated.by_object_cap = true`.
+   - Aggregate hits; if cap reached, set `truncated.by_object_cap = true` and break out of source-unit iteration immediately so no later FUGR/CLAS includes are fetched.
    - If `emit_no_hits=true` and the target produced zero hits, append to `no_hits`.
 4. Assemble final result; sort `results` by `(devclass, object_name, include, line)`.
 
@@ -182,7 +186,7 @@ Create handler `src/handlers/system/readonly/handleSearchSource.ts`:
 - Wrap result in `return_response({ data: JSON.stringify(result, null, 2), status: 200 })`.
 - Errors go through `return_error`.
 
-Register the handler in the appropriate group file (`ReadOnlyHandlersGroup` since the operation is read-only).
+Register the handler in `SearchHandlersGroup`, because users exposing the search group expect source-search tools to appear alongside `SearchObject`, `GetObjectsList`, and `GetObjectsByType`. The tool remains read-only via `available_in` and implementation behaviour; do not duplicate-register it in `ReadOnlyHandlersGroup` unless the exposure/dedup strategy is updated deliberately.
 
 Unit tests of orchestrator with all three dependencies stubbed:
 
@@ -190,6 +194,7 @@ Unit tests of orchestrator with all three dependencies stubbed:
 2. `max_hits_per_object = 2` with one target producing 5 candidate matches → 2 hits, `truncated.by_object_cap = true`.
 3. `max_objects = 1` with enumerator returning 3 → only first processed, `truncated.by_max_objects = true`.
 4. `emit_no_hits = true` and one target has zero hits → entry appears in `no_hits`, not in `results`.
+5. Per-object cap stops lazy source iteration → a target with multiple source units stops requesting later units once the remaining hit budget reaches zero.
 
 Verification: `npm run build` clean, `npx jest src/lib/search-source` green, `npx jest src/handlers/system/readonly/handleSearchSource` green.
 
@@ -208,11 +213,12 @@ Create `src/__tests__/integration/readOnly/system/SearchSourceHandler.test.ts`:
 
 1. AND-query across two strings — assert exact lines hit.
 2. Exclusion — same query plus `exclude = ["marker_A"]` — assert the line that contained `marker_A` is dropped.
-3. `exclude_comments = true` — assert col-1-`*` and full-line-`"` lines are dropped, inline-comment-on-code line is kept.
-4. `max_hits_per_object = 1` with a target that has 3 candidate matches → 1 hit + `truncated.by_object_cap = true`.
-5. `emit_no_hits = true` for a target with zero matches → entry in `no_hits`.
-6. `object_filter = "Z_FOO*"` — assert only the matching object is scanned.
-7. Multi-object-type pass (`object_types: ['PROG', 'FUGR']`, excluding `CLAS`) — assert no `CLAS` hits in result.
+3. Comments searched by default — marker strings inside col-1 `*` and full-line `"` comments are returned when `exclude_comments` is omitted or `false`.
+4. `exclude_comments = true` — assert col-1-`*` and full-line-`"` lines are dropped, inline-comment-on-code line is kept.
+5. `max_hits_per_object = 1` with a target that has 3 candidate matches → 1 hit + `truncated.by_object_cap = true`.
+6. `emit_no_hits = true` for a target with zero matches → entry in `no_hits`.
+7. `object_filter = "Z_FOO*"` — assert only the matching object is scanned.
+8. Multi-object-type pass (`object_types: ['PROG', 'FUGR']`, excluding `CLAS`) — assert no `CLAS` hits in result.
 
 Run on `trial` env only as a smoke check (the test will skip on cloud given `available_in`). Real verification requires an onprem environment with the seeded package; that test run happens on the user's onprem-capable machine.
 
@@ -236,4 +242,42 @@ Commit: `test(search): integration tests for SearchSource`.
 
 ## Phase 0 notes (filled during Phase 0 execution)
 
-_(to be filled in)_
+### Package enumeration
+
+- Handler: `src/handlers/package/readonly/handleGetPackageContents.ts` → wraps `client.getUtils().getPackageContentsList(name, options)`.
+- Options: `{ includeSubpackages, maxDepth, includeDescriptions }`.
+- Response item shape (`IPackageContentItem` from `@mcp-abap-adt/adt-clients/dist/core/shared/types.d.ts`):
+  - `name: string` — object name (→ `EnumeratedObject.object_name`)
+  - `adtType: string` — ADT type code, e.g. `'PROG/P'`, `'FUGR/F'`, `'CLAS/OC'` (→ filter source for our three families)
+  - `packageName: string` — devclass (→ `EnumeratedObject.devclass`)
+  - `isPackage: boolean` — exclude subpackage entries when populating scan targets
+- ADT-type mapping for the scan:
+  - PROG: `adtType === 'PROG/P'` (executable programs; we deliberately skip `PROG/I` includes here because they're picked up via FUGR / class include traversal or appear as top-level only in tests)
+  - FUGR: `adtType === 'FUGR/F'`
+  - CLAS: `adtType === 'CLAS/OC'`
+
+### Source reads
+
+- **Program (`PROG/P`)** — `src/handlers/program/readonly/handleReadProgram.ts` line 32: `handleReadProgram({ program_name, version?: 'active' | 'inactive' })`. Calls `client.getProgram().read({ programName }, version)`. Returns `source_code` as raw string. ✅ Inactive-source supported. Use the underlying `client.getProgram().read(...)` directly in `sourceReader.ts`, not the MCP handler.
+- **Include (`PROG/I`)** — `src/handlers/include/readonly/handleGetInclude.ts` line 32: direct GET to `/sap/bc/adt/programs/includes/<name>/source/main` via `makeAdtRequestWithTimeout`. Returns raw text body. ❌ No `version` parameter — always active. **Document as a per-family divergence**: FUGR and class-include scans run against the active version regardless of the user's intent.
+- **Class (`CLAS/OC`)** — `src/handlers/class/readonly/handleReadClass.ts` line 32: `handleReadClass({ class_name, version?: 'active' | 'inactive' })`. Reads only the class **main include** via `client.getClass().read({ className }, version)`. ✅ Inactive supported, but only for the main include — subincludes (CCDEF, CCMAC, CCAU, CCIMP, CCPUBLIC) are not covered by this handler. For v1 the class scan **reads the main include only**; per-subinclude scanning becomes a follow-up. (See AFX `scan_devc_class` which loops `TRDIR WHERE name IN <class>*` — adt-clients does not expose an equivalent today and `GetIncludesList` for `CLAS/OC` may return class-local IDs that need separate URL construction.)
+- **Includes-list (`GetIncludesList`)** — `src/handlers/include/readonly/handleGetIncludesList.ts` line 133: returns newline-separated include names by walking `fetchNodeStructure` XML. Usable for FUGR (`object_type: 'FUGR'`) to discover subincludes; for `CLAS/OC` the returned IDs need further investigation (Phase 3 implementation task).
+
+### `GetProgFullCode` normalization (confirmed)
+
+`src/handlers/program/readonly/handleGetProgFullCode.ts:299`:
+
+```ts
+obj.code.replace(/ {2,}/g, ' ')
+```
+
+Collapses runs of 2+ spaces into 1. Cannot be used for `SearchSource` because it destroys whitespace fidelity that snippet provenance depends on.
+
+### Adjustments to phase plan based on Phase 0 findings
+
+- **Phase 3 (source reader)**:
+  - PROG path: call `client.getProgram().read(..., version)` directly.
+  - FUGR path: call `client.getUtils().fetchNodeStructure(...)` (the function `GetIncludesList` builds on) to enumerate REPO/FUNC sub-objects, then fetch each via `makeAdtRequestWithTimeout` against the same `/sap/bc/adt/programs/includes/<name>/source/main` URL. Note that `STOR_RESOLVE_FUGR` is RFC-only and not available via ADT; the discovery here is `fetchNodeStructure` instead. Verify in implementation that `FUGR/F` node walk returns child include names usable as direct URL segments. If not, fall back to reading the FUGR main include only and document the gap.
+  - CLAS path: call `client.getClass().read({ className }, version)` for the main include only; mark subinclude scanning as a follow-up issue rather than a quiet skip. Open a tracking issue at end of Phase 0 / start of Phase 1.
+- **Spec divergence to record in handler description**: include reads (FUGR subincludes) are always active; `version` parameter on the tool only affects PROG and CLAS main include. Implementer: surface this in the tool description so the LLM-side caller does not assume uniform inactive support.
+

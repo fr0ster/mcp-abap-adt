@@ -12,6 +12,10 @@ import {
   handleSearchObject,
   TOOL_DEFINITION as SearchObject_Tool,
 } from '../../../handlers/search/readonly/handleSearchObject';
+import {
+  handleSearchSource,
+  TOOL_DEFINITION as SearchSource_Tool,
+} from '../../../handlers/system/readonly/handleSearchSource';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';
 
@@ -30,6 +34,10 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: SearchObject_Tool,
         handler: (args: any) => handleSearchObject(this.context, args),
+      },
+      {
+        toolDefinition: SearchSource_Tool,
+        handler: (args: any) => handleSearchSource(this.context, args),
       },
       // Dynamic import handlers
       {

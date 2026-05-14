@@ -1833,6 +1833,28 @@ list_transports_readonly:
         # user: "DEVELOPER"              # Optional: SAP user name (defaults to current session user)
         # modifiable_only: true           # Optional: only modifiable transports (default: true)
 
+# SearchSource Read-Only Handler — onprem-only
+search_source_readonly:
+  test_cases:
+    - name: "test_search_source"
+      enabled: true
+      available_in: ["onprem", "legacy"]
+      description: "SearchSource integration tests (scans shared package + objects from shared_dependencies)"
+      params:
+        # Package scanned by the test. Should match shared_dependencies.package so
+        # the seeded objects (Z_MCP_BLD_SHR_FM etc.) are inside it.
+        scan_package: "ZADT_BLD_PKG03"
+        # Substring known to be present in shared FM source ("Echo:" appears in Z_MCP_BLD_SHR_FM).
+        known_query: "Echo:"
+        # Second AND-substring known to co-occur with known_query on the same line.
+        known_and_query: "iv_input"
+        # Substring used as exclusion — present in at least one matching line so the test
+        # can assert the line was dropped.
+        known_exclude: "ev_output"
+        # Glob that matches only one of the seeded programs/classes — used to verify
+        # object_filter narrows the scan.
+        narrow_object_filter: "Z_MCP_BLD_SHR_FM*"
+
 # WhereUsed Read-Only Handler
 whereused_readonly:
   test_cases:

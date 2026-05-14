@@ -19,7 +19,7 @@ The tool must support the same scan semantics as `AFX_CODE_SCANNER` (package-sco
 - Optional recursive subpackage expansion (parity with `p_conpck`).
 - AND-pair substring query (`p_strg1` mandatory, `p_strg2` optional), up to three exclusion strings (parity with `p_excl1..3`).
 - **Comments are searched by default.** Comments routinely carry load-bearing information — TODOs, FIXMEs, deprecated markers, ticket / spec references, business-rule explanations, disabled code under review. Excluding them silently hides legitimate hits. `exclude_comments` is an opt-in filter, default `false`.
-- When `exclude_comments=true`: skip lines where `line[0] = '*'` (column 1 `*`, AFX-strict) **or** the first non-whitespace character is `"` (full-line `"` comment). Whitespace-prefixed `*` is **not** a comment in ABAP (only column 1) and must not be skipped — doing so would produce false negatives on real code.
+- When `exclude_comments=true`: skip lines where `line[0] = '*'` (column 1 `*`, AFX-strict) **or** the first non-whitespace character is `"` (full-line `"` comment). Whitespace-prefixed `*` is **not** a comment in ABAP (only column 1) and must not be skipped — doing so would produce false negatives on real code. Inline comments after code, e.g. `WRITE lv_value. " ticket ABC-123`, remain searchable because the source line is code-bearing, not a comment line.
 - Per-object hit cap (parity with `p_lrng`).
 - Optional emit-no-hits row (parity with `p_nohits`) — surfaced as a separate result type, not as a fake match.
 - `available_in: ['onprem', 'legacy']` — cloud is explicitly out of scope (see fr0ster/mcp-abap-adt-clients#36 — `informationsystem/textsearch` on cloud requires active TREX/Enterprise Search infrastructure that we cannot rely on, and the read-side fallback is impractical at scale).
@@ -111,7 +111,7 @@ A cloud-capable variant can be revisited later as a separate tool if SAP exposes
 
 ## Tests
 
-- **Unit:** scan algorithm against in-memory source — query / query2 / exclude / comment-skip / cap behaviours.
+- **Unit:** scan algorithm against in-memory source — query / query2 / exclude / comment-default / comment-skip / cap behaviours. Tests must assert that matches inside `* ...` and full-line `" ...` comments are returned when `exclude_comments` is omitted or `false`, and skipped only when `exclude_comments=true`. Tests must also assert that inline comments after code remain searchable even when `exclude_comments=true`.
 - **Integration (soft mode):** create a small package with three controlled objects (one program, one FUGR with two FMs, one class with two includes) inside `shared:setup`, then call `SearchSource` with each AFX-equivalent option permutation and assert the expected line set.
 - **Integration (hard mode):** same flow through MCP stdio.
 

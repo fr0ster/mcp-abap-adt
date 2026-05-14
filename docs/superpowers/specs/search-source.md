@@ -18,7 +18,7 @@ The tool must support the same scan semantics as `AFX_CODE_SCANNER` (package-sco
 - Scans across the three object families that AFX covers: programs (`PROG`), function groups (`FUGR`), classes (`CLAS`). Behaviour parity with `p_prog` / `p_fugr` / `p_cinc` flags.
 - Optional recursive subpackage expansion (parity with `p_conpck`).
 - AND-pair substring query (`p_strg1` mandatory, `p_strg2` optional), up to three exclusion strings (parity with `p_excl1..3`).
-- Optional comment-line skip. Strict AFX parity means `*` in column 1 only; the MCP default also skips whitespace-prefixed `*` and full-line `"` comments because both are normal ABAP comment forms.
+- Optional comment-line skip. Strict AFX parity: `*` in column 1 only. We additionally drop lines whose first non-whitespace character is `"` (full-line `"` is a valid ABAP comment). Whitespace-prefixed `*` is **not** a comment in ABAP (only column 1) and must not be skipped.
 - Per-object hit cap (parity with `p_lrng`).
 - Optional emit-no-hits row (parity with `p_nohits`) — surfaced as a separate result type, not as a fake match.
 - `available_in: ['onprem', 'legacy']` — cloud is explicitly out of scope (see fr0ster/mcp-abap-adt-clients#36 — `informationsystem/textsearch` on cloud requires active TREX/Enterprise Search infrastructure that we cannot rely on, and the read-side fallback is impractical at scale).
@@ -69,7 +69,7 @@ SearchSource({
 
 - All substring matches are case-insensitive (ABAP `CS` semantic).
 - Exclusion logic: a line is **dropped** if it contains any `exclude` entry. (Matches AFX where `p_excl1..3` are independent negatives.)
-- Comment skip: when `exclude_comments=true`, drop lines whose first non-whitespace character is `*` (classic ABAP) or whose trimmed start is `"` (modern comment). This is an intentional MCP divergence from strict AFX behaviour, where `p_excomm` only checked `*` in column 1.
+- Comment skip: when `exclude_comments=true`, drop lines where `line[0] = '*'` (column 1, AFX-strict) **or** the first non-whitespace character is `"` (full-line `"` comment). Lines like `  * foo` (whitespace then `*`) are not comments in ABAP and must not be skipped — that would produce false negatives on real code.
 - Per-object cap counts matched lines, not scanned lines. After the cap, scanning the rest of the source is skipped to save work.
 - `max_objects` is the total budget across all packages and object types. When exhausted, scanning stops and `truncated.by_max_objects = true`. Callers can narrow scope and re-invoke.
 - `no_hits` is only populated when `emit_no_hits=true`. It is **not** mixed into `results` (unlike AFX which emitted a "Keine Treffer" pseudo-row).

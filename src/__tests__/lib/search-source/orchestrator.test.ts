@@ -99,6 +99,42 @@ describe('runSearchSource', () => {
     expect(result.truncated.by_max_objects).toBe(false);
   });
 
+  it('does not flip truncated.by_object_cap when an object has exactly max_hits_per_object matches', async () => {
+    const deps: OrchestratorDeps = {
+      fetchPackageContents: pkg([
+        { name: 'Z_PROG', adtType: 'PROG/P', packageName: 'ZPKG' },
+      ]),
+      sourceReader: sourceFor({
+        'PROG:Z_PROG': 'marker 1\nno match\nstill no match',
+      }),
+    };
+    const result = await runSearchSource(deps, {
+      ...baseInput,
+      max_hits_per_object: 1,
+    });
+    expect(result.results).toHaveLength(1);
+    expect(result.truncated.by_object_cap).toBe(false);
+  });
+
+  it('probes later source units and flips truncated.by_object_cap when matches are omitted after the per-object budget is filled', async () => {
+    const deps: OrchestratorDeps = {
+      fetchPackageContents: pkg([
+        { name: 'Z_FG', adtType: 'FUGR/F', packageName: 'ZPKG' },
+      ]),
+      sourceReader: sourceFor({
+        'FUGRSTR:Z_FG': 'FUGR/FF|Z_FM_A\nFUGR/FF|Z_FM_B',
+        'FM:Z_FG/Z_FM_A': 'marker 1',
+        'FM:Z_FG/Z_FM_B': 'marker 2',
+      }),
+    };
+    const result = await runSearchSource(deps, {
+      ...baseInput,
+      max_hits_per_object: 1,
+    });
+    expect(result.results).toHaveLength(1);
+    expect(result.truncated.by_object_cap).toBe(true);
+  });
+
   it('caps enumerated targets via max_objects and flips truncated.by_max_objects', async () => {
     const deps: OrchestratorDeps = {
       fetchPackageContents: pkg([

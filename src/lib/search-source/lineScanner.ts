@@ -25,6 +25,21 @@ function isCommentLine(line: string): boolean {
   return idx !== -1 && line[idx] === '"';
 }
 
+function lineMatches(
+  raw: string,
+  needle1: string,
+  needle2: string | undefined,
+  excludes: string[] | undefined,
+  skipComments: boolean,
+): boolean {
+  if (skipComments && isCommentLine(raw)) return false;
+  const lower = raw.toLowerCase();
+  if (lower.indexOf(needle1) === -1) return false;
+  if (needle2 !== undefined && lower.indexOf(needle2) === -1) return false;
+  if (excludes && excludes.some((e) => lower.indexOf(e) !== -1)) return false;
+  return true;
+}
+
 export function scanLines(
   lines: readonly string[],
   input: ScanInput,
@@ -43,23 +58,17 @@ export function scanLines(
   const skipComments = input.exclude_comments === true;
 
   for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    if (!lineMatches(raw, needle1, needle2, excludes, skipComments)) continue;
     if (hits.length >= input.max_hits) {
       capped = true;
       break;
     }
-    const raw = lines[i];
-    if (skipComments && isCommentLine(raw)) continue;
-    const lower = raw.toLowerCase();
-    if (lower.indexOf(needle1) === -1) continue;
-    if (needle2 !== undefined && lower.indexOf(needle2) === -1) continue;
-    if (excludes && excludes.some((e) => lower.indexOf(e) !== -1)) continue;
     hits.push({
       line: i + 1,
       snippet: raw.length > SNIPPET_MAX ? raw.slice(0, SNIPPET_MAX) : raw,
     });
   }
-
-  if (hits.length >= input.max_hits) capped = true;
 
   return { hits, capped };
 }

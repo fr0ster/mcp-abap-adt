@@ -67,6 +67,13 @@ describe('scanLines', () => {
     expect(r.capped).toBe(true);
   });
 
+  it('does not report capped when the hit count exactly equals max_hits with no omitted match', () => {
+    const lines = ['foo a', 'bar b', 'baz c'];
+    const r = scanLines(lines, { query: 'foo', max_hits: 1 });
+    expect(r.hits.map((h) => h.line)).toEqual([1]);
+    expect(r.capped).toBe(false);
+  });
+
   it('matches are case-insensitive for query, query2, and exclude', () => {
     const lines = ['CALL Function FOO', 'call function bar'];
     const r = scanLines(lines, {

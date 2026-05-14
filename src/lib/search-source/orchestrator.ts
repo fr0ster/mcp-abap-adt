@@ -142,7 +142,20 @@ export async function runSearchSource(
     )) {
       sourcesScanned++;
       const remaining = maxHits - totalForTarget;
-      if (remaining <= 0) break;
+      if (remaining <= 0) {
+        const probe = scanLines(unit.lines, {
+          query: input.query,
+          query2: input.query2,
+          exclude: input.exclude,
+          exclude_comments: input.exclude_comments,
+          max_hits: 1,
+        });
+        if (probe.hits.length > 0) {
+          capHitForTarget = true;
+          break;
+        }
+        continue;
+      }
       const scan = scanLines(unit.lines, {
         query: input.query,
         query2: input.query2,
@@ -161,7 +174,7 @@ export async function runSearchSource(
         });
       }
       totalForTarget += scan.hits.length;
-      if (totalForTarget >= maxHits) {
+      if (scan.capped) {
         capHitForTarget = true;
         break;
       }

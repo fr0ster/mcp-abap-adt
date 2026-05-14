@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [6.7.0] - 2026-05-14
+
+### Added
+- `SearchSource` (onprem + legacy) — source-text search across ABAP repository objects without invoking `SUBMIT AFX_CODE_SCANNER`. Scans programs (`PROG/P`), function groups (`FUGR/F`, including FMs and FUGR/PU/PD/PT/PY auto-includes), and classes (`CLAS/OC`, main include only in v1). Supports AND-query, up to three exclusion substrings, per-object hit cap, comment-line skip, subpackage recursion, object-name glob filter, bounded parallelism (default 8, max 16), and a deterministic `truncated` signal (`by_object_cap` / `by_max_objects`). Cloud is explicitly out of scope (no indexed source-search endpoint; see fr0ster/mcp-abap-adt-clients#36). Closes #79.
+
+### Notes
+- Comments are **searched by default**. Set `exclude_comments=true` to drop col-1 `*` and full-line `"` comment lines (AFX-strict semantics; whitespace-prefixed `*` is not a comment in ABAP and is never skipped).
+- The `version` parameter affects PROG and CLAS main include reads only — FUGR subincludes are always read against the active version because the include endpoint exposes no version selector.
+- Class subincludes (CCDEF / CCMAC / CCAU / CCIMP / CCPUBLIC) are not yet enumerable through the MCP surface and are out of scope for v1; tracked as a follow-up.
+
 ## [6.6.0] - 2026-05-14
 
 ### Added

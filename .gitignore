@@ -88,3 +88,4 @@ desktop.ini
 .vscode/mcp.json
 .claude/settings.local.json
 .codex
+.worktrees/

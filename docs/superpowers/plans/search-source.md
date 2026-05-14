@@ -273,11 +273,22 @@ obj.code.replace(/ {2,}/g, ' ')
 
 Collapses runs of 2+ spaces into 1. Cannot be used for `SearchSource` because it destroys whitespace fidelity that snippet provenance depends on.
 
-### Adjustments to phase plan based on Phase 0 findings
+### Empirical verification via live proxy (E19 onprem, MCP `mcp-abap-adt 6.6.7`)
 
-- **Phase 3 (source reader)**:
-  - PROG path: call `client.getProgram().read(..., version)` directly.
-  - FUGR path: call `client.getUtils().fetchNodeStructure(...)` (the function `GetIncludesList` builds on) to enumerate REPO/FUNC sub-objects, then fetch each via `makeAdtRequestWithTimeout` against the same `/sap/bc/adt/programs/includes/<name>/source/main` URL. Note that `STOR_RESOLVE_FUGR` is RFC-only and not available via ADT; the discovery here is `fetchNodeStructure` instead. Verify in implementation that `FUGR/F` node walk returns child include names usable as direct URL segments. If not, fall back to reading the FUGR main include only and document the gap.
-  - CLAS path: call `client.getClass().read({ className }, version)` for the main include only; mark subinclude scanning as a follow-up issue rather than a quiet skip. Open a tracking issue at end of Phase 0 / start of Phase 1.
-- **Spec divergence to record in handler description**: include reads (FUGR subincludes) are always active; `version` parameter on the tool only affects PROG and CLAS main include. Implementer: surface this in the tool description so the LLM-side caller does not assume uniform inactive support.
+Run against `SLIS` (standard FUGR) and `CL_GUI_ALV_GRID` (standard class):
+
+- `GetIncludesList { object_type: 'FUGR', object_name: 'SLIS' }` → "No includes found". The handler looks only for `OBJECT_TYPE = PROG/I` nodes (see `parseIncludesFromXml` in `handleGetIncludesList.ts:51-79`), which is the wrong concept for FUGR / class internal structure.
+- `GetIncludesList { object_type: 'CLAS/OC', object_name: 'CL_GUI_ALV_GRID' }` → same. Empty.
+- `GetObjectStructure { objecttype: 'FUGR/F', objectname: 'SLIS' }` → tree with `FUGR/FF` entries (function module names: `RS_DELETE_LISTS`, `RS_DISPLAY_LISTS`, ...), plus `FUGR/PU` / `FUGR/PD` / `FUGR/PT` / `FUGR/PY` groups carrying internal include names (`LSLISTOP`, `LSLISF01`, `RSSERPDT`, ...). This **is** the FUGR enumeration we need.
+- `GetObjectStructure { objecttype: 'CLAS/OC', objectname: 'CL_GUI_ALV_GRID' }` → HTTP 500.
+- `GetObjectStructure { objecttype: 'CLAS', objectname: 'CL_GUI_ALV_GRID' }` → "No nodes found in object structure response."
+- MCP-exposed class-subinclude tools today: only `GetLocalTestClass`. No CCDEF / CCMAC / CCIMP / CCPUBLIC / CCAU readers, no enumeration that lists them.
+
+### Adjustments to phase plan based on Phase 0 findings (verified, not inferred)
+
+- **Phase 3 (source reader) — PROG**: call `client.getProgram().read(..., version)` directly. No change.
+- **Phase 3 (source reader) — FUGR**: enumerate via `GetObjectStructure` (or its underlying `client.getUtils().fetchNodeStructure` with parent type `'FUGR/F'`), then `client.getInclude().read(...)` (or `makeAdtRequestWithTimeout` to `/sap/bc/adt/programs/includes/<name>/source/main`) per yielded include. Strip `VIEW*` per AFX. **Do not use `GetIncludesList`** for FUGR — empirically returns empty.
+- **Phase 3 (source reader) — CLAS**: read class **main include only** via `client.getClass().read({ className }, version)`. Class internal sections (CCDEF, CCMAC, CCAU, CCIMP, CCPUBLIC) are not enumerable through the current MCP surface and are out of scope for v1. **Open a follow-up issue** in `mcp-abap-adt` for "expose class subinclude enumeration + per-section source read" and link it from the SearchSource handler description.
+- **Spec divergence to record in handler description**: FUGR subinclude reads use `GetInclude` which has no `version` parameter — they always return active source. `version` on `SearchSource` therefore only affects PROG and CLAS main include. State this explicitly in the tool description so LLM-side callers don't assume uniform inactive support.
+- **Empirical evidence vs. inference**: All four bullets above are now backed by the live `SLIS` / `CL_GUI_ALV_GRID` probes recorded in the previous subsection. Earlier draft used `STOR_RESOLVE_FUGR` and `fetchNodeStructure` based on code-structure inference; the FUGR primitive is now confirmed.
 

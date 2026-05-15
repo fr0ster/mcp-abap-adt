@@ -43,6 +43,26 @@ function parseResult(result: any): SearchSourceResult {
   return JSON.parse(text);
 }
 
+function deriveMaskFromPackage(pkg: string): string {
+  // Keep the mask narrow so integration tests stay fixture-scoped:
+  // ZADT_BLD_PKG03 -> ZADT_BLD_PKG0*; /NS/ZFOO -> /NS/ZFO*
+  const slashTail = pkg.lastIndexOf('/');
+  const prefixEnd = slashTail >= 0 ? slashTail + 1 : 0;
+  const tail = pkg.slice(prefixEnd);
+  const stem = tail.length > 4 ? tail.slice(0, tail.length - 1) : tail;
+  return pkg.slice(0, prefixEnd) + stem + '*';
+}
+
+function maskToRegExp(mask: string): RegExp {
+  let p = '';
+  for (const ch of mask) {
+    if (ch === '*') p += '.*';
+    else if (ch === '+') p += '.';
+    else p += ch.replace(/[\\.+^$()|[\]{}]/g, '\\$&');
+  }
+  return new RegExp(`^${p}$`, 'i');
+}
+
 describe('SearchSource Handler Integration', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('search-source-test');
@@ -317,6 +337,141 @@ describe('SearchSource Handler Integration', () => {
         for (const hit of data.results) {
           expect(matcher.test(hit.object_name)).toBe(true);
         }
+      });
+    },
+    getTimeout('long'),
+  );
+
+  it(
+    'mask derived from the shared package yields hits (include_subpackages: true)',
+    async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params } = context;
+        const pkg = String(params?.scan_package ?? 'ZADT_BLD_PKG03');
+        const query = String(params?.known_query ?? 'Echo:');
+        const mask = deriveMaskFromPackage(pkg);
+
+        const args = {
+          query,
+          packages: [mask],
+          include_subpackages: true,
+          max_hits_per_object: 5,
+          max_objects: 50,
+        };
+        const result = await tester.invokeToolOrHandler(
+          'SearchSource',
+          args,
+          async () => {
+            const handlerContext = createHandlerContext({ connection, logger });
+            return handleSearchSource(handlerContext, args);
+          },
+        );
+
+        expect(result.isError).toBe(false);
+        const data = parseResult(result);
+        expect(data.results.length).toBeGreaterThan(0);
+      });
+    },
+    getTimeout('long'),
+  );
+
+  it(
+    'mask derived from the shared package matches devclass when include_subpackages: false',
+    async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params } = context;
+        const pkg = String(params?.scan_package ?? 'ZADT_BLD_PKG03');
+        const query = String(params?.known_query ?? 'Echo:');
+        const mask = deriveMaskFromPackage(pkg);
+        const maskRe = maskToRegExp(mask);
+
+        const args = {
+          query,
+          packages: [mask],
+          include_subpackages: false,
+          max_hits_per_object: 5,
+          max_objects: 50,
+        };
+        const result = await tester.invokeToolOrHandler(
+          'SearchSource',
+          args,
+          async () => {
+            const handlerContext = createHandlerContext({ connection, logger });
+            return handleSearchSource(handlerContext, args);
+          },
+        );
+
+        expect(result.isError).toBe(false);
+        const data = parseResult(result);
+        expect(data.results.length).toBeGreaterThan(0);
+        for (const hit of data.results) {
+          expect(hit.devclass).toMatch(maskRe);
+        }
+      });
+    },
+    getTimeout('long'),
+  );
+
+  it(
+    'pattern that resolves to zero packages returns an empty result',
+    async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params } = context;
+        const query = String(params?.known_query ?? 'Echo:');
+
+        const args = {
+          query,
+          packages: ['ZZZ_NONEXISTENT_NAMESPACE_XYZ*'],
+          max_objects: 50,
+        };
+        const result = await tester.invokeToolOrHandler(
+          'SearchSource',
+          args,
+          async () => {
+            const handlerContext = createHandlerContext({ connection, logger });
+            return handleSearchSource(handlerContext, args);
+          },
+        );
+
+        expect(result.isError).toBe(false);
+        const data = parseResult(result);
+        expect(data.results).toEqual([]);
+        expect(data.scanned.packages).toBe(0);
+      });
+    },
+    getTimeout('medium'),
+  );
+
+  it(
+    'mixed [shared.package, mask] preserves hits from the shared package',
+    async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params } = context;
+        const pkg = String(params?.scan_package ?? 'ZADT_BLD_PKG03');
+        const query = String(params?.known_query ?? 'Echo:');
+        const mask = deriveMaskFromPackage(pkg);
+
+        const args = {
+          query,
+          packages: [pkg, mask],
+          include_subpackages: true,
+          max_hits_per_object: 5,
+          max_objects: 50,
+        };
+        const result = await tester.invokeToolOrHandler(
+          'SearchSource',
+          args,
+          async () => {
+            const handlerContext = createHandlerContext({ connection, logger });
+            return handleSearchSource(handlerContext, args);
+          },
+        );
+
+        expect(result.isError).toBe(false);
+        const data = parseResult(result);
+        expect(data.results.length).toBeGreaterThan(0);
+        const devclasses = new Set(data.results.map((h) => h.devclass));
+        expect(devclasses.has(pkg)).toBe(true);
       });
     },
     getTimeout('long'),

@@ -9,6 +9,11 @@ import {
   type ScanObjectType,
 } from './packageEnumerator';
 import {
+  createPackagePatternResolver,
+  type PackageResolverDeps,
+  resolvePackagePatterns,
+} from './packageResolver';
+import {
   createSourceReaderDeps,
   type ReadSourceUnitsDeps,
   readSourceUnits,
@@ -56,6 +61,7 @@ export interface OrchestratorResult {
 export interface OrchestratorDeps {
   fetchPackageContents: PackageContentsFetcher;
   sourceReader: ReadSourceUnitsDeps;
+  resolvePackages: (entries: string[]) => Promise<string[]>;
 }
 
 const DEFAULTS = {
@@ -109,17 +115,18 @@ export async function runSearchSource(
   const emitNoHits = input.emit_no_hits ?? DEFAULTS.emit_no_hits;
   const version = input.version ?? DEFAULTS.version;
 
+  const resolvedPackages = await deps.resolvePackages(input.packages);
   const enumerateInput: EnumerateInput = {
-    packages: input.packages,
+    packages: resolvedPackages,
     include_subpackages:
       input.include_subpackages ?? DEFAULTS.include_subpackages,
     object_filter: input.object_filter,
     object_types: input.object_types ?? DEFAULTS.object_types,
   };
-  const allTargets = await enumerateScanTargets(
-    deps.fetchPackageContents,
-    enumerateInput,
-  );
+  const allTargets =
+    resolvedPackages.length === 0
+      ? []
+      : await enumerateScanTargets(deps.fetchPackageContents, enumerateInput);
   const truncatedByMaxObjects = allTargets.length > maxObjects;
   const targets = truncatedByMaxObjects
     ? allTargets.slice(0, maxObjects)
@@ -212,7 +219,7 @@ export async function runSearchSource(
   const result: OrchestratorResult = {
     results: allHits,
     scanned: {
-      packages: input.packages.length,
+      packages: resolvedPackages.length,
       objects: targets.length,
       sources: sourcesScanned,
     },
@@ -229,10 +236,14 @@ export function runSearchSourceWithContext(
   ctx: HandlerContext,
   input: OrchestratorInput,
 ): Promise<OrchestratorResult> {
+  const searchObjects = createPackagePatternResolver(ctx);
+  const resolverDeps: PackageResolverDeps = { searchObjects };
   return runSearchSource(
     {
       fetchPackageContents: createPackageContentsFetcher(ctx),
       sourceReader: createSourceReaderDeps(ctx),
+      resolvePackages: (entries) =>
+        resolvePackagePatterns(resolverDeps, entries),
     },
     input,
   );

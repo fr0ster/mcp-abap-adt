@@ -2,7 +2,6 @@ import type { HandlerContext } from '../handlers/interfaces';
 import { scanLines } from './lineScanner';
 import {
   createPackageContentsFetcher,
-  type EnumeratedObject,
   type EnumerateInput,
   enumerateScanTargets,
   type PackageContentsFetcher,

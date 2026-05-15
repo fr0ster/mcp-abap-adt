@@ -84,7 +84,9 @@ Package masks are best-effort scoping, not exhaustive enumeration. The tool desc
 
 Today the orchestrator reports `scanned.packages = input.packages.length` (raw input count). With mask support that number is no longer meaningful — `['Z*']` is one input entry but can resolve to hundreds of dev classes, and `['ZZZ_NONEXISTENT*']` can resolve to zero.
 
-The orchestrator changes to report **resolved** package count instead: `scanned.packages = resolved.length` (after `resolvePackagePatterns` and dedup). For purely-exact callers the new number equals the old one as long as they pass no duplicates — duplicates now collapse, which is the correct semantics for a count of what was scanned.
+The orchestrator changes to report **resolved starting package** count instead: `scanned.packages = resolved.length` (after `resolvePackagePatterns` and dedup). This counts package roots passed into `enumerateScanTargets`, not every `devclass` that may appear in scanned objects through `include_subpackages`.
+
+For purely-exact callers the new number equals the old one as long as they pass no duplicates. Duplicate and case-duplicate entries now collapse before enumeration, so `scanned.packages` reports the deduplicated starting package count.
 
 This is the only externally visible behaviour change beyond the new mask support.
 
@@ -92,7 +94,7 @@ This is the only externally visible behaviour change beyond the new mask support
 
 | Input | Behaviour |
 | --- | --- |
-| All entries exact (no `*`/`+`) | No ADT call. Pass-through. Identical to v6.7.0 behaviour. |
+| All entries exact (no `*`/`+`) | No ADT call. Exact entries are deduplicated before enumeration; `scanned.packages` reports the resolved starting package count. |
 | One pattern, resolves to N packages in the ADT result window | Scan those N resolved packages (subject to `max_objects`). |
 | Pattern resolves to zero packages | Treated as "empty codebase". Orchestrator returns the normal empty result (`results: []`, `scanned.packages: 0`, `isError: false`). No diagnostic field, no error. |
 | Mixed `["ZFI_OBSOLETE", "Z*"]` | Exact entries first; resolved package names from patterns appended; deduplicated (uppercase). |

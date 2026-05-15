@@ -186,3 +186,73 @@ describe('runSearchSource', () => {
     ]);
   });
 });
+
+describe('runSearchSource — scanned.packages reflects resolved count', () => {
+  it('counts resolved packages, not raw input, when patterns expand', async () => {
+    const deps: OrchestratorDeps = {
+      fetchPackageContents: pkg([
+        { name: 'ZA_PROG', adtType: 'PROG/P', packageName: 'ZA' },
+        { name: 'ZB_PROG', adtType: 'PROG/P', packageName: 'ZB' },
+      ]),
+      sourceReader: sourceFor({
+        'PROG:ZA_PROG': 'marker',
+        'PROG:ZB_PROG': 'marker',
+      }),
+      resolvePackages: async () => ['ZA', 'ZB'],
+    };
+    const result = await runSearchSource(deps, {
+      ...baseInput,
+      packages: ['Z*'],
+    });
+    expect(result.scanned.packages).toBe(2);
+  });
+
+  it('returns empty result with scanned.packages: 0 when resolution is empty', async () => {
+    const deps: OrchestratorDeps = {
+      fetchPackageContents: async () => {
+        throw new Error('must not enumerate when resolved set is empty');
+      },
+      sourceReader: sourceFor({}),
+      resolvePackages: async () => [],
+    };
+    const result = await runSearchSource(deps, {
+      ...baseInput,
+      packages: ['ZZZ_NONEXISTENT*'],
+    });
+    expect(result.results).toEqual([]);
+    expect(result.scanned).toEqual({ packages: 0, objects: 0, sources: 0 });
+    expect(result.truncated).toEqual({
+      by_object_cap: false,
+      by_max_objects: false,
+    });
+  });
+
+  it('collapses case-duplicate exact entries before enumeration', async () => {
+    let fetchedFor: string | undefined;
+    const deps: OrchestratorDeps = {
+      fetchPackageContents: async (name) => {
+        fetchedFor = name;
+        return [];
+      },
+      sourceReader: sourceFor({}),
+      resolvePackages: async (entries) => {
+        const seen = new Set<string>();
+        const out: string[] = [];
+        for (const e of entries) {
+          const key = e.toUpperCase();
+          if (!seen.has(key)) {
+            seen.add(key);
+            out.push(e);
+          }
+        }
+        return out;
+      },
+    };
+    const result = await runSearchSource(deps, {
+      ...baseInput,
+      packages: ['ZPKG', 'zpkg'],
+    });
+    expect(result.scanned.packages).toBe(1);
+    expect(fetchedFor).toBe('ZPKG');
+  });
+});

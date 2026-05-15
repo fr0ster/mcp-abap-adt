@@ -44,8 +44,9 @@ function parseResult(result: any): SearchSourceResult {
 }
 
 function deriveMaskFromPackage(pkg: string): string {
-  // Keep the mask narrow so integration tests stay fixture-scoped:
-  // ZADT_BLD_PKG03 -> ZADT_BLD_PKG0*; /NS/ZFOO -> /NS/ZFO*
+  // Keep the mask narrow so integration tests stay fixture-scoped.
+  // Tails of 5+ chars are trimmed by one (ZADT_BLD_PKG03 -> ZADT_BLD_PKG0*);
+  // shorter tails keep the full segment (/NS/ZFOO -> /NS/ZFOO*).
   const slashTail = pkg.lastIndexOf('/');
   const prefixEnd = slashTail >= 0 ? slashTail + 1 : 0;
   const tail = pkg.slice(prefixEnd);

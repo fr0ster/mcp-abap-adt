@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'SearchSource',
   available_in: ['onprem', 'legacy'] as const,
   description:
-    '[read-only] Search ABAP source text inside one or more packages (programs, function groups, classes). Onprem-only (cloud lacks an indexed source-search endpoint). Comments are searched by default; set exclude_comments=true to drop col-1 `*` and full-line `"` comments. The `version` parameter affects PROG and CLAS main include reads only — FUGR subinclude reads always go against the active version (the include endpoint exposes no version selector).',
+    '[read-only] Search ABAP source text inside one or more packages (programs, function groups, classes). Onprem-only (cloud lacks an indexed source-search endpoint). `packages` accepts ABAP-style masks (Z*, ZFI_*, /NS/Z*, Z+OK) alongside exact names; mask resolution is best-effort and scoped to the ADT repository-search result window — there is no guarantee that every matching package is scanned. If you need certainty, pass concrete package names. When using masks, narrow the mask itself and use `object_types`, `object_filter`, and `max_objects` as scan-target controls that apply after package resolution. Comments are searched by default; set exclude_comments=true to drop col-1 `*` and full-line `"` comments. The `version` parameter affects PROG and CLAS main include reads only — FUGR subinclude reads always go against the active version (the include endpoint exposes no version selector).',
   inputSchema: {
     query: z
       .string()
@@ -32,7 +32,9 @@ export const TOOL_DEFINITION = {
     packages: z
       .array(z.string().min(1))
       .min(1)
-      .describe('Packages to scan (one or more dev classes).'),
+      .describe(
+        'Packages to scan. Each entry is either an exact dev-class name or an ABAP mask (* = any chars, + = exactly one char). Examples: "ZFI_OBSOLETE", "Z*", "ZFI_*", "/NS/Z*", "Z+OK".',
+      ),
     include_subpackages: z
       .boolean()
       .optional()

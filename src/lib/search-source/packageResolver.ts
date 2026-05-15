@@ -59,7 +59,7 @@ export function createPackagePatternResolver(
       objectType,
       maxResults,
     });
-    const status = response?.status ?? response?.response?.status;
+    const status = response?.status;
     if (status && status !== 200) {
       throw new Error(`ADT request failed (status ${status})`);
     }
@@ -68,9 +68,7 @@ export function createPackagePatternResolver(
         ? response.data
         : String(response?.data ?? '');
     const names: string[] = [];
-    for (const m of xml.matchAll(
-      /<adtcore:objectReference\s+([^>]*)\/>/g,
-    )) {
+    for (const m of xml.matchAll(/<adtcore:objectReference\s+([^>]*)\/>/g)) {
       const attrs = m[1];
       const name = attrs.match(/adtcore:name="([^"]*)"/)?.[1];
       if (name) names.push(name);

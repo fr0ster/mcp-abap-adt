@@ -76,9 +76,17 @@ The `maxResults: 1000` is intentional and follows the existing ADT/SearchObject 
 
 Package masks are best-effort scoping, not exhaustive enumeration. The tool description for `SearchSource` is updated to say so plainly, so an LLM caller sees it without reading internals:
 
-> `packages` accepts ABAP-style masks (`Z*`, `ZFI_*`, `/NS/Z*`, `Z+OK`) alongside exact names. Mask resolution is best-effort: there are no guarantees that every matching package is scanned. If you need certainty — narrow the search: pass concrete package names, set `object_types`, set `object_filter`, raise `max_objects`, or combine them.
+> `packages` accepts ABAP-style masks (`Z*`, `ZFI_*`, `/NS/Z*`, `Z+OK`) alongside exact names. Mask resolution is best-effort and scoped to the ADT repository-search result window; there is no guarantee that every matching package is scanned. If you need certainty, pass concrete package names. When using masks, narrow the package mask itself and treat `object_types`, `object_filter`, and `max_objects` as scan-target controls that apply only after package resolution.
 
 `include_subpackages` is applied after package-pattern resolution, as it is for exact package names today. A package mask selects the starting dev classes; with `include_subpackages: true`, the scan may include objects whose `devclass` is a subpackage that does not itself match the original mask.
+
+### `scanned.packages` semantics change
+
+Today the orchestrator reports `scanned.packages = input.packages.length` (raw input count). With mask support that number is no longer meaningful — `['Z*']` is one input entry but can resolve to hundreds of dev classes, and `['ZZZ_NONEXISTENT*']` can resolve to zero.
+
+The orchestrator changes to report **resolved** package count instead: `scanned.packages = resolved.length` (after `resolvePackagePatterns` and dedup). For purely-exact callers the new number equals the old one as long as they pass no duplicates — duplicates now collapse, which is the correct semantics for a count of what was scanned.
+
+This is the only externally visible behaviour change beyond the new mask support.
 
 ## Behavioural contracts
 
@@ -86,8 +94,8 @@ Package masks are best-effort scoping, not exhaustive enumeration. The tool desc
 | --- | --- |
 | All entries exact (no `*`/`+`) | No ADT call. Pass-through. Identical to v6.7.0 behaviour. |
 | One pattern, resolves to N packages in the ADT result window | Scan those N resolved packages (subject to `max_objects`). |
-| Pattern resolves to zero packages | Treated as "empty codebase". Orchestrator returns the normal empty result (`hits: []`, `scanned.packages: 0`, `isError: false`). No diagnostic field, no error. |
-| Mixed `["ZFI_OBSOLETE", "Z*"]` | Exact entries first; pattern hits appended; deduplicated (uppercase). |
+| Pattern resolves to zero packages | Treated as "empty codebase". Orchestrator returns the normal empty result (`results: []`, `scanned.packages: 0`, `isError: false`). No diagnostic field, no error. |
+| Mixed `["ZFI_OBSOLETE", "Z*"]` | Exact entries first; resolved package names from patterns appended; deduplicated (uppercase). |
 | `include_subpackages: true` with a package mask | The mask filters only the starting packages. Subpackage objects may have a `devclass` that does not match the original mask. |
 | `object_types` set | Existing object-family filter still applies after package resolution (`PROG`, `FUGR`, `CLAS`). |
 | `object_filter` set | Existing object-name glob filter still applies after package resolution. |
@@ -106,15 +114,15 @@ Package masks are best-effort scoping, not exhaustive enumeration. The tool desc
 
 ### Integration — extend `src/__tests__/integration/readOnly/system/SearchSourceHandler.test.ts`
 
-- Mask derived from the configured shared package, with the existing known query: hits are present. Do not assert that every returned `devclass` matches the original mask when `include_subpackages` is true, because subpackages can expand beyond the starting package mask.
-- `packages: ['Z*']`, `include_subpackages: false`: every hit has `devclass` matching the mask (`/^Z/i` or namespace form `/^\/[^/]+\/Z/i`). This is the only test that asserts mask correctness directly; with `include_subpackages: true` the assertion is unsound (see row above).
-- `packages: ['Z*']`, `object_types: ['CLAS']`: every hit has `object_type === 'CLAS'`.
-- `packages: ['Z*']`, `object_types: ['PROG']`: every hit has `object_type === 'PROG'`.
-- `packages: ['Z*']`, `object_filter: 'ZCL_*'`, `object_types: ['CLAS']`: every hit has `object_type === 'CLAS'` and an object name matching `ZCL_*`.
+- Mask derived from the configured shared package, with the existing known query: `results.length > 0`. Do not assert that every returned `devclass` matches the original mask when `include_subpackages` is true, because subpackages can expand beyond the starting package mask.
+- Mask derived from the configured shared package, `include_subpackages: false`, and the existing known query: `results.length > 0` and every hit has `devclass` matching the derived mask. This is the only test that asserts mask correctness directly; with `include_subpackages: true` the assertion is unsound (see row above).
+- Use a fixture-backed class query, `object_types: ['CLAS']`: `results.length > 0` and every hit has `object_type === 'CLAS'`. If the configured shared fixtures do not include a class hit for the query, discover a suitable class first or skip with a clear reason; do not allow a zero-hit pass.
+- Use a fixture-backed program query, `object_types: ['PROG']`: `results.length > 0` and every hit has `object_type === 'PROG'`. If the configured shared fixtures do not include a program hit for the query, discover a suitable program first or skip with a clear reason; do not allow a zero-hit pass.
+- Use a fixture-backed class-name glob, `object_filter: '<known class glob>'`, `object_types: ['CLAS']`: `results.length > 0`, every hit has `object_type === 'CLAS'`, and every hit has an object name matching the glob.
 - `packages: ['ZZZ_NONEXISTENT_NAMESPACE*']`: returns empty result, `isError: false`, `scanned.packages: 0`.
 - Mixed `[<shared.package>, 'Z*']`: hits include objects from the shared package and from other Z-packages.
 
-Both blocks run under the existing `describeIntegration` / `available_in` gating — no new env flags.
+The integration cases run under the existing SearchSource integration gating / `available_in` handling — no new env flags.
 
 ### Reality-check before merge
 
@@ -122,9 +130,11 @@ Before opening the PR, run a discovery probe against the live onprem SAP system:
 
 ```
 SearchObject({ object_name: 'Z*', object_type: 'DEVC' })
+SearchObject({ object_name: 'Z+*', object_type: 'DEVC' })
+SearchObject({ object_name: '/NS/Z*', object_type: 'DEVC' })
 ```
 
-Confirm the XML payload matches the parser's assumptions on this target system (Issue #87 was filed against E19; behaviour on other onprem releases is not assumed).
+Confirm the XML payload matches the parser's assumptions on this target system, and confirm that `+` and namespace masks are accepted with the intended ADT semantics. If the backend does not support `+` as expected, remove `+` from the public examples for this release. Issue #87 was filed against E19; behaviour on other onprem releases is not assumed.
 
 ## Out-of-scope follow-ups
 

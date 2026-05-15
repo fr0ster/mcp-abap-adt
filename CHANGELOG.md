@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+- `SearchSource.packages` now accepts ABAP `*` masks (e.g. `Z*`, `ZFI_*`, `/NS/Z*`) alongside exact dev-class names. Mask resolution reuses the same ADT informationsystem/search path that `SearchObject` uses for `objectType=DEVC`. Mask resolution is best-effort and capped at the ADT result window (1000 references); for certainty, pass concrete package names. The tool description carries the no-guarantees disclosure so an LLM caller sees it.
+- `SearchSource.scanned.packages` now reports the resolved-and-deduplicated starting-package count (post-mask resolution, post-dedup) instead of raw input length. Closes #87.
+
+### Notes
+- `+` (single-char) wildcard probed against an onprem E19 system and found unsupported by the ADT `informationsystem/search` endpoint (despite SAP CP-pattern docs). Dropped from public examples; the resolver still detects `+` for forward-compat with backends that may honor it.
+
 ## [6.7.0] - 2026-05-14
 
 ### Added

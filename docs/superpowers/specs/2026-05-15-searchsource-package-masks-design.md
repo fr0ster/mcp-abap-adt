@@ -29,7 +29,18 @@ packages: z.array(z.string().min(1)).min(1)
   )
 ```
 
-All other fields (`include_subpackages`, `object_filter`, `object_types`, `max_objects`, etc.) are unchanged.
+All other fields (`include_subpackages`, `object_filter`, `object_types`, `max_objects`, etc.) are unchanged and remain the way callers narrow the object set after package-pattern resolution:
+
+```ts
+// Only classes in packages resolved from ZFI_*
+{ packages: ["ZFI_*"], object_types: ["CLAS"], query: "SELECT" }
+
+// Only programs/reports in Z packages
+{ packages: ["Z*"], object_types: ["PROG"], query: "CALL FUNCTION" }
+
+// Only class-like names inside the resolved package set
+{ packages: ["Z*"], object_filter: "ZCL_*", object_types: ["CLAS"], query: "SELECT" }
+```
 
 ## Resolution pipeline
 
@@ -57,16 +68,29 @@ input.packages → resolvePackagePatterns(ctx, …) → resolved: string[] → e
 3. **Merge.** Concatenation order: exact entries first (in input order), then resolved patterns (in input order, each in the order ADT returned them).
 4. **Dedup.** A `Set<string>` keyed by uppercased name. First occurrence wins for ordering.
 
-The `maxResults: 1000` is intentional: the DEVC search returns only names (cheap); the real workload cap is `max_objects`, applied later at scan-target level.
+The `maxResults: 1000` is intentional and follows the existing ADT/SearchObject behaviour. Package-pattern resolution scans exactly the package references returned by ADT for that request. If the ABAP/ADT repository search has more than 1000 matching packages, entries beyond that ADT result window are not scanned and no `SearchSource` truncation signal is added for package-resolution overflow. The workload cap remains `max_objects`, applied later at scan-target level to the resolved package list.
+
+`maxResults: 1000` is a resolver-internal detail and is not exposed as a `SearchSource` input — keeping the surface narrow and the cap consistent with `SearchObject`.
+
+### No-guarantees disclosure
+
+Package masks are best-effort scoping, not exhaustive enumeration. The tool description for `SearchSource` is updated to say so plainly, so an LLM caller sees it without reading internals:
+
+> `packages` accepts ABAP-style masks (`Z*`, `ZFI_*`, `/NS/Z*`, `Z+OK`) alongside exact names. Mask resolution is best-effort: there are no guarantees that every matching package is scanned. If you need certainty — narrow the search: pass concrete package names, set `object_types`, set `object_filter`, raise `max_objects`, or combine them.
+
+`include_subpackages` is applied after package-pattern resolution, as it is for exact package names today. A package mask selects the starting dev classes; with `include_subpackages: true`, the scan may include objects whose `devclass` is a subpackage that does not itself match the original mask.
 
 ## Behavioural contracts
 
 | Input | Behaviour |
 | --- | --- |
 | All entries exact (no `*`/`+`) | No ADT call. Pass-through. Identical to v6.7.0 behaviour. |
-| One pattern, resolves to N packages | Scan all N (subject to `max_objects`). |
+| One pattern, resolves to N packages in the ADT result window | Scan those N resolved packages (subject to `max_objects`). |
 | Pattern resolves to zero packages | Treated as "empty codebase". Orchestrator returns the normal empty result (`hits: []`, `scanned.packages: 0`, `isError: false`). No diagnostic field, no error. |
 | Mixed `["ZFI_OBSOLETE", "Z*"]` | Exact entries first; pattern hits appended; deduplicated (uppercase). |
+| `include_subpackages: true` with a package mask | The mask filters only the starting packages. Subpackage objects may have a `devclass` that does not match the original mask. |
+| `object_types` set | Existing object-family filter still applies after package resolution (`PROG`, `FUGR`, `CLAS`). |
+| `object_filter` set | Existing object-name glob filter still applies after package resolution. |
 | `searchObjects` (DEVC) errors (network, 5xx, 406) | Error propagates. `handleSearchSource` returns `isError: true` as today. |
 | Resolved set > `max_objects` worth of scan targets | `enumerateScanTargets` produces the full target list; orchestrator caps to `max_objects` and sets `truncated.by_max_objects: true`. Order of truncation is the existing `enumerateScanTargets` order: alphabetical by `devclass`, then `object_type`, then `object_name`. Mask support does not change this. |
 
@@ -82,7 +106,11 @@ The `maxResults: 1000` is intentional: the DEVC search returns only names (cheap
 
 ### Integration — extend `src/__tests__/integration/readOnly/system/SearchSourceHandler.test.ts`
 
-- `packages: ['Z*']`, `query: 'CALL FUNCTION'`: hits present, every `devclass` matches `/^Z/i` (or namespace form `^/.*/Z`).
+- Mask derived from the configured shared package, with the existing known query: hits are present. Do not assert that every returned `devclass` matches the original mask when `include_subpackages` is true, because subpackages can expand beyond the starting package mask.
+- `packages: ['Z*']`, `include_subpackages: false`: every hit has `devclass` matching the mask (`/^Z/i` or namespace form `/^\/[^/]+\/Z/i`). This is the only test that asserts mask correctness directly; with `include_subpackages: true` the assertion is unsound (see row above).
+- `packages: ['Z*']`, `object_types: ['CLAS']`: every hit has `object_type === 'CLAS'`.
+- `packages: ['Z*']`, `object_types: ['PROG']`: every hit has `object_type === 'PROG'`.
+- `packages: ['Z*']`, `object_filter: 'ZCL_*'`, `object_types: ['CLAS']`: every hit has `object_type === 'CLAS'` and an object name matching `ZCL_*`.
 - `packages: ['ZZZ_NONEXISTENT_NAMESPACE*']`: returns empty result, `isError: false`, `scanned.packages: 0`.
 - Mixed `[<shared.package>, 'Z*']`: hits include objects from the shared package and from other Z-packages.
 

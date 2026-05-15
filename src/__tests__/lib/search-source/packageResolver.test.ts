@@ -82,3 +82,52 @@ describe('createPackagePatternResolver — XML parsing', () => {
     expect(names).toEqual([]);
   });
 });
+
+describe('resolvePackagePatterns — merge semantics', () => {
+  it('places exact entries before pattern-resolved names', async () => {
+    const out = await resolvePackagePatterns(
+      {
+        searchObjects: async () => ['Z_FROM_PATTERN_A', 'Z_FROM_PATTERN_B'],
+      },
+      ['Z_EXACT_1', 'Z*', 'Z_EXACT_2'],
+    );
+    expect(out).toEqual([
+      'Z_EXACT_1',
+      'Z_EXACT_2',
+      'Z_FROM_PATTERN_A',
+      'Z_FROM_PATTERN_B',
+    ]);
+  });
+
+  it('deduplicates by uppercase, first occurrence wins for ordering', async () => {
+    const out = await resolvePackagePatterns(
+      {
+        searchObjects: async () => ['ZFI', 'ZFI_BUDGET'],
+      },
+      ['zfi', 'ZFI_*'],
+    );
+    expect(out).toEqual(['zfi', 'ZFI_BUDGET']);
+  });
+
+  it('returns empty array when patterns resolve to no packages and no exact entries', async () => {
+    const out = await resolvePackagePatterns(
+      { searchObjects: async () => [] },
+      ['ZZZ_NONEXISTENT*'],
+    );
+    expect(out).toEqual([]);
+  });
+
+  it('propagates errors from searchObjects', async () => {
+    const boom = new Error('ADT 502');
+    await expect(
+      resolvePackagePatterns(
+        {
+          searchObjects: async () => {
+            throw boom;
+          },
+        },
+        ['Z*'],
+      ),
+    ).rejects.toBe(boom);
+  });
+});

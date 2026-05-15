@@ -86,7 +86,7 @@ describe('resolvePackagePatterns — wildcard detection', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npm run test:unit -- --testPathPattern=packageResolver`
+Run: `npm test -- --testPathPatterns=packageResolver`
 Expected: FAIL with "Cannot find module '../../../lib/search-source/packageResolver'".
 
 - [ ] **Step 3: Implement minimal resolver to make the predicate behavior pass**
@@ -155,6 +155,10 @@ export function createPackagePatternResolver(
       objectType,
       maxResults,
     });
+    const status = response?.status ?? response?.response?.status;
+    if (status && status !== 200) {
+      throw new Error(`ADT request failed (status ${status})`);
+    }
     const xml: string =
       typeof response?.data === 'string'
         ? response.data
@@ -174,7 +178,7 @@ export function createPackagePatternResolver(
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `npm run test:unit -- --testPathPattern=packageResolver`
+Run: `npm test -- --testPathPatterns=packageResolver`
 Expected: PASS (3 tests).
 
 - [ ] **Step 5: Commit**
@@ -243,7 +247,7 @@ describe('createPackagePatternResolver — XML parsing', () => {
 
 - [ ] **Step 2: Run test to verify it passes**
 
-Run: `npm run test:unit -- --testPathPattern=packageResolver`
+Run: `npm test -- --testPathPatterns=packageResolver`
 Expected: PASS (5 tests total — the factory was already implemented in Task 1).
 
 - [ ] **Step 3: Commit**
@@ -317,7 +321,7 @@ describe('resolvePackagePatterns — merge semantics', () => {
 
 - [ ] **Step 2: Run tests to verify they pass**
 
-Run: `npm run test:unit -- --testPathPattern=packageResolver`
+Run: `npm test -- --testPathPatterns=packageResolver`
 Expected: PASS (9 tests total). Implementation from Task 1 already covers these cases.
 
 - [ ] **Step 3: Commit**
@@ -465,14 +469,14 @@ resolvePackages: identityResolver,
 There is no shortcut here — the type system requires it on every literal. Run a search to find them all:
 
 ```bash
-grep -n "OrchestratorDeps = {" src/__tests__/lib/search-source/orchestrator.test.ts
+rg -n "OrchestratorDeps = \\{" src/__tests__/lib/search-source/orchestrator.test.ts
 ```
 
 Add `resolvePackages: identityResolver,` to each.
 
 - [ ] **Step 3: Run orchestrator tests to verify they still pass**
 
-Run: `npm run test:unit -- --testPathPattern=orchestrator`
+Run: `npm test -- --testPathPatterns=orchestrator`
 Expected: PASS — pre-existing behavior is unchanged because exact inputs without duplicates resolve to themselves.
 
 - [ ] **Step 4: Commit**
@@ -567,7 +571,7 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
 
 - [ ] **Step 2: Run tests**
 
-Run: `npm run test:unit -- --testPathPattern=orchestrator`
+Run: `npm test -- --testPathPatterns=orchestrator`
 Expected: PASS (all three new cases plus all pre-existing).
 
 - [ ] **Step 3: Commit**
@@ -645,7 +649,8 @@ Open `src/__tests__/integration/readOnly/system/SearchSourceHandler.test.ts`. Be
 
 ```ts
 function deriveMaskFromPackage(pkg: string): string {
-  // ZADT_BLD_PKG03 -> ZADT_BLD_*; /NS/ZFOO -> /NS/Z*
+  // Keep the mask narrow so integration tests stay fixture-scoped:
+  // ZADT_BLD_PKG03 -> ZADT_BLD_PKG0*; /NS/ZFOO -> /NS/ZFO*
   const slashTail = pkg.lastIndexOf('/');
   const prefixEnd = slashTail >= 0 ? slashTail + 1 : 0;
   const tail = pkg.slice(prefixEnd);
@@ -786,7 +791,7 @@ it(
 
 ```ts
 it(
-  'mixed [shared.package, mask] returns hits from the shared package and beyond',
+  'mixed [shared.package, mask] preserves hits from the shared package',
   async () => {
     await tester.run(async (context: LambdaTesterContext) => {
       const { connection, params } = context;
@@ -826,7 +831,7 @@ it(
 This requires SAP onprem connectivity. Ask the user before running (per project CLAUDE.md). The expected invocation:
 
 ```bash
-npm run test:integration -- --testPathPattern=integration/readOnly/system/SearchSource 2>&1 | tee /tmp/search-source-mask.log
+npm run test:integration -- --testPathPatterns=integration/readOnly/system/SearchSource 2>&1 | tee /tmp/search-source-mask.log
 ```
 
 Expected: all four new cases plus the three pre-existing pass; no zero-hit silent passes.
@@ -865,7 +870,7 @@ If `+` is not honored by this backend, remove it from the public examples (descr
 
 - [ ] **Step 2: Full unit-test sweep**
 
-Run: `npm run test:unit`
+Run: `npm test`
 Expected: all suites pass.
 
 - [ ] **Step 3: Lint and type-check**
@@ -909,8 +914,8 @@ gh pr create --title "feat(search-source): package name masks (#87)" --body "$(c
 Closes #87.
 
 ## Test plan
-- [ ] `npm run test:unit -- --testPathPattern="(packageResolver|orchestrator)"`
-- [ ] `npm run test:integration -- --testPathPattern=integration/readOnly/system/SearchSource` (onprem connectivity required)
+- [ ] `npm test -- --testPathPatterns="(packageResolver|orchestrator)"`
+- [ ] `npm run test:integration -- --testPathPatterns=integration/readOnly/system/SearchSource` (onprem connectivity required)
 - [ ] Live probe through `mcp-abap-adt-proxy`: `SearchObject({object_name:'Z*', object_type:'DEVC'})` returns expected XML
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

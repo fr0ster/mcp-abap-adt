@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [6.8.0] - 2026-05-16
+
 ### Changed
 - `SearchSource.packages` now accepts ABAP `*` masks (e.g. `Z*`, `ZFI_*`, `/NS/Z*`) alongside exact dev-class names. Mask resolution reuses the same ADT informationsystem/search path that `SearchObject` uses for `objectType=DEVC`. Mask resolution is best-effort and capped at the ADT result window (1000 references); for certainty, pass concrete package names. The tool description carries the no-guarantees disclosure so an LLM caller sees it.
 - `SearchSource.scanned.packages` now reports the resolved-and-deduplicated starting-package count (post-mask resolution, post-dedup) instead of raw input length. Closes #87.

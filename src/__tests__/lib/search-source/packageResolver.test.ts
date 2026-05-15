@@ -1,4 +1,7 @@
-import { resolvePackagePatterns, createPackagePatternResolver } from '../../../lib/search-source/packageResolver';
+import {
+  createPackagePatternResolver,
+  resolvePackagePatterns,
+} from '../../../lib/search-source/packageResolver';
 
 jest.mock('../../../lib/clients', () => ({
   createAdtClient: (_conn: unknown, _logger: unknown) => ({
@@ -22,10 +25,11 @@ function neverCalled(): never {
 
 describe('resolvePackagePatterns — wildcard detection', () => {
   it('passes exact dev-class names through without calling ADT', async () => {
-    const out = await resolvePackagePatterns(
-      { searchObjects: neverCalled },
-      ['ZFI_OBSOLETE', '$TMP', '/NS/ZFI'],
-    );
+    const out = await resolvePackagePatterns({ searchObjects: neverCalled }, [
+      'ZFI_OBSOLETE',
+      '$TMP',
+      '/NS/ZFI',
+    ]);
     expect(out).toEqual(['ZFI_OBSOLETE', '$TMP', '/NS/ZFI']);
   });
 

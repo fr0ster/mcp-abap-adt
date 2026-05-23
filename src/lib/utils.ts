@@ -1344,6 +1344,7 @@ SAP CONNECTION (.env file):
   SAP_CERT_PATH / SAP_CERT_KEY_PATH         Client cert + key (PEM) for certificate auth
   SAP_CERT_PFX_PATH / SAP_CERT_PASSPHRASE   PKCS#12 cert for certificate auth (alternative to PEM)
   SAP_KERBEROS_SPN                          SPN for kerberos auth (default HTTP@<host>)
+  SAP_KERBEROS_SERVICE                      Service class for SPN derivation when SAP_KERBEROS_SPN unset (default HTTP)
 
 GENERATING .ENV FROM SERVICE KEY (JWT Authentication):
   To generate .env file from SAP BTP service key JSON file, install the

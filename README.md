@@ -322,6 +322,8 @@ SAP_AUTH_TYPE=kerberos
 
 # Optional: explicit SPN (default: HTTP@<host>)
 # SAP_KERBEROS_SPN=HTTP@mysaphost.corp.example
+# Optional: service class used to derive the SPN when SAP_KERBEROS_SPN is unset (default: HTTP)
+# SAP_KERBEROS_SERVICE=HTTP
 ```
 
 **Certificate auth notes:**

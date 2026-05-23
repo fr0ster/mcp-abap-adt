@@ -11,6 +11,7 @@ import {
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError, type AxiosResponse } from 'axios';
+import { applyCertKerberosFields } from './config/applyAuthFields.js';
 import { parseAuthType } from './config/parseAuthType.js';
 import {
   notifyConnectionResetListeners,
@@ -1958,6 +1959,8 @@ export function getConfig(): SapConfig {
     if (uaaUrl) config.uaaUrl = uaaUrl.trim();
     if (uaaClientId) config.uaaClientId = uaaClientId.trim();
     if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret.trim();
+  } else if (applyCertKerberosFields(config, process.env)) {
+    // certificate / kerberos: no username/password required
   } else {
     // basic and rfc both require username/password
     const username = process.env.SAP_USERNAME;

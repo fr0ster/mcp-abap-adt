@@ -6,6 +6,7 @@
  */
 
 import type { SapConfig } from '@mcp-abap-adt/connection';
+import { applyCertKerberosFields } from './config/applyAuthFields.js';
 import { parseAuthType } from './config/parseAuthType.js';
 
 // Don't import setConfigOverride from utils.ts to avoid circular dependency
@@ -126,6 +127,8 @@ export function getConfig(): SapConfig {
     if (uaaUrl) config.uaaUrl = uaaUrl.trim();
     if (uaaClientId) config.uaaClientId = uaaClientId.trim();
     if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret.trim();
+  } else if (applyCertKerberosFields(config, process.env)) {
+    // certificate / kerberos: no username/password required
   } else {
     // basic (and rfc connection type) require username/password
     const username = process.env.SAP_USERNAME;

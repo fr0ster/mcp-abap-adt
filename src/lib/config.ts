@@ -6,6 +6,8 @@
  */
 
 import type { SapConfig } from '@mcp-abap-adt/connection';
+import { applyCertKerberosFields } from './config/applyAuthFields.js';
+import { parseAuthType } from './config/parseAuthType.js';
 
 // Don't import setConfigOverride from utils.ts to avoid circular dependency
 // setConfigOverride will be called lazily if needed
@@ -58,21 +60,7 @@ export function getConfig(): SapConfig {
   }
 
   // Auto-detect auth type: JWT token → jwt; SAP_AUTH_TYPE → explicit; default → basic
-  let authType: SapConfig['authType'] = 'basic';
-  if (process.env.SAP_JWT_TOKEN) {
-    authType = 'jwt';
-  } else if (process.env.SAP_AUTH_TYPE) {
-    const rawAuthType = process.env.SAP_AUTH_TYPE.trim().toLowerCase();
-    if (rawAuthType === 'xsuaa') {
-      authType = 'jwt';
-    } else if (
-      rawAuthType === 'basic' ||
-      rawAuthType === 'jwt' ||
-      rawAuthType === 'saml'
-    ) {
-      authType = rawAuthType;
-    }
-  }
+  const authType = parseAuthType(process.env);
 
   // Connection type: http (default) or rfc
   const connectionType: SapConfig['connectionType'] =
@@ -139,6 +127,8 @@ export function getConfig(): SapConfig {
     if (uaaUrl) config.uaaUrl = uaaUrl.trim();
     if (uaaClientId) config.uaaClientId = uaaClientId.trim();
     if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret.trim();
+  } else if (applyCertKerberosFields(config, process.env)) {
+    // certificate / kerberos: no username/password required
   } else {
     // basic (and rfc connection type) require username/password
     const username = process.env.SAP_USERNAME;

@@ -11,6 +11,8 @@ import {
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError, type AxiosResponse } from 'axios';
+import { applyCertKerberosFields } from './config/applyAuthFields.js';
+import { parseAuthType } from './config/parseAuthType.js';
 import {
   notifyConnectionResetListeners,
   registerConnectionResetHook,
@@ -1334,11 +1336,15 @@ SAP CONNECTION (.env file):
                                    Example: https://your-system.sap.com
   SAP_CLIENT                       SAP client number (required for basic auth)
                                    Example: 100
-  SAP_AUTH_TYPE                    Authentication type: basic|jwt (default: basic)
+  SAP_AUTH_TYPE                    Authentication type: basic|jwt|saml|certificate|kerberos (default: basic)
   SAP_CONNECTION_TYPE              Connection type: http|rfc (default: http)
   SAP_USERNAME                     SAP username (required for basic auth)
   SAP_PASSWORD                     SAP password (required for basic auth)
   SAP_JWT_TOKEN                    JWT token (required for jwt auth)
+  SAP_CERT_PATH / SAP_CERT_KEY_PATH         Client cert + key (PEM) for certificate auth
+  SAP_CERT_PFX_PATH / SAP_CERT_PASSPHRASE   PKCS#12 cert for certificate auth (alternative to PEM)
+  SAP_KERBEROS_SPN                          SPN for kerberos auth (default HTTP@<host>)
+  SAP_KERBEROS_SERVICE                      Service class for SPN derivation when SAP_KERBEROS_SPN unset (default HTTP)
 
 GENERATING .ENV FROM SERVICE KEY (JWT Authentication):
   To generate .env file from SAP BTP service key JSON file, install the
@@ -1890,21 +1896,7 @@ export function getConfig(): SapConfig {
   }
 
   // Auto-detect auth type: JWT token → jwt; SAP_AUTH_TYPE → explicit; default → basic
-  let authType: SapConfig['authType'] = 'basic';
-  if (process.env.SAP_JWT_TOKEN) {
-    authType = 'jwt';
-  } else if (process.env.SAP_AUTH_TYPE) {
-    const rawAuthType = process.env.SAP_AUTH_TYPE.trim().toLowerCase();
-    if (rawAuthType === 'xsuaa') {
-      authType = 'jwt';
-    } else if (
-      rawAuthType === 'basic' ||
-      rawAuthType === 'jwt' ||
-      rawAuthType === 'saml'
-    ) {
-      authType = rawAuthType;
-    }
-  }
+  const authType = parseAuthType(process.env);
 
   // Connection type: http (default) or rfc
   const connectionType: SapConfig['connectionType'] =
@@ -1971,6 +1963,8 @@ export function getConfig(): SapConfig {
     if (uaaUrl) config.uaaUrl = uaaUrl.trim();
     if (uaaClientId) config.uaaClientId = uaaClientId.trim();
     if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret.trim();
+  } else if (applyCertKerberosFields(config, process.env)) {
+    // certificate / kerberos: no username/password required
   } else {
     // basic and rfc both require username/password
     const username = process.env.SAP_USERNAME;

@@ -21,29 +21,22 @@ Add two new authentication types to the ADT connection stack:
 
 ## 2. Architecture decision (the core call)
 
-The existing stack already supports non-bearer credentials through the token-provider abstraction: `Saml2PureProvider` returns **session cookies** in `ITokenResult.authorizationToken` with `tokenType: 'saml'`, and `ITokenResult.tokenType` already includes `'opaque'`. So "provider → credential string → header/cookie" is a real, reusable pattern — not OAuth-only.
-
-Against that, the two new types split differently:
+**Both new auth types bypass `@mcp-abap-adt/auth-broker` and `@mcp-abap-adt/auth-providers` entirely.** The broker's role is narrow: OAuth-style authorization with browser-callback interception. Certificate and Kerberos are non-interactive and transport/connection-level — no browser callback, no broker token lifecycle. They live in the **connection** package (+ types in `interfaces`, + env wiring in the server).
 
 | Type | Pattern | Why |
 |------|---------|-----|
-| **Kerberos** | **Provider + `ITokenRefresher` injection** (the JWT path) | The credential is a Negotiate blob that goes into the `Authorization: Negotiate <blob>` **header** — same consumption point as bearer/SAML. Fits the provider model directly. |
-| **Certificate** | **Connection subclass + `httpsAgent` options** (the SAML/JWT subclass path), with an injected `ICertificateMaterialLoader` for testability | The credential is `cert`+private-key used in the **TLS handshake via `httpsAgent`** — a transport-layer concern *below* `getAuthHeaders()`. There is no header/cookie to "provide", so the provider abstraction does not apply. |
+| **Certificate** | Connection subclass + `httpsAgent` options, with an injected `ICertificateMaterialLoader` for testability | The credential is `cert`+private-key used in the **TLS handshake via `httpsAgent`** — transport-layer, below `getAuthHeaders()`. No header/cookie to "provide". |
+| **Kerberos** | Connection subclass that generates the SPNEGO token **locally** (lazy/optional `kerberos` npm wrapper inside the connection package), sends `Authorization: Negotiate <token>` on the first request, then reuses the SAP session cookie | The Negotiate blob goes into a header, but generation is local GSSAPI (no callback, no refresh lifecycle). No broker, no `ITokenRefresher`, no `BaseTokenProvider`. |
 
-This split is deliberate: kerberos reuses an existing DI path (no new interface needed); certificate uses the existing per-type connection-subclass pattern plus one small injected loader for the file I/O.
+`@mcp-abap-adt/connection` depends only on `interfaces` + `sap-rfc-lite` (not on `auth-providers`), so the SPNEGO wrapper lives in `connection`, keeping that dependency boundary intact.
 
-### Kerberos sub-decision (K2, recommended)
+### Kerberos handshake = single-leg, cookie reuse
 
-Two ways to run the SPNEGO handshake:
-
-- **K1** — provider performs the full HTTP login round-trip against SAP and returns session cookies (mirrors `Saml2PureProvider`). Connection becomes cookie-only.
-- **K2 (recommended)** — provider/refresher returns only the Negotiate **token** (`tokenType: 'opaque'`); `KerberosAbapConnection` sends `Authorization: Negotiate <token>` on the first request, captures the SAP session cookie (`SAP_SESSIONID`/`MYSAPSSO2`), and reuses the cookie thereafter.
-
-**Choose K2.** `AbstractAbapConnection` already owns CSRF fetch + cookie capture/reuse (`fetchCsrfToken`, cookie merge). K2 keeps HTTP in the connection layer and reduces the genuinely-native, mockable unit to just "generate an AP-REQ for this SPN". K1 would duplicate HTTP+cookie handling inside the provider.
+`AbstractAbapConnection` already owns CSRF fetch + cookie capture/reuse (`fetchCsrfToken`, cookie merge). `KerberosAbapConnection` generates one AP-REQ for the SPN, sends `Authorization: Negotiate <token>` on the first request, captures the SAP session cookie (`SAP_SESSIONID`/`MYSAPSSO2`), and reuses the cookie thereafter. Single-leg only (no mutual-auth continuation in v1 — see Assumptions).
 
 ## 3. Per-package changes
 
-Five repos. Listed in dependency (release) order — see §7.
+**Three repos** (auth-broker and auth-providers are NOT touched). Listed in dependency (release) order — see §7.
 
 ### 3.1 `@mcp-abap-adt/interfaces` (`~/prj/mcp-abap-adt-interfaces`)
 
@@ -72,43 +65,30 @@ Five repos. Listed in dependency (release) order — see §7.
   - `getHttpsAgentOptions()` returns `{ cert, key, pfx, passphrase }`.
   - `buildAuthorizationHeader()` returns `''` (no Authorization header; mTLS identifies the user).
 - New `src/connection/KerberosAbapConnection.ts` (extends `AbstractAbapConnection`):
-  - Mirrors `JwtAbapConnection`: takes injected `ITokenRefresher` (broker-created, see §3.4).
-  - `buildAuthorizationHeader()` → `Negotiate ${currentToken}` (token from refresher).
-  - First request sends Negotiate; capture session cookie via existing cookie machinery; subsequent requests reuse cookie. On 401, re-acquire token via `refreshToken()` (re-init security context).
+  - **Self-contained — no broker, no `ITokenRefresher`, no provider.** Generates the SPNEGO token locally via the connection-local wrapper (below), using the resolved SPN.
+  - `connect()` generates the Negotiate token, sends it on the first request, captures the SAP session cookie via the existing cookie machinery; subsequent requests reuse the cookie.
+  - `buildAuthorizationHeader()` → `Negotiate ${token}` while no session cookie yet; `''` once a cookie exists.
   - `validateConfig`: requires `connectionType !== 'rfc'`; requires resolvable SPN (`kerberosSpn` or derive `HTTP@<host>` from URL).
 - New `src/auth/FileCertificateMaterialLoader.ts`: reads PEM/PFX from disk → `ICertificateMaterial`. Pure I/O, mockable.
+- New `src/auth/kerberosSpnego.ts`: thin wrapper over the optional `kerberos` npm package (`initializeClient` / `step`), **lazy `import()`**; declared in this package's `optionalDependencies`. The single native, mockable seam. (Lives here, not in auth-providers, because `connection` does not depend on `auth-providers`.)
 - `src/connection/connectionFactory.ts`: add cases:
   ```ts
-  case 'certificate': return new CertificateAbapConnection(config, logger, sessionId, certLoader);
-  case 'kerberos':    return new KerberosAbapConnection(config, logger, sessionId, tokenRefresher);
+  case 'certificate': return new CertificateAbapConnection(config, logger, sessionId, options?.certLoader);
+  case 'kerberos':    return new KerberosAbapConnection(config, logger, sessionId);
   ```
   Keep the existing `connectionType === 'rfc'` early-return guard (rfc wins) — but add validation so cert/kerberos + rfc throws a clear error rather than silently doing RFC.
 - `src/config/sapConfig.ts`: extend `sapConfigSignature()` to include cert paths / SPN (so connection is recreated when these change). Never log key/passphrase contents.
 
-### 3.3 `@mcp-abap-adt/auth-providers` (`~/prj/mcp-abap-adt-auth-providers`)
+### 3.3 NOT touched: `auth-providers` and `auth-broker`
 
-- New `src/providers/KerberosProvider.ts` extends `BaseTokenProvider`:
-  - `tokenType = 'opaque'`. `performLogin()` = generate SPNEGO AP-REQ for the SPN via the native step (below). `performRefresh()` = re-generate (re-init security context).
-  - Returns `ITokenResult { authorizationToken: <negotiate-blob>, tokenType: 'opaque', authType: <user-token-grant> }`.
-  - Expiry: derive from Kerberos ticket lifetime if available, else short TTL so it re-inits on demand.
-- New `src/sso/kerberosSpnego.ts`: thin wrapper over the `kerberos` npm package (`initializeClient` / `step`). **Lazy `import()`** so the package is only required when kerberos auth is actually used; declared in `optionalDependencies`. This is the single native, mockable seam.
-- Export `KerberosProvider` (+ config type) from `src/index.ts`; optionally register in `SsoProviderFactory`.
+Certificate and Kerberos bypass both. The broker is only for OAuth-style authorization + browser-callback interception; cert/kerberos are non-interactive and connection-level. **Do not add a `KerberosProvider` to auth-providers, do not modify `AuthBroker`, do not widen the broker's `IConnectionConfig.authType`** — that union is the broker's surface and stays `'basic' | 'jwt' | 'saml'`.
 
-### 3.4 `@mcp-abap-adt/auth-broker` (`~/prj/mcp-abap-adt-auth-broker`)
+### 3.4 `mcp-abap-adt` (server, this repo)
 
-- `AuthBroker.ts`: when `authType === 'kerberos'`, build a `KerberosProvider` + an `ITokenRefresher` over it (same wiring as the JWT/SAML refresher at `AuthBroker.ts:419/477`) and inject into the connection. For `certificate`, no provider/refresher — broker treats it as a credential-static type (like `basic` → `session-only` broker mode).
-- `src/cli/parseArgs.ts`: note this file's `authType` is the **broker store type** (`abap|xsuaa`), a different axis — no change needed there for the SAP auth type. Confirm cert/kerberos flow through the SAP-config axis, not this one.
-- Broker mode mapping: `certificate` → `session-only`; `kerberos` → `session-provider` (needs the provider/refresher).
-
-### 3.5 `mcp-abap-adt` (server, this repo)
-
-- `src/lib/config.ts` (lines ~59-75) and `src/lib/utils.ts` (duplicate parser ~1892-1900): extend `SAP_AUTH_TYPE` acceptance to include `'certificate'` and `'kerberos'`. **De-dup opportunity:** these two parsers are copies — consider extracting one shared `parseAuthType()` while here (optional, flagged, not required).
-- New env vars (document in `src/lib/utils.ts` help text ~1337):
-  - `SAP_CERT_PATH`, `SAP_CERT_KEY_PATH`, `SAP_CERT_PFX_PATH`, `SAP_CERT_PASSPHRASE`
-  - `SAP_KERBEROS_SPN`, `SAP_KERBEROS_SERVICE`
-- `src/lib/auth/IBrokerSessionConfig.ts`: extend `IConnectionConfig.authType` union (`'basic' | 'jwt'`) → add `'certificate' | 'kerberos'`; add the new config fields.
-- `src/lib/auth/brokerFactory.ts` (~750-786): map the new auth types into the broker session config; pass cert paths / SPN through.
-- Tool `available_in`: cert/kerberos are on-prem-only auth; no tool-level `available_in` change needed (they're a connection concern, not a tool capability), but verify nothing assumes `authType ∈ {basic,jwt,saml}`.
+- `src/lib/config.ts` (lines ~59-75) and `src/lib/utils.ts` (duplicate parser ~1892-1900): extend `SAP_AUTH_TYPE` acceptance to include `'certificate'` and `'kerberos'`. **De-dup opportunity:** these two parsers are copies — extract one shared `parseAuthType()` (recommended while here).
+- Read new env into the assembled `SapConfig`: `SAP_CERT_PATH`, `SAP_CERT_KEY_PATH`, `SAP_CERT_PFX_PATH`, `SAP_CERT_PASSPHRASE`, `SAP_KERBEROS_SPN`, `SAP_KERBEROS_SERVICE`. Document in the help text (~line 1337).
+- **Connection creation path:** find where the server creates an `AbapConnection` for non-broker auth (basic/RFC today) — cert/kerberos follow that same direct `createAbapConnection(...)` path, NOT the broker/`brokerFactory` path. Verify in code during Phase 3; do NOT route cert/kerberos through `brokerFactory`/`IBrokerSessionConfig`.
+- Tool `available_in`: cert/kerberos are connection concerns, not tool capabilities — no tool-level change; but verify nothing assumes `authType ∈ {basic,jwt,saml}`.
 
 ## 4. Configuration surface (summary)
 
@@ -139,34 +119,31 @@ Per repo, unit-first (mock the native/IO seams):
 - **interfaces**: type-level only (compile).
 - **connection**:
   - `CertificateAbapConnection`: inject a fake `ICertificateMaterialLoader`; assert `getHttpsAgentOptions()` carries cert/key/pfx; assert no Authorization header; assert PEM-vs-PFX validation and rfc-conflict errors.
-  - `KerberosAbapConnection`: inject a fake `ITokenRefresher`; assert `Authorization: Negotiate <token>`; assert cookie capture+reuse; assert 401 → `refreshToken()`.
+  - `KerberosAbapConnection`: mock the connection-local `kerberosSpnego` wrapper; assert `Authorization: Negotiate <token>` on first request and `''` after a cookie exists; assert cookie capture+reuse; assert rfc-conflict error. No real KDC.
   - `connectionFactory`: new cases route correctly; cert/kerberos + rfc throws.
-- **auth-providers**: `KerberosProvider` with mocked `kerberosSpnego` step → asserts `ITokenResult` shape (`tokenType:'opaque'`), `performRefresh` re-inits. No real KDC.
-- **auth-broker**: kerberos → provider+refresher created & injected; certificate → session-only, no provider.
-- **server**: `SAP_AUTH_TYPE=certificate|kerberos` parsed in both `config.ts` and `utils.ts`; brokerFactory threads fields.
+- **server**: `SAP_AUTH_TYPE=certificate|kerberos` parsed (shared `parseAuthType`); cert/kerberos env fields land in the assembled `SapConfig`; connection created via the direct `createAbapConnection` path (not broker).
 - **Integration (live SAP, gated):** one cert smoke + one kerberos smoke against an on-prem system that supports them. Follow CLAUDE.md soft-mode strategy; do not block CI on secrets (see integration-test-env-gates approach).
 
 ## 7. Release order (cross-package)
 
 Bottom-up. **The user publishes each package — the agent never runs `npm publish`.** Consumers import published npm versions (not local links), so each step is hard-gated: implement → commit → PR/merge → user publishes → bump consumer to the confirmed version → next step (follow the cross-package-fix-cycle discipline):
 
-1. `interfaces` — union + fields + `ICertificateMaterialLoader`. Publish, bump everywhere.
-2. `auth-providers` — `KerberosProvider` + `kerberosSpnego` (optionalDep). Publish.
-3. `connection` — connection classes + agent hook + loader + factory. Publish.
-4. `auth-broker` — kerberos provider/refresher wiring + broker modes. Publish.
-5. `mcp-abap-adt` (server) — env parsing + `IConnectionConfig` + brokerFactory + docs. Bump deps to the published versions.
+1. `interfaces` — union + fields + `ICertificateMaterialLoader`. User publishes, bump everywhere.
+2. `connection` — connection classes + agent hook + cert loader + `kerberosSpnego` (optionalDep) + factory + signature. User publishes.
+3. `mcp-abap-adt` (server) — `parseAuthType` + env→`SapConfig` + direct `createAbapConnection` wiring + docs. Bump deps to the published versions.
 
-Each step gets its own worktree in its repo (per project workflow: worktrees on all changed code repos; spec stays only here).
+(`auth-providers` and `auth-broker` are not in the chain — not touched.) Each step gets its own worktree in its repo (per project workflow: worktrees on all changed code repos; spec stays only here).
 
 ## 8. Risks & assumptions
 
-- **A1 — single-leg Negotiate.** Assumes SAP accepts a one-shot AP-REQ then issues a session cookie (typical for Kerberos). If a system demands mutual-auth continuation (`WWW-Authenticate: Negotiate <challenge>` round-trips), the K2 single `getToken()` does not cover it; would need a continuation hook. Validate on a live system before claiming kerberos done.
+- **A1 — single-leg Negotiate.** Assumes SAP accepts a one-shot AP-REQ then issues a session cookie (typical for Kerberos). If a system demands mutual-auth continuation (`WWW-Authenticate: Negotiate <challenge>` round-trips), the single-token approach does not cover it; would need a continuation hook. **Accepted for v1** (user-confirmed); validate on a live system before claiming kerberos done.
 - **A2 — native build.** `kerberos` npm compiles native bindings (needs GSSAPI dev libs on Linux / build tools on Windows). Mitigated by `optionalDependencies` + lazy import so non-kerberos installs never touch it.
 - **A3 — TGT availability.** Cross-platform kerberos needs a valid TGT in the OS credential cache (`kinit`) or a keytab. Document prerequisite; not auto-provisioned.
 - **A4 — Agent caching.** `getAxiosInstance()` caches the Agent; ensure cert material is loaded before the first request (it is, in `connect()`), else the cached Agent lacks the client cert.
 - **A5 — duplicate auth parser.** `config.ts` and `utils.ts` both parse `SAP_AUTH_TYPE`; both must change. Optional de-dup flagged in §3.5.
 
-## 9. Open questions for the user
+## 9. Decisions (resolved)
 
-1. PEM **and** PFX both supported, or pick one for v1? (Spec assumes both; PFX is a small extra.)
-2. Confirm assumption A1 (single-leg) is acceptable for v1, or must continuation be designed in now?
+1. **PEM and PFX both supported** in v1. (user-confirmed)
+2. **Single-leg Negotiate accepted** for v1; no mutual-auth continuation. (user-confirmed)
+3. **cert and kerberos both bypass the broker and auth-providers** — connection-layer only. (user-confirmed)
